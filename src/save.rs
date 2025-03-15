@@ -102,9 +102,7 @@ impl<'a> XmlSaveCtxt<'a> {
         if let Some(enc) = encoding {
             ret.handler = find_encoding_handler(enc).map(|e| Rc::new(RefCell::new(e)));
             if ret.handler.is_none() {
-                unsafe {
-                    xml_save_err(XmlParserErrors::XmlSaveUnknownEncoding, None, encoding);
-                }
+                xml_save_err(XmlParserErrors::XmlSaveUnknownEncoding, None, encoding);
                 return None;
             }
             ret.encoding = Some(enc.to_owned());
@@ -189,30 +187,28 @@ impl<'a> XmlSaveCtxt<'a> {
         })
     }
 
-    unsafe fn switch_encoding(&mut self, encoding: &str) -> i32 {
-        unsafe {
-            let mut buf = self.buf.borrow_mut();
+    fn switch_encoding(&mut self, encoding: &str) -> i32 {
+        let mut buf = self.buf.borrow_mut();
 
-            if buf.encoder.is_none() && buf.conv.is_none() {
-                buf.encoder = find_encoding_handler(encoding).map(|e| Rc::new(RefCell::new(e)));
-                if buf.encoder.is_none() {
-                    xml_save_err(
-                        XmlParserErrors::XmlSaveUnknownEncoding,
-                        None,
-                        Some(encoding),
-                    );
-                    return -1;
-                }
-                buf.conv = XmlBufRef::new();
-                if buf.conv.is_none() {
-                    xml_save_err_memory("creating encoding buffer");
-                    return -1;
-                }
-                // initialize the state, e.g. if outputting a BOM
-                buf.encode(true).ok();
+        if buf.encoder.is_none() && buf.conv.is_none() {
+            buf.encoder = find_encoding_handler(encoding).map(|e| Rc::new(RefCell::new(e)));
+            if buf.encoder.is_none() {
+                xml_save_err(
+                    XmlParserErrors::XmlSaveUnknownEncoding,
+                    None,
+                    Some(encoding),
+                );
+                return -1;
             }
-            0
+            buf.conv = XmlBufRef::new();
+            if buf.conv.is_none() {
+                xml_save_err_memory("creating encoding buffer");
+                return -1;
+            }
+            // initialize the state, e.g. if outputting a BOM
+            buf.encode(true).ok();
         }
+        0
     }
 
     unsafe fn clear_encoding(&mut self) -> i32 {
@@ -560,31 +556,27 @@ impl Drop for XmlSaveCtxt<'_> {
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlSaveErr")]
-pub(crate) unsafe fn xml_save_err(
+pub(crate) fn xml_save_err(
     code: XmlParserErrors,
     node: Option<XmlGenericNodePtr>,
     extra: Option<&str>,
 ) {
-    unsafe {
-        let msg: Cow<'static, str> = match code {
-            XmlParserErrors::XmlSaveNotUTF8 => "string is not in UTF-8\n".into(),
-            XmlParserErrors::XmlSaveCharInvalid => "invalid character value\n".into(),
-            XmlParserErrors::XmlSaveUnknownEncoding => {
-                format!("unknown encoding {}\n", extra.expect("Internal Error")).into()
-            }
-            XmlParserErrors::XmlSaveNoDoctype => "document has no DOCTYPE\n".into(),
-            _ => "unexpected error number\n".into(),
-        };
-        __xml_simple_error!(XmlErrorDomain::XmlFromOutput, code, node, msg.as_ref());
-    }
+    let msg: Cow<'static, str> = match code {
+        XmlParserErrors::XmlSaveNotUTF8 => "string is not in UTF-8\n".into(),
+        XmlParserErrors::XmlSaveCharInvalid => "invalid character value\n".into(),
+        XmlParserErrors::XmlSaveUnknownEncoding => {
+            format!("unknown encoding {}\n", extra.expect("Internal Error")).into()
+        }
+        XmlParserErrors::XmlSaveNoDoctype => "document has no DOCTYPE\n".into(),
+        _ => "unexpected error number\n".into(),
+    };
+    __xml_simple_error!(XmlErrorDomain::XmlFromOutput, code, node, msg.as_ref());
 }
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlSaveErrMemory")]
-pub(crate) unsafe fn xml_save_err_memory(extra: &str) {
-    unsafe {
-        __xml_simple_oom_error(XmlErrorDomain::XmlFromOutput, None, Some(extra));
-    }
+pub(crate) fn xml_save_err_memory(extra: &str) {
+    __xml_simple_oom_error(XmlErrorDomain::XmlFromOutput, None, Some(extra));
 }
 
 /// # Panics
@@ -1806,84 +1798,82 @@ unsafe fn html_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, cur: XmlGeneric
 
 /// Serialize text attribute values to an xmlBufPtr
 #[doc(alias = "xmlBufAttrSerializeTxtContent")]
-pub(crate) unsafe fn attr_serialize_text_content<'a>(
+pub(crate) fn attr_serialize_text_content<'a>(
     buf: &mut (impl Write + 'a),
     doc: Option<XmlDocPtr>,
     attr: Option<XmlAttrPtr>,
     string: &str,
 ) {
-    unsafe {
-        let mut base = string;
-        let mut cur = base;
-        while !cur.is_empty() {
-            if let Some(rem) = cur.strip_prefix(['\n', '\r', '\t']) {
-                if base.len() != cur.len() {
-                    write!(buf, "{}", &base[..base.len() - cur.len()]).ok();
-                }
-                write!(buf, "&#{};", cur.as_bytes()[0]).ok();
-                cur = rem;
-                base = rem;
-            } else if let Some(rem) = cur.strip_prefix(['"', '<', '>', '&']) {
-                if base.len() != cur.len() {
-                    write!(buf, "{}", &base[..base.len() - cur.len()]).ok();
-                }
-                match cur.as_bytes()[0] {
-                    b'"' => write!(buf, "&quot;").ok(),
-                    b'<' => write!(buf, "&lt;").ok(),
-                    b'>' => write!(buf, "&gt;").ok(),
-                    b'&' => write!(buf, "&amp;").ok(),
-                    _ => None,
-                };
-                cur = rem;
-                base = rem;
-            } else if cur.len() > 1
-                && cur.as_bytes()[0] >= 0x80
-                && doc.is_none_or(|doc| doc.encoding.is_none())
-            {
-                // We assume we have UTF-8 content.
-                let mut tmp = [0; 12];
-
-                if base.len() != cur.len() {
-                    write!(buf, "{}", &base[..base.len() - cur.len()]).ok();
-                }
-                if cur.as_bytes()[0] < 0xC0 {
-                    xml_save_err(
-                        XmlParserErrors::XmlSaveNotUTF8 as _,
-                        attr.map(|attr| attr.into()),
-                        None,
-                    );
-                    buf.write_all(serialize_hex_charref(&mut tmp, cur.as_bytes()[0] as u32))
-                        .ok();
-                    cur = &cur[1..];
-                    base = cur;
-                    continue;
-                }
-                let val = cur.chars().next().unwrap();
-                if val.len_utf8() == 1 || !xml_is_char(val as u32) {
-                    xml_save_err(
-                        XmlParserErrors::XmlSaveCharInvalid as _,
-                        attr.map(|attr| attr.into()),
-                        None,
-                    );
-                    buf.write_all(serialize_hex_charref(&mut tmp, cur.as_bytes()[0] as u32))
-                        .ok();
-                    cur = &cur[1..];
-                    base = cur;
-                    continue;
-                }
-                // We could do multiple things here. Just save as a c_char ref
-                buf.write_all(serialize_hex_charref(&mut tmp, val as u32))
-                    .ok();
-                cur = &cur[val.len_utf8()..];
-                base = cur;
-            } else {
-                let c = cur.chars().next().unwrap();
-                cur = &cur[c.len_utf8()..];
+    let mut base = string;
+    let mut cur = base;
+    while !cur.is_empty() {
+        if let Some(rem) = cur.strip_prefix(['\n', '\r', '\t']) {
+            if base.len() != cur.len() {
+                write!(buf, "{}", &base[..base.len() - cur.len()]).ok();
             }
+            write!(buf, "&#{};", cur.as_bytes()[0]).ok();
+            cur = rem;
+            base = rem;
+        } else if let Some(rem) = cur.strip_prefix(['"', '<', '>', '&']) {
+            if base.len() != cur.len() {
+                write!(buf, "{}", &base[..base.len() - cur.len()]).ok();
+            }
+            match cur.as_bytes()[0] {
+                b'"' => write!(buf, "&quot;").ok(),
+                b'<' => write!(buf, "&lt;").ok(),
+                b'>' => write!(buf, "&gt;").ok(),
+                b'&' => write!(buf, "&amp;").ok(),
+                _ => None,
+            };
+            cur = rem;
+            base = rem;
+        } else if cur.len() > 1
+            && cur.as_bytes()[0] >= 0x80
+            && doc.is_none_or(|doc| doc.encoding.is_none())
+        {
+            // We assume we have UTF-8 content.
+            let mut tmp = [0; 12];
+
+            if base.len() != cur.len() {
+                write!(buf, "{}", &base[..base.len() - cur.len()]).ok();
+            }
+            if cur.as_bytes()[0] < 0xC0 {
+                xml_save_err(
+                    XmlParserErrors::XmlSaveNotUTF8 as _,
+                    attr.map(|attr| attr.into()),
+                    None,
+                );
+                buf.write_all(serialize_hex_charref(&mut tmp, cur.as_bytes()[0] as u32))
+                    .ok();
+                cur = &cur[1..];
+                base = cur;
+                continue;
+            }
+            let val = cur.chars().next().unwrap();
+            if val.len_utf8() == 1 || !xml_is_char(val as u32) {
+                xml_save_err(
+                    XmlParserErrors::XmlSaveCharInvalid as _,
+                    attr.map(|attr| attr.into()),
+                    None,
+                );
+                buf.write_all(serialize_hex_charref(&mut tmp, cur.as_bytes()[0] as u32))
+                    .ok();
+                cur = &cur[1..];
+                base = cur;
+                continue;
+            }
+            // We could do multiple things here. Just save as a c_char ref
+            buf.write_all(serialize_hex_charref(&mut tmp, val as u32))
+                .ok();
+            cur = &cur[val.len_utf8()..];
+            base = cur;
+        } else {
+            let c = cur.chars().next().unwrap();
+            cur = &cur[c.len_utf8()..];
         }
-        if base.len() != cur.len() {
-            write!(buf, "{}", base).ok();
-        }
+    }
+    if base.len() != cur.len() {
+        write!(buf, "{}", base).ok();
     }
 }
 

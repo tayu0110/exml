@@ -58,9 +58,9 @@ macro_rules! xml_debug_err {
             None,
             null_mut(),
             (*$ctxt).node,
-            XmlErrorDomain::XmlFromCheck,
+            $crate::error::XmlErrorDomain::XmlFromCheck,
             $error,
-            XmlErrorLevel::XmlErrError,
+            $crate::error::XmlErrorLevel::XmlErrError,
             None,
             0,
             None,
@@ -170,15 +170,13 @@ impl XmlDebugCtxt<'_> {
 
     /// Do debugging on the string, currently it just checks the UTF-8 content
     #[doc(alias = "xmlCtxtCheckString")]
-    unsafe fn check_string(&mut self, s: &str) {
-        unsafe {
-            if self.check != 0 {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckNotUTF8,
-                    "String is not UTF-8 {s}",
-                );
-            }
+    fn check_string(&mut self, s: &str) {
+        if self.check != 0 {
+            xml_debug_err!(
+                self,
+                XmlParserErrors::XmlCheckNotUTF8,
+                "String is not UTF-8 {s}",
+            );
         }
     }
 
@@ -1163,106 +1161,104 @@ impl XmlDebugCtxt<'_> {
     }
 
     #[doc(alias = "xmlCtxtDumpDocHead")]
-    unsafe fn dump_doc_head(&mut self, doc: XmlDocPtr) {
-        unsafe {
-            self.node = Some(XmlGenericNodePtr::from(doc));
+    fn dump_doc_head(&mut self, doc: XmlDocPtr) {
+        self.node = Some(XmlGenericNodePtr::from(doc));
 
-            match doc.typ {
-                XmlElementType::XmlElementNode => {
-                    xml_debug_err!(
-                        self,
-                        XmlParserErrors::XmlCheckFoundElement,
-                        "Misplaced ELEMENT node\n",
-                    );
+        match doc.typ {
+            XmlElementType::XmlElementNode => {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckFoundElement,
+                    "Misplaced ELEMENT node\n",
+                );
+            }
+            XmlElementType::XmlAttributeNode => {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckFoundAttribute,
+                    "Misplaced ATTRIBUTE node\n",
+                );
+            }
+            XmlElementType::XmlTextNode => {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckFoundText,
+                    "Misplaced TEXT node\n",
+                );
+            }
+            XmlElementType::XmlCDATASectionNode => {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckFoundCDATA,
+                    "Misplaced CDATA node\n",
+                );
+            }
+            XmlElementType::XmlEntityRefNode => {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckFoundEntityRef,
+                    "Misplaced ENTITYREF node\n",
+                );
+            }
+            XmlElementType::XmlEntityNode => {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckFoundEntity,
+                    "Misplaced ENTITY node\n",
+                );
+            }
+            XmlElementType::XmlPINode => {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckFoundPI,
+                    "Misplaced PI node\n",
+                );
+            }
+            XmlElementType::XmlCommentNode => {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckFoundComment,
+                    "Misplaced COMMENT node\n",
+                );
+            }
+            XmlElementType::XmlDocumentNode => {
+                if self.check == 0 {
+                    writeln!(self.output, "DOCUMENT").ok();
                 }
-                XmlElementType::XmlAttributeNode => {
-                    xml_debug_err!(
-                        self,
-                        XmlParserErrors::XmlCheckFoundAttribute,
-                        "Misplaced ATTRIBUTE node\n",
-                    );
+            }
+            XmlElementType::XmlHTMLDocumentNode => {
+                if self.check == 0 {
+                    writeln!(self.output, "HTML DOCUMENT").ok();
                 }
-                XmlElementType::XmlTextNode => {
-                    xml_debug_err!(
-                        self,
-                        XmlParserErrors::XmlCheckFoundText,
-                        "Misplaced TEXT node\n",
-                    );
-                }
-                XmlElementType::XmlCDATASectionNode => {
-                    xml_debug_err!(
-                        self,
-                        XmlParserErrors::XmlCheckFoundCDATA,
-                        "Misplaced CDATA node\n",
-                    );
-                }
-                XmlElementType::XmlEntityRefNode => {
-                    xml_debug_err!(
-                        self,
-                        XmlParserErrors::XmlCheckFoundEntityRef,
-                        "Misplaced ENTITYREF node\n",
-                    );
-                }
-                XmlElementType::XmlEntityNode => {
-                    xml_debug_err!(
-                        self,
-                        XmlParserErrors::XmlCheckFoundEntity,
-                        "Misplaced ENTITY node\n",
-                    );
-                }
-                XmlElementType::XmlPINode => {
-                    xml_debug_err!(
-                        self,
-                        XmlParserErrors::XmlCheckFoundPI,
-                        "Misplaced PI node\n",
-                    );
-                }
-                XmlElementType::XmlCommentNode => {
-                    xml_debug_err!(
-                        self,
-                        XmlParserErrors::XmlCheckFoundComment,
-                        "Misplaced COMMENT node\n",
-                    );
-                }
-                XmlElementType::XmlDocumentNode => {
-                    if self.check == 0 {
-                        writeln!(self.output, "DOCUMENT").ok();
-                    }
-                }
-                XmlElementType::XmlHTMLDocumentNode => {
-                    if self.check == 0 {
-                        writeln!(self.output, "HTML DOCUMENT").ok();
-                    }
-                }
-                XmlElementType::XmlDocumentTypeNode => {
-                    xml_debug_err!(
-                        self,
-                        XmlParserErrors::XmlCheckFoundDoctype,
-                        "Misplaced DOCTYPE node\n",
-                    );
-                }
-                XmlElementType::XmlDocumentFragNode => {
-                    xml_debug_err!(
-                        self,
-                        XmlParserErrors::XmlCheckFoundFragment,
-                        "Misplaced FRAGMENT node\n",
-                    );
-                }
-                XmlElementType::XmlNotationNode => {
-                    xml_debug_err!(
-                        self,
-                        XmlParserErrors::XmlCheckFoundNotation,
-                        "Misplaced NOTATION node\n",
-                    );
-                }
-                _ => {
-                    xml_debug_err!(
-                        self,
-                        XmlParserErrors::XmlCheckUnknownNode,
-                        "Unknown node type {}\n",
-                        doc.element_type() as i32
-                    );
-                }
+            }
+            XmlElementType::XmlDocumentTypeNode => {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckFoundDoctype,
+                    "Misplaced DOCTYPE node\n",
+                );
+            }
+            XmlElementType::XmlDocumentFragNode => {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckFoundFragment,
+                    "Misplaced FRAGMENT node\n",
+                );
+            }
+            XmlElementType::XmlNotationNode => {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckFoundNotation,
+                    "Misplaced NOTATION node\n",
+                );
+            }
+            _ => {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckUnknownNode,
+                    "Unknown node type {}\n",
+                    doc.element_type() as i32
+                );
             }
         }
     }

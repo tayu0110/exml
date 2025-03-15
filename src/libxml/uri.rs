@@ -25,7 +25,7 @@ use std::{ffi::c_char, mem::size_of, ptr::null_mut};
 
 use libc::{INT_MAX, memcpy, memset, snprintf, strlen};
 
-use crate::error::__xml_raise_error;
+use crate::error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors};
 
 use super::{
     globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
@@ -61,28 +61,26 @@ pub struct XmlURI {
 const PORT_EMPTY: i32 = 0;
 const PORT_EMPTY_SERVER: i32 = -1;
 
-unsafe fn xml_uri_err_memory(extra: &str) {
-    unsafe {
-        __xml_raise_error!(
-            None,
-            None,
-            None,
-            null_mut(),
-            None,
-            XmlErrorDomain::XmlFromURI,
-            XmlParserErrors::XmlErrNoMemory,
-            XmlErrorLevel::XmlErrFatal,
-            None,
-            0,
-            Some(extra.to_owned().into()),
-            None,
-            None,
-            0,
-            0,
-            "Memory allocation failed : {}\n",
-            extra
-        );
-    }
+fn xml_uri_err_memory(extra: &str) {
+    __xml_raise_error!(
+        None,
+        None,
+        None,
+        null_mut(),
+        None,
+        XmlErrorDomain::XmlFromURI,
+        XmlParserErrors::XmlErrNoMemory,
+        XmlErrorLevel::XmlErrFatal,
+        None,
+        0,
+        Some(extra.to_owned().into()),
+        None,
+        None,
+        0,
+        0,
+        "Memory allocation failed : {}\n",
+        extra
+    );
 }
 
 /// Simply creates an empty xmlURI

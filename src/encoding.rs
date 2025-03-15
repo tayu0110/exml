@@ -54,6 +54,8 @@ use encoding_rs::{
     mem::{convert_latin1_to_str, convert_utf8_to_latin1_lossy, str_latin1_up_to},
 };
 
+use crate::error::XmlParserErrors;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum XmlCharEncoding {
     Error = -1,
@@ -416,11 +418,11 @@ macro_rules! xml_encoding_err {
             None,
             None,
             None,
-            null_mut(),
+            std::ptr::null_mut(),
             None,
-            XmlErrorDomain::XmlFromI18N,
+            $crate::error::XmlErrorDomain::XmlFromI18N,
             $error,
-            XmlErrorLevel::XmlErrFatal,
+            $crate::error::XmlErrorLevel::XmlErrFatal,
             None,
             0,
             Some($val.to_owned().into()),
@@ -437,16 +439,14 @@ pub(crate) use xml_encoding_err;
 pub fn register_encoding_handler(handler: CustomEncodingHandler) -> Result<(), EncodingError> {
     let mut handlers = HANDLERS.lock().unwrap();
     if handlers.len() >= MAX_ENCODING_HANDLERS {
-        unsafe {
-            xml_encoding_err!(
-                XmlParserErrors::XmlI18NExcessHandler,
-                "xmlRegisterCharEncodingHandler: Too many handler registered, see {}\n",
-                "MAX_ENCODING_HANDLERS"
-            );
-            return Err(EncodingError::Other {
-                msg: "Too many CustomEncodingHandlers are registerd.".into(),
-            });
-        }
+        xml_encoding_err!(
+            XmlParserErrors::XmlI18NExcessHandler,
+            "xmlRegisterCharEncodingHandler: Too many handler registered, see {}\n",
+            "MAX_ENCODING_HANDLERS"
+        );
+        return Err(EncodingError::Other {
+            msg: "Too many CustomEncodingHandlers are registerd.".into(),
+        });
     }
     handlers.push(handler);
     Ok(())

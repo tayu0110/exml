@@ -424,10 +424,8 @@ unsafe fn xml_schema_cleanup_types_internal() {
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlSchemaTypeErrMemory")]
-unsafe fn xml_schema_type_err_memory(node: Option<XmlGenericNodePtr>, extra: Option<&str>) {
-    unsafe {
-        __xml_simple_oom_error(XmlErrorDomain::XmlFromDatatype, node, extra);
-    }
+fn xml_schema_type_err_memory(node: Option<XmlGenericNodePtr>, extra: Option<&str>) {
+    __xml_simple_oom_error(XmlErrorDomain::XmlFromDatatype, node, extra);
 }
 
 /// Allocate a new simple type value

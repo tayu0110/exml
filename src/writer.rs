@@ -38,7 +38,7 @@ use std::{
 use crate::{
     buf::XmlBufRef,
     encoding::find_encoding_handler,
-    error::{__xml_raise_error, XmlParserErrors},
+    error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     globals::GenericErrorContext,
     io::XmlOutputBuffer,
     libxml::{
@@ -535,83 +535,81 @@ impl<'a> XmlTextWriter<'a> {
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterStartDocument")]
-    pub unsafe fn start_document(
+    pub fn start_document(
         &mut self,
         version: Option<&str>,
         encoding: Option<&str>,
         standalone: Option<&str>,
     ) -> io::Result<usize> {
-        unsafe {
-            if self.nodes.front().is_some() {
+        if self.nodes.front().is_some() {
+            xml_writer_err_msg(
+                Some(self),
+                XmlParserErrors::XmlErrInternalError,
+                "xmlTextWriterStartDocument : not allowed in this context!\n",
+            );
+            return Err(io::Error::other(
+                "xmlTextWriterStartDocument : not allowed in this context!",
+            ));
+        }
+
+        let encoder = if let Some(encoding) = encoding {
+            let Some(encoder) = find_encoding_handler(encoding) else {
                 xml_writer_err_msg(
                     Some(self),
-                    XmlParserErrors::XmlErrInternalError,
-                    "xmlTextWriterStartDocument : not allowed in this context!\n",
+                    XmlParserErrors::XmlErrUnsupportedEncoding,
+                    "xmlTextWriterStartDocument : unsupported encoding\n",
                 );
                 return Err(io::Error::other(
-                    "xmlTextWriterStartDocument : not allowed in this context!",
+                    "xmlTextWriterStartDocument : unsupported encoding",
                 ));
-            }
-
-            let encoder = if let Some(encoding) = encoding {
-                let Some(encoder) = find_encoding_handler(encoding) else {
-                    xml_writer_err_msg(
-                        Some(self),
-                        XmlParserErrors::XmlErrUnsupportedEncoding,
-                        "xmlTextWriterStartDocument : unsupported encoding\n",
-                    );
-                    return Err(io::Error::other(
-                        "xmlTextWriterStartDocument : unsupported encoding",
-                    ));
-                };
-                Some(encoder)
-            } else {
-                None
             };
+            Some(encoder)
+        } else {
+            None
+        };
 
-            self.out.encoder = encoder.map(|e| Rc::new(RefCell::new(e)));
-            if self.out.encoder.is_some() {
-                if self.out.conv.is_none() {
-                    self.out.conv = XmlBufRef::with_capacity(4000);
-                }
-                self.out.encode(true).ok();
-                if let Some(mut doc) = self.doc.filter(|doc| doc.encoding.is_none()) {
-                    let encoder = self.out.encoder.as_ref().unwrap().borrow();
-                    doc.encoding = Some(encoder.name().to_owned());
-                }
-            } else {
-                self.out.conv = None;
+        self.out.encoder = encoder.map(|e| Rc::new(RefCell::new(e)));
+        if self.out.encoder.is_some() {
+            if self.out.conv.is_none() {
+                self.out.conv = XmlBufRef::with_capacity(4000);
             }
-
-            let mut sum = self.out.write_str("<?xml version=")?;
-            sum += self.out.write_bytes(&[self.qchar])?;
-            sum += self.out.write_str(version.unwrap_or("1.0"))?;
-            sum += self.out.write_bytes(&[self.qchar])?;
-            if self.out.encoder.is_some() {
-                sum += self.out.write_str(" encoding=")?;
-                sum += self.out.write_bytes(&[self.qchar])?;
-                let name = self
-                    .out
-                    .encoder
-                    .as_ref()
-                    .unwrap()
-                    .borrow()
-                    .name()
-                    .to_owned();
-                sum += self.out.write_str(&name)?;
-                sum += self.out.write_bytes(&[self.qchar])?;
+            self.out.encode(true).ok();
+            if let Some(mut doc) = self.doc.filter(|doc| doc.encoding.is_none()) {
+                let encoder = self.out.encoder.as_ref().unwrap().borrow();
+                doc.encoding = Some(encoder.name().to_owned());
             }
-
-            if let Some(standalone) = standalone {
-                sum += self.out.write_str(" standalone=")?;
-                sum += self.out.write_bytes(&[self.qchar])?;
-                sum += self.out.write_str(standalone)?;
-                sum += self.out.write_bytes(&[self.qchar])?;
-            }
-
-            sum += self.out.write_str("?>\n")?;
-            Ok(sum)
+        } else {
+            self.out.conv = None;
         }
+
+        let mut sum = self.out.write_str("<?xml version=")?;
+        sum += self.out.write_bytes(&[self.qchar])?;
+        sum += self.out.write_str(version.unwrap_or("1.0"))?;
+        sum += self.out.write_bytes(&[self.qchar])?;
+        if self.out.encoder.is_some() {
+            sum += self.out.write_str(" encoding=")?;
+            sum += self.out.write_bytes(&[self.qchar])?;
+            let name = self
+                .out
+                .encoder
+                .as_ref()
+                .unwrap()
+                .borrow()
+                .name()
+                .to_owned();
+            sum += self.out.write_str(&name)?;
+            sum += self.out.write_bytes(&[self.qchar])?;
+        }
+
+        if let Some(standalone) = standalone {
+            sum += self.out.write_str(" standalone=")?;
+            sum += self.out.write_bytes(&[self.qchar])?;
+            sum += self.out.write_str(standalone)?;
+            sum += self.out.write_bytes(&[self.qchar])?;
+        }
+
+        sum += self.out.write_str("?>\n")?;
+        Ok(sum)
     }
 
     /// End an xml document. All open elements are closed, and
@@ -1344,120 +1342,116 @@ impl<'a> XmlTextWriter<'a> {
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterEndComment")]
-    pub unsafe fn end_comment(&mut self) -> io::Result<usize> {
-        unsafe {
-            let Some(lk) = self.nodes.front() else {
-                xml_writer_err_msg(
-                    Some(self),
-                    XmlParserErrors::XmlErrInternalError,
-                    "xmlTextWriterEndComment : not allowed in this context!\n",
-                );
-                return Err(io::Error::other(
-                    "xmlTextWriterEndComment : not allowed in this context!",
-                ));
-            };
+    pub fn end_comment(&mut self) -> io::Result<usize> {
+        let Some(lk) = self.nodes.front() else {
+            xml_writer_err_msg(
+                Some(self),
+                XmlParserErrors::XmlErrInternalError,
+                "xmlTextWriterEndComment : not allowed in this context!\n",
+            );
+            return Err(io::Error::other(
+                "xmlTextWriterEndComment : not allowed in this context!",
+            ));
+        };
 
-            let mut sum = 0;
-            match lk.state.get() {
-                XmlTextWriterState::XmlTextwriterComment => {
-                    sum += self.out.write_str("-->")?;
-                }
-                _ => {
-                    return Err(io::Error::other("Invalid state"));
-                }
+        let mut sum = 0;
+        match lk.state.get() {
+            XmlTextWriterState::XmlTextwriterComment => {
+                sum += self.out.write_str("-->")?;
             }
-
-            if self.indent != 0 {
-                sum += self.out.write_str("\n")?;
+            _ => {
+                return Err(io::Error::other("Invalid state"));
             }
-
-            self.nodes.pop_front();
-            Ok(sum)
         }
+
+        if self.indent != 0 {
+            sum += self.out.write_str("\n")?;
+        }
+
+        self.nodes.pop_front();
+        Ok(sum)
     }
 
     /// Start an xml DTD.
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterStartDTD")]
-    pub unsafe fn start_dtd(
+    pub fn start_dtd(
         &mut self,
         name: &str,
         pubid: Option<&str>,
         sysid: Option<&str>,
     ) -> io::Result<usize> {
-        unsafe {
-            if name.is_empty() {
-                return Err(io::Error::other("Writer or name is NULL"));
-            }
+        if name.is_empty() {
+            return Err(io::Error::other("Writer or name is NULL"));
+        }
 
-            if self.nodes.front().is_some() {
+        if self.nodes.front().is_some() {
+            xml_writer_err_msg(
+                Some(self),
+                XmlParserErrors::XmlErrInternalError,
+                "xmlTextWriterStartDTD : DTD allowed only in prolog!\n",
+            );
+            return Err(io::Error::other(
+                "xmlTextWriterStartDTD : DTD allowed only in prolog!",
+            ));
+        }
+
+        let p = XmlTextWriterStackEntry {
+            name: Some(name.to_owned()),
+            state: Cell::new(XmlTextWriterState::XmlTextwriterDTD),
+        };
+        self.nodes.push_front(p.into());
+
+        let mut sum = self.out.write_str("<!DOCTYPE ")?;
+        sum += self.out.write_str(name)?;
+
+        if let Some(pubid) = pubid {
+            if sysid.is_none() {
                 xml_writer_err_msg(
                     Some(self),
                     XmlParserErrors::XmlErrInternalError,
-                    "xmlTextWriterStartDTD : DTD allowed only in prolog!\n",
+                    "xmlTextWriterStartDTD : system identifier needed!\n",
                 );
                 return Err(io::Error::other(
-                    "xmlTextWriterStartDTD : DTD allowed only in prolog!",
+                    "xmlTextWriterStartDTD : system identifier needed!",
                 ));
+            };
+
+            if self.indent != 0 {
+                sum += self.out.write_bytes(b"\n")?;
+            } else {
+                sum += self.out.write_bytes(b" ")?;
             }
 
-            let p = XmlTextWriterStackEntry {
-                name: Some(name.to_owned()),
-                state: Cell::new(XmlTextWriterState::XmlTextwriterDTD),
-            };
-            self.nodes.push_front(p.into());
+            sum += self.out.write_str("PUBLIC ")?;
+            sum += self.out.write_bytes(&[self.qchar])?;
+            sum += self.out.write_str(pubid)?;
+            sum += self.out.write_bytes(&[self.qchar])?;
+        }
 
-            let mut sum = self.out.write_str("<!DOCTYPE ")?;
-            sum += self.out.write_str(name)?;
-
-            if let Some(pubid) = pubid {
-                if sysid.is_none() {
-                    xml_writer_err_msg(
-                        Some(self),
-                        XmlParserErrors::XmlErrInternalError,
-                        "xmlTextWriterStartDTD : system identifier needed!\n",
-                    );
-                    return Err(io::Error::other(
-                        "xmlTextWriterStartDTD : system identifier needed!",
-                    ));
-                };
-
+        if let Some(sysid) = sysid {
+            if pubid.is_some() {
+                if self.indent != 0 {
+                    sum += self.out.write_str("\n       ")?;
+                } else {
+                    sum += self.out.write_bytes(b" ")?;
+                }
+            } else {
                 if self.indent != 0 {
                     sum += self.out.write_bytes(b"\n")?;
                 } else {
                     sum += self.out.write_bytes(b" ")?;
                 }
-
-                sum += self.out.write_str("PUBLIC ")?;
-                sum += self.out.write_bytes(&[self.qchar])?;
-                sum += self.out.write_str(pubid)?;
-                sum += self.out.write_bytes(&[self.qchar])?;
+                sum += self.out.write_str("SYSTEM ")?;
             }
 
-            if let Some(sysid) = sysid {
-                if pubid.is_some() {
-                    if self.indent != 0 {
-                        sum += self.out.write_str("\n       ")?;
-                    } else {
-                        sum += self.out.write_bytes(b" ")?;
-                    }
-                } else {
-                    if self.indent != 0 {
-                        sum += self.out.write_bytes(b"\n")?;
-                    } else {
-                        sum += self.out.write_bytes(b" ")?;
-                    }
-                    sum += self.out.write_str("SYSTEM ")?;
-                }
-
-                sum += self.out.write_bytes(&[self.qchar])?;
-                sum += self.out.write_str(sysid)?;
-                sum += self.out.write_bytes(&[self.qchar])?;
-            }
-
-            Ok(sum)
+            sum += self.out.write_bytes(&[self.qchar])?;
+            sum += self.out.write_str(sysid)?;
+            sum += self.out.write_bytes(&[self.qchar])?;
         }
+
+        Ok(sum)
     }
 
     /// Write a DTD.
@@ -1834,14 +1828,38 @@ impl<'a> XmlTextWriter<'a> {
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterWriteDTDExternalEntityContents")]
-    pub unsafe fn write_dtd_external_entity_contents(
+    pub fn write_dtd_external_entity_contents(
         &mut self,
         pubid: Option<&str>,
         sysid: Option<&str>,
         ndataid: Option<&str>,
     ) -> io::Result<usize> {
-        unsafe {
-            let Some(lk) = self.nodes.front() else {
+        let Some(lk) = self.nodes.front() else {
+            xml_writer_err_msg(
+                Some(self),
+                XmlParserErrors::XmlErrInternalError,
+                "xmlTextWriterWriteDTDExternalEntityContents: you must call xmlTextWriterStartDTDEntity before the call to this function!\n",
+            );
+            return Err(io::Error::other(
+                "xmlTextWriterWriteDTDExternalEntityContents: you must call xmlTextWriterStartDTDEntity before the call to this function!",
+            ));
+        };
+
+        match lk.state.get() {
+            XmlTextWriterState::XmlTextwriterDTDEnty => {}
+            XmlTextWriterState::XmlTextwriterDTDPEnt => {
+                if ndataid.is_some() {
+                    xml_writer_err_msg(
+                        Some(self),
+                        XmlParserErrors::XmlErrInternalError,
+                        "xmlTextWriterWriteDTDExternalEntityContents: notation not allowed with parameter entities!\n",
+                    );
+                    return Err(io::Error::other(
+                        "xmlTextWriterWriteDTDExternalEntityContents: notation not allowed with parameter entities!",
+                    ));
+                }
+            }
+            _ => {
                 xml_writer_err_msg(
                     Some(self),
                     XmlParserErrors::XmlErrInternalError,
@@ -1850,69 +1868,43 @@ impl<'a> XmlTextWriter<'a> {
                 return Err(io::Error::other(
                     "xmlTextWriterWriteDTDExternalEntityContents: you must call xmlTextWriterStartDTDEntity before the call to this function!",
                 ));
-            };
-
-            match lk.state.get() {
-                XmlTextWriterState::XmlTextwriterDTDEnty => {}
-                XmlTextWriterState::XmlTextwriterDTDPEnt => {
-                    if ndataid.is_some() {
-                        xml_writer_err_msg(
-                            Some(self),
-                            XmlParserErrors::XmlErrInternalError,
-                            "xmlTextWriterWriteDTDExternalEntityContents: notation not allowed with parameter entities!\n",
-                        );
-                        return Err(io::Error::other(
-                            "xmlTextWriterWriteDTDExternalEntityContents: notation not allowed with parameter entities!",
-                        ));
-                    }
-                }
-                _ => {
-                    xml_writer_err_msg(
-                        Some(self),
-                        XmlParserErrors::XmlErrInternalError,
-                        "xmlTextWriterWriteDTDExternalEntityContents: you must call xmlTextWriterStartDTDEntity before the call to this function!\n",
-                    );
-                    return Err(io::Error::other(
-                        "xmlTextWriterWriteDTDExternalEntityContents: you must call xmlTextWriterStartDTDEntity before the call to this function!",
-                    ));
-                }
             }
-
-            let mut sum = 0;
-            if let Some(pubid) = pubid {
-                if sysid.is_none() {
-                    xml_writer_err_msg(
-                        Some(self),
-                        XmlParserErrors::XmlErrInternalError,
-                        "xmlTextWriterWriteDTDExternalEntityContents: system identifier needed!\n",
-                    );
-                    return Err(io::Error::other(
-                        "xmlTextWriterWriteDTDExternalEntityContents: system identifier needed!",
-                    ));
-                }
-
-                sum += self.out.write_str(" PUBLIC ")?;
-                sum += self.out.write_bytes(&[self.qchar])?;
-                sum += self.out.write_str(pubid)?;
-                sum += self.out.write_bytes(&[self.qchar])?;
-            }
-
-            if let Some(sysid) = sysid {
-                if pubid.is_none() {
-                    sum += self.out.write_str(" SYSTEM")?;
-                }
-                sum += self.out.write_str(" ")?;
-                sum += self.out.write_bytes(&[self.qchar])?;
-                sum += self.out.write_str(sysid)?;
-                sum += self.out.write_bytes(&[self.qchar])?;
-            }
-
-            if let Some(ndataid) = ndataid {
-                sum += self.out.write_str(" NDATA ")?;
-                sum += self.out.write_str(ndataid)?;
-            }
-            Ok(sum)
         }
+
+        let mut sum = 0;
+        if let Some(pubid) = pubid {
+            if sysid.is_none() {
+                xml_writer_err_msg(
+                    Some(self),
+                    XmlParserErrors::XmlErrInternalError,
+                    "xmlTextWriterWriteDTDExternalEntityContents: system identifier needed!\n",
+                );
+                return Err(io::Error::other(
+                    "xmlTextWriterWriteDTDExternalEntityContents: system identifier needed!",
+                ));
+            }
+
+            sum += self.out.write_str(" PUBLIC ")?;
+            sum += self.out.write_bytes(&[self.qchar])?;
+            sum += self.out.write_str(pubid)?;
+            sum += self.out.write_bytes(&[self.qchar])?;
+        }
+
+        if let Some(sysid) = sysid {
+            if pubid.is_none() {
+                sum += self.out.write_str(" SYSTEM")?;
+            }
+            sum += self.out.write_str(" ")?;
+            sum += self.out.write_bytes(&[self.qchar])?;
+            sum += self.out.write_str(sysid)?;
+            sum += self.out.write_bytes(&[self.qchar])?;
+        }
+
+        if let Some(ndataid) = ndataid {
+            sum += self.out.write_str(" NDATA ")?;
+            sum += self.out.write_str(ndataid)?;
+        }
+        Ok(sum)
     }
 
     /// End an xml DTD entity.
@@ -2051,47 +2043,45 @@ impl Drop for XmlTextWriter<'_> {
 
 /// Handle a writer error
 #[doc(alias = "xmlWriterErrMsg")]
-unsafe fn xml_writer_err_msg(ctxt: Option<&XmlTextWriter>, error: XmlParserErrors, msg: &str) {
-    unsafe {
-        if let Some(ctxt) = ctxt {
-            __xml_raise_error!(
-                None,
-                None,
-                None,
-                ctxt.ctxt as _,
-                None,
-                XmlErrorDomain::XmlFromWriter,
-                error,
-                XmlErrorLevel::XmlErrFatal,
-                None,
-                0,
-                None,
-                None,
-                None,
-                0,
-                0,
-                msg,
-            );
-        } else {
-            __xml_raise_error!(
-                None,
-                None,
-                None,
-                null_mut(),
-                None,
-                XmlErrorDomain::XmlFromWriter,
-                error,
-                XmlErrorLevel::XmlErrFatal,
-                None,
-                0,
-                None,
-                None,
-                None,
-                0,
-                0,
-                msg,
-            );
-        }
+fn xml_writer_err_msg(ctxt: Option<&XmlTextWriter>, error: XmlParserErrors, msg: &str) {
+    if let Some(ctxt) = ctxt {
+        __xml_raise_error!(
+            None,
+            None,
+            None,
+            ctxt.ctxt as _,
+            None,
+            XmlErrorDomain::XmlFromWriter,
+            error,
+            XmlErrorLevel::XmlErrFatal,
+            None,
+            0,
+            None,
+            None,
+            None,
+            0,
+            0,
+            msg,
+        );
+    } else {
+        __xml_raise_error!(
+            None,
+            None,
+            None,
+            null_mut(),
+            None,
+            XmlErrorDomain::XmlFromWriter,
+            error,
+            XmlErrorLevel::XmlErrFatal,
+            None,
+            0,
+            None,
+            None,
+            None,
+            0,
+            0,
+            msg,
+        );
     }
 }
 

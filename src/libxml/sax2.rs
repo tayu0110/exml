@@ -31,7 +31,10 @@ use libc::memcpy;
 
 use crate::{
     encoding::{XmlCharEncoding, detect_encoding},
-    error::{__xml_raise_error, XmlParserErrors, parser_error, parser_warning},
+    error::{
+        __xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors, parser_error,
+        parser_warning,
+    },
     globals::{GenericErrorContext, StructuredError},
     libxml::{
         htmltree::html_new_doc_no_dtd,
@@ -290,7 +293,7 @@ pub unsafe fn xml_sax2_internal_subset(
             if (*ctxt).html != 0 {
                 return;
             }
-            (*dtd).unlink();
+            dtd.unlink();
             xml_free_dtd(dtd);
             my_doc.int_subset = None;
         }

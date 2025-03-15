@@ -662,10 +662,8 @@ pub fn validate_nmtoken<const ALLOW_SPACE: bool>(value: &str) -> Result<(), &'st
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlTreeErrMemory")]
-unsafe fn xml_tree_err_memory(extra: &str) {
-    unsafe {
-        __xml_simple_oom_error(XmlErrorDomain::XmlFromTree, None, Some(extra));
-    }
+fn xml_tree_err_memory(extra: &str) {
+    __xml_simple_oom_error(XmlErrorDomain::XmlFromTree, None, Some(extra));
 }
 
 /// Builds the QName @prefix:@ncname in @memory if there is enough space
@@ -2326,25 +2324,19 @@ static XML_CHECK_DTD: AtomicBool = AtomicBool::new(true);
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlTreeErr")]
-unsafe fn xml_tree_err(
-    code: XmlParserErrors,
-    node: Option<XmlGenericNodePtr>,
-    extra: Option<&str>,
-) {
-    unsafe {
-        let msg: Cow<'static, str> = match code {
-            XmlParserErrors::XmlTreeInvalidHex => "invalid hexadecimal character value\n".into(),
-            XmlParserErrors::XmlTreeInvalidDec => "invalid decimal character value\n".into(),
-            XmlParserErrors::XmlTreeUnterminatedEntity => format!(
-                "unterminated entity reference {}\n",
-                extra.expect("Internal Error")
-            )
-            .into(),
-            XmlParserErrors::XmlTreeNotUTF8 => "string is not in UTF-8\n".into(),
-            _ => "unexpected error number\n".into(),
-        };
-        __xml_simple_error!(XmlErrorDomain::XmlFromTree, code, node, &msg);
-    }
+fn xml_tree_err(code: XmlParserErrors, node: Option<XmlGenericNodePtr>, extra: Option<&str>) {
+    let msg: Cow<'static, str> = match code {
+        XmlParserErrors::XmlTreeInvalidHex => "invalid hexadecimal character value\n".into(),
+        XmlParserErrors::XmlTreeInvalidDec => "invalid decimal character value\n".into(),
+        XmlParserErrors::XmlTreeUnterminatedEntity => format!(
+            "unterminated entity reference {}\n",
+            extra.expect("Internal Error")
+        )
+        .into(),
+        XmlParserErrors::XmlTreeNotUTF8 => "string is not in UTF-8\n".into(),
+        _ => "unexpected error number\n".into(),
+    };
+    __xml_simple_error!(XmlErrorDomain::XmlFromTree, code, node, &msg);
 }
 
 const XHTML_STRICT_PUBLIC_ID: &str = "-//W3C//DTD XHTML 1.0 Strict//EN";

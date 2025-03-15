@@ -29,7 +29,7 @@ use std::{
 
 use libc::{RTLD_GLOBAL, RTLD_NOW, dlclose, dlerror, dlopen, dlsym, memset};
 
-use crate::error::__xml_raise_error;
+use crate::error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors};
 
 use super::{
     globals::{xml_free, xml_malloc},

@@ -38,7 +38,7 @@ use std::{
 };
 
 use crate::{
-    error::{__xml_raise_error, XmlParserErrors},
+    error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     io::{XmlOutputBuffer, write_quoted},
     libxml::xmlstring::xml_strlen,
     list::XmlList,
@@ -1273,80 +1273,74 @@ pub unsafe fn xml_c14n_doc_save_to<'a>(
 
 /// Handle a redefinition of param error
 #[doc(alias = "xmlC14NErrParam")]
-unsafe fn xml_c14n_err_param(extra: &str) {
-    unsafe {
-        __xml_raise_error!(
-            None,
-            None,
-            None,
-            null_mut(),
-            None,
-            XmlErrorDomain::XmlFromC14N,
-            XmlParserErrors::XmlErrInternalError,
-            XmlErrorLevel::XmlErrError,
-            None,
-            0,
-            Some(extra.to_owned().into()),
-            None,
-            None,
-            0,
-            0,
-            "Invalid parameter : {}\n",
-            extra
-        );
-    }
+fn xml_c14n_err_param(extra: &str) {
+    __xml_raise_error!(
+        None,
+        None,
+        None,
+        null_mut(),
+        None,
+        XmlErrorDomain::XmlFromC14N,
+        XmlParserErrors::XmlErrInternalError,
+        XmlErrorLevel::XmlErrError,
+        None,
+        0,
+        Some(extra.to_owned().into()),
+        None,
+        None,
+        0,
+        0,
+        "Invalid parameter : {}\n",
+        extra
+    );
 }
 
 /// Handle a redefinition of memory error
 #[doc(alias = "xmlC14NErrMemory")]
-unsafe fn xml_c14n_err_memory(extra: &str) {
-    unsafe {
-        __xml_raise_error!(
-            None,
-            None,
-            None,
-            null_mut(),
-            None,
-            XmlErrorDomain::XmlFromC14N,
-            XmlParserErrors::XmlErrNoMemory,
-            XmlErrorLevel::XmlErrError,
-            None,
-            0,
-            Some(extra.to_owned().into()),
-            None,
-            None,
-            0,
-            0,
-            "Memory allocation failed : {}\n",
-            extra
-        );
-    }
+fn xml_c14n_err_memory(extra: &str) {
+    __xml_raise_error!(
+        None,
+        None,
+        None,
+        null_mut(),
+        None,
+        XmlErrorDomain::XmlFromC14N,
+        XmlParserErrors::XmlErrNoMemory,
+        XmlErrorLevel::XmlErrError,
+        None,
+        0,
+        Some(extra.to_owned().into()),
+        None,
+        None,
+        0,
+        0,
+        "Memory allocation failed : {}\n",
+        extra
+    );
 }
 
 /// Handle a redefinition of internal error
 #[doc(alias = "xmlC14NErrInternal")]
-unsafe fn xml_c14n_err_internal(extra: &str) {
-    unsafe {
-        __xml_raise_error!(
-            None,
-            None,
-            None,
-            null_mut(),
-            None,
-            XmlErrorDomain::XmlFromC14N,
-            XmlParserErrors::XmlErrInternalError,
-            XmlErrorLevel::XmlErrError,
-            None,
-            0,
-            Some(extra.to_owned().into()),
-            None,
-            None,
-            0,
-            0,
-            "Internal error : {}\n",
-            extra
-        );
-    }
+fn xml_c14n_err_internal(extra: &str) {
+    __xml_raise_error!(
+        None,
+        None,
+        None,
+        null_mut(),
+        None,
+        XmlErrorDomain::XmlFromC14N,
+        XmlParserErrors::XmlErrInternalError,
+        XmlErrorLevel::XmlErrError,
+        None,
+        0,
+        Some(extra.to_owned().into()),
+        None,
+        None,
+        0,
+        0,
+        "Internal error : {}\n",
+        extra
+    );
 }
 
 /// Dumps the canonized image of given XML document into memory.  
@@ -1533,28 +1527,26 @@ unsafe fn xml_c14n_new_ctx<'a, T>(
 
 /// Handle a redefinition of relative namespace error
 #[doc(alias = "xmlC14NErrRelativeNamespace")]
-unsafe fn xml_c14n_err_relative_namespace(ns_uri: &str) {
-    unsafe {
-        __xml_raise_error!(
-            None,
-            None,
-            None,
-            null_mut(),
-            None,
-            XmlErrorDomain::XmlFromC14N,
-            XmlParserErrors::XmlC14NRelativeNamespace,
-            XmlErrorLevel::XmlErrError,
-            None,
-            0,
-            None,
-            None,
-            None,
-            0,
-            0,
-            "Relative namespace UR is invalid here : {}\n",
-            ns_uri
-        );
-    }
+fn xml_c14n_err_relative_namespace(ns_uri: &str) {
+    __xml_raise_error!(
+        None,
+        None,
+        None,
+        null_mut(),
+        None,
+        XmlErrorDomain::XmlFromC14N,
+        XmlParserErrors::XmlC14NRelativeNamespace,
+        XmlErrorLevel::XmlErrError,
+        None,
+        0,
+        None,
+        None,
+        None,
+        0,
+        0,
+        "Relative namespace UR is invalid here : {}\n",
+        ns_uri
+    );
 }
 
 /// Compares the namespaces by names (prefixes).
@@ -1722,56 +1714,52 @@ fn normalize_pi(a: &str) -> String {
 
 /// Handle a redefinition of invalid node error
 #[doc(alias = "xmlC14NErrInvalidNode")]
-unsafe fn xml_c14n_err_invalid_node(node_type: &str, extra: &str) {
-    unsafe {
-        __xml_raise_error!(
-            None,
-            None,
-            None,
-            null_mut(),
-            None,
-            XmlErrorDomain::XmlFromC14N,
-            XmlParserErrors::XmlC14NInvalidNode,
-            XmlErrorLevel::XmlErrError,
-            None,
-            0,
-            Some(extra.to_owned().into()),
-            None,
-            None,
-            0,
-            0,
-            "Node {} is invalid here : {}\n",
-            node_type,
-            extra
-        );
-    }
+fn xml_c14n_err_invalid_node(node_type: &str, extra: &str) {
+    __xml_raise_error!(
+        None,
+        None,
+        None,
+        null_mut(),
+        None,
+        XmlErrorDomain::XmlFromC14N,
+        XmlParserErrors::XmlC14NInvalidNode,
+        XmlErrorLevel::XmlErrError,
+        None,
+        0,
+        Some(extra.to_owned().into()),
+        None,
+        None,
+        0,
+        0,
+        "Node {} is invalid here : {}\n",
+        node_type,
+        extra
+    );
 }
 
 /// Handle a redefinition of unknown node error
 #[doc(alias = "xmlC14NErrUnknownNode")]
-unsafe fn xml_c14n_err_unknown_node(node_type: i32, extra: &str) {
-    unsafe {
-        __xml_raise_error!(
-            None,
-            None,
-            None,
-            null_mut(),
-            None,
-            XmlErrorDomain::XmlFromC14N,
-            XmlParserErrors::XmlC14NUnknowNode,
-            XmlErrorLevel::XmlErrError,
-            None,
-            0,
-            Some(extra.to_owned().into()),
-            None,
-            None,
-            0,
-            0,
-            "Unknown node type {} found : {}\n",
-            node_type,
-            extra
-        );
-    }
+fn xml_c14n_err_unknown_node(node_type: i32, extra: &str) {
+    __xml_raise_error!(
+        None,
+        None,
+        None,
+        null_mut(),
+        None,
+        XmlErrorDomain::XmlFromC14N,
+        XmlParserErrors::XmlC14NUnknowNode,
+        XmlErrorLevel::XmlErrError,
+        None,
+        0,
+        Some(extra.to_owned().into()),
+        None,
+        None,
+        0,
+        0,
+        "Unknown node type {} found : {}\n",
+        node_type,
+        extra
+    );
 }
 
 /// Dumps the canonized image of given XML document into the provided buffer.

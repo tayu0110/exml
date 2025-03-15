@@ -185,13 +185,11 @@ impl<'a> XmlOutputBuffer<'a> {
                                 content.get(3).unwrap_or(&0)
                             );
 
-                            unsafe {
-                                xml_encoding_err!(
-                                    XmlParserErrors::XmlI18NConvFailed,
-                                    "output conversion failed due to conv error, bytes {}\n",
-                                    msg.as_str()
-                                );
-                            }
+                            xml_encoding_err!(
+                                XmlParserErrors::XmlI18NConvFailed,
+                                "output conversion failed due to conv error, bytes {}\n",
+                                msg.as_str()
+                            );
                             out.push_bytes(b" ").ok();
                             break e.map(|_| 0);
                         }

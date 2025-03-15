@@ -39,7 +39,7 @@ use std::{
 use libc::{INT_MAX, memcpy, memset, snprintf, strlen};
 
 use crate::{
-    error::{__xml_raise_error, XmlParserErrors},
+    error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     libxml::{
         dict::{XmlDictPtr, xml_dict_lookup},
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},

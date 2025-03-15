@@ -2151,19 +2151,15 @@ pub(crate) unsafe fn xml_schema_verr_memory(
     }
 }
 
-pub(super) unsafe fn xml_schema_psimple_err(msg: &str) {
-    unsafe {
-        __xml_simple_oom_error(XmlErrorDomain::XmlFromSchemasp, None, Some(msg));
-    }
+pub(super) fn xml_schema_psimple_err(msg: &str) {
+    __xml_simple_oom_error(XmlErrorDomain::XmlFromSchemasp, None, Some(msg));
 }
 
-pub(crate) unsafe fn xml_schema_psimple_internal_err(node: Option<XmlGenericNodePtr>, msg: &str) {
-    unsafe {
-        __xml_simple_error!(
-            XmlErrorDomain::XmlFromSchemasp,
-            XmlParserErrors::XmlSchemapInternal,
-            node,
-            msg
-        );
-    }
+pub(crate) fn xml_schema_psimple_internal_err(node: Option<XmlGenericNodePtr>, msg: &str) {
+    __xml_simple_error!(
+        XmlErrorDomain::XmlFromSchemasp,
+        XmlParserErrors::XmlSchemapInternal,
+        node,
+        msg
+    );
 }

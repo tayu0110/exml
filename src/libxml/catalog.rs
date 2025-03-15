@@ -58,7 +58,7 @@ use crate::tree::XmlNsPtr;
 use crate::{
     SYSCONFDIR,
     encoding::XmlCharEncoding,
-    error::__xml_raise_error,
+    error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     generic_error,
     io::{XmlParserInputBuffer, xml_parser_get_directory},
     libxml::{
@@ -67,8 +67,8 @@ use crate::{
     },
     parser::{XmlParserInputPtr, xml_free_parser_ctxt, xml_new_input_stream, xml_new_parser_ctxt},
     tree::{
-        NodeCommon, XML_XML_NAMESPACE, XmlDocPtr, XmlNodePtr, xml_free_doc, xml_free_ns,
-        xml_new_doc, xml_new_doc_node, xml_new_dtd, xml_new_ns,
+        NodeCommon, XML_XML_NAMESPACE, XmlDocPtr, XmlGenericNodePtr, XmlNodePtr, xml_free_doc,
+        xml_free_ns, xml_new_doc, xml_new_doc_node, xml_new_dtd, xml_new_ns,
     },
     uri::{build_uri, canonic_path},
 };
@@ -77,28 +77,26 @@ use super::{chvalid::xml_is_pubid_char, parser_internals::xml_is_letter};
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlCatalogErrMemory")]
-unsafe fn xml_catalog_err_memory(extra: &str) {
-    unsafe {
-        __xml_raise_error!(
-            None,
-            None,
-            None,
-            null_mut(),
-            None,
-            XmlErrorDomain::XmlFromCatalog,
-            XmlParserErrors::XmlErrNoMemory,
-            XmlErrorLevel::XmlErrError,
-            None,
-            0,
-            Some(extra.to_owned().into()),
-            None,
-            None,
-            0,
-            0,
-            "Memory allocation failed : {}\n",
-            extra
-        );
-    }
+fn xml_catalog_err_memory(extra: &str) {
+    __xml_raise_error!(
+        None,
+        None,
+        None,
+        null_mut(),
+        None,
+        XmlErrorDomain::XmlFromCatalog,
+        XmlParserErrors::XmlErrNoMemory,
+        XmlErrorLevel::XmlErrError,
+        None,
+        0,
+        Some(extra.to_owned().into()),
+        None,
+        None,
+        0,
+        0,
+        "Memory allocation failed : {}\n",
+        extra
+    );
 }
 
 /// Handle a catalog error

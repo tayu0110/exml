@@ -26,9 +26,7 @@ impl<T> XmlSchemaItemList<T> {
     #[doc(alias = "xmlSchemaItemListRemove")]
     pub(crate) fn remove(&mut self, idx: usize) -> i32 {
         if idx >= self.items.len() {
-            unsafe {
-                xml_schema_psimple_err("Internal error: xmlSchemaItemListRemove, index error.\n");
-            }
+            xml_schema_psimple_err("Internal error: xmlSchemaItemListRemove, index error.\n");
             return -1;
         }
         self.items.remove(idx);

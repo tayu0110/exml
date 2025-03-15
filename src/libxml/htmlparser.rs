@@ -38,7 +38,10 @@ use libc::{INT_MAX, memcpy, memset, size_t};
 
 use crate::{
     encoding::{XmlCharEncoding, detect_encoding, find_encoding_handler},
-    error::{__xml_raise_error, XmlParserErrors, parser_validity_error, parser_validity_warning},
+    error::{
+        __xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors, parser_validity_error,
+        parser_validity_warning,
+    },
     globals::{GenericErrorContext, get_keep_blanks_default_value, get_line_numbers_default_value},
     io::XmlParserInputBuffer,
     libxml::{

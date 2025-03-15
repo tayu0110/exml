@@ -28,30 +28,26 @@ use crate::{
     tree::{BASE_BUFFER_SIZE, XmlBufferAllocationScheme},
 };
 
-unsafe fn xml_buf_memory_error(buf: &mut XmlBuf, extra: &str) {
-    unsafe {
-        __xml_simple_oom_error(XmlErrorDomain::XmlFromBuffer, None, Some(extra));
-        if buf.error.is_ok() {
-            buf.error = XmlParserErrors::XmlErrNoMemory;
-        }
+fn xml_buf_memory_error(buf: &mut XmlBuf, extra: &str) {
+    __xml_simple_oom_error(XmlErrorDomain::XmlFromBuffer, None, Some(extra));
+    if buf.error.is_ok() {
+        buf.error = XmlParserErrors::XmlErrNoMemory;
     }
 }
 
 /// Handle a buffer overflow error
 /// To be improved...
 #[doc(alias = "xmlBufOverflowError")]
-pub(crate) unsafe fn xml_buf_overflow_error(buf: &mut XmlBuf, extra: &str) {
-    unsafe {
-        __xml_simple_error!(
-            XmlErrorDomain::XmlFromBuffer,
-            XmlParserErrors::XmlBufOverflow,
-            None,
-            None,
-            extra
-        );
-        if buf.is_ok() {
-            buf.error = XmlParserErrors::XmlBufOverflow;
-        }
+pub(crate) fn xml_buf_overflow_error(buf: &mut XmlBuf, extra: &str) {
+    __xml_simple_error!(
+        XmlErrorDomain::XmlFromBuffer,
+        XmlParserErrors::XmlBufOverflow,
+        None,
+        None,
+        extra
+    );
+    if buf.is_ok() {
+        buf.error = XmlParserErrors::XmlBufOverflow;
     }
 }
 
@@ -166,9 +162,7 @@ impl XmlBuf {
         }
         if additional >= usize::MAX - self.next_use {
             const MSG: &str = "growing buffer past SIZE_MAX";
-            unsafe {
-                xml_buf_memory_error(self, MSG);
-            }
+            xml_buf_memory_error(self, MSG);
             bail!(MSG);
         }
 
@@ -188,9 +182,7 @@ impl XmlBuf {
                 || self.content.len() >= XML_MAX_TEXT_LENGTH
             {
                 const MSG: &str = "buffer error: text too long\n";
-                unsafe {
-                    xml_buf_memory_error(self, MSG);
-                }
+                xml_buf_memory_error(self, MSG);
                 bail!(MSG);
             }
             size = size.max(XML_MAX_TEXT_LENGTH);
@@ -224,9 +216,7 @@ impl XmlBuf {
             // Used to provide parsing limits
             if new_size >= XML_MAX_TEXT_LENGTH {
                 const MSG: &str = "buffer error: text too long\n";
-                unsafe {
-                    xml_buf_memory_error(self, MSG);
-                }
+                xml_buf_memory_error(self, MSG);
                 bail!(MSG);
             }
         }
@@ -250,9 +240,7 @@ impl XmlBuf {
                     let (new, f) = now.overflowing_mul(2);
                     if f {
                         const MSG: &str = "growing buffer";
-                        unsafe {
-                            xml_buf_memory_error(self, MSG);
-                        }
+                        xml_buf_memory_error(self, MSG);
                         bail!(MSG);
                     }
                     now = new;
@@ -269,9 +257,7 @@ impl XmlBuf {
                         let (new, f) = now.overflowing_mul(2);
                         if f {
                             const MSG: &str = "growing buffer";
-                            unsafe {
-                                xml_buf_memory_error(self, MSG);
-                            }
+                            xml_buf_memory_error(self, MSG);
                             bail!(MSG);
                         }
                         now = new;
@@ -324,25 +310,19 @@ impl XmlBuf {
 
         if self.next_use + len >= self.content.len() {
             if len >= usize::MAX - self.len() {
-                unsafe {
-                    xml_buf_memory_error(self, "growing buffer past SIZE_MAX");
-                }
+                xml_buf_memory_error(self, "growing buffer past SIZE_MAX");
                 return Err(None);
             }
             let need_size = self.len() + len + 1; // for NULL-terminator, +1
             if self.scheme == XmlBufferAllocationScheme::XmlBufferAllocBounded
                 && need_size >= XML_MAX_TEXT_LENGTH
             {
-                unsafe {
-                    xml_buf_memory_error(self, "buffer error: text too long\n");
-                }
+                xml_buf_memory_error(self, "buffer error: text too long\n");
                 return Err(None);
             }
 
             self.resize(need_size).map_err(|_| {
-                unsafe {
-                    xml_buf_memory_error(self, "growing buffer");
-                }
+                xml_buf_memory_error(self, "growing buffer");
                 Some(XmlParserErrors::XmlErrNoMemory)
             })?;
         }

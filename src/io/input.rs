@@ -199,13 +199,11 @@ impl XmlParserInputBuffer {
                     content.get(3).unwrap_or(&0)
                 );
 
-                unsafe {
-                    xml_encoding_err!(
-                        XmlParserErrors::XmlI18NConvFailed,
-                        "input conversion failed due to input error, bytes {}\n",
-                        buf.as_str()
-                    );
-                }
+                xml_encoding_err!(
+                    XmlParserErrors::XmlI18NConvFailed,
+                    "input conversion failed due to input error, bytes {}\n",
+                    buf.as_str()
+                );
                 Err(e)
             }
             _ => Ok(0),
@@ -256,9 +254,7 @@ impl XmlParserInputBuffer {
         // Call the read method for this I/O type.
         if let Some(context) = self.context.as_mut() {
             if buf.is_none_or(|mut buf| buf.grow((len + 1) as usize).is_err()) {
-                unsafe {
-                    xml_ioerr_memory("growing input buffer");
-                }
+                xml_ioerr_memory("growing input buffer");
                 self.error = XmlParserErrors::XmlErrNoMemory;
                 return -1;
             }

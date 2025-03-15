@@ -96,28 +96,26 @@ macro_rules! STRANGE {
 
 /// Handle a redefinition of attribute error
 #[doc(alias = "xmlXPtrErrMemory")]
-unsafe fn xml_xptr_err_memory(extra: &str) {
-    unsafe {
-        __xml_raise_error!(
-            None,
-            None,
-            None,
-            null_mut(),
-            None,
-            XmlErrorDomain::XmlFromXPointer,
-            XmlParserErrors::XmlErrNoMemory,
-            XmlErrorLevel::XmlErrError,
-            None,
-            0,
-            Some(extra.to_owned().into()),
-            None,
-            None,
-            0,
-            0,
-            "Memory allocation failed : {}\n",
-            extra
-        );
-    }
+fn xml_xptr_err_memory(extra: &str) {
+    __xml_raise_error!(
+        None,
+        None,
+        None,
+        null_mut(),
+        None,
+        XmlErrorDomain::XmlFromXPointer,
+        XmlParserErrors::XmlErrNoMemory,
+        XmlErrorLevel::XmlErrError,
+        None,
+        0,
+        Some(extra.to_owned().into()),
+        None,
+        None,
+        0,
+        0,
+        "Memory allocation failed : {}\n",
+        extra
+    );
 }
 
 /// Create a new xmlXPathObjectPtr of type LocationSet and initialize

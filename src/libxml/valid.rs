@@ -48,7 +48,7 @@ use crate::tree::{XmlElementPtr, XmlGenericNodePtr, XmlNsPtr};
 #[cfg(not(feature = "libxml_regexp"))]
 use crate::tree::{XmlNodePtr, xml_free_node_list};
 use crate::{
-    error::{__xml_raise_error, XmlParserErrors},
+    error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     globals::{GenericError, GenericErrorContext, StructuredError},
     hash::XmlHashTableRef,
     libxml::{

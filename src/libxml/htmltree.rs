@@ -460,27 +460,23 @@ pub unsafe fn html_doc_dump_memory(cur: XmlDocPtr, mem: *mut *mut XmlChar, size:
 /// Handle an out of memory condition
 #[doc(alias = "htmlSaveErr")]
 #[cfg(feature = "libxml_output")]
-unsafe fn html_save_err(
-    code: XmlParserErrors,
-    node: Option<XmlGenericNodePtr>,
-    extra: Option<&str>,
-) {
-    unsafe {
-        use std::borrow::Cow;
+fn html_save_err(code: XmlParserErrors, node: Option<XmlGenericNodePtr>, extra: Option<&str>) {
+    use crate::error::XmlErrorDomain;
 
-        use crate::error::__xml_simple_error;
+    use std::borrow::Cow;
 
-        let msg: Cow<'static, str> = match code {
-            XmlParserErrors::XmlSaveNotUTF8 => "string is not in UTF-8\n".into(),
-            XmlParserErrors::XmlSaveCharInvalid => "invalid character value\n".into(),
-            XmlParserErrors::XmlSaveUnknownEncoding => {
-                format!("unknown encoding {}\n", extra.expect("Internal Error")).into()
-            }
-            XmlParserErrors::XmlSaveNoDoctype => "HTML has no DOCTYPE\n".into(),
-            _ => "unexpected error number\n".into(),
-        };
-        __xml_simple_error!(XmlErrorDomain::XmlFromOutput, code, node, msg.as_ref());
-    }
+    use crate::error::__xml_simple_error;
+
+    let msg: Cow<'static, str> = match code {
+        XmlParserErrors::XmlSaveNotUTF8 => "string is not in UTF-8\n".into(),
+        XmlParserErrors::XmlSaveCharInvalid => "invalid character value\n".into(),
+        XmlParserErrors::XmlSaveUnknownEncoding => {
+            format!("unknown encoding {}\n", extra.expect("Internal Error")).into()
+        }
+        XmlParserErrors::XmlSaveNoDoctype => "HTML has no DOCTYPE\n".into(),
+        _ => "unexpected error number\n".into(),
+    };
+    __xml_simple_error!(XmlErrorDomain::XmlFromOutput, code, node, msg.as_ref());
 }
 
 /// Dump an HTML document in memory and return the xmlChar * and it's size.  
@@ -850,41 +846,39 @@ pub unsafe fn html_save_file_format(
 /// Dump the HTML document DTD, if any.
 #[doc(alias = "htmlDtdDumpOutput")]
 #[cfg(feature = "libxml_output")]
-unsafe fn html_dtd_dump_output(buf: &mut XmlOutputBuffer, doc: XmlDocPtr, _encoding: Option<&str>) {
-    unsafe {
-        let Some(cur) = doc.int_subset else {
-            html_save_err(XmlParserErrors::XmlSaveNoDoctype, Some(doc.into()), None);
-            return;
-        };
+fn html_dtd_dump_output(buf: &mut XmlOutputBuffer, doc: XmlDocPtr, _encoding: Option<&str>) {
+    let Some(cur) = doc.int_subset else {
+        html_save_err(XmlParserErrors::XmlSaveNoDoctype, Some(doc.into()), None);
+        return;
+    };
 
-        buf.write_str("<!DOCTYPE ").ok();
-        buf.write_str(cur.name.as_deref().unwrap()).ok();
-        if let Some(external_id) = cur.external_id.as_deref() {
-            buf.write_str(" PUBLIC ").ok();
-            if let Some(mut buf) = buf.buffer {
-                let external_id = CString::new(external_id).unwrap();
-                buf.push_quoted_cstr(&external_id).ok();
-            }
-            if let Some(system_id) = cur.system_id.as_deref() {
-                buf.write_str(" ").ok();
-                if let Some(mut buf) = buf.buffer {
-                    let system_id = CString::new(system_id).unwrap();
-                    buf.push_quoted_cstr(&system_id).ok();
-                }
-            }
-        } else if let Some(system_id) = cur
-            .system_id
-            .as_deref()
-            .filter(|&s| s != "about:legacy-compat")
-        {
-            buf.write_str(" SYSTEM ").ok();
+    buf.write_str("<!DOCTYPE ").ok();
+    buf.write_str(cur.name.as_deref().unwrap()).ok();
+    if let Some(external_id) = cur.external_id.as_deref() {
+        buf.write_str(" PUBLIC ").ok();
+        if let Some(mut buf) = buf.buffer {
+            let external_id = CString::new(external_id).unwrap();
+            buf.push_quoted_cstr(&external_id).ok();
+        }
+        if let Some(system_id) = cur.system_id.as_deref() {
+            buf.write_str(" ").ok();
             if let Some(mut buf) = buf.buffer {
                 let system_id = CString::new(system_id).unwrap();
                 buf.push_quoted_cstr(&system_id).ok();
             }
         }
-        buf.write_str(">\n").ok();
+    } else if let Some(system_id) = cur
+        .system_id
+        .as_deref()
+        .filter(|&s| s != "about:legacy-compat")
+    {
+        buf.write_str(" SYSTEM ").ok();
+        if let Some(mut buf) = buf.buffer {
+            let system_id = CString::new(system_id).unwrap();
+            buf.push_quoted_cstr(&system_id).ok();
+        }
     }
+    buf.write_str(">\n").ok();
 }
 
 /// Dump an HTML attribute

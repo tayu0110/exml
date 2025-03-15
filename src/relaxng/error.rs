@@ -3,7 +3,7 @@ use std::{borrow::Cow, ffi::CStr, ptr::null_mut};
 use libc::snprintf;
 
 use crate::{
-    error::{__xml_raise_error, XmlParserErrors},
+    error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     globals::{GenericError, StructuredError},
     libxml::{
         globals::xml_free,

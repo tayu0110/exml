@@ -37,7 +37,7 @@ use libc::memset;
 use crate::libxml::xpointer::XmlLocationSetPtr;
 use crate::{
     encoding::{XmlCharEncoding, get_encoding_handler},
-    error::__xml_raise_error,
+    error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     io::xml_parser_get_directory,
     libxml::{
         globals::{xml_free, xml_malloc},
