@@ -205,7 +205,7 @@ macro_rules! xml_err_valid {
             None,
             0,
             0,
-            $msg,
+            Some($msg),
         );
     };
 }
@@ -767,7 +767,7 @@ unsafe fn xml_err_valid_node(
             str3.map(|s| s.to_owned().into()),
             0,
             0,
-            msg,
+            Some(msg),
         );
     }
 }
@@ -1550,7 +1550,7 @@ macro_rules! xml_err_valid_warning {
             $str3,
             0,
             0,
-            $msg,
+            Some($msg),
         );
     };
 }
@@ -2910,7 +2910,7 @@ macro_rules! xml_err_valid_node_nr {
             None,
             $int2,
             0,
-            format!($msg, $str1, $int2, $str3).as_str(),
+            Some(format!($msg, $str1, $int2, $str3).as_str()),
         );
     };
 }

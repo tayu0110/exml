@@ -2061,7 +2061,7 @@ fn xml_writer_err_msg(ctxt: Option<&XmlTextWriter>, error: XmlParserErrors, msg:
             None,
             0,
             0,
-            msg,
+            Some(msg),
         );
     } else {
         __xml_raise_error!(
@@ -2080,7 +2080,7 @@ fn xml_writer_err_msg(ctxt: Option<&XmlTextWriter>, error: XmlParserErrors, msg:
             None,
             0,
             0,
-            msg,
+            Some(msg),
         );
     }
 }
@@ -2110,7 +2110,7 @@ macro_rules! xml_writer_err_msg_int {
             None,
             $val,
             0,
-            format!($msg, $val).as_str(),
+            Some(format!($msg, $val).as_str()),
         );
     };
 }

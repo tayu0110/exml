@@ -68,7 +68,7 @@ macro_rules! xml_debug_err {
             None,
             0,
             0,
-            msg.as_str(),
+            Some(msg.as_str()),
         );
     };
 }

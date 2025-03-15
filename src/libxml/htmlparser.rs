@@ -5296,7 +5296,7 @@ macro_rules! html_parse_err_int {
                 None,
                 $val,
                 0,
-                format!($msg, $val).as_str(),
+                Some(format!($msg, $val).as_str()),
             );
             if !$ctxt.is_null() {
                 (*$ctxt).well_formed = 0;
@@ -5410,7 +5410,7 @@ unsafe fn html_parse_err(
             None,
             0,
             0,
-            msg,
+            Some(msg),
         );
         if !ctxt.is_null() {
             (*ctxt).well_formed = 0;

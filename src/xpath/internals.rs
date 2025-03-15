@@ -478,7 +478,7 @@ pub unsafe fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error: i32) {
                 None,
                 0,
                 0,
-                XML_XPATH_ERROR_MESSAGES[error as usize],
+                Some(XML_XPATH_ERROR_MESSAGES[error as usize]),
             );
             return;
         }
@@ -507,7 +507,7 @@ pub unsafe fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error: i32) {
                 None,
                 (*ctxt).cur as _,
                 0,
-                XML_XPATH_ERROR_MESSAGES[error as usize],
+                Some(XML_XPATH_ERROR_MESSAGES[error as usize]),
             );
             return;
         }
@@ -551,7 +551,7 @@ pub unsafe fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error: i32) {
                 None,
                 (*ctxt).cur as _,
                 0,
-                XML_XPATH_ERROR_MESSAGES[error as usize],
+                Some(XML_XPATH_ERROR_MESSAGES[error as usize]),
             );
         }
     }

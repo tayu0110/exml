@@ -1471,7 +1471,7 @@ unsafe fn xml_c14n_err<T>(
             None,
             0,
             0,
-            msg,
+            Some(msg),
         );
     }
 }

@@ -862,7 +862,7 @@ pub(crate) unsafe fn xml_schema_err4_line(
                     str3.map(|s| s.to_owned().into()),
                     0,
                     col,
-                    msg,
+                    Some(msg),
                 );
             } else if (*ctxt).typ == XML_SCHEMA_CTXT_PARSER {
                 let pctxt: XmlSchemaParserCtxtPtr = ctxt as XmlSchemaParserCtxtPtr;
@@ -891,7 +891,7 @@ pub(crate) unsafe fn xml_schema_err4_line(
                     str3.map(|s| s.to_owned().into()),
                     0,
                     0,
-                    msg,
+                    Some(msg),
                 );
             } else {
                 // TODO
@@ -1570,7 +1570,7 @@ pub(crate) unsafe fn xml_schema_perr(
             None,
             0,
             0,
-            msg,
+            Some(msg),
         );
     }
 }
@@ -1646,7 +1646,7 @@ unsafe fn xml_schema_perr_ext(
             str_data3.map(|s| s.to_owned().into()),
             0,
             0,
-            msg,
+            Some(msg),
         );
     }
 }

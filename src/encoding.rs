@@ -430,7 +430,7 @@ macro_rules! xml_encoding_err {
             None,
             0,
             0,
-            format!($msg, $val).as_str(),
+            Some(format!($msg, $val).as_str()),
         );
     };
 }

@@ -2066,7 +2066,7 @@ macro_rules! xml_xptr_err {
                 None,
                 0,
                 0,
-                $msg,
+                Some($msg),
             );
         } else {
             // cleanup current last error
@@ -2100,7 +2100,7 @@ macro_rules! xml_xptr_err {
                     None,
                     (*ctxt).cur as _,
                     0,
-                    $msg,
+                    Some($msg),
                 );
             }
         }

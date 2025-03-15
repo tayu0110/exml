@@ -333,7 +333,7 @@ unsafe fn xml_rng_verr(
             None,
             0,
             0,
-            msg,
+            Some(msg),
         );
     }
 }
@@ -680,7 +680,7 @@ pub(crate) unsafe fn xml_rng_err_internal(
             None,
             0,
             0,
-            msg,
+            Some(msg),
         );
     }
 }

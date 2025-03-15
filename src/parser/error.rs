@@ -180,7 +180,7 @@ pub(crate) unsafe fn xml_fatal_err_msg(ctxt: XmlParserCtxtPtr, error: XmlParserE
             None,
             0,
             0,
-            msg,
+            Some(msg),
         );
         if !ctxt.is_null() {
             (*ctxt).well_formed = 0;
@@ -226,7 +226,7 @@ macro_rules! xml_fatal_err_msg_str {
                 None,
                 0,
                 0,
-                $msg,
+                Some($msg),
             );
             if !ctxt.is_null() {
                 (*ctxt).well_formed = 0;
@@ -282,7 +282,7 @@ macro_rules! xml_warning_msg {
                     None,
                     0,
                     0,
-                    $msg,
+                    Some($msg),
                 );
             } else {
                 $crate::error::__xml_raise_error!(
@@ -301,7 +301,7 @@ macro_rules! xml_warning_msg {
                     None,
                     0,
                     0,
-                    $msg,
+                    Some($msg),
                 );
             }
         }
@@ -344,7 +344,7 @@ macro_rules! xml_err_msg_str {
                 None,
                 0,
                 0,
-                $msg,
+                Some($msg),
             );
         }
     };
@@ -379,7 +379,7 @@ macro_rules! xml_fatal_err_msg_int {
                 None,
                 $val,
                 0,
-                $msg,
+                Some($msg),
             );
             if !ctxt.is_null() {
                 (*ctxt).well_formed = 0;
@@ -435,7 +435,7 @@ macro_rules! xml_validity_error {
                     None,
                     0,
                     0,
-                    $msg,
+                    Some($msg),
                 );
                 (*ctxt).valid = 0;
             } else {
@@ -455,7 +455,7 @@ macro_rules! xml_validity_error {
                     None,
                     0,
                     0,
-                    $msg,
+                    Some($msg),
                 );
             }
         }
@@ -515,7 +515,7 @@ macro_rules! xml_fatal_err_msg_str_int_str {
                 None,
                 $val,
                 0,
-                $msg,
+                Some($msg),
             );
             if !ctxt.is_null() {
                 (*ctxt).well_formed = 0;
@@ -571,7 +571,7 @@ macro_rules! xml_ns_err {
                 $info3,
                 0,
                 0,
-                $msg,
+                Some($msg),
             );
             if !ctxt.is_null() {
                 (*ctxt).ns_well_formed = 0;
@@ -616,7 +616,7 @@ macro_rules! xml_err_internal {
                 None,
                 0,
                 0,
-                $msg,
+                Some($msg),
             );
             if !ctxt.is_null() {
                 (*ctxt).well_formed = 0;
@@ -726,7 +726,7 @@ macro_rules! __xml_err_encoding {
                 None,
                 0,
                 0,
-                $msg,
+                Some($msg),
             );
             if !ctxt.is_null() {
                 (*ctxt).well_formed = 0;
@@ -770,7 +770,7 @@ macro_rules! xml_err_encoding_int {
                 None,
                 $val,
                 0,
-                format!($msg, $val).as_str(),
+                Some(format!($msg, $val).as_str()),
             );
             if !ctxt.is_null() {
                 (*ctxt).well_formed = 0;
@@ -855,7 +855,7 @@ macro_rules! xml_ns_warn {
                 $info3,
                 0,
                 0,
-                $msg,
+                Some($msg),
             );
         }
     };

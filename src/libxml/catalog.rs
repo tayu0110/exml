@@ -170,7 +170,7 @@ macro_rules! xml_catalog_err {
             $str3,
             0,
             0,
-            $msg,
+            Some($msg),
         );
     };
 }

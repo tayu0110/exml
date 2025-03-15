@@ -442,7 +442,7 @@ macro_rules! xml_entities_warn {
             None,
             0,
             0,
-            $msg,
+            Some($msg),
         );
     };
 }

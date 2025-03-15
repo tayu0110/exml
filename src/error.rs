@@ -1393,28 +1393,8 @@ pub(crate) fn parser_validity_warning(ctx: Option<GenericErrorContext>, msg: &st
 /// error callback handler
 #[doc(alias = "__xmlRaiseError")]
 macro_rules! __xml_raise_error {
-    ($schannel:expr, $channel:expr, $data:expr, $ctx:expr, $nod:expr, $domain:expr, $code:expr, $level:expr, $file:expr, $line:expr, $str1:expr, $str2:expr, $str3:expr, $int1:expr, $col:expr) => {
-        $crate::error::__xml_raise_error!(
-            $schannel,
-            $channel,
-            $data,
-            $ctx,
-            $nod,
-            $domain,
-            $code,
-            $level,
-            $file,
-            $line,
-            $str1,
-            $str2,
-            $str3,
-            $int1,
-            $col,
-            "No error message provided",
-        );
-    };
     ($schannel:expr, $channel:expr, $data:expr, $ctx:expr, $nod:expr, $domain:expr, $code:expr, $level:expr, $file:expr, $line:expr, $str1:expr, $str2:expr, $str3:expr, $int1:expr, $col:expr, $msg:literal, $( $args:expr ),*) => {
-        $crate::error::__xml_raise_error!(
+        $crate::error::xml_raise_error(
             $schannel,
             $channel,
             $data,
@@ -1430,7 +1410,7 @@ macro_rules! __xml_raise_error {
             $str3,
             $int1,
             $col,
-            format!($msg, $( $args ),*).as_str(),
+            Some(format!($msg, $( $args ),*).as_str()),
         );
     };
     ($schannel:expr, $channel:expr, $data:expr, $ctx:expr, $nod:expr, $domain:expr, $code:expr, $level:expr, $file:expr, $line:expr, $str1:expr, $str2:expr, $str3:expr, $int1:expr, $col:expr, $msg:expr,) => {{
@@ -1473,8 +1453,9 @@ pub(crate) fn xml_raise_error(
     str3: Option<Cow<'static, str>>,
     int1: i32,
     mut col: i32,
-    msg: &str,
+    msg: Option<&str>,
 ) {
+    let msg = msg.unwrap_or("No error message provided");
     let mut ctxt: XmlParserCtxtPtr = null_mut();
     let Some((channel, error, s, data)) = GLOBAL_STATE.with_borrow_mut(|state| {
         let mut node = nod;
@@ -1752,7 +1733,7 @@ pub(crate) fn __xml_simple_oom_error(
             None,
             0,
             0,
-            format!("Memory allocation failed : {msg}\n").as_str(),
+            Some(format!("Memory allocation failed : {msg}\n").as_str()),
         );
     } else {
         __xml_raise_error!(
@@ -1806,7 +1787,8 @@ macro_rules! __xml_simple_error {
             None,
             None,
             0,
-            0
+            0,
+            None,
         );
     };
     (
@@ -1836,7 +1818,7 @@ macro_rules! __xml_simple_error {
             None,
             0,
             0,
-            $msg,
+            Some($msg),
         );
     };
     (
@@ -1867,7 +1849,7 @@ macro_rules! __xml_simple_error {
             None,
             0,
             0,
-            format!($msg, $extra).as_str(),
+            Some(format!($msg, $extra).as_str()),
         );
     };
 }

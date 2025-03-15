@@ -119,7 +119,7 @@ macro_rules! xml_schematron_perr {
             None,
             0,
             0,
-            $msg,
+            Some($msg),
         );
     };
 }
@@ -712,7 +712,7 @@ impl<'a> XmlSchematronValidCtxt<'a> {
                         Some(report.into()),
                         0,
                         0,
-                        msg.as_str(),
+                        Some(msg.as_str()),
                     );
                 } else {
                     self.report_output(Some(cur), &msg);

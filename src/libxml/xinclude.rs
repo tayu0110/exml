@@ -236,7 +236,7 @@ macro_rules! xml_xinclude_err {
             None,
             0,
             0,
-            $msg,
+            Some($msg),
         );
     };
 }

@@ -395,7 +395,7 @@ macro_rules! __xml_loader_err {
                 None,
                 0,
                 0,
-                $msg,
+                Some($msg),
             );
         }
     };

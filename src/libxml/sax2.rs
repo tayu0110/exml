@@ -239,7 +239,7 @@ unsafe fn xml_sax2_err_memory(ctxt: XmlParserCtxtPtr, msg: &str) {
                 None,
                 0,
                 0,
-                msg,
+                Some(msg),
             );
             (*ctxt).err_no = XmlParserErrors::XmlErrNoMemory as i32;
             (*ctxt).instate = XmlParserInputState::XmlParserEOF;
@@ -261,7 +261,7 @@ unsafe fn xml_sax2_err_memory(ctxt: XmlParserCtxtPtr, msg: &str) {
                 None,
                 0,
                 0,
-                msg,
+                Some(msg),
             );
         }
     }
@@ -457,7 +457,7 @@ macro_rules! xml_fatal_err_msg {
                 None,
                 0,
                 0,
-                $msg,
+                Some($msg),
             );
             if !ctxt.is_null() {
                 (*ctxt).well_formed = 0;
@@ -604,7 +604,7 @@ macro_rules! xml_warn_msg {
                 None,
                 0,
                 0,
-                format!($msg, $str1).as_str(),
+                Some(format!($msg, $str1).as_str()),
             );
         }
     };
@@ -758,7 +758,7 @@ macro_rules! xml_err_valid {
                     None,
                     0,
                     0,
-                    $msg,
+                    Some($msg),
                 );
                 (*ctxt).valid = 0;
             } else {
@@ -778,7 +778,7 @@ macro_rules! xml_err_valid {
                     None,
                     0,
                     0,
-                    $msg,
+                    Some($msg),
                 );
             }
         }
@@ -1271,7 +1271,7 @@ macro_rules! xml_ns_warn_msg {
                 None,
                 0,
                 0,
-                $msg,
+                Some($msg),
             );
         }
     };
@@ -1338,7 +1338,7 @@ macro_rules! xml_ns_err_msg {
                 None,
                 0,
                 0,
-                $msg,
+                Some($msg),
             );
         }
     };
