@@ -20,7 +20,7 @@
 
 use std::{
     cell::RefCell,
-    ffi::{CStr, CString, c_char},
+    ffi::{CStr, c_char},
     mem::{size_of, take},
     os::raw::c_void,
     ptr::{drop_in_place, null_mut},
@@ -28,7 +28,7 @@ use std::{
     slice::from_raw_parts,
 };
 
-use libc::{FILE, malloc};
+use libc::FILE;
 
 #[cfg(feature = "libxml_pattern")]
 use crate::pattern::{XmlPattern, XmlPatternFlags, xml_pattern_compile};
@@ -54,7 +54,6 @@ use crate::{
 use super::{
     globals::{xml_free, xml_malloc},
     parser::XmlParserOption,
-    xmlstring::{XmlChar, xml_strdup},
 };
 
 /// Handle a parser error
@@ -155,14 +154,26 @@ enum XmlSchematronTestType {
     XmlSchematronReport = 2,
 }
 
-pub type XmlSchematronLetPtr = *mut XmlSchematronLet;
 /// A Schematron let variable
 #[doc(alias = "xmlSchematronLet")]
 #[repr(C)]
 pub struct XmlSchematronLet {
-    next: XmlSchematronLetPtr, /* the next let variable in the list */
-    name: *mut XmlChar,        /* the name of the variable */
-    comp: XmlXPathCompExprPtr, /* the compiled expression */
+    next: Option<Box<XmlSchematronLet>>, /* the next let variable in the list */
+    name: String,                        /* the name of the variable */
+    comp: XmlXPathCompExprPtr,           /* the compiled expression */
+}
+
+impl Drop for XmlSchematronLet {
+    /// Free a list of let variables.
+    #[doc(alias = "xmlSchematronFreeLets")]
+    fn drop(&mut self) {
+        self.next.take();
+        unsafe {
+            if !self.comp.is_null() {
+                xml_xpath_free_comp_expr(self.comp);
+            }
+        }
+    }
 }
 
 /// A Schematrons test, either an assert or a report
@@ -201,23 +212,7 @@ pub struct XmlSchematronRule {
     tests: Option<Box<XmlSchematronTest>>,        /* the list of tests */
     pattern: Option<Box<XmlPattern>>,             /* the compiled pattern associated */
     report: Option<String>,                       /* the message to report */
-    lets: XmlSchematronLetPtr,                    /* the list of let variables */
-}
-
-impl Drop for XmlSchematronRule {
-    /// Free a list of rules.
-    #[doc(alias = "xmlSchematronFreeRules")]
-    fn drop(&mut self) {
-        self.next.take();
-        self.tests.take();
-        self.pattern.take();
-        self.report.take();
-        if !self.lets.is_null() {
-            unsafe {
-                xml_schematron_free_lets(self.lets);
-            }
-        }
-    }
+    lets: Option<Box<XmlSchematronLet>>,          /* the list of let variables */
 }
 
 /// A Schematrons pattern
@@ -670,7 +665,7 @@ impl XmlSchematronValidCtxt {
 
                             if xml_schematron_register_variables(
                                 self.xctxt,
-                                rule.lets,
+                                rule.lets.as_deref(),
                                 instance,
                                 Some(cur_node.into()),
                             ) != 0
@@ -689,7 +684,9 @@ impl XmlSchematronValidCtxt {
                                 test = tst.next.as_deref();
                             }
 
-                            if xml_schematron_unregister_variables(self.xctxt, rule.lets) != 0 {
+                            if xml_schematron_unregister_variables(self.xctxt, rule.lets.as_deref())
+                                != 0
+                            {
                                 return -1;
                             }
                         }
@@ -725,7 +722,7 @@ impl XmlSchematronValidCtxt {
                                 let mut test = rule.tests.as_deref();
                                 xml_schematron_register_variables(
                                     self.xctxt,
-                                    rule.lets,
+                                    rule.lets.as_deref(),
                                     instance,
                                     Some(cur_node.into()),
                                 );
@@ -735,7 +732,10 @@ impl XmlSchematronValidCtxt {
                                     test = tst.next.as_deref();
                                 }
 
-                                xml_schematron_unregister_variables(self.xctxt, rule.lets);
+                                xml_schematron_unregister_variables(
+                                    self.xctxt,
+                                    rule.lets.as_deref(),
+                                );
                             }
                             now = rule.borrow().patnext.clone();
                         }
@@ -884,7 +884,7 @@ impl XmlSchematronParserCtxt {
                 tests: None,
                 pattern,
                 report: report.map(|report| report.to_owned()),
-                lets: null_mut(),
+                lets: None,
             }));
             if let Some(rules) = (*schema).rules.clone() {
                 let mut prev = rules;
@@ -1005,10 +1005,7 @@ impl XmlSchematronParserCtxt {
                             );
                             return;
                         }
-                        Some(name) => {
-                            let name = CString::new(name).unwrap();
-                            xml_strdup(name.as_ptr() as *const u8)
-                        }
+                        Some(name) => name,
                         None => {
                             xml_schematron_perr!(
                                 self,
@@ -1053,17 +1050,13 @@ impl XmlSchematronParserCtxt {
                         return;
                     }
 
-                    let letr: XmlSchematronLetPtr =
-                        malloc(size_of::<XmlSchematronLet>()) as XmlSchematronLetPtr;
-                    (*letr).name = name;
-                    (*letr).comp = var_comp;
-                    (*letr).next = null_mut();
-
                     // add new let variable to the beginning of the list
-                    if !ruleptr.borrow().lets.is_null() {
-                        (*letr).next = ruleptr.borrow().lets;
-                    }
-                    ruleptr.borrow_mut().lets = letr;
+                    let letr = Box::new(XmlSchematronLet {
+                        name,
+                        next: ruleptr.borrow_mut().lets.take(),
+                        comp: var_comp,
+                    });
+                    ruleptr.borrow_mut().lets = Some(letr);
                 } else if is_schematron(cur_node, "assert") {
                     nb_checks += 1;
                     match cur_node.get_no_ns_prop("test") {
@@ -1633,26 +1626,6 @@ unsafe fn xml_schematron_new_schematron(ctxt: XmlSchematronParserCtxtPtr) -> Xml
     }
 }
 
-/// Free a list of let variables.
-#[doc(alias = "xmlSchematronFreeLets")]
-unsafe fn xml_schematron_free_lets(mut lets: XmlSchematronLetPtr) {
-    unsafe {
-        let mut next: XmlSchematronLetPtr;
-
-        while !lets.is_null() {
-            next = (*lets).next;
-            if !(*lets).name.is_null() {
-                xml_free((*lets).name as _);
-            }
-            if !(*lets).comp.is_null() {
-                xml_xpath_free_comp_expr((*lets).comp);
-            }
-            xml_free(lets as _);
-            lets = next;
-        }
-    }
-}
-
 /// Deallocate a Schematron structure.
 #[doc(alias = "xmlSchematronFree")]
 pub unsafe fn xml_schematron_free(schema: XmlSchematronPtr) {
@@ -1741,7 +1714,7 @@ pub unsafe fn xml_schematron_free_valid_ctxt(ctxt: XmlSchematronValidCtxtPtr) {
 #[doc(alias = "xmlSchematronRegisterVariables")]
 unsafe fn xml_schematron_register_variables(
     ctxt: XmlXPathContextPtr,
-    mut letr: XmlSchematronLetPtr,
+    mut letr: Option<&XmlSchematronLet>,
     instance: XmlDocPtr,
     cur: Option<XmlGenericNodePtr>,
 ) -> i32 {
@@ -1750,17 +1723,17 @@ unsafe fn xml_schematron_register_variables(
 
         (*ctxt).doc = Some(instance);
         (*ctxt).node = cur;
-        while !letr.is_null() {
-            let_eval = xml_xpath_compiled_eval((*letr).comp, ctxt);
+        while let Some(now) = letr {
+            let_eval = xml_xpath_compiled_eval(now.comp, ctxt);
             if let_eval.is_null() {
                 generic_error!("Evaluation of compiled expression failed\n");
                 return -1;
             }
-            if xml_xpath_register_variable_ns(ctxt, (*letr).name, null_mut(), let_eval) != 0 {
+            if xml_xpath_register_variable_ns(ctxt, &now.name, null_mut(), let_eval) != 0 {
                 generic_error!("Registering a let variable failed\n");
                 return -1;
             }
-            letr = (*letr).next;
+            letr = now.next.as_deref();
         }
         0
     }
@@ -1772,15 +1745,15 @@ unsafe fn xml_schematron_register_variables(
 #[doc(alias = "xmlSchematronUnregisterVariables")]
 unsafe fn xml_schematron_unregister_variables(
     ctxt: XmlXPathContextPtr,
-    mut letr: XmlSchematronLetPtr,
+    mut letr: Option<&XmlSchematronLet>,
 ) -> i32 {
     unsafe {
-        while !letr.is_null() {
-            if xml_xpath_register_variable_ns(ctxt, (*letr).name, null_mut(), null_mut()) != 0 {
+        while let Some(now) = letr {
+            if xml_xpath_register_variable_ns(ctxt, &now.name, null_mut(), null_mut()) != 0 {
                 generic_error!("Unregistering a let variable failed\n");
                 return -1;
             }
-            letr = (*letr).next;
+            letr = now.next.as_deref();
         }
         0
     }

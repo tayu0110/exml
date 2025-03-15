@@ -667,7 +667,7 @@ pub unsafe fn xml_xpath_registered_ns_cleanup(ctxt: XmlXPathContextPtr) {
 #[doc(alias = "xmlXPathRegisterVariable")]
 pub unsafe fn xml_xpath_register_variable(
     ctxt: XmlXPathContextPtr,
-    name: *const XmlChar,
+    name: &str,
     value: XmlXPathObjectPtr,
 ) -> i32 {
     unsafe { xml_xpath_register_variable_ns(ctxt, name, null(), value) }
@@ -685,15 +685,12 @@ extern "C" fn xml_xpath_free_object_entry(obj: XmlXPathObjectPtr) {
 #[doc(alias = "xmlXPathRegisterVariableNS")]
 pub unsafe fn xml_xpath_register_variable_ns(
     ctxt: XmlXPathContextPtr,
-    name: *const XmlChar,
+    name: &str,
     ns_uri: *const XmlChar,
     value: XmlXPathObjectPtr,
 ) -> i32 {
     unsafe {
         if ctxt.is_null() {
-            return -1;
-        }
-        if name.is_null() {
             return -1;
         }
 
@@ -708,7 +705,7 @@ pub unsafe fn xml_xpath_register_variable_ns(
         };
         if value.is_null() {
             return match var_hash.remove_entry2(
-                CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
+                name,
                 (!ns_uri.is_null())
                     .then(|| CStr::from_ptr(ns_uri as *const i8).to_string_lossy())
                     .as_deref(),
@@ -722,7 +719,7 @@ pub unsafe fn xml_xpath_register_variable_ns(
         }
 
         match var_hash.update_entry2(
-            CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
+            name,
             (!ns_uri.is_null())
                 .then(|| CStr::from_ptr(ns_uri as *const i8).to_string_lossy())
                 .as_deref(),
