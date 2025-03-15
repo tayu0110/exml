@@ -34,6 +34,8 @@ pub mod pattern;
 pub mod relaxng;
 #[cfg(feature = "libxml_output")]
 pub mod save;
+#[cfg(feature = "schematron")]
+pub mod schematron;
 #[cfg(test)]
 pub(crate) mod test_util;
 pub mod tree;

@@ -36,6 +36,7 @@ use crate::{
     generic_error,
     globals::{GenericError, GenericErrorContext, StructuredError},
     io::{XmlOutputCloseCallback, XmlOutputWriteCallback},
+    libxml::parser::XmlParserOption,
     parser::{xml_read_file, xml_read_memory},
     tree::{
         NodeCommon, XmlAttrPtr, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNodePtr,
@@ -49,8 +50,6 @@ use crate::{
         xml_xpath_free_context, xml_xpath_free_object, xml_xpath_is_nan, xml_xpath_new_context,
     },
 };
-
-use super::parser::XmlParserOption;
 
 /// Handle a parser error
 #[doc(alias = "xmlSchematronPErr")]
@@ -121,6 +120,140 @@ macro_rules! xml_schematron_perr {
             $msg,
         );
     };
+}
+
+const XML_STRON_CTXT_PARSER: i32 = 1;
+const XML_STRON_CTXT_VALIDATOR: i32 = 2;
+
+const SCHEMATRON_PARSE_OPTIONS: XmlParserOption = XmlParserOption::XmlParseNoEnt;
+
+const SCT_OLD_NS: &str = "http://www.ascc.net/xml/schematron";
+
+const XML_SCHEMATRON_NS: &str = "http://purl.oclc.org/dsdl/schematron";
+
+const XML_OLD_SCHEMATRON_NS: &str = SCT_OLD_NS;
+
+/// Handle an out of memory condition
+#[doc(alias = "xmlSchematronPErrMemory")]
+unsafe fn xml_schematron_perr_memory(extra: &str, node: Option<XmlGenericNodePtr>) {
+    unsafe {
+        __xml_simple_oom_error(XmlErrorDomain::XmlFromSchemasp, node, Some(extra));
+    }
+}
+
+unsafe fn is_schematron(node: XmlNodePtr, elem: &str) -> bool {
+    unsafe {
+        node.element_type() == XmlElementType::XmlElementNode
+            && node.name().as_deref() == Some(elem)
+            && node.ns.is_some_and(|ns| {
+                ns.href().as_deref() == Some(XML_SCHEMATRON_NS)
+                    || ns.href().as_deref() == Some(XML_OLD_SCHEMATRON_NS)
+            })
+    }
+}
+
+unsafe fn next_schematron(mut node: Option<XmlNodePtr>) -> Option<XmlNodePtr> {
+    unsafe {
+        while let Some(cur) = node {
+            if cur.element_type() == XmlElementType::XmlElementNode
+                && cur.ns.is_some_and(|ns| {
+                    ns.href().as_deref() == Some(XML_SCHEMATRON_NS)
+                        || ns.href().as_deref() == Some(XML_OLD_SCHEMATRON_NS)
+                })
+            {
+                break;
+            }
+            node = cur.next.map(|node| XmlNodePtr::try_from(node).unwrap());
+        }
+        node
+    }
+}
+
+/// Registers a list of let variables to the current context of @cur
+///
+/// Returns -1 in case of errors, otherwise 0
+#[doc(alias = "xmlSchematronRegisterVariables")]
+unsafe fn xml_schematron_register_variables(
+    ctxt: XmlXPathContextPtr,
+    mut letr: Option<&XmlSchematronLet>,
+    instance: XmlDocPtr,
+    cur: Option<XmlGenericNodePtr>,
+) -> i32 {
+    unsafe {
+        let mut let_eval: XmlXPathObjectPtr;
+
+        (*ctxt).doc = Some(instance);
+        (*ctxt).node = cur;
+        while let Some(now) = letr {
+            let_eval = xml_xpath_compiled_eval(now.comp, ctxt);
+            if let_eval.is_null() {
+                generic_error!("Evaluation of compiled expression failed\n");
+                return -1;
+            }
+            if xml_xpath_register_variable_ns(ctxt, &now.name, null_mut(), let_eval) != 0 {
+                generic_error!("Registering a let variable failed\n");
+                return -1;
+            }
+            letr = now.next.as_deref();
+        }
+        0
+    }
+}
+
+/// Unregisters a list of let variables from the context
+///
+/// Returns -1 in case of errors, otherwise 0
+#[doc(alias = "xmlSchematronUnregisterVariables")]
+unsafe fn xml_schematron_unregister_variables(
+    ctxt: XmlXPathContextPtr,
+    mut letr: Option<&XmlSchematronLet>,
+) -> i32 {
+    unsafe {
+        while let Some(now) = letr {
+            if xml_xpath_register_variable_ns(ctxt, &now.name, null_mut(), null_mut()) != 0 {
+                generic_error!("Unregistering a let variable failed\n");
+                return -1;
+            }
+            letr = now.next.as_deref();
+        }
+        0
+    }
+}
+
+unsafe fn xml_schematron_next_node(cur: XmlNodePtr) -> Option<XmlNodePtr> {
+    let mut cur = if let Some(children) = cur.children() {
+        // Do not descend on entities declarations
+        if children.element_type() != XmlElementType::XmlEntityDecl {
+            // Skip DTDs
+            if children.element_type() != XmlElementType::XmlDTDNode {
+                return Some(XmlNodePtr::try_from(children).unwrap());
+            }
+            children
+        } else {
+            XmlGenericNodePtr::from(cur)
+        }
+    } else {
+        XmlGenericNodePtr::from(cur)
+    };
+
+    while let Some(next) = cur.next() {
+        cur = next;
+        if cur.element_type() != XmlElementType::XmlEntityDecl
+            && cur.element_type() != XmlElementType::XmlDTDNode
+        {
+            return Some(XmlNodePtr::try_from(cur).unwrap());
+        }
+    }
+
+    loop {
+        cur = cur.parent()?;
+        if cur.element_type() == XmlElementType::XmlDocumentNode {
+            break None;
+        }
+        if let Some(next) = cur.next() {
+            break Some(XmlNodePtr::try_from(next).unwrap());
+        }
+    }
 }
 
 #[repr(C)]
@@ -1571,140 +1704,6 @@ impl Drop for XmlSchematronParserCtxt<'_> {
             if !self.xctxt.is_null() {
                 xml_xpath_free_context(self.xctxt);
             }
-        }
-    }
-}
-
-const XML_STRON_CTXT_PARSER: i32 = 1;
-const XML_STRON_CTXT_VALIDATOR: i32 = 2;
-
-const SCHEMATRON_PARSE_OPTIONS: XmlParserOption = XmlParserOption::XmlParseNoEnt;
-
-const SCT_OLD_NS: &str = "http://www.ascc.net/xml/schematron";
-
-const XML_SCHEMATRON_NS: &str = "http://purl.oclc.org/dsdl/schematron";
-
-const XML_OLD_SCHEMATRON_NS: &str = SCT_OLD_NS;
-
-/// Handle an out of memory condition
-#[doc(alias = "xmlSchematronPErrMemory")]
-unsafe fn xml_schematron_perr_memory(extra: &str, node: Option<XmlGenericNodePtr>) {
-    unsafe {
-        __xml_simple_oom_error(XmlErrorDomain::XmlFromSchemasp, node, Some(extra));
-    }
-}
-
-unsafe fn is_schematron(node: XmlNodePtr, elem: &str) -> bool {
-    unsafe {
-        node.element_type() == XmlElementType::XmlElementNode
-            && node.name().as_deref() == Some(elem)
-            && node.ns.is_some_and(|ns| {
-                ns.href().as_deref() == Some(XML_SCHEMATRON_NS)
-                    || ns.href().as_deref() == Some(XML_OLD_SCHEMATRON_NS)
-            })
-    }
-}
-
-unsafe fn next_schematron(mut node: Option<XmlNodePtr>) -> Option<XmlNodePtr> {
-    unsafe {
-        while let Some(cur) = node {
-            if cur.element_type() == XmlElementType::XmlElementNode
-                && cur.ns.is_some_and(|ns| {
-                    ns.href().as_deref() == Some(XML_SCHEMATRON_NS)
-                        || ns.href().as_deref() == Some(XML_OLD_SCHEMATRON_NS)
-                })
-            {
-                break;
-            }
-            node = cur.next.map(|node| XmlNodePtr::try_from(node).unwrap());
-        }
-        node
-    }
-}
-
-/// Registers a list of let variables to the current context of @cur
-///
-/// Returns -1 in case of errors, otherwise 0
-#[doc(alias = "xmlSchematronRegisterVariables")]
-unsafe fn xml_schematron_register_variables(
-    ctxt: XmlXPathContextPtr,
-    mut letr: Option<&XmlSchematronLet>,
-    instance: XmlDocPtr,
-    cur: Option<XmlGenericNodePtr>,
-) -> i32 {
-    unsafe {
-        let mut let_eval: XmlXPathObjectPtr;
-
-        (*ctxt).doc = Some(instance);
-        (*ctxt).node = cur;
-        while let Some(now) = letr {
-            let_eval = xml_xpath_compiled_eval(now.comp, ctxt);
-            if let_eval.is_null() {
-                generic_error!("Evaluation of compiled expression failed\n");
-                return -1;
-            }
-            if xml_xpath_register_variable_ns(ctxt, &now.name, null_mut(), let_eval) != 0 {
-                generic_error!("Registering a let variable failed\n");
-                return -1;
-            }
-            letr = now.next.as_deref();
-        }
-        0
-    }
-}
-
-/// Unregisters a list of let variables from the context
-///
-/// Returns -1 in case of errors, otherwise 0
-#[doc(alias = "xmlSchematronUnregisterVariables")]
-unsafe fn xml_schematron_unregister_variables(
-    ctxt: XmlXPathContextPtr,
-    mut letr: Option<&XmlSchematronLet>,
-) -> i32 {
-    unsafe {
-        while let Some(now) = letr {
-            if xml_xpath_register_variable_ns(ctxt, &now.name, null_mut(), null_mut()) != 0 {
-                generic_error!("Unregistering a let variable failed\n");
-                return -1;
-            }
-            letr = now.next.as_deref();
-        }
-        0
-    }
-}
-
-unsafe fn xml_schematron_next_node(cur: XmlNodePtr) -> Option<XmlNodePtr> {
-    let mut cur = if let Some(children) = cur.children() {
-        // Do not descend on entities declarations
-        if children.element_type() != XmlElementType::XmlEntityDecl {
-            // Skip DTDs
-            if children.element_type() != XmlElementType::XmlDTDNode {
-                return Some(XmlNodePtr::try_from(children).unwrap());
-            }
-            children
-        } else {
-            XmlGenericNodePtr::from(cur)
-        }
-    } else {
-        XmlGenericNodePtr::from(cur)
-    };
-
-    while let Some(next) = cur.next() {
-        cur = next;
-        if cur.element_type() != XmlElementType::XmlEntityDecl
-            && cur.element_type() != XmlElementType::XmlDTDNode
-        {
-            return Some(XmlNodePtr::try_from(cur).unwrap());
-        }
-    }
-
-    loop {
-        cur = cur.parent()?;
-        if cur.element_type() == XmlElementType::XmlDocumentNode {
-            break None;
-        }
-        if let Some(next) = cur.next() {
-            break Some(XmlNodePtr::try_from(next).unwrap());
         }
     }
 }

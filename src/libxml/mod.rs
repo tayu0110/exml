@@ -17,8 +17,6 @@ pub mod relaxng;
 pub mod sax2;
 #[cfg(feature = "schema")]
 pub mod schemas_internals;
-#[cfg(feature = "schematron")]
-pub mod schematron;
 pub mod threads;
 pub mod uri;
 pub mod valid;

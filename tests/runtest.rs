@@ -22,10 +22,10 @@ use std::{
 use const_format::concatcp;
 #[cfg(feature = "c14n")]
 use exml::c14n::XmlC14NMode;
-#[cfg(feature = "schematron")]
-use exml::libxml::schematron::XmlSchematron;
 #[cfg(feature = "libxml_pattern")]
 use exml::pattern::{XmlPattern, XmlStreamCtxt};
+#[cfg(feature = "schematron")]
+use exml::schematron::XmlSchematron;
 #[cfg(feature = "schema")]
 use exml::xmlschemas::schema::XmlSchemaPtr;
 use exml::{
@@ -4019,11 +4019,9 @@ unsafe fn schematron_one_test(
     options: i32,
     schematron: &mut XmlSchematron,
 ) -> i32 {
-    use exml::libxml::schematron::XmlSchematronValidCtxt;
+    use exml::schematron::{XmlSchematronValidCtxt, XmlSchematronValidOptions};
 
     unsafe {
-        use exml::libxml::schematron::XmlSchematronValidOptions;
-
         let Some(doc) = xml_read_file(filename, None, options) else {
             eprintln!("failed to parse instance {} for {}", filename, sch,);
             return -1;
@@ -4064,7 +4062,7 @@ unsafe fn schematron_test(
     _errr: Option<String>,
     options: i32,
 ) -> i32 {
-    use exml::libxml::schematron::XmlSchematronParserCtxt;
+    use exml::schematron::XmlSchematronParserCtxt;
 
     unsafe {
         use std::mem::zeroed;

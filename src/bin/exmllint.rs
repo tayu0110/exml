@@ -31,10 +31,12 @@ use clap::Parser;
 use exml::c14n::{XmlC14NMode, xml_c14n_doc_dump_memory};
 #[cfg(feature = "catalog")]
 use exml::libxml::catalog::xml_load_catalogs;
-#[cfg(feature = "schematron")]
-use exml::libxml::schematron::{XmlSchematron, XmlSchematronValidCtxt, XmlSchematronValidOptions};
 #[cfg(feature = "libxml_pattern")]
 use exml::pattern::{XmlPattern, XmlStreamCtxt, xml_pattern_compile};
+#[cfg(feature = "schematron")]
+use exml::schematron::{
+    XmlSchematron, XmlSchematronParserCtxt, XmlSchematronValidCtxt, XmlSchematronValidOptions,
+};
 #[cfg(feature = "schema")]
 use exml::xmlschemas::schema::XmlSchema;
 use exml::{
@@ -65,7 +67,6 @@ use exml::{
             XmlRelaxNG, xml_relaxng_free, xml_relaxng_parse, xml_relaxng_set_valid_errors,
             xml_relaxng_validate_doc,
         },
-        schematron::XmlSchematronParserCtxt,
         valid::{
             xml_free_valid_ctxt, xml_new_valid_ctxt, xml_valid_get_valid_elements,
             xml_validate_document, xml_validate_dtd,
