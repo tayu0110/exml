@@ -19,10 +19,12 @@
 // Daniel Veillard <daniel@veillard.com>
 
 use std::{
+    cell::RefCell,
     ffi::{CStr, CString, c_char},
     mem::{size_of, take},
     os::raw::c_void,
     ptr::{drop_in_place, null_mut},
+    rc::Rc,
     slice::from_raw_parts,
 };
 
@@ -176,19 +178,38 @@ pub struct XmlSchematronTest {
     report: Option<String>,     /* the message to report */
 }
 
-pub type XmlSchematronRulePtr = *mut XmlSchematronRule;
 /// A Schematrons rule
 #[doc(alias = "xmlSchematronRule")]
 #[repr(C)]
 pub struct XmlSchematronRule {
-    next: XmlSchematronRulePtr,       /* the next rule in the list */
-    patnext: XmlSchematronRulePtr,    /* the next rule in the pattern list */
-    node: Option<XmlNodePtr>,         /* the node in the tree */
-    context: String,                  /* the context evaluation rule */
-    tests: XmlSchematronTestPtr,      /* the list of tests */
-    pattern: Option<Box<XmlPattern>>, /* the compiled pattern associated */
-    report: Option<String>,           /* the message to report */
-    lets: XmlSchematronLetPtr,        /* the list of let variables */
+    next: Option<Rc<RefCell<XmlSchematronRule>>>, /* the next rule in the list */
+    patnext: Option<Rc<RefCell<XmlSchematronRule>>>, /* the next rule in the pattern list */
+    node: Option<XmlNodePtr>,                     /* the node in the tree */
+    context: String,                              /* the context evaluation rule */
+    tests: XmlSchematronTestPtr,                  /* the list of tests */
+    pattern: Option<Box<XmlPattern>>,             /* the compiled pattern associated */
+    report: Option<String>,                       /* the message to report */
+    lets: XmlSchematronLetPtr,                    /* the list of let variables */
+}
+
+impl Drop for XmlSchematronRule {
+    /// Free a list of rules.
+    #[doc(alias = "xmlSchematronFreeRules")]
+    fn drop(&mut self) {
+        let _ = self.next.take();
+        if !self.tests.is_null() {
+            unsafe {
+                xml_schematron_free_tests(self.tests);
+            }
+        }
+        self.pattern.take();
+        self.report.take();
+        if !self.lets.is_null() {
+            unsafe {
+                xml_schematron_free_lets(self.lets);
+            }
+        }
+    }
 }
 
 pub type XmlSchematronPatternPtr = *mut XmlSchematronPattern;
@@ -197,7 +218,7 @@ pub type XmlSchematronPatternPtr = *mut XmlSchematronPattern;
 #[repr(C)]
 pub struct XmlSchematronPattern {
     next: XmlSchematronPatternPtr, /* the next pattern in the list */
-    rules: XmlSchematronRulePtr,   /* the list of rules */
+    rules: Option<Rc<RefCell<XmlSchematronRule>>>, /* the list of rules */
     name: String,                  /* the name of the pattern */
 }
 
@@ -207,7 +228,7 @@ pub type XmlSchematronPtr = *mut XmlSchematron;
 #[doc(alias = "xmlSchematron")]
 #[repr(C)]
 pub struct XmlSchematron {
-    name: *const XmlChar,   /* schema name */
+    name: Option<String>,   /* schema name */
     preserve: i32,          /* was the document passed by the user */
     doc: Option<XmlDocPtr>, /* pointer to the parsed document */
     flags: i32,             /* specific to this schematron */
@@ -217,9 +238,9 @@ pub struct XmlSchematron {
 
     nb_ns: i32, /* the number of namespaces */
 
-    nb_pattern: i32,                   /* the number of patterns */
-    patterns: XmlSchematronPatternPtr, /* the patterns found */
-    rules: XmlSchematronRulePtr,       /* the rules gathered */
+    nb_pattern: i32,                               /* the number of patterns */
+    patterns: XmlSchematronPatternPtr,             /* the patterns found */
+    rules: Option<Rc<RefCell<XmlSchematronRule>>>, /* the rules gathered */
     // the array of namespaces
     // (href, prefix)
     namespaces: Vec<(String, Option<String>)>,
@@ -228,7 +249,7 @@ pub struct XmlSchematron {
 impl Default for XmlSchematron {
     fn default() -> Self {
         Self {
-            name: null_mut(),
+            name: None,
             preserve: 0,
             doc: None,
             flags: 0,
@@ -237,7 +258,7 @@ impl Default for XmlSchematron {
             nb_ns: 0,
             nb_pattern: 0,
             patterns: null_mut(),
-            rules: null_mut(),
+            rules: None,
             namespaces: vec![],
         }
     }
@@ -622,10 +643,9 @@ impl XmlSchematronValidCtxt {
     pub unsafe fn validate_doc(&mut self, instance: XmlDocPtr) -> i32 {
         unsafe {
             let mut pattern: XmlSchematronPatternPtr;
-            let mut rule: XmlSchematronRulePtr;
             let mut test: XmlSchematronTestPtr;
 
-            if self.schema.is_null() || (*self.schema).rules.is_null() {
+            if self.schema.is_null() || (*self.schema).rules.is_none() {
                 return -1;
             }
             self.nberrors = 0;
@@ -641,20 +661,21 @@ impl XmlSchematronValidCtxt {
                 // speed primes over the output, run in a single pass
                 let mut cur = Some(root);
                 while let Some(cur_node) = cur {
-                    rule = (*self.schema).rules;
-                    while !rule.is_null() {
-                        if (*rule)
+                    let mut now = (*self.schema).rules.clone();
+                    while let Some(rule) = now {
+                        if rule
+                            .borrow()
                             .pattern
                             .as_deref()
                             .unwrap()
                             .pattern_match(cur_node.into())
                             == 1
                         {
-                            test = (*rule).tests;
+                            test = rule.borrow().tests;
 
                             if xml_schematron_register_variables(
                                 self.xctxt,
-                                (*rule).lets,
+                                rule.borrow().lets,
                                 instance,
                                 Some(cur_node.into()),
                             ) != 0
@@ -669,17 +690,19 @@ impl XmlSchematronValidCtxt {
                                     cur_node,
                                     // What is this ????
                                     // XmlPattern and XmlSchematronPattern are not compatible...
-                                    // (*rule).pattern as XmlSchematronPatternPtr,
+                                    // rule.pattern as XmlSchematronPatternPtr,
                                     null_mut(),
                                 );
                                 test = (*test).next;
                             }
 
-                            if xml_schematron_unregister_variables(self.xctxt, (*rule).lets) != 0 {
+                            if xml_schematron_unregister_variables(self.xctxt, rule.borrow().lets)
+                                != 0
+                            {
                                 return -1;
                             }
                         }
-                        rule = (*rule).next;
+                        now = rule.borrow().next.clone();
                     }
 
                     cur = xml_schematron_next_node(cur_node);
@@ -697,19 +720,20 @@ impl XmlSchematronValidCtxt {
                     // Check the exact semantic
                     let mut cur = Some(root);
                     while let Some(cur_node) = cur {
-                        rule = (*pattern).rules;
-                        while !rule.is_null() {
-                            if (*rule)
+                        let mut now = (*pattern).rules.clone();
+                        while let Some(rule) = now {
+                            if rule
+                                .borrow()
                                 .pattern
                                 .as_deref()
                                 .unwrap()
                                 .pattern_match(cur_node.into())
                                 == 1
                             {
-                                test = (*rule).tests;
+                                test = rule.borrow().tests;
                                 xml_schematron_register_variables(
                                     self.xctxt,
-                                    (*rule).lets,
+                                    rule.borrow().lets,
                                     instance,
                                     Some(cur_node.into()),
                                 );
@@ -719,9 +743,9 @@ impl XmlSchematronValidCtxt {
                                     test = (*test).next;
                                 }
 
-                                xml_schematron_unregister_variables(self.xctxt, (*rule).lets);
+                                xml_schematron_unregister_variables(self.xctxt, rule.borrow().lets);
                             }
-                            rule = (*rule).patnext;
+                            now = rule.borrow().patnext.clone();
                         }
 
                         cur = xml_schematron_next_node(cur_node);
@@ -843,10 +867,10 @@ impl XmlSchematronParserCtxt {
         node: XmlNodePtr,
         context: &str,
         report: Option<&str>,
-    ) -> XmlSchematronRulePtr {
+    ) -> Option<Rc<RefCell<XmlSchematronRule>>> {
         unsafe {
             if schema.is_null() {
-                return null_mut();
+                return None;
             }
 
             // Try first to compile the pattern
@@ -865,41 +889,39 @@ impl XmlSchematronParserCtxt {
                 );
             }
 
-            let ret: XmlSchematronRulePtr =
-                xml_malloc(size_of::<XmlSchematronRule>()) as XmlSchematronRulePtr;
-            if ret.is_null() {
-                xml_schematron_perr_memory(self, "allocating schema rule", Some(node.into()));
-                return null_mut();
-            }
-            memset(ret as _, 0, size_of::<XmlSchematronRule>());
-            (*ret).node = Some(node);
-            std::ptr::write(&mut (*ret).context, context.to_owned());
-            (*ret).pattern = pattern;
-            std::ptr::write(&mut (*ret).report, report.map(|report| report.to_owned()));
-            (*ret).next = null_mut();
-            (*ret).lets = null_mut();
-            if (*schema).rules.is_null() {
-                (*schema).rules = ret;
-            } else {
-                let mut prev: XmlSchematronRulePtr = (*schema).rules;
+            let ret = Rc::new(RefCell::new(XmlSchematronRule {
+                node: Some(node),
+                next: None,
+                patnext: None,
+                context: context.to_owned(),
+                tests: null_mut(),
+                pattern,
+                report: report.map(|report| report.to_owned()),
+                lets: null_mut(),
+            }));
+            if let Some(rules) = (*schema).rules.clone() {
+                let mut prev = rules;
 
-                while !(*prev).next.is_null() {
-                    prev = (*prev).next;
+                while prev.borrow().next.is_some() {
+                    let next = prev.borrow().next.clone().unwrap();
+                    prev = next;
                 }
-                (*prev).next = ret;
-            }
-            (*ret).patnext = null_mut();
-            if (*pat).rules.is_null() {
-                (*pat).rules = ret;
+                prev.borrow_mut().next = Some(ret.clone());
             } else {
-                let mut prev: XmlSchematronRulePtr = (*pat).rules;
-
-                while !(*prev).patnext.is_null() {
-                    prev = (*prev).patnext;
-                }
-                (*prev).patnext = ret;
+                (*schema).rules = Some(ret.clone());
             }
-            ret
+            if let Some(rules) = (*pat).rules.clone() {
+                let mut prev = rules;
+
+                while prev.borrow().patnext.is_some() {
+                    let next = prev.borrow().patnext.clone().unwrap();
+                    prev = next;
+                }
+                prev.borrow_mut().patnext = Some(ret.clone());
+            } else {
+                (*pat).rules = Some(ret.clone());
+            }
+            Some(ret)
         }
     }
 
@@ -910,16 +932,12 @@ impl XmlSchematronParserCtxt {
     unsafe fn add_test(
         &mut self,
         typ: XmlSchematronTestType,
-        rule: XmlSchematronRulePtr,
+        rule: &mut XmlSchematronRule,
         node: XmlNodePtr,
         test: &str,
         report: Option<&str>,
     ) -> XmlSchematronTestPtr {
         unsafe {
-            if rule.is_null() {
-                return null_mut();
-            }
-
             // try first to compile the test expression
             let comp: XmlXPathCompExprPtr = xml_xpath_ctxt_compile(self.xctxt, test);
             if comp.is_null() {
@@ -946,10 +964,10 @@ impl XmlSchematronParserCtxt {
             (*ret).comp = comp;
             std::ptr::write(&mut (*ret).report, report.map(|report| report.to_owned()));
             (*ret).next = null_mut();
-            if (*rule).tests.is_null() {
-                (*rule).tests = ret;
+            if rule.tests.is_null() {
+                rule.tests = ret;
             } else {
-                let mut prev: XmlSchematronTestPtr = (*rule).tests;
+                let mut prev: XmlSchematronTestPtr = rule.tests;
 
                 while !(*prev).next.is_null() {
                     prev = (*prev).next;
@@ -965,9 +983,8 @@ impl XmlSchematronParserCtxt {
     unsafe fn parse_rule(&mut self, pattern: XmlSchematronPatternPtr, rule: XmlNodePtr) {
         unsafe {
             let mut nb_checks: i32 = 0;
-            let ruleptr: XmlSchematronRulePtr;
 
-            match rule.get_no_ns_prop("context") {
+            let ruleptr = match rule.get_no_ns_prop("context") {
                 Some(context) if context.is_empty() => {
                     xml_schematron_perr!(
                         self,
@@ -978,10 +995,11 @@ impl XmlSchematronParserCtxt {
                     return;
                 }
                 Some(context) => {
-                    ruleptr = self.add_rule(self.schema, pattern, rule, &context, None);
-                    if ruleptr.is_null() {
+                    let Some(ruleptr) = self.add_rule(self.schema, pattern, rule, &context, None)
+                    else {
                         return;
-                    }
+                    };
+                    ruleptr
                 }
                 None => {
                     xml_schematron_perr!(
@@ -992,7 +1010,7 @@ impl XmlSchematronParserCtxt {
                     );
                     return;
                 }
-            }
+            };
 
             let mut cur = rule.children().map(|c| XmlNodePtr::try_from(c).unwrap());
             cur = next_schematron(cur);
@@ -1063,10 +1081,10 @@ impl XmlSchematronParserCtxt {
                     (*letr).next = null_mut();
 
                     // add new let variable to the beginning of the list
-                    if !(*ruleptr).lets.is_null() {
-                        (*letr).next = (*ruleptr).lets;
+                    if !ruleptr.borrow().lets.is_null() {
+                        (*letr).next = ruleptr.borrow().lets;
                     }
-                    (*ruleptr).lets = letr;
+                    ruleptr.borrow_mut().lets = letr;
                 } else if is_schematron(cur_node, "assert") {
                     nb_checks += 1;
                     match cur_node.get_no_ns_prop("test") {
@@ -1084,7 +1102,7 @@ impl XmlSchematronParserCtxt {
 
                             self.add_test(
                                 XmlSchematronTestType::XmlSchematronAssert,
-                                ruleptr,
+                                &mut ruleptr.borrow_mut(),
                                 cur_node,
                                 &test,
                                 report.as_deref(),
@@ -1116,7 +1134,7 @@ impl XmlSchematronParserCtxt {
 
                             self.add_test(
                                 XmlSchematronTestType::XmlSchematronReport,
-                                ruleptr,
+                                &mut ruleptr.borrow_mut(),
                                 cur_node,
                                 &test,
                                 report.as_deref(),
@@ -1675,29 +1693,6 @@ unsafe fn xml_schematron_free_lets(mut lets: XmlSchematronLetPtr) {
     }
 }
 
-/// Free a list of rules.
-#[doc(alias = "xmlSchematronFreeRules")]
-unsafe fn xml_schematron_free_rules(mut rules: XmlSchematronRulePtr) {
-    unsafe {
-        let mut next: XmlSchematronRulePtr;
-
-        while !rules.is_null() {
-            next = (*rules).next;
-            if !(*rules).tests.is_null() {
-                xml_schematron_free_tests((*rules).tests);
-            }
-            (*rules).pattern.take();
-            (*rules).report.take();
-            if !(*rules).lets.is_null() {
-                xml_schematron_free_lets((*rules).lets);
-            }
-            drop_in_place(rules);
-            xml_free(rules as _);
-            rules = next;
-        }
-    }
-}
-
 /// Free a list of patterns.
 #[doc(alias = "xmlSchematronFreePatterns")]
 unsafe fn xml_schematron_free_patterns(mut patterns: XmlSchematronPatternPtr) {
@@ -1725,7 +1720,6 @@ pub unsafe fn xml_schematron_free(schema: XmlSchematronPtr) {
             xml_free_doc(doc);
         }
 
-        xml_schematron_free_rules((*schema).rules);
         xml_schematron_free_patterns((*schema).patterns);
         drop_in_place(schema);
         xml_free(schema as _);
