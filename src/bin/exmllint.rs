@@ -31,6 +31,12 @@ use clap::Parser;
 use exml::c14n::{XmlC14NMode, xml_c14n_doc_dump_memory};
 #[cfg(feature = "catalog")]
 use exml::libxml::catalog::xml_load_catalogs;
+#[cfg(feature = "schematron")]
+use exml::libxml::schematron::{
+    XmlSchematron, XmlSchematronParserCtxtPtr, XmlSchematronValidCtxtPtr,
+    XmlSchematronValidOptions, xml_schematron_free_parser_ctxt, xml_schematron_free_valid_ctxt,
+    xml_schematron_new_parser_ctxt, xml_schematron_new_valid_ctxt,
+};
 #[cfg(feature = "libxml_pattern")]
 use exml::pattern::{XmlPattern, XmlStreamCtxt, xml_pattern_compile};
 #[cfg(feature = "schema")]
@@ -62,12 +68,6 @@ use exml::{
         relaxng::{
             XmlRelaxNG, xml_relaxng_free, xml_relaxng_parse, xml_relaxng_set_valid_errors,
             xml_relaxng_validate_doc,
-        },
-        schematron::{
-            XmlSchematron, XmlSchematronParserCtxtPtr, XmlSchematronValidCtxtPtr,
-            XmlSchematronValidOptions, xml_schematron_free, xml_schematron_free_parser_ctxt,
-            xml_schematron_free_valid_ctxt, xml_schematron_new_parser_ctxt,
-            xml_schematron_new_valid_ctxt,
         },
         valid::{
             xml_free_valid_ctxt, xml_new_valid_ctxt, xml_valid_get_valid_elements,
@@ -656,11 +656,12 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
                     xml_memory_dump();
                     exit(PROGRESULT.load(Ordering::Relaxed));
                 }
-                WXSCHEMATRON.store((*ctxt).parse(), Ordering::Relaxed);
-                if WXSCHEMATRON.load(Ordering::Relaxed).is_null() {
+                let schematron = (*ctxt).parse();
+                if schematron.is_none() {
                     generic_error!("Schematron schema {s} failed to compile\n",);
                     PROGRESULT.store(ERR_SCHEMACOMP, Ordering::Relaxed);
                 }
+                *WXSCHEMATRON.lock().unwrap() = schematron;
                 xml_schematron_free_parser_ctxt(ctxt);
                 if cmd_args.timing {
                     end_timer!("Compiling the schemas");
@@ -757,7 +758,7 @@ static RELAXNGSCHEMAS: AtomicPtr<XmlRelaxNG> = AtomicPtr::new(null_mut());
 #[cfg(feature = "schema")]
 static WXSCHEMAS: AtomicPtr<XmlSchema> = AtomicPtr::new(null_mut());
 #[cfg(feature = "schematron")]
-static WXSCHEMATRON: AtomicPtr<XmlSchematron> = AtomicPtr::new(null_mut());
+static WXSCHEMATRON: Mutex<Option<XmlSchematron>> = Mutex::new(None);
 static REPEAT: AtomicUsize = AtomicUsize::new(0);
 #[cfg(feature = "libxml_push")]
 static PUSHSIZE: AtomicUsize = AtomicUsize::new(4096);
@@ -3180,7 +3181,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             xml_free_valid_ctxt(cvp);
         }
         #[cfg(feature = "schematron")]
-        if !WXSCHEMATRON.load(Ordering::Relaxed).is_null() {
+        if let Some(schematron) = WXSCHEMATRON.lock().unwrap().as_mut() {
             if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
                 start_timer();
             }
@@ -3193,8 +3194,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             if CMD_ARGS.noout {
                 flag |= XmlSchematronValidOptions::XmlSchematronOutQuiet as i32;
             }
-            let ctxt: XmlSchematronValidCtxtPtr =
-                xml_schematron_new_valid_ctxt(WXSCHEMATRON.load(Ordering::Relaxed), flag);
+            let ctxt: XmlSchematronValidCtxtPtr = xml_schematron_new_valid_ctxt(schematron, flag);
             if ctxt.is_null() {
                 PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
                 xml_free_doc(doc);
@@ -3465,15 +3465,6 @@ fn main() {
     }
     if CMD_ARGS.htmlout && !CMD_ARGS.nowrap {
         generic_error!("</body></html>\n");
-    }
-    #[cfg(feature = "schematron")]
-    {
-        let wxschematron = WXSCHEMATRON.load(Ordering::Relaxed);
-        if !wxschematron.is_null() {
-            unsafe {
-                xml_schematron_free(wxschematron);
-            }
-        }
     }
     #[cfg(feature = "schema")]
     {
