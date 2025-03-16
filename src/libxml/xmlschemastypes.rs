@@ -5943,7 +5943,11 @@ pub unsafe fn xml_schema_check_facet(
                 }
             }
             XmlSchemaTypeType::XmlSchemaFacetPattern => {
-                (*facet).regexp = xml_regexp_compile((*facet).value);
+                (*facet).regexp = xml_regexp_compile(
+                    CStr::from_ptr((*facet).value as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                );
                 if (*facet).regexp.is_null() {
                     ret = XmlParserErrors::XmlSchemapRegexpInvalid as i32;
                     // No error message for RelaxNG.

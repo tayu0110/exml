@@ -36,7 +36,7 @@ use std::{
     ptr::{addr_of_mut, drop_in_place, null, null_mut},
 };
 
-use libc::{INT_MAX, memcpy, memset, snprintf, strlen};
+use libc::{memcpy, memset, snprintf, strlen};
 
 use crate::{
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
@@ -248,6 +248,139 @@ pub struct XmlRegAtom {
     pub(crate) data: *mut c_void,
 }
 
+impl XmlRegAtom {
+    #[doc(alias = "xmlRegCheckCharacter")]
+    unsafe fn check_character(&self, codepoint: i32) -> i32 {
+        unsafe {
+            let mut ret: i32;
+
+            if !xml_is_char(codepoint as u32) {
+                return -1;
+            }
+
+            match self.typ {
+                XmlRegAtomType::XmlRegexpSubReg | XmlRegAtomType::XmlRegexpEpsilon => {
+                    return -1;
+                }
+                XmlRegAtomType::XmlRegexpCharval => {
+                    return (codepoint == self.codepoint) as i32;
+                }
+                XmlRegAtomType::XmlRegexpRanges => {
+                    let mut accept: i32 = 0;
+
+                    for &range in &self.ranges {
+                        if (*range).neg == 2 {
+                            ret = xml_reg_check_character_range(
+                                (*range).typ,
+                                codepoint,
+                                0,
+                                (*range).start,
+                                (*range).end,
+                                (*range).block_name.as_deref(),
+                            );
+                            if ret != 0 {
+                                return 0; /* excluded char */
+                            }
+                        } else if (*range).neg != 0 {
+                            ret = xml_reg_check_character_range(
+                                (*range).typ,
+                                codepoint,
+                                0,
+                                (*range).start,
+                                (*range).end,
+                                (*range).block_name.as_deref(),
+                            );
+                            if ret == 0 {
+                                accept = 1;
+                            } else {
+                                return 0;
+                            }
+                        } else {
+                            ret = xml_reg_check_character_range(
+                                (*range).typ,
+                                codepoint,
+                                0,
+                                (*range).start,
+                                (*range).end,
+                                (*range).block_name.as_deref(),
+                            );
+                            if ret != 0 {
+                                accept = 1; /* might still be excluded */
+                            }
+                        }
+                    }
+                    return accept;
+                }
+                XmlRegAtomType::XmlRegexpString => {
+                    println!("TODO: XML_REGEXP_STRING");
+                    return -1;
+                }
+                XmlRegAtomType::XmlRegexpAnyChar
+                | XmlRegAtomType::XmlRegexpAnySpace
+                | XmlRegAtomType::XmlRegexpNotSpace
+                | XmlRegAtomType::XmlRegexpInitName
+                | XmlRegAtomType::XmlRegexpNotInitName
+                | XmlRegAtomType::XmlRegexpNameChar
+                | XmlRegAtomType::XmlRegexpNotNameChar
+                | XmlRegAtomType::XmlRegexpDecimal
+                | XmlRegAtomType::XmlRegexpNotDecimal
+                | XmlRegAtomType::XmlRegexpRealChar
+                | XmlRegAtomType::XmlRegexpNotRealChar
+                | XmlRegAtomType::XmlRegexpLetter
+                | XmlRegAtomType::XmlRegexpLetterUppercase
+                | XmlRegAtomType::XmlRegexpLetterLowercase
+                | XmlRegAtomType::XmlRegexpLetterTitlecase
+                | XmlRegAtomType::XmlRegexpLetterModifier
+                | XmlRegAtomType::XmlRegexpLetterOthers
+                | XmlRegAtomType::XmlRegexpMark
+                | XmlRegAtomType::XmlRegexpMarkNonSpacing
+                | XmlRegAtomType::XmlRegexpMarkSpaceCombining
+                | XmlRegAtomType::XmlRegexpMarkEnclosing
+                | XmlRegAtomType::XmlRegexpNumber
+                | XmlRegAtomType::XmlRegexpNumberDecimal
+                | XmlRegAtomType::XmlRegexpNumberLetter
+                | XmlRegAtomType::XmlRegexpNumberOthers
+                | XmlRegAtomType::XmlRegexpPunct
+                | XmlRegAtomType::XmlRegexpPunctConnector
+                | XmlRegAtomType::XmlRegexpPunctDash
+                | XmlRegAtomType::XmlRegexpPunctOpen
+                | XmlRegAtomType::XmlRegexpPunctClose
+                | XmlRegAtomType::XmlRegexpPunctInitQuote
+                | XmlRegAtomType::XmlRegexpPunctFinQuote
+                | XmlRegAtomType::XmlRegexpPunctOthers
+                | XmlRegAtomType::XmlRegexpSepar
+                | XmlRegAtomType::XmlRegexpSeparSpace
+                | XmlRegAtomType::XmlRegexpSeparLine
+                | XmlRegAtomType::XmlRegexpSeparPara
+                | XmlRegAtomType::XmlRegexpSymbol
+                | XmlRegAtomType::XmlRegexpSymbolMath
+                | XmlRegAtomType::XmlRegexpSymbolCurrency
+                | XmlRegAtomType::XmlRegexpSymbolModifier
+                | XmlRegAtomType::XmlRegexpSymbolOthers
+                | XmlRegAtomType::XmlRegexpOther
+                | XmlRegAtomType::XmlRegexpOtherControl
+                | XmlRegAtomType::XmlRegexpOtherFormat
+                | XmlRegAtomType::XmlRegexpOtherPrivate
+                | XmlRegAtomType::XmlRegexpOtherNa
+                | XmlRegAtomType::XmlRegexpBlockName => {
+                    ret = xml_reg_check_character_range(
+                        self.typ,
+                        codepoint,
+                        0,
+                        0,
+                        0,
+                        self.valuep.as_deref(),
+                    );
+                    if self.neg != 0 {
+                        ret = (ret == 0) as i32;
+                    }
+                }
+            }
+            ret
+        }
+    }
+}
+
 impl Default for XmlRegAtom {
     fn default() -> Self {
         Self {
@@ -305,7 +438,7 @@ impl XmlRegParserCtxt {
                 return null_mut();
             }
             std::ptr::write(&mut *ret, XmlRegexp::default());
-            (*ret).string = self.string;
+            (*ret).string = xml_strndup(self.string.as_ptr(), self.string.len() as i32);
             (*ret).states = take(&mut self.states);
             (*ret).atoms = take(&mut self.atoms);
             (*ret).counters = take(&mut self.counters);
@@ -437,7 +570,7 @@ impl XmlRegParserCtxt {
                                 xml_free(transitions as _);
                                 xml_free(state_remap as _);
                                 // goto not_determ;
-                                self.string = null_mut();
+                                self.string = "".to_owned().into_boxed_str();
                                 self.states.clear();
                                 self.atoms.clear();
                                 self.counters.clear();
@@ -468,7 +601,7 @@ impl XmlRegParserCtxt {
                 xml_free(state_remap as _);
             }
             // not_determ:
-            self.string = null_mut();
+            self.string = "".to_owned().into_boxed_str();
             self.states.clear();
             self.atoms.clear();
             self.counters.clear();
@@ -702,73 +835,64 @@ impl XmlRegParserCtxt {
         }
     }
 
-    unsafe fn parse_escaped_codeunit(&mut self) -> i32 {
-        unsafe {
-            let mut val: i32 = 0;
-            let mut cur: i32;
-            for _ in 0..4 {
-                NEXT!(self);
-                val *= 16;
-                cur = CUR!(self) as _;
-                if cur >= b'0' as i32 && cur <= b'9' as i32 {
-                    val += cur - b'0' as i32;
-                } else if cur >= b'A' as i32 && cur <= b'F' as i32 {
-                    val += cur - b'A' as i32 + 10;
-                } else if cur >= b'a' as i32 && cur <= b'f' as i32 {
-                    val += cur - b'a' as i32 + 10;
-                } else {
+    fn parse_escaped_codeunit(&mut self) -> i32 {
+        let mut val = 0;
+        for _ in 0..4 {
+            self.cur += 1;
+            val *= 16;
+            match self.current_byte() {
+                Some(cur @ b'0'..=b'9') => {
+                    val += cur as i32 - b'0' as i32;
+                }
+                Some(cur @ b'A'..=b'F') => {
+                    val += cur as i32 - b'A' as i32 + 10;
+                }
+                Some(cur @ b'a'..=b'f') => {
+                    val += cur as i32 - b'a' as i32 + 10;
+                }
+                _ => {
                     ERROR!(self, "Expecting hex digit");
                     return -1;
                 }
             }
-            val
         }
+        val
     }
 
-    unsafe fn parse_escaped_codepoint(&mut self) -> i32 {
-        unsafe {
-            let mut val: i32 = self.parse_escaped_codeunit();
-            if (0xD800..=0xDBFF).contains(&val) {
-                NEXT!(self);
-                if CUR!(self) == b'\\' {
-                    NEXT!(self);
-                    if CUR!(self) == b'u' {
-                        let low: i32 = self.parse_escaped_codeunit();
-                        if (0xDC00..=0xDFFF).contains(&low) {
-                            return (val - 0xD800) * 0x400 + (low - 0xDC00) + 0x10000;
-                        }
+    fn parse_escaped_codepoint(&mut self) -> i32 {
+        let mut val: i32 = self.parse_escaped_codeunit();
+        if (0xD800..=0xDBFF).contains(&val) {
+            self.cur += 1;
+            if self.current_byte() == Some(b'\\') {
+                self.cur += 1;
+                if self.current_byte() == Some(b'u') {
+                    let low: i32 = self.parse_escaped_codeunit();
+                    if (0xDC00..=0xDFFF).contains(&low) {
+                        return (val - 0xD800) * 0x400 + (low - 0xDC00) + 0x10000;
                     }
                 }
-                ERROR!(self, "Invalid low surrogate pair code unit");
-                val = -1;
             }
-            val
+            ERROR!(self, "Invalid low surrogate pair code unit");
+            val = -1;
         }
+        val
     }
 
     /// `[10]   Char   ::=   [^.\?*+()|#x5B#x5D]`
     #[doc(alias = "xmlFAIsChar")]
-    unsafe fn fa_is_char(&self) -> i32 {
-        unsafe {
-            let mut len: i32 = 0;
-
-            let cur: i32 = CUR_SCHAR!(self.cur, len);
-            if cur == b'.' as i32
-                || cur == b'\\' as i32
-                || cur == b'?' as i32
-                || cur == b'*' as i32
-                || cur == b'+' as i32
-                || cur == b'(' as i32
-                || cur == b')' as i32
-                || cur == b'|' as i32
-                || cur == 0x5B
-                || cur == 0x5D
-                || cur == 0
-            {
-                return -1;
-            }
-            cur
-        }
+    fn fa_is_char(&self) -> Option<char> {
+        self.current_char().filter(|&cur| {
+            cur != '.'
+                && cur != '\\'
+                && cur != '?'
+                && cur != '*'
+                && cur != '+'
+                && cur != '('
+                && cur != ')'
+                && cur != '|'
+                && cur != '\x5B'
+                && cur != '\x5D'
+        })
     }
 
     /// Returns 0 if success and -1 in case of error.
@@ -1557,196 +1681,181 @@ impl XmlRegParserCtxt {
     #[doc(alias = "xmlFAParseCharProp")]
     unsafe fn fa_parse_char_prop(&mut self) {
         unsafe {
-            let mut cur: i32;
-            let mut block_name: *mut XmlChar = null_mut();
+            let mut block_name = None;
 
-            cur = CUR!(self) as _;
-            let typ = if cur == b'L' as _ {
-                NEXT!(self);
-                cur = CUR!(self) as _;
-                if cur == b'u' as _ {
-                    NEXT!(self);
+            let cur = self.current_byte().unwrap_or(0);
+            let typ = if cur == b'L' {
+                self.cur += 1;
+                let cur = self.current_byte().unwrap_or(0);
+                if cur == b'u' {
+                    self.cur += 1;
                     XmlRegAtomType::XmlRegexpLetterUppercase
-                } else if cur == b'l' as _ {
-                    NEXT!(self);
+                } else if cur == b'l' {
+                    self.cur += 1;
                     XmlRegAtomType::XmlRegexpLetterLowercase
-                } else if cur == b't' as _ {
-                    NEXT!(self);
+                } else if cur == b't' {
+                    self.cur += 1;
                     XmlRegAtomType::XmlRegexpLetterTitlecase
-                } else if cur == b'm' as _ {
-                    NEXT!(self);
+                } else if cur == b'm' {
+                    self.cur += 1;
                     XmlRegAtomType::XmlRegexpLetterModifier
-                } else if cur == b'o' as _ {
-                    NEXT!(self);
+                } else if cur == b'o' {
+                    self.cur += 1;
                     XmlRegAtomType::XmlRegexpLetterOthers
                 } else {
                     XmlRegAtomType::XmlRegexpLetter
                 }
-            } else if cur == b'M' as _ {
-                NEXT!(self);
-                cur = CUR!(self) as _;
-                if cur == b'n' as _ {
-                    NEXT!(self);
+            } else if cur == b'M' {
+                self.cur += 1;
+                let cur = self.current_byte().unwrap_or(0);
+                if cur == b'n' {
+                    self.cur += 1;
                     // nonspacing
                     XmlRegAtomType::XmlRegexpMarkNonSpacing
-                } else if cur == b'c' as _ {
-                    NEXT!(self);
+                } else if cur == b'c' {
+                    self.cur += 1;
                     // spacing combining
                     XmlRegAtomType::XmlRegexpMarkSpaceCombining
-                } else if cur == b'e' as _ {
-                    NEXT!(self);
+                } else if cur == b'e' {
+                    self.cur += 1;
                     // enclosing
                     XmlRegAtomType::XmlRegexpMarkEnclosing
                 } else {
                     // all marks
                     XmlRegAtomType::XmlRegexpMark
                 }
-            } else if cur == b'N' as _ {
-                NEXT!(self);
-                cur = CUR!(self) as _;
-                if cur == b'd' as _ {
-                    NEXT!(self);
+            } else if cur == b'N' {
+                self.cur += 1;
+                let cur = self.current_byte().unwrap_or(0);
+                if cur == b'd' {
+                    self.cur += 1;
                     // digital
                     XmlRegAtomType::XmlRegexpNumberDecimal
-                } else if cur == b'l' as _ {
-                    NEXT!(self);
+                } else if cur == b'l' {
+                    self.cur += 1;
                     // letter
                     XmlRegAtomType::XmlRegexpNumberLetter
-                } else if cur == b'o' as _ {
-                    NEXT!(self);
+                } else if cur == b'o' {
+                    self.cur += 1;
                     // other
                     XmlRegAtomType::XmlRegexpNumberOthers
                 } else {
                     // all numbers
                     XmlRegAtomType::XmlRegexpNumber
                 }
-            } else if cur == b'P' as _ {
-                NEXT!(self);
-                cur = CUR!(self) as _;
-                if cur == b'c' as _ {
-                    NEXT!(self);
+            } else if cur == b'P' {
+                self.cur += 1;
+                let cur = self.current_byte().unwrap_or(0);
+                if cur == b'c' {
+                    self.cur += 1;
                     // connector
                     XmlRegAtomType::XmlRegexpPunctConnector
-                } else if cur == b'd' as _ {
-                    NEXT!(self);
+                } else if cur == b'd' {
+                    self.cur += 1;
                     // dash
                     XmlRegAtomType::XmlRegexpPunctDash
-                } else if cur == b's' as _ {
-                    NEXT!(self);
+                } else if cur == b's' {
+                    self.cur += 1;
                     // open
                     XmlRegAtomType::XmlRegexpPunctOpen
-                } else if cur == b'e' as _ {
-                    NEXT!(self);
+                } else if cur == b'e' {
+                    self.cur += 1;
                     // close
                     XmlRegAtomType::XmlRegexpPunctClose
-                } else if cur == b'i' as _ {
-                    NEXT!(self);
+                } else if cur == b'i' {
+                    self.cur += 1;
                     // initial quote
                     XmlRegAtomType::XmlRegexpPunctInitQuote
-                } else if cur == b'f' as _ {
-                    NEXT!(self);
+                } else if cur == b'f' {
+                    self.cur += 1;
                     // final quote
                     XmlRegAtomType::XmlRegexpPunctFinQuote
-                } else if cur == b'o' as _ {
-                    NEXT!(self);
+                } else if cur == b'o' {
+                    self.cur += 1;
                     // other
                     XmlRegAtomType::XmlRegexpPunctOthers
                 } else {
                     // all punctuation
                     XmlRegAtomType::XmlRegexpPunct
                 }
-            } else if cur == b'Z' as _ {
-                NEXT!(self);
-                cur = CUR!(self) as _;
-                if cur == b's' as _ {
-                    NEXT!(self);
+            } else if cur == b'Z' {
+                self.cur += 1;
+                let cur = self.current_byte().unwrap_or(0);
+                if cur == b's' {
+                    self.cur += 1;
                     // space
                     XmlRegAtomType::XmlRegexpSeparSpace
-                } else if cur == b'l' as _ {
-                    NEXT!(self);
+                } else if cur == b'l' {
+                    self.cur += 1;
                     // line
                     XmlRegAtomType::XmlRegexpSeparLine
-                } else if cur == b'p' as _ {
-                    NEXT!(self);
+                } else if cur == b'p' {
+                    self.cur += 1;
                     // paragraph
                     XmlRegAtomType::XmlRegexpSeparPara
                 } else {
                     // all separators
                     XmlRegAtomType::XmlRegexpSepar
                 }
-            } else if cur == b'S' as _ {
-                NEXT!(self);
-                cur = CUR!(self) as _;
-                if cur == b'm' as _ {
+            } else if cur == b'S' {
+                self.cur += 1;
+                let cur = self.current_byte().unwrap_or(0);
+                if cur == b'm' {
                     // math
-                    NEXT!(self);
+                    self.cur += 1;
                     XmlRegAtomType::XmlRegexpSymbolMath
-                } else if cur == b'c' as _ {
+                } else if cur == b'c' {
                     // currency
-                    NEXT!(self);
+                    self.cur += 1;
                     XmlRegAtomType::XmlRegexpSymbolCurrency
-                } else if cur == b'k' as _ {
+                } else if cur == b'k' {
                     // modifiers
-                    NEXT!(self);
+                    self.cur += 1;
                     XmlRegAtomType::XmlRegexpSymbolModifier
-                } else if cur == b'o' as _ {
+                } else if cur == b'o' {
                     // other
-                    NEXT!(self);
+                    self.cur += 1;
                     XmlRegAtomType::XmlRegexpSymbolOthers
                 } else {
                     // all symbols
                     XmlRegAtomType::XmlRegexpSymbol
                 }
-            } else if cur == b'C' as _ {
-                NEXT!(self);
-                cur = CUR!(self) as _;
-                if cur == b'c' as _ {
-                    NEXT!(self);
+            } else if cur == b'C' {
+                self.cur += 1;
+                let cur = self.current_byte().unwrap_or(0);
+                if cur == b'c' {
+                    self.cur += 1;
                     // control
                     XmlRegAtomType::XmlRegexpOtherControl
-                } else if cur == b'f' as _ {
-                    NEXT!(self);
+                } else if cur == b'f' {
+                    self.cur += 1;
                     // format
                     XmlRegAtomType::XmlRegexpOtherFormat
-                } else if cur == b'o' as _ {
-                    NEXT!(self);
+                } else if cur == b'o' {
+                    self.cur += 1;
                     // private use
                     XmlRegAtomType::XmlRegexpOtherPrivate
-                } else if cur == b'n' as _ {
-                    NEXT!(self);
+                } else if cur == b'n' {
+                    self.cur += 1;
                     // not assigned
                     XmlRegAtomType::XmlRegexpOtherNa
                 } else {
                     // all others
                     XmlRegAtomType::XmlRegexpOther
                 }
-            } else if cur == b'I' as _ {
-                NEXT!(self);
-                cur = CUR!(self) as _;
-                if cur != b's' as _ {
+            } else if cur == b'I' {
+                self.cur += 1;
+                if self.current_byte() != Some(b's') {
                     ERROR!(self, "IsXXXX expected");
                     return;
                 }
-                NEXT!(self);
-                let start: *const XmlChar = self.cur;
-                cur = CUR!(self) as _;
-                if (cur >= b'a' as _ && cur <= b'z' as _)
-                    || (cur >= b'A' as _ && cur <= b'Z' as _)
-                    || (cur >= b'0' as _ && cur <= b'9' as _)
-                    || cur == 0x2D
-                {
-                    NEXT!(self);
-                    cur = CUR!(self) as _;
-                    while (cur >= b'a' as _ && cur <= b'z' as _)
-                        || (cur >= b'A' as _ && cur <= b'Z' as _)
-                        || (cur >= b'0' as _ && cur <= b'9' as _)
-                        || cur == 0x2D
-                    {
-                        NEXT!(self);
-                        cur = CUR!(self) as _;
-                    }
-                }
-                block_name = xml_strndup(start, self.cur.offset_from(start) as _);
+                self.cur += 1;
+                let start = self.current_str();
+                let trimmed =
+                    start.trim_start_matches(|c: char| c.is_ascii_alphanumeric() || c == '\x2D');
+                let diff = start.len() - trimmed.len();
+                block_name = Some(start[..diff].to_owned());
+                self.cur += diff;
                 XmlRegAtomType::XmlRegexpBlockName
             } else {
                 ERROR!(self, "Unknown char property");
@@ -1755,33 +1864,16 @@ impl XmlRegParserCtxt {
             if self.atom.is_null() {
                 self.atom = self.reg_new_atom(typ);
                 if self.atom.is_null() {
-                    xml_free(block_name as _);
                     return;
                 }
-                (*self.atom).valuep = (!block_name.is_null()).then(|| {
-                    CStr::from_ptr(block_name as *const i8)
-                        .to_string_lossy()
-                        .into_owned()
-                });
+                (*self.atom).valuep = block_name;
             } else if matches!((*self.atom).typ, XmlRegAtomType::XmlRegexpRanges)
                 && self
-                    .reg_atom_add_range(
-                        self.atom,
-                        self.neg,
-                        typ,
-                        0,
-                        0,
-                        Some(
-                            CStr::from_ptr(block_name as *const i8)
-                                .to_string_lossy()
-                                .as_ref(),
-                        ),
-                    )
+                    .reg_atom_add_range(self.atom, self.neg, typ, 0, 0, block_name.as_deref())
                     .is_null()
             {
                 // no op
             }
-            xml_free(block_name as _);
         }
     }
 
@@ -1795,9 +1887,7 @@ impl XmlRegParserCtxt {
     #[doc(alias = "xmlFAParseCharClassEsc")]
     unsafe fn fa_parse_char_class_esc(&mut self) {
         unsafe {
-            let mut cur: i32;
-
-            if CUR!(self) == b'.' {
+            if self.current_byte() == Some(b'.') {
                 if self.atom.is_null() {
                     self.atom = self.reg_new_atom(XmlRegAtomType::XmlRegexpAnyChar);
                 } else if matches!((*self.atom).typ, XmlRegAtomType::XmlRegexpRanges) {
@@ -1810,182 +1900,134 @@ impl XmlRegParserCtxt {
                         None,
                     );
                 }
-                NEXT!(self);
+                self.cur += 1;
                 return;
             }
-            if CUR!(self) != b'\\' {
+            if self.current_byte() != Some(b'\\') {
                 ERROR!(self, "Escaped sequence: expecting \\");
                 return;
             }
-            NEXT!(self);
-            cur = CUR!(self) as _;
-            if cur == b'p' as _ {
-                NEXT!(self);
-                if CUR!(self) != b'{' {
-                    ERROR!(self, "Expecting '{'");
-                    return;
-                }
-                NEXT!(self);
-                self.fa_parse_char_prop();
-                if CUR!(self) != b'}' {
-                    ERROR!(self, "Expecting '}'");
-                    return;
-                }
-                NEXT!(self);
-            } else if cur == b'P' as _ {
-                NEXT!(self);
-                if CUR!(self) != b'{' {
-                    ERROR!(self, "Expecting '{'");
-                    return;
-                }
-                NEXT!(self);
-                self.fa_parse_char_prop();
-                if !self.atom.is_null() {
-                    (*self.atom).neg = 1;
-                }
-                if CUR!(self) != b'}' {
-                    ERROR!(self, "Expecting '}'");
-                    return;
-                }
-                NEXT!(self);
-            } else if cur == b'n' as _
-        || cur == b'r' as _
-        || cur == b't' as _
-        || cur == b'\\' as _
-        || cur == b'|' as _
-        || cur == b'.' as _
-        || cur == b'?' as _
-        || cur == b'*' as _
-        || cur == b'+' as _
-        || cur == b'(' as _
-        || cur == b')' as _
-        || cur == b'{' as _
-        || cur == b'}' as _
-        || cur == 0x2D
-        || cur == 0x5B
-        || cur == 0x5D
-        || cur == 0x5E
-        // Non-standard escape sequences:
-        //                  Java 1.8|.NET Core 3.1|MSXML 6
-        || cur == b'!' as _ /*   +  |     +       |    +   */
-        || cur == b'"' as _ /*   +  |     +       |    +   */
-        || cur == b'#' as _ /*   +  |     +       |    +   */
-        || cur == b'$' as _ /*   +  |     +       |    +   */
-        || cur == b'%' as _ /*   +  |     +       |    +   */
-        || cur == b',' as _ /*   +  |     +       |    +   */
-        || cur == b'/' as _ /*   +  |     +       |    +   */
-        || cur == b':' as _ /*   +  |     +       |    +   */
-        || cur == b';' as _ /*   +  |     +       |    +   */
-        || cur == b'=' as _ /*   +  |     +       |    +   */
-        || cur == b'>' as _ /*      |     +       |    +   */
-        || cur == b'@' as _ /*   +  |     +       |    +   */
-        || cur == b'`' as _ /*   +  |     +       |    +   */
-        || cur == b'~' as _ /*   +  |     +       |    +   */
-        || cur == b'u' as _
-            /*      |     +       |    +   */
-            {
-                if self.atom.is_null() {
-                    self.atom = self.reg_new_atom(XmlRegAtomType::XmlRegexpCharval);
-                    if !self.atom.is_null() {
-                        match TryInto::<u8>::try_into(cur) {
-                            Ok(b'n') => {
-                                (*self.atom).codepoint = b'\n' as i32;
-                            }
-                            Ok(b'r') => {
-                                (*self.atom).codepoint = b'\r' as i32;
-                            }
-                            Ok(b't') => {
-                                (*self.atom).codepoint = b'\t' as i32;
-                            }
-                            Ok(b'u') => {
-                                cur = self.parse_escaped_codepoint();
-                                if cur < 0 {
-                                    return;
-                                }
-                                (*self.atom).codepoint = cur;
-                            }
-                            _ => {
-                                (*self.atom).codepoint = cur;
-                            }
-                        }
+            self.cur += 1;
+            match self.current_byte() {
+                Some(b'p') => {
+                    self.cur += 1;
+                    if self.current_byte() != Some(b'{') {
+                        ERROR!(self, "Expecting '{'");
+                        return;
                     }
-                } else if matches!((*self.atom).typ, XmlRegAtomType::XmlRegexpRanges) {
-                    match TryInto::<u8>::try_into(cur) {
-                        Ok(b'n') => {
-                            cur = b'\n' as _;
+                    self.cur += 1;
+                    self.fa_parse_char_prop();
+                    if self.current_byte() != Some(b'}') {
+                        ERROR!(self, "Expecting '}'");
+                        return;
+                    }
+                    self.cur += 1;
+                }
+                Some(b'P') => {
+                    self.cur += 1;
+                    if self.current_byte() != Some(b'{') {
+                        ERROR!(self, "Expecting '{'");
+                        return;
+                    }
+                    self.cur += 1;
+                    self.fa_parse_char_prop();
+                    if !self.atom.is_null() {
+                        (*self.atom).neg = 1;
+                    }
+                    if self.current_byte() != Some(b'}') {
+                        ERROR!(self, "Expecting '}'");
+                        return;
+                    }
+                    self.cur += 1;
+                }
+                Some(
+                    mut cur @ (b'n' | b'r' | b't' | b'\\' | b'|' | b'.' | b'?' | b'*' | b'+' | b'('
+                    | b')' | b'{' | b'}' | 0x2D | 0x5B | 0x5D | 0x5E | b'!' | b'"' | b'#'
+                    | b'$' | b'%' | b',' | b'/' | b':' | b';' | b'=' | b'>' | b'@' | b'`'
+                    | b'~' | b'u'),
+                ) => {
+                    // Non-standard escape sequences:
+                    //     |Java 1.8|.NET Core 3.1|MSXML 6
+                    //  !  |    +   |      +      |    +
+                    //  "  |    +   |      +      |    +
+                    //  #  |    +   |      +      |    +
+                    //  $  |    +   |      +      |    +
+                    //  %  |    +   |      +      |    +
+                    //  ,  |    +   |      +      |    +
+                    //  /  |    +   |      +      |    +
+                    //  :  |    +   |      +      |    +
+                    //  ;  |    +   |      +      |    +
+                    //  =  |    +   |      +      |    +
+                    //  >  |        |      +      |    +
+                    //  @  |    +   |      +      |    +
+                    //  `  |    +   |      +      |    +
+                    //  ~  |    +   |      +      |    +
+                    //  u  |        |      +      |    +
+                    if self.atom.is_null() {
+                        self.atom = self.reg_new_atom(XmlRegAtomType::XmlRegexpCharval);
+                        if !self.atom.is_null() {
+                            match cur {
+                                b'n' => (*self.atom).codepoint = b'\n' as i32,
+                                b'r' => (*self.atom).codepoint = b'\r' as i32,
+                                b't' => (*self.atom).codepoint = b'\t' as i32,
+                                b'u' => {
+                                    let cur = self.parse_escaped_codepoint();
+                                    if cur < 0 {
+                                        return;
+                                    }
+                                    (*self.atom).codepoint = cur;
+                                }
+                                _ => {
+                                    (*self.atom).codepoint = cur as i32;
+                                }
+                            }
                         }
-                        Ok(b'r') => {
-                            cur = b'\r' as _;
+                    } else if matches!((*self.atom).typ, XmlRegAtomType::XmlRegexpRanges) {
+                        match cur {
+                            b'n' => cur = b'\n',
+                            b'r' => cur = b'\r',
+                            b't' => cur = b'\t',
+                            _ => {}
                         }
-                        Ok(b't') => {
-                            cur = b'\t' as _;
-                        }
+                        self.reg_atom_add_range(
+                            self.atom,
+                            self.neg,
+                            XmlRegAtomType::XmlRegexpCharval,
+                            cur as i32,
+                            cur as i32,
+                            None,
+                        );
+                    }
+                    self.cur += 1;
+                }
+                Some(
+                    cur @ (b's' | b'S' | b'i' | b'I' | b'c' | b'C' | b'd' | b'D' | b'w' | b'W'),
+                ) => {
+                    let mut typ: XmlRegAtomType = XmlRegAtomType::XmlRegexpAnySpace;
+
+                    match cur {
+                        b's' => typ = XmlRegAtomType::XmlRegexpAnySpace,
+                        b'S' => typ = XmlRegAtomType::XmlRegexpNotSpace,
+                        b'i' => typ = XmlRegAtomType::XmlRegexpInitName,
+                        b'I' => typ = XmlRegAtomType::XmlRegexpNotInitName,
+                        b'c' => typ = XmlRegAtomType::XmlRegexpNameChar,
+                        b'C' => typ = XmlRegAtomType::XmlRegexpNotNameChar,
+                        b'd' => typ = XmlRegAtomType::XmlRegexpDecimal,
+                        b'D' => typ = XmlRegAtomType::XmlRegexpNotDecimal,
+                        b'w' => typ = XmlRegAtomType::XmlRegexpRealChar,
+                        b'W' => typ = XmlRegAtomType::XmlRegexpNotRealChar,
                         _ => {}
                     }
-                    self.reg_atom_add_range(
-                        self.atom,
-                        self.neg,
-                        XmlRegAtomType::XmlRegexpCharval,
-                        cur,
-                        cur,
-                        None,
-                    );
+                    self.cur += 1;
+                    if self.atom.is_null() {
+                        self.atom = self.reg_new_atom(typ);
+                    } else if matches!((*self.atom).typ, XmlRegAtomType::XmlRegexpRanges) {
+                        self.reg_atom_add_range(self.atom, self.neg, typ, 0, 0, None);
+                    }
                 }
-                NEXT!(self);
-            } else if cur == b's' as _
-                || cur == b'S' as _
-                || cur == b'i' as _
-                || cur == b'I' as _
-                || cur == b'c' as _
-                || cur == b'C' as _
-                || cur == b'd' as _
-                || cur == b'D' as _
-                || cur == b'w' as _
-                || cur == b'W' as _
-            {
-                let mut typ: XmlRegAtomType = XmlRegAtomType::XmlRegexpAnySpace;
-
-                match TryInto::<u8>::try_into(cur) {
-                    Ok(b's') => {
-                        typ = XmlRegAtomType::XmlRegexpAnySpace;
-                    }
-                    Ok(b'S') => {
-                        typ = XmlRegAtomType::XmlRegexpNotSpace;
-                    }
-                    Ok(b'i') => {
-                        typ = XmlRegAtomType::XmlRegexpInitName;
-                    }
-                    Ok(b'I') => {
-                        typ = XmlRegAtomType::XmlRegexpNotInitName;
-                    }
-                    Ok(b'c') => {
-                        typ = XmlRegAtomType::XmlRegexpNameChar;
-                    }
-                    Ok(b'C') => {
-                        typ = XmlRegAtomType::XmlRegexpNotNameChar;
-                    }
-                    Ok(b'd') => {
-                        typ = XmlRegAtomType::XmlRegexpDecimal;
-                    }
-                    Ok(b'D') => {
-                        typ = XmlRegAtomType::XmlRegexpNotDecimal;
-                    }
-                    Ok(b'w') => {
-                        typ = XmlRegAtomType::XmlRegexpRealChar;
-                    }
-                    Ok(b'W') => {
-                        typ = XmlRegAtomType::XmlRegexpNotRealChar;
-                    }
-                    _ => {}
+                _ => {
+                    ERROR!(self, "Wrong escape sequence, misuse of character '\\'");
                 }
-                NEXT!(self);
-                if self.atom.is_null() {
-                    self.atom = self.reg_new_atom(typ);
-                } else if matches!((*self.atom).typ, XmlRegAtomType::XmlRegexpRanges) {
-                    self.reg_atom_add_range(self.atom, self.neg, typ, 0, 0, None);
-                }
-            } else {
-                ERROR!(self, "Wrong escape sequence, misuse of character '\\'");
             }
         }
     }
@@ -2000,35 +2042,25 @@ impl XmlRegParserCtxt {
     #[doc(alias = "xmlFAParseCharRange")]
     unsafe fn fa_parse_char_range(&mut self) {
         unsafe {
-            let mut cur: i32;
-            let mut len: i32 = 0;
+            let mut len: usize;
             let start: i32;
             let mut end: i32;
 
-            if CUR!(self) == b'\0' {
+            let Some(cur) = self.current_byte() else {
                 ERROR!(self, "Expecting ']'");
                 return;
-            }
+            };
 
-            cur = CUR!(self) as _;
-            if cur == '\\' as i32 {
-                NEXT!(self);
-                cur = CUR!(self) as _;
-                match TryInto::<u8>::try_into(cur) {
-                    Ok(b'n') => {
-                        start = 0xA;
-                    }
-                    Ok(b'r') => {
-                        start = 0xD;
-                    }
-                    Ok(b't') => {
-                        start = 0x9;
-                    }
-                    Ok(b'\\') | Ok(b'|') | Ok(b'.') | Ok(b'-') | Ok(b'^') | Ok(b'?') | Ok(b'*')
-                    | Ok(b'+') | Ok(b'{') | Ok(b'}') | Ok(b'(') | Ok(b')') | Ok(b'[')
-                    | Ok(b']') => {
-                        start = cur;
-                    }
+            if cur == b'\\' {
+                self.cur += 1;
+                match self.current_byte() {
+                    Some(b'n') => start = 0xA,
+                    Some(b'r') => start = 0xD,
+                    Some(b't') => start = 0x9,
+                    Some(
+                        cur @ (b'\\' | b'|' | b'.' | b'-' | b'^' | b'?' | b'*' | b'+' | b'{' | b'}'
+                        | b'(' | b')' | b'[' | b']'),
+                    ) => start = cur as i32,
                     _ => {
                         ERROR!(self, "Invalid escape value");
                         return;
@@ -2037,8 +2069,13 @@ impl XmlRegParserCtxt {
                 end = start;
                 len = 1;
             } else if cur != 0x5B && cur != 0x5D {
-                start = CUR_SCHAR!(self.cur, len);
-                end = start;
+                if let Some(c) = self.current_char() {
+                    start = c as i32;
+                    end = start;
+                    len = c.len_utf8();
+                } else {
+                    (start, end, len) = (0, 0, 0);
+                }
             } else {
                 ERROR!(self, "Expecting a char range");
                 return;
@@ -2046,16 +2083,16 @@ impl XmlRegParserCtxt {
             // Since we are "inside" a range, we can assume self.cur is past
             // the start of self.string, and PREV should be safe
             if start == '-' as i32
-                && NXT!(self, 1) != b']'
-                && PREV!(self) != b'['
-                && PREV!(self) != b'^'
+                && self.nth_byte(1) != Some(b']')
+                && self.prev_byte(1) != Some(b'[')
+                && self.prev_byte(1) != Some(b'^')
             {
-                NEXTL!(self, len);
+                self.cur += len;
                 return;
             }
-            NEXTL!(self, len);
-            cur = CUR!(self) as _;
-            if cur != '-' as i32 || NXT!(self, 1) == b'[' || NXT!(self, 1) == b']' {
+            self.cur += len;
+            let cur = self.current_byte().unwrap_or(0);
+            if cur != b'-' || self.nth_byte(1) == Some(b'[') || self.nth_byte(1) == Some(b']') {
                 self.reg_atom_add_range(
                     self.atom,
                     self.neg,
@@ -2066,25 +2103,19 @@ impl XmlRegParserCtxt {
                 );
                 return;
             }
-            NEXT!(self);
-            cur = CUR!(self) as _;
-            if cur == '\\' as i32 {
-                NEXT!(self);
-                cur = CUR!(self) as _;
-                match TryInto::<u8>::try_into(cur) {
-                    Ok(b'n') => {
-                        end = 0xA;
-                    }
-                    Ok(b'r') => {
-                        end = 0xD;
-                    }
-                    Ok(b't') => {
-                        end = 0x9;
-                    }
-                    Ok(b'\\') | Ok(b'|') | Ok(b'.') | Ok(b'-') | Ok(b'^') | Ok(b'?') | Ok(b'*')
-                    | Ok(b'+') | Ok(b'{') | Ok(b'}') | Ok(b'(') | Ok(b')') | Ok(b'[')
-                    | Ok(b']') => {
-                        end = cur;
+            self.cur += 1;
+            let cur = self.current_byte().unwrap_or(0);
+            if cur == b'\\' {
+                self.cur += 1;
+                match self.current_byte() {
+                    Some(b'n') => end = 0xA,
+                    Some(b'r') => end = 0xD,
+                    Some(b't') => end = 0x9,
+                    Some(
+                        cur @ (b'\\' | b'|' | b'.' | b'-' | b'^' | b'?' | b'*' | b'+' | b'{' | b'}'
+                        | b'(' | b')' | b'[' | b']'),
+                    ) => {
+                        end = cur as i32;
                     }
                     _ => {
                         ERROR!(self, "Invalid escape value");
@@ -2092,8 +2123,14 @@ impl XmlRegParserCtxt {
                     }
                 }
                 len = 1;
-            } else if cur != '\0' as i32 && cur != 0x5B && cur != 0x5D {
-                end = CUR_SCHAR!(self.cur, len);
+            } else if cur != 0 && cur != 0x5B && cur != 0x5D {
+                if let Some(c) = self.current_char() {
+                    end = c as i32;
+                    len = c.len_utf8();
+                } else {
+                    end = 0;
+                    len = 0;
+                }
             } else {
                 ERROR!(self, "Expecting the end of a char range");
                 return;
@@ -2103,7 +2140,7 @@ impl XmlRegParserCtxt {
             if end < start {
                 ERROR!(self, "End of range is before start of range");
             } else {
-                NEXTL!(self, len);
+                self.cur += len;
                 self.reg_atom_add_range(
                     self.atom,
                     self.neg,
@@ -2120,14 +2157,18 @@ impl XmlRegParserCtxt {
     #[doc(alias = "xmlFAParsePosCharGroup")]
     unsafe fn fa_parse_pos_char_group(&mut self) {
         unsafe {
-            while {
-                if CUR!(self) == b'\\' {
+            if self.current_byte() == Some(b'\\') {
+                self.fa_parse_char_class_esc();
+            } else {
+                self.fa_parse_char_range();
+            }
+            while self.error == 0 && !matches!(self.current_byte(), Some(b']' | b'-') | None) {
+                if self.current_byte() == Some(b'\\') {
                     self.fa_parse_char_class_esc();
                 } else {
                     self.fa_parse_char_range();
                 }
-                CUR!(self) != b']' && CUR!(self) != b'-' && CUR!(self) != 0 && self.error == 0
-            } {}
+            }
         }
     }
 
@@ -2142,21 +2183,21 @@ impl XmlRegParserCtxt {
         unsafe {
             let neg: i32 = self.neg;
 
-            if CUR!(self) == b'^' as _ {
-                NEXT!(self);
+            if self.current_byte() == Some(b'^') {
+                self.cur += 1;
                 self.neg = (self.neg == 0) as i32;
                 self.fa_parse_pos_char_group();
                 self.neg = neg;
             }
-            while CUR!(self) != b']' && self.error == 0 {
-                if CUR!(self) == b'-' && NXT!(self, 1) == b'[' {
-                    NEXT!(self); /* eat the '-' */
-                    NEXT!(self); /* eat the '[' */
+            while self.current_byte() != Some(b']') && self.error == 0 {
+                if self.current_byte() == Some(b'-') && self.nth_byte(1) == Some(b'[') {
+                    self.cur += 1; /* eat the '-' */
+                    self.cur += 1; /* eat the '[' */
                     self.neg = 2;
                     self.fa_parse_char_group();
                     self.neg = neg;
-                    if CUR!(self) == b']' {
-                        NEXT!(self);
+                    if self.current_byte() == Some(b']') {
+                        self.cur += 1;
                     } else {
                         ERROR!(self, "charClassExpr: ']' expected");
                     }
@@ -2175,15 +2216,15 @@ impl XmlRegParserCtxt {
     #[doc(alias = "xmlFAParseCharClass")]
     unsafe fn fa_parse_char_class(&mut self) {
         unsafe {
-            if CUR!(self) == b'[' {
-                NEXT!(self);
+            if self.current_byte() == Some(b'[') {
+                self.cur += 1;
                 self.atom = self.reg_new_atom(XmlRegAtomType::XmlRegexpRanges);
                 if self.atom.is_null() {
                     return;
                 }
                 self.fa_parse_char_group();
-                if CUR!(self) == b']' {
-                    NEXT!(self);
+                if self.current_byte() == Some(b']') {
+                    self.cur += 1;
                 } else {
                     ERROR!(self, "xmlFAParseCharClass: ']' expected");
                 }
@@ -2197,23 +2238,21 @@ impl XmlRegParserCtxt {
     #[doc(alias = "xmlFAParseAtom")]
     unsafe fn fa_parse_atom(&mut self) -> i32 {
         unsafe {
-            let mut codepoint: i32;
-            let mut len: i32 = 0;
-
-            codepoint = self.fa_is_char();
-            if codepoint > 0 {
+            if let Some(codepoint) = self.fa_is_char() {
                 self.atom = self.reg_new_atom(XmlRegAtomType::XmlRegexpCharval);
                 if self.atom.is_null() {
                     return -1;
                 }
-                codepoint = CUR_SCHAR!(self.cur, len);
-                (*self.atom).codepoint = codepoint;
-                NEXTL!(self, len);
+                (*self.atom).codepoint = codepoint as i32;
+                self.cur += codepoint.len_utf8();
                 return 1;
-            } else if CUR!(self) == b'|' || CUR!(self) == 0 || CUR!(self) == b')' {
+            } else if self.current_byte() == Some(b'|')
+                || self.current_byte().is_none()
+                || self.current_byte() == Some(b')')
+            {
                 return 0;
-            } else if CUR!(self) == b'(' {
-                NEXT!(self);
+            } else if self.current_byte() == Some(b'(') {
+                self.cur += 1;
                 if self.depth >= 50 {
                     ERROR!(self, "xmlFAParseAtom: maximum nesting depth exceeded");
                     return -1;
@@ -2230,8 +2269,8 @@ impl XmlRegParserCtxt {
                 self.depth += 1;
                 self.fa_parse_reg_exp(0);
                 self.depth -= 1;
-                if CUR!(self) == b')' {
-                    NEXT!(self);
+                if self.current_byte() == Some(b')') {
+                    self.cur += 1;
                 } else {
                     ERROR!(self, "xmlFAParseAtom: expecting ')'");
                 }
@@ -2244,7 +2283,10 @@ impl XmlRegParserCtxt {
                 (*self.atom).stop = self.state;
                 self.end = oldend;
                 return 1;
-            } else if CUR!(self) == b'[' || CUR!(self) == b'\\' || CUR!(self) == b'.' {
+            } else if self.current_byte() == Some(b'[')
+                || self.current_byte() == Some(b'\\')
+                || self.current_byte() == Some(b'.')
+            {
                 self.fa_parse_char_class();
                 return 1;
             }
@@ -2256,33 +2298,21 @@ impl XmlRegParserCtxt {
     ///
     /// Returns 0 if success or -1 in case of error
     #[doc(alias = "xmlFAParseQuantExact")]
-    unsafe fn fa_parse_quant_exact(&mut self) -> i32 {
-        unsafe {
-            let mut ret: i32 = 0;
-            let mut ok: i32 = 0;
-            let mut overflow: i32 = 0;
+    fn fa_parse_quant_exact(&mut self) -> Option<i32> {
+        let mut ret = 0i32;
+        let mut ok = false;
+        let mut overflow = false;
 
-            while CUR!(self) >= b'0' && CUR!(self) <= b'9' {
-                if ret > INT_MAX / 10 {
-                    overflow = 1;
-                } else {
-                    let digit: i32 = CUR!(self) as i32 - b'0' as i32;
-
-                    ret *= 10;
-                    if ret > INT_MAX - digit {
-                        overflow = 1;
-                    } else {
-                        ret += digit;
-                    }
-                }
-                ok = 1;
-                NEXT!(self);
-            }
-            if ok != 1 || overflow == 1 {
-                return -1;
-            }
-            ret
+        while let Some(d) = self.current_byte().filter(|b| b.is_ascii_digit()) {
+            let (r, f) = ret.overflowing_mul(10);
+            overflow |= f;
+            let (r, f) = r.overflowing_add(d as i32 - b'0' as i32);
+            overflow |= f;
+            ret = r;
+            ok = true;
+            self.cur += 1;
         }
+        (ok && !overflow).then_some(ret)
     }
 
     /// ```text
@@ -2295,48 +2325,42 @@ impl XmlRegParserCtxt {
     #[doc(alias = "xmlFAParseQuantifier")]
     unsafe fn fa_parse_quantifier(&mut self) -> i32 {
         unsafe {
-            let mut cur: i32;
-
-            cur = CUR!(self) as _;
-            if cur == '?' as i32 || cur == '*' as i32 || cur == '+' as i32 {
+            let cur = self.current_byte().unwrap_or(0);
+            if cur == b'?' || cur == b'*' || cur == b'+' {
                 if !self.atom.is_null() {
-                    if cur == '?' as i32 {
+                    if cur == b'?' {
                         (*self.atom).quant = XmlRegQuantType::XmlRegexpQuantOpt;
-                    } else if cur == '*' as i32 {
+                    } else if cur == b'*' {
                         (*self.atom).quant = XmlRegQuantType::XmlRegexpQuantMult;
-                    } else if cur == '+' as i32 {
+                    } else if cur == b'+' {
                         (*self.atom).quant = XmlRegQuantType::XmlRegexpQuantPlus;
                     }
                 }
-                NEXT!(self);
+                self.cur += 1;
                 return 1;
             }
-            if cur == '{' as i32 {
+            if cur == b'{' {
                 let mut min: i32 = 0;
                 let mut max: i32 = 0;
 
-                NEXT!(self);
-                cur = self.fa_parse_quant_exact();
-                if cur >= 0 {
-                    min = cur;
+                self.cur += 1;
+                if let Some(cur) = self.fa_parse_quant_exact() {
+                    min = cur
                 } else {
                     ERROR!(self, "Improper quantifier");
                 }
-                if CUR!(self) == b',' {
-                    NEXT!(self);
-                    if CUR!(self) == b'}' {
-                        max = INT_MAX;
+                if self.current_byte() == Some(b',') {
+                    self.cur += 1;
+                    if self.current_byte() == Some(b'}') {
+                        max = i32::MAX;
+                    } else if let Some(cur) = self.fa_parse_quant_exact() {
+                        max = cur;
                     } else {
-                        cur = self.fa_parse_quant_exact();
-                        if cur >= 0 {
-                            max = cur;
-                        } else {
-                            ERROR!(self, "Improper quantifier");
-                        }
+                        ERROR!(self, "Improper quantifier");
                     }
                 }
-                if CUR!(self) == b'}' {
-                    NEXT!(self);
+                if self.current_byte() == Some(b'}') {
+                    self.cur += 1;
                 } else {
                     ERROR!(self, "Unterminated quantifier");
                 }
@@ -2389,7 +2413,10 @@ impl XmlRegParserCtxt {
             } else {
                 if self.fa_generate_transitions(
                     previous,
-                    if CUR!(self) == b'|' || CUR!(self) == b')' || CUR!(self) == 0 {
+                    if self.current_byte() == Some(b'|')
+                        || self.current_byte() == Some(b')')
+                        || self.current_byte().is_none()
+                    {
                         to
                     } else {
                         null_mut()
@@ -2409,7 +2436,10 @@ impl XmlRegParserCtxt {
                 if ret != 0 {
                     if self.fa_generate_transitions(
                         previous,
-                        if CUR!(self) == b'|' || CUR!(self) == b')' || CUR!(self) == 0 {
+                        if self.current_byte() == Some(b'|')
+                            || self.current_byte() == Some(b')')
+                            || self.current_byte().is_none()
+                        {
                             to
                         } else {
                             null_mut()
@@ -2440,13 +2470,13 @@ impl XmlRegParserCtxt {
             if top != 0 {
                 (*self.state).typ = XmlRegStateType::XmlRegexpFinalState;
             }
-            if CUR!(self) != b'|' as _ {
+            if self.current_byte() != Some(b'|') {
                 self.end = self.state;
                 return;
             }
             let end: XmlRegStatePtr = self.state;
-            while CUR!(self) == b'|' as _ && self.error == 0 {
-                NEXT!(self);
+            while self.current_byte() == Some(b'|') as _ && self.error == 0 {
+                self.cur += 1;
                 self.state = start;
                 self.end = null_mut();
                 self.fa_parse_branch(end);
@@ -2585,7 +2615,7 @@ impl Default for XmlRegExecCtxt {
 ///
 /// Returns the new context or NULL in case of error
 #[doc(alias = "xmlRegNewParserCtxt")]
-pub(crate) unsafe fn xml_reg_new_parser_ctxt(string: *const XmlChar) -> XmlRegParserCtxtPtr {
+pub(crate) unsafe fn xml_reg_new_parser_ctxt(string: Option<&str>) -> XmlRegParserCtxtPtr {
     unsafe {
         let ret: XmlRegParserCtxtPtr =
             xml_malloc(size_of::<XmlRegParserCtxt>()) as XmlRegParserCtxtPtr;
@@ -2593,10 +2623,10 @@ pub(crate) unsafe fn xml_reg_new_parser_ctxt(string: *const XmlChar) -> XmlRegPa
             return null_mut();
         }
         std::ptr::write(&mut *ret, XmlRegParserCtxt::default());
-        if !string.is_null() {
-            (*ret).string = xml_strdup(string);
+        if let Some(string) = string {
+            (*ret).string = string.to_owned().into_boxed_str();
         }
-        (*ret).cur = (*ret).string;
+        (*ret).cur = 0;
         (*ret).neg = 0;
         (*ret).negs = 0;
         (*ret).error = 0;
@@ -2609,9 +2639,9 @@ pub(crate) unsafe fn xml_reg_new_parser_ctxt(string: *const XmlChar) -> XmlRegPa
 #[doc(alias = "xmlRegexpErrMemory")]
 unsafe fn xml_regexp_err_memory(ctxt: XmlRegParserCtxtPtr, extra: &str) {
     unsafe {
-        let mut regexp: *const c_char = null();
-        if !ctxt.is_null() {
-            regexp = (*ctxt).string as _;
+        let mut regexp = None;
+        if !ctxt.is_null() && !(*ctxt).string.is_empty() {
+            regexp = Some((*ctxt).string.to_string().into());
             (*ctxt).error = XmlParserErrors::XmlErrNoMemory as _;
         }
         __xml_raise_error!(
@@ -2626,8 +2656,7 @@ unsafe fn xml_regexp_err_memory(ctxt: XmlRegParserCtxtPtr, extra: &str) {
             None,
             0,
             Some(extra.to_owned().into()),
-            (!regexp.is_null())
-                .then(|| CStr::from_ptr(regexp).to_string_lossy().into_owned().into()),
+            regexp,
             None,
             0,
             0,
@@ -2687,9 +2716,6 @@ pub(crate) unsafe fn xml_reg_free_parser_ctxt(ctxt: XmlRegParserCtxtPtr) {
             return;
         }
 
-        if !(*ctxt).string.is_null() {
-            xml_free((*ctxt).string as _);
-        }
         for state in (*ctxt).states.drain(..) {
             xml_reg_free_state(state);
         }
@@ -2714,37 +2740,34 @@ macro_rules! IS_NILLABLE {
 
 /// Handle a compilation failure
 #[doc(alias = "xmlRegexpErrCompile")]
-unsafe fn xml_regexp_err_compile(ctxt: XmlRegParserCtxtPtr, extra: &str) {
-    unsafe {
-        let mut regexp: *const c_char = null();
-        let mut idx: i32 = 0;
+fn xml_regexp_err_compile(ctxt: &mut XmlRegParserCtxt, extra: &str) {
+    let mut regexp = None;
+    let mut idx = 0;
 
-        if !ctxt.is_null() {
-            regexp = (*ctxt).string as _;
-            idx = (*ctxt).cur.offset_from((*ctxt).string) as _;
-            (*ctxt).error = XmlParserErrors::XmlRegexpCompileError as _;
-        }
-        __xml_raise_error!(
-            None,
-            None,
-            None,
-            null_mut(),
-            None,
-            XmlErrorDomain::XmlFromRegexp,
-            XmlParserErrors::XmlRegexpCompileError,
-            XmlErrorLevel::XmlErrFatal,
-            None,
-            0,
-            Some(extra.to_owned().into()),
-            (!regexp.is_null())
-                .then(|| CStr::from_ptr(regexp).to_string_lossy().into_owned().into()),
-            None,
-            idx,
-            0,
-            "failed to compile: {}\n",
-            extra
-        );
+    if !ctxt.string.is_empty() {
+        regexp = Some(ctxt.string.to_string().into());
+        idx = ctxt.cur as i32;
+        ctxt.error = XmlParserErrors::XmlRegexpCompileError as _;
     }
+    __xml_raise_error!(
+        None,
+        None,
+        None,
+        null_mut(),
+        None,
+        XmlErrorDomain::XmlFromRegexp,
+        XmlParserErrors::XmlRegexpCompileError,
+        XmlErrorLevel::XmlErrFatal,
+        None,
+        0,
+        Some(extra.to_owned().into()),
+        regexp,
+        None,
+        idx,
+        0,
+        "failed to compile: {}\n",
+        extra
+    );
 }
 
 /// Allocate a two-dimensional array and set all elements to zero.
@@ -2772,11 +2795,11 @@ unsafe fn xml_reg_calloc2(dim1: usize, dim2: usize, elem_size: usize) -> *mut c_
 ///
 /// Returns the compiled expression or NULL in case of error
 #[doc(alias = "xmlRegexpCompile")]
-pub unsafe fn xml_regexp_compile(regexp: *const XmlChar) -> XmlRegexpPtr {
+pub unsafe fn xml_regexp_compile(regexp: &str) -> XmlRegexpPtr {
     unsafe {
         let mut ret: XmlRegexpPtr = null_mut();
 
-        let ctxt: XmlRegParserCtxtPtr = xml_reg_new_parser_ctxt(regexp);
+        let ctxt: XmlRegParserCtxtPtr = xml_reg_new_parser_ctxt(Some(regexp));
         if ctxt.is_null() {
             return null_mut();
         }
@@ -2793,8 +2816,8 @@ pub unsafe fn xml_regexp_compile(regexp: *const XmlChar) -> XmlRegexpPtr {
 
         // parse the expression building an automata
         (*ctxt).fa_parse_reg_exp(1);
-        if CUR!(ctxt) != 0 {
-            ERROR!(ctxt, "xmlFAParseRegExp: extra characters");
+        if (*ctxt).current_byte().is_some() {
+            ERROR!(&mut *ctxt, "xmlFAParseRegExp: extra characters");
         }
         if (*ctxt).error != 0 {
             // goto error;
@@ -2993,136 +3016,6 @@ unsafe fn xml_reg_check_character_range(
     ret as i32
 }
 
-unsafe fn xml_reg_check_character(atom: XmlRegAtomPtr, codepoint: i32) -> i32 {
-    unsafe {
-        let mut ret: i32;
-
-        if atom.is_null() || !xml_is_char(codepoint as u32) {
-            return -1;
-        }
-
-        match (*atom).typ {
-            XmlRegAtomType::XmlRegexpSubReg | XmlRegAtomType::XmlRegexpEpsilon => {
-                return -1;
-            }
-            XmlRegAtomType::XmlRegexpCharval => {
-                return (codepoint == (*atom).codepoint) as i32;
-            }
-            XmlRegAtomType::XmlRegexpRanges => {
-                let mut accept: i32 = 0;
-
-                for &range in &(*atom).ranges {
-                    if (*range).neg == 2 {
-                        ret = xml_reg_check_character_range(
-                            (*range).typ,
-                            codepoint,
-                            0,
-                            (*range).start,
-                            (*range).end,
-                            (*range).block_name.as_deref(),
-                        );
-                        if ret != 0 {
-                            return 0; /* excluded char */
-                        }
-                    } else if (*range).neg != 0 {
-                        ret = xml_reg_check_character_range(
-                            (*range).typ,
-                            codepoint,
-                            0,
-                            (*range).start,
-                            (*range).end,
-                            (*range).block_name.as_deref(),
-                        );
-                        if ret == 0 {
-                            accept = 1;
-                        } else {
-                            return 0;
-                        }
-                    } else {
-                        ret = xml_reg_check_character_range(
-                            (*range).typ,
-                            codepoint,
-                            0,
-                            (*range).start,
-                            (*range).end,
-                            (*range).block_name.as_deref(),
-                        );
-                        if ret != 0 {
-                            accept = 1; /* might still be excluded */
-                        }
-                    }
-                }
-                return accept;
-            }
-            XmlRegAtomType::XmlRegexpString => {
-                println!("TODO: XML_REGEXP_STRING");
-                return -1;
-            }
-            XmlRegAtomType::XmlRegexpAnyChar
-            | XmlRegAtomType::XmlRegexpAnySpace
-            | XmlRegAtomType::XmlRegexpNotSpace
-            | XmlRegAtomType::XmlRegexpInitName
-            | XmlRegAtomType::XmlRegexpNotInitName
-            | XmlRegAtomType::XmlRegexpNameChar
-            | XmlRegAtomType::XmlRegexpNotNameChar
-            | XmlRegAtomType::XmlRegexpDecimal
-            | XmlRegAtomType::XmlRegexpNotDecimal
-            | XmlRegAtomType::XmlRegexpRealChar
-            | XmlRegAtomType::XmlRegexpNotRealChar
-            | XmlRegAtomType::XmlRegexpLetter
-            | XmlRegAtomType::XmlRegexpLetterUppercase
-            | XmlRegAtomType::XmlRegexpLetterLowercase
-            | XmlRegAtomType::XmlRegexpLetterTitlecase
-            | XmlRegAtomType::XmlRegexpLetterModifier
-            | XmlRegAtomType::XmlRegexpLetterOthers
-            | XmlRegAtomType::XmlRegexpMark
-            | XmlRegAtomType::XmlRegexpMarkNonSpacing
-            | XmlRegAtomType::XmlRegexpMarkSpaceCombining
-            | XmlRegAtomType::XmlRegexpMarkEnclosing
-            | XmlRegAtomType::XmlRegexpNumber
-            | XmlRegAtomType::XmlRegexpNumberDecimal
-            | XmlRegAtomType::XmlRegexpNumberLetter
-            | XmlRegAtomType::XmlRegexpNumberOthers
-            | XmlRegAtomType::XmlRegexpPunct
-            | XmlRegAtomType::XmlRegexpPunctConnector
-            | XmlRegAtomType::XmlRegexpPunctDash
-            | XmlRegAtomType::XmlRegexpPunctOpen
-            | XmlRegAtomType::XmlRegexpPunctClose
-            | XmlRegAtomType::XmlRegexpPunctInitQuote
-            | XmlRegAtomType::XmlRegexpPunctFinQuote
-            | XmlRegAtomType::XmlRegexpPunctOthers
-            | XmlRegAtomType::XmlRegexpSepar
-            | XmlRegAtomType::XmlRegexpSeparSpace
-            | XmlRegAtomType::XmlRegexpSeparLine
-            | XmlRegAtomType::XmlRegexpSeparPara
-            | XmlRegAtomType::XmlRegexpSymbol
-            | XmlRegAtomType::XmlRegexpSymbolMath
-            | XmlRegAtomType::XmlRegexpSymbolCurrency
-            | XmlRegAtomType::XmlRegexpSymbolModifier
-            | XmlRegAtomType::XmlRegexpSymbolOthers
-            | XmlRegAtomType::XmlRegexpOther
-            | XmlRegAtomType::XmlRegexpOtherControl
-            | XmlRegAtomType::XmlRegexpOtherFormat
-            | XmlRegAtomType::XmlRegexpOtherPrivate
-            | XmlRegAtomType::XmlRegexpOtherNa
-            | XmlRegAtomType::XmlRegexpBlockName => {
-                ret = xml_reg_check_character_range(
-                    (*atom).typ,
-                    codepoint,
-                    0,
-                    0,
-                    0,
-                    (*atom).valuep.as_deref(),
-                );
-                if (*atom).neg != 0 {
-                    ret = (ret == 0) as i32;
-                }
-            }
-        }
-        ret
-    }
-}
-
 unsafe fn xml_fa_reg_exec_save(exec: XmlRegExecCtxtPtr) {
     unsafe {
         if (*exec).nb_push as usize > MAX_PUSH {
@@ -3241,7 +3134,7 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
                         } else if *(*exec).input_string.add((*exec).index as usize) != 0 {
                             codepoint =
                                 CUR_SCHAR!((*exec).input_string.add((*exec).index as usize), len);
-                            ret = xml_reg_check_character(atom, codepoint);
+                            ret = (*atom).check_character(codepoint);
                             if ret == 1 && (*atom).min >= 0 && (*atom).max > 0 {
                                 let to: XmlRegStatePtr = (*comp).states[trans.to as usize];
 
@@ -3294,7 +3187,7 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
                                         (*exec).input_string.add((*exec).index as usize),
                                         len
                                     );
-                                    ret = xml_reg_check_character(atom, codepoint);
+                                    ret = (*atom).check_character(codepoint);
                                     (*exec).transcount += 1;
                                     ret == 1
                                 } {}
@@ -4340,7 +4233,7 @@ unsafe fn xml_fa_compare_atoms(
                     if matches!((*atom2).typ, XmlRegAtomType::XmlRegexpCharval) {
                         ret = ((*atom1).codepoint == (*atom2).codepoint) as i32;
                     } else {
-                        ret = xml_reg_check_character(atom2, (*atom1).codepoint);
+                        ret = (*atom2).check_character((*atom1).codepoint);
                         if ret < 0 {
                             ret = 1;
                         }

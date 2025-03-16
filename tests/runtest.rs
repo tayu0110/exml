@@ -4982,7 +4982,11 @@ unsafe fn regexp_test(
                         CStr::from_ptr(pattern).to_string_lossy()
                     )
                     .ok();
-                    comp = xml_regexp_compile(pattern as _);
+                    comp = xml_regexp_compile(
+                        CStr::from_ptr(pattern as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    );
                     if comp.is_null() {
                         writeln!(output, "   failed to compile").ok();
                         break;
@@ -4994,7 +4998,11 @@ unsafe fn regexp_test(
                         CStr::from_ptr(expression.as_ptr() as _).to_string_lossy()
                     )
                     .ok();
-                    comp = xml_regexp_compile(expression.as_ptr());
+                    comp = xml_regexp_compile(
+                        CStr::from_ptr(expression.as_ptr() as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    );
                     if comp.is_null() {
                         writeln!(output, "   failed to compile").ok();
                         break;

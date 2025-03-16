@@ -25,18 +25,12 @@
 //
 // Daniel Veillard <veillard@redhat.com>
 
-use std::{
-    os::raw::c_void,
-    ptr::{null, null_mut},
-};
+use std::{os::raw::c_void, ptr::null_mut};
 
-use crate::libxml::{
-    xmlregexp::{
-        XmlRegAtomPtr, XmlRegAtomType, XmlRegCounter, XmlRegMarkedType, XmlRegQuantType,
-        XmlRegStatePtr, XmlRegStateType, XmlRegTrans, XmlRegexp, xml_reg_free_atom,
-        xml_reg_free_parser_ctxt, xml_reg_new_parser_ctxt,
-    },
-    xmlstring::XmlChar,
+use crate::libxml::xmlregexp::{
+    XmlRegAtomPtr, XmlRegAtomType, XmlRegCounter, XmlRegMarkedType, XmlRegQuantType,
+    XmlRegStatePtr, XmlRegStateType, XmlRegTrans, XmlRegexp, xml_reg_free_atom,
+    xml_reg_free_parser_ctxt, xml_reg_new_parser_ctxt,
 };
 
 /// A libxml automata description, It can be compiled into a regexp
@@ -45,8 +39,8 @@ pub type XmlAutomataPtr = *mut XmlAutomata;
 #[doc(alias = "xmlAutomata")]
 #[repr(C)]
 pub struct XmlAutomata {
-    pub(crate) string: *mut XmlChar,
-    pub(crate) cur: *mut XmlChar,
+    pub(crate) string: Box<str>,
+    pub(crate) cur: usize,
     pub(crate) error: i32,
     pub(crate) neg: i32,
     pub(crate) start: XmlRegStatePtr,
@@ -63,6 +57,30 @@ pub struct XmlAutomata {
 }
 
 impl XmlAutomata {
+    pub(crate) fn current_str(&self) -> &str {
+        &self.string[self.cur..]
+    }
+
+    pub(crate) fn current_char(&self) -> Option<char> {
+        self.current_str().chars().next()
+    }
+
+    pub(crate) fn current_byte(&self) -> Option<u8> {
+        self.current_str().as_bytes().first().copied()
+    }
+
+    pub(crate) fn nth_byte(&self, index: usize) -> Option<u8> {
+        self.current_str().as_bytes().get(index).copied()
+    }
+
+    pub(crate) fn prev_byte(&self, prev: usize) -> Option<u8> {
+        if self.cur < prev {
+            return None;
+        }
+        let index = self.cur - prev;
+        Some(self.string.as_bytes()[index])
+    }
+
     /// Compile the automata into a Reg Exp ready for being executed.
     /// The automata should be free after this point.
     ///
@@ -639,8 +657,8 @@ impl XmlAutomata {
 impl Default for XmlAutomata {
     fn default() -> Self {
         Self {
-            string: null_mut(),
-            cur: null_mut(),
+            string: "".to_owned().into_boxed_str(),
+            cur: 0,
             error: 0,
             neg: 0,
             start: null_mut(),
@@ -692,7 +710,7 @@ impl XmlAutomataState {
 #[doc(alias = "xmlNewAutomata")]
 pub unsafe fn xml_new_automata() -> XmlAutomataPtr {
     unsafe {
-        let ctxt: XmlAutomataPtr = xml_reg_new_parser_ctxt(null());
+        let ctxt: XmlAutomataPtr = xml_reg_new_parser_ctxt(None);
         if ctxt.is_null() {
             return null_mut();
         }
