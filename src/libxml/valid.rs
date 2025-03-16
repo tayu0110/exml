@@ -33,8 +33,8 @@ use libc::{memset, strcat, strlen, strncat};
 
 #[cfg(feature = "libxml_regexp")]
 use crate::libxml::xmlautomata::{
-    XmlAutomataPtr, xml_automata_compile, xml_automata_get_init_state,
-    xml_automata_set_final_state, xml_free_automata, xml_new_automata,
+    XmlAutomataPtr, xml_automata_compile, xml_automata_set_final_state, xml_free_automata,
+    xml_new_automata,
 };
 #[cfg(feature = "libxml_regexp")]
 use crate::libxml::xmlregexp::{
@@ -6851,7 +6851,7 @@ pub unsafe fn xml_valid_build_content_model(ctxt: XmlValidCtxtPtr, mut elem: Xml
             );
             return 0;
         }
-        (*ctxt).state = xml_automata_get_init_state((*ctxt).am);
+        (*ctxt).state = (*(*ctxt).am).get_init_state();
         xml_valid_build_acontent_model(
             elem.content,
             ctxt,

@@ -87,12 +87,12 @@ use crate::{
         },
         valid::xml_add_id,
         xmlautomata::{
-            XmlAutomataStatePtr, xml_automata_compile, xml_automata_get_init_state,
-            xml_automata_new_all_trans, xml_automata_new_count_trans2,
-            xml_automata_new_counted_trans, xml_automata_new_counter,
-            xml_automata_new_counter_trans, xml_automata_new_epsilon, xml_automata_new_neg_trans,
-            xml_automata_new_once_trans2, xml_automata_new_state, xml_automata_new_transition2,
-            xml_automata_set_final_state, xml_free_automata, xml_new_automata,
+            XmlAutomataStatePtr, xml_automata_compile, xml_automata_new_all_trans,
+            xml_automata_new_count_trans2, xml_automata_new_counted_trans,
+            xml_automata_new_counter, xml_automata_new_counter_trans, xml_automata_new_epsilon,
+            xml_automata_new_neg_trans, xml_automata_new_once_trans2, xml_automata_new_state,
+            xml_automata_new_transition2, xml_automata_set_final_state, xml_free_automata,
+            xml_new_automata,
         },
         xmlregexp::{
             XmlRegExecCtxtPtr, xml_reg_exec_err_info, xml_reg_exec_next_values,
@@ -13058,7 +13058,7 @@ unsafe fn xml_schema_build_content_model(typ: XmlSchemaTypePtr, ctxt: XmlSchemaP
             );
             return;
         }
-        (*ctxt).state = xml_automata_get_init_state((*ctxt).am);
+        (*ctxt).state = (*(*ctxt).am).get_init_state();
         // Build the automaton.
         xml_schema_build_acontent_model(ctxt, WXS_TYPE_PARTICLE!(typ));
         xml_automata_set_final_state((*ctxt).am, (*ctxt).state);

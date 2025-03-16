@@ -46,6 +46,7 @@ use crate::libxml::{
 /// A libxml automata description, It can be compiled into a regexp
 #[doc(alias = "xmlAutomataPtr")]
 pub type XmlAutomataPtr = *mut XmlAutomata;
+#[doc(alias = "xmlAutomata")]
 #[repr(C)]
 pub struct XmlAutomata {
     pub(crate) string: *mut XmlChar,
@@ -63,6 +64,16 @@ pub struct XmlAutomata {
     pub(crate) negs: i32,
     pub(crate) flags: i32,
     pub(crate) depth: i32,
+}
+
+impl XmlAutomata {
+    /// Initial state lookup
+    ///
+    /// Returns the initial state of the automata
+    #[doc(alias = "xmlAutomataGetInitState")]
+    pub fn get_init_state(&self) -> XmlAutomataStatePtr {
+        self.start
+    }
 }
 
 impl Default for XmlAutomata {
@@ -90,6 +101,7 @@ impl Default for XmlAutomata {
 /// A state int the automata description,
 #[doc(alias = "xmlAutomataStatePtr")]
 pub type XmlAutomataStatePtr = *mut XmlAutomataState;
+#[doc(alias = "xmlAutomataState")]
 #[repr(C)]
 #[derive(Default)]
 pub struct XmlAutomataState {
@@ -138,19 +150,6 @@ pub unsafe fn xml_free_automata(am: XmlAutomataPtr) {
             return;
         }
         xml_reg_free_parser_ctxt(am);
-    }
-}
-
-/// Initial state lookup
-///
-/// Returns the initial state of the automata
-#[doc(alias = "xmlAutomataGetInitState")]
-pub unsafe fn xml_automata_get_init_state(am: XmlAutomataPtr) -> XmlAutomataStatePtr {
-    unsafe {
-        if am.is_null() {
-            return null_mut();
-        }
-        (*am).start
     }
 }
 

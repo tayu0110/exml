@@ -42,10 +42,10 @@ use crate::{
         },
         valid::{XmlValidCtxt, xml_validate_document_final},
         xmlautomata::{
-            XmlAutomataPtr, XmlAutomataStatePtr, xml_automata_compile, xml_automata_get_init_state,
-            xml_automata_is_determinist, xml_automata_new_epsilon, xml_automata_new_transition,
-            xml_automata_new_transition2, xml_automata_set_final_state, xml_automata_set_flags,
-            xml_free_automata, xml_new_automata,
+            XmlAutomataPtr, XmlAutomataStatePtr, xml_automata_compile, xml_automata_is_determinist,
+            xml_automata_new_epsilon, xml_automata_new_transition, xml_automata_new_transition2,
+            xml_automata_set_final_state, xml_automata_set_flags, xml_free_automata,
+            xml_new_automata,
         },
         xmlregexp::{
             XmlRegExecCtxtPtr, XmlRegexpPtr, xml_reg_exec_push_string, xml_reg_exec_push_string2,
@@ -5803,7 +5803,7 @@ unsafe fn xml_relaxng_compile(ctxt: XmlRelaxNGParserCtxtPtr, def: XmlRelaxNGDefi
                     // thing of exploring both choices.
                     xml_automata_set_flags((*ctxt).am, 1);
 
-                    (*ctxt).state = xml_automata_get_init_state((*ctxt).am);
+                    (*ctxt).state = (*(*ctxt).am).get_init_state();
                     while !list.is_null() {
                         xml_relaxng_compile(ctxt, list);
                         list = (*list).next;
@@ -5845,7 +5845,7 @@ unsafe fn xml_relaxng_compile(ctxt: XmlRelaxNGParserCtxtPtr, def: XmlRelaxNGDefi
                         return -1;
                     }
                     xml_automata_set_flags((*ctxt).am, 1);
-                    (*ctxt).state = xml_automata_get_init_state((*ctxt).am);
+                    (*ctxt).state = (*(*ctxt).am).get_init_state();
                     while !list.is_null() {
                         xml_relaxng_compile(ctxt, list);
                         list = (*list).next;

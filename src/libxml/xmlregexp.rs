@@ -71,6 +71,7 @@ const SIZE_MAX: usize = usize::MAX;
 const MAX_PUSH: usize = 10000000;
 
 // Note: the order of the enums below is significant, do not shuffle
+#[doc(alias = "xmlRegAtomType")]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub enum XmlRegAtomType {
@@ -78,19 +79,19 @@ pub enum XmlRegAtomType {
     XmlRegexpEpsilon = 1,
     XmlRegexpCharval,
     XmlRegexpRanges,
-    XmlRegexpSubreg, /* used for () sub regexps */
+    XmlRegexpSubReg, /* used for () sub regexps */
     XmlRegexpString,
-    XmlRegexpAnychar,     /* . */
-    XmlRegexpAnyspace,    /* \s */
-    XmlRegexpNotspace,    /* \S */
-    XmlRegexpInitname,    /* \l */
-    XmlRegexpNotinitname, /* \L */
-    XmlRegexpNamechar,    /* \c */
-    XmlRegexpNotnamechar, /* \C */
+    XmlRegexpAnyChar,     /* . */
+    XmlRegexpAnySpace,    /* \s */
+    XmlRegexpNotSpace,    /* \S */
+    XmlRegexpInitName,    /* \l */
+    XmlRegexpNotInitName, /* \L */
+    XmlRegexpNameChar,    /* \c */
+    XmlRegexpNotNameChar, /* \C */
     XmlRegexpDecimal,     /* \d */
-    XmlRegexpNotdecimal,  /* \D */
-    XmlRegexpRealchar,    /* \w */
-    XmlRegexpNotrealchar, /* \W */
+    XmlRegexpNotDecimal,  /* \D */
+    XmlRegexpRealChar,    /* \w */
+    XmlRegexpNotRealChar, /* \W */
     XmlRegexpLetter = 100,
     XmlRegexpLetterUppercase,
     XmlRegexpLetterLowercase,
@@ -98,8 +99,8 @@ pub enum XmlRegAtomType {
     XmlRegexpLetterModifier,
     XmlRegexpLetterOthers,
     XmlRegexpMark,
-    XmlRegexpMarkNonspacing,
-    XmlRegexpMarkSpacecombining,
+    XmlRegexpMarkNonSpacing,
+    XmlRegexpMarkSpaceCombining,
     XmlRegexpMarkEnclosing,
     XmlRegexpNumber,
     XmlRegexpNumberDecimal,
@@ -110,8 +111,8 @@ pub enum XmlRegAtomType {
     XmlRegexpPunctDash,
     XmlRegexpPunctOpen,
     XmlRegexpPunctClose,
-    XmlRegexpPunctInitquote,
-    XmlRegexpPunctFinquote,
+    XmlRegexpPunctInitQuote,
+    XmlRegexpPunctFinQuote,
     XmlRegexpPunctOthers,
     XmlRegexpSepar,
     XmlRegexpSeparSpace,
@@ -130,6 +131,7 @@ pub enum XmlRegAtomType {
     XmlRegexpBlockName,
 }
 
+#[doc(alias = "xmlRegQuantType")]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum XmlRegQuantType {
@@ -144,6 +146,7 @@ pub enum XmlRegQuantType {
     XmlRegexpQuantRange,
 }
 
+#[doc(alias = "xmlRegStateType")]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum XmlRegStateType {
@@ -155,6 +158,7 @@ pub enum XmlRegStateType {
     XmlRegexpUnreachState,
 }
 
+#[doc(alias = "xmlRegMarkedType")]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum XmlRegMarkedType {
@@ -165,6 +169,7 @@ pub enum XmlRegMarkedType {
 }
 
 pub type XmlRegRangePtr = *mut XmlRegRange;
+#[doc(alias = "xmlRegRange")]
 #[repr(C)]
 #[derive(Default)]
 pub struct XmlRegRange {
@@ -179,6 +184,7 @@ pub type XmlRegState = XmlAutomataState;
 pub type XmlRegStatePtr = *mut XmlRegState;
 
 pub type XmlRegAtomPtr = *mut XmlRegAtom;
+#[doc(alias = "xmlRegAtom")]
 #[repr(C)]
 pub struct XmlRegAtom {
     pub(crate) no: i32,
@@ -218,12 +224,14 @@ impl Default for XmlRegAtom {
     }
 }
 
+#[doc(alias = "xmlRegCounter")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct XmlRegCounter {
     pub(crate) min: i32,
     pub(crate) max: i32,
 }
 
+#[doc(alias = "xmlRegTrans")]
 #[repr(C)]
 pub struct XmlRegTrans {
     atom: XmlRegAtomPtr,
@@ -233,6 +241,7 @@ pub struct XmlRegTrans {
     nd: i32,
 }
 
+#[doc(alias = "xmlRegParserCtxt")]
 pub type XmlRegParserCtxt = XmlAutomata;
 pub type XmlRegParserCtxtPtr = *mut XmlRegParserCtxt;
 
@@ -242,6 +251,7 @@ const AM_AUTOMATA_RNG: usize = 1;
 /// thank the POSIX regex expressions.
 #[doc(alias = "xmlRegexpPtr")]
 pub type XmlRegexpPtr = *mut XmlRegexp;
+#[doc(alias = "xmlRegexp")]
 #[repr(C)]
 pub struct XmlRegexp {
     string: *mut XmlChar,
@@ -275,6 +285,7 @@ impl Default for XmlRegexp {
 }
 
 pub type XmlRegExecRollbackPtr = *mut XmlRegExecRollback;
+#[doc(alias = "xmlRegExecRollback")]
 #[repr(C)]
 pub struct XmlRegExecRollback {
     state: XmlRegStatePtr, /* the current state */
@@ -284,6 +295,7 @@ pub struct XmlRegExecRollback {
 }
 
 pub type XmlRegInputTokenPtr = *mut XmlRegInputToken;
+#[doc(alias = "xmlRegInputToken")]
 #[repr(C)]
 pub struct XmlRegInputToken {
     value: *mut XmlChar,
@@ -293,6 +305,7 @@ pub struct XmlRegInputToken {
 /// A libxml progressive regular expression evaluation context
 #[doc(alias = "xmlRegExecCtxtPtr")]
 pub type XmlRegExecCtxtPtr = *mut XmlRegExecCtxt;
+#[doc(alias = "xmlRegExecCtxt")]
 #[repr(C)]
 pub struct XmlRegExecCtxt {
     status: i32,        /* execution status != 0 indicate an error */
@@ -799,11 +812,11 @@ unsafe fn xml_fa_parse_char_prop(ctxt: XmlRegParserCtxtPtr) {
             if cur == b'n' as _ {
                 NEXT!(ctxt);
                 // nonspacing
-                XmlRegAtomType::XmlRegexpMarkNonspacing
+                XmlRegAtomType::XmlRegexpMarkNonSpacing
             } else if cur == b'c' as _ {
                 NEXT!(ctxt);
                 // spacing combining
-                XmlRegAtomType::XmlRegexpMarkSpacecombining
+                XmlRegAtomType::XmlRegexpMarkSpaceCombining
             } else if cur == b'e' as _ {
                 NEXT!(ctxt);
                 // enclosing
@@ -853,11 +866,11 @@ unsafe fn xml_fa_parse_char_prop(ctxt: XmlRegParserCtxtPtr) {
             } else if cur == b'i' as _ {
                 NEXT!(ctxt);
                 // initial quote
-                XmlRegAtomType::XmlRegexpPunctInitquote
+                XmlRegAtomType::XmlRegexpPunctInitQuote
             } else if cur == b'f' as _ {
                 NEXT!(ctxt);
                 // final quote
-                XmlRegAtomType::XmlRegexpPunctFinquote
+                XmlRegAtomType::XmlRegexpPunctFinQuote
             } else if cur == b'o' as _ {
                 NEXT!(ctxt);
                 // other
@@ -1057,13 +1070,13 @@ unsafe fn xml_fa_parse_char_class_esc(ctxt: XmlRegParserCtxtPtr) {
 
         if CUR!(ctxt) == b'.' {
             if (*ctxt).atom.is_null() {
-                (*ctxt).atom = xml_reg_new_atom(ctxt, XmlRegAtomType::XmlRegexpAnychar);
+                (*ctxt).atom = xml_reg_new_atom(ctxt, XmlRegAtomType::XmlRegexpAnyChar);
             } else if matches!((*(*ctxt).atom).typ, XmlRegAtomType::XmlRegexpRanges) {
                 xml_reg_atom_add_range(
                     ctxt,
                     (*ctxt).atom,
                     (*ctxt).neg,
-                    XmlRegAtomType::XmlRegexpAnychar,
+                    XmlRegAtomType::XmlRegexpAnyChar,
                     0,
                     0,
                     None,
@@ -1203,38 +1216,38 @@ unsafe fn xml_fa_parse_char_class_esc(ctxt: XmlRegParserCtxtPtr) {
             || cur == b'w' as _
             || cur == b'W' as _
         {
-            let mut typ: XmlRegAtomType = XmlRegAtomType::XmlRegexpAnyspace;
+            let mut typ: XmlRegAtomType = XmlRegAtomType::XmlRegexpAnySpace;
 
             match TryInto::<u8>::try_into(cur) {
                 Ok(b's') => {
-                    typ = XmlRegAtomType::XmlRegexpAnyspace;
+                    typ = XmlRegAtomType::XmlRegexpAnySpace;
                 }
                 Ok(b'S') => {
-                    typ = XmlRegAtomType::XmlRegexpNotspace;
+                    typ = XmlRegAtomType::XmlRegexpNotSpace;
                 }
                 Ok(b'i') => {
-                    typ = XmlRegAtomType::XmlRegexpInitname;
+                    typ = XmlRegAtomType::XmlRegexpInitName;
                 }
                 Ok(b'I') => {
-                    typ = XmlRegAtomType::XmlRegexpNotinitname;
+                    typ = XmlRegAtomType::XmlRegexpNotInitName;
                 }
                 Ok(b'c') => {
-                    typ = XmlRegAtomType::XmlRegexpNamechar;
+                    typ = XmlRegAtomType::XmlRegexpNameChar;
                 }
                 Ok(b'C') => {
-                    typ = XmlRegAtomType::XmlRegexpNotnamechar;
+                    typ = XmlRegAtomType::XmlRegexpNotNameChar;
                 }
                 Ok(b'd') => {
                     typ = XmlRegAtomType::XmlRegexpDecimal;
                 }
                 Ok(b'D') => {
-                    typ = XmlRegAtomType::XmlRegexpNotdecimal;
+                    typ = XmlRegAtomType::XmlRegexpNotDecimal;
                 }
                 Ok(b'w') => {
-                    typ = XmlRegAtomType::XmlRegexpRealchar;
+                    typ = XmlRegAtomType::XmlRegexpRealChar;
                 }
                 Ok(b'W') => {
-                    typ = XmlRegAtomType::XmlRegexpNotrealchar;
+                    typ = XmlRegAtomType::XmlRegexpNotRealChar;
                 }
                 _ => {}
             }
@@ -1509,7 +1522,7 @@ unsafe fn xml_fa_parse_atom(ctxt: XmlRegParserCtxtPtr) -> i32 {
             } else {
                 ERROR!(ctxt, "xmlFAParseAtom: expecting ')'");
             }
-            (*ctxt).atom = xml_reg_new_atom(ctxt, XmlRegAtomType::XmlRegexpSubreg);
+            (*ctxt).atom = xml_reg_new_atom(ctxt, XmlRegAtomType::XmlRegexpSubReg);
             if (*ctxt).atom.is_null() {
                 return -1;
             }
@@ -1776,7 +1789,7 @@ pub(crate) unsafe fn xml_fa_generate_transitions(
             ERROR!(ctxt, "generate transition: atom == NULL");
             return -1;
         }
-        if matches!((*atom).typ, XmlRegAtomType::XmlRegexpSubreg) {
+        if matches!((*atom).typ, XmlRegAtomType::XmlRegexpSubReg) {
             // this is a subexpression handling one should not need to
             // create a new node except for XML_REGEXP_QUANT_RANGE.
             if !to.is_null()
@@ -2653,34 +2666,34 @@ unsafe fn xml_reg_check_character_range(
 ) -> i32 {
     let ret = match typ {
         XmlRegAtomType::XmlRegexpString
-        | XmlRegAtomType::XmlRegexpSubreg
+        | XmlRegAtomType::XmlRegexpSubReg
         | XmlRegAtomType::XmlRegexpRanges
         | XmlRegAtomType::XmlRegexpEpsilon => {
             return -1;
         }
-        XmlRegAtomType::XmlRegexpAnychar => codepoint != '\n' as i32 && codepoint != '\r' as i32,
+        XmlRegAtomType::XmlRegexpAnyChar => codepoint != '\n' as i32 && codepoint != '\r' as i32,
         XmlRegAtomType::XmlRegexpCharval => codepoint >= start && codepoint <= end,
-        XmlRegAtomType::XmlRegexpNotspace => {
+        XmlRegAtomType::XmlRegexpNotSpace => {
             neg = (neg == 0) as i32;
             codepoint == '\n' as i32
                 || codepoint == '\r' as i32
                 || codepoint == '\t' as i32
                 || codepoint == ' ' as i32
         }
-        XmlRegAtomType::XmlRegexpAnyspace => {
+        XmlRegAtomType::XmlRegexpAnySpace => {
             codepoint == '\n' as i32
                 || codepoint == '\r' as i32
                 || codepoint == '\t' as i32
                 || codepoint == ' ' as i32
         }
-        XmlRegAtomType::XmlRegexpNotinitname => {
+        XmlRegAtomType::XmlRegexpNotInitName => {
             neg = (neg == 0) as i32;
             xml_is_letter(codepoint as u32) || codepoint == '_' as i32 || codepoint == ':' as i32
         }
-        XmlRegAtomType::XmlRegexpInitname => {
+        XmlRegAtomType::XmlRegexpInitName => {
             xml_is_letter(codepoint as u32) || codepoint == '_' as i32 || codepoint == ':' as i32
         }
-        XmlRegAtomType::XmlRegexpNotnamechar => {
+        XmlRegAtomType::XmlRegexpNotNameChar => {
             neg = (neg == 0) as i32;
             xml_is_letter(codepoint as u32)
                 || xml_is_digit(codepoint as u32)
@@ -2691,7 +2704,7 @@ unsafe fn xml_reg_check_character_range(
                 || xml_is_combining(codepoint as u32)
                 || xml_is_extender(codepoint as u32)
         }
-        XmlRegAtomType::XmlRegexpNamechar => {
+        XmlRegAtomType::XmlRegexpNameChar => {
             xml_is_letter(codepoint as u32)
                 || xml_is_digit(codepoint as u32)
                 || codepoint == '.' as i32
@@ -2701,18 +2714,18 @@ unsafe fn xml_reg_check_character_range(
                 || xml_is_combining(codepoint as u32)
                 || xml_is_extender(codepoint as u32)
         }
-        XmlRegAtomType::XmlRegexpNotdecimal => {
+        XmlRegAtomType::XmlRegexpNotDecimal => {
             neg = (neg == 0) as i32;
             xml_ucs_is_cat_nd(codepoint)
         }
         XmlRegAtomType::XmlRegexpDecimal => xml_ucs_is_cat_nd(codepoint),
-        XmlRegAtomType::XmlRegexpRealchar => {
+        XmlRegAtomType::XmlRegexpRealChar => {
             neg = (neg == 0) as i32;
             xml_ucs_is_cat_p(codepoint)
                 || xml_ucs_is_cat_z(codepoint)
                 || xml_ucs_is_cat_c(codepoint)
         }
-        XmlRegAtomType::XmlRegexpNotrealchar => {
+        XmlRegAtomType::XmlRegexpNotRealChar => {
             xml_ucs_is_cat_p(codepoint)
                 || xml_ucs_is_cat_z(codepoint)
                 || xml_ucs_is_cat_c(codepoint)
@@ -2724,8 +2737,8 @@ unsafe fn xml_reg_check_character_range(
         XmlRegAtomType::XmlRegexpLetterModifier => xml_ucs_is_cat_lm(codepoint),
         XmlRegAtomType::XmlRegexpLetterOthers => xml_ucs_is_cat_lo(codepoint),
         XmlRegAtomType::XmlRegexpMark => xml_ucs_is_cat_m(codepoint),
-        XmlRegAtomType::XmlRegexpMarkNonspacing => xml_ucs_is_cat_mn(codepoint),
-        XmlRegAtomType::XmlRegexpMarkSpacecombining => xml_ucs_is_cat_mc(codepoint),
+        XmlRegAtomType::XmlRegexpMarkNonSpacing => xml_ucs_is_cat_mn(codepoint),
+        XmlRegAtomType::XmlRegexpMarkSpaceCombining => xml_ucs_is_cat_mc(codepoint),
         XmlRegAtomType::XmlRegexpMarkEnclosing => xml_ucs_is_cat_me(codepoint),
         XmlRegAtomType::XmlRegexpNumber => xml_ucs_is_cat_n(codepoint),
         XmlRegAtomType::XmlRegexpNumberDecimal => xml_ucs_is_cat_nd(codepoint),
@@ -2736,8 +2749,8 @@ unsafe fn xml_reg_check_character_range(
         XmlRegAtomType::XmlRegexpPunctDash => xml_ucs_is_cat_pd(codepoint),
         XmlRegAtomType::XmlRegexpPunctOpen => xml_ucs_is_cat_ps(codepoint),
         XmlRegAtomType::XmlRegexpPunctClose => xml_ucs_is_cat_pe(codepoint),
-        XmlRegAtomType::XmlRegexpPunctInitquote => xml_ucs_is_cat_pi(codepoint),
-        XmlRegAtomType::XmlRegexpPunctFinquote => xml_ucs_is_cat_pf(codepoint),
+        XmlRegAtomType::XmlRegexpPunctInitQuote => xml_ucs_is_cat_pi(codepoint),
+        XmlRegAtomType::XmlRegexpPunctFinQuote => xml_ucs_is_cat_pf(codepoint),
         XmlRegAtomType::XmlRegexpPunctOthers => xml_ucs_is_cat_po(codepoint),
         XmlRegAtomType::XmlRegexpSepar => xml_ucs_is_cat_z(codepoint),
         XmlRegAtomType::XmlRegexpSeparSpace => xml_ucs_is_cat_zs(codepoint),
@@ -2777,7 +2790,7 @@ unsafe fn xml_reg_check_character(atom: XmlRegAtomPtr, codepoint: i32) -> i32 {
         }
 
         match (*atom).typ {
-            XmlRegAtomType::XmlRegexpSubreg | XmlRegAtomType::XmlRegexpEpsilon => {
+            XmlRegAtomType::XmlRegexpSubReg | XmlRegAtomType::XmlRegexpEpsilon => {
                 return -1;
             }
             XmlRegAtomType::XmlRegexpCharval => {
@@ -2833,17 +2846,17 @@ unsafe fn xml_reg_check_character(atom: XmlRegAtomPtr, codepoint: i32) -> i32 {
                 println!("TODO: XML_REGEXP_STRING");
                 return -1;
             }
-            XmlRegAtomType::XmlRegexpAnychar
-            | XmlRegAtomType::XmlRegexpAnyspace
-            | XmlRegAtomType::XmlRegexpNotspace
-            | XmlRegAtomType::XmlRegexpInitname
-            | XmlRegAtomType::XmlRegexpNotinitname
-            | XmlRegAtomType::XmlRegexpNamechar
-            | XmlRegAtomType::XmlRegexpNotnamechar
+            XmlRegAtomType::XmlRegexpAnyChar
+            | XmlRegAtomType::XmlRegexpAnySpace
+            | XmlRegAtomType::XmlRegexpNotSpace
+            | XmlRegAtomType::XmlRegexpInitName
+            | XmlRegAtomType::XmlRegexpNotInitName
+            | XmlRegAtomType::XmlRegexpNameChar
+            | XmlRegAtomType::XmlRegexpNotNameChar
             | XmlRegAtomType::XmlRegexpDecimal
-            | XmlRegAtomType::XmlRegexpNotdecimal
-            | XmlRegAtomType::XmlRegexpRealchar
-            | XmlRegAtomType::XmlRegexpNotrealchar
+            | XmlRegAtomType::XmlRegexpNotDecimal
+            | XmlRegAtomType::XmlRegexpRealChar
+            | XmlRegAtomType::XmlRegexpNotRealChar
             | XmlRegAtomType::XmlRegexpLetter
             | XmlRegAtomType::XmlRegexpLetterUppercase
             | XmlRegAtomType::XmlRegexpLetterLowercase
@@ -2851,8 +2864,8 @@ unsafe fn xml_reg_check_character(atom: XmlRegAtomPtr, codepoint: i32) -> i32 {
             | XmlRegAtomType::XmlRegexpLetterModifier
             | XmlRegAtomType::XmlRegexpLetterOthers
             | XmlRegAtomType::XmlRegexpMark
-            | XmlRegAtomType::XmlRegexpMarkNonspacing
-            | XmlRegAtomType::XmlRegexpMarkSpacecombining
+            | XmlRegAtomType::XmlRegexpMarkNonSpacing
+            | XmlRegAtomType::XmlRegexpMarkSpaceCombining
             | XmlRegAtomType::XmlRegexpMarkEnclosing
             | XmlRegAtomType::XmlRegexpNumber
             | XmlRegAtomType::XmlRegexpNumberDecimal
@@ -2863,8 +2876,8 @@ unsafe fn xml_reg_check_character(atom: XmlRegAtomPtr, codepoint: i32) -> i32 {
             | XmlRegAtomType::XmlRegexpPunctDash
             | XmlRegAtomType::XmlRegexpPunctOpen
             | XmlRegAtomType::XmlRegexpPunctClose
-            | XmlRegAtomType::XmlRegexpPunctInitquote
-            | XmlRegAtomType::XmlRegexpPunctFinquote
+            | XmlRegAtomType::XmlRegexpPunctInitQuote
+            | XmlRegAtomType::XmlRegexpPunctFinQuote
             | XmlRegAtomType::XmlRegexpPunctOthers
             | XmlRegAtomType::XmlRegexpSepar
             | XmlRegAtomType::XmlRegexpSeparSpace
@@ -3199,43 +3212,43 @@ unsafe fn xml_reg_print_atom_type<'a>(output: &mut (impl Write + 'a), typ: XmlRe
         XmlRegAtomType::XmlRegexpRanges => {
             write!(output, "ranges ").ok();
         }
-        XmlRegAtomType::XmlRegexpSubreg => {
+        XmlRegAtomType::XmlRegexpSubReg => {
             write!(output, "subexpr ").ok();
         }
         XmlRegAtomType::XmlRegexpString => {
             write!(output, "string ").ok();
         }
-        XmlRegAtomType::XmlRegexpAnychar => {
+        XmlRegAtomType::XmlRegexpAnyChar => {
             write!(output, "anychar ").ok();
         }
-        XmlRegAtomType::XmlRegexpAnyspace => {
+        XmlRegAtomType::XmlRegexpAnySpace => {
             write!(output, "anyspace ").ok();
         }
-        XmlRegAtomType::XmlRegexpNotspace => {
+        XmlRegAtomType::XmlRegexpNotSpace => {
             write!(output, "notspace ").ok();
         }
-        XmlRegAtomType::XmlRegexpInitname => {
+        XmlRegAtomType::XmlRegexpInitName => {
             write!(output, "initname ").ok();
         }
-        XmlRegAtomType::XmlRegexpNotinitname => {
+        XmlRegAtomType::XmlRegexpNotInitName => {
             write!(output, "notinitname ").ok();
         }
-        XmlRegAtomType::XmlRegexpNamechar => {
+        XmlRegAtomType::XmlRegexpNameChar => {
             write!(output, "namechar ").ok();
         }
-        XmlRegAtomType::XmlRegexpNotnamechar => {
+        XmlRegAtomType::XmlRegexpNotNameChar => {
             write!(output, "notnamechar ").ok();
         }
         XmlRegAtomType::XmlRegexpDecimal => {
             write!(output, "decimal ").ok();
         }
-        XmlRegAtomType::XmlRegexpNotdecimal => {
+        XmlRegAtomType::XmlRegexpNotDecimal => {
             write!(output, "notdecimal ").ok();
         }
-        XmlRegAtomType::XmlRegexpRealchar => {
+        XmlRegAtomType::XmlRegexpRealChar => {
             write!(output, "realchar ").ok();
         }
-        XmlRegAtomType::XmlRegexpNotrealchar => {
+        XmlRegAtomType::XmlRegexpNotRealChar => {
             write!(output, "notrealchar ").ok();
         }
         XmlRegAtomType::XmlRegexpLetter => {
@@ -3259,10 +3272,10 @@ unsafe fn xml_reg_print_atom_type<'a>(output: &mut (impl Write + 'a), typ: XmlRe
         XmlRegAtomType::XmlRegexpMark => {
             write!(output, "MARK ").ok();
         }
-        XmlRegAtomType::XmlRegexpMarkNonspacing => {
+        XmlRegAtomType::XmlRegexpMarkNonSpacing => {
             write!(output, "MARK_NONSPACING ").ok();
         }
-        XmlRegAtomType::XmlRegexpMarkSpacecombining => {
+        XmlRegAtomType::XmlRegexpMarkSpaceCombining => {
             write!(output, "MARK_SPACECOMBINING ").ok();
         }
         XmlRegAtomType::XmlRegexpMarkEnclosing => {
@@ -3295,10 +3308,10 @@ unsafe fn xml_reg_print_atom_type<'a>(output: &mut (impl Write + 'a), typ: XmlRe
         XmlRegAtomType::XmlRegexpPunctClose => {
             write!(output, "PUNCT_CLOSE ").ok();
         }
-        XmlRegAtomType::XmlRegexpPunctInitquote => {
+        XmlRegAtomType::XmlRegexpPunctInitQuote => {
             write!(output, "PUNCT_INITQUOTE ").ok();
         }
-        XmlRegAtomType::XmlRegexpPunctFinquote => {
+        XmlRegAtomType::XmlRegexpPunctFinQuote => {
             write!(output, "PUNCT_FINQUOTE ").ok();
         }
         XmlRegAtomType::XmlRegexpPunctOthers => {
@@ -3428,7 +3441,7 @@ unsafe fn xml_reg_print_atom<'a>(output: &mut (impl Write + 'a), atom: XmlRegAto
             for &range in &(*atom).ranges {
                 xml_reg_print_range(output, range);
             }
-        } else if matches!((*atom).typ, XmlRegAtomType::XmlRegexpSubreg) {
+        } else if matches!((*atom).typ, XmlRegAtomType::XmlRegexpSubReg) {
             writeln!(
                 output,
                 "start {} end {}",
@@ -3594,9 +3607,9 @@ unsafe fn xml_fa_compare_atom_types(mut type1: XmlRegAtomType, mut type2: XmlReg
         XmlRegAtomType::XmlRegexpEpsilon
             | XmlRegAtomType::XmlRegexpCharval
             | XmlRegAtomType::XmlRegexpRanges
-            | XmlRegAtomType::XmlRegexpSubreg
+            | XmlRegAtomType::XmlRegexpSubReg
             | XmlRegAtomType::XmlRegexpString
-            | XmlRegAtomType::XmlRegexpAnychar
+            | XmlRegAtomType::XmlRegexpAnyChar
     ) {
         return 1;
     }
@@ -3605,9 +3618,9 @@ unsafe fn xml_fa_compare_atom_types(mut type1: XmlRegAtomType, mut type2: XmlReg
         XmlRegAtomType::XmlRegexpEpsilon
             | XmlRegAtomType::XmlRegexpCharval
             | XmlRegAtomType::XmlRegexpRanges
-            | XmlRegAtomType::XmlRegexpSubreg
+            | XmlRegAtomType::XmlRegexpSubReg
             | XmlRegAtomType::XmlRegexpString
-            | XmlRegAtomType::XmlRegexpAnychar
+            | XmlRegAtomType::XmlRegexpAnyChar
     ) {
         return 1;
     }
@@ -3621,10 +3634,10 @@ unsafe fn xml_fa_compare_atom_types(mut type1: XmlRegAtomType, mut type2: XmlReg
         std::mem::swap(&mut type1, &mut type2);
     }
     match type1 {
-        XmlRegAtomType::XmlRegexpAnyspace => {
+        XmlRegAtomType::XmlRegexpAnySpace => {
             // \s
             // can't be a letter, number, mark, punctuation, symbol
-            if type2 == XmlRegAtomType::XmlRegexpNotspace
+            if type2 == XmlRegAtomType::XmlRegexpNotSpace
                 || (type2 >= XmlRegAtomType::XmlRegexpLetter
                     && type2 <= XmlRegAtomType::XmlRegexpLetterOthers)
                 || (type2 >= XmlRegAtomType::XmlRegexpNumber
@@ -3639,11 +3652,11 @@ unsafe fn xml_fa_compare_atom_types(mut type1: XmlRegAtomType, mut type2: XmlReg
                 return 0;
             }
         }
-        XmlRegAtomType::XmlRegexpNotspace => { /* \S */ }
-        XmlRegAtomType::XmlRegexpInitname => {
+        XmlRegAtomType::XmlRegexpNotSpace => { /* \S */ }
+        XmlRegAtomType::XmlRegexpInitName => {
             // \l
             // can't be a number, mark, separator, punctuation, symbol or other
-            if type2 == XmlRegAtomType::XmlRegexpNotinitname
+            if type2 == XmlRegAtomType::XmlRegexpNotInitName
                 || (type2 >= XmlRegAtomType::XmlRegexpNumber
                     && type2 <= XmlRegAtomType::XmlRegexpNumberOthers)
                 || (type2 >= XmlRegAtomType::XmlRegexpMark
@@ -3660,11 +3673,11 @@ unsafe fn xml_fa_compare_atom_types(mut type1: XmlRegAtomType, mut type2: XmlReg
                 return 0;
             }
         }
-        XmlRegAtomType::XmlRegexpNotinitname => { /* \L */ }
-        XmlRegAtomType::XmlRegexpNamechar => {
+        XmlRegAtomType::XmlRegexpNotInitName => { /* \L */ }
+        XmlRegAtomType::XmlRegexpNameChar => {
             // \c
             // can't be a mark, separator, punctuation, symbol or other
-            if type2 == XmlRegAtomType::XmlRegexpNotnamechar
+            if type2 == XmlRegAtomType::XmlRegexpNotNameChar
                 || (type2 >= XmlRegAtomType::XmlRegexpMark
                     && type2 <= XmlRegAtomType::XmlRegexpMarkEnclosing)
                 || (type2 >= XmlRegAtomType::XmlRegexpPunct
@@ -3679,12 +3692,12 @@ unsafe fn xml_fa_compare_atom_types(mut type1: XmlRegAtomType, mut type2: XmlReg
                 return 0;
             }
         }
-        XmlRegAtomType::XmlRegexpNotnamechar => { /* \C */ }
+        XmlRegAtomType::XmlRegexpNotNameChar => { /* \C */ }
         XmlRegAtomType::XmlRegexpDecimal => {
             // \d
             // can't be a letter, mark, separator, punctuation, symbol or other
-            if type2 == XmlRegAtomType::XmlRegexpNotdecimal
-                || type2 == XmlRegAtomType::XmlRegexpRealchar
+            if type2 == XmlRegAtomType::XmlRegexpNotDecimal
+                || type2 == XmlRegAtomType::XmlRegexpRealChar
                 || (type2 >= XmlRegAtomType::XmlRegexpLetter
                     && type2 <= XmlRegAtomType::XmlRegexpLetterOthers)
                 || (type2 >= XmlRegAtomType::XmlRegexpMark
@@ -3701,11 +3714,11 @@ unsafe fn xml_fa_compare_atom_types(mut type1: XmlRegAtomType, mut type2: XmlReg
                 return 0;
             }
         }
-        XmlRegAtomType::XmlRegexpNotdecimal => { /* \D */ }
-        XmlRegAtomType::XmlRegexpRealchar => {
+        XmlRegAtomType::XmlRegexpNotDecimal => { /* \D */ }
+        XmlRegAtomType::XmlRegexpRealChar => {
             // \w
             // can't be a mark, separator, punctuation, symbol or other
-            if type2 == XmlRegAtomType::XmlRegexpNotdecimal
+            if type2 == XmlRegAtomType::XmlRegexpNotDecimal
                 || (type2 >= XmlRegAtomType::XmlRegexpMark
                     && type2 <= XmlRegAtomType::XmlRegexpMarkEnclosing)
                 || (type2 >= XmlRegAtomType::XmlRegexpPunct
@@ -3720,7 +3733,7 @@ unsafe fn xml_fa_compare_atom_types(mut type1: XmlRegAtomType, mut type2: XmlReg
                 return 0;
             }
         }
-        XmlRegAtomType::XmlRegexpNotrealchar => { /* \W */ }
+        XmlRegAtomType::XmlRegexpNotRealChar => { /* \W */ }
         // at that point we know both type 1 and type2 are from
         // character categories are ordered and are different,
         // it becomes simple because this is a partition
@@ -3743,8 +3756,8 @@ unsafe fn xml_fa_compare_atom_types(mut type1: XmlRegAtomType, mut type2: XmlReg
             }
             return 0;
         }
-        XmlRegAtomType::XmlRegexpMarkNonspacing
-        | XmlRegAtomType::XmlRegexpMarkSpacecombining
+        XmlRegAtomType::XmlRegexpMarkNonSpacing
+        | XmlRegAtomType::XmlRegexpMarkSpaceCombining
         | XmlRegAtomType::XmlRegexpMarkEnclosing => {
             return 0;
         }
@@ -3769,8 +3782,8 @@ unsafe fn xml_fa_compare_atom_types(mut type1: XmlRegAtomType, mut type2: XmlReg
         | XmlRegAtomType::XmlRegexpPunctDash
         | XmlRegAtomType::XmlRegexpPunctOpen
         | XmlRegAtomType::XmlRegexpPunctClose
-        | XmlRegAtomType::XmlRegexpPunctInitquote
-        | XmlRegAtomType::XmlRegexpPunctFinquote
+        | XmlRegAtomType::XmlRegexpPunctInitQuote
+        | XmlRegAtomType::XmlRegexpPunctFinQuote
         | XmlRegAtomType::XmlRegexpPunctOthers => {
             return 0;
         }
@@ -3859,12 +3872,12 @@ unsafe fn xml_fa_compare_ranges(mut range1: XmlRegRangePtr, mut range2: XmlRegRa
         if matches!(
             (*range1).typ,
             XmlRegAtomType::XmlRegexpRanges
-                | XmlRegAtomType::XmlRegexpSubreg
+                | XmlRegAtomType::XmlRegexpSubReg
                 | XmlRegAtomType::XmlRegexpString
         ) || matches!(
             (*range2).typ,
             XmlRegAtomType::XmlRegexpRanges
-                | XmlRegAtomType::XmlRegexpSubreg
+                | XmlRegAtomType::XmlRegexpSubReg
                 | XmlRegAtomType::XmlRegexpString
         ) {
             return -1;
@@ -3874,8 +3887,8 @@ unsafe fn xml_fa_compare_ranges(mut range1: XmlRegRangePtr, mut range2: XmlRegRa
         if (*range1).typ > (*range2).typ {
             std::mem::swap(&mut range1, &mut range2);
         }
-        if (*range1).typ == XmlRegAtomType::XmlRegexpAnychar
-            || (*range2).typ == XmlRegAtomType::XmlRegexpAnychar
+        if (*range1).typ == XmlRegAtomType::XmlRegexpAnyChar
+            || (*range2).typ == XmlRegAtomType::XmlRegexpAnyChar
         {
             ret = 1;
         } else if (*range1).typ == XmlRegAtomType::XmlRegexpEpsilon
@@ -3934,16 +3947,16 @@ unsafe fn xml_fa_compare_ranges(mut range1: XmlRegRangePtr, mut range2: XmlRegRa
         } else if (*range1).typ < XmlRegAtomType::XmlRegexpLetter
             || (*range2).typ < XmlRegAtomType::XmlRegexpLetter
         {
-            if ((*range1).typ == XmlRegAtomType::XmlRegexpAnyspace
-                && (*range2).typ == XmlRegAtomType::XmlRegexpNotspace)
-                || ((*range1).typ == XmlRegAtomType::XmlRegexpInitname
-                    && (*range2).typ == XmlRegAtomType::XmlRegexpNotinitname)
-                || ((*range1).typ == XmlRegAtomType::XmlRegexpNamechar
-                    && (*range2).typ == XmlRegAtomType::XmlRegexpNotnamechar)
+            if ((*range1).typ == XmlRegAtomType::XmlRegexpAnySpace
+                && (*range2).typ == XmlRegAtomType::XmlRegexpNotSpace)
+                || ((*range1).typ == XmlRegAtomType::XmlRegexpInitName
+                    && (*range2).typ == XmlRegAtomType::XmlRegexpNotInitName)
+                || ((*range1).typ == XmlRegAtomType::XmlRegexpNameChar
+                    && (*range2).typ == XmlRegAtomType::XmlRegexpNotNameChar)
                 || ((*range1).typ == XmlRegAtomType::XmlRegexpDecimal
-                    && (*range2).typ == XmlRegAtomType::XmlRegexpNotdecimal)
-                || ((*range1).typ == XmlRegAtomType::XmlRegexpRealchar
-                    && (*range2).typ == XmlRegAtomType::XmlRegexpNotrealchar)
+                    && (*range2).typ == XmlRegAtomType::XmlRegexpNotDecimal)
+                || ((*range1).typ == XmlRegAtomType::XmlRegexpRealChar
+                    && (*range2).typ == XmlRegAtomType::XmlRegexpNotRealChar)
             {
                 ret = 0;
             } else {
@@ -3970,8 +3983,8 @@ unsafe fn xml_fa_compare_ranges(mut range1: XmlRegRangePtr, mut range2: XmlRegRa
                 XmlRegAtomType::XmlRegexpMark => {
                     if matches!(
                         (*range2).typ,
-                        XmlRegAtomType::XmlRegexpMarkNonspacing
-                            | XmlRegAtomType::XmlRegexpMarkSpacecombining
+                        XmlRegAtomType::XmlRegexpMarkNonSpacing
+                            | XmlRegAtomType::XmlRegexpMarkSpaceCombining
                             | XmlRegAtomType::XmlRegexpMarkEnclosing
                     ) {
                         ret = 1;
@@ -3994,8 +4007,8 @@ unsafe fn xml_fa_compare_ranges(mut range1: XmlRegRangePtr, mut range2: XmlRegRa
                             | XmlRegAtomType::XmlRegexpPunctDash
                             | XmlRegAtomType::XmlRegexpPunctOpen
                             | XmlRegAtomType::XmlRegexpPunctClose
-                            | XmlRegAtomType::XmlRegexpPunctInitquote
-                            | XmlRegAtomType::XmlRegexpPunctFinquote
+                            | XmlRegAtomType::XmlRegexpPunctInitQuote
+                            | XmlRegAtomType::XmlRegexpPunctFinQuote
                             | XmlRegAtomType::XmlRegexpPunctOthers
                     ) {
                         ret = 1;
@@ -4072,8 +4085,8 @@ unsafe fn xml_fa_compare_atoms(
             return 0;
         }
 
-        if matches!((*atom1).typ, XmlRegAtomType::XmlRegexpAnychar)
-            || matches!((*atom2).typ, XmlRegAtomType::XmlRegexpAnychar)
+        if matches!((*atom1).typ, XmlRegAtomType::XmlRegexpAnyChar)
+            || matches!((*atom2).typ, XmlRegAtomType::XmlRegexpAnyChar)
         {
             return 1;
         }

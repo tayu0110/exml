@@ -5059,9 +5059,9 @@ unsafe fn automata_test(
             libxml::{
                 xmlautomata::{
                     XmlAutomataPtr, XmlAutomataStatePtr, xml_automata_compile,
-                    xml_automata_get_init_state, xml_automata_new_count_trans,
-                    xml_automata_new_epsilon, xml_automata_new_state, xml_automata_new_transition,
-                    xml_automata_set_final_state, xml_free_automata, xml_new_automata,
+                    xml_automata_new_count_trans, xml_automata_new_epsilon, xml_automata_new_state,
+                    xml_automata_new_transition, xml_automata_set_final_state, xml_free_automata,
+                    xml_new_automata,
                 },
                 xmlregexp::{
                     XmlRegExecCtxtPtr, xml_reg_exec_push_string, xml_reg_free_exec_ctxt,
@@ -5102,7 +5102,7 @@ unsafe fn automata_test(
             generic_error!("Cannot create automata\n");
             return -1;
         }
-        states[0] = xml_automata_get_init_state(am);
+        states[0] = (*am).get_init_state();
         if states[0].is_null() {
             generic_error!("Cannot get start state\n");
             xml_free_automata(am);
