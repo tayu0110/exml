@@ -32,13 +32,9 @@ use std::{
 
 use crate::libxml::{
     xmlregexp::{
-        REGEXP_ALL_COUNTER, REGEXP_ALL_LAX_COUNTER, XmlRegAtomPtr, XmlRegAtomType, XmlRegCounter,
-        XmlRegMarkedType, XmlRegParserCtxtPtr, XmlRegQuantType, XmlRegStatePtr, XmlRegStateType,
-        XmlRegTrans, XmlRegexp, xml_fa_computes_determinism, xml_fa_eliminate_epsilon_transitions,
-        xml_fa_generate_counted_epsilon_transition, xml_fa_generate_counted_transition,
-        xml_fa_generate_epsilon_transition, xml_fa_generate_transitions, xml_reg_atom_push,
-        xml_reg_epx_from_parse, xml_reg_free_atom, xml_reg_free_parser_ctxt, xml_reg_get_counter,
-        xml_reg_new_atom, xml_reg_new_parser_ctxt, xml_reg_state_add_trans, xml_reg_state_push,
+        XmlRegAtomPtr, XmlRegAtomType, XmlRegCounter, XmlRegMarkedType, XmlRegQuantType,
+        XmlRegStatePtr, XmlRegStateType, XmlRegTrans, XmlRegexp, xml_reg_free_atom,
+        xml_reg_free_parser_ctxt, xml_reg_new_parser_ctxt,
     },
     xmlstring::XmlChar,
 };
@@ -67,12 +63,576 @@ pub struct XmlAutomata {
 }
 
 impl XmlAutomata {
+    /// Compile the automata into a Reg Exp ready for being executed.
+    /// The automata should be free after this point.
+    ///
+    /// Returns the compiled regexp or NULL in case of error
+    #[doc(alias = "xmlAutomataCompile")]
+    pub unsafe fn compile(&mut self) -> *mut XmlRegexp {
+        unsafe {
+            if self.error != 0 {
+                return null_mut();
+            }
+            self.fa_eliminate_epsilon_transitions();
+            /* xmlFAComputesDeterminism(self); */
+            self.parse()
+        }
+    }
+
+    /// Checks if an automata is determinist.
+    ///
+    /// Returns 1 if true, 0 if not, and -1 in case of error
+    #[doc(alias = "xmlAutomataIsDeterminist")]
+    pub unsafe fn is_determinist(&mut self) -> i32 {
+        unsafe {
+            let ret: i32 = self.fa_computes_determinism();
+            ret
+        }
+    }
+
     /// Initial state lookup
     ///
     /// Returns the initial state of the automata
     #[doc(alias = "xmlAutomataGetInitState")]
     pub fn get_init_state(&self) -> XmlAutomataStatePtr {
         self.start
+    }
+
+    /// Set some flags on the automata
+    #[doc(alias = "xmlAutomataSetFlags")]
+    pub(crate) fn set_flags(&mut self, flags: i32) {
+        self.flags |= flags;
+    }
+
+    /// Create a new disconnected state in the automata
+    ///
+    /// Returns the new state or NULL in case of error
+    #[doc(alias = "xmlAutomataNewState")]
+    pub unsafe fn new_state(&mut self) -> XmlAutomataStatePtr {
+        unsafe { self.reg_state_push() }
+    }
+
+    /// Create a new counter
+    ///
+    /// Returns the counter number or -1 in case of error
+    #[doc(alias = "xmlAutomataNewCounter")]
+    pub fn new_counter(&mut self, min: i32, max: i32) -> i32 {
+        let ret = self.reg_get_counter();
+        self.counters[ret].min = min;
+        self.counters[ret].max = max;
+        ret as i32
+    }
+
+    /// If @to is NULL, this creates first a new target state in the automata
+    /// and then adds a transition from the @from state to the target state
+    /// activated by the value of @token
+    ///
+    /// Returns the target state or NULL in case of error
+    #[doc(alias = "xmlAutomataNewTransition")]
+    pub unsafe fn new_transition(
+        &mut self,
+        from: XmlAutomataStatePtr,
+        to: XmlAutomataStatePtr,
+        token: &str,
+        data: *mut c_void,
+    ) -> XmlAutomataStatePtr {
+        unsafe {
+            if from.is_null() {
+                return null_mut();
+            }
+            let atom: XmlRegAtomPtr = self.reg_new_atom(XmlRegAtomType::XmlRegexpString);
+            if atom.is_null() {
+                return null_mut();
+            }
+            (*atom).data = data;
+            (*atom).valuep = Some(token.to_owned());
+
+            if self.fa_generate_transitions(from, to, atom) < 0 {
+                xml_reg_free_atom(atom);
+                return null_mut();
+            }
+            if to.is_null() {
+                return self.state;
+            }
+            to
+        }
+    }
+
+    /// If @to is NULL, this creates first a new target state in the automata
+    /// and then adds a transition from the @from state to the target state
+    /// activated by the value of @token
+    ///
+    /// Returns the target state or NULL in case of error
+    #[doc(alias = "xmlAutomataNewTransition2")]
+    pub unsafe fn new_transition2(
+        &mut self,
+        from: XmlAutomataStatePtr,
+        to: XmlAutomataStatePtr,
+        token: &str,
+        token2: Option<&str>,
+        data: *mut c_void,
+    ) -> XmlAutomataStatePtr {
+        unsafe {
+            if from.is_null() {
+                return null_mut();
+            }
+            let atom: XmlRegAtomPtr = self.reg_new_atom(XmlRegAtomType::XmlRegexpString);
+            if atom.is_null() {
+                return null_mut();
+            }
+            (*atom).data = data;
+            if let Some(token2) = token2.filter(|t| !t.is_empty()) {
+                (*atom).valuep = Some(format!("{token}|{token2}"));
+            } else {
+                (*atom).valuep = Some(token.to_owned());
+            }
+
+            if self.fa_generate_transitions(from, to, atom) < 0 {
+                xml_reg_free_atom(atom);
+                return null_mut();
+            }
+            if to.is_null() {
+                return self.state;
+            }
+            to
+        }
+    }
+
+    /// If @to is NULL, this creates first a new target state in the automata
+    /// and then adds a transition from the @from state to the target state
+    /// activated by any value except (@token,@token2)
+    /// Note that if @token2 is not NULL, then (X, NULL) won't match to follow
+    /// the semantic of XSD ##other
+    ///
+    /// Returns the target state or NULL in case of error
+    #[doc(alias = "xmlAutomataNewNegTrans")]
+    pub unsafe fn new_neg_trans(
+        &mut self,
+        from: XmlAutomataStatePtr,
+        to: XmlAutomataStatePtr,
+        token: &str,
+        token2: Option<&str>,
+        data: *mut c_void,
+    ) -> XmlAutomataStatePtr {
+        unsafe {
+            if from.is_null() {
+                return null_mut();
+            }
+            let atom: XmlRegAtomPtr = self.reg_new_atom(XmlRegAtomType::XmlRegexpString);
+            if atom.is_null() {
+                return null_mut();
+            }
+            (*atom).data = data;
+            (*atom).neg = 1;
+            if let Some(token2) = token2.filter(|t| !t.is_empty()) {
+                (*atom).valuep = Some(format!("{token}|{token2}"));
+            } else {
+                (*atom).valuep = Some(token.to_owned());
+            }
+            let err_msg = format!("not {}", (*atom).valuep.as_deref().unwrap());
+            (*atom).valuep2 = Some(err_msg);
+
+            if self.fa_generate_transitions(from, to, atom) < 0 {
+                xml_reg_free_atom(atom);
+                return null_mut();
+            }
+            self.negs += 1;
+            if to.is_null() {
+                return self.state;
+            }
+            to
+        }
+    }
+
+    /// If @to is NULL, this creates first a new target state in the automata
+    /// and then adds a transition from the @from state to the target state
+    /// activated by a succession of input of value @token and whose number
+    /// is between @min and @max
+    ///
+    /// Returns the target state or NULL in case of error
+    #[doc(alias = "xmlAutomataNewCountTrans")]
+    pub unsafe fn new_count_trans(
+        &mut self,
+        from: XmlAutomataStatePtr,
+        mut to: XmlAutomataStatePtr,
+        token: &str,
+        min: i32,
+        max: i32,
+        data: *mut c_void,
+    ) -> XmlAutomataStatePtr {
+        unsafe {
+            if from.is_null() {
+                return null_mut();
+            }
+            if min < 0 {
+                return null_mut();
+            }
+            if max < min || max < 1 {
+                return null_mut();
+            }
+            let atom: XmlRegAtomPtr = self.reg_new_atom(XmlRegAtomType::XmlRegexpString);
+            if atom.is_null() {
+                return null_mut();
+            }
+            (*atom).valuep = Some(token.to_owned());
+            (*atom).data = data;
+            if min == 0 {
+                (*atom).min = 1;
+            } else {
+                (*atom).min = min;
+            }
+            (*atom).max = max;
+
+            // associate a counter to the transition.
+            let counter = self.reg_get_counter();
+            self.counters[counter].min = min;
+            self.counters[counter].max = max;
+
+            // xmlFAGenerateTransitions(am, from, to, atom);
+            if to.is_null() {
+                to = self.reg_state_push();
+                if to.is_null() {
+                    // goto error;
+                    xml_reg_free_atom(atom);
+                    return null_mut();
+                }
+            }
+            self.reg_state_add_trans(from, atom, to, counter as i32, -1);
+            if self.reg_atom_push(atom) < 0 {
+                // goto error;
+                xml_reg_free_atom(atom);
+                return null_mut();
+            }
+            self.state = to;
+
+            if to.is_null() {
+                to = self.state;
+            }
+            if to.is_null() {
+                return null_mut();
+            }
+            if min == 0 {
+                self.fa_generate_epsilon_transition(from, to);
+            }
+            to
+
+            // error:
+            //     xmlRegFreeAtom(atom);
+            //     return null_mut();
+        }
+    }
+
+    /// If @to is NULL, this creates first a new target state in the automata
+    /// and then adds a transition from the @from state to the target state
+    /// activated by a succession of input of value @token and @token2 and
+    /// whose number is between @min and @max
+    ///
+    /// Returns the target state or NULL in case of error
+    #[doc(alias = "xmlAutomataNewCountTrans2")]
+    #[allow(clippy::too_many_arguments)]
+    pub unsafe fn new_count_trans2(
+        &mut self,
+        from: XmlAutomataStatePtr,
+        mut to: XmlAutomataStatePtr,
+        token: &str,
+        token2: Option<&str>,
+        min: i32,
+        max: i32,
+        data: *mut c_void,
+    ) -> XmlAutomataStatePtr {
+        unsafe {
+            if from.is_null() {
+                return null_mut();
+            }
+            if min < 0 {
+                return null_mut();
+            }
+            if max < min || max < 1 {
+                return null_mut();
+            }
+            let atom: XmlRegAtomPtr = self.reg_new_atom(XmlRegAtomType::XmlRegexpString);
+            if atom.is_null() {
+                return null_mut();
+            }
+            if let Some(token2) = token2.filter(|t| !t.is_empty()) {
+                (*atom).valuep = Some(format!("{token}|{token2}"));
+            } else {
+                (*atom).valuep = Some(token.to_owned());
+            }
+            (*atom).data = data;
+            if min == 0 {
+                (*atom).min = 1;
+            } else {
+                (*atom).min = min;
+            }
+            (*atom).max = max;
+
+            // associate a counter to the transition.
+            let counter = self.reg_get_counter();
+            self.counters[counter].min = min;
+            self.counters[counter].max = max;
+
+            // xmlFAGenerateTransitions(self, from, to, atom);
+            if to.is_null() {
+                to = self.reg_state_push();
+                if to.is_null() {
+                    // goto error;
+                    xml_reg_free_atom(atom);
+                    return null_mut();
+                }
+            }
+            self.reg_state_add_trans(from, atom, to, counter as i32, -1);
+            if self.reg_atom_push(atom) < 0 {
+                // goto error;
+                xml_reg_free_atom(atom);
+                return null_mut();
+            }
+            self.state = to;
+
+            if to.is_null() {
+                to = self.state;
+            }
+            if to.is_null() {
+                return null_mut();
+            }
+            if min == 0 {
+                self.fa_generate_epsilon_transition(from, to);
+            }
+            to
+
+            // error:
+            //     xmlRegFreeAtom(atom);
+            //     return null_mut();
+        }
+    }
+
+    /// If @to is NULL, this creates first a new target state in the automata
+    /// and then adds an epsilon transition from the @from state to the target state
+    /// which will increment the counter provided
+    ///
+    /// Returns the target state or NULL in case of error
+    #[doc(alias = "xmlAutomataNewCountedTrans")]
+    pub unsafe fn new_counted_trans(
+        &mut self,
+        from: XmlAutomataStatePtr,
+        to: XmlAutomataStatePtr,
+        counter: i32,
+    ) -> XmlAutomataStatePtr {
+        unsafe {
+            if from.is_null() || counter < 0 {
+                return null_mut();
+            }
+            self.fa_generate_counted_epsilon_transition(from, to, counter);
+            if to.is_null() {
+                return self.state;
+            }
+            to
+        }
+    }
+
+    /// If @to is NULL, this creates first a new target state in the automata
+    /// and then adds an epsilon transition from the @from state to the target state
+    /// which will be allowed only if the counter is within the right range.
+    ///
+    /// Returns the target state or NULL in case of error
+    #[doc(alias = "xmlAutomataNewCounterTrans")]
+    pub unsafe fn new_counter_trans(
+        &mut self,
+        from: XmlAutomataStatePtr,
+        to: XmlAutomataStatePtr,
+        counter: i32,
+    ) -> XmlAutomataStatePtr {
+        unsafe {
+            if from.is_null() || counter < 0 {
+                return null_mut();
+            }
+            self.fa_generate_counted_transition(from, to, counter);
+            if to.is_null() {
+                return self.state;
+            }
+            to
+        }
+    }
+
+    /// If @to is NULL, this creates first a new target state in the automata
+    /// and then adds a transition from the @from state to the target state
+    /// activated by a succession of input of value @token and whose number
+    /// is between @min and @max, moreover that transition can only be crossed once.
+    ///
+    /// Returns the target state or NULL in case of error
+    #[doc(alias = "xmlAutomataNewOnceTrans")]
+    pub unsafe fn new_once_trans(
+        &mut self,
+        from: XmlAutomataStatePtr,
+        mut to: XmlAutomataStatePtr,
+        token: &str,
+        min: i32,
+        max: i32,
+        data: *mut c_void,
+    ) -> XmlAutomataStatePtr {
+        unsafe {
+            if from.is_null() {
+                return null_mut();
+            }
+            if min < 1 {
+                return null_mut();
+            }
+            if max < min {
+                return null_mut();
+            }
+            let atom: XmlRegAtomPtr = self.reg_new_atom(XmlRegAtomType::XmlRegexpString);
+            if atom.is_null() {
+                return null_mut();
+            }
+            (*atom).valuep = Some(token.to_owned());
+            (*atom).data = data;
+            (*atom).quant = XmlRegQuantType::XmlRegexpQuantOnceonly;
+            (*atom).min = min;
+            (*atom).max = max;
+            // associate a counter to the transition.
+            let counter = self.reg_get_counter();
+            self.counters[counter].min = 1;
+            self.counters[counter].max = 1;
+
+            // xmlFAGenerateTransitions(self, from, to, atom);
+            if to.is_null() {
+                to = self.reg_state_push();
+                if to.is_null() {
+                    // goto error;
+                    xml_reg_free_atom(atom);
+                    return null_mut();
+                }
+            }
+            self.reg_state_add_trans(from, atom, to, counter as i32, -1);
+            if self.reg_atom_push(atom) < 0 {
+                // goto error;
+                xml_reg_free_atom(atom);
+                return null_mut();
+            }
+            self.state = to;
+            to
+
+            // error:
+            //     xmlRegFreeAtom(atom);
+            //     return null_mut();
+        }
+    }
+
+    /// If @to is NULL, this creates first a new target state in the automata
+    /// and then adds a transition from the @from state to the target state
+    /// activated by a succession of input of value @token and @token2 and whose
+    /// number is between @min and @max, moreover that transition can only be crossed once.
+    ///
+    /// Returns the target state or NULL in case of error
+    #[doc(alias = "xmlAutomataNewOnceTrans2")]
+    #[allow(clippy::too_many_arguments)]
+    pub unsafe fn new_once_trans2(
+        &mut self,
+        from: XmlAutomataStatePtr,
+        mut to: XmlAutomataStatePtr,
+        token: &str,
+        token2: Option<&str>,
+        min: i32,
+        max: i32,
+        data: *mut c_void,
+    ) -> XmlAutomataStatePtr {
+        unsafe {
+            if from.is_null() {
+                return null_mut();
+            }
+            if min < 1 {
+                return null_mut();
+            }
+            if max < min {
+                return null_mut();
+            }
+            let atom: XmlRegAtomPtr = self.reg_new_atom(XmlRegAtomType::XmlRegexpString);
+            if atom.is_null() {
+                return null_mut();
+            }
+            if let Some(token2) = token2.filter(|t| !t.is_empty()) {
+                (*atom).valuep = Some(format!("{token}|{token2}"));
+            } else {
+                (*atom).valuep = Some(token.to_owned());
+            }
+            (*atom).data = data;
+            (*atom).quant = XmlRegQuantType::XmlRegexpQuantOnceonly;
+            (*atom).min = min;
+            (*atom).max = max;
+            // associate a counter to the transition.
+            let counter = self.reg_get_counter();
+            self.counters[counter].min = 1;
+            self.counters[counter].max = 1;
+
+            // xmlFAGenerateTransitions(self, from, to, atom);
+            if to.is_null() {
+                to = self.reg_state_push();
+                if to.is_null() {
+                    // goto error;
+                    xml_reg_free_atom(atom);
+                    return null_mut();
+                }
+            }
+            self.reg_state_add_trans(from, atom, to, counter as i32, -1);
+            if self.reg_atom_push(atom) < 0 {
+                // goto error;
+                xml_reg_free_atom(atom);
+                return null_mut();
+            }
+            self.state = to;
+            to
+
+            // error:
+            //     xmlRegFreeAtom(atom);
+            //     return null_mut();
+        }
+    }
+
+    /// If @to is NULL, this creates first a new target state in the automata
+    /// and then adds a an ALL transition from the @from state to the
+    /// target state. That transition is an epsilon transition allowed only when
+    /// all transitions from the @from node have been activated.
+    ///
+    /// Returns the target state or NULL in case of error
+    #[doc(alias = "xmlAutomataNewAllTrans")]
+    pub unsafe fn new_all_trans(
+        &mut self,
+        from: XmlAutomataStatePtr,
+        to: XmlAutomataStatePtr,
+        lax: i32,
+    ) -> XmlAutomataStatePtr {
+        unsafe {
+            if from.is_null() {
+                return null_mut();
+            }
+            self.fa_generate_all_transition(from, to, lax);
+            if to.is_null() {
+                return self.state;
+            }
+            to
+        }
+    }
+
+    /// If @to is NULL, this creates first a new target state in the automata
+    /// and then adds an epsilon transition from the @from state to the target state
+    ///
+    /// Returns the target state or NULL in case of error
+    #[doc(alias = "xmlAutomataNewEpsilon")]
+    pub unsafe fn new_epsilon(
+        &mut self,
+        from: XmlAutomataStatePtr,
+        to: XmlAutomataStatePtr,
+    ) -> XmlAutomataStatePtr {
+        unsafe {
+            if from.is_null() {
+                return null_mut();
+            }
+            self.fa_generate_epsilon_transition(from, to);
+            if to.is_null() {
+                return self.state;
+            }
+            to
+        }
     }
 }
 
@@ -115,6 +675,17 @@ pub struct XmlAutomataState {
     pub(crate) trans_to: Vec<i32>,
 }
 
+impl XmlAutomataState {
+    /// Makes that state a final state
+    ///
+    /// Returns 0 or -1 in case of error
+    #[doc(alias = "xmlAutomataSetFinalState")]
+    pub fn set_final_state(&mut self) -> i32 {
+        self.typ = XmlRegStateType::XmlRegexpFinalState;
+        0
+    }
+}
+
 /// Create a new automata
 ///
 /// Returns the new object or NULL in case of failure
@@ -127,7 +698,7 @@ pub unsafe fn xml_new_automata() -> XmlAutomataPtr {
         }
 
         // initialize the parser
-        (*ctxt).state = xml_reg_state_push(ctxt);
+        (*ctxt).state = (*ctxt).reg_state_push();
         if (*ctxt).state.is_null() {
             xml_free_automata(ctxt);
             return null_mut();
@@ -150,699 +721,5 @@ pub unsafe fn xml_free_automata(am: XmlAutomataPtr) {
             return;
         }
         xml_reg_free_parser_ctxt(am);
-    }
-}
-
-/// Makes that state a final state
-///
-/// Returns 0 or -1 in case of error
-#[doc(alias = "xmlAutomataSetFinalState")]
-pub unsafe fn xml_automata_set_final_state(am: XmlAutomataPtr, state: XmlAutomataStatePtr) -> i32 {
-    unsafe {
-        if am.is_null() || state.is_null() {
-            return -1;
-        }
-        (*state).typ = XmlRegStateType::XmlRegexpFinalState;
-        0
-    }
-}
-
-/// Create a new disconnected state in the automata
-///
-/// Returns the new state or NULL in case of error
-#[doc(alias = "xmlAutomataNewState")]
-pub unsafe fn xml_automata_new_state(am: XmlAutomataPtr) -> XmlAutomataStatePtr {
-    unsafe {
-        if am.is_null() {
-            return null_mut();
-        }
-        xml_reg_state_push(am)
-    }
-}
-
-/// If @to is NULL, this creates first a new target state in the automata
-/// and then adds a transition from the @from state to the target state
-/// activated by the value of @token
-///
-/// Returns the target state or NULL in case of error
-#[doc(alias = "xmlAutomataNewTransition")]
-pub unsafe fn xml_automata_new_transition(
-    am: XmlAutomataPtr,
-    from: XmlAutomataStatePtr,
-    to: XmlAutomataStatePtr,
-    token: &str,
-    data: *mut c_void,
-) -> XmlAutomataStatePtr {
-    unsafe {
-        if am.is_null() || from.is_null() {
-            return null_mut();
-        }
-        let atom: XmlRegAtomPtr = xml_reg_new_atom(am, XmlRegAtomType::XmlRegexpString);
-        if atom.is_null() {
-            return null_mut();
-        }
-        (*atom).data = data;
-        (*atom).valuep = Some(token.to_owned());
-
-        if xml_fa_generate_transitions(am, from, to, atom) < 0 {
-            xml_reg_free_atom(atom);
-            return null_mut();
-        }
-        if to.is_null() {
-            return (*am).state;
-        }
-        to
-    }
-}
-
-/// If @to is NULL, this creates first a new target state in the automata
-/// and then adds a transition from the @from state to the target state
-/// activated by the value of @token
-///
-/// Returns the target state or NULL in case of error
-#[doc(alias = "xmlAutomataNewTransition2")]
-pub unsafe fn xml_automata_new_transition2(
-    am: XmlAutomataPtr,
-    from: XmlAutomataStatePtr,
-    to: XmlAutomataStatePtr,
-    token: &str,
-    token2: Option<&str>,
-    data: *mut c_void,
-) -> XmlAutomataStatePtr {
-    unsafe {
-        if am.is_null() || from.is_null() {
-            return null_mut();
-        }
-        let atom: XmlRegAtomPtr = xml_reg_new_atom(am, XmlRegAtomType::XmlRegexpString);
-        if atom.is_null() {
-            return null_mut();
-        }
-        (*atom).data = data;
-        if let Some(token2) = token2.filter(|t| !t.is_empty()) {
-            (*atom).valuep = Some(format!("{token}|{token2}"));
-        } else {
-            (*atom).valuep = Some(token.to_owned());
-        }
-
-        if xml_fa_generate_transitions(am, from, to, atom) < 0 {
-            xml_reg_free_atom(atom);
-            return null_mut();
-        }
-        if to.is_null() {
-            return (*am).state;
-        }
-        to
-    }
-}
-
-/// If @to is NULL, this creates first a new target state in the automata
-/// and then adds a transition from the @from state to the target state
-/// activated by any value except (@token,@token2)
-/// Note that if @token2 is not NULL, then (X, NULL) won't match to follow
-/// the semantic of XSD ##other
-///
-/// Returns the target state or NULL in case of error
-#[doc(alias = "xmlAutomataNewNegTrans")]
-pub unsafe fn xml_automata_new_neg_trans(
-    am: XmlAutomataPtr,
-    from: XmlAutomataStatePtr,
-    to: XmlAutomataStatePtr,
-    token: &str,
-    token2: Option<&str>,
-    data: *mut c_void,
-) -> XmlAutomataStatePtr {
-    unsafe {
-        if am.is_null() || from.is_null() {
-            return null_mut();
-        }
-        let atom: XmlRegAtomPtr = xml_reg_new_atom(am, XmlRegAtomType::XmlRegexpString);
-        if atom.is_null() {
-            return null_mut();
-        }
-        (*atom).data = data;
-        (*atom).neg = 1;
-        if let Some(token2) = token2.filter(|t| !t.is_empty()) {
-            (*atom).valuep = Some(format!("{token}|{token2}"));
-        } else {
-            (*atom).valuep = Some(token.to_owned());
-        }
-        let err_msg = format!("not {}", (*atom).valuep.as_deref().unwrap());
-        (*atom).valuep2 = Some(err_msg);
-
-        if xml_fa_generate_transitions(am, from, to, atom) < 0 {
-            xml_reg_free_atom(atom);
-            return null_mut();
-        }
-        (*am).negs += 1;
-        if to.is_null() {
-            return (*am).state;
-        }
-        to
-    }
-}
-
-/// If @to is NULL, this creates first a new target state in the automata
-/// and then adds a transition from the @from state to the target state
-/// activated by a succession of input of value @token and whose number
-/// is between @min and @max
-///
-/// Returns the target state or NULL in case of error
-#[doc(alias = "xmlAutomataNewCountTrans")]
-pub unsafe fn xml_automata_new_count_trans(
-    am: XmlAutomataPtr,
-    from: XmlAutomataStatePtr,
-    mut to: XmlAutomataStatePtr,
-    token: &str,
-    min: i32,
-    max: i32,
-    data: *mut c_void,
-) -> XmlAutomataStatePtr {
-    unsafe {
-        if am.is_null() || from.is_null() {
-            return null_mut();
-        }
-        if min < 0 {
-            return null_mut();
-        }
-        if max < min || max < 1 {
-            return null_mut();
-        }
-        let atom: XmlRegAtomPtr = xml_reg_new_atom(am, XmlRegAtomType::XmlRegexpString);
-        if atom.is_null() {
-            return null_mut();
-        }
-        (*atom).valuep = Some(token.to_owned());
-        (*atom).data = data;
-        if min == 0 {
-            (*atom).min = 1;
-        } else {
-            (*atom).min = min;
-        }
-        (*atom).max = max;
-
-        // associate a counter to the transition.
-        let counter = xml_reg_get_counter(am);
-        (*am).counters[counter].min = min;
-        (*am).counters[counter].max = max;
-
-        // xmlFAGenerateTransitions(am, from, to, atom);
-        if to.is_null() {
-            to = xml_reg_state_push(am);
-            if to.is_null() {
-                // goto error;
-                xml_reg_free_atom(atom);
-                return null_mut();
-            }
-        }
-        xml_reg_state_add_trans(am, from, atom, to, counter as i32, -1);
-        if xml_reg_atom_push(am, atom) < 0 {
-            // goto error;
-            xml_reg_free_atom(atom);
-            return null_mut();
-        }
-        (*am).state = to;
-
-        if to.is_null() {
-            to = (*am).state;
-        }
-        if to.is_null() {
-            return null_mut();
-        }
-        if min == 0 {
-            xml_fa_generate_epsilon_transition(am, from, to);
-        }
-        to
-
-        // error:
-        //     xmlRegFreeAtom(atom);
-        //     return null_mut();
-    }
-}
-
-/// If @to is NULL, this creates first a new target state in the automata
-/// and then adds a transition from the @from state to the target state
-/// activated by a succession of input of value @token and @token2 and
-/// whose number is between @min and @max
-///
-/// Returns the target state or NULL in case of error
-#[doc(alias = "xmlAutomataNewCountTrans2")]
-#[allow(clippy::too_many_arguments)]
-pub unsafe fn xml_automata_new_count_trans2(
-    am: XmlAutomataPtr,
-    from: XmlAutomataStatePtr,
-    mut to: XmlAutomataStatePtr,
-    token: &str,
-    token2: Option<&str>,
-    min: i32,
-    max: i32,
-    data: *mut c_void,
-) -> XmlAutomataStatePtr {
-    unsafe {
-        if am.is_null() || from.is_null() {
-            return null_mut();
-        }
-        if min < 0 {
-            return null_mut();
-        }
-        if max < min || max < 1 {
-            return null_mut();
-        }
-        let atom: XmlRegAtomPtr = xml_reg_new_atom(am, XmlRegAtomType::XmlRegexpString);
-        if atom.is_null() {
-            return null_mut();
-        }
-        if let Some(token2) = token2.filter(|t| !t.is_empty()) {
-            (*atom).valuep = Some(format!("{token}|{token2}"));
-        } else {
-            (*atom).valuep = Some(token.to_owned());
-        }
-        (*atom).data = data;
-        if min == 0 {
-            (*atom).min = 1;
-        } else {
-            (*atom).min = min;
-        }
-        (*atom).max = max;
-
-        // associate a counter to the transition.
-        let counter = xml_reg_get_counter(am);
-        (*am).counters[counter].min = min;
-        (*am).counters[counter].max = max;
-
-        // xmlFAGenerateTransitions(am, from, to, atom);
-        if to.is_null() {
-            to = xml_reg_state_push(am);
-            if to.is_null() {
-                // goto error;
-                xml_reg_free_atom(atom);
-                return null_mut();
-            }
-        }
-        xml_reg_state_add_trans(am, from, atom, to, counter as i32, -1);
-        if xml_reg_atom_push(am, atom) < 0 {
-            // goto error;
-            xml_reg_free_atom(atom);
-            return null_mut();
-        }
-        (*am).state = to;
-
-        if to.is_null() {
-            to = (*am).state;
-        }
-        if to.is_null() {
-            return null_mut();
-        }
-        if min == 0 {
-            xml_fa_generate_epsilon_transition(am, from, to);
-        }
-        to
-
-        // error:
-        //     xmlRegFreeAtom(atom);
-        //     return null_mut();
-    }
-}
-
-/// If @to is NULL, this creates first a new target state in the automata
-/// and then adds a transition from the @from state to the target state
-/// activated by a succession of input of value @token and whose number
-/// is between @min and @max, moreover that transition can only be crossed once.
-///
-/// Returns the target state or NULL in case of error
-#[doc(alias = "xmlAutomataNewOnceTrans")]
-pub unsafe fn xml_automata_new_once_trans(
-    am: XmlAutomataPtr,
-    from: XmlAutomataStatePtr,
-    mut to: XmlAutomataStatePtr,
-    token: &str,
-    min: i32,
-    max: i32,
-    data: *mut c_void,
-) -> XmlAutomataStatePtr {
-    unsafe {
-        if am.is_null() || from.is_null() {
-            return null_mut();
-        }
-        if min < 1 {
-            return null_mut();
-        }
-        if max < min {
-            return null_mut();
-        }
-        let atom: XmlRegAtomPtr = xml_reg_new_atom(am, XmlRegAtomType::XmlRegexpString);
-        if atom.is_null() {
-            return null_mut();
-        }
-        (*atom).valuep = Some(token.to_owned());
-        (*atom).data = data;
-        (*atom).quant = XmlRegQuantType::XmlRegexpQuantOnceonly;
-        (*atom).min = min;
-        (*atom).max = max;
-        // associate a counter to the transition.
-        let counter = xml_reg_get_counter(am);
-        (*am).counters[counter].min = 1;
-        (*am).counters[counter].max = 1;
-
-        // xmlFAGenerateTransitions(am, from, to, atom);
-        if to.is_null() {
-            to = xml_reg_state_push(am);
-            if to.is_null() {
-                // goto error;
-                xml_reg_free_atom(atom);
-                return null_mut();
-            }
-        }
-        xml_reg_state_add_trans(am, from, atom, to, counter as i32, -1);
-        if xml_reg_atom_push(am, atom) < 0 {
-            // goto error;
-            xml_reg_free_atom(atom);
-            return null_mut();
-        }
-        (*am).state = to;
-        to
-
-        // error:
-        //     xmlRegFreeAtom(atom);
-        //     return null_mut();
-    }
-}
-
-/// If @to is NULL, this creates first a new target state in the automata
-/// and then adds a transition from the @from state to the target state
-/// activated by a succession of input of value @token and @token2 and whose
-/// number is between @min and @max, moreover that transition can only be crossed once.
-///
-/// Returns the target state or NULL in case of error
-#[doc(alias = "xmlAutomataNewOnceTrans2")]
-#[allow(clippy::too_many_arguments)]
-pub unsafe fn xml_automata_new_once_trans2(
-    am: XmlAutomataPtr,
-    from: XmlAutomataStatePtr,
-    mut to: XmlAutomataStatePtr,
-    token: &str,
-    token2: Option<&str>,
-    min: i32,
-    max: i32,
-    data: *mut c_void,
-) -> XmlAutomataStatePtr {
-    unsafe {
-        if am.is_null() || from.is_null() {
-            return null_mut();
-        }
-        if min < 1 {
-            return null_mut();
-        }
-        if max < min {
-            return null_mut();
-        }
-        let atom: XmlRegAtomPtr = xml_reg_new_atom(am, XmlRegAtomType::XmlRegexpString);
-        if atom.is_null() {
-            return null_mut();
-        }
-        if let Some(token2) = token2.filter(|t| !t.is_empty()) {
-            (*atom).valuep = Some(format!("{token}|{token2}"));
-        } else {
-            (*atom).valuep = Some(token.to_owned());
-        }
-        (*atom).data = data;
-        (*atom).quant = XmlRegQuantType::XmlRegexpQuantOnceonly;
-        (*atom).min = min;
-        (*atom).max = max;
-        // associate a counter to the transition.
-        let counter = xml_reg_get_counter(am);
-        (*am).counters[counter].min = 1;
-        (*am).counters[counter].max = 1;
-
-        // xmlFAGenerateTransitions(am, from, to, atom);
-        if to.is_null() {
-            to = xml_reg_state_push(am);
-            if to.is_null() {
-                // goto error;
-                xml_reg_free_atom(atom);
-                return null_mut();
-            }
-        }
-        xml_reg_state_add_trans(am, from, atom, to, counter as i32, -1);
-        if xml_reg_atom_push(am, atom) < 0 {
-            // goto error;
-            xml_reg_free_atom(atom);
-            return null_mut();
-        }
-        (*am).state = to;
-        to
-
-        // error:
-        //     xmlRegFreeAtom(atom);
-        //     return null_mut();
-    }
-}
-
-#[doc(alias = "xmlFAGenerateAllTransition")]
-unsafe fn xml_fa_generate_all_transition(
-    ctxt: XmlRegParserCtxtPtr,
-    from: XmlRegStatePtr,
-    mut to: XmlRegStatePtr,
-    lax: i32,
-) -> i32 {
-    unsafe {
-        if to.is_null() {
-            to = xml_reg_state_push(ctxt);
-            if to.is_null() {
-                return -1;
-            }
-            (*ctxt).state = to;
-        }
-        if lax != 0 {
-            xml_reg_state_add_trans(ctxt, from, null_mut(), to, -1, REGEXP_ALL_LAX_COUNTER as _);
-        } else {
-            xml_reg_state_add_trans(ctxt, from, null_mut(), to, -1, REGEXP_ALL_COUNTER as _);
-        }
-        0
-    }
-}
-
-/// If @to is NULL, this creates first a new target state in the automata
-/// and then adds a an ALL transition from the @from state to the
-/// target state. That transition is an epsilon transition allowed only when
-/// all transitions from the @from node have been activated.
-///
-/// Returns the target state or NULL in case of error
-#[doc(alias = "xmlAutomataNewAllTrans")]
-pub unsafe fn xml_automata_new_all_trans(
-    am: XmlAutomataPtr,
-    from: XmlAutomataStatePtr,
-    to: XmlAutomataStatePtr,
-    lax: i32,
-) -> XmlAutomataStatePtr {
-    unsafe {
-        if am.is_null() || from.is_null() {
-            return null_mut();
-        }
-        xml_fa_generate_all_transition(am, from, to, lax);
-        if to.is_null() {
-            return (*am).state;
-        }
-        to
-    }
-}
-
-/// If @to is NULL, this creates first a new target state in the automata
-/// and then adds an epsilon transition from the @from state to the target state
-///
-/// Returns the target state or NULL in case of error
-#[doc(alias = "xmlAutomataNewEpsilon")]
-pub unsafe fn xml_automata_new_epsilon(
-    am: XmlAutomataPtr,
-    from: XmlAutomataStatePtr,
-    to: XmlAutomataStatePtr,
-) -> XmlAutomataStatePtr {
-    unsafe {
-        if am.is_null() || from.is_null() {
-            return null_mut();
-        }
-        xml_fa_generate_epsilon_transition(am, from, to);
-        if to.is_null() {
-            return (*am).state;
-        }
-        to
-    }
-}
-
-/// If @to is NULL, this creates first a new target state in the automata
-/// and then adds an epsilon transition from the @from state to the target state
-/// which will increment the counter provided
-///
-/// Returns the target state or NULL in case of error
-#[doc(alias = "xmlAutomataNewCountedTrans")]
-pub unsafe fn xml_automata_new_counted_trans(
-    am: XmlAutomataPtr,
-    from: XmlAutomataStatePtr,
-    to: XmlAutomataStatePtr,
-    counter: i32,
-) -> XmlAutomataStatePtr {
-    unsafe {
-        if am.is_null() || from.is_null() || counter < 0 {
-            return null_mut();
-        }
-        xml_fa_generate_counted_epsilon_transition(am, from, to, counter);
-        if to.is_null() {
-            return (*am).state;
-        }
-        to
-    }
-}
-
-/// If @to is NULL, this creates first a new target state in the automata
-/// and then adds an epsilon transition from the @from state to the target state
-/// which will be allowed only if the counter is within the right range.
-///
-/// Returns the target state or NULL in case of error
-#[doc(alias = "xmlAutomataNewCounterTrans")]
-pub unsafe fn xml_automata_new_counter_trans(
-    am: XmlAutomataPtr,
-    from: XmlAutomataStatePtr,
-    to: XmlAutomataStatePtr,
-    counter: i32,
-) -> XmlAutomataStatePtr {
-    unsafe {
-        if am.is_null() || from.is_null() || counter < 0 {
-            return null_mut();
-        }
-        xml_fa_generate_counted_transition(am, from, to, counter);
-        if to.is_null() {
-            return (*am).state;
-        }
-        to
-    }
-}
-
-/// Create a new counter
-///
-/// Returns the counter number or -1 in case of error
-#[doc(alias = "xmlAutomataNewCounter")]
-pub unsafe fn xml_automata_new_counter(am: XmlAutomataPtr, min: i32, max: i32) -> i32 {
-    unsafe {
-        if am.is_null() {
-            return -1;
-        }
-
-        let ret = xml_reg_get_counter(am);
-        (*am).counters[ret].min = min;
-        (*am).counters[ret].max = max;
-        ret as i32
-    }
-}
-
-/// Compile the automata into a Reg Exp ready for being executed.
-/// The automata should be free after this point.
-///
-/// Returns the compiled regexp or NULL in case of error
-#[doc(alias = "xmlAutomataCompile")]
-pub unsafe fn xml_automata_compile(am: XmlAutomataPtr) -> *mut XmlRegexp {
-    unsafe {
-        if am.is_null() || (*am).error != 0 {
-            return null_mut();
-        }
-        xml_fa_eliminate_epsilon_transitions(am);
-        /* xmlFAComputesDeterminism(am); */
-        xml_reg_epx_from_parse(am)
-    }
-}
-
-/// Checks if an automata is determinist.
-///
-/// Returns 1 if true, 0 if not, and -1 in case of error
-#[doc(alias = "xmlAutomataIsDeterminist")]
-pub unsafe fn xml_automata_is_determinist(am: XmlAutomataPtr) -> i32 {
-    unsafe {
-        if am.is_null() {
-            return -1;
-        }
-
-        let ret: i32 = xml_fa_computes_determinism(am);
-        ret
-    }
-}
-
-/// Set some flags on the automata
-#[doc(alias = "xmlAutomataSetFlags")]
-pub(crate) unsafe fn xml_automata_set_flags(am: XmlAutomataPtr, flags: i32) {
-    unsafe {
-        if am.is_null() {
-            return;
-        }
-        (*am).flags |= flags;
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
-
-    use super::*;
-
-    #[test]
-    fn test_xml_automata_is_determinist() {
-        #[cfg(all(feature = "libxml_regexp", feature = "libxml_automata"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_am in 0..GEN_NB_XML_AUTOMATA_PTR {
-                let mem_base = xml_mem_blocks();
-                let am = gen_xml_automata_ptr(n_am, 0);
-
-                let ret_val = xml_automata_is_determinist(am);
-                desret_int(ret_val);
-                des_xml_automata_ptr(n_am, am, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlAutomataIsDeterminist",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlAutomataIsDeterminist()"
-                    );
-                    eprintln!(" {}", n_am);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_automata_set_final_state() {
-        #[cfg(all(feature = "libxml_regexp", feature = "libxml_automata"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_am in 0..GEN_NB_XML_AUTOMATA_PTR {
-                for n_state in 0..GEN_NB_XML_AUTOMATA_STATE_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let am = gen_xml_automata_ptr(n_am, 0);
-                    let state = gen_xml_automata_state_ptr(n_state, 1);
-
-                    let ret_val = xml_automata_set_final_state(am, state);
-                    desret_int(ret_val);
-                    des_xml_automata_ptr(n_am, am, 0);
-                    des_xml_automata_state_ptr(n_state, state, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlAutomataSetFinalState",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlAutomataSetFinalState()"
-                        );
-                        eprint!(" {}", n_am);
-                        eprintln!(" {}", n_state);
-                    }
-                }
-            }
-        }
     }
 }

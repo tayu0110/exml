@@ -5058,10 +5058,7 @@ unsafe fn automata_test(
             generic_error,
             libxml::{
                 xmlautomata::{
-                    XmlAutomataPtr, XmlAutomataStatePtr, xml_automata_compile,
-                    xml_automata_new_count_trans, xml_automata_new_epsilon, xml_automata_new_state,
-                    xml_automata_new_transition, xml_automata_set_final_state, xml_free_automata,
-                    xml_new_automata,
+                    XmlAutomataPtr, XmlAutomataStatePtr, xml_free_automata, xml_new_automata,
                 },
                 xmlregexp::{
                     XmlRegExecCtxtPtr, xml_reg_exec_push_string, xml_reg_free_exec_ctxt,
@@ -5146,7 +5143,7 @@ unsafe fn automata_test(
                         break;
                     }
                     if states[from].is_null() {
-                        states[from] = xml_automata_new_state(am);
+                        states[from] = (*am).new_state();
                     }
                     ptr = ptr.add(1);
                     let to: usize = scan_number(addr_of_mut!(ptr)) as _;
@@ -5156,11 +5153,10 @@ unsafe fn automata_test(
                         break;
                     }
                     if states[to].is_null() {
-                        states[to] = xml_automata_new_state(am);
+                        states[to] = (*am).new_state();
                     }
                     ptr = ptr.add(1);
-                    xml_automata_new_transition(
-                        am,
+                    (*am).new_transition(
                         states[from],
                         states[to],
                         CStr::from_ptr(ptr as *const i8).to_string_lossy().as_ref(),
@@ -5176,14 +5172,14 @@ unsafe fn automata_test(
                         break;
                     }
                     if states[from].is_null() {
-                        states[from] = xml_automata_new_state(am);
+                        states[from] = (*am).new_state();
                     }
                     ptr = ptr.add(1);
                     let to: usize = scan_number(addr_of_mut!(ptr)) as _;
                     if states[to].is_null() {
-                        states[to] = xml_automata_new_state(am);
+                        states[to] = (*am).new_state();
                     }
-                    xml_automata_new_epsilon(am, states[from], states[to]);
+                    (*am).new_epsilon(states[from], states[to]);
                 } else if !am.is_null() && expr[0] == b'f' && expr[1] == b' ' {
                     let mut ptr: *mut c_char = expr.as_mut_ptr().add(2) as _;
 
@@ -5193,7 +5189,7 @@ unsafe fn automata_test(
                         generic_error!("Bad state {state} : {expr}\n");
                         break;
                     }
-                    xml_automata_set_final_state(am, states[state]);
+                    (*states[state]).set_final_state();
                 } else if !am.is_null() && expr[0] == b'c' && expr[1] == b' ' {
                     let mut ptr: *mut c_char = expr.as_mut_ptr().add(2) as _;
 
@@ -5204,7 +5200,7 @@ unsafe fn automata_test(
                         break;
                     }
                     if states[from].is_null() {
-                        states[from] = xml_automata_new_state(am);
+                        states[from] = (*am).new_state();
                     }
                     ptr = ptr.add(1);
                     let to: usize = scan_number(addr_of_mut!(ptr)) as _;
@@ -5214,7 +5210,7 @@ unsafe fn automata_test(
                         break;
                     }
                     if states[to].is_null() {
-                        states[to] = xml_automata_new_state(am);
+                        states[to] = (*am).new_state();
                     }
                     ptr = ptr.add(1);
                     let min: i32 = scan_number(addr_of_mut!(ptr));
@@ -5231,8 +5227,7 @@ unsafe fn automata_test(
                         break;
                     }
                     ptr = ptr.add(1);
-                    xml_automata_new_count_trans(
-                        am,
+                    (*am).new_count_trans(
                         states[from],
                         states[to],
                         CStr::from_ptr(ptr as *const i8).to_string_lossy().as_ref(),
@@ -5241,8 +5236,8 @@ unsafe fn automata_test(
                         null_mut(),
                     );
                 } else if !am.is_null() && expr[0] == b'-' && expr[1] == b'-' {
-                    /* end of the automata */
-                    regexp = xml_automata_compile(am);
+                    // end of the automata
+                    regexp = (*am).compile();
                     xml_free_automata(am);
                     am = null_mut();
                     if regexp.is_null() {

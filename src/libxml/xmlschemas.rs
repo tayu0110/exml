@@ -86,14 +86,7 @@ use crate::{
             xml_schema_free_wildcard_ns_set,
         },
         valid::xml_add_id,
-        xmlautomata::{
-            XmlAutomataStatePtr, xml_automata_compile, xml_automata_new_all_trans,
-            xml_automata_new_count_trans2, xml_automata_new_counted_trans,
-            xml_automata_new_counter, xml_automata_new_counter_trans, xml_automata_new_epsilon,
-            xml_automata_new_neg_trans, xml_automata_new_once_trans2, xml_automata_new_state,
-            xml_automata_new_transition2, xml_automata_set_final_state, xml_free_automata,
-            xml_new_automata,
-        },
+        xmlautomata::{XmlAutomataStatePtr, xml_free_automata, xml_new_automata},
         xmlregexp::{
             XmlRegExecCtxtPtr, xml_reg_exec_err_info, xml_reg_exec_next_values,
             xml_reg_exec_push_string, xml_reg_exec_push_string2, xml_reg_free_regexp,
@@ -12256,7 +12249,7 @@ unsafe fn xml_schema_build_content_model_for_subst_group(
         // Wrap the substitution group with a CHOICE.
         let start: XmlAutomataStatePtr = (*pctxt).state;
         if end.is_null() {
-            end = xml_automata_new_state((*pctxt).am);
+            end = (*(*pctxt).am).new_state();
         }
         let subst_group: XmlSchemaSubstGroupPtr = xml_schema_subst_group_get(pctxt, elem_decl);
         if subst_group.is_null() {
@@ -12276,9 +12269,8 @@ unsafe fn xml_schema_build_content_model_for_subst_group(
             // However, an error will be raised during *validation* if an element
             // information item shall be validated against an abstract element
             // declaration.
-            tmp = xml_automata_new_counted_trans((*pctxt).am, start, null_mut(), counter);
-            xml_automata_new_transition2(
-                (*pctxt).am,
+            tmp = (*(*pctxt).am).new_counted_trans(start, null_mut(), counter);
+            (*(*pctxt).am).new_transition2(
                 tmp,
                 end,
                 CStr::from_ptr((*elem_decl).name as *const i8)
@@ -12297,8 +12289,7 @@ unsafe fn xml_schema_build_content_model_for_subst_group(
                 .iter()
                 .map(|&member| member as XmlSchemaElementPtr)
             {
-                xml_automata_new_transition2(
-                    (*pctxt).am,
+                (*(*pctxt).am).new_transition2(
                     tmp,
                     end,
                     CStr::from_ptr((*member).name as *const i8)
@@ -12315,10 +12306,8 @@ unsafe fn xml_schema_build_content_model_for_subst_group(
             }
         } else if (*particle).max_occurs == 1 {
             // NOTE that we put the declaration in, even if it's abstract,
-            xml_automata_new_epsilon(
-                (*pctxt).am,
-                xml_automata_new_transition2(
-                    (*pctxt).am,
+            (*(*pctxt).am).new_epsilon(
+                (*(*pctxt).am).new_transition2(
                     start,
                     null_mut(),
                     CStr::from_ptr((*elem_decl).name as *const i8)
@@ -12351,8 +12340,7 @@ unsafe fn xml_schema_build_content_model_for_subst_group(
                 // tmp = xmlAutomataNewOnceTrans2((*pctxt).am, start, null_mut(),
                 //                   (*member).name, (*member).target_namespace,
                 //               1, 1, member);
-                tmp = xml_automata_new_transition2(
-                    (*pctxt).am,
+                tmp = (*(*pctxt).am).new_transition2(
                     start,
                     null_mut(),
                     CStr::from_ptr((*member).name as *const i8)
@@ -12366,7 +12354,7 @@ unsafe fn xml_schema_build_content_model_for_subst_group(
                         .as_deref(),
                     member as _,
                 );
-                xml_automata_new_epsilon((*pctxt).am, tmp, end);
+                (*(*pctxt).am).new_epsilon(tmp, end);
             }
         } else {
             let max_occurs: i32 = if (*particle).max_occurs == UNBOUNDED as i32 {
@@ -12380,13 +12368,11 @@ unsafe fn xml_schema_build_content_model_for_subst_group(
                 (*particle).min_occurs - 1
             };
 
-            counter = xml_automata_new_counter((*pctxt).am, min_occurs, max_occurs);
-            let hop: XmlAutomataStatePtr = xml_automata_new_state((*pctxt).am);
+            counter = (*(*pctxt).am).new_counter(min_occurs, max_occurs);
+            let hop: XmlAutomataStatePtr = (*(*pctxt).am).new_state();
 
-            xml_automata_new_epsilon(
-                (*pctxt).am,
-                xml_automata_new_transition2(
-                    (*pctxt).am,
+            (*(*pctxt).am).new_epsilon(
+                (*(*pctxt).am).new_transition2(
                     start,
                     null_mut(),
                     CStr::from_ptr((*elem_decl).name as *const i8)
@@ -12408,10 +12394,8 @@ unsafe fn xml_schema_build_content_model_for_subst_group(
                 .iter()
                 .map(|&member| member as XmlSchemaElementPtr)
             {
-                xml_automata_new_epsilon(
-                    (*pctxt).am,
-                    xml_automata_new_transition2(
-                        (*pctxt).am,
+                (*(*pctxt).am).new_epsilon(
+                    (*(*pctxt).am).new_transition2(
                         start,
                         null_mut(),
                         CStr::from_ptr((*member).name as *const i8)
@@ -12428,11 +12412,11 @@ unsafe fn xml_schema_build_content_model_for_subst_group(
                     hop,
                 );
             }
-            xml_automata_new_counted_trans((*pctxt).am, hop, start, counter);
-            xml_automata_new_counter_trans((*pctxt).am, hop, end, counter);
+            (*(*pctxt).am).new_counted_trans(hop, start, counter);
+            (*(*pctxt).am).new_counter_trans(hop, end, counter);
         }
         if (*particle).min_occurs == 0 {
-            xml_automata_new_epsilon((*pctxt).am, start, end);
+            (*(*pctxt).am).new_epsilon(start, end);
             ret = 1;
         }
         (*pctxt).state = end;
@@ -12464,8 +12448,7 @@ unsafe fn xml_schema_build_content_model_for_element(
             }
             if (*particle).max_occurs == 1 {
                 start = (*ctxt).state;
-                (*ctxt).state = xml_automata_new_transition2(
-                    (*ctxt).am,
+                (*ctxt).state = (*(*ctxt).am).new_transition2(
                     start,
                     null_mut(),
                     CStr::from_ptr((*elem_decl).name as *const i8)
@@ -12482,8 +12465,7 @@ unsafe fn xml_schema_build_content_model_for_element(
             } else if (*particle).max_occurs >= UNBOUNDED as i32 && (*particle).min_occurs < 2 {
                 // Special case.
                 start = (*ctxt).state;
-                (*ctxt).state = xml_automata_new_transition2(
-                    (*ctxt).am,
+                (*ctxt).state = (*(*ctxt).am).new_transition2(
                     start,
                     null_mut(),
                     CStr::from_ptr((*elem_decl).name as *const i8)
@@ -12497,8 +12479,7 @@ unsafe fn xml_schema_build_content_model_for_element(
                         .as_deref(),
                     elem_decl as _,
                 );
-                (*ctxt).state = xml_automata_new_transition2(
-                    (*ctxt).am,
+                (*ctxt).state = (*(*ctxt).am).new_transition2(
                     (*ctxt).state,
                     (*ctxt).state,
                     CStr::from_ptr((*elem_decl).name as *const i8)
@@ -12524,10 +12505,9 @@ unsafe fn xml_schema_build_content_model_for_element(
                     (*particle).min_occurs - 1
                 };
 
-                start = xml_automata_new_epsilon((*ctxt).am, (*ctxt).state, null_mut());
-                let counter: i32 = xml_automata_new_counter((*ctxt).am, min_occurs, max_occurs);
-                (*ctxt).state = xml_automata_new_transition2(
-                    (*ctxt).am,
+                start = (*(*ctxt).am).new_epsilon((*ctxt).state, null_mut());
+                let counter: i32 = (*(*ctxt).am).new_counter(min_occurs, max_occurs);
+                (*ctxt).state = (*(*ctxt).am).new_transition2(
                     start,
                     null_mut(),
                     CStr::from_ptr((*elem_decl).name as *const i8)
@@ -12541,12 +12521,11 @@ unsafe fn xml_schema_build_content_model_for_element(
                         .as_deref(),
                     elem_decl as _,
                 );
-                xml_automata_new_counted_trans((*ctxt).am, (*ctxt).state, start, counter);
-                (*ctxt).state =
-                    xml_automata_new_counter_trans((*ctxt).am, (*ctxt).state, null_mut(), counter);
+                (*(*ctxt).am).new_counted_trans((*ctxt).state, start, counter);
+                (*ctxt).state = (*(*ctxt).am).new_counter_trans((*ctxt).state, null_mut(), counter);
             }
             if (*particle).min_occurs == 0 {
-                xml_automata_new_epsilon((*ctxt).am, start, (*ctxt).state);
+                (*(*ctxt).am).new_epsilon(start, (*ctxt).state);
                 ret = 1;
             }
         }
@@ -12581,38 +12560,30 @@ unsafe fn xml_schema_build_acontent_model(
                 let mut ns: XmlSchemaWildcardNsPtr;
                 let wild: XmlSchemaWildcardPtr = (*particle).children as XmlSchemaWildcardPtr;
                 let start: XmlAutomataStatePtr = (*pctxt).state;
-                let end: XmlAutomataStatePtr = xml_automata_new_state((*pctxt).am);
+                let end: XmlAutomataStatePtr = (*(*pctxt).am).new_state();
 
                 if (*particle).max_occurs == 1 {
                     if (*wild).any == 1 {
                         // We need to add both transitions:
                         //
                         // 1. the {"*", "*"} for elements in a namespace.
-                        (*pctxt).state = xml_automata_new_transition2(
-                            (*pctxt).am,
+                        (*pctxt).state = (*(*pctxt).am).new_transition2(
                             start,
                             null_mut(),
                             "*",
                             Some("*"),
                             wild as _,
                         );
-                        xml_automata_new_epsilon((*pctxt).am, (*pctxt).state, end);
+                        (*(*pctxt).am).new_epsilon((*pctxt).state, end);
                         // 2. the {"*"} for elements in no namespace.
-                        (*pctxt).state = xml_automata_new_transition2(
-                            (*pctxt).am,
-                            start,
-                            null_mut(),
-                            "*",
-                            None,
-                            wild as _,
-                        );
-                        xml_automata_new_epsilon((*pctxt).am, (*pctxt).state, end);
+                        (*pctxt).state =
+                            (*(*pctxt).am).new_transition2(start, null_mut(), "*", None, wild as _);
+                        (*(*pctxt).am).new_epsilon((*pctxt).state, end);
                     } else if !(*wild).ns_set.is_null() {
                         ns = (*wild).ns_set;
                         while {
                             (*pctxt).state = start;
-                            (*pctxt).state = xml_automata_new_transition2(
-                                (*pctxt).am,
+                            (*pctxt).state = (*(*pctxt).am).new_transition2(
                                 (*pctxt).state,
                                 null_mut(),
                                 "*",
@@ -12623,13 +12594,12 @@ unsafe fn xml_schema_build_acontent_model(
                                     .as_deref(),
                                 wild as _,
                             );
-                            xml_automata_new_epsilon((*pctxt).am, (*pctxt).state, end);
+                            (*(*pctxt).am).new_epsilon((*pctxt).state, end);
                             ns = (*ns).next;
                             !ns.is_null()
                         } {}
                     } else if !(*wild).neg_ns_set.is_null() {
-                        (*pctxt).state = xml_automata_new_neg_trans(
-                            (*pctxt).am,
+                        (*pctxt).state = (*(*pctxt).am).new_neg_trans(
                             start,
                             end,
                             "*",
@@ -12654,33 +12624,24 @@ unsafe fn xml_schema_build_acontent_model(
                         (*particle).min_occurs - 1
                     };
 
-                    let counter: i32 =
-                        xml_automata_new_counter((*pctxt).am, min_occurs, max_occurs);
-                    let hop: XmlAutomataStatePtr = xml_automata_new_state((*pctxt).am);
+                    let counter: i32 = (*(*pctxt).am).new_counter(min_occurs, max_occurs);
+                    let hop: XmlAutomataStatePtr = (*(*pctxt).am).new_state();
                     if (*wild).any == 1 {
-                        (*pctxt).state = xml_automata_new_transition2(
-                            (*pctxt).am,
+                        (*pctxt).state = (*(*pctxt).am).new_transition2(
                             start,
                             null_mut(),
                             "*",
                             Some("*"),
                             wild as _,
                         );
-                        xml_automata_new_epsilon((*pctxt).am, (*pctxt).state, hop);
-                        (*pctxt).state = xml_automata_new_transition2(
-                            (*pctxt).am,
-                            start,
-                            null_mut(),
-                            "*",
-                            None,
-                            wild as _,
-                        );
-                        xml_automata_new_epsilon((*pctxt).am, (*pctxt).state, hop);
+                        (*(*pctxt).am).new_epsilon((*pctxt).state, hop);
+                        (*pctxt).state =
+                            (*(*pctxt).am).new_transition2(start, null_mut(), "*", None, wild as _);
+                        (*(*pctxt).am).new_epsilon((*pctxt).state, hop);
                     } else if !(*wild).ns_set.is_null() {
                         ns = (*wild).ns_set;
                         while {
-                            (*pctxt).state = xml_automata_new_transition2(
-                                (*pctxt).am,
+                            (*pctxt).state = (*(*pctxt).am).new_transition2(
                                 start,
                                 null_mut(),
                                 "*",
@@ -12691,13 +12652,12 @@ unsafe fn xml_schema_build_acontent_model(
                                     .as_deref(),
                                 wild as _,
                             );
-                            xml_automata_new_epsilon((*pctxt).am, (*pctxt).state, hop);
+                            (*(*pctxt).am).new_epsilon((*pctxt).state, hop);
                             ns = (*ns).next;
                             !ns.is_null()
                         } {}
                     } else if !(*wild).neg_ns_set.is_null() {
-                        (*pctxt).state = xml_automata_new_neg_trans(
-                            (*pctxt).am,
+                        (*pctxt).state = (*(*pctxt).am).new_neg_trans(
                             start,
                             hop,
                             "*",
@@ -12710,11 +12670,11 @@ unsafe fn xml_schema_build_acontent_model(
                             wild as _,
                         );
                     }
-                    xml_automata_new_counted_trans((*pctxt).am, hop, start, counter);
-                    xml_automata_new_counter_trans((*pctxt).am, hop, end, counter);
+                    (*(*pctxt).am).new_counted_trans(hop, start, counter);
+                    (*(*pctxt).am).new_counter_trans(hop, end, counter);
                 }
                 if (*particle).min_occurs == 0 {
-                    xml_automata_new_epsilon((*pctxt).am, start, end);
+                    (*(*pctxt).am).new_epsilon(start, end);
                     ret = 1;
                 }
                 (*pctxt).state = end;
@@ -12743,15 +12703,11 @@ unsafe fn xml_schema_build_acontent_model(
 
                     if (*particle).max_occurs >= UNBOUNDED as i32 {
                         if (*particle).min_occurs > 1 {
-                            (*pctxt).state =
-                                xml_automata_new_epsilon((*pctxt).am, oldstate, null_mut());
+                            (*pctxt).state = (*(*pctxt).am).new_epsilon(oldstate, null_mut());
                             oldstate = (*pctxt).state;
 
-                            let counter: i32 = xml_automata_new_counter(
-                                (*pctxt).am,
-                                (*particle).min_occurs - 1,
-                                UNBOUNDED as _,
-                            );
+                            let counter: i32 = (*(*pctxt).am)
+                                .new_counter((*particle).min_occurs - 1, UNBOUNDED as _);
 
                             sub = (*(*particle).children).children;
                             while !sub.is_null() {
@@ -12765,19 +12721,14 @@ unsafe fn xml_schema_build_acontent_model(
                                 sub = (*sub).next;
                             }
                             let tmp: XmlAutomataStatePtr = (*pctxt).state;
-                            xml_automata_new_counted_trans((*pctxt).am, tmp, oldstate, counter);
-                            (*pctxt).state = xml_automata_new_counter_trans(
-                                (*pctxt).am,
-                                tmp,
-                                null_mut(),
-                                counter,
-                            );
+                            (*(*pctxt).am).new_counted_trans(tmp, oldstate, counter);
+                            (*pctxt).state =
+                                (*(*pctxt).am).new_counter_trans(tmp, null_mut(), counter);
                             if ret == 1 {
-                                xml_automata_new_epsilon((*pctxt).am, oldstate, (*pctxt).state);
+                                (*(*pctxt).am).new_epsilon(oldstate, (*pctxt).state);
                             }
                         } else {
-                            (*pctxt).state =
-                                xml_automata_new_epsilon((*pctxt).am, oldstate, null_mut());
+                            (*pctxt).state = (*(*pctxt).am).new_epsilon(oldstate, null_mut());
                             oldstate = (*pctxt).state;
 
                             sub = (*(*particle).children).children;
@@ -12791,26 +12742,21 @@ unsafe fn xml_schema_build_acontent_model(
                                 }
                                 sub = (*sub).next;
                             }
-                            xml_automata_new_epsilon((*pctxt).am, (*pctxt).state, oldstate);
+                            (*(*pctxt).am).new_epsilon((*pctxt).state, oldstate);
                             // epsilon needed to block previous trans from
                             // being allowed to enter back from another construct
-                            (*pctxt).state =
-                                xml_automata_new_epsilon((*pctxt).am, (*pctxt).state, null_mut());
+                            (*pctxt).state = (*(*pctxt).am).new_epsilon((*pctxt).state, null_mut());
                             if (*particle).min_occurs == 0 {
-                                xml_automata_new_epsilon((*pctxt).am, oldstate, (*pctxt).state);
+                                (*(*pctxt).am).new_epsilon(oldstate, (*pctxt).state);
                                 ret = 1;
                             }
                         }
                     } else if (*particle).max_occurs > 1 || (*particle).min_occurs > 1 {
-                        (*pctxt).state =
-                            xml_automata_new_epsilon((*pctxt).am, oldstate, null_mut());
+                        (*pctxt).state = (*(*pctxt).am).new_epsilon(oldstate, null_mut());
                         oldstate = (*pctxt).state;
 
-                        let counter: i32 = xml_automata_new_counter(
-                            (*pctxt).am,
-                            (*particle).min_occurs - 1,
-                            (*particle).max_occurs - 1,
-                        );
+                        let counter: i32 = (*(*pctxt).am)
+                            .new_counter((*particle).min_occurs - 1, (*particle).max_occurs - 1);
 
                         sub = (*(*particle).children).children;
                         while !sub.is_null() {
@@ -12822,11 +12768,10 @@ unsafe fn xml_schema_build_acontent_model(
                             sub = (*sub).next;
                         }
                         let tmp: XmlAutomataStatePtr = (*pctxt).state;
-                        xml_automata_new_counted_trans((*pctxt).am, tmp, oldstate, counter);
-                        (*pctxt).state =
-                            xml_automata_new_counter_trans((*pctxt).am, tmp, null_mut(), counter);
+                        (*(*pctxt).am).new_counted_trans(tmp, oldstate, counter);
+                        (*pctxt).state = (*(*pctxt).am).new_counter_trans(tmp, null_mut(), counter);
                         if (*particle).min_occurs == 0 || ret == 1 {
-                            xml_automata_new_epsilon((*pctxt).am, oldstate, (*pctxt).state);
+                            (*(*pctxt).am).new_epsilon(oldstate, (*pctxt).state);
                             ret = 1;
                         }
                     } else {
@@ -12842,11 +12787,10 @@ unsafe fn xml_schema_build_acontent_model(
 
                         // epsilon needed to block previous trans from
                         // being allowed to enter back from another construct
-                        (*pctxt).state =
-                            xml_automata_new_epsilon((*pctxt).am, (*pctxt).state, null_mut());
+                        (*pctxt).state = (*(*pctxt).am).new_epsilon((*pctxt).state, null_mut());
 
                         if (*particle).min_occurs == 0 {
-                            xml_automata_new_epsilon((*pctxt).am, oldstate, (*pctxt).state);
+                            (*(*pctxt).am).new_epsilon(oldstate, (*pctxt).state);
                             ret = 1;
                         }
                     }
@@ -12857,7 +12801,7 @@ unsafe fn xml_schema_build_acontent_model(
 
                 ret = 0;
                 let start: XmlAutomataStatePtr = (*pctxt).state;
-                let end: XmlAutomataStatePtr = xml_automata_new_state((*pctxt).am);
+                let end: XmlAutomataStatePtr = (*(*pctxt).am).new_state();
 
                 // iterate over the subtypes and remerge the end with an
                 // epsilon transition
@@ -12869,7 +12813,7 @@ unsafe fn xml_schema_build_acontent_model(
                         if tmp2 == 1 {
                             ret = 1
                         }
-                        xml_automata_new_epsilon((*pctxt).am, (*pctxt).state, end);
+                        (*(*pctxt).am).new_epsilon((*pctxt).state, end);
                         sub = (*sub).next;
                     }
                 } else {
@@ -12886,10 +12830,9 @@ unsafe fn xml_schema_build_acontent_model(
 
                     // use a counter to keep track of the number of transitions
                     // which went through the choice.
-                    let counter: i32 =
-                        xml_automata_new_counter((*pctxt).am, min_occurs, max_occurs);
-                    let hop: XmlAutomataStatePtr = xml_automata_new_state((*pctxt).am);
-                    let base: XmlAutomataStatePtr = xml_automata_new_state((*pctxt).am);
+                    let counter: i32 = (*(*pctxt).am).new_counter(min_occurs, max_occurs);
+                    let hop: XmlAutomataStatePtr = (*(*pctxt).am).new_state();
+                    let base: XmlAutomataStatePtr = (*(*pctxt).am).new_state();
 
                     sub = (*(*particle).children).children;
                     while !sub.is_null() {
@@ -12898,18 +12841,18 @@ unsafe fn xml_schema_build_acontent_model(
                         if tmp2 == 1 {
                             ret = 1
                         }
-                        xml_automata_new_epsilon((*pctxt).am, (*pctxt).state, hop);
+                        (*(*pctxt).am).new_epsilon((*pctxt).state, hop);
                         sub = (*sub).next;
                     }
-                    xml_automata_new_epsilon((*pctxt).am, start, base);
-                    xml_automata_new_counted_trans((*pctxt).am, hop, base, counter);
-                    xml_automata_new_counter_trans((*pctxt).am, hop, end, counter);
+                    (*(*pctxt).am).new_epsilon(start, base);
+                    (*(*pctxt).am).new_counted_trans(hop, base, counter);
+                    (*(*pctxt).am).new_counter_trans(hop, end, counter);
                     if ret == 1 {
-                        xml_automata_new_epsilon((*pctxt).am, base, end);
+                        (*(*pctxt).am).new_epsilon(base, end);
                     }
                 }
                 if (*particle).min_occurs == 0 {
-                    xml_automata_new_epsilon((*pctxt).am, start, end);
+                    (*(*pctxt).am).new_epsilon(start, end);
                     ret = 1;
                 }
                 (*pctxt).state = end;
@@ -12929,8 +12872,8 @@ unsafe fn xml_schema_build_acontent_model(
                     ret = 0;
 
                     start = (*pctxt).state;
-                    tmp = xml_automata_new_state((*pctxt).am);
-                    xml_automata_new_epsilon((*pctxt).am, (*pctxt).state, tmp);
+                    tmp = (*(*pctxt).am).new_state();
+                    (*(*pctxt).am).new_epsilon((*pctxt).state, tmp);
                     (*pctxt).state = tmp;
                     while !sub.is_null() {
                         (*pctxt).state = tmp;
@@ -12952,11 +12895,8 @@ unsafe fn xml_schema_build_acontent_model(
                             // This is an abstract group, we need to share
                             // the same counter for all the element transitions
                             // derived from the group
-                            let counter: i32 = xml_automata_new_counter(
-                                (*pctxt).am,
-                                (*sub).min_occurs,
-                                (*sub).max_occurs,
-                            );
+                            let counter: i32 =
+                                (*(*pctxt).am).new_counter((*sub).min_occurs, (*sub).max_occurs);
                             xml_schema_build_content_model_for_subst_group(
                                 pctxt,
                                 sub,
@@ -12964,8 +12904,7 @@ unsafe fn xml_schema_build_acontent_model(
                                 (*pctxt).state,
                             );
                         } else if (*sub).min_occurs == 1 && (*sub).max_occurs == 1 {
-                            xml_automata_new_once_trans2(
-                                (*pctxt).am,
+                            (*(*pctxt).am).new_once_trans2(
                                 (*pctxt).state,
                                 (*pctxt).state,
                                 CStr::from_ptr((*elem_decl).name as *const i8)
@@ -12982,8 +12921,7 @@ unsafe fn xml_schema_build_acontent_model(
                                 elem_decl as _,
                             );
                         } else if (*sub).min_occurs == 0 && (*sub).max_occurs == 1 {
-                            xml_automata_new_count_trans2(
-                                (*pctxt).am,
+                            (*(*pctxt).am).new_count_trans2(
                                 (*pctxt).state,
                                 (*pctxt).state,
                                 CStr::from_ptr((*elem_decl).name as *const i8)
@@ -13002,10 +12940,9 @@ unsafe fn xml_schema_build_acontent_model(
                         }
                         sub = (*sub).next as XmlSchemaParticlePtr;
                     }
-                    (*pctxt).state =
-                        xml_automata_new_all_trans((*pctxt).am, (*pctxt).state, null_mut(), 0);
+                    (*pctxt).state = (*(*pctxt).am).new_all_trans((*pctxt).state, null_mut(), 0);
                     if (*particle).min_occurs == 0 {
-                        xml_automata_new_epsilon((*pctxt).am, start, (*pctxt).state);
+                        (*(*pctxt).am).new_epsilon(start, (*pctxt).state);
                         ret = 1;
                     }
                 }
@@ -13061,8 +12998,8 @@ unsafe fn xml_schema_build_content_model(typ: XmlSchemaTypePtr, ctxt: XmlSchemaP
         (*ctxt).state = (*(*ctxt).am).get_init_state();
         // Build the automaton.
         xml_schema_build_acontent_model(ctxt, WXS_TYPE_PARTICLE!(typ));
-        xml_automata_set_final_state((*ctxt).am, (*ctxt).state);
-        (*typ).cont_model = xml_automata_compile((*ctxt).am);
+        (*(*ctxt).state).set_final_state();
+        (*typ).cont_model = (*(*ctxt).am).compile();
         if (*typ).cont_model.is_null() {
             xml_schema_pcustom_err(
                 ctxt,
