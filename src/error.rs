@@ -1652,9 +1652,9 @@ pub(crate) fn xml_raise_error(
             {
                 let sax = (*ctxt).sax.as_deref_mut().unwrap();
                 if matches!(level, XmlErrorLevel::XmlErrWarning) {
-                    channel = sax.warning;
+                    channel = sax.warning as _;
                 } else {
-                    channel = sax.error;
+                    channel = sax.error as _;
                 }
                 channel.map(|c| {
                     (

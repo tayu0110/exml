@@ -69,7 +69,7 @@ use crate::{
     error::{XmlError, XmlParserErrors},
     generic_error,
     globals::{
-        GenericError, GenericErrorContext, StructuredError, get_keep_blanks_default_value,
+        GenericErrorContext, StructuredError, get_keep_blanks_default_value,
         get_line_numbers_default_value, get_parser_debug_entities,
         get_pedantic_parser_default_value, get_substitute_entities_default_value,
         set_indent_tree_output, set_keep_blanks_default_value, set_line_numbers_default_value,
@@ -422,17 +422,17 @@ pub type CDATABlockSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>, value: 
 
 /// Display and format a warning messages, callback.
 #[doc(alias = "warningSAXFunc")]
-pub type WarningSAXFunc = unsafe fn(ctx: *mut c_void, msg: &str);
+pub type WarningSAXFunc = fn(ctx: Option<GenericErrorContext>, msg: &str);
 
 /// Display and format an error messages, callback.
 #[doc(alias = "errorSAXFunc")]
-pub type ErrorSAXFunc = unsafe fn(ctx: *mut c_void, msg: &str);
+pub type ErrorSAXFunc = fn(ctx: Option<GenericErrorContext>, msg: &str);
 
 /// Display and format fatal error messages, callback.
 /// # Note
 /// so far fatalError() SAX callbacks are not used, error() get all the callbacks for errors.
 #[doc(alias = "fatalErrorSAXFunc")]
-pub type FatalErrorSAXFunc = unsafe fn(ctx: *mut c_void, msg: &str);
+pub type FatalErrorSAXFunc = fn(ctx: Option<GenericErrorContext>, msg: &str);
 
 /// Is this document tagged standalone?
 ///
@@ -506,14 +506,14 @@ pub struct XmlSAXHandler {
     pub ignorable_whitespace: Option<IgnorableWhitespaceSAXFunc>,
     pub processing_instruction: Option<ProcessingInstructionSAXFunc>,
     pub comment: Option<CommentSAXFunc>,
-    pub warning: Option<GenericError>,
-    pub error: Option<GenericError>,
-    pub fatal_error: Option<GenericError>, /* unused error() get all the errors */
+    pub warning: Option<WarningSAXFunc>,
+    pub error: Option<ErrorSAXFunc>,
+    pub fatal_error: Option<FatalErrorSAXFunc>, /* unused error() get all the errors */
     pub get_parameter_entity: Option<GetParameterEntitySAXFunc>,
     pub cdata_block: Option<CDATABlockSAXFunc>,
     pub external_subset: Option<ExternalSubsetSAXFunc>,
     pub initialized: u32,
-    /* The following fields are extensions available only on version 2 */
+    // The following fields are extensions available only on version 2
     pub _private: AtomicPtr<c_void>,
     pub start_element_ns: Option<StartElementNsSAX2Func>,
     pub end_element_ns: Option<EndElementNsSAX2Func>,
