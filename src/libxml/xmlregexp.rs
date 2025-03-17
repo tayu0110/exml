@@ -457,7 +457,6 @@ impl XmlRegParserCtxt {
             {
                 let mut nbstates: i32 = 0;
                 let mut nbatoms: i32 = 0;
-                let mut transdata: *mut *mut c_void;
 
                 // Switch to a compact representation
                 // 1/ counting the effective number of states left
@@ -516,7 +515,7 @@ impl XmlRegParserCtxt {
 
                 // Allocate the transition table. The first entry for each
                 // state corresponds to the state type.
-                transdata = null_mut();
+                let mut transdata = vec![];
 
                 for (i, &state) in (*ret).states.iter().enumerate() {
                     let mut atomno: i32;
@@ -535,16 +534,8 @@ impl XmlRegParserCtxt {
                             continue;
                         }
                         atomno = string_remap[(*trans.atom).no as usize];
-                        if !(*trans.atom).data.is_null() && transdata.is_null() {
-                            transdata = xml_reg_calloc2(
-                                nbstates as usize,
-                                nbatoms as usize,
-                                size_of::<*mut c_void>(),
-                            ) as *mut *mut c_void;
-                            if transdata.is_null() {
-                                xml_regexp_err_memory(self, "compiling regexp");
-                                break;
-                            }
+                        if !(*trans.atom).data.is_null() && transdata.is_empty() {
+                            transdata = vec![vec![null_mut(); nbatoms as usize]; nbstates as usize];
                         }
                         targetno = *state_remap.add(trans.to as usize);
                         // if the same atom can generate transitions to 2 different
@@ -554,9 +545,6 @@ impl XmlRegParserCtxt {
                         if prev != 0 {
                             if prev != targetno + 1 {
                                 (*ret).determinist = 0;
-                                if !transdata.is_null() {
-                                    xml_free(transdata as _);
-                                }
                                 xml_free(state_remap as _);
                                 // goto not_determ;
                                 self.string = "".to_owned().into_boxed_str();
@@ -567,9 +555,8 @@ impl XmlRegParserCtxt {
                             }
                         } else {
                             transitions[stateno as usize][(atomno + 1) as usize] = targetno + 1; /* to avoid 0 */
-                            if !transdata.is_null() {
-                                *transdata.add((stateno * nbatoms + atomno) as usize) =
-                                    (*trans.atom).data;
+                            if !transdata.is_empty() {
+                                transdata[stateno as usize][atomno as usize] = (*trans.atom).data;
                             }
                         }
                     }
@@ -2495,7 +2482,7 @@ pub struct XmlRegexp {
     // That's the compact form for determinists automatas
     nbstates: i32,
     compact: Vec<Vec<i32>>,
-    transdata: *mut *mut c_void,
+    transdata: Vec<Vec<*mut c_void>>,
     string_map: Vec<String>,
 }
 
@@ -2510,7 +2497,7 @@ impl Default for XmlRegexp {
             flags: 0,
             nbstates: 0,
             compact: vec![],
-            transdata: null_mut(),
+            transdata: vec![],
             string_map: vec![],
         }
     }
@@ -2758,25 +2745,6 @@ fn xml_regexp_err_compile(ctxt: &mut XmlRegParserCtxt, extra: &str) {
     );
 }
 
-/// Allocate a two-dimensional array and set all elements to zero.
-///
-/// Returns the new array or NULL in case of error.
-#[doc(alias = "xmlRegCalloc2")]
-unsafe fn xml_reg_calloc2(dim1: usize, dim2: usize, elem_size: usize) -> *mut c_void {
-    unsafe {
-        // Check for overflow
-        if dim2 == 0 || elem_size == 0 || dim1 > SIZE_MAX / dim2 / elem_size {
-            return null_mut();
-        }
-        let total_size: usize = dim1 * dim2 * elem_size;
-        let ret: *mut c_void = xml_malloc(total_size);
-        if !ret.is_null() {
-            memset(ret, 0, total_size);
-        }
-        ret
-    }
-}
-
 /// Parses a regular expression conforming to XML Schemas Part 2 Datatype
 /// Appendix F and builds an automata suitable for testing strings against
 /// that regular expression
@@ -2848,9 +2816,6 @@ pub unsafe fn xml_reg_free_regexp(regexp: XmlRegexpPtr) {
         }
         for atom in (*regexp).atoms.drain(..) {
             xml_reg_free_atom(atom);
-        }
-        if !(*regexp).transdata.is_null() {
-            xml_free((*regexp).transdata as _);
         }
 
         drop_in_place(regexp);
@@ -4422,15 +4387,13 @@ unsafe fn xml_reg_compact_push_string(
                 {
                     (*exec).index = target;
                     if let Some(callback) = (*exec).callback {
-                        if !(*comp).transdata.is_null() {
+                        if !(*comp).transdata.is_empty() {
                             callback(
                                 (*exec).data as _,
                                 CStr::from_ptr(value as *const i8)
                                     .to_string_lossy()
                                     .as_ref(),
-                                *(*comp)
-                                    .transdata
-                                    .add(state as usize * (*comp).string_map.len() + i),
+                                (*comp).transdata[state as usize][i],
                                 data,
                             );
                         }
