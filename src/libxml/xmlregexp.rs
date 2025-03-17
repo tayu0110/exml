@@ -707,13 +707,6 @@ impl XmlRegParserCtxt {
         }
     }
 
-    #[doc(alias = "xmlRegStateAddTransTo")]
-    unsafe fn reg_state_add_trans_to(&mut self, target: XmlRegStatePtr, from: i32) {
-        unsafe {
-            (*target).trans_to.push(from);
-        }
-    }
-
     #[doc(alias = "xmlRegStateAddTrans")]
     pub(crate) unsafe fn reg_state_add_trans(
         &mut self,
@@ -754,7 +747,7 @@ impl XmlRegParserCtxt {
                 nd: 0,
             };
             (*state).trans.push(trans);
-            self.reg_state_add_trans_to(target, (*state).no);
+            (*target).trans_to.push((*state).no);
         }
     }
 
