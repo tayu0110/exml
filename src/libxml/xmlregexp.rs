@@ -44,9 +44,7 @@ use crate::{
         dict::{XmlDictPtr, xml_dict_lookup},
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         parser_internals::xml_string_current_char,
-        xmlautomata::{
-            XmlAutomata, XmlAutomataPtr, XmlAutomataState, xml_free_automata, xml_new_automata,
-        },
+        xmlautomata::{XmlAutomata, XmlAutomataState},
         xmlstring::{XmlChar, xml_strdup, xml_strndup},
         xmlunicode::{
             xml_ucs_is_block, xml_ucs_is_cat_c, xml_ucs_is_cat_cc, xml_ucs_is_cat_cf,
@@ -438,6 +436,23 @@ pub type XmlRegParserCtxt = XmlAutomata;
 pub type XmlRegParserCtxtPtr = *mut XmlRegParserCtxt;
 
 impl XmlRegParserCtxt {
+    /// Allocate a new regexp parser context
+    ///
+    /// Returns the new context or NULL in case of error
+    #[doc(alias = "xmlRegNewParserCtxt")]
+    pub(crate) fn new_parser(string: Option<&str>) -> Self {
+        let mut ret = XmlRegParserCtxt::default();
+        if let Some(string) = string {
+            ret.string = string.to_owned().into_boxed_str();
+        }
+        ret.cur = 0;
+        ret.neg = 0;
+        ret.negs = 0;
+        ret.error = 0;
+        ret.determinist = -1;
+        ret
+    }
+
     /// Allocate a new regexp and fill it with the result from the parser
     ///
     /// Returns the new regexp or NULL in case of error
@@ -630,21 +645,6 @@ impl XmlRegParserCtxt {
         }
     }
 
-    #[doc(alias = "xmlRegNewState")]
-    unsafe fn reg_new_state(&mut self) -> XmlRegStatePtr {
-        unsafe {
-            let ret: XmlRegStatePtr = xml_malloc(size_of::<XmlRegState>()) as XmlRegStatePtr;
-            if ret.is_null() {
-                xml_regexp_err_memory(self, "allocating state");
-                return null_mut();
-            }
-            std::ptr::write(&mut *ret, XmlRegState::default());
-            (*ret).typ = XmlRegStateType::XmlRegexpTransState;
-            (*ret).mark = XmlRegMarkedType::XmlRegexpMarkNormal;
-            ret
-        }
-    }
-
     /// Allocate a new regexp range
     ///
     /// Returns the new range or NULL in case of error
@@ -718,6 +718,21 @@ impl XmlRegParserCtxt {
             if let Some(block_name) = (*range).block_name.as_deref() {
                 (*ret).block_name = Some(block_name.to_owned());
             }
+            ret
+        }
+    }
+
+    #[doc(alias = "xmlRegNewState")]
+    unsafe fn reg_new_state(&mut self) -> XmlRegStatePtr {
+        unsafe {
+            let ret: XmlRegStatePtr = xml_malloc(size_of::<XmlRegState>()) as XmlRegStatePtr;
+            if ret.is_null() {
+                xml_regexp_err_memory(self, "allocating state");
+                return null_mut();
+            }
+            std::ptr::write(&mut *ret, XmlRegState::default());
+            (*ret).typ = XmlRegStateType::XmlRegexpTransState;
+            (*ret).mark = XmlRegMarkedType::XmlRegexpMarkNormal;
             ret
         }
     }
@@ -2481,6 +2496,18 @@ impl XmlRegParserCtxt {
     }
 }
 
+impl Drop for XmlRegParserCtxt {
+    /// Free a regexp parser context
+    #[doc(alias = "xmlRegFreeParserCtxt")]
+    fn drop(&mut self) {
+        unsafe {
+            for state in self.states.drain(..) {
+                xml_reg_free_state(state);
+            }
+        }
+    }
+}
+
 const AM_AUTOMATA_RNG: usize = 1;
 
 /// A libxml regular expression, they can actually be far more complex
@@ -2603,30 +2630,6 @@ impl Default for XmlRegExecCtxt {
     }
 }
 
-/// Allocate a new regexp parser context
-///
-/// Returns the new context or NULL in case of error
-#[doc(alias = "xmlRegNewParserCtxt")]
-pub(crate) unsafe fn xml_reg_new_parser_ctxt(string: Option<&str>) -> XmlRegParserCtxtPtr {
-    unsafe {
-        let ret: XmlRegParserCtxtPtr =
-            xml_malloc(size_of::<XmlRegParserCtxt>()) as XmlRegParserCtxtPtr;
-        if ret.is_null() {
-            return null_mut();
-        }
-        std::ptr::write(&mut *ret, XmlRegParserCtxt::default());
-        if let Some(string) = string {
-            (*ret).string = string.to_owned().into_boxed_str();
-        }
-        (*ret).cur = 0;
-        (*ret).neg = 0;
-        (*ret).negs = 0;
-        (*ret).error = 0;
-        (*ret).determinist = -1;
-        ret
-    }
-}
-
 /// Handle an out of memory condition
 #[doc(alias = "xmlRegexpErrMemory")]
 unsafe fn xml_regexp_err_memory(ctxt: XmlRegParserCtxtPtr, extra: &str) {
@@ -2684,22 +2687,6 @@ unsafe fn xml_reg_free_range(range: XmlRegRangePtr) {
     }
 }
 
-/// Free a regexp parser context
-#[doc(alias = "xmlRegFreeParserCtxt")]
-pub(crate) unsafe fn xml_reg_free_parser_ctxt(ctxt: XmlRegParserCtxtPtr) {
-    unsafe {
-        if ctxt.is_null() {
-            return;
-        }
-
-        for state in (*ctxt).states.drain(..) {
-            xml_reg_free_state(state);
-        }
-        drop_in_place(ctxt);
-        xml_free(ctxt as _);
-    }
-}
-
 #[repr(C)]
 enum XmlExpNodeInfo {
     XmlExpNilable = 1 << 0,
@@ -2751,50 +2738,35 @@ fn xml_regexp_err_compile(ctxt: &mut XmlRegParserCtxt, extra: &str) {
 #[doc(alias = "xmlRegexpCompile")]
 pub unsafe fn xml_regexp_compile(regexp: &str) -> XmlRegexpPtr {
     unsafe {
-        let mut ret: XmlRegexpPtr = null_mut();
-
-        let ctxt: XmlRegParserCtxtPtr = xml_reg_new_parser_ctxt(Some(regexp));
-        if ctxt.is_null() {
-            return null_mut();
-        }
+        let mut ctxt = XmlRegParserCtxt::new_parser(Some(regexp));
 
         // initialize the parser
-        (*ctxt).state = (*ctxt).reg_state_push();
-        if (*ctxt).state.is_null() {
-            // goto error;
-            xml_reg_free_parser_ctxt(ctxt);
-            return ret;
+        ctxt.state = ctxt.reg_state_push();
+        if ctxt.state.is_null() {
+            return null_mut();
         }
-        (*ctxt).start = (*ctxt).state;
-        (*ctxt).end = null_mut();
+        ctxt.start = ctxt.state;
+        ctxt.end = null_mut();
 
         // parse the expression building an automata
-        (*ctxt).fa_parse_reg_exp(1);
-        if (*ctxt).current_byte().is_some() {
-            ERROR!(&mut *ctxt, "xmlFAParseRegExp: extra characters");
+        ctxt.fa_parse_reg_exp(1);
+        if ctxt.current_byte().is_some() {
+            ERROR!(&mut ctxt, "xmlFAParseRegExp: extra characters");
         }
-        if (*ctxt).error != 0 {
-            // goto error;
-            xml_reg_free_parser_ctxt(ctxt);
-            return ret;
+        if ctxt.error != 0 {
+            return null_mut();
         }
-        (*ctxt).end = (*ctxt).state;
-        (*(*ctxt).start).typ = XmlRegStateType::XmlRegexpStartState;
-        (*(*ctxt).end).typ = XmlRegStateType::XmlRegexpFinalState;
+        ctxt.end = ctxt.state;
+        (*ctxt.start).typ = XmlRegStateType::XmlRegexpStartState;
+        (*ctxt.end).typ = XmlRegStateType::XmlRegexpFinalState;
 
         // remove the Epsilon except for counted transitions
-        (*ctxt).fa_eliminate_epsilon_transitions();
+        ctxt.fa_eliminate_epsilon_transitions();
 
-        if (*ctxt).error != 0 {
-            // goto error;
-            xml_reg_free_parser_ctxt(ctxt);
-            return ret;
+        if ctxt.error != 0 {
+            return null_mut();
         }
-        ret = (*ctxt).parse();
-
-        // error:
-        xml_reg_free_parser_ctxt(ctxt);
-        ret
+        ctxt.parse()
     }
 }
 
@@ -4232,21 +4204,19 @@ pub unsafe fn xml_regexp_is_determinist(comp: XmlRegexpPtr) -> i32 {
             return (*comp).determinist;
         }
 
-        let am: XmlAutomataPtr = xml_new_automata();
-        if am.is_null() {
+        let Some(mut am) = XmlAutomata::new() else {
             return -1;
-        }
-        for state in (*am).states.drain(..) {
+        };
+        for state in am.states.drain(..) {
             xml_reg_free_state(state);
         }
-        (*am).atoms = take(&mut (*comp).atoms);
-        (*am).states = take(&mut (*comp).states);
-        (*am).determinist = -1;
-        (*am).flags = (*comp).flags;
-        let ret: i32 = (*am).fa_computes_determinism();
-        (*comp).atoms = take(&mut (*am).atoms);
-        (*comp).states = take(&mut (*am).states);
-        xml_free_automata(am);
+        am.atoms = take(&mut (*comp).atoms);
+        am.states = take(&mut (*comp).states);
+        am.determinist = -1;
+        am.flags = (*comp).flags;
+        let ret: i32 = am.fa_computes_determinism();
+        (*comp).atoms = take(&mut am.atoms);
+        (*comp).states = take(&mut am.states);
         (*comp).determinist = ret;
         ret
     }

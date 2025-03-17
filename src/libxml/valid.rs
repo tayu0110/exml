@@ -32,7 +32,7 @@ use std::{
 use libc::{memset, strcat, strlen, strncat};
 
 #[cfg(feature = "libxml_regexp")]
-use crate::libxml::xmlautomata::{XmlAutomataPtr, xml_free_automata, xml_new_automata};
+use crate::libxml::xmlautomata::{XmlAutomata, XmlAutomataStatePtr};
 #[cfg(feature = "libxml_regexp")]
 use crate::libxml::xmlregexp::{
     XmlRegExecCtxtPtr, xml_reg_exec_push_string, xml_reg_free_exec_ctxt, xml_reg_new_exec_ctxt,
@@ -53,7 +53,6 @@ use crate::{
         hash::XmlHashTable,
         parser::XmlParserMode,
         parser_internals::xml_string_current_char,
-        xmlautomata::XmlAutomataStatePtr,
         xmlstring::{XmlChar, xml_str_equal, xml_strdup, xml_strlen, xml_strndup},
     },
     list::XmlList,
@@ -125,7 +124,7 @@ pub struct XmlValidCtxt {
     pub(crate) vstate_tab: Vec<XmlValidState>, /* array of validation states */
 
     #[cfg(feature = "libxml_regexp")]
-    pub(crate) am: XmlAutomataPtr, /* the automata */
+    pub(crate) am: Option<XmlAutomata>, /* the automata */
     #[cfg(feature = "libxml_regexp")]
     pub(crate) state: XmlAutomataStatePtr, /* used to build the automata */
     #[cfg(not(feature = "libxml_regexp"))]
@@ -146,7 +145,7 @@ impl Default for XmlValidCtxt {
             doc: None,
             valid: 0,
             vstate_tab: vec![],
-            am: null_mut(),
+            am: None,
             state: null_mut(),
         }
     }
@@ -6650,7 +6649,7 @@ unsafe fn xml_valid_build_acontent_model(
 
                 match (*content).ocur {
                     XmlElementContentOccur::XmlElementContentOnce => {
-                        (*ctxt).state = (*(*ctxt).am).new_transition(
+                        (*ctxt).state = (*ctxt).am.as_mut().unwrap().new_transition(
                             (*ctxt).state,
                             null_mut(),
                             CStr::from_ptr(fullname as *const i8)
@@ -6660,7 +6659,7 @@ unsafe fn xml_valid_build_acontent_model(
                         );
                     }
                     XmlElementContentOccur::XmlElementContentOpt => {
-                        (*ctxt).state = (*(*ctxt).am).new_transition(
+                        (*ctxt).state = (*ctxt).am.as_mut().unwrap().new_transition(
                             (*ctxt).state,
                             null_mut(),
                             CStr::from_ptr(fullname as *const i8)
@@ -6668,10 +6667,14 @@ unsafe fn xml_valid_build_acontent_model(
                                 .as_ref(),
                             null_mut(),
                         );
-                        (*(*ctxt).am).new_epsilon(oldstate, (*ctxt).state);
+                        (*ctxt)
+                            .am
+                            .as_mut()
+                            .unwrap()
+                            .new_epsilon(oldstate, (*ctxt).state);
                     }
                     XmlElementContentOccur::XmlElementContentPlus => {
-                        (*ctxt).state = (*(*ctxt).am).new_transition(
+                        (*ctxt).state = (*ctxt).am.as_mut().unwrap().new_transition(
                             (*ctxt).state,
                             null_mut(),
                             CStr::from_ptr(fullname as *const i8)
@@ -6679,7 +6682,7 @@ unsafe fn xml_valid_build_acontent_model(
                                 .as_ref(),
                             null_mut(),
                         );
-                        (*(*ctxt).am).new_transition(
+                        (*ctxt).am.as_mut().unwrap().new_transition(
                             (*ctxt).state,
                             (*ctxt).state,
                             CStr::from_ptr(fullname as *const i8)
@@ -6689,8 +6692,12 @@ unsafe fn xml_valid_build_acontent_model(
                         );
                     }
                     XmlElementContentOccur::XmlElementContentMult => {
-                        (*ctxt).state = (*(*ctxt).am).new_epsilon((*ctxt).state, null_mut());
-                        (*(*ctxt).am).new_transition(
+                        (*ctxt).state = (*ctxt)
+                            .am
+                            .as_mut()
+                            .unwrap()
+                            .new_epsilon((*ctxt).state, null_mut());
+                        (*ctxt).am.as_mut().unwrap().new_transition(
                             (*ctxt).state,
                             (*ctxt).state,
                             CStr::from_ptr(fullname as *const i8)
@@ -6711,7 +6718,11 @@ unsafe fn xml_valid_build_acontent_model(
                 oldstate = (*ctxt).state;
                 let ocur: XmlElementContentOccur = (*content).ocur;
                 if !matches!(ocur, XmlElementContentOccur::XmlElementContentOnce) {
-                    (*ctxt).state = (*(*ctxt).am).new_epsilon(oldstate, null_mut());
+                    (*ctxt).state = (*ctxt)
+                        .am
+                        .as_mut()
+                        .unwrap()
+                        .new_epsilon(oldstate, null_mut());
                     oldstate = (*ctxt).state;
                 }
                 while {
@@ -6725,18 +6736,26 @@ unsafe fn xml_valid_build_acontent_model(
                 } {}
                 xml_valid_build_acontent_model(content, ctxt, name);
                 let oldend: XmlAutomataStatePtr = (*ctxt).state;
-                (*ctxt).state = (*(*ctxt).am).new_epsilon(oldend, null_mut());
+                (*ctxt).state = (*ctxt).am.as_mut().unwrap().new_epsilon(oldend, null_mut());
                 match ocur {
                     XmlElementContentOccur::XmlElementContentOnce => {}
                     XmlElementContentOccur::XmlElementContentOpt => {
-                        (*(*ctxt).am).new_epsilon(oldstate, (*ctxt).state);
+                        (*ctxt)
+                            .am
+                            .as_mut()
+                            .unwrap()
+                            .new_epsilon(oldstate, (*ctxt).state);
                     }
                     XmlElementContentOccur::XmlElementContentMult => {
-                        (*(*ctxt).am).new_epsilon(oldstate, (*ctxt).state);
-                        (*(*ctxt).am).new_epsilon(oldend, oldstate);
+                        (*ctxt)
+                            .am
+                            .as_mut()
+                            .unwrap()
+                            .new_epsilon(oldstate, (*ctxt).state);
+                        (*ctxt).am.as_mut().unwrap().new_epsilon(oldend, oldstate);
                     }
                     XmlElementContentOccur::XmlElementContentPlus => {
-                        (*(*ctxt).am).new_epsilon(oldend, oldstate);
+                        (*ctxt).am.as_mut().unwrap().new_epsilon(oldend, oldstate);
                     }
                 }
             }
@@ -6747,17 +6766,25 @@ unsafe fn xml_valid_build_acontent_model(
                     XmlElementContentOccur::XmlElementContentPlus
                         | XmlElementContentOccur::XmlElementContentMult
                 ) {
-                    (*ctxt).state = (*(*ctxt).am).new_epsilon((*ctxt).state, null_mut());
+                    (*ctxt).state = (*ctxt)
+                        .am
+                        .as_mut()
+                        .unwrap()
+                        .new_epsilon((*ctxt).state, null_mut());
                 }
                 let oldstate: XmlAutomataStatePtr = (*ctxt).state;
-                let oldend: XmlAutomataStatePtr = (*(*ctxt).am).new_state();
+                let oldend: XmlAutomataStatePtr = (*ctxt).am.as_mut().unwrap().new_state();
 
                 // iterate over the subtypes and remerge the end with an
                 // epsilon transition
                 while {
                     (*ctxt).state = oldstate;
                     xml_valid_build_acontent_model((*content).c1, ctxt, name);
-                    (*(*ctxt).am).new_epsilon((*ctxt).state, oldend);
+                    (*ctxt)
+                        .am
+                        .as_mut()
+                        .unwrap()
+                        .new_epsilon((*ctxt).state, oldend);
                     content = (*content).c2;
                     (*content).typ == XmlElementContentType::XmlElementContentOr
                         && matches!(
@@ -6767,19 +6794,31 @@ unsafe fn xml_valid_build_acontent_model(
                 } {}
                 (*ctxt).state = oldstate;
                 xml_valid_build_acontent_model(content, ctxt, name);
-                (*(*ctxt).am).new_epsilon((*ctxt).state, oldend);
-                (*ctxt).state = (*(*ctxt).am).new_epsilon(oldend, null_mut());
+                (*ctxt)
+                    .am
+                    .as_mut()
+                    .unwrap()
+                    .new_epsilon((*ctxt).state, oldend);
+                (*ctxt).state = (*ctxt).am.as_mut().unwrap().new_epsilon(oldend, null_mut());
                 match ocur {
                     XmlElementContentOccur::XmlElementContentOnce => {}
                     XmlElementContentOccur::XmlElementContentOpt => {
-                        (*(*ctxt).am).new_epsilon(oldstate, (*ctxt).state);
+                        (*ctxt)
+                            .am
+                            .as_mut()
+                            .unwrap()
+                            .new_epsilon(oldstate, (*ctxt).state);
                     }
                     XmlElementContentOccur::XmlElementContentMult => {
-                        (*(*ctxt).am).new_epsilon(oldstate, (*ctxt).state);
-                        (*(*ctxt).am).new_epsilon(oldend, oldstate);
+                        (*ctxt)
+                            .am
+                            .as_mut()
+                            .unwrap()
+                            .new_epsilon(oldstate, (*ctxt).state);
+                        (*ctxt).am.as_mut().unwrap().new_epsilon(oldend, oldstate);
                     }
                     XmlElementContentOccur::XmlElementContentPlus => {
-                        (*(*ctxt).am).new_epsilon(oldend, oldstate);
+                        (*ctxt).am.as_mut().unwrap().new_epsilon(oldend, oldstate);
                     }
                 }
             } // _ => {
@@ -6821,12 +6860,12 @@ pub unsafe fn xml_valid_build_content_model(ctxt: XmlValidCtxtPtr, mut elem: Xml
             return 1;
         }
 
-        (*ctxt).am = xml_new_automata();
+        (*ctxt).am = XmlAutomata::new();
         let name = elem
             .name
             .as_ref()
             .map(|n| CString::new(n.as_str()).unwrap());
-        if (*ctxt).am.is_null() {
+        if (*ctxt).am.is_none() {
             let name = elem.name.as_deref().unwrap();
             xml_err_valid_node(
                 ctxt,
@@ -6839,14 +6878,14 @@ pub unsafe fn xml_valid_build_content_model(ctxt: XmlValidCtxtPtr, mut elem: Xml
             );
             return 0;
         }
-        (*ctxt).state = (*(*ctxt).am).get_init_state();
+        (*ctxt).state = (*ctxt).am.as_mut().unwrap().get_init_state();
         xml_valid_build_acontent_model(
             elem.content,
             ctxt,
             name.as_ref().map_or(null(), |n| n.as_ptr() as *const u8),
         );
         (*(*ctxt).state).set_final_state();
-        elem.cont_model = (*(*ctxt).am).compile();
+        elem.cont_model = (*ctxt).am.as_mut().unwrap().compile();
         if xml_regexp_is_determinist(elem.cont_model) != 1 {
             let mut expr = String::with_capacity(5000);
             xml_snprintf_element_content(&mut expr, 5000, elem.content, 1);
@@ -6862,13 +6901,11 @@ pub unsafe fn xml_valid_build_content_model(ctxt: XmlValidCtxtPtr, mut elem: Xml
             );
             (*ctxt).valid = 0;
             (*ctxt).state = null_mut();
-            xml_free_automata((*ctxt).am);
-            (*ctxt).am = null_mut();
+            (*ctxt).am.take();
             return 0;
         }
         (*ctxt).state = null_mut();
-        xml_free_automata((*ctxt).am);
-        (*ctxt).am = null_mut();
+        (*ctxt).am.take();
         1
     }
 }

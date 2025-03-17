@@ -29,7 +29,7 @@ use std::{os::raw::c_void, ptr::null_mut};
 
 use crate::libxml::xmlregexp::{
     XmlRegAtomType, XmlRegCounter, XmlRegMarkedType, XmlRegQuantType, XmlRegStatePtr,
-    XmlRegStateType, XmlRegTrans, XmlRegexp, xml_reg_free_parser_ctxt, xml_reg_new_parser_ctxt,
+    XmlRegStateType, XmlRegTrans, XmlRegexp,
 };
 
 use super::xmlregexp::XmlRegAtom;
@@ -58,6 +58,28 @@ pub struct XmlAutomata {
 }
 
 impl XmlAutomata {
+    /// Create a new automata
+    ///
+    /// Returns the new object or NULL in case of failure
+    #[doc(alias = "xmlNewAutomata")]
+    pub unsafe fn new() -> Option<Self> {
+        unsafe {
+            let mut ctxt = XmlAutomata::new_parser(None);
+
+            // initialize the parser
+            ctxt.state = ctxt.reg_state_push();
+            if ctxt.state.is_null() {
+                return None;
+            }
+            ctxt.start = ctxt.state;
+            ctxt.end = null_mut();
+
+            (*ctxt.start).typ = XmlRegStateType::XmlRegexpStartState;
+            ctxt.flags = 0;
+            Some(ctxt)
+        }
+    }
+
     pub(crate) fn current_str(&self) -> &str {
         &self.string[self.cur..]
     }
@@ -634,43 +656,5 @@ impl XmlAutomataState {
     pub fn set_final_state(&mut self) -> i32 {
         self.typ = XmlRegStateType::XmlRegexpFinalState;
         0
-    }
-}
-
-/// Create a new automata
-///
-/// Returns the new object or NULL in case of failure
-#[doc(alias = "xmlNewAutomata")]
-pub unsafe fn xml_new_automata() -> XmlAutomataPtr {
-    unsafe {
-        let ctxt: XmlAutomataPtr = xml_reg_new_parser_ctxt(None);
-        if ctxt.is_null() {
-            return null_mut();
-        }
-
-        // initialize the parser
-        (*ctxt).state = (*ctxt).reg_state_push();
-        if (*ctxt).state.is_null() {
-            xml_free_automata(ctxt);
-            return null_mut();
-        }
-        (*ctxt).start = (*ctxt).state;
-        (*ctxt).end = null_mut();
-
-        (*(*ctxt).start).typ = XmlRegStateType::XmlRegexpStartState;
-        (*ctxt).flags = 0;
-
-        ctxt
-    }
-}
-
-/// Free an automata
-#[doc(alias = "xmlFreeAutomata")]
-pub unsafe fn xml_free_automata(am: XmlAutomataPtr) {
-    unsafe {
-        if am.is_null() {
-            return;
-        }
-        xml_reg_free_parser_ctxt(am);
     }
 }

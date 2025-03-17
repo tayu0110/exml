@@ -10,7 +10,7 @@ use crate::{
             XmlRelaxNGParserFlag, XmlRelaxNGPtr, XmlRelaxNGValidErr, xml_relaxng_free_document,
             xml_relaxng_free_document_list, xml_relaxng_free_include_list,
         },
-        xmlautomata::{XmlAutomataPtr, XmlAutomataStatePtr},
+        xmlautomata::{XmlAutomata, XmlAutomataStatePtr},
     },
     tree::{XmlDocPtr, xml_copy_doc, xml_free_doc},
 };
@@ -60,7 +60,7 @@ pub struct XmlRelaxNGParserCtxt {
     pub(crate) idref: i32, // requires idref checking
 
     // used to compile content models
-    pub(crate) am: XmlAutomataPtr,         // the automata
+    pub(crate) am: Option<XmlAutomata>,    // the automata
     pub(crate) state: XmlAutomataStatePtr, // used to build the automata
 
     pub(crate) crng: i32,    // compact syntax and other flags
@@ -204,7 +204,7 @@ impl Default for XmlRelaxNGParserCtxt {
             inc: null_mut(),
             inc_tab: vec![],
             idref: 0,
-            am: null_mut(),
+            am: None,
             state: null_mut(),
             crng: 0,
             freedoc: 0,

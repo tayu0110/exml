@@ -41,7 +41,7 @@ use crate::{
             XmlHashTablePtr, xml_hash_add_entry2, xml_hash_create, xml_hash_free, xml_hash_lookup2,
         },
         valid::{XmlValidCtxt, xml_validate_document_final},
-        xmlautomata::{XmlAutomataPtr, XmlAutomataStatePtr, xml_free_automata, xml_new_automata},
+        xmlautomata::XmlAutomataStatePtr,
         xmlregexp::{
             XmlRegExecCtxtPtr, XmlRegexpPtr, xml_reg_exec_push_string, xml_reg_exec_push_string2,
             xml_reg_free_exec_ctxt, xml_reg_free_regexp, xml_reg_new_exec_ctxt,
@@ -69,7 +69,7 @@ use crate::{
     uri::{XmlURI, build_uri, escape_url_except},
 };
 
-use super::{chvalid::xml_is_blank_char, xmlstring::xml_strndup};
+use super::{chvalid::xml_is_blank_char, xmlautomata::XmlAutomata, xmlstring::xml_strndup};
 
 /// Signature of an error callback from a Relax-NG validation
 #[doc(alias = "xmlRelaxNGValidityErrorFunc")]
@@ -5779,14 +5779,14 @@ unsafe fn xml_relaxng_compile(ctxt: XmlRelaxNGParserCtxtPtr, def: XmlRelaxNGDefi
         match (*def).typ {
             XmlRelaxNGType::Start => {
                 if xml_relaxng_is_compilable(def) == 1 && (*def).depth != -25 {
-                    let oldam: XmlAutomataPtr = (*ctxt).am;
+                    let oldam = (*ctxt).am.take();
                     let oldstate: XmlAutomataStatePtr = (*ctxt).state;
 
                     (*def).depth = -25;
 
                     list = (*def).content;
-                    (*ctxt).am = xml_new_automata();
-                    if (*ctxt).am.is_null() {
+                    (*ctxt).am = XmlAutomata::new();
+                    if (*ctxt).am.is_none() {
                         return -1;
                     }
 
@@ -5796,66 +5796,66 @@ unsafe fn xml_relaxng_compile(ctxt: XmlRelaxNGParserCtxtPtr, def: XmlRelaxNGDefi
                     // branch the automata is found non-deterministic and
                     // we fallback to the normal validation which does the right
                     // thing of exploring both choices.
-                    (*(*ctxt).am).set_flags(1);
+                    (*ctxt).am.as_mut().unwrap().set_flags(1);
 
-                    (*ctxt).state = (*(*ctxt).am).get_init_state();
+                    (*ctxt).state = (*ctxt).am.as_ref().unwrap().get_init_state();
                     while !list.is_null() {
                         xml_relaxng_compile(ctxt, list);
                         list = (*list).next;
                     }
                     (*(*ctxt).state).set_final_state();
-                    if (*(*ctxt).am).is_determinist() != 0 {
-                        (*def).cont_model = (*(*ctxt).am).compile();
+                    if (*ctxt).am.as_mut().unwrap().is_determinist() != 0 {
+                        (*def).cont_model = (*ctxt).am.as_mut().unwrap().compile();
                     }
 
-                    xml_free_automata((*ctxt).am);
                     (*ctxt).state = oldstate;
                     (*ctxt).am = oldam;
                 }
             }
             XmlRelaxNGType::Element => {
-                if !(*ctxt).am.is_null() && !(*def).name.is_null() {
-                    (*ctxt).state = (*(*ctxt).am).new_transition2(
-                        (*ctxt).state,
-                        null_mut(),
-                        CStr::from_ptr((*def).name as *const i8)
-                            .to_string_lossy()
-                            .as_ref(),
-                        (!(*def).ns.is_null())
-                            .then(|| CStr::from_ptr((*def).ns as *const i8).to_string_lossy())
-                            .as_deref(),
-                        def as _,
-                    );
+                if let Some(am) = (*ctxt).am.as_mut() {
+                    if !(*def).name.is_null() {
+                        (*ctxt).state = am.new_transition2(
+                            (*ctxt).state,
+                            null_mut(),
+                            CStr::from_ptr((*def).name as *const i8)
+                                .to_string_lossy()
+                                .as_ref(),
+                            (!(*def).ns.is_null())
+                                .then(|| CStr::from_ptr((*def).ns as *const i8).to_string_lossy())
+                                .as_deref(),
+                            def as _,
+                        );
+                    }
                 }
                 if (*def).dflags & IS_COMPILABLE as i16 != 0 && (*def).depth != -25 {
-                    let oldam: XmlAutomataPtr = (*ctxt).am;
+                    let oldam = (*ctxt).am.take();
                     let oldstate: XmlAutomataStatePtr = (*ctxt).state;
 
                     (*def).depth = -25;
 
                     list = (*def).content;
-                    (*ctxt).am = xml_new_automata();
-                    if (*ctxt).am.is_null() {
+                    (*ctxt).am = XmlAutomata::new();
+                    if (*ctxt).am.is_none() {
                         return -1;
                     }
-                    (*(*ctxt).am).set_flags(1);
-                    (*ctxt).state = (*(*ctxt).am).get_init_state();
+                    (*ctxt).am.as_mut().unwrap().set_flags(1);
+                    (*ctxt).state = (*ctxt).am.as_ref().unwrap().get_init_state();
                     while !list.is_null() {
                         xml_relaxng_compile(ctxt, list);
                         list = (*list).next;
                     }
                     (*(*ctxt).state).set_final_state();
-                    (*def).cont_model = (*(*ctxt).am).compile();
+                    (*def).cont_model = (*ctxt).am.as_mut().unwrap().compile();
                     if xml_regexp_is_determinist((*def).cont_model) == 0 {
                         // we can only use the automata if it is determinist
                         xml_reg_free_regexp((*def).cont_model);
                         (*def).cont_model = null_mut();
                     }
-                    xml_free_automata((*ctxt).am);
                     (*ctxt).state = oldstate;
                     (*ctxt).am = oldam;
                 } else {
-                    let oldam: XmlAutomataPtr = (*ctxt).am;
+                    let oldam = (*ctxt).am.take();
 
                     // we can't build the content model for this element content
                     // but it still might be possible to build it for some of its
@@ -5873,18 +5873,34 @@ unsafe fn xml_relaxng_compile(ctxt: XmlRelaxNGParserCtxtPtr, def: XmlRelaxNGDefi
                     xml_relaxng_compile(ctxt, list);
                     list = (*list).next;
                 }
-                (*(*ctxt).am).new_epsilon(oldstate, (*ctxt).state);
+                (*ctxt)
+                    .am
+                    .as_mut()
+                    .unwrap()
+                    .new_epsilon(oldstate, (*ctxt).state);
             }
             XmlRelaxNGType::Zeroormore => {
-                (*ctxt).state = (*(*ctxt).am).new_epsilon((*ctxt).state, null_mut());
+                (*ctxt).state = (*ctxt)
+                    .am
+                    .as_mut()
+                    .unwrap()
+                    .new_epsilon((*ctxt).state, null_mut());
                 let oldstate: XmlAutomataStatePtr = (*ctxt).state;
                 list = (*def).content;
                 while !list.is_null() {
                     xml_relaxng_compile(ctxt, list);
                     list = (*list).next;
                 }
-                (*(*ctxt).am).new_epsilon((*ctxt).state, oldstate);
-                (*ctxt).state = (*(*ctxt).am).new_epsilon(oldstate, null_mut());
+                (*ctxt)
+                    .am
+                    .as_mut()
+                    .unwrap()
+                    .new_epsilon((*ctxt).state, oldstate);
+                (*ctxt).state = (*ctxt)
+                    .am
+                    .as_mut()
+                    .unwrap()
+                    .new_epsilon(oldstate, null_mut());
             }
             XmlRelaxNGType::Oneormore => {
                 list = (*def).content;
@@ -5898,8 +5914,16 @@ unsafe fn xml_relaxng_compile(ctxt: XmlRelaxNGParserCtxtPtr, def: XmlRelaxNGDefi
                     xml_relaxng_compile(ctxt, list);
                     list = (*list).next;
                 }
-                (*(*ctxt).am).new_epsilon((*ctxt).state, oldstate);
-                (*ctxt).state = (*(*ctxt).am).new_epsilon(oldstate, null_mut());
+                (*ctxt)
+                    .am
+                    .as_mut()
+                    .unwrap()
+                    .new_epsilon((*ctxt).state, oldstate);
+                (*ctxt).state = (*ctxt)
+                    .am
+                    .as_mut()
+                    .unwrap()
+                    .new_epsilon(oldstate, null_mut());
             }
             XmlRelaxNGType::Choice => {
                 let mut target: XmlAutomataStatePtr = null_mut();
@@ -5915,7 +5939,11 @@ unsafe fn xml_relaxng_compile(ctxt: XmlRelaxNGParserCtxtPtr, def: XmlRelaxNGDefi
                     if target.is_null() {
                         target = (*ctxt).state;
                     } else {
-                        (*(*ctxt).am).new_epsilon((*ctxt).state, target);
+                        (*ctxt)
+                            .am
+                            .as_mut()
+                            .unwrap()
+                            .new_epsilon((*ctxt).state, target);
                     }
                     list = (*list).next;
                 }
@@ -5936,14 +5964,31 @@ unsafe fn xml_relaxng_compile(ctxt: XmlRelaxNGParserCtxtPtr, def: XmlRelaxNGDefi
                 }
             }
             XmlRelaxNGType::Text => {
-                (*ctxt).state = (*(*ctxt).am).new_epsilon((*ctxt).state, null_mut());
+                (*ctxt).state = (*ctxt)
+                    .am
+                    .as_mut()
+                    .unwrap()
+                    .new_epsilon((*ctxt).state, null_mut());
                 let oldstate: XmlAutomataStatePtr = (*ctxt).state;
                 xml_relaxng_compile(ctxt, (*def).content);
-                (*(*ctxt).am).new_transition((*ctxt).state, (*ctxt).state, "#text", null_mut());
-                (*ctxt).state = (*(*ctxt).am).new_epsilon(oldstate, null_mut());
+                (*ctxt).am.as_mut().unwrap().new_transition(
+                    (*ctxt).state,
+                    (*ctxt).state,
+                    "#text",
+                    null_mut(),
+                );
+                (*ctxt).state = (*ctxt)
+                    .am
+                    .as_mut()
+                    .unwrap()
+                    .new_epsilon(oldstate, null_mut());
             }
             XmlRelaxNGType::Empty => {
-                (*ctxt).state = (*(*ctxt).am).new_epsilon((*ctxt).state, null_mut())
+                (*ctxt).state = (*ctxt)
+                    .am
+                    .as_mut()
+                    .unwrap()
+                    .new_epsilon((*ctxt).state, null_mut())
             }
             XmlRelaxNGType::Except
             | XmlRelaxNGType::Attribute
@@ -5978,7 +6023,7 @@ unsafe fn xml_relaxng_try_compile(ctxt: XmlRelaxNGParserCtxtPtr, def: XmlRelaxNG
         if matches!((*def).typ, XmlRelaxNGType::Start | XmlRelaxNGType::Element) {
             ret = xml_relaxng_is_compilable(def);
             if (*def).dflags & IS_COMPILABLE as i16 != 0 && (*def).depth != -25 {
-                (*ctxt).am = null_mut();
+                (*ctxt).am = None;
                 ret = xml_relaxng_compile(ctxt, def);
                 return ret;
             }
