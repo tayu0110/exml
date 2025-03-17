@@ -511,18 +511,8 @@ impl XmlRegParserCtxt {
                         return null_mut();
                     }
                 }
-                let transitions: *mut i32 = xml_reg_calloc2(
-                    (nbstates + 1) as usize,
-                    (nbatoms + 1) as usize,
-                    size_of::<i32>(),
-                ) as *mut i32;
-                if transitions.is_null() {
-                    self.states = take(&mut (*ret).states);
-                    self.counters = take(&mut (*ret).counters);
-                    xml_free(state_remap as _);
-                    xml_free(ret as _);
-                    return null_mut();
-                }
+                let mut transitions =
+                    vec![vec![0; (nbatoms + 1) as usize]; (nbstates + 1) as usize];
 
                 // Allocate the transition table. The first entry for each
                 // state corresponds to the state type.
@@ -538,7 +528,7 @@ impl XmlRegParserCtxt {
                         continue;
                     }
 
-                    *transitions.add((stateno * (nbatoms + 1)) as usize) = (*state).typ as _;
+                    transitions[stateno as usize][0] = (*state).typ as i32;
 
                     for trans in &(*state).trans {
                         if trans.to == -1 || trans.atom.is_null() {
@@ -560,14 +550,13 @@ impl XmlRegParserCtxt {
                         // if the same atom can generate transitions to 2 different
                         // states then it means the automata is not deterministic and
                         // the compact form can't be used !
-                        prev = *transitions.add((stateno * (nbatoms + 1) + atomno + 1) as usize);
+                        prev = transitions[stateno as usize][(atomno + 1) as usize];
                         if prev != 0 {
                             if prev != targetno + 1 {
                                 (*ret).determinist = 0;
                                 if !transdata.is_null() {
                                     xml_free(transdata as _);
                                 }
-                                xml_free(transitions as _);
                                 xml_free(state_remap as _);
                                 // goto not_determ;
                                 self.string = "".to_owned().into_boxed_str();
@@ -577,8 +566,7 @@ impl XmlRegParserCtxt {
                                 return ret;
                             }
                         } else {
-                            *transitions.add((stateno * (nbatoms + 1) + atomno + 1) as usize) =
-                                targetno + 1; /* to avoid 0 */
+                            transitions[stateno as usize][(atomno + 1) as usize] = targetno + 1; /* to avoid 0 */
                             if !transdata.is_null() {
                                 *transdata.add((stateno * nbatoms + atomno) as usize) =
                                     (*trans.atom).data;
@@ -2506,7 +2494,7 @@ pub struct XmlRegexp {
     flags: i32,
     // That's the compact form for determinists automatas
     nbstates: i32,
-    compact: *mut i32,
+    compact: Vec<Vec<i32>>,
     transdata: *mut *mut c_void,
     string_map: Vec<String>,
 }
@@ -2521,7 +2509,7 @@ impl Default for XmlRegexp {
             determinist: 0,
             flags: 0,
             nbstates: 0,
-            compact: null_mut(),
+            compact: vec![],
             transdata: null_mut(),
             string_map: vec![],
         }
@@ -2860,9 +2848,6 @@ pub unsafe fn xml_reg_free_regexp(regexp: XmlRegexpPtr) {
         }
         for atom in (*regexp).atoms.drain(..) {
             xml_reg_free_atom(atom);
-        }
-        if !(*regexp).compact.is_null() {
-            xml_free((*regexp).compact as _);
         }
         if !(*regexp).transdata.is_null() {
             xml_free((*regexp).transdata as _);
@@ -4325,7 +4310,7 @@ pub unsafe fn xml_reg_new_exec_ctxt(
         if comp.is_null() {
             return null_mut();
         }
-        if (*comp).compact.is_null() && (*comp).states.is_empty() {
+        if (*comp).compact.is_empty() && (*comp).states.is_empty() {
             return null_mut();
         }
         let exec: XmlRegExecCtxtPtr = xml_malloc(size_of::<XmlRegExecCtxt>()) as XmlRegExecCtxtPtr;
@@ -4340,7 +4325,7 @@ pub unsafe fn xml_reg_new_exec_ctxt(
         (*exec).rollbacks.clear();
         (*exec).status = 0;
         (*exec).comp = comp;
-        if (*comp).compact.is_null() {
+        if (*comp).compact.is_empty() {
             (*exec).state = *(*comp).states.first().unwrap_or(&null_mut());
         }
         (*exec).transno = 0;
@@ -4409,17 +4394,13 @@ unsafe fn xml_reg_compact_push_string(
         let state: i32 = (*exec).index;
         let mut target: i32;
 
-        if comp.is_null() || (*comp).compact.is_null() {
+        if comp.is_null() || (*comp).compact.is_empty() {
             return -1;
         }
 
         if value.is_null() {
             // are we at a final state ?
-            if *(*comp)
-                .compact
-                .add(state as usize * ((*comp).string_map.len() + 1))
-                == XmlRegStateType::XmlRegexpFinalState as i32
-            {
+            if (*comp).compact[state as usize][0] == XmlRegStateType::XmlRegexpFinalState as i32 {
                 return 1;
             }
             return 0;
@@ -4427,9 +4408,7 @@ unsafe fn xml_reg_compact_push_string(
 
         // Examine all outside transitions from current state
         for i in 0..(*comp).string_map.len() {
-            target = *(*comp)
-                .compact
-                .add(state as usize * ((*comp).string_map.len() + 1) + i + 1);
+            target = (*comp).compact[state as usize][i + 1];
             if target > 0 && target <= (*comp).nbstates {
                 target -= 1; /* to avoid 0 */
                 if xml_reg_str_equal_wildcard(
@@ -4456,18 +4435,14 @@ unsafe fn xml_reg_compact_push_string(
                             );
                         }
                     }
-                    if *(*comp)
-                        .compact
-                        .add(target as usize * ((*comp).string_map.len() + 1))
+                    if (*comp).compact[target as usize][0]
                         == XmlRegStateType::XmlRegexpSinkState as i32
                     {
                         // goto error;
                         break;
                     }
 
-                    if *(*comp)
-                        .compact
-                        .add(target as usize * ((*comp).string_map.len() + 1))
+                    if (*comp).compact[target as usize][0]
                         == XmlRegStateType::XmlRegexpFinalState as i32
                     {
                         return 1;
@@ -4552,7 +4527,7 @@ unsafe fn xml_reg_exec_push_string_internal(
             return (*exec).status;
         }
 
-        if !(*(*exec).comp).compact.is_null() {
+        if !(*(*exec).comp).compact.is_empty() {
             return xml_reg_compact_push_string(exec, (*exec).comp, value, data);
         }
 
@@ -4913,7 +4888,7 @@ pub unsafe fn xml_reg_exec_push_string2(
         memcpy(str.add(lenp as usize + 1) as _, value2 as _, lenn as usize);
         *str.add(lenn as usize + lenp as usize + 1) = 0;
 
-        let ret = if !(*(*exec).comp).compact.is_null() {
+        let ret = if !(*(*exec).comp).compact.is_empty() {
             xml_reg_compact_push_string(exec, (*exec).comp, str, data)
         } else {
             xml_reg_exec_push_string_internal(exec, str, data, 1)
@@ -4947,7 +4922,7 @@ unsafe fn xml_reg_exec_get_values<'a>(
         let mut nb = 0;
         let mut nbval = 0;
         let mut nbneg = 0;
-        if !(*exec).comp.is_null() && !(*(*exec).comp).compact.is_null() {
+        if !(*exec).comp.is_null() && !(*(*exec).comp).compact.is_empty() {
             let mut target: i32;
             let comp: XmlRegexpPtr = (*exec).comp;
 
@@ -4960,10 +4935,7 @@ unsafe fn xml_reg_exec_get_values<'a>(
                 (*exec).index
             };
             if !terminal.is_null() {
-                if *(*comp)
-                    .compact
-                    .add(state as usize * ((*comp).string_map.len() + 1))
-                    == XmlRegStateType::XmlRegexpFinalState as i32
+                if (*comp).compact[state as usize][0] == XmlRegStateType::XmlRegexpFinalState as i32
                 {
                     *terminal = 1;
                 } else {
@@ -4972,14 +4944,10 @@ unsafe fn xml_reg_exec_get_values<'a>(
             }
             if nb < maxval {
                 for i in 0..(*comp).string_map.len() {
-                    target = *(*comp)
-                        .compact
-                        .add(state as usize * ((*comp).string_map.len() + 1) + i + 1);
+                    target = (*comp).compact[state as usize][i + 1];
                     if target > 0
                         && target <= (*comp).nbstates
-                        && *(*comp)
-                            .compact
-                            .add((target - 1) as usize * ((*comp).string_map.len() + 1))
+                        && (*comp).compact[(target - 1) as usize][0]
                             != XmlRegStateType::XmlRegexpSinkState as i32
                     {
                         values[nb] = Cow::Owned((*comp).string_map[i].clone());
@@ -4993,14 +4961,10 @@ unsafe fn xml_reg_exec_get_values<'a>(
             }
             if nb < maxval {
                 for i in 0..(*comp).string_map.len() {
-                    target = *(*comp)
-                        .compact
-                        .add(state as usize * ((*comp).string_map.len() + 1) + i + 1);
+                    target = (*comp).compact[state as usize][i + 1];
                     if target > 0
                         && target <= (*comp).nbstates
-                        && *(*comp)
-                            .compact
-                            .add((target - 1) as usize * ((*comp).string_map.len() + 1))
+                        && (*comp).compact[(target - 1) as usize][0]
                             == XmlRegStateType::XmlRegexpSinkState as i32
                     {
                         values[nb] = Cow::Owned((*comp).string_map[i].clone());
