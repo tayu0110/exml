@@ -464,21 +464,13 @@ impl XmlRegParserCtxt {
                 //    they are all of the string type
                 // 3/ build a table state x atom for the transitions
 
-                let state_remap: *mut i32 = xml_malloc((*ret).states.len() * size_of::<i32>()) as _;
-                if state_remap.is_null() {
-                    xml_regexp_err_memory(self, "compiling regexp");
-                    self.states = take(&mut (*ret).states);
-                    self.atoms = take(&mut (*ret).atoms);
-                    self.counters = take(&mut (*ret).counters);
-                    xml_free(ret as _);
-                    return null_mut();
-                }
+                let mut state_remap = vec![0; (*ret).states.len()];
                 for (i, &state) in (*ret).states.iter().enumerate() {
                     if !state.is_null() {
-                        *state_remap.add(i) = nbstates;
+                        state_remap[i] = nbstates;
                         nbstates += 1;
                     } else {
-                        *state_remap.add(i) = -1;
+                        state_remap[i] = -1;
                     }
                 }
                 let mut string_map = Vec::with_capacity((*ret).atoms.len());
@@ -505,7 +497,6 @@ impl XmlRegParserCtxt {
                         self.states = take(&mut (*ret).states);
                         self.counters = take(&mut (*ret).counters);
                         self.atoms = take(&mut (*ret).atoms);
-                        xml_free(state_remap as _);
                         xml_free(ret as _);
                         return null_mut();
                     }
@@ -522,7 +513,7 @@ impl XmlRegParserCtxt {
                     let mut targetno: i32;
                     let mut prev: i32;
 
-                    let stateno: i32 = *state_remap.add(i);
+                    let stateno: i32 = state_remap[i];
                     if stateno == -1 {
                         continue;
                     }
@@ -537,7 +528,7 @@ impl XmlRegParserCtxt {
                         if !(*trans.atom).data.is_null() && transdata.is_empty() {
                             transdata = vec![vec![null_mut(); nbatoms as usize]; nbstates as usize];
                         }
-                        targetno = *state_remap.add(trans.to as usize);
+                        targetno = state_remap[trans.to as usize];
                         // if the same atom can generate transitions to 2 different
                         // states then it means the automata is not deterministic and
                         // the compact form can't be used !
@@ -545,8 +536,6 @@ impl XmlRegParserCtxt {
                         if prev != 0 {
                             if prev != targetno + 1 {
                                 (*ret).determinist = 0;
-                                xml_free(state_remap as _);
-                                // goto not_determ;
                                 self.string = "".to_owned().into_boxed_str();
                                 self.states.clear();
                                 self.atoms.clear();
@@ -573,7 +562,6 @@ impl XmlRegParserCtxt {
                 (*ret).transdata = transdata;
                 (*ret).string_map = string_map;
                 (*ret).nbstates = nbstates;
-                xml_free(state_remap as _);
             }
             // not_determ:
             self.string = "".to_owned().into_boxed_str();
@@ -4426,7 +4414,7 @@ unsafe fn xml_reg_compact_push_string(
     }
 }
 
-unsafe fn xml_fareg_exec_save_input_string(
+unsafe fn xml_fa_reg_exec_save_input_string(
     exec: XmlRegExecCtxtPtr,
     value: *const XmlChar,
     data: *mut c_void,
@@ -4504,7 +4492,7 @@ unsafe fn xml_reg_exec_push_string_internal(
         // If we have an active rollback stack push the new value there
         // and get back to where we were left
         if !value.is_null() && (*exec).input_stack_nr > 0 {
-            xml_fareg_exec_save_input_string(exec, value, data);
+            xml_fa_reg_exec_save_input_string(exec, value, data);
             value = (*(*exec).input_stack.add((*exec).index as usize)).value;
             data = (*(*exec).input_stack.add((*exec).index as usize)).data;
         }
@@ -4630,7 +4618,7 @@ unsafe fn xml_reg_exec_push_string_internal(
                                 // this is a multiple input sequence
                                 if (*(*exec).state).trans.len() as i32 > (*exec).transno + 1 {
                                     if (*exec).input_stack_nr <= 0 {
-                                        xml_fareg_exec_save_input_string(exec, value, data);
+                                        xml_fa_reg_exec_save_input_string(exec, value, data);
                                     }
                                     xml_fa_reg_exec_save(exec);
                                 }
@@ -4658,7 +4646,7 @@ unsafe fn xml_reg_exec_push_string_internal(
                                         (*exec).transno = -1; /* trick */
                                         (*exec).state = to;
                                         if (*exec).input_stack_nr <= 0 {
-                                            xml_fareg_exec_save_input_string(exec, value, data);
+                                            xml_fa_reg_exec_save_input_string(exec, value, data);
                                         }
                                         xml_fa_reg_exec_save(exec);
                                         (*exec).transno = transno;
@@ -4700,7 +4688,7 @@ unsafe fn xml_reg_exec_push_string_internal(
                             }
                             if (*(*exec).state).trans.len() as i32 > (*exec).transno + 1 {
                                 if (*exec).input_stack_nr <= 0 {
-                                    xml_fareg_exec_save_input_string(exec, value, data);
+                                    xml_fa_reg_exec_save_input_string(exec, value, data);
                                 }
                                 xml_fa_reg_exec_save(exec);
                             }
