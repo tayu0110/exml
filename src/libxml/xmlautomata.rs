@@ -28,10 +28,11 @@
 use std::{os::raw::c_void, ptr::null_mut};
 
 use crate::libxml::xmlregexp::{
-    XmlRegAtomPtr, XmlRegAtomType, XmlRegCounter, XmlRegMarkedType, XmlRegQuantType,
-    XmlRegStatePtr, XmlRegStateType, XmlRegTrans, XmlRegexp, xml_reg_free_atom,
-    xml_reg_free_parser_ctxt, xml_reg_new_parser_ctxt,
+    XmlRegAtomType, XmlRegCounter, XmlRegMarkedType, XmlRegQuantType, XmlRegStatePtr,
+    XmlRegStateType, XmlRegTrans, XmlRegexp, xml_reg_free_parser_ctxt, xml_reg_new_parser_ctxt,
 };
+
+use super::xmlregexp::XmlRegAtom;
 
 /// A libxml automata description, It can be compiled into a regexp
 #[doc(alias = "xmlAutomataPtr")]
@@ -46,8 +47,8 @@ pub struct XmlAutomata {
     pub(crate) start: XmlRegStatePtr,
     pub(crate) end: XmlRegStatePtr,
     pub(crate) state: XmlRegStatePtr,
-    pub(crate) atom: XmlRegAtomPtr,
-    pub(crate) atoms: Vec<XmlRegAtomPtr>,
+    pub(crate) atom: usize,
+    pub(crate) atoms: Vec<XmlRegAtom>,
     pub(crate) states: Vec<XmlRegStatePtr>,
     pub(crate) counters: Vec<XmlRegCounter>,
     pub(crate) determinist: i32,
@@ -158,15 +159,11 @@ impl XmlAutomata {
             if from.is_null() {
                 return null_mut();
             }
-            let atom: XmlRegAtomPtr = self.reg_new_atom(XmlRegAtomType::XmlRegexpString);
-            if atom.is_null() {
-                return null_mut();
-            }
-            (*atom).data = data;
-            (*atom).valuep = Some(token.to_owned());
+            let atom = self.reg_new_atom(XmlRegAtomType::XmlRegexpString);
+            self.atoms[atom].data = data;
+            self.atoms[atom].valuep = Some(token.to_owned());
 
             if self.fa_generate_transitions(from, to, atom) < 0 {
-                xml_reg_free_atom(atom);
                 return null_mut();
             }
             if to.is_null() {
@@ -194,19 +191,15 @@ impl XmlAutomata {
             if from.is_null() {
                 return null_mut();
             }
-            let atom: XmlRegAtomPtr = self.reg_new_atom(XmlRegAtomType::XmlRegexpString);
-            if atom.is_null() {
-                return null_mut();
-            }
-            (*atom).data = data;
+            let atom = self.reg_new_atom(XmlRegAtomType::XmlRegexpString);
+            self.atoms[atom].data = data;
             if let Some(token2) = token2.filter(|t| !t.is_empty()) {
-                (*atom).valuep = Some(format!("{token}|{token2}"));
+                self.atoms[atom].valuep = Some(format!("{token}|{token2}"));
             } else {
-                (*atom).valuep = Some(token.to_owned());
+                self.atoms[atom].valuep = Some(token.to_owned());
             }
 
             if self.fa_generate_transitions(from, to, atom) < 0 {
-                xml_reg_free_atom(atom);
                 return null_mut();
             }
             if to.is_null() {
@@ -236,22 +229,18 @@ impl XmlAutomata {
             if from.is_null() {
                 return null_mut();
             }
-            let atom: XmlRegAtomPtr = self.reg_new_atom(XmlRegAtomType::XmlRegexpString);
-            if atom.is_null() {
-                return null_mut();
-            }
-            (*atom).data = data;
-            (*atom).neg = 1;
+            let atom = self.reg_new_atom(XmlRegAtomType::XmlRegexpString);
+            self.atoms[atom].data = data;
+            self.atoms[atom].neg = 1;
             if let Some(token2) = token2.filter(|t| !t.is_empty()) {
-                (*atom).valuep = Some(format!("{token}|{token2}"));
+                self.atoms[atom].valuep = Some(format!("{token}|{token2}"));
             } else {
-                (*atom).valuep = Some(token.to_owned());
+                self.atoms[atom].valuep = Some(token.to_owned());
             }
-            let err_msg = format!("not {}", (*atom).valuep.as_deref().unwrap());
-            (*atom).valuep2 = Some(err_msg);
+            let err_msg = format!("not {}", self.atoms[atom].valuep.as_deref().unwrap());
+            self.atoms[atom].valuep2 = Some(err_msg);
 
             if self.fa_generate_transitions(from, to, atom) < 0 {
-                xml_reg_free_atom(atom);
                 return null_mut();
             }
             self.negs += 1;
@@ -288,18 +277,15 @@ impl XmlAutomata {
             if max < min || max < 1 {
                 return null_mut();
             }
-            let atom: XmlRegAtomPtr = self.reg_new_atom(XmlRegAtomType::XmlRegexpString);
-            if atom.is_null() {
-                return null_mut();
-            }
-            (*atom).valuep = Some(token.to_owned());
-            (*atom).data = data;
+            let atom = self.reg_new_atom(XmlRegAtomType::XmlRegexpString);
+            self.atoms[atom].valuep = Some(token.to_owned());
+            self.atoms[atom].data = data;
             if min == 0 {
-                (*atom).min = 1;
+                self.atoms[atom].min = 1;
             } else {
-                (*atom).min = min;
+                self.atoms[atom].min = min;
             }
-            (*atom).max = max;
+            self.atoms[atom].max = max;
 
             // associate a counter to the transition.
             let counter = self.reg_get_counter();
@@ -310,17 +296,10 @@ impl XmlAutomata {
             if to.is_null() {
                 to = self.reg_state_push();
                 if to.is_null() {
-                    // goto error;
-                    xml_reg_free_atom(atom);
                     return null_mut();
                 }
             }
             self.reg_state_add_trans(from, atom, to, counter as i32, -1);
-            if self.reg_atom_push(atom) < 0 {
-                // goto error;
-                xml_reg_free_atom(atom);
-                return null_mut();
-            }
             self.state = to;
 
             if to.is_null() {
@@ -333,10 +312,6 @@ impl XmlAutomata {
                 self.fa_generate_epsilon_transition(from, to);
             }
             to
-
-            // error:
-            //     xmlRegFreeAtom(atom);
-            //     return null_mut();
         }
     }
 
@@ -368,22 +343,19 @@ impl XmlAutomata {
             if max < min || max < 1 {
                 return null_mut();
             }
-            let atom: XmlRegAtomPtr = self.reg_new_atom(XmlRegAtomType::XmlRegexpString);
-            if atom.is_null() {
-                return null_mut();
-            }
+            let atom = self.reg_new_atom(XmlRegAtomType::XmlRegexpString);
             if let Some(token2) = token2.filter(|t| !t.is_empty()) {
-                (*atom).valuep = Some(format!("{token}|{token2}"));
+                self.atoms[atom].valuep = Some(format!("{token}|{token2}"));
             } else {
-                (*atom).valuep = Some(token.to_owned());
+                self.atoms[atom].valuep = Some(token.to_owned());
             }
-            (*atom).data = data;
+            self.atoms[atom].data = data;
             if min == 0 {
-                (*atom).min = 1;
+                self.atoms[atom].min = 1;
             } else {
-                (*atom).min = min;
+                self.atoms[atom].min = min;
             }
-            (*atom).max = max;
+            self.atoms[atom].max = max;
 
             // associate a counter to the transition.
             let counter = self.reg_get_counter();
@@ -394,17 +366,10 @@ impl XmlAutomata {
             if to.is_null() {
                 to = self.reg_state_push();
                 if to.is_null() {
-                    // goto error;
-                    xml_reg_free_atom(atom);
                     return null_mut();
                 }
             }
             self.reg_state_add_trans(from, atom, to, counter as i32, -1);
-            if self.reg_atom_push(atom) < 0 {
-                // goto error;
-                xml_reg_free_atom(atom);
-                return null_mut();
-            }
             self.state = to;
 
             if to.is_null() {
@@ -417,10 +382,6 @@ impl XmlAutomata {
                 self.fa_generate_epsilon_transition(from, to);
             }
             to
-
-            // error:
-            //     xmlRegFreeAtom(atom);
-            //     return null_mut();
         }
     }
 
@@ -498,15 +459,12 @@ impl XmlAutomata {
             if max < min {
                 return null_mut();
             }
-            let atom: XmlRegAtomPtr = self.reg_new_atom(XmlRegAtomType::XmlRegexpString);
-            if atom.is_null() {
-                return null_mut();
-            }
-            (*atom).valuep = Some(token.to_owned());
-            (*atom).data = data;
-            (*atom).quant = XmlRegQuantType::XmlRegexpQuantOnceonly;
-            (*atom).min = min;
-            (*atom).max = max;
+            let atom = self.reg_new_atom(XmlRegAtomType::XmlRegexpString);
+            self.atoms[atom].valuep = Some(token.to_owned());
+            self.atoms[atom].data = data;
+            self.atoms[atom].quant = XmlRegQuantType::XmlRegexpQuantOnceonly;
+            self.atoms[atom].min = min;
+            self.atoms[atom].max = max;
             // associate a counter to the transition.
             let counter = self.reg_get_counter();
             self.counters[counter].min = 1;
@@ -516,23 +474,12 @@ impl XmlAutomata {
             if to.is_null() {
                 to = self.reg_state_push();
                 if to.is_null() {
-                    // goto error;
-                    xml_reg_free_atom(atom);
                     return null_mut();
                 }
             }
             self.reg_state_add_trans(from, atom, to, counter as i32, -1);
-            if self.reg_atom_push(atom) < 0 {
-                // goto error;
-                xml_reg_free_atom(atom);
-                return null_mut();
-            }
             self.state = to;
             to
-
-            // error:
-            //     xmlRegFreeAtom(atom);
-            //     return null_mut();
         }
     }
 
@@ -564,19 +511,16 @@ impl XmlAutomata {
             if max < min {
                 return null_mut();
             }
-            let atom: XmlRegAtomPtr = self.reg_new_atom(XmlRegAtomType::XmlRegexpString);
-            if atom.is_null() {
-                return null_mut();
-            }
+            let atom = self.reg_new_atom(XmlRegAtomType::XmlRegexpString);
             if let Some(token2) = token2.filter(|t| !t.is_empty()) {
-                (*atom).valuep = Some(format!("{token}|{token2}"));
+                self.atoms[atom].valuep = Some(format!("{token}|{token2}"));
             } else {
-                (*atom).valuep = Some(token.to_owned());
+                self.atoms[atom].valuep = Some(token.to_owned());
             }
-            (*atom).data = data;
-            (*atom).quant = XmlRegQuantType::XmlRegexpQuantOnceonly;
-            (*atom).min = min;
-            (*atom).max = max;
+            self.atoms[atom].data = data;
+            self.atoms[atom].quant = XmlRegQuantType::XmlRegexpQuantOnceonly;
+            self.atoms[atom].min = min;
+            self.atoms[atom].max = max;
             // associate a counter to the transition.
             let counter = self.reg_get_counter();
             self.counters[counter].min = 1;
@@ -586,23 +530,12 @@ impl XmlAutomata {
             if to.is_null() {
                 to = self.reg_state_push();
                 if to.is_null() {
-                    // goto error;
-                    xml_reg_free_atom(atom);
                     return null_mut();
                 }
             }
             self.reg_state_add_trans(from, atom, to, counter as i32, -1);
-            if self.reg_atom_push(atom) < 0 {
-                // goto error;
-                xml_reg_free_atom(atom);
-                return null_mut();
-            }
             self.state = to;
             to
-
-            // error:
-            //     xmlRegFreeAtom(atom);
-            //     return null_mut();
         }
     }
 
@@ -664,7 +597,7 @@ impl Default for XmlAutomata {
             start: null_mut(),
             end: null_mut(),
             state: null_mut(),
-            atom: null_mut(),
+            atom: usize::MAX,
             atoms: vec![],
             states: vec![],
             counters: vec![],
