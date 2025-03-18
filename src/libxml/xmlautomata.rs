@@ -591,6 +591,7 @@ pub struct XmlAutomataState {
     pub(crate) trans: Vec<XmlRegTrans>,
     // knowing states pointing to us can speed things up
     pub(crate) trans_to: Vec<i32>,
+    pub(crate) invalid: bool,
 }
 
 impl XmlAutomataState {

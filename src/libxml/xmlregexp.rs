@@ -684,6 +684,7 @@ impl XmlRegParserCtxt {
         XmlRegState {
             typ: XmlRegStateType::XmlRegexpTransState,
             mark: XmlRegMarkedType::XmlRegexpMarkNormal,
+            invalid: false,
             ..Default::default()
         }
     }
@@ -705,22 +706,22 @@ impl XmlRegParserCtxt {
         counter: i32,
         count: i32,
     ) {
-        if state == usize::MAX || self.states[state].is_none() {
+        if self.get_state(state).is_none() {
             ERROR!(self, "add state: state is NULL");
             return;
         }
-        if target == usize::MAX || self.states[target].is_none() {
+        if self.get_state(target).is_none() {
             ERROR!(self, "add state: target is NULL");
             return;
         }
-        let no = self.states[target].as_ref().unwrap().no;
+        let no = self.get_state(target).unwrap().no;
         // Other routines follow the philosophy 'When in doubt, add a transition'
         // so we check here whether such a transition is already present and, if
         // so, silently ignore this request.
 
-        for trans in self.states[state].as_ref().unwrap().trans.iter().rev() {
+        for trans in self.get_state(state).unwrap().trans.iter().rev() {
             if trans.atom_index == atom_index
-                && trans.to == self.states[target].as_ref().unwrap().no
+                && trans.to == self.get_state(target).unwrap().no
                 && trans.counter == counter
                 && trans.count == count
             {
@@ -735,9 +736,9 @@ impl XmlRegParserCtxt {
             count,
             nd: 0,
         };
-        let no = self.states[state].as_ref().unwrap().no;
-        self.states[state].as_mut().unwrap().trans.push(trans);
-        self.states[target].as_mut().unwrap().trans_to.push(no);
+        let no = self.get_state(state).unwrap().no;
+        self.get_state_mut(state).unwrap().trans.push(trans);
+        self.get_state_mut(target).unwrap().trans_to.push(no);
     }
 
     fn parse_escaped_codeunit(&mut self) -> i32 {
@@ -817,8 +818,7 @@ impl XmlRegParserCtxt {
         if matches!(self.atoms[atom_index].typ, XmlRegAtomType::XmlRegexpSubReg) {
             // this is a subexpression handling one should not need to
             // create a new node except for XML_REGEXP_QUANT_RANGE.
-            if to != usize::MAX
-                && self.states[to].is_some()
+            if self.get_state(to).is_some()
                 && self.atoms[atom_index].stop != to
                 && !matches!(
                     self.atoms[atom_index].quant,
@@ -834,7 +834,7 @@ impl XmlRegParserCtxt {
                     // transition done to the state after end of atom.
                     //      1. set transition from atom start to new state
                     //      2. set transition from atom end to this state.
-                    if to == usize::MAX || self.states[to].is_none() {
+                    if self.get_state(to).is_none() {
                         self.fa_generate_epsilon_transition(
                             self.atoms[atom_index].start,
                             usize::MAX,
@@ -867,7 +867,7 @@ impl XmlRegParserCtxt {
                 }
                 XmlRegQuantType::XmlRegexpQuantRange => {
                     // create the final state now if needed
-                    let newstate = if to != usize::MAX && self.states[to].is_some() {
+                    let newstate = if self.get_state(to).is_some() {
                         to
                     } else {
                         self.reg_state_push()
@@ -878,8 +878,7 @@ impl XmlRegParserCtxt {
                     // graph. This is clearly more complex but should not
                     // be exploitable at runtime.
                     if self.atoms[atom_index].min == 0
-                        && (self.atoms[atom_index].start0 == usize::MAX
-                            || self.states[self.atoms[atom_index].start0].is_none())
+                        && self.get_state(self.atoms[atom_index].start0).is_none()
                     {
                         // duplicate a transition based on atom to count next
                         // occurrences after 1. We cannot loop to (*atom).start
@@ -962,14 +961,14 @@ impl XmlRegParserCtxt {
             )
         {
             // we can discard the atom and generate an epsilon transition instead
-            if to == usize::MAX || self.states[to].is_none() {
+            if self.get_state(to).is_none() {
                 to = self.reg_state_push();
             }
             self.fa_generate_epsilon_transition(from, to);
             self.state = to;
             return 0;
         }
-        if to == usize::MAX || self.states[to].is_none() {
+        if self.get_state(to).is_none() {
             to = self.reg_state_push();
         }
         let end = to;
@@ -1030,7 +1029,7 @@ impl XmlRegParserCtxt {
         mut to: usize,
         counter: i32,
     ) -> i32 {
-        if to == usize::MAX || self.states[to].is_none() {
+        if self.get_state(to).is_none() {
             to = self.reg_state_push();
             self.state = to;
         }
@@ -1040,7 +1039,7 @@ impl XmlRegParserCtxt {
 
     #[doc(alias = "xmlFAGenerateEpsilonTransition")]
     pub(crate) fn fa_generate_epsilon_transition(&mut self, from: usize, mut to: usize) -> i32 {
-        if to == usize::MAX || self.states[to].is_none() {
+        if self.get_state(to).is_none() {
             to = self.reg_state_push();
             self.state = to;
         }
@@ -1055,7 +1054,7 @@ impl XmlRegParserCtxt {
         mut to: usize,
         counter: i32,
     ) -> i32 {
-        if to == usize::MAX || self.states[to].is_none() {
+        if self.get_state(to).is_none() {
             to = self.reg_state_push();
             self.state = to;
         }
@@ -1070,7 +1069,7 @@ impl XmlRegParserCtxt {
         mut to: usize,
         lax: i32,
     ) -> i32 {
-        if to == usize::MAX || self.states[to].is_none() {
+        if self.get_state(to).is_none() {
             to = self.reg_state_push();
             self.state = to;
         }
@@ -1099,16 +1098,16 @@ impl XmlRegParserCtxt {
         // there is long cascading epsilon chains this minimize the
         // recursions and transition compares when adding the new ones
         for statenr in (0..self.states.len()).rev() {
-            let Some(state) = self.states[statenr].as_mut() else {
+            let Some(state) = self.get_state_mut(statenr) else {
                 continue;
             };
             if state.trans.is_empty() && !matches!(state.typ, XmlRegStateType::XmlRegexpFinalState)
             {
                 state.typ = XmlRegStateType::XmlRegexpSinkState;
             }
-            let len = self.states[statenr].as_ref().unwrap().trans.len();
+            let len = self.get_state(statenr).unwrap().trans.len();
             for transnr in 0..len {
-                let trans = &mut self.states[statenr].as_mut().unwrap().trans[transnr];
+                let trans = &mut self.get_state_mut(statenr).unwrap().trans[transnr];
                 if trans.atom_index == usize::MAX && trans.to >= 0 {
                     if trans.to == statenr as i32 {
                         trans.to = -1;
@@ -1118,10 +1117,10 @@ impl XmlRegParserCtxt {
                         has_epsilon = 1;
                         trans.to = -2;
                         let counter = trans.counter;
-                        self.states[statenr].as_mut().unwrap().mark =
+                        self.get_state_mut(statenr).unwrap().mark =
                             XmlRegMarkedType::XmlRegexpMarkStart;
                         self.fa_reduce_epsilon_transitions(statenr, newto as usize, counter);
-                        self.states[statenr].as_mut().unwrap().mark =
+                        self.get_state_mut(statenr).unwrap().mark =
                             XmlRegMarkedType::XmlRegexpMarkNormal;
                     }
                 }
@@ -1146,20 +1145,20 @@ impl XmlRegParserCtxt {
             state.reached = XmlRegMarkedType::XmlRegexpMarkNormal;
         }
         let mut now = 0;
-        if let Some(Some(state)) = self.states.first_mut() {
+        if let Some(state) = self.get_state_mut(0) {
             state.reached = XmlRegMarkedType::XmlRegexpMarkStart;
             now = 0;
         }
-        while now != usize::MAX && self.states[now].is_some() {
+        while self.get_state(now).is_some() {
             let mut target = usize::MAX;
-            self.states[now].as_mut().unwrap().reached = XmlRegMarkedType::XmlRegexpMarkVisited;
+            self.get_state_mut(now).unwrap().reached = XmlRegMarkedType::XmlRegexpMarkVisited;
             // Mark all states reachable from the current reachable state
-            for transnr in 0..self.states[now].as_ref().unwrap().trans.len() {
-                let trans = &self.states[now].as_ref().unwrap().trans[transnr];
+            for transnr in 0..self.get_state(now).unwrap().trans.len() {
+                let trans = &self.get_state(now).unwrap().trans[transnr];
                 if trans.to >= 0 && (trans.atom_index != usize::MAX || trans.count >= 0) {
                     let newto = trans.to;
 
-                    let Some(to) = self.states[newto as usize].as_mut() else {
+                    let Some(to) = self.get_state_mut(newto as usize) else {
                         continue;
                     };
                     if matches!(to.reached, XmlRegMarkedType::XmlRegexpMarkNormal) {
@@ -1170,7 +1169,7 @@ impl XmlRegParserCtxt {
             }
 
             // find the next accessible state not explored
-            if target == usize::MAX || self.states[target].is_none() {
+            if self.get_state(target).is_none() {
                 if let Some(pos) = self.states.iter().skip(1).position(|state| {
                     state.as_ref().is_some_and(|state| {
                         matches!(state.reached, XmlRegMarkedType::XmlRegexpMarkStart)
@@ -1205,37 +1204,36 @@ impl XmlRegParserCtxt {
     #[doc(alias = "xmlFAEliminateSimpleEpsilonTransitions")]
     fn fa_eliminate_simple_epsilon_transitions(&mut self) {
         for statenr in 0..self.states.len() {
-            if self.states[statenr].is_none() {
+            if self.get_state(statenr).is_none() {
                 continue;
             }
-            if self.states[statenr].as_ref().unwrap().trans.len() != 1 {
+            if self.get_state(statenr).unwrap().trans.len() != 1 {
                 continue;
             }
             if matches!(
-                self.states[statenr].as_ref().unwrap().typ,
+                self.get_state(statenr).unwrap().typ,
                 XmlRegStateType::XmlRegexpUnreachState | XmlRegStateType::XmlRegexpFinalState
             ) {
                 continue;
             }
             // is the only transition out a basic transition
-            if self.states[statenr].as_ref().unwrap().trans[0].atom_index == usize::MAX
-                && self.states[statenr].as_ref().unwrap().trans[0].to >= 0
-                && self.states[statenr].as_ref().unwrap().trans[0].to != statenr as i32
-                && self.states[statenr].as_ref().unwrap().trans[0].counter < 0
-                && self.states[statenr].as_ref().unwrap().trans[0].count < 0
+            if self.get_state(statenr).unwrap().trans[0].atom_index == usize::MAX
+                && self.get_state(statenr).unwrap().trans[0].to >= 0
+                && self.get_state(statenr).unwrap().trans[0].to != statenr as i32
+                && self.get_state(statenr).unwrap().trans[0].counter < 0
+                && self.get_state(statenr).unwrap().trans[0].count < 0
             {
-                let newto = self.states[statenr].as_ref().unwrap().trans[0].to;
+                let newto = self.get_state(statenr).unwrap().trans[0].to;
 
                 if !matches!(
-                    self.states[statenr].as_ref().unwrap().typ,
+                    self.get_state(statenr).unwrap().typ,
                     XmlRegStateType::XmlRegexpStartState
                 ) {
-                    for index in 0..self.states[statenr].as_ref().unwrap().trans_to.len() {
-                        let index = self.states[statenr].as_ref().unwrap().trans_to[index];
-                        for transnr in 0..self.states[index as usize].as_ref().unwrap().trans.len()
-                        {
+                    for index in 0..self.get_state(statenr).unwrap().trans_to.len() {
+                        let index = self.get_state(statenr).unwrap().trans_to[index];
+                        for transnr in 0..self.get_state(index as usize).unwrap().trans.len() {
                             let trans =
-                                &mut self.states[index as usize].as_mut().unwrap().trans[transnr];
+                                &mut self.get_state_mut(index as usize).unwrap().trans[transnr];
                             if trans.to == statenr as i32 {
                                 trans.to = -1;
                                 let atom_index = trans.atom_index;
@@ -1252,15 +1250,15 @@ impl XmlRegParserCtxt {
                         }
                     }
                     if matches!(
-                        self.states[statenr].as_ref().unwrap().typ,
+                        self.get_state(statenr).unwrap().typ,
                         XmlRegStateType::XmlRegexpFinalState
                     ) {
-                        self.states[newto as usize].as_mut().unwrap().typ =
+                        self.get_state_mut(newto as usize).unwrap().typ =
                             XmlRegStateType::XmlRegexpFinalState;
                     }
                     // eliminate the transition completely
-                    self.states[statenr].as_mut().unwrap().trans.clear();
-                    self.states[statenr].as_mut().unwrap().typ =
+                    self.get_state_mut(statenr).unwrap().trans.clear();
+                    self.get_state_mut(statenr).unwrap().typ =
                         XmlRegStateType::XmlRegexpUnreachState;
                 }
             }
@@ -1269,30 +1267,28 @@ impl XmlRegParserCtxt {
 
     #[doc(alias = "xmlFAReduceEpsilonTransitions")]
     fn fa_reduce_epsilon_transitions(&mut self, fromnr: usize, tonr: usize, counter: i32) {
-        if fromnr == usize::MAX || self.states[fromnr].is_none() {
+        if self.get_state(fromnr).is_none() {
             return;
         }
-        if tonr == usize::MAX
-            || self.states[tonr].as_ref().is_none_or(|state| {
-                matches!(
-                    state.mark,
-                    XmlRegMarkedType::XmlRegexpMarkStart | XmlRegMarkedType::XmlRegexpMarkVisited
-                )
-            })
-        {
+        if self.get_state(tonr).is_none_or(|state| {
+            matches!(
+                state.mark,
+                XmlRegMarkedType::XmlRegexpMarkStart | XmlRegMarkedType::XmlRegexpMarkVisited
+            )
+        }) {
             return;
         }
 
-        self.states[tonr].as_mut().unwrap().mark = XmlRegMarkedType::XmlRegexpMarkVisited;
+        self.get_state_mut(tonr).unwrap().mark = XmlRegMarkedType::XmlRegexpMarkVisited;
         if matches!(
-            self.states[tonr].as_mut().unwrap().typ,
+            self.get_state_mut(tonr).unwrap().typ,
             XmlRegStateType::XmlRegexpFinalState
         ) {
-            self.states[fromnr].as_mut().unwrap().typ = XmlRegStateType::XmlRegexpFinalState;
+            self.get_state_mut(fromnr).unwrap().typ = XmlRegStateType::XmlRegexpFinalState;
         }
-        let len = self.states[tonr].as_ref().unwrap().trans.len();
+        let len = self.get_state(tonr).unwrap().trans.len();
         for trannr in 0..len {
-            let trans = &self.states[tonr].as_ref().unwrap().trans[trannr];
+            let trans = &self.get_state(tonr).unwrap().trans[trannr];
             if trans.to < 0 {
                 continue;
             }
@@ -1336,7 +1332,7 @@ impl XmlRegParserCtxt {
                 }
             }
         }
-        self.states[tonr].as_mut().unwrap().mark = XmlRegMarkedType::XmlRegexpMarkNormal;
+        self.get_state_mut(tonr).unwrap().mark = XmlRegMarkedType::XmlRegexpMarkNormal;
     }
 
     /// Check whether the associated regexp is determinist,
@@ -1347,10 +1343,9 @@ impl XmlRegParserCtxt {
         let mut res: i32;
         let mut deep: i32 = 1;
 
-        if state == usize::MAX
-            || self.states[state]
-                .as_ref()
-                .is_none_or(|state| matches!(state.markd, XmlRegMarkedType::XmlRegexpMarkVisited))
+        if self
+            .get_state(state)
+            .is_none_or(|state| matches!(state.markd, XmlRegMarkedType::XmlRegexpMarkVisited))
         {
             return ret;
         }
@@ -1360,7 +1355,7 @@ impl XmlRegParserCtxt {
         }
 
         // don't recurse on transitions potentially added in the course of the elimination.
-        for t1 in 0..self.states[state].as_ref().unwrap().trans.len() {
+        for t1 in 0..self.get_state(state).unwrap().trans.len() {
             // check transitions conflicting with the one looked at
             let t1 = &mut self.states[state].as_mut().unwrap().trans[t1];
             if t1.atom_index == usize::MAX {
@@ -1368,7 +1363,7 @@ impl XmlRegParserCtxt {
                     continue;
                 }
                 let t1_to = t1.to as usize;
-                self.states[state].as_mut().unwrap().markd = XmlRegMarkedType::XmlRegexpMarkVisited;
+                self.get_state_mut(state).unwrap().markd = XmlRegMarkedType::XmlRegexpMarkVisited;
                 res = self.fa_recurse_determinism(t1_to, to, atom_index);
                 if res == 0 {
                     ret = 0;
@@ -1394,20 +1389,20 @@ impl XmlRegParserCtxt {
     /// Reset flags after checking determinism.
     #[doc(alias = "xmlFAFinishRecurseDeterminism")]
     fn fa_finish_recurse_determinism(&mut self, state: usize) {
-        if state == usize::MAX || self.states[state].is_none() {
+        if self.get_state(state).is_none() {
             return;
         }
         if !matches!(
-            self.states[state].as_ref().unwrap().markd,
+            self.get_state(state).unwrap().markd,
             XmlRegMarkedType::XmlRegexpMarkVisited
         ) {
             return;
         }
-        self.states[state].as_mut().unwrap().markd = XmlRegMarkedType::XmlRegexpMarkNormal;
+        self.get_state_mut(state).unwrap().markd = XmlRegMarkedType::XmlRegexpMarkNormal;
 
-        let len = self.states[state].as_ref().unwrap().trans.len();
+        let len = self.get_state(state).unwrap().trans.len();
         for t1 in 0..len {
-            let t1 = &self.states[state].as_ref().unwrap().trans[t1];
+            let t1 = &self.get_state(state).unwrap().trans[t1];
             if t1.atom_index == usize::MAX && t1.to >= 0 {
                 let to = t1.to as usize;
                 self.fa_finish_recurse_determinism(to);
@@ -1474,15 +1469,15 @@ impl XmlRegParserCtxt {
         // Check for all states that there aren't 2 transitions
         // with the same atom and a different target.
         for statenr in 0..self.states.len() {
-            if self.states[statenr]
-                .as_ref()
+            if self
+                .get_state(statenr)
                 .is_none_or(|state| state.trans.len() < 2)
             {
                 continue;
             }
             let mut last = None::<usize>;
-            for transnr in 0..self.states[statenr].as_ref().unwrap().trans.len() {
-                let t1 = &self.states[statenr].as_ref().unwrap().trans[transnr];
+            for transnr in 0..self.get_state(statenr).unwrap().trans.len() {
+                let t1 = &self.get_state(statenr).unwrap().trans[transnr];
                 let mut t1_to = t1.to;
                 let mut t1_atom_index = t1.atom_index;
                 // Determinism checks in case of counted or all transitions
@@ -1495,7 +1490,7 @@ impl XmlRegParserCtxt {
                     continue;
                 }
                 for transnr2 in 0..transnr {
-                    let t2 = &self.states[statenr].as_ref().unwrap().trans[transnr2];
+                    let t2 = &self.get_state(statenr).unwrap().trans[transnr2];
                     let t2_to = t2.to;
                     let t2_atom_index = t2.atom_index;
                     if t2_to == -1 {
@@ -1513,8 +1508,8 @@ impl XmlRegParserCtxt {
                         {
                             ret = 0;
                             // mark the transitions as non-deterministic ones
-                            self.states[statenr].as_mut().unwrap().trans[transnr].nd = 1;
-                            self.states[statenr].as_mut().unwrap().trans[transnr2].nd = 1;
+                            self.get_state_mut(statenr).unwrap().trans[transnr].nd = 1;
+                            self.get_state_mut(statenr).unwrap().trans[transnr2].nd = 1;
                             last = Some(transnr);
                         }
                     } else if t1_to != -1 {
@@ -1525,10 +1520,10 @@ impl XmlRegParserCtxt {
                             t2_to as usize,
                             t2_atom_index,
                         );
-                        let t1 = &self.states[statenr].as_ref().unwrap().trans[transnr];
+                        let t1 = &self.get_state(statenr).unwrap().trans[transnr];
                         t1_to = t1.to;
                         self.fa_finish_recurse_determinism(t1_to as usize);
-                        let t1 = &self.states[statenr].as_ref().unwrap().trans[transnr];
+                        let t1 = &self.get_state(statenr).unwrap().trans[transnr];
                         t1_to = t1.to;
                         t1_atom_index = t1.atom_index;
                         // don't shortcut the computation so all non deterministic
@@ -1536,7 +1531,7 @@ impl XmlRegParserCtxt {
                         // if (ret == 0)
                         // return(0);
                         if ret == 0 {
-                            self.states[statenr].as_mut().unwrap().trans[transnr].nd = 1;
+                            self.get_state_mut(statenr).unwrap().trans[transnr].nd = 1;
                             // (*t2).nd = 1;
                             last = Some(transnr);
                         }
@@ -1550,7 +1545,7 @@ impl XmlRegParserCtxt {
             // mark specifically the last non-deterministic transition
             // from a state since there is no need to set-up rollback from it
             if let Some(last) = last {
-                self.states[statenr].as_mut().unwrap().trans[last].nd = 2;
+                self.get_state_mut(statenr).unwrap().trans[last].nd = 2;
             }
 
             // don't shortcut the computation so all non deterministic
@@ -2352,7 +2347,7 @@ impl XmlRegParserCtxt {
         self.end = usize::MAX;
         self.fa_parse_branch(usize::MAX);
         if top != 0 {
-            self.states[self.state].as_mut().unwrap().typ = XmlRegStateType::XmlRegexpFinalState;
+            self.get_state_mut(self.state).unwrap().typ = XmlRegStateType::XmlRegexpFinalState;
         }
         if self.current_byte() != Some(b'|') {
             self.end = self.state;
@@ -2595,8 +2590,8 @@ pub unsafe fn xml_regexp_compile(regexp: &str) -> XmlRegexpPtr {
             return null_mut();
         }
         ctxt.end = ctxt.state;
-        ctxt.states[ctxt.start].as_mut().unwrap().typ = XmlRegStateType::XmlRegexpStartState;
-        ctxt.states[ctxt.end].as_mut().unwrap().typ = XmlRegStateType::XmlRegexpFinalState;
+        ctxt.get_state_mut(ctxt.start).unwrap().typ = XmlRegStateType::XmlRegexpStartState;
+        ctxt.get_state_mut(ctxt.end).unwrap().typ = XmlRegStateType::XmlRegexpFinalState;
 
         // remove the Epsilon except for counted transitions
         ctxt.fa_eliminate_epsilon_transitions();
