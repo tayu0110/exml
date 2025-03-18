@@ -223,7 +223,6 @@ pub struct XmlRegRange {
 }
 
 pub type XmlRegState = XmlAutomataState;
-pub type XmlRegStatePtr = *mut XmlRegState;
 
 #[doc(alias = "xmlRegAtom")]
 #[repr(C)]
@@ -237,9 +236,12 @@ pub struct XmlRegAtom {
     pub(crate) valuep2: Option<String>,
     pub(crate) neg: i32,
     pub(crate) codepoint: i32,
-    pub(crate) start: XmlRegStatePtr,
-    pub(crate) start0: XmlRegStatePtr,
-    pub(crate) stop: XmlRegStatePtr,
+
+    // state index
+    pub(crate) start: usize,
+    pub(crate) start0: usize,
+    pub(crate) stop: usize,
+
     pub(crate) ranges: Vec<XmlRegRange>,
     pub(crate) data: *mut c_void,
 }
@@ -387,9 +389,9 @@ impl Default for XmlRegAtom {
             valuep2: None,
             neg: 0,
             codepoint: 0,
-            start: null_mut(),
-            start0: null_mut(),
-            stop: null_mut(),
+            start: usize::MAX,
+            start0: usize::MAX,
+            stop: usize::MAX,
             ranges: vec![],
             data: null_mut(),
         }
@@ -476,14 +478,15 @@ impl XmlRegParserCtxt {
                 // 3/ build a table state x atom for the transitions
 
                 let mut state_remap = vec![0; (*ret).states.len()];
-                for (i, &state) in (*ret).states.iter().enumerate() {
-                    if !state.is_null() {
+                for (i, state) in (*ret).states.iter().enumerate() {
+                    if state.is_some() {
                         state_remap[i] = nbstates;
                         nbstates += 1;
                     } else {
                         state_remap[i] = -1;
                     }
                 }
+
                 let mut string_map = Vec::with_capacity((*ret).atoms.len());
                 let mut string_remap = vec![0; (*ret).atoms.len()];
                 for (i, atom) in (*ret).atoms.iter().enumerate() {
@@ -519,7 +522,7 @@ impl XmlRegParserCtxt {
                 // state corresponds to the state type.
                 let mut transdata = vec![];
 
-                for (i, &state) in (*ret).states.iter().enumerate() {
+                for (i, state) in (*ret).states.iter().enumerate() {
                     let mut atomno: i32;
                     let mut targetno: i32;
                     let mut prev: i32;
@@ -529,9 +532,9 @@ impl XmlRegParserCtxt {
                         continue;
                     }
 
-                    transitions[stateno as usize][0] = (*state).typ as i32;
+                    transitions[stateno as usize][0] = state.as_ref().unwrap().typ as i32;
 
-                    for trans in &(*state).trans {
+                    for trans in &state.as_ref().unwrap().trans {
                         if trans.to == -1 || trans.atom_index == usize::MAX {
                             continue;
                         }
@@ -564,9 +567,7 @@ impl XmlRegParserCtxt {
                 }
                 (*ret).determinist = 1;
                 // Cleanup of the old data
-                for state in (*ret).states.drain(..) {
-                    xml_reg_free_state(state);
-                }
+                (*ret).states.clear();
                 (*ret).compact = transitions;
                 (*ret).transdata = transdata;
                 (*ret).string_map = string_map;
@@ -679,76 +680,64 @@ impl XmlRegParserCtxt {
     }
 
     #[doc(alias = "xmlRegNewState")]
-    unsafe fn reg_new_state(&mut self) -> XmlRegStatePtr {
-        unsafe {
-            let ret: XmlRegStatePtr = xml_malloc(size_of::<XmlRegState>()) as XmlRegStatePtr;
-            if ret.is_null() {
-                xml_regexp_err_memory(self, "allocating state");
-                return null_mut();
-            }
-            std::ptr::write(&mut *ret, XmlRegState::default());
-            (*ret).typ = XmlRegStateType::XmlRegexpTransState;
-            (*ret).mark = XmlRegMarkedType::XmlRegexpMarkNormal;
-            ret
+    fn reg_new_state(&self) -> XmlRegState {
+        XmlRegState {
+            typ: XmlRegStateType::XmlRegexpTransState,
+            mark: XmlRegMarkedType::XmlRegexpMarkNormal,
+            ..Default::default()
         }
     }
 
     #[doc(alias = "xmlRegStatePush")]
-    pub(crate) unsafe fn reg_state_push(&mut self) -> XmlRegStatePtr {
-        unsafe {
-            let state: XmlRegStatePtr = self.reg_new_state();
-            if state.is_null() {
-                return null_mut();
-            }
-
-            (*state).no = self.states.len() as i32;
-            self.states.push(state);
-            state
-        }
+    pub(crate) fn reg_state_push(&mut self) -> usize {
+        let mut state = self.reg_new_state();
+        state.no = self.states.len() as i32;
+        self.states.push(Some(state));
+        self.states.len() - 1
     }
 
     #[doc(alias = "xmlRegStateAddTrans")]
-    pub(crate) unsafe fn reg_state_add_trans(
+    pub(crate) fn reg_state_add_trans(
         &mut self,
-        state: XmlRegStatePtr,
+        state: usize,
         atom_index: usize,
-        target: XmlRegStatePtr,
+        target: usize,
         counter: i32,
         count: i32,
     ) {
-        unsafe {
-            if state.is_null() {
-                ERROR!(self, "add state: state is NULL");
-                return;
-            }
-            if target.is_null() {
-                ERROR!(self, "add state: target is NULL");
-                return;
-            }
-            // Other routines follow the philosophy 'When in doubt, add a transition'
-            // so we check here whether such a transition is already present and, if
-            // so, silently ignore this request.
-
-            for trans in (*state).trans.iter().rev() {
-                if trans.atom_index == atom_index
-                    && trans.to == (*target).no
-                    && trans.counter == counter
-                    && trans.count == count
-                {
-                    return;
-                }
-            }
-
-            let trans = XmlRegTrans {
-                atom_index,
-                to: (*target).no,
-                counter,
-                count,
-                nd: 0,
-            };
-            (*state).trans.push(trans);
-            (*target).trans_to.push((*state).no);
+        if state == usize::MAX || self.states[state].is_none() {
+            ERROR!(self, "add state: state is NULL");
+            return;
         }
+        if target == usize::MAX || self.states[target].is_none() {
+            ERROR!(self, "add state: target is NULL");
+            return;
+        }
+        let no = self.states[target].as_ref().unwrap().no;
+        // Other routines follow the philosophy 'When in doubt, add a transition'
+        // so we check here whether such a transition is already present and, if
+        // so, silently ignore this request.
+
+        for trans in self.states[state].as_ref().unwrap().trans.iter().rev() {
+            if trans.atom_index == atom_index
+                && trans.to == self.states[target].as_ref().unwrap().no
+                && trans.counter == counter
+                && trans.count == count
+            {
+                return;
+            }
+        }
+
+        let trans = XmlRegTrans {
+            atom_index,
+            to: no,
+            counter,
+            count,
+            nd: 0,
+        };
+        let no = self.states[state].as_ref().unwrap().no;
+        self.states[state].as_mut().unwrap().trans.push(trans);
+        self.states[target].as_mut().unwrap().trans_to.push(no);
     }
 
     fn parse_escaped_codeunit(&mut self) -> i32 {
@@ -813,447 +802,387 @@ impl XmlRegParserCtxt {
 
     /// Returns 0 if success and -1 in case of error.
     #[doc(alias = "xmlFAGenerateTransitions")]
-    pub(crate) unsafe fn fa_generate_transitions(
+    pub(crate) fn fa_generate_transitions(
         &mut self,
-        from: XmlRegStatePtr,
-        mut to: XmlRegStatePtr,
+        from: usize,
+        mut to: usize,
         atom_index: usize,
     ) -> i32 {
-        unsafe {
-            let mut nullable: i32 = 0;
+        let mut nullable: i32 = 0;
 
-            if atom_index == usize::MAX {
-                ERROR!(self, "generate transition: atom == NULL");
-                return -1;
-            }
-            if matches!(self.atoms[atom_index].typ, XmlRegAtomType::XmlRegexpSubReg) {
-                // this is a subexpression handling one should not need to
-                // create a new node except for XML_REGEXP_QUANT_RANGE.
-                if !to.is_null()
-                    && self.atoms[atom_index].stop != to
-                    && !matches!(
-                        self.atoms[atom_index].quant,
-                        XmlRegQuantType::XmlRegexpQuantRange
-                    )
-                {
-                    // Generate an epsilon transition to link to the target
-                    self.fa_generate_epsilon_transition(self.atoms[atom_index].stop, to);
-                }
-                match self.atoms[atom_index].quant {
-                    XmlRegQuantType::XmlRegexpQuantOpt => {
-                        self.atoms[atom_index].quant = XmlRegQuantType::XmlRegexpQuantOnce;
-                        // transition done to the state after end of atom.
-                        //      1. set transition from atom start to new state
-                        //      2. set transition from atom end to this state.
-                        if to.is_null() {
-                            self.fa_generate_epsilon_transition(
-                                self.atoms[atom_index].start,
-                                null_mut(),
-                            );
-                            self.fa_generate_epsilon_transition(
-                                self.atoms[atom_index].stop,
-                                self.state,
-                            );
-                        } else {
-                            self.fa_generate_epsilon_transition(self.atoms[atom_index].start, to);
-                        }
-                    }
-                    XmlRegQuantType::XmlRegexpQuantMult => {
-                        self.atoms[atom_index].quant = XmlRegQuantType::XmlRegexpQuantOnce;
-                        self.fa_generate_epsilon_transition(
-                            self.atoms[atom_index].start,
-                            self.atoms[atom_index].stop,
-                        );
-                        self.fa_generate_epsilon_transition(
-                            self.atoms[atom_index].stop,
-                            self.atoms[atom_index].start,
-                        );
-                    }
-                    XmlRegQuantType::XmlRegexpQuantPlus => {
-                        self.atoms[atom_index].quant = XmlRegQuantType::XmlRegexpQuantOnce;
-                        self.fa_generate_epsilon_transition(
-                            self.atoms[atom_index].stop,
-                            self.atoms[atom_index].start,
-                        );
-                    }
-                    XmlRegQuantType::XmlRegexpQuantRange => {
-                        let inter: XmlRegStatePtr;
-                        let newstate: XmlRegStatePtr;
-
-                        // create the final state now if needed
-                        if !to.is_null() {
-                            newstate = to;
-                        } else {
-                            newstate = self.reg_state_push();
-                            if newstate.is_null() {
-                                return -1;
-                            }
-                        }
-
-                        // The principle here is to use counted transition
-                        // to avoid explosion in the number of states in the
-                        // graph. This is clearly more complex but should not
-                        // be exploitable at runtime.
-                        if self.atoms[atom_index].min == 0
-                            && self.atoms[atom_index].start0.is_null()
-                        {
-                            // duplicate a transition based on atom to count next
-                            // occurrences after 1. We cannot loop to (*atom).start
-                            // directly because we need an epsilon transition to
-                            // newstate.
-                            // ???? For some reason it seems we never reach that
-                            //     case, I suppose this got optimized out before when
-                            // building the automata
-                            let copy = self.reg_copy_atom(atom_index);
-                            if copy == usize::MAX {
-                                return -1;
-                            }
-                            self.atoms[copy].quant = XmlRegQuantType::XmlRegexpQuantOnce;
-                            self.atoms[copy].min = 0;
-                            self.atoms[copy].max = 0;
-
-                            if self.fa_generate_transitions(
-                                self.atoms[atom_index].start,
-                                null_mut(),
-                                copy,
-                            ) < 0
-                            {
-                                return -1;
-                            }
-                            inter = self.state;
-                            let counter = self.reg_get_counter();
-                            self.counters[counter].min = self.atoms[atom_index].min - 1;
-                            self.counters[counter].max = self.atoms[atom_index].max - 1;
-                            // count the number of times we see it again
-                            self.fa_generate_counted_epsilon_transition(
-                                inter,
-                                self.atoms[atom_index].stop,
-                                counter as i32,
-                            );
-                            // allow a way out based on the count
-                            self.fa_generate_counted_transition(inter, newstate, counter as i32);
-                            // and also allow a direct exit for 0
-                            self.fa_generate_epsilon_transition(
-                                self.atoms[atom_index].start,
-                                newstate,
-                            );
-                        } else {
-                            // either we need the atom at least once or there
-                            // is an (*atom).start0 allowing to easily plug the
-                            // epsilon transition.
-                            let counter = self.reg_get_counter();
-                            self.counters[counter].min = self.atoms[atom_index].min - 1;
-                            self.counters[counter].max = self.atoms[atom_index].max - 1;
-                            // allow a way out based on the count
-                            self.fa_generate_counted_transition(
-                                self.atoms[atom_index].stop,
-                                newstate,
-                                counter as i32,
-                            );
-                            // count the number of times we see it again
-                            self.fa_generate_counted_epsilon_transition(
-                                self.atoms[atom_index].stop,
-                                self.atoms[atom_index].start,
-                                counter as i32,
-                            );
-                            // and if needed allow a direct exit for 0
-                            if self.atoms[atom_index].min == 0 {
-                                self.fa_generate_epsilon_transition(
-                                    self.atoms[atom_index].start0,
-                                    newstate,
-                                );
-                            }
-                        }
-                        self.atoms[atom_index].min = 0;
-                        self.atoms[atom_index].max = 0;
-                        self.atoms[atom_index].quant = XmlRegQuantType::XmlRegexpQuantOnce;
-                        self.state = newstate;
-                    }
-                    _ => {}
-                }
-                return 0;
-            }
-            if self.atoms[atom_index].min == 0
-                && self.atoms[atom_index].max == 0
-                && matches!(
+        if atom_index == usize::MAX {
+            ERROR!(self, "generate transition: atom == NULL");
+            return -1;
+        }
+        if matches!(self.atoms[atom_index].typ, XmlRegAtomType::XmlRegexpSubReg) {
+            // this is a subexpression handling one should not need to
+            // create a new node except for XML_REGEXP_QUANT_RANGE.
+            if to != usize::MAX
+                && self.states[to].is_some()
+                && self.atoms[atom_index].stop != to
+                && !matches!(
                     self.atoms[atom_index].quant,
                     XmlRegQuantType::XmlRegexpQuantRange
                 )
             {
-                // we can discard the atom and generate an epsilon transition instead
-                if to.is_null() {
-                    to = self.reg_state_push();
-                    if to.is_null() {
-                        return -1;
-                    }
-                }
-                self.fa_generate_epsilon_transition(from, to);
-                self.state = to;
-                return 0;
+                // Generate an epsilon transition to link to the target
+                self.fa_generate_epsilon_transition(self.atoms[atom_index].stop, to);
             }
-            if to.is_null() {
-                to = self.reg_state_push();
-                if to.is_null() {
-                    return -1;
-                }
-            }
-            let end: XmlRegStatePtr = to;
-            if matches!(
-                self.atoms[atom_index].quant,
-                XmlRegQuantType::XmlRegexpQuantMult | XmlRegQuantType::XmlRegexpQuantPlus
-            ) {
-                // Do not pollute the target state by adding transitions from
-                // it as it is likely to be the shared target of multiple branches.
-                // So isolate with an epsilon transition.
-
-                let tmp: XmlRegStatePtr = self.reg_state_push();
-                if tmp.is_null() {
-                    return -1;
-                }
-                self.fa_generate_epsilon_transition(tmp, to);
-                to = tmp;
-            }
-            if matches!(
-                self.atoms[atom_index].quant,
-                XmlRegQuantType::XmlRegexpQuantRange
-            ) && self.atoms[atom_index].min == 0
-                && self.atoms[atom_index].max > 0
-            {
-                nullable = 1;
-                self.atoms[atom_index].min = 1;
-                if self.atoms[atom_index].max == 1 {
-                    self.atoms[atom_index].quant = XmlRegQuantType::XmlRegexpQuantOpt;
-                }
-            }
-            self.reg_state_add_trans(from, atom_index, to, -1, -1);
-            self.state = end;
             match self.atoms[atom_index].quant {
                 XmlRegQuantType::XmlRegexpQuantOpt => {
                     self.atoms[atom_index].quant = XmlRegQuantType::XmlRegexpQuantOnce;
-                    self.fa_generate_epsilon_transition(from, to);
+                    // transition done to the state after end of atom.
+                    //      1. set transition from atom start to new state
+                    //      2. set transition from atom end to this state.
+                    if to == usize::MAX || self.states[to].is_none() {
+                        self.fa_generate_epsilon_transition(
+                            self.atoms[atom_index].start,
+                            usize::MAX,
+                        );
+                        self.fa_generate_epsilon_transition(
+                            self.atoms[atom_index].stop,
+                            self.state,
+                        );
+                    } else {
+                        self.fa_generate_epsilon_transition(self.atoms[atom_index].start, to);
+                    }
                 }
                 XmlRegQuantType::XmlRegexpQuantMult => {
                     self.atoms[atom_index].quant = XmlRegQuantType::XmlRegexpQuantOnce;
-                    self.fa_generate_epsilon_transition(from, to);
-                    self.reg_state_add_trans(to, atom_index, to, -1, -1);
+                    self.fa_generate_epsilon_transition(
+                        self.atoms[atom_index].start,
+                        self.atoms[atom_index].stop,
+                    );
+                    self.fa_generate_epsilon_transition(
+                        self.atoms[atom_index].stop,
+                        self.atoms[atom_index].start,
+                    );
                 }
                 XmlRegQuantType::XmlRegexpQuantPlus => {
                     self.atoms[atom_index].quant = XmlRegQuantType::XmlRegexpQuantOnce;
-                    self.reg_state_add_trans(to, atom_index, to, -1, -1);
+                    self.fa_generate_epsilon_transition(
+                        self.atoms[atom_index].stop,
+                        self.atoms[atom_index].start,
+                    );
                 }
                 XmlRegQuantType::XmlRegexpQuantRange => {
-                    if nullable != 0 {
-                        self.fa_generate_epsilon_transition(from, to);
+                    // create the final state now if needed
+                    let newstate = if to != usize::MAX && self.states[to].is_some() {
+                        to
+                    } else {
+                        self.reg_state_push()
+                    };
+
+                    // The principle here is to use counted transition
+                    // to avoid explosion in the number of states in the
+                    // graph. This is clearly more complex but should not
+                    // be exploitable at runtime.
+                    if self.atoms[atom_index].min == 0
+                        && (self.atoms[atom_index].start0 == usize::MAX
+                            || self.states[self.atoms[atom_index].start0].is_none())
+                    {
+                        // duplicate a transition based on atom to count next
+                        // occurrences after 1. We cannot loop to (*atom).start
+                        // directly because we need an epsilon transition to
+                        // newstate.
+                        // ???? For some reason it seems we never reach that
+                        //     case, I suppose this got optimized out before when
+                        // building the automata
+                        let copy = self.reg_copy_atom(atom_index);
+                        if copy == usize::MAX {
+                            return -1;
+                        }
+                        self.atoms[copy].quant = XmlRegQuantType::XmlRegexpQuantOnce;
+                        self.atoms[copy].min = 0;
+                        self.atoms[copy].max = 0;
+
+                        if self.fa_generate_transitions(
+                            self.atoms[atom_index].start,
+                            usize::MAX,
+                            copy,
+                        ) < 0
+                        {
+                            return -1;
+                        }
+                        let inter = self.state;
+                        let counter = self.reg_get_counter();
+                        self.counters[counter].min = self.atoms[atom_index].min - 1;
+                        self.counters[counter].max = self.atoms[atom_index].max - 1;
+                        // count the number of times we see it again
+                        self.fa_generate_counted_epsilon_transition(
+                            inter,
+                            self.atoms[atom_index].stop,
+                            counter as i32,
+                        );
+                        // allow a way out based on the count
+                        self.fa_generate_counted_transition(inter, newstate, counter as i32);
+                        // and also allow a direct exit for 0
+                        self.fa_generate_epsilon_transition(self.atoms[atom_index].start, newstate);
+                    } else {
+                        // either we need the atom at least once or there
+                        // is an (*atom).start0 allowing to easily plug the
+                        // epsilon transition.
+                        let counter = self.reg_get_counter();
+                        self.counters[counter].min = self.atoms[atom_index].min - 1;
+                        self.counters[counter].max = self.atoms[atom_index].max - 1;
+                        // allow a way out based on the count
+                        self.fa_generate_counted_transition(
+                            self.atoms[atom_index].stop,
+                            newstate,
+                            counter as i32,
+                        );
+                        // count the number of times we see it again
+                        self.fa_generate_counted_epsilon_transition(
+                            self.atoms[atom_index].stop,
+                            self.atoms[atom_index].start,
+                            counter as i32,
+                        );
+                        // and if needed allow a direct exit for 0
+                        if self.atoms[atom_index].min == 0 {
+                            self.fa_generate_epsilon_transition(
+                                self.atoms[atom_index].start0,
+                                newstate,
+                            );
+                        }
                     }
+                    self.atoms[atom_index].min = 0;
+                    self.atoms[atom_index].max = 0;
+                    self.atoms[atom_index].quant = XmlRegQuantType::XmlRegexpQuantOnce;
+                    self.state = newstate;
                 }
                 _ => {}
             }
-            0
+            return 0;
         }
+        if self.atoms[atom_index].min == 0
+            && self.atoms[atom_index].max == 0
+            && matches!(
+                self.atoms[atom_index].quant,
+                XmlRegQuantType::XmlRegexpQuantRange
+            )
+        {
+            // we can discard the atom and generate an epsilon transition instead
+            if to == usize::MAX || self.states[to].is_none() {
+                to = self.reg_state_push();
+            }
+            self.fa_generate_epsilon_transition(from, to);
+            self.state = to;
+            return 0;
+        }
+        if to == usize::MAX || self.states[to].is_none() {
+            to = self.reg_state_push();
+        }
+        let end = to;
+        if matches!(
+            self.atoms[atom_index].quant,
+            XmlRegQuantType::XmlRegexpQuantMult | XmlRegQuantType::XmlRegexpQuantPlus
+        ) {
+            // Do not pollute the target state by adding transitions from
+            // it as it is likely to be the shared target of multiple branches.
+            // So isolate with an epsilon transition.
+
+            let tmp = self.reg_state_push();
+            self.fa_generate_epsilon_transition(tmp, to);
+            to = tmp;
+        }
+        if matches!(
+            self.atoms[atom_index].quant,
+            XmlRegQuantType::XmlRegexpQuantRange
+        ) && self.atoms[atom_index].min == 0
+            && self.atoms[atom_index].max > 0
+        {
+            nullable = 1;
+            self.atoms[atom_index].min = 1;
+            if self.atoms[atom_index].max == 1 {
+                self.atoms[atom_index].quant = XmlRegQuantType::XmlRegexpQuantOpt;
+            }
+        }
+        self.reg_state_add_trans(from, atom_index, to, -1, -1);
+        self.state = end;
+        match self.atoms[atom_index].quant {
+            XmlRegQuantType::XmlRegexpQuantOpt => {
+                self.atoms[atom_index].quant = XmlRegQuantType::XmlRegexpQuantOnce;
+                self.fa_generate_epsilon_transition(from, to);
+            }
+            XmlRegQuantType::XmlRegexpQuantMult => {
+                self.atoms[atom_index].quant = XmlRegQuantType::XmlRegexpQuantOnce;
+                self.fa_generate_epsilon_transition(from, to);
+                self.reg_state_add_trans(to, atom_index, to, -1, -1);
+            }
+            XmlRegQuantType::XmlRegexpQuantPlus => {
+                self.atoms[atom_index].quant = XmlRegQuantType::XmlRegexpQuantOnce;
+                self.reg_state_add_trans(to, atom_index, to, -1, -1);
+            }
+            XmlRegQuantType::XmlRegexpQuantRange => {
+                if nullable != 0 {
+                    self.fa_generate_epsilon_transition(from, to);
+                }
+            }
+            _ => {}
+        }
+        0
     }
 
     #[doc(alias = "xmlFAGenerateCountedTransition")]
-    pub(crate) unsafe fn fa_generate_counted_transition(
+    pub(crate) fn fa_generate_counted_transition(
         &mut self,
-        from: XmlRegStatePtr,
-        mut to: XmlRegStatePtr,
+        from: usize,
+        mut to: usize,
         counter: i32,
     ) -> i32 {
-        unsafe {
-            if to.is_null() {
-                to = self.reg_state_push();
-                if to.is_null() {
-                    return -1;
-                }
-                self.state = to;
-            }
-            self.reg_state_add_trans(from, usize::MAX, to, -1, counter);
-            0
+        if to == usize::MAX || self.states[to].is_none() {
+            to = self.reg_state_push();
+            self.state = to;
         }
+        self.reg_state_add_trans(from, usize::MAX, to, -1, counter);
+        0
     }
 
     #[doc(alias = "xmlFAGenerateEpsilonTransition")]
-    pub(crate) unsafe fn fa_generate_epsilon_transition(
-        &mut self,
-        from: XmlRegStatePtr,
-        mut to: XmlRegStatePtr,
-    ) -> i32 {
-        unsafe {
-            if to.is_null() {
-                to = self.reg_state_push();
-                if to.is_null() {
-                    return -1;
-                }
-                self.state = to;
-            }
-            self.reg_state_add_trans(from, usize::MAX, to, -1, -1);
-            0
+    pub(crate) fn fa_generate_epsilon_transition(&mut self, from: usize, mut to: usize) -> i32 {
+        if to == usize::MAX || self.states[to].is_none() {
+            to = self.reg_state_push();
+            self.state = to;
         }
+        self.reg_state_add_trans(from, usize::MAX, to, -1, -1);
+        0
     }
 
     #[doc(alias = "xmlFAGenerateCountedEpsilonTransition")]
-    pub(crate) unsafe fn fa_generate_counted_epsilon_transition(
+    pub(crate) fn fa_generate_counted_epsilon_transition(
         &mut self,
-        from: XmlRegStatePtr,
-        mut to: XmlRegStatePtr,
+        from: usize,
+        mut to: usize,
         counter: i32,
     ) -> i32 {
-        unsafe {
-            if to.is_null() {
-                to = self.reg_state_push();
-                if to.is_null() {
-                    return -1;
-                }
-                self.state = to;
-            }
-            self.reg_state_add_trans(from, usize::MAX, to, counter, -1);
-            0
+        if to == usize::MAX || self.states[to].is_none() {
+            to = self.reg_state_push();
+            self.state = to;
         }
+        self.reg_state_add_trans(from, usize::MAX, to, counter, -1);
+        0
     }
 
     #[doc(alias = "xmlFAGenerateAllTransition")]
-    pub(crate) unsafe fn fa_generate_all_transition(
+    pub(crate) fn fa_generate_all_transition(
         &mut self,
-        from: XmlRegStatePtr,
-        mut to: XmlRegStatePtr,
+        from: usize,
+        mut to: usize,
         lax: i32,
     ) -> i32 {
-        unsafe {
-            if to.is_null() {
-                to = self.reg_state_push();
-                if to.is_null() {
-                    return -1;
-                }
-                self.state = to;
-            }
-            if lax != 0 {
-                self.reg_state_add_trans(from, usize::MAX, to, -1, REGEXP_ALL_LAX_COUNTER as _);
-            } else {
-                self.reg_state_add_trans(from, usize::MAX, to, -1, REGEXP_ALL_COUNTER as _);
-            }
-            0
+        if to == usize::MAX || self.states[to].is_none() {
+            to = self.reg_state_push();
+            self.state = to;
         }
+        if lax != 0 {
+            self.reg_state_add_trans(from, usize::MAX, to, -1, REGEXP_ALL_LAX_COUNTER as _);
+        } else {
+            self.reg_state_add_trans(from, usize::MAX, to, -1, REGEXP_ALL_COUNTER as _);
+        }
+        0
     }
 
     #[doc(alias = "xmlFAEliminateEpsilonTransitions")]
-    pub(crate) unsafe fn fa_eliminate_epsilon_transitions(&mut self) {
-        unsafe {
-            // Eliminate simple epsilon transition and the associated unreachable states.
-            self.fa_eliminate_simple_epsilon_transitions();
-            for state in self.states.iter_mut() {
-                if !(*state).is_null()
-                    && matches!((**state).typ, XmlRegStateType::XmlRegexpUnreachState)
-                {
-                    xml_reg_free_state(*state);
-                    *state = null_mut();
-                }
-            }
+    pub(crate) fn fa_eliminate_epsilon_transitions(&mut self) {
+        // Eliminate simple epsilon transition and the associated unreachable states.
+        self.fa_eliminate_simple_epsilon_transitions();
+        for state in self.states.iter_mut() {
+            state.take_if(|state| matches!(state.typ, XmlRegStateType::XmlRegexpUnreachState));
+        }
 
-            let mut has_epsilon = 0;
+        let mut has_epsilon = 0;
 
-            // Build the completed transitions bypassing the epsilons
-            // Use a marking algorithm to avoid loops
-            // Mark sink states too.
-            // Process from the latest states backward to the start when
-            // there is long cascading epsilon chains this minimize the
-            // recursions and transition compares when adding the new ones
-            for statenr in (0..self.states.len()).rev() {
-                let state = self.states[statenr];
-                if state.is_null() {
-                    continue;
-                }
-                if (*state).trans.is_empty()
-                    && !matches!((*state).typ, XmlRegStateType::XmlRegexpFinalState)
-                {
-                    (*state).typ = XmlRegStateType::XmlRegexpSinkState;
-                }
-                for trans in (*state).trans.iter_mut() {
-                    if trans.atom_index == usize::MAX && trans.to >= 0 {
-                        if trans.to == statenr as i32 {
-                            trans.to = -1;
-                        } else if trans.count < 0 {
-                            let newto = trans.to;
-
-                            has_epsilon = 1;
-                            trans.to = -2;
-                            (*state).mark = XmlRegMarkedType::XmlRegexpMarkStart;
-                            self.fa_reduce_epsilon_transitions(
-                                statenr as i32,
-                                newto,
-                                trans.counter,
-                            );
-                            (*state).mark = XmlRegMarkedType::XmlRegexpMarkNormal;
-                        }
-                    }
-                }
+        // Build the completed transitions bypassing the epsilons
+        // Use a marking algorithm to avoid loops
+        // Mark sink states too.
+        // Process from the latest states backward to the start when
+        // there is long cascading epsilon chains this minimize the
+        // recursions and transition compares when adding the new ones
+        for statenr in (0..self.states.len()).rev() {
+            let Some(state) = self.states[statenr].as_mut() else {
+                continue;
+            };
+            if state.trans.is_empty() && !matches!(state.typ, XmlRegStateType::XmlRegexpFinalState)
+            {
+                state.typ = XmlRegStateType::XmlRegexpSinkState;
             }
-            // Eliminate the epsilon transitions
-            if has_epsilon != 0 {
-                for &state in &self.states {
-                    if state.is_null() {
-                        continue;
-                    }
-                    for trans in (*state).trans.iter_mut() {
-                        if trans.atom_index == usize::MAX && trans.count < 0 && trans.to >= 0 {
-                            trans.to = -1;
-                        }
-                    }
-                }
-            }
-
-            // Use this pass to detect unreachable states too
-            for &state in &self.states {
-                if !state.is_null() {
-                    (*state).reached = XmlRegMarkedType::XmlRegexpMarkNormal;
-                }
-            }
-            let mut state = *self.states.first().unwrap_or(&null_mut());
-            if !state.is_null() {
-                (*state).reached = XmlRegMarkedType::XmlRegexpMarkStart;
-            }
-            while !state.is_null() {
-                let mut target: XmlRegStatePtr = null_mut();
-                (*state).reached = XmlRegMarkedType::XmlRegexpMarkVisited;
-                // Mark all states reachable from the current reachable state
-                for trans in &(*state).trans {
-                    if trans.to >= 0 && (trans.atom_index != usize::MAX || trans.count >= 0) {
+            let len = self.states[statenr].as_ref().unwrap().trans.len();
+            for transnr in 0..len {
+                let trans = &mut self.states[statenr].as_mut().unwrap().trans[transnr];
+                if trans.atom_index == usize::MAX && trans.to >= 0 {
+                    if trans.to == statenr as i32 {
+                        trans.to = -1;
+                    } else if trans.count < 0 {
                         let newto = trans.to;
 
-                        if self.states[newto as usize].is_null() {
-                            continue;
-                        }
-                        if matches!(
-                            (*self.states[newto as usize]).reached,
-                            XmlRegMarkedType::XmlRegexpMarkNormal
-                        ) {
-                            (*self.states[newto as usize]).reached =
-                                XmlRegMarkedType::XmlRegexpMarkStart;
-                            target = self.states[newto as usize];
-                        }
+                        has_epsilon = 1;
+                        trans.to = -2;
+                        let counter = trans.counter;
+                        self.states[statenr].as_mut().unwrap().mark =
+                            XmlRegMarkedType::XmlRegexpMarkStart;
+                        self.fa_reduce_epsilon_transitions(statenr, newto as usize, counter);
+                        self.states[statenr].as_mut().unwrap().mark =
+                            XmlRegMarkedType::XmlRegexpMarkNormal;
                     }
                 }
+            }
+        }
+        // Eliminate the epsilon transitions
+        if has_epsilon != 0 {
+            for state in &mut self.states {
+                let Some(state) = state else {
+                    continue;
+                };
+                for trans in state.trans.iter_mut() {
+                    if trans.atom_index == usize::MAX && trans.count < 0 && trans.to >= 0 {
+                        trans.to = -1;
+                    }
+                }
+            }
+        }
 
-                // find the next accessible state not explored
-                if target.is_null() {
-                    for &state in self.states.iter().skip(1) {
-                        if !state.is_null()
-                            && matches!((*state).reached, XmlRegMarkedType::XmlRegexpMarkStart)
-                        {
-                            target = state;
-                            break;
-                        }
+        // Use this pass to detect unreachable states too
+        for state in self.states.iter_mut().filter_map(|state| state.as_mut()) {
+            state.reached = XmlRegMarkedType::XmlRegexpMarkNormal;
+        }
+        let mut now = 0;
+        if let Some(Some(state)) = self.states.first_mut() {
+            state.reached = XmlRegMarkedType::XmlRegexpMarkStart;
+            now = 0;
+        }
+        while now != usize::MAX && self.states[now].is_some() {
+            let mut target = usize::MAX;
+            self.states[now].as_mut().unwrap().reached = XmlRegMarkedType::XmlRegexpMarkVisited;
+            // Mark all states reachable from the current reachable state
+            for transnr in 0..self.states[now].as_ref().unwrap().trans.len() {
+                let trans = &self.states[now].as_ref().unwrap().trans[transnr];
+                if trans.to >= 0 && (trans.atom_index != usize::MAX || trans.count >= 0) {
+                    let newto = trans.to;
+
+                    let Some(to) = self.states[newto as usize].as_mut() else {
+                        continue;
+                    };
+                    if matches!(to.reached, XmlRegMarkedType::XmlRegexpMarkNormal) {
+                        to.reached = XmlRegMarkedType::XmlRegexpMarkStart;
+                        target = newto as usize;
                     }
                 }
-                state = target;
             }
-            for state in self.states.iter_mut() {
-                if !(*state).is_null()
-                    && matches!((**state).reached, XmlRegMarkedType::XmlRegexpMarkNormal)
-                {
-                    xml_reg_free_state(*state);
-                    *state = null_mut();
+
+            // find the next accessible state not explored
+            if target == usize::MAX || self.states[target].is_none() {
+                if let Some(pos) = self.states.iter().skip(1).position(|state| {
+                    state.as_ref().is_some_and(|state| {
+                        matches!(state.reached, XmlRegMarkedType::XmlRegexpMarkStart)
+                    })
+                }) {
+                    target = pos + 1;
                 }
             }
+            now = target;
+        }
+        for state in self.states.iter_mut() {
+            state.take_if(|state| matches!(state.reached, XmlRegMarkedType::XmlRegexpMarkNormal));
         }
     }
 
@@ -1274,150 +1203,156 @@ impl XmlRegParserCtxt {
     /// State 1 has a transition with an atom to state 2.
     /// State 2 is final and has an epsilon transition to state 1.
     #[doc(alias = "xmlFAEliminateSimpleEpsilonTransitions")]
-    unsafe fn fa_eliminate_simple_epsilon_transitions(&mut self) {
-        unsafe {
-            for statenr in 0..self.states.len() {
-                let state = self.states[statenr];
-                if state.is_null() {
-                    continue;
-                }
-                if (*state).trans.len() != 1 {
-                    continue;
-                }
-                if matches!(
-                    (*state).typ,
-                    XmlRegStateType::XmlRegexpUnreachState | XmlRegStateType::XmlRegexpFinalState
-                ) {
-                    continue;
-                }
-                // is the only transition out a basic transition
-                if (*state).trans[0].atom_index == usize::MAX
-                    && (*state).trans[0].to >= 0
-                    && (*state).trans[0].to != statenr as i32
-                    && (*state).trans[0].counter < 0
-                    && (*state).trans[0].count < 0
-                {
-                    let newto = (*state).trans[0].to;
+    fn fa_eliminate_simple_epsilon_transitions(&mut self) {
+        for statenr in 0..self.states.len() {
+            if self.states[statenr].is_none() {
+                continue;
+            }
+            if self.states[statenr].as_ref().unwrap().trans.len() != 1 {
+                continue;
+            }
+            if matches!(
+                self.states[statenr].as_ref().unwrap().typ,
+                XmlRegStateType::XmlRegexpUnreachState | XmlRegStateType::XmlRegexpFinalState
+            ) {
+                continue;
+            }
+            // is the only transition out a basic transition
+            if self.states[statenr].as_ref().unwrap().trans[0].atom_index == usize::MAX
+                && self.states[statenr].as_ref().unwrap().trans[0].to >= 0
+                && self.states[statenr].as_ref().unwrap().trans[0].to != statenr as i32
+                && self.states[statenr].as_ref().unwrap().trans[0].counter < 0
+                && self.states[statenr].as_ref().unwrap().trans[0].count < 0
+            {
+                let newto = self.states[statenr].as_ref().unwrap().trans[0].to;
 
-                    if !matches!((*state).typ, XmlRegStateType::XmlRegexpStartState) {
-                        for &index in &(*state).trans_to {
-                            let tmp = self.states[index as usize];
-                            for trans in (*tmp).trans.iter_mut() {
-                                if trans.to == statenr as i32 {
-                                    trans.to = -1;
-                                    self.reg_state_add_trans(
-                                        tmp,
-                                        trans.atom_index,
-                                        self.states[newto as usize],
-                                        trans.counter,
-                                        trans.count,
-                                    );
-                                }
+                if !matches!(
+                    self.states[statenr].as_ref().unwrap().typ,
+                    XmlRegStateType::XmlRegexpStartState
+                ) {
+                    for index in 0..self.states[statenr].as_ref().unwrap().trans_to.len() {
+                        let index = self.states[statenr].as_ref().unwrap().trans_to[index];
+                        for transnr in 0..self.states[index as usize].as_ref().unwrap().trans.len()
+                        {
+                            let trans =
+                                &mut self.states[index as usize].as_mut().unwrap().trans[transnr];
+                            if trans.to == statenr as i32 {
+                                trans.to = -1;
+                                let atom_index = trans.atom_index;
+                                let counter = trans.counter;
+                                let count = trans.count;
+                                self.reg_state_add_trans(
+                                    index as usize,
+                                    atom_index,
+                                    newto as usize,
+                                    counter,
+                                    count,
+                                );
                             }
                         }
-                        if matches!((*state).typ, XmlRegStateType::XmlRegexpFinalState) {
-                            (*self.states[newto as usize]).typ =
-                                XmlRegStateType::XmlRegexpFinalState;
-                        }
-                        // eliminate the transition completely
-                        (*state).trans.clear();
-                        (*state).typ = XmlRegStateType::XmlRegexpUnreachState;
                     }
+                    if matches!(
+                        self.states[statenr].as_ref().unwrap().typ,
+                        XmlRegStateType::XmlRegexpFinalState
+                    ) {
+                        self.states[newto as usize].as_mut().unwrap().typ =
+                            XmlRegStateType::XmlRegexpFinalState;
+                    }
+                    // eliminate the transition completely
+                    self.states[statenr].as_mut().unwrap().trans.clear();
+                    self.states[statenr].as_mut().unwrap().typ =
+                        XmlRegStateType::XmlRegexpUnreachState;
                 }
             }
         }
     }
 
     #[doc(alias = "xmlFAReduceEpsilonTransitions")]
-    unsafe fn fa_reduce_epsilon_transitions(&mut self, fromnr: i32, tonr: i32, counter: i32) {
-        unsafe {
-            let from: XmlRegStatePtr = self.states[fromnr as usize];
-            if from.is_null() {
-                return;
-            }
-            let to: XmlRegStatePtr = self.states[tonr as usize];
-            if to.is_null() {
-                return;
-            }
-            if matches!(
-                (*to).mark,
-                XmlRegMarkedType::XmlRegexpMarkStart | XmlRegMarkedType::XmlRegexpMarkVisited
-            ) {
-                return;
-            }
+    fn fa_reduce_epsilon_transitions(&mut self, fromnr: usize, tonr: usize, counter: i32) {
+        if fromnr == usize::MAX || self.states[fromnr].is_none() {
+            return;
+        }
+        if tonr == usize::MAX
+            || self.states[tonr].as_ref().is_none_or(|state| {
+                matches!(
+                    state.mark,
+                    XmlRegMarkedType::XmlRegexpMarkStart | XmlRegMarkedType::XmlRegexpMarkVisited
+                )
+            })
+        {
+            return;
+        }
 
-            (*to).mark = XmlRegMarkedType::XmlRegexpMarkVisited;
-            if matches!((*to).typ, XmlRegStateType::XmlRegexpFinalState) {
-                (*from).typ = XmlRegStateType::XmlRegexpFinalState;
+        self.states[tonr].as_mut().unwrap().mark = XmlRegMarkedType::XmlRegexpMarkVisited;
+        if matches!(
+            self.states[tonr].as_mut().unwrap().typ,
+            XmlRegStateType::XmlRegexpFinalState
+        ) {
+            self.states[fromnr].as_mut().unwrap().typ = XmlRegStateType::XmlRegexpFinalState;
+        }
+        let len = self.states[tonr].as_ref().unwrap().trans.len();
+        for trannr in 0..len {
+            let trans = &self.states[tonr].as_ref().unwrap().trans[trannr];
+            if trans.to < 0 {
+                continue;
             }
-            for trans in &(*to).trans {
-                if trans.to < 0 {
-                    continue;
-                }
-                if trans.atom_index == usize::MAX {
-                    // Don't remove counted transitions
-                    // Don't loop either
-                    if trans.to != fromnr {
-                        if trans.count >= 0 {
-                            let newto: i32 = trans.to;
+            if trans.atom_index == usize::MAX {
+                // Don't remove counted transitions
+                // Don't loop either
+                if trans.to != fromnr as i32 {
+                    if trans.count >= 0 {
+                        let newto: i32 = trans.to;
 
-                            self.reg_state_add_trans(
-                                from,
-                                usize::MAX,
-                                self.states[newto as usize],
-                                -1,
-                                trans.count,
-                            );
-                        } else if trans.counter >= 0 {
-                            self.fa_reduce_epsilon_transitions(fromnr, trans.to, trans.counter);
-                        } else {
-                            self.fa_reduce_epsilon_transitions(fromnr, trans.to, counter);
-                        }
-                    }
-                } else {
-                    let newto: i32 = trans.to;
-
-                    if trans.counter >= 0 {
                         self.reg_state_add_trans(
-                            from,
-                            trans.atom_index,
-                            self.states[newto as usize],
-                            trans.counter,
+                            fromnr,
+                            usize::MAX,
+                            newto as usize,
                             -1,
+                            trans.count,
+                        );
+                    } else if trans.counter >= 0 {
+                        self.fa_reduce_epsilon_transitions(
+                            fromnr,
+                            trans.to as usize,
+                            trans.counter,
                         );
                     } else {
-                        self.reg_state_add_trans(
-                            from,
-                            trans.atom_index,
-                            self.states[newto as usize],
-                            counter,
-                            -1,
-                        );
+                        self.fa_reduce_epsilon_transitions(fromnr, trans.to as usize, counter);
                     }
                 }
+            } else {
+                let newto: i32 = trans.to;
+
+                if trans.counter >= 0 {
+                    self.reg_state_add_trans(
+                        fromnr,
+                        trans.atom_index,
+                        newto as usize,
+                        trans.counter,
+                        -1,
+                    );
+                } else {
+                    self.reg_state_add_trans(fromnr, trans.atom_index, newto as usize, counter, -1);
+                }
             }
-            (*to).mark = XmlRegMarkedType::XmlRegexpMarkNormal;
         }
+        self.states[tonr].as_mut().unwrap().mark = XmlRegMarkedType::XmlRegexpMarkNormal;
     }
 
     /// Check whether the associated regexp is determinist,
     /// should be called after xmlFAEliminateEpsilonTransitions()
     #[doc(alias = "xmlFARecurseDeterminism")]
-    unsafe fn fa_recurse_determinism(
-        &mut self,
-        state: XmlRegStatePtr,
-        to: i32,
-        atom_index: usize,
-    ) -> i32 {
+    unsafe fn fa_recurse_determinism(&mut self, state: usize, to: usize, atom_index: usize) -> i32 {
         unsafe {
             let mut ret: i32 = 1;
             let mut res: i32;
             let mut deep: i32 = 1;
 
-            if state.is_null() {
-                return ret;
-            }
-            if matches!((*state).markd, XmlRegMarkedType::XmlRegexpMarkVisited) {
+            if state == usize::MAX
+                || self.states[state].as_ref().is_none_or(|state| {
+                    matches!(state.markd, XmlRegMarkedType::XmlRegexpMarkVisited)
+                })
+            {
                 return ret;
             }
 
@@ -1426,21 +1361,23 @@ impl XmlRegParserCtxt {
             }
 
             // don't recurse on transitions potentially added in the course of the elimination.
-            for t1 in (*state).trans.iter_mut() {
+            for t1 in 0..self.states[state].as_ref().unwrap().trans.len() {
                 // check transitions conflicting with the one looked at
+                let t1 = &mut self.states[state].as_mut().unwrap().trans[t1];
                 if t1.atom_index == usize::MAX {
                     if t1.to < 0 {
                         continue;
                     }
-                    (*state).markd = XmlRegMarkedType::XmlRegexpMarkVisited;
-                    res = self.fa_recurse_determinism(self.states[t1.to as usize], to, atom_index);
+                    let t1_to = t1.to as usize;
+                    self.states[state].as_mut().unwrap().markd =
+                        XmlRegMarkedType::XmlRegexpMarkVisited;
+                    res = self.fa_recurse_determinism(t1_to, to, atom_index);
                     if res == 0 {
                         ret = 0;
-                        // (*t1).nd = 1;
                     }
                     continue;
                 }
-                if t1.to != to {
+                if t1.to != to as i32 {
                     continue;
                 }
                 if t1.atom_index != usize::MAX
@@ -1462,20 +1399,24 @@ impl XmlRegParserCtxt {
 
     /// Reset flags after checking determinism.
     #[doc(alias = "xmlFAFinishRecurseDeterminism")]
-    unsafe fn fa_finish_recurse_determinism(&mut self, state: XmlRegStatePtr) {
-        unsafe {
-            if state.is_null() {
-                return;
-            }
-            if !matches!((*state).markd, XmlRegMarkedType::XmlRegexpMarkVisited) {
-                return;
-            }
-            (*state).markd = XmlRegMarkedType::XmlRegexpMarkNormal;
+    fn fa_finish_recurse_determinism(&mut self, state: usize) {
+        if state == usize::MAX || self.states[state].is_none() {
+            return;
+        }
+        if !matches!(
+            self.states[state].as_ref().unwrap().markd,
+            XmlRegMarkedType::XmlRegexpMarkVisited
+        ) {
+            return;
+        }
+        self.states[state].as_mut().unwrap().markd = XmlRegMarkedType::XmlRegexpMarkNormal;
 
-            for t1 in &(*state).trans {
-                if t1.atom_index == usize::MAX && t1.to >= 0 {
-                    self.fa_finish_recurse_determinism(self.states[t1.to as usize]);
-                }
+        let len = self.states[state].as_ref().unwrap().trans.len();
+        for t1 in 0..len {
+            let t1 = &self.states[state].as_ref().unwrap().trans[t1];
+            if t1.atom_index == usize::MAX && t1.to >= 0 {
+                let to = t1.to as usize;
+                self.fa_finish_recurse_determinism(to);
             }
         }
     }
@@ -1497,15 +1438,12 @@ impl XmlRegParserCtxt {
             }
 
             // First cleanup the automata removing cancelled transitions
-            for &state in &self.states {
-                if state.is_null() {
+            for state in self.states.iter_mut().filter_map(|state| state.as_mut()) {
+                if state.trans.len() < 2 {
                     continue;
                 }
-                if (*state).trans.len() < 2 {
-                    continue;
-                }
-                for transnr in 0..(*state).trans.len() {
-                    let (trans, rem) = (*state).trans.split_at_mut(transnr);
+                for transnr in 0..state.trans.len() {
+                    let (trans, rem) = state.trans.split_at_mut(transnr);
                     let t1 = &rem[0];
                     // Determinism checks in case of counted or all transitions
                     // will have to be handled separately
@@ -1543,61 +1481,69 @@ impl XmlRegParserCtxt {
             // Check for all states that there aren't 2 transitions
             // with the same atom and a different target.
             for statenr in 0..self.states.len() {
-                let state = self.states[statenr];
-                if state.is_null() {
-                    continue;
-                }
-                if (*state).trans.len() < 2 {
+                if self.states[statenr]
+                    .as_ref()
+                    .is_none_or(|state| state.trans.len() < 2)
+                {
                     continue;
                 }
                 let mut last = None::<usize>;
-                for transnr in 0..(*state).trans.len() {
-                    let (trans, rem) = (*state).trans.split_at_mut(transnr);
-                    let t1 = &mut rem[0];
+                for transnr in 0..self.states[statenr].as_ref().unwrap().trans.len() {
+                    let t1 = &self.states[statenr].as_ref().unwrap().trans[transnr];
+                    let mut t1_to = t1.to;
+                    let mut t1_atom_index = t1.atom_index;
                     // Determinism checks in case of counted or all transitions
                     // will have to be handled separately
-                    if t1.atom_index == usize::MAX {
+                    if t1_atom_index == usize::MAX {
                         continue;
                     }
-                    if t1.to == -1 {
+                    if t1_to == -1 {
                         // eliminated
                         continue;
                     }
-                    for t2 in trans {
-                        if t2.to == -1 {
+                    for transnr2 in 0..transnr {
+                        let t2 = &self.states[statenr].as_ref().unwrap().trans[transnr2];
+                        let t2_to = t2.to;
+                        let t2_atom_index = t2.atom_index;
+                        if t2_to == -1 {
                             // eliminated
                             continue;
                         }
-                        if t2.atom_index != usize::MAX {
+                        if t2_atom_index != usize::MAX {
                             // But here we don't use deep because we want to
                             // find transitions which indicate a conflict
                             if xml_fa_compare_atoms(
-                                &self.atoms[t1.atom_index],
+                                &self.atoms[t1_atom_index],
                                 &self.atoms[t2.atom_index],
                                 1,
                             ) != 0
                             {
                                 ret = 0;
                                 // mark the transitions as non-deterministic ones
-                                t1.nd = 1;
-                                t2.nd = 1;
+                                self.states[statenr].as_mut().unwrap().trans[transnr].nd = 1;
+                                self.states[statenr].as_mut().unwrap().trans[transnr2].nd = 1;
                                 last = Some(transnr);
                             }
-                        } else if t1.to != -1 {
+                        } else if t1_to != -1 {
                             // do the closure in case of remaining specific
                             // epsilon transitions like choices or all
                             ret = self.fa_recurse_determinism(
-                                self.states[t1.to as usize],
-                                t2.to,
-                                t2.atom_index,
+                                t1_to as usize,
+                                t2_to as usize,
+                                t2_atom_index,
                             );
-                            self.fa_finish_recurse_determinism(self.states[t1.to as usize]);
+                            let t1 = &self.states[statenr].as_ref().unwrap().trans[transnr];
+                            t1_to = t1.to;
+                            self.fa_finish_recurse_determinism(t1_to as usize);
+                            let t1 = &self.states[statenr].as_ref().unwrap().trans[transnr];
+                            t1_to = t1.to;
+                            t1_atom_index = t1.atom_index;
                             // don't shortcut the computation so all non deterministic
                             // transition get marked down
                             // if (ret == 0)
                             // return(0);
                             if ret == 0 {
-                                t1.nd = 1;
+                                self.states[statenr].as_mut().unwrap().trans[transnr].nd = 1;
                                 // (*t2).nd = 1;
                                 last = Some(transnr);
                             }
@@ -1611,7 +1557,7 @@ impl XmlRegParserCtxt {
                 // mark specifically the last non-deterministic transition
                 // from a state since there is no need to set-up rollback from it
                 if let Some(last) = last {
-                    (*state).trans[last].nd = 2;
+                    self.states[statenr].as_mut().unwrap().trans[last].nd = 2;
                 }
 
                 // don't shortcut the computation so all non deterministic
@@ -2209,12 +2155,12 @@ impl XmlRegParserCtxt {
                 }
                 // this extra Epsilon transition is needed if we count with 0 allowed
                 // unfortunately this can't be known at that point
-                self.fa_generate_epsilon_transition(self.state, null_mut());
-                let start0: XmlRegStatePtr = self.state;
-                self.fa_generate_epsilon_transition(self.state, null_mut());
-                let start: XmlRegStatePtr = self.state;
-                let oldend: XmlRegStatePtr = self.end;
-                self.end = null_mut();
+                self.fa_generate_epsilon_transition(self.state, usize::MAX);
+                let start0 = self.state;
+                self.fa_generate_epsilon_transition(self.state, usize::MAX);
+                let start = self.state;
+                let oldend = self.end;
+                self.end = usize::MAX;
                 self.atom = usize::MAX;
                 self.depth += 1;
                 self.fa_parse_reg_exp(0);
@@ -2348,12 +2294,11 @@ impl XmlRegParserCtxt {
     ///
     /// `[2]   branch   ::=   piece*`
     #[doc(alias = "xmlFAParseBranch")]
-    unsafe fn fa_parse_branch(&mut self, to: XmlRegStatePtr) -> i32 {
+    unsafe fn fa_parse_branch(&mut self, to: usize) -> i32 {
         unsafe {
-            let mut previous: XmlRegStatePtr;
             let mut ret: i32;
 
-            previous = self.state;
+            let mut previous = self.state;
             ret = self.fa_parse_piece();
             if ret == 0 {
                 // Empty branch
@@ -2367,7 +2312,7 @@ impl XmlRegParserCtxt {
                     {
                         to
                     } else {
-                        null_mut()
+                        usize::MAX
                     },
                     self.atom,
                 ) < 0
@@ -2389,7 +2334,7 @@ impl XmlRegParserCtxt {
                         {
                             to
                         } else {
-                            null_mut()
+                            usize::MAX
                         },
                         self.atom,
                     ) < 0
@@ -2410,38 +2355,27 @@ impl XmlRegParserCtxt {
     unsafe fn fa_parse_reg_exp(&mut self, top: i32) {
         unsafe {
             // if not top start should have been generated by an epsilon trans
-            let start: XmlRegStatePtr = self.state;
-            self.end = null_mut();
-            self.fa_parse_branch(null_mut());
+            let start = self.state;
+            self.end = usize::MAX;
+            self.fa_parse_branch(usize::MAX);
             if top != 0 {
-                (*self.state).typ = XmlRegStateType::XmlRegexpFinalState;
+                self.states[self.state].as_mut().unwrap().typ =
+                    XmlRegStateType::XmlRegexpFinalState;
             }
             if self.current_byte() != Some(b'|') {
                 self.end = self.state;
                 return;
             }
-            let end: XmlRegStatePtr = self.state;
+            let end = self.state;
             while self.current_byte() == Some(b'|') as _ && self.error == 0 {
                 self.cur += 1;
                 self.state = start;
-                self.end = null_mut();
+                self.end = usize::MAX;
                 self.fa_parse_branch(end);
             }
             if top == 0 {
                 self.state = end;
                 self.end = end;
-            }
-        }
-    }
-}
-
-impl Drop for XmlRegParserCtxt {
-    /// Free a regexp parser context
-    #[doc(alias = "xmlRegFreeParserCtxt")]
-    fn drop(&mut self) {
-        unsafe {
-            for state in self.states.drain(..) {
-                xml_reg_free_state(state);
             }
         }
     }
@@ -2457,7 +2391,7 @@ pub type XmlRegexpPtr = *mut XmlRegexp;
 #[repr(C)]
 pub struct XmlRegexp {
     string: *mut XmlChar,
-    states: Vec<XmlRegStatePtr>,
+    states: Vec<Option<XmlRegState>>,
     atoms: Vec<XmlRegAtom>,
     counters: Vec<XmlRegCounter>,
     determinist: i32,
@@ -2490,10 +2424,10 @@ pub type XmlRegExecRollbackPtr = *mut XmlRegExecRollback;
 #[doc(alias = "xmlRegExecRollback")]
 #[repr(C)]
 pub struct XmlRegExecRollback {
-    state: XmlRegStatePtr, /* the current state */
-    index: i32,            /* the index in the input stack */
-    nextbranch: i32,       /* the next transition to explore in that state */
-    counts: Vec<i32>,      /* save the automata state if it has some */
+    state: usize,     /* the current state */
+    index: i32,       /* the index in the input stack */
+    nextbranch: i32,  /* the next transition to explore in that state */
+    counts: Vec<i32>, /* save the automata state if it has some */
 }
 
 pub type XmlRegInputTokenPtr = *mut XmlRegInputToken;
@@ -2516,9 +2450,9 @@ pub struct XmlRegExecCtxt {
     callback: Option<XmlRegExecCallbacks>,
     data: *mut c_void,
 
-    state: XmlRegStatePtr, /* the current state */
-    transno: i32,          /* the current transition on that state */
-    transcount: i32,       /* the number of chars in c_char counted transitions */
+    state: usize,    /* the current state */
+    transno: i32,    /* the current transition on that state */
+    transcount: i32, /* the number of chars in c_char counted transitions */
     // A stack of rollback states
     rollbacks: Vec<XmlRegExecRollback>,
 
@@ -2534,10 +2468,10 @@ pub struct XmlRegExecCtxt {
     input_stack: XmlRegInputTokenPtr, /* when operating on strings */
 
     // error handling
-    err_state_no: i32,         /* the error state number */
-    err_state: XmlRegStatePtr, /* the error state */
-    err_string: *mut XmlChar,  /* the string raising the error */
-    err_counts: Vec<i32>,      /* counters at the error state */
+    err_state_no: i32,        /* the error state number */
+    err_state: usize,         /* the error state */
+    err_string: *mut XmlChar, /* the string raising the error */
+    err_counts: Vec<i32>,     /* counters at the error state */
     nb_push: i32,
 }
 
@@ -2549,7 +2483,7 @@ impl Default for XmlRegExecCtxt {
             comp: null_mut(),
             callback: None,
             data: null_mut(),
-            state: null_mut(),
+            state: usize::MAX,
             transno: 0,
             transcount: 0,
             rollbacks: vec![],
@@ -2561,7 +2495,7 @@ impl Default for XmlRegExecCtxt {
             input_string: null(),
             input_stack: null_mut(),
             err_state_no: 0,
-            err_state: null_mut(),
+            err_state: usize::MAX,
             err_string: null_mut(),
             err_counts: vec![],
             nb_push: 0,
@@ -2597,19 +2531,6 @@ unsafe fn xml_regexp_err_memory(ctxt: XmlRegParserCtxtPtr, extra: &str) {
             "Memory allocation failed : {}\n",
             extra
         );
-    }
-}
-
-/// Free a regexp state
-#[doc(alias = "xmlRegFreeState")]
-unsafe fn xml_reg_free_state(state: XmlRegStatePtr) {
-    unsafe {
-        if state.is_null() {
-            return;
-        }
-
-        drop_in_place(state);
-        xml_free(state as _);
     }
 }
 
@@ -2668,11 +2589,11 @@ pub unsafe fn xml_regexp_compile(regexp: &str) -> XmlRegexpPtr {
 
         // initialize the parser
         ctxt.state = ctxt.reg_state_push();
-        if ctxt.state.is_null() {
+        if ctxt.state == usize::MAX {
             return null_mut();
         }
         ctxt.start = ctxt.state;
-        ctxt.end = null_mut();
+        ctxt.end = usize::MAX;
 
         // parse the expression building an automata
         ctxt.fa_parse_reg_exp(1);
@@ -2683,8 +2604,8 @@ pub unsafe fn xml_regexp_compile(regexp: &str) -> XmlRegexpPtr {
             return null_mut();
         }
         ctxt.end = ctxt.state;
-        (*ctxt.start).typ = XmlRegStateType::XmlRegexpStartState;
-        (*ctxt.end).typ = XmlRegStateType::XmlRegexpFinalState;
+        ctxt.states[ctxt.start].as_mut().unwrap().typ = XmlRegStateType::XmlRegexpStartState;
+        ctxt.states[ctxt.end].as_mut().unwrap().typ = XmlRegStateType::XmlRegexpFinalState;
 
         // remove the Epsilon except for counted transitions
         ctxt.fa_eliminate_epsilon_transitions();
@@ -2706,9 +2627,6 @@ pub unsafe fn xml_reg_free_regexp(regexp: XmlRegexpPtr) {
 
         if !(*regexp).string.is_null() {
             xml_free((*regexp).string as _);
-        }
-        for state in (*regexp).states.drain(..) {
-            xml_reg_free_state(state);
         }
 
         drop_in_place(regexp);
@@ -2899,7 +2817,7 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
         (*exec).rollbacks.clear();
         (*exec).status = 0;
         (*exec).comp = comp;
-        (*exec).state = *(*comp).states.first().unwrap_or(&null_mut());
+        (*exec).state = 0;
         (*exec).transno = 0;
         (*exec).transcount = 0;
         (*exec).input_stack = null_mut();
@@ -2911,11 +2829,13 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
             (*exec).counts.clear();
         }
         'error: {
-            'b: while (*exec).status == 0
-                && !(*exec).state.is_null()
-                && (*(*exec).input_string.add((*exec).index as usize) != 0
-                    || (!(*exec).state.is_null()
-                        && !matches!((*(*exec).state).typ, XmlRegStateType::XmlRegexpFinalState)))
+            'b: while !((*exec).status != 0
+                || (*exec).state == usize::MAX
+                || *(*exec).input_string.add((*exec).index as usize) == 0
+                    && matches!(
+                        (*(*exec).comp).states[(*exec).state].as_ref().unwrap().typ,
+                        XmlRegStateType::XmlRegexpFinalState
+                    ))
             {
                 'rollback: {
                     // If end of input on non-terminal state, rollback, however we may
@@ -2929,8 +2849,17 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
                     {
                         // if there is a transition, we must check if
                         //  atom allows minOccurs of 0
-                        if (*exec).transno < (*(*exec).state).trans.len() as i32 {
-                            let trans = &(*(*exec).state).trans[(*exec).transno as usize];
+                        if (*exec).transno
+                            < (*(*exec).comp).states[(*exec).state]
+                                .as_ref()
+                                .unwrap()
+                                .trans
+                                .len() as i32
+                        {
+                            let trans = &(*(*exec).comp).states[(*exec).state]
+                                .as_ref()
+                                .unwrap()
+                                .trans[(*exec).transno as usize];
                             if trans.to >= 0 {
                                 let atom = &(*comp).atoms[trans.atom_index];
                                 if !(atom.min == 0 && atom.max > 0) {
@@ -2946,9 +2875,17 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
                     (*exec).transno -= 1;
                     while {
                         (*exec).transno += 1;
-                        (*exec).transno < (*(*exec).state).trans.len() as i32
+                        (*exec).transno
+                            < (*(*exec).comp).states[(*exec).state]
+                                .as_ref()
+                                .unwrap()
+                                .trans
+                                .len() as i32
                     } {
-                        let trans = &(*(*exec).state).trans[(*exec).transno as usize];
+                        let trans = &(*(*exec).comp).states[(*exec).state]
+                            .as_ref()
+                            .unwrap()
+                            .trans[(*exec).transno as usize];
                         if trans.to < 0 {
                             continue;
                         }
@@ -2980,7 +2917,7 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
                                 );
                                 ret = atom.check_character(codepoint);
                                 if ret == 1 && atom.min >= 0 && atom.max > 0 {
-                                    let to: XmlRegStatePtr = (*comp).states[trans.to as usize];
+                                    let to = trans.to as usize;
 
                                     // this is a multiple input sequence
                                     // If there is a counter associated increment it now.
@@ -2999,7 +2936,13 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
                                         }
                                     }
                                     // Save before incrementing
-                                    if (*(*exec).state).trans.len() as i32 > (*exec).transno + 1 {
+                                    if (*(*exec).comp).states[(*exec).state]
+                                        .as_ref()
+                                        .unwrap()
+                                        .trans
+                                        .len() as i32
+                                        > (*exec).transno + 1
+                                    {
                                         xml_fa_reg_exec_save(exec);
                                     }
                                     if trans.counter >= 0 {
@@ -3019,7 +2962,7 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
                                         }
                                         if (*exec).transcount >= atom.min {
                                             let transno: i32 = (*exec).transno;
-                                            let state: XmlRegStatePtr = (*exec).state;
+                                            let state = (*exec).state;
 
                                             // The transition is acceptable save it
                                             (*exec).transno = -1; /* trick */
@@ -3074,7 +3017,12 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
                             if trans.nd == 1
                                 || (trans.count >= 0
                                     && deter == 0
-                                    && (*(*exec).state).trans.len() as i32 > (*exec).transno + 1)
+                                    && (*(*exec).comp).states[(*exec).state]
+                                        .as_ref()
+                                        .unwrap()
+                                        .trans
+                                        .len() as i32
+                                        > (*exec).transno + 1)
                             {
                                 xml_fa_reg_exec_save(exec);
                             }
@@ -3098,7 +3046,7 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
                                 }
                                 (*exec).counts[trans.count as usize] = 0;
                             }
-                            (*exec).state = (*comp).states[trans.to as usize];
+                            (*exec).state = trans.to as usize;
                             (*exec).transno = 0;
                             if trans.atom_index != usize::MAX {
                                 (*exec).index += len;
@@ -3109,7 +3057,13 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
                             break;
                         }
                     }
-                    if (*exec).transno != 0 || (*(*exec).state).trans.is_empty() {
+                    if (*exec).transno != 0
+                        || (*(*exec).comp).states[(*exec).state]
+                            .as_ref()
+                            .unwrap()
+                            .trans
+                            .is_empty()
+                    {
                         // rollback:
                         break 'rollback;
                     }
@@ -3122,7 +3076,7 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
         }
         // error:
         (*exec).rollbacks.clear();
-        if (*exec).state.is_null() {
+        if (*exec).state == usize::MAX {
             return -1;
         }
         (*exec).counts.clear();
@@ -3360,37 +3314,35 @@ fn xml_reg_print_range<'a>(output: &mut (impl Write + 'a), range: &XmlRegRange) 
     .ok();
 }
 
-unsafe fn xml_reg_print_atom<'a>(output: &mut (impl Write + 'a), atom: &XmlRegAtom) {
-    unsafe {
-        write!(output, " atom: ").ok();
-        if atom.neg != 0 {
-            write!(output, "not ").ok();
+fn xml_reg_print_atom<'a>(output: &mut (impl Write + 'a), atom: &XmlRegAtom) {
+    write!(output, " atom: ").ok();
+    if atom.neg != 0 {
+        write!(output, "not ").ok();
+    }
+    xml_reg_print_atom_type(output, atom.typ);
+    xml_reg_print_quant_type(output, atom.quant);
+    if matches!(atom.quant, XmlRegQuantType::XmlRegexpQuantRange) {
+        write!(output, "{}-{} ", atom.min, atom.max).ok();
+    }
+    if matches!(atom.typ, XmlRegAtomType::XmlRegexpString) {
+        write!(output, "'{}' ", atom.valuep.as_deref().unwrap()).ok();
+    }
+    if matches!(atom.typ, XmlRegAtomType::XmlRegexpCharval) {
+        writeln!(
+            output,
+            "char {}",
+            char::from_u32(atom.codepoint as u32).unwrap()
+        )
+        .ok();
+    } else if matches!(atom.typ, XmlRegAtomType::XmlRegexpRanges) {
+        writeln!(output, "{} entries", atom.ranges.len()).ok();
+        for range in &atom.ranges {
+            xml_reg_print_range(output, range);
         }
-        xml_reg_print_atom_type(output, atom.typ);
-        xml_reg_print_quant_type(output, atom.quant);
-        if matches!(atom.quant, XmlRegQuantType::XmlRegexpQuantRange) {
-            write!(output, "{}-{} ", atom.min, atom.max).ok();
-        }
-        if matches!(atom.typ, XmlRegAtomType::XmlRegexpString) {
-            write!(output, "'{}' ", atom.valuep.as_deref().unwrap()).ok();
-        }
-        if matches!(atom.typ, XmlRegAtomType::XmlRegexpCharval) {
-            writeln!(
-                output,
-                "char {}",
-                char::from_u32(atom.codepoint as u32).unwrap()
-            )
-            .ok();
-        } else if matches!(atom.typ, XmlRegAtomType::XmlRegexpRanges) {
-            writeln!(output, "{} entries", atom.ranges.len()).ok();
-            for range in &atom.ranges {
-                xml_reg_print_range(output, range);
-            }
-        } else if matches!(atom.typ, XmlRegAtomType::XmlRegexpSubReg) {
-            writeln!(output, "start {} end {}", (*atom.start).no, (*atom.stop).no).ok();
-        } else {
-            writeln!(output).ok();
-        }
+    } else if matches!(atom.typ, XmlRegAtomType::XmlRegexpSubReg) {
+        writeln!(output, "start {} end {}", atom.start, atom.stop).ok();
+    } else {
+        writeln!(output).ok();
     }
 }
 
@@ -3448,29 +3400,23 @@ unsafe fn xml_reg_print_trans<'a>(
 unsafe fn xml_reg_print_state<'a>(
     output: &mut (impl Write + 'a),
     regexp: XmlRegexpPtr,
-    state: XmlRegStatePtr,
+    state: Option<&XmlRegState>,
 ) {
     unsafe {
         write!(output, " state: ").ok();
-        if state.is_null() {
+        let Some(state) = state else {
             writeln!(output, "NULL").ok();
             return;
-        }
-        if matches!((*state).typ, XmlRegStateType::XmlRegexpStartState) {
+        };
+        if matches!(state.typ, XmlRegStateType::XmlRegexpStartState) {
             write!(output, "START ").ok();
         }
-        if matches!((*state).typ, XmlRegStateType::XmlRegexpFinalState) {
+        if matches!(state.typ, XmlRegStateType::XmlRegexpFinalState) {
             write!(output, "FINAL ").ok();
         }
 
-        writeln!(
-            output,
-            "{}, {} transitions:",
-            (*state).no,
-            (*state).trans.len(),
-        )
-        .ok();
-        for trans in &(*state).trans {
+        writeln!(output, "{}, {} transitions:", state.no, state.trans.len(),).ok();
+        for trans in &state.trans {
             xml_reg_print_trans(output, regexp, trans);
         }
     }
@@ -3499,8 +3445,8 @@ pub unsafe fn xml_regexp_print<'a>(output: &mut (impl Write + 'a), regexp: XmlRe
         }
         write!(output, "{} states:", (*regexp).states.len()).ok();
         writeln!(output).ok();
-        for &state in &(*regexp).states {
-            xml_reg_print_state(output, regexp, state);
+        for state in &(*regexp).states {
+            xml_reg_print_state(output, regexp, state.as_ref());
         }
         writeln!(output, "{} counters:", (*regexp).counters.len()).ok();
         for (i, counter) in (*regexp).counters.iter().enumerate() {
@@ -4128,9 +4074,7 @@ pub unsafe fn xml_regexp_is_determinist(comp: XmlRegexpPtr) -> i32 {
         let Some(mut am) = XmlAutomata::new() else {
             return -1;
         };
-        for state in am.states.drain(..) {
-            xml_reg_free_state(state);
-        }
+        am.states.clear();
         am.atoms = take(&mut (*comp).atoms);
         am.states = take(&mut (*comp).states);
         am.determinist = -1;
@@ -4177,7 +4121,7 @@ pub unsafe fn xml_reg_new_exec_ctxt(
         (*exec).status = 0;
         (*exec).comp = comp;
         if (*comp).compact.is_empty() {
-            (*exec).state = *(*comp).states.first().unwrap_or(&null_mut());
+            (*exec).state = 0;
         }
         (*exec).transno = 0;
         (*exec).transcount = 0;
@@ -4380,7 +4324,10 @@ unsafe fn xml_reg_exec_push_string_internal(
         }
 
         if value.is_null() {
-            if matches!((*(*exec).state).typ, XmlRegStateType::XmlRegexpFinalState) {
+            if matches!(
+                (*(*exec).comp).states[(*exec).state].as_ref().unwrap().typ,
+                XmlRegStateType::XmlRegexpFinalState
+            ) {
                 return 1;
             }
             is_final = 1;
@@ -4397,7 +4344,10 @@ unsafe fn xml_reg_exec_push_string_internal(
         'b: while (*exec).status == 0
             && (!value.is_null()
                 || (is_final == 1
-                    && !matches!((*(*exec).state).typ, XmlRegStateType::XmlRegexpFinalState)))
+                    && !matches!(
+                        (*(*exec).comp).states[(*exec).state].as_ref().unwrap().typ,
+                        XmlRegStateType::XmlRegexpFinalState
+                    )))
         {
             'rollback: {
                 'progress: {
@@ -4412,9 +4362,17 @@ unsafe fn xml_reg_exec_push_string_internal(
                     (*exec).transno -= 1;
                     while {
                         (*exec).transno += 1;
-                        (*exec).transno < (*(*exec).state).trans.len() as i32
+                        (*exec).transno
+                            < (*(*exec).comp).states[(*exec).state]
+                                .as_ref()
+                                .unwrap()
+                                .trans
+                                .len() as i32
                     } {
-                        let trans = &(*(*exec).state).trans[(*exec).transno as usize];
+                        let trans = &(*(*exec).comp).states[(*exec).state]
+                            .as_ref()
+                            .unwrap()
+                            .trans[(*exec).transno as usize];
                         if trans.to < 0 {
                             continue;
                         }
@@ -4428,7 +4386,13 @@ unsafe fn xml_reg_exec_push_string_internal(
                             if value.is_null() && is_final != 0 {
                                 ret = 1;
                             } else if !value.is_null() {
-                                for (i, t) in (*(*exec).state).trans.iter().enumerate() {
+                                for (i, t) in (*(*exec).comp).states[(*exec).state]
+                                    .as_ref()
+                                    .unwrap()
+                                    .trans
+                                    .iter()
+                                    .enumerate()
+                                {
                                     if t.counter < 0 || i == (*exec).transno as usize {
                                         continue;
                                     }
@@ -4469,7 +4433,13 @@ unsafe fn xml_reg_exec_push_string_internal(
                             ret = 1;
 
                             // Check all counted transitions from the current state
-                            for (i, t) in (*(*exec).state).trans.iter().enumerate() {
+                            for (i, t) in (*(*exec).comp).states[(*exec).state]
+                                .as_ref()
+                                .unwrap()
+                                .trans
+                                .iter()
+                                .enumerate()
+                            {
                                 if t.counter < 0 || i == (*exec).transno as usize {
                                     continue;
                                 }
@@ -4515,11 +4485,16 @@ unsafe fn xml_reg_exec_push_string_internal(
                                 }
 
                                 if ret == 1 && atom.min > 0 && atom.max > 0 {
-                                    let to: XmlRegStatePtr =
-                                        (*(*exec).comp).states[trans.to as usize];
+                                    let to = trans.to as usize;
 
                                     // this is a multiple input sequence
-                                    if (*(*exec).state).trans.len() as i32 > (*exec).transno + 1 {
+                                    if (*(*exec).comp).states[(*exec).state]
+                                        .as_ref()
+                                        .unwrap()
+                                        .trans
+                                        .len() as i32
+                                        > (*exec).transno + 1
+                                    {
                                         if (*exec).input_stack_nr <= 0 {
                                             xml_fa_reg_exec_save_input_string(exec, value, data);
                                         }
@@ -4544,7 +4519,7 @@ unsafe fn xml_reg_exec_push_string_internal(
                                         }
                                         if (*exec).transcount >= atom.min {
                                             let transno: i32 = (*exec).transno;
-                                            let state: XmlRegStatePtr = (*exec).state;
+                                            let state = (*exec).state;
 
                                             // The transition is acceptable save it
                                             (*exec).transno = -1; /* trick */
@@ -4594,7 +4569,13 @@ unsafe fn xml_reg_exec_push_string_internal(
                                     );
                                 }
                             }
-                            if (*(*exec).state).trans.len() as i32 > (*exec).transno + 1 {
+                            if (*(*exec).comp).states[(*exec).state]
+                                .as_ref()
+                                .unwrap()
+                                .trans
+                                .len() as i32
+                                > (*exec).transno + 1
+                            {
                                 if (*exec).input_stack_nr <= 0 {
                                     xml_fa_reg_exec_save_input_string(exec, value, data);
                                 }
@@ -4606,9 +4587,13 @@ unsafe fn xml_reg_exec_push_string_internal(
                             if trans.count >= 0 && (trans.count as usize) < REGEXP_ALL_COUNTER {
                                 (*exec).counts[trans.count as usize] = 0;
                             }
-                            if !(*(*exec).comp).states[trans.to as usize].is_null()
+                            if trans.to != -1
+                                && (*(*exec).comp).states[trans.to as usize].is_some()
                                 && matches!(
-                                    (*((*(*exec).comp).states[trans.to as usize])).typ,
+                                    (*(*exec).comp).states[trans.to as usize]
+                                        .as_ref()
+                                        .unwrap()
+                                        .typ,
                                     XmlRegStateType::XmlRegexpSinkState
                                 )
                             {
@@ -4620,7 +4605,7 @@ unsafe fn xml_reg_exec_push_string_internal(
                                 (*exec).err_state = (*exec).state;
                                 (*exec).err_counts.copy_from_slice(&(*exec).counts);
                             }
-                            (*exec).state = (*(*exec).comp).states[trans.to as usize];
+                            (*exec).state = trans.to as usize;
                             (*exec).transno = 0;
                             if trans.atom_index != usize::MAX {
                                 if !(*exec).input_stack.is_null() {
@@ -4645,7 +4630,13 @@ unsafe fn xml_reg_exec_push_string_internal(
                             break;
                         }
                     }
-                    if (*exec).transno != 0 || (*(*exec).state).trans.is_empty() {
+                    if (*exec).transno != 0
+                        || (*(*exec).comp).states[(*exec).state]
+                            .as_ref()
+                            .unwrap()
+                            .trans
+                            .is_empty()
+                    {
                         break 'rollback;
                     }
                     continue 'b;
@@ -4657,8 +4648,11 @@ unsafe fn xml_reg_exec_push_string_internal(
             // if we didn't yet rollback on the current input
             // store the current state as the error state.
             if progress != 0
-                && !(*exec).state.is_null()
-                && !matches!((*(*exec).state).typ, XmlRegStateType::XmlRegexpSinkState)
+                && (*exec).state != usize::MAX
+                && !matches!(
+                    (*(*exec).comp).states[(*exec).state].as_ref().unwrap().typ,
+                    XmlRegStateType::XmlRegexpSinkState
+                )
             {
                 progress = 0;
                 if !(*exec).err_string.is_null() {
@@ -4680,7 +4674,10 @@ unsafe fn xml_reg_exec_push_string_internal(
             }
         }
         if (*exec).status == 0 {
-            return matches!((*(*exec).state).typ, XmlRegStateType::XmlRegexpFinalState) as _;
+            return matches!(
+                (*(*exec).comp).states[(*exec).state].as_ref().unwrap().typ,
+                XmlRegStateType::XmlRegexpFinalState
+            ) as _;
         }
         (*exec).status
     }
@@ -4837,7 +4834,10 @@ unsafe fn xml_reg_exec_get_values<'a>(
             }
         } else {
             if !terminal.is_null() {
-                if matches!((*(*exec).state).typ, XmlRegStateType::XmlRegexpFinalState) {
+                if matches!(
+                    (*(*exec).comp).states[(*exec).state].as_ref().unwrap().typ,
+                    XmlRegStateType::XmlRegexpFinalState
+                ) {
                     *terminal = 1;
                 } else {
                     *terminal = 0;
@@ -4845,18 +4845,20 @@ unsafe fn xml_reg_exec_get_values<'a>(
             }
 
             let state = if err != 0 {
-                if (*exec).err_state.is_null() {
+                if (*exec).err_state == usize::MAX
+                    || (*(*exec).comp).states[(*exec).err_state].is_none()
+                {
                     return None;
                 }
                 (*exec).err_state
             } else {
-                if (*exec).state.is_null() {
+                if (*exec).state == usize::MAX || (*(*exec).comp).states[(*exec).state].is_none() {
                     return None;
                 }
                 (*exec).state
             };
             if nb < maxval {
-                for trans in &(*state).trans {
+                for trans in &(*(*exec).comp).states[state].as_ref().unwrap().trans {
                     if trans.to < 0 {
                         continue;
                     }
@@ -4896,9 +4898,12 @@ unsafe fn xml_reg_exec_get_values<'a>(
                             nbval += 1;
                         }
                     } else if !(*exec).comp.is_null()
-                        && !((*(*exec).comp).states[trans.to as usize]).is_null()
+                        && (*(*exec).comp).states[trans.to as usize].is_some()
                         && !matches!(
-                            (*((*(*exec).comp).states[trans.to as usize])).typ,
+                            (*(*exec).comp).states[trans.to as usize]
+                                .as_ref()
+                                .unwrap()
+                                .typ,
                             XmlRegStateType::XmlRegexpSinkState,
                         )
                     {
@@ -4917,7 +4922,7 @@ unsafe fn xml_reg_exec_get_values<'a>(
                 }
             }
             if nb < maxval {
-                for trans in &(*state).trans {
+                for trans in &(*(*exec).comp).states[state].as_ref().unwrap().trans {
                     if trans.to < 0 {
                         continue;
                     }
@@ -4933,9 +4938,12 @@ unsafe fn xml_reg_exec_get_values<'a>(
                         || trans.counter >= 0
                     {
                         continue;
-                    } else if !((*(*exec).comp).states[trans.to as usize]).is_null()
+                    } else if ((*(*exec).comp).states[trans.to as usize]).is_some()
                         && matches!(
-                            (*((*(*exec).comp).states[trans.to as usize])).typ,
+                            (*(*exec).comp).states[trans.to as usize]
+                                .as_ref()
+                                .unwrap()
+                                .typ,
                             XmlRegStateType::XmlRegexpSinkState
                         )
                     {

@@ -5066,18 +5066,15 @@ unsafe fn automata_test(
 
         use exml::{
             generic_error,
-            libxml::{
-                xmlautomata::XmlAutomataStatePtr,
-                xmlregexp::{
-                    XmlRegExecCtxtPtr, xml_reg_exec_push_string, xml_reg_free_exec_ctxt,
-                    xml_reg_free_regexp, xml_reg_new_exec_ctxt,
-                },
+            libxml::xmlregexp::{
+                XmlRegExecCtxtPtr, xml_reg_exec_push_string, xml_reg_free_exec_ctxt,
+                xml_reg_free_regexp, xml_reg_new_exec_ctxt,
             },
         };
 
         let mut ret: i32;
         let mut res: i32 = 0;
-        let mut states: [XmlAutomataStatePtr; 1000] = [null_mut(); 1000];
+        let mut states: [usize; 1000] = [usize::MAX; 1000];
         let mut regexp: XmlRegexpPtr = null_mut();
         let mut exec: XmlRegExecCtxtPtr = null_mut();
 
@@ -5107,7 +5104,7 @@ unsafe fn automata_test(
             return -1;
         };
         states[0] = nam.as_ref().unwrap().get_init_state();
-        if states[0].is_null() {
+        if states[0] == usize::MAX {
             generic_error!("Cannot get start state\n");
             return -1;
         }
@@ -5149,7 +5146,7 @@ unsafe fn automata_test(
                             generic_error!("Bad line {expr}\n");
                             break;
                         }
-                        if states[from].is_null() {
+                        if states[from] == usize::MAX {
                             states[from] = am.new_state();
                         }
                         ptr = ptr.add(1);
@@ -5159,7 +5156,7 @@ unsafe fn automata_test(
                             generic_error!("Bad line {expr}\n");
                             break;
                         }
-                        if states[to].is_null() {
+                        if states[to] == usize::MAX {
                             states[to] = am.new_state();
                         }
                         ptr = ptr.add(1);
@@ -5178,12 +5175,12 @@ unsafe fn automata_test(
                             generic_error!("Bad line {expr}\n");
                             break;
                         }
-                        if states[from].is_null() {
+                        if states[from] == usize::MAX {
                             states[from] = am.new_state();
                         }
                         ptr = ptr.add(1);
                         let to: usize = scan_number(addr_of_mut!(ptr)) as _;
-                        if states[to].is_null() {
+                        if states[to] == usize::MAX {
                             states[to] = am.new_state();
                         }
                         am.new_epsilon(states[from], states[to]);
@@ -5191,12 +5188,12 @@ unsafe fn automata_test(
                         let mut ptr: *mut c_char = expr.as_mut_ptr().add(2) as _;
 
                         let state: usize = scan_number(addr_of_mut!(ptr)) as _;
-                        if states[state].is_null() {
+                        if states[state] == usize::MAX {
                             let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
                             generic_error!("Bad state {state} : {expr}\n");
                             break;
                         }
-                        (*states[state]).set_final_state();
+                        am.get_state_mut(states[state]).unwrap().set_final_state();
                     } else if expr[0] == b'c' && expr[1] == b' ' {
                         let mut ptr: *mut c_char = expr.as_mut_ptr().add(2) as _;
 
@@ -5206,7 +5203,7 @@ unsafe fn automata_test(
                             generic_error!("Bad line {expr}\n");
                             break;
                         }
-                        if states[from].is_null() {
+                        if states[from] == usize::MAX {
                             states[from] = am.new_state();
                         }
                         ptr = ptr.add(1);
@@ -5216,7 +5213,7 @@ unsafe fn automata_test(
                             generic_error!("Bad line {expr}\n");
                             break;
                         }
-                        if states[to].is_null() {
+                        if states[to] == usize::MAX {
                             states[to] = am.new_state();
                         }
                         ptr = ptr.add(1);

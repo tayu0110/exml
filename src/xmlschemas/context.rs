@@ -8,7 +8,7 @@ use std::{
 use libc::memset;
 
 #[cfg(feature = "libxml_automata")]
-use crate::libxml::xmlautomata::{XmlAutomata, XmlAutomataStatePtr};
+use crate::libxml::xmlautomata::XmlAutomata;
 use crate::{
     dict::{XmlDictPtr, xml_dict_create, xml_dict_free, xml_dict_lookup, xml_dict_reference},
     encoding::XmlCharEncoding,
@@ -75,9 +75,9 @@ pub struct XmlSchemaParserCtxt {
 
     // Used to build complex element content models
     pub(crate) am: Option<XmlAutomata>,
-    start: XmlAutomataStatePtr,
-    end: XmlAutomataStatePtr,
-    pub(crate) state: XmlAutomataStatePtr,
+    start: usize,
+    end: usize,
+    pub(crate) state: usize,
 
     pub(crate) dict: XmlDictPtr, /* dictionary for interned string names */
     pub(crate) ctxt_type: XmlSchemaTypePtr, /* The current context simple/complex type */
@@ -186,9 +186,9 @@ impl Default for XmlSchemaParserCtxt {
             buffer: null(),
             size: 0,
             am: None,
-            start: null_mut(),
-            end: null_mut(),
-            state: null_mut(),
+            start: usize::MAX,
+            end: usize::MAX,
+            state: usize::MAX,
             dict: null_mut(),
             ctxt_type: null_mut(),
             options: 0,

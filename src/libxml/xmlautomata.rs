@@ -28,11 +28,11 @@
 use std::{os::raw::c_void, ptr::null_mut};
 
 use crate::libxml::xmlregexp::{
-    XmlRegAtomType, XmlRegCounter, XmlRegMarkedType, XmlRegQuantType, XmlRegStatePtr,
-    XmlRegStateType, XmlRegTrans, XmlRegexp,
+    XmlRegAtomType, XmlRegCounter, XmlRegMarkedType, XmlRegQuantType, XmlRegStateType, XmlRegTrans,
+    XmlRegexp,
 };
 
-use super::xmlregexp::XmlRegAtom;
+use super::xmlregexp::{XmlRegAtom, XmlRegState};
 
 /// A libxml automata description, It can be compiled into a regexp
 #[doc(alias = "xmlAutomataPtr")]
@@ -44,12 +44,12 @@ pub struct XmlAutomata {
     pub(crate) cur: usize,
     pub(crate) error: i32,
     pub(crate) neg: i32,
-    pub(crate) start: XmlRegStatePtr,
-    pub(crate) end: XmlRegStatePtr,
-    pub(crate) state: XmlRegStatePtr,
+    pub(crate) start: usize,
+    pub(crate) end: usize,
+    pub(crate) state: usize,
     pub(crate) atom: usize,
     pub(crate) atoms: Vec<XmlRegAtom>,
-    pub(crate) states: Vec<XmlRegStatePtr>,
+    pub(crate) states: Vec<Option<XmlRegState>>,
     pub(crate) counters: Vec<XmlRegCounter>,
     pub(crate) determinist: i32,
     pub(crate) negs: i32,
@@ -62,22 +62,17 @@ impl XmlAutomata {
     ///
     /// Returns the new object or NULL in case of failure
     #[doc(alias = "xmlNewAutomata")]
-    pub unsafe fn new() -> Option<Self> {
-        unsafe {
-            let mut ctxt = XmlAutomata::new_parser(None);
+    pub fn new() -> Option<Self> {
+        let mut ctxt = XmlAutomata::new_parser(None);
 
-            // initialize the parser
-            ctxt.state = ctxt.reg_state_push();
-            if ctxt.state.is_null() {
-                return None;
-            }
-            ctxt.start = ctxt.state;
-            ctxt.end = null_mut();
+        // initialize the parser
+        ctxt.state = ctxt.reg_state_push();
+        ctxt.start = ctxt.state;
+        ctxt.end = usize::MAX;
 
-            (*ctxt.start).typ = XmlRegStateType::XmlRegexpStartState;
-            ctxt.flags = 0;
-            Some(ctxt)
-        }
+        ctxt.states[ctxt.start].as_mut().unwrap().typ = XmlRegStateType::XmlRegexpStartState;
+        ctxt.flags = 0;
+        Some(ctxt)
     }
 
     pub(crate) fn current_str(&self) -> &str {
@@ -131,11 +126,19 @@ impl XmlAutomata {
         }
     }
 
+    pub fn get_state(&self, index: usize) -> Option<&XmlAutomataState> {
+        self.states.get(index).and_then(|state| state.as_ref())
+    }
+
+    pub fn get_state_mut(&mut self, index: usize) -> Option<&mut XmlAutomataState> {
+        self.states.get_mut(index).and_then(|state| state.as_mut())
+    }
+
     /// Initial state lookup
     ///
     /// Returns the initial state of the automata
     #[doc(alias = "xmlAutomataGetInitState")]
-    pub fn get_init_state(&self) -> XmlAutomataStatePtr {
+    pub fn get_init_state(&self) -> usize {
         self.start
     }
 
@@ -149,8 +152,8 @@ impl XmlAutomata {
     ///
     /// Returns the new state or NULL in case of error
     #[doc(alias = "xmlAutomataNewState")]
-    pub unsafe fn new_state(&mut self) -> XmlAutomataStatePtr {
-        unsafe { self.reg_state_push() }
+    pub fn new_state(&mut self) -> usize {
+        self.reg_state_push()
     }
 
     /// Create a new counter
@@ -170,29 +173,27 @@ impl XmlAutomata {
     ///
     /// Returns the target state or NULL in case of error
     #[doc(alias = "xmlAutomataNewTransition")]
-    pub unsafe fn new_transition(
+    pub fn new_transition(
         &mut self,
-        from: XmlAutomataStatePtr,
-        to: XmlAutomataStatePtr,
+        from: usize,
+        to: usize,
         token: &str,
         data: *mut c_void,
-    ) -> XmlAutomataStatePtr {
-        unsafe {
-            if from.is_null() {
-                return null_mut();
-            }
-            let atom = self.reg_new_atom(XmlRegAtomType::XmlRegexpString);
-            self.atoms[atom].data = data;
-            self.atoms[atom].valuep = Some(token.to_owned());
-
-            if self.fa_generate_transitions(from, to, atom) < 0 {
-                return null_mut();
-            }
-            if to.is_null() {
-                return self.state;
-            }
-            to
+    ) -> usize {
+        if from == usize::MAX || self.states[from].is_none() {
+            return usize::MAX;
         }
+        let atom = self.reg_new_atom(XmlRegAtomType::XmlRegexpString);
+        self.atoms[atom].data = data;
+        self.atoms[atom].valuep = Some(token.to_owned());
+
+        if self.fa_generate_transitions(from, to, atom) < 0 {
+            return usize::MAX;
+        }
+        if to == usize::MAX || self.states[to].is_none() {
+            return self.state;
+        }
+        to
     }
 
     /// If @to is NULL, this creates first a new target state in the automata
@@ -201,34 +202,32 @@ impl XmlAutomata {
     ///
     /// Returns the target state or NULL in case of error
     #[doc(alias = "xmlAutomataNewTransition2")]
-    pub unsafe fn new_transition2(
+    pub fn new_transition2(
         &mut self,
-        from: XmlAutomataStatePtr,
-        to: XmlAutomataStatePtr,
+        from: usize,
+        to: usize,
         token: &str,
         token2: Option<&str>,
         data: *mut c_void,
-    ) -> XmlAutomataStatePtr {
-        unsafe {
-            if from.is_null() {
-                return null_mut();
-            }
-            let atom = self.reg_new_atom(XmlRegAtomType::XmlRegexpString);
-            self.atoms[atom].data = data;
-            if let Some(token2) = token2.filter(|t| !t.is_empty()) {
-                self.atoms[atom].valuep = Some(format!("{token}|{token2}"));
-            } else {
-                self.atoms[atom].valuep = Some(token.to_owned());
-            }
-
-            if self.fa_generate_transitions(from, to, atom) < 0 {
-                return null_mut();
-            }
-            if to.is_null() {
-                return self.state;
-            }
-            to
+    ) -> usize {
+        if from == usize::MAX || self.states[from].is_none() {
+            return usize::MAX;
         }
+        let atom = self.reg_new_atom(XmlRegAtomType::XmlRegexpString);
+        self.atoms[atom].data = data;
+        if let Some(token2) = token2.filter(|t| !t.is_empty()) {
+            self.atoms[atom].valuep = Some(format!("{token}|{token2}"));
+        } else {
+            self.atoms[atom].valuep = Some(token.to_owned());
+        }
+
+        if self.fa_generate_transitions(from, to, atom) < 0 {
+            return usize::MAX;
+        }
+        if to == usize::MAX || self.states[to].is_none() {
+            return self.state;
+        }
+        to
     }
 
     /// If @to is NULL, this creates first a new target state in the automata
@@ -239,38 +238,36 @@ impl XmlAutomata {
     ///
     /// Returns the target state or NULL in case of error
     #[doc(alias = "xmlAutomataNewNegTrans")]
-    pub unsafe fn new_neg_trans(
+    pub fn new_neg_trans(
         &mut self,
-        from: XmlAutomataStatePtr,
-        to: XmlAutomataStatePtr,
+        from: usize,
+        to: usize,
         token: &str,
         token2: Option<&str>,
         data: *mut c_void,
-    ) -> XmlAutomataStatePtr {
-        unsafe {
-            if from.is_null() {
-                return null_mut();
-            }
-            let atom = self.reg_new_atom(XmlRegAtomType::XmlRegexpString);
-            self.atoms[atom].data = data;
-            self.atoms[atom].neg = 1;
-            if let Some(token2) = token2.filter(|t| !t.is_empty()) {
-                self.atoms[atom].valuep = Some(format!("{token}|{token2}"));
-            } else {
-                self.atoms[atom].valuep = Some(token.to_owned());
-            }
-            let err_msg = format!("not {}", self.atoms[atom].valuep.as_deref().unwrap());
-            self.atoms[atom].valuep2 = Some(err_msg);
-
-            if self.fa_generate_transitions(from, to, atom) < 0 {
-                return null_mut();
-            }
-            self.negs += 1;
-            if to.is_null() {
-                return self.state;
-            }
-            to
+    ) -> usize {
+        if from == usize::MAX || self.states[from].is_none() {
+            return usize::MAX;
         }
+        let atom = self.reg_new_atom(XmlRegAtomType::XmlRegexpString);
+        self.atoms[atom].data = data;
+        self.atoms[atom].neg = 1;
+        if let Some(token2) = token2.filter(|t| !t.is_empty()) {
+            self.atoms[atom].valuep = Some(format!("{token}|{token2}"));
+        } else {
+            self.atoms[atom].valuep = Some(token.to_owned());
+        }
+        let err_msg = format!("not {}", self.atoms[atom].valuep.as_deref().unwrap());
+        self.atoms[atom].valuep2 = Some(err_msg);
+
+        if self.fa_generate_transitions(from, to, atom) < 0 {
+            return usize::MAX;
+        }
+        self.negs += 1;
+        if to == usize::MAX || self.states[to].is_none() {
+            return self.state;
+        }
+        to
     }
 
     /// If @to is NULL, this creates first a new target state in the automata
@@ -280,61 +277,56 @@ impl XmlAutomata {
     ///
     /// Returns the target state or NULL in case of error
     #[doc(alias = "xmlAutomataNewCountTrans")]
-    pub unsafe fn new_count_trans(
+    pub fn new_count_trans(
         &mut self,
-        from: XmlAutomataStatePtr,
-        mut to: XmlAutomataStatePtr,
+        from: usize,
+        mut to: usize,
         token: &str,
         min: i32,
         max: i32,
         data: *mut c_void,
-    ) -> XmlAutomataStatePtr {
-        unsafe {
-            if from.is_null() {
-                return null_mut();
-            }
-            if min < 0 {
-                return null_mut();
-            }
-            if max < min || max < 1 {
-                return null_mut();
-            }
-            let atom = self.reg_new_atom(XmlRegAtomType::XmlRegexpString);
-            self.atoms[atom].valuep = Some(token.to_owned());
-            self.atoms[atom].data = data;
-            if min == 0 {
-                self.atoms[atom].min = 1;
-            } else {
-                self.atoms[atom].min = min;
-            }
-            self.atoms[atom].max = max;
-
-            // associate a counter to the transition.
-            let counter = self.reg_get_counter();
-            self.counters[counter].min = min;
-            self.counters[counter].max = max;
-
-            // xmlFAGenerateTransitions(am, from, to, atom);
-            if to.is_null() {
-                to = self.reg_state_push();
-                if to.is_null() {
-                    return null_mut();
-                }
-            }
-            self.reg_state_add_trans(from, atom, to, counter as i32, -1);
-            self.state = to;
-
-            if to.is_null() {
-                to = self.state;
-            }
-            if to.is_null() {
-                return null_mut();
-            }
-            if min == 0 {
-                self.fa_generate_epsilon_transition(from, to);
-            }
-            to
+    ) -> usize {
+        if from == usize::MAX || self.states[from].is_none() {
+            return usize::MAX;
         }
+        if min < 0 {
+            return usize::MAX;
+        }
+        if max < min || max < 1 {
+            return usize::MAX;
+        }
+        let atom = self.reg_new_atom(XmlRegAtomType::XmlRegexpString);
+        self.atoms[atom].valuep = Some(token.to_owned());
+        self.atoms[atom].data = data;
+        if min == 0 {
+            self.atoms[atom].min = 1;
+        } else {
+            self.atoms[atom].min = min;
+        }
+        self.atoms[atom].max = max;
+
+        // associate a counter to the transition.
+        let counter = self.reg_get_counter();
+        self.counters[counter].min = min;
+        self.counters[counter].max = max;
+
+        // xmlFAGenerateTransitions(am, from, to, atom);
+        if to == usize::MAX || self.states[to].is_none() {
+            to = self.reg_state_push();
+        }
+        self.reg_state_add_trans(from, atom, to, counter as i32, -1);
+        self.state = to;
+
+        if to == usize::MAX || self.states[to].is_none() {
+            to = self.state;
+        }
+        if to == usize::MAX || self.states[to].is_none() {
+            return usize::MAX;
+        }
+        if min == 0 {
+            self.fa_generate_epsilon_transition(from, to);
+        }
+        to
     }
 
     /// If @to is NULL, this creates first a new target state in the automata
@@ -345,66 +337,61 @@ impl XmlAutomata {
     /// Returns the target state or NULL in case of error
     #[doc(alias = "xmlAutomataNewCountTrans2")]
     #[allow(clippy::too_many_arguments)]
-    pub unsafe fn new_count_trans2(
+    pub fn new_count_trans2(
         &mut self,
-        from: XmlAutomataStatePtr,
-        mut to: XmlAutomataStatePtr,
+        from: usize,
+        mut to: usize,
         token: &str,
         token2: Option<&str>,
         min: i32,
         max: i32,
         data: *mut c_void,
-    ) -> XmlAutomataStatePtr {
-        unsafe {
-            if from.is_null() {
-                return null_mut();
-            }
-            if min < 0 {
-                return null_mut();
-            }
-            if max < min || max < 1 {
-                return null_mut();
-            }
-            let atom = self.reg_new_atom(XmlRegAtomType::XmlRegexpString);
-            if let Some(token2) = token2.filter(|t| !t.is_empty()) {
-                self.atoms[atom].valuep = Some(format!("{token}|{token2}"));
-            } else {
-                self.atoms[atom].valuep = Some(token.to_owned());
-            }
-            self.atoms[atom].data = data;
-            if min == 0 {
-                self.atoms[atom].min = 1;
-            } else {
-                self.atoms[atom].min = min;
-            }
-            self.atoms[atom].max = max;
-
-            // associate a counter to the transition.
-            let counter = self.reg_get_counter();
-            self.counters[counter].min = min;
-            self.counters[counter].max = max;
-
-            // xmlFAGenerateTransitions(self, from, to, atom);
-            if to.is_null() {
-                to = self.reg_state_push();
-                if to.is_null() {
-                    return null_mut();
-                }
-            }
-            self.reg_state_add_trans(from, atom, to, counter as i32, -1);
-            self.state = to;
-
-            if to.is_null() {
-                to = self.state;
-            }
-            if to.is_null() {
-                return null_mut();
-            }
-            if min == 0 {
-                self.fa_generate_epsilon_transition(from, to);
-            }
-            to
+    ) -> usize {
+        if from == usize::MAX || self.states[from].is_none() {
+            return usize::MAX;
         }
+        if min < 0 {
+            return usize::MAX;
+        }
+        if max < min || max < 1 {
+            return usize::MAX;
+        }
+        let atom = self.reg_new_atom(XmlRegAtomType::XmlRegexpString);
+        if let Some(token2) = token2.filter(|t| !t.is_empty()) {
+            self.atoms[atom].valuep = Some(format!("{token}|{token2}"));
+        } else {
+            self.atoms[atom].valuep = Some(token.to_owned());
+        }
+        self.atoms[atom].data = data;
+        if min == 0 {
+            self.atoms[atom].min = 1;
+        } else {
+            self.atoms[atom].min = min;
+        }
+        self.atoms[atom].max = max;
+
+        // associate a counter to the transition.
+        let counter = self.reg_get_counter();
+        self.counters[counter].min = min;
+        self.counters[counter].max = max;
+
+        // xmlFAGenerateTransitions(self, from, to, atom);
+        if to == usize::MAX || self.states[to].is_none() {
+            to = self.reg_state_push();
+        }
+        self.reg_state_add_trans(from, atom, to, counter as i32, -1);
+        self.state = to;
+
+        if to == usize::MAX || self.states[to].is_none() {
+            to = self.state;
+        }
+        if to == usize::MAX || self.states[to].is_none() {
+            return usize::MAX;
+        }
+        if min == 0 {
+            self.fa_generate_epsilon_transition(from, to);
+        }
+        to
     }
 
     /// If @to is NULL, this creates first a new target state in the automata
@@ -413,22 +400,15 @@ impl XmlAutomata {
     ///
     /// Returns the target state or NULL in case of error
     #[doc(alias = "xmlAutomataNewCountedTrans")]
-    pub unsafe fn new_counted_trans(
-        &mut self,
-        from: XmlAutomataStatePtr,
-        to: XmlAutomataStatePtr,
-        counter: i32,
-    ) -> XmlAutomataStatePtr {
-        unsafe {
-            if from.is_null() || counter < 0 {
-                return null_mut();
-            }
-            self.fa_generate_counted_epsilon_transition(from, to, counter);
-            if to.is_null() {
-                return self.state;
-            }
-            to
+    pub fn new_counted_trans(&mut self, from: usize, to: usize, counter: i32) -> usize {
+        if from == usize::MAX || self.states[from].is_none() || counter < 0 {
+            return usize::MAX;
         }
+        self.fa_generate_counted_epsilon_transition(from, to, counter);
+        if to == usize::MAX || self.states[to].is_none() {
+            return self.state;
+        }
+        to
     }
 
     /// If @to is NULL, this creates first a new target state in the automata
@@ -437,22 +417,15 @@ impl XmlAutomata {
     ///
     /// Returns the target state or NULL in case of error
     #[doc(alias = "xmlAutomataNewCounterTrans")]
-    pub unsafe fn new_counter_trans(
-        &mut self,
-        from: XmlAutomataStatePtr,
-        to: XmlAutomataStatePtr,
-        counter: i32,
-    ) -> XmlAutomataStatePtr {
-        unsafe {
-            if from.is_null() || counter < 0 {
-                return null_mut();
-            }
-            self.fa_generate_counted_transition(from, to, counter);
-            if to.is_null() {
-                return self.state;
-            }
-            to
+    pub fn new_counter_trans(&mut self, from: usize, to: usize, counter: i32) -> usize {
+        if from == usize::MAX || self.states[from].is_none() || counter < 0 {
+            return usize::MAX;
         }
+        self.fa_generate_counted_transition(from, to, counter);
+        if to == usize::MAX || self.states[to].is_none() {
+            return self.state;
+        }
+        to
     }
 
     /// If @to is NULL, this creates first a new target state in the automata
@@ -462,47 +435,42 @@ impl XmlAutomata {
     ///
     /// Returns the target state or NULL in case of error
     #[doc(alias = "xmlAutomataNewOnceTrans")]
-    pub unsafe fn new_once_trans(
+    pub fn new_once_trans(
         &mut self,
-        from: XmlAutomataStatePtr,
-        mut to: XmlAutomataStatePtr,
+        from: usize,
+        mut to: usize,
         token: &str,
         min: i32,
         max: i32,
         data: *mut c_void,
-    ) -> XmlAutomataStatePtr {
-        unsafe {
-            if from.is_null() {
-                return null_mut();
-            }
-            if min < 1 {
-                return null_mut();
-            }
-            if max < min {
-                return null_mut();
-            }
-            let atom = self.reg_new_atom(XmlRegAtomType::XmlRegexpString);
-            self.atoms[atom].valuep = Some(token.to_owned());
-            self.atoms[atom].data = data;
-            self.atoms[atom].quant = XmlRegQuantType::XmlRegexpQuantOnceonly;
-            self.atoms[atom].min = min;
-            self.atoms[atom].max = max;
-            // associate a counter to the transition.
-            let counter = self.reg_get_counter();
-            self.counters[counter].min = 1;
-            self.counters[counter].max = 1;
-
-            // xmlFAGenerateTransitions(self, from, to, atom);
-            if to.is_null() {
-                to = self.reg_state_push();
-                if to.is_null() {
-                    return null_mut();
-                }
-            }
-            self.reg_state_add_trans(from, atom, to, counter as i32, -1);
-            self.state = to;
-            to
+    ) -> usize {
+        if from == usize::MAX || self.states[from].is_none() {
+            return usize::MAX;
         }
+        if min < 1 {
+            return usize::MAX;
+        }
+        if max < min {
+            return usize::MAX;
+        }
+        let atom = self.reg_new_atom(XmlRegAtomType::XmlRegexpString);
+        self.atoms[atom].valuep = Some(token.to_owned());
+        self.atoms[atom].data = data;
+        self.atoms[atom].quant = XmlRegQuantType::XmlRegexpQuantOnceonly;
+        self.atoms[atom].min = min;
+        self.atoms[atom].max = max;
+        // associate a counter to the transition.
+        let counter = self.reg_get_counter();
+        self.counters[counter].min = 1;
+        self.counters[counter].max = 1;
+
+        // xmlFAGenerateTransitions(self, from, to, atom);
+        if to == usize::MAX || self.states[to].is_none() {
+            to = self.reg_state_push();
+        }
+        self.reg_state_add_trans(from, atom, to, counter as i32, -1);
+        self.state = to;
+        to
     }
 
     /// If @to is NULL, this creates first a new target state in the automata
@@ -513,52 +481,47 @@ impl XmlAutomata {
     /// Returns the target state or NULL in case of error
     #[doc(alias = "xmlAutomataNewOnceTrans2")]
     #[allow(clippy::too_many_arguments)]
-    pub unsafe fn new_once_trans2(
+    pub fn new_once_trans2(
         &mut self,
-        from: XmlAutomataStatePtr,
-        mut to: XmlAutomataStatePtr,
+        from: usize,
+        mut to: usize,
         token: &str,
         token2: Option<&str>,
         min: i32,
         max: i32,
         data: *mut c_void,
-    ) -> XmlAutomataStatePtr {
-        unsafe {
-            if from.is_null() {
-                return null_mut();
-            }
-            if min < 1 {
-                return null_mut();
-            }
-            if max < min {
-                return null_mut();
-            }
-            let atom = self.reg_new_atom(XmlRegAtomType::XmlRegexpString);
-            if let Some(token2) = token2.filter(|t| !t.is_empty()) {
-                self.atoms[atom].valuep = Some(format!("{token}|{token2}"));
-            } else {
-                self.atoms[atom].valuep = Some(token.to_owned());
-            }
-            self.atoms[atom].data = data;
-            self.atoms[atom].quant = XmlRegQuantType::XmlRegexpQuantOnceonly;
-            self.atoms[atom].min = min;
-            self.atoms[atom].max = max;
-            // associate a counter to the transition.
-            let counter = self.reg_get_counter();
-            self.counters[counter].min = 1;
-            self.counters[counter].max = 1;
-
-            // xmlFAGenerateTransitions(self, from, to, atom);
-            if to.is_null() {
-                to = self.reg_state_push();
-                if to.is_null() {
-                    return null_mut();
-                }
-            }
-            self.reg_state_add_trans(from, atom, to, counter as i32, -1);
-            self.state = to;
-            to
+    ) -> usize {
+        if from == usize::MAX || self.states[from].is_none() {
+            return usize::MAX;
         }
+        if min < 1 {
+            return usize::MAX;
+        }
+        if max < min {
+            return usize::MAX;
+        }
+        let atom = self.reg_new_atom(XmlRegAtomType::XmlRegexpString);
+        if let Some(token2) = token2.filter(|t| !t.is_empty()) {
+            self.atoms[atom].valuep = Some(format!("{token}|{token2}"));
+        } else {
+            self.atoms[atom].valuep = Some(token.to_owned());
+        }
+        self.atoms[atom].data = data;
+        self.atoms[atom].quant = XmlRegQuantType::XmlRegexpQuantOnceonly;
+        self.atoms[atom].min = min;
+        self.atoms[atom].max = max;
+        // associate a counter to the transition.
+        let counter = self.reg_get_counter();
+        self.counters[counter].min = 1;
+        self.counters[counter].max = 1;
+
+        // xmlFAGenerateTransitions(self, from, to, atom);
+        if to == usize::MAX || self.states[to].is_none() {
+            to = self.reg_state_push();
+        }
+        self.reg_state_add_trans(from, atom, to, counter as i32, -1);
+        self.state = to;
+        to
     }
 
     /// If @to is NULL, this creates first a new target state in the automata
@@ -568,22 +531,15 @@ impl XmlAutomata {
     ///
     /// Returns the target state or NULL in case of error
     #[doc(alias = "xmlAutomataNewAllTrans")]
-    pub unsafe fn new_all_trans(
-        &mut self,
-        from: XmlAutomataStatePtr,
-        to: XmlAutomataStatePtr,
-        lax: i32,
-    ) -> XmlAutomataStatePtr {
-        unsafe {
-            if from.is_null() {
-                return null_mut();
-            }
-            self.fa_generate_all_transition(from, to, lax);
-            if to.is_null() {
-                return self.state;
-            }
-            to
+    pub fn new_all_trans(&mut self, from: usize, to: usize, lax: i32) -> usize {
+        if from == usize::MAX || self.states[from].is_none() {
+            return usize::MAX;
         }
+        self.fa_generate_all_transition(from, to, lax);
+        if to == usize::MAX || self.states[to].is_none() {
+            return self.state;
+        }
+        to
     }
 
     /// If @to is NULL, this creates first a new target state in the automata
@@ -591,21 +547,15 @@ impl XmlAutomata {
     ///
     /// Returns the target state or NULL in case of error
     #[doc(alias = "xmlAutomataNewEpsilon")]
-    pub unsafe fn new_epsilon(
-        &mut self,
-        from: XmlAutomataStatePtr,
-        to: XmlAutomataStatePtr,
-    ) -> XmlAutomataStatePtr {
-        unsafe {
-            if from.is_null() {
-                return null_mut();
-            }
-            self.fa_generate_epsilon_transition(from, to);
-            if to.is_null() {
-                return self.state;
-            }
-            to
+    pub fn new_epsilon(&mut self, from: usize, to: usize) -> usize {
+        if from == usize::MAX || self.states[from].is_none() {
+            return usize::MAX;
         }
+        self.fa_generate_epsilon_transition(from, to);
+        if to == usize::MAX || self.states[to].is_none() {
+            return self.state;
+        }
+        to
     }
 }
 
@@ -616,9 +566,9 @@ impl Default for XmlAutomata {
             cur: 0,
             error: 0,
             neg: 0,
-            start: null_mut(),
-            end: null_mut(),
-            state: null_mut(),
+            start: usize::MAX,
+            end: usize::MAX,
+            state: usize::MAX,
             atom: usize::MAX,
             atoms: vec![],
             states: vec![],
@@ -632,8 +582,6 @@ impl Default for XmlAutomata {
 }
 
 /// A state int the automata description,
-#[doc(alias = "xmlAutomataStatePtr")]
-pub type XmlAutomataStatePtr = *mut XmlAutomataState;
 #[doc(alias = "xmlAutomataState")]
 #[repr(C)]
 #[derive(Default)]

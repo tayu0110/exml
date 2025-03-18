@@ -88,7 +88,6 @@ use crate::{
             xml_schema_free_wildcard_ns_set,
         },
         valid::xml_add_id,
-        xmlautomata::XmlAutomataStatePtr,
         xmlregexp::{
             XmlRegExecCtxtPtr, xml_reg_exec_err_info, xml_reg_exec_next_values,
             xml_reg_exec_push_string, xml_reg_exec_push_string2, xml_reg_free_regexp,
@@ -12241,16 +12240,15 @@ unsafe fn xml_schema_build_content_model_for_subst_group(
     pctxt: XmlSchemaParserCtxtPtr,
     particle: XmlSchemaParticlePtr,
     mut counter: i32,
-    mut end: XmlAutomataStatePtr,
+    mut end: usize,
 ) -> i32 {
     unsafe {
-        let mut tmp: XmlAutomataStatePtr;
         let mut ret: i32 = 0;
         let elem_decl: XmlSchemaElementPtr = (*particle).children as XmlSchemaElementPtr;
 
         // Wrap the substitution group with a CHOICE.
-        let start: XmlAutomataStatePtr = (*pctxt).state;
-        if end.is_null() {
+        let start = (*pctxt).state;
+        if end == usize::MAX {
             end = (*pctxt).am.as_mut().unwrap().new_state();
         }
         let subst_group: XmlSchemaSubstGroupPtr = xml_schema_subst_group_get(pctxt, elem_decl);
@@ -12271,11 +12269,11 @@ unsafe fn xml_schema_build_content_model_for_subst_group(
             // However, an error will be raised during *validation* if an element
             // information item shall be validated against an abstract element
             // declaration.
-            tmp = (*pctxt)
+            let tmp = (*pctxt)
                 .am
                 .as_mut()
                 .unwrap()
-                .new_counted_trans(start, null_mut(), counter);
+                .new_counted_trans(start, usize::MAX, counter);
             (*pctxt).am.as_mut().unwrap().new_transition2(
                 tmp,
                 end,
@@ -12315,7 +12313,7 @@ unsafe fn xml_schema_build_content_model_for_subst_group(
             (*pctxt).am.as_mut().unwrap().new_epsilon(
                 (*pctxt).am.as_mut().unwrap().new_transition2(
                     start,
-                    null_mut(),
+                    usize::MAX,
                     CStr::from_ptr((*elem_decl).name as *const i8)
                         .to_string_lossy()
                         .as_ref(),
@@ -12346,9 +12344,9 @@ unsafe fn xml_schema_build_content_model_for_subst_group(
                 // tmp = xmlAutomataNewOnceTrans2((*pctxt).am, start, null_mut(),
                 //                   (*member).name, (*member).target_namespace,
                 //               1, 1, member);
-                tmp = (*pctxt).am.as_mut().unwrap().new_transition2(
+                let tmp = (*pctxt).am.as_mut().unwrap().new_transition2(
                     start,
-                    null_mut(),
+                    usize::MAX,
                     CStr::from_ptr((*member).name as *const i8)
                         .to_string_lossy()
                         .as_ref(),
@@ -12379,12 +12377,12 @@ unsafe fn xml_schema_build_content_model_for_subst_group(
                 .as_mut()
                 .unwrap()
                 .new_counter(min_occurs, max_occurs);
-            let hop: XmlAutomataStatePtr = (*pctxt).am.as_mut().unwrap().new_state();
+            let hop = (*pctxt).am.as_mut().unwrap().new_state();
 
             (*pctxt).am.as_mut().unwrap().new_epsilon(
                 (*pctxt).am.as_mut().unwrap().new_transition2(
                     start,
-                    null_mut(),
+                    usize::MAX,
                     CStr::from_ptr((*elem_decl).name as *const i8)
                         .to_string_lossy()
                         .as_ref(),
@@ -12407,7 +12405,7 @@ unsafe fn xml_schema_build_content_model_for_subst_group(
                 (*pctxt).am.as_mut().unwrap().new_epsilon(
                     (*pctxt).am.as_mut().unwrap().new_transition2(
                         start,
-                        null_mut(),
+                        usize::MAX,
                         CStr::from_ptr((*member).name as *const i8)
                             .to_string_lossy()
                             .as_ref(),
@@ -12456,9 +12454,9 @@ unsafe fn xml_schema_build_content_model_for_element(
             != 0
         {
             // Substitution groups.
-            ret = xml_schema_build_content_model_for_subst_group(ctxt, particle, -1, null_mut());
+            ret = xml_schema_build_content_model_for_subst_group(ctxt, particle, -1, usize::MAX);
         } else {
-            let start: XmlAutomataStatePtr;
+            let start;
             let elem_decl: XmlSchemaElementPtr = (*particle).children as XmlSchemaElementPtr;
 
             if (*elem_decl).flags & XML_SCHEMAS_ELEM_ABSTRACT != 0 {
@@ -12468,7 +12466,7 @@ unsafe fn xml_schema_build_content_model_for_element(
                 start = (*ctxt).state;
                 (*ctxt).state = (*ctxt).am.as_mut().unwrap().new_transition2(
                     start,
-                    null_mut(),
+                    usize::MAX,
                     CStr::from_ptr((*elem_decl).name as *const i8)
                         .to_string_lossy()
                         .as_ref(),
@@ -12485,7 +12483,7 @@ unsafe fn xml_schema_build_content_model_for_element(
                 start = (*ctxt).state;
                 (*ctxt).state = (*ctxt).am.as_mut().unwrap().new_transition2(
                     start,
-                    null_mut(),
+                    usize::MAX,
                     CStr::from_ptr((*elem_decl).name as *const i8)
                         .to_string_lossy()
                         .as_ref(),
@@ -12527,7 +12525,7 @@ unsafe fn xml_schema_build_content_model_for_element(
                     .am
                     .as_mut()
                     .unwrap()
-                    .new_epsilon((*ctxt).state, null_mut());
+                    .new_epsilon((*ctxt).state, usize::MAX);
                 let counter: i32 = (*ctxt)
                     .am
                     .as_mut()
@@ -12535,7 +12533,7 @@ unsafe fn xml_schema_build_content_model_for_element(
                     .new_counter(min_occurs, max_occurs);
                 (*ctxt).state = (*ctxt).am.as_mut().unwrap().new_transition2(
                     start,
-                    null_mut(),
+                    usize::MAX,
                     CStr::from_ptr((*elem_decl).name as *const i8)
                         .to_string_lossy()
                         .as_ref(),
@@ -12554,7 +12552,7 @@ unsafe fn xml_schema_build_content_model_for_element(
                     .new_counted_trans((*ctxt).state, start, counter);
                 (*ctxt).state = (*ctxt).am.as_mut().unwrap().new_counter_trans(
                     (*ctxt).state,
-                    null_mut(),
+                    usize::MAX,
                     counter,
                 );
             }
@@ -12597,8 +12595,8 @@ unsafe fn xml_schema_build_acontent_model(
             XmlSchemaTypeType::XmlSchemaTypeAny => {
                 let mut ns: XmlSchemaWildcardNsPtr;
                 let wild: XmlSchemaWildcardPtr = (*particle).children as XmlSchemaWildcardPtr;
-                let start: XmlAutomataStatePtr = (*pctxt).state;
-                let end: XmlAutomataStatePtr = (*pctxt).am.as_mut().unwrap().new_state();
+                let start = (*pctxt).state;
+                let end = (*pctxt).am.as_mut().unwrap().new_state();
 
                 if (*particle).max_occurs == 1 {
                     if (*wild).any == 1 {
@@ -12607,7 +12605,7 @@ unsafe fn xml_schema_build_acontent_model(
                         // 1. the {"*", "*"} for elements in a namespace.
                         (*pctxt).state = (*pctxt).am.as_mut().unwrap().new_transition2(
                             start,
-                            null_mut(),
+                            usize::MAX,
                             "*",
                             Some("*"),
                             wild as _,
@@ -12620,7 +12618,7 @@ unsafe fn xml_schema_build_acontent_model(
                         // 2. the {"*"} for elements in no namespace.
                         (*pctxt).state = (*pctxt).am.as_mut().unwrap().new_transition2(
                             start,
-                            null_mut(),
+                            usize::MAX,
                             "*",
                             None,
                             wild as _,
@@ -12636,7 +12634,7 @@ unsafe fn xml_schema_build_acontent_model(
                             (*pctxt).state = start;
                             (*pctxt).state = (*pctxt).am.as_mut().unwrap().new_transition2(
                                 (*pctxt).state,
-                                null_mut(),
+                                usize::MAX,
                                 "*",
                                 (!(*ns).value.is_null())
                                     .then(|| {
@@ -12684,11 +12682,11 @@ unsafe fn xml_schema_build_acontent_model(
                         .as_mut()
                         .unwrap()
                         .new_counter(min_occurs, max_occurs);
-                    let hop: XmlAutomataStatePtr = (*pctxt).am.as_mut().unwrap().new_state();
+                    let hop = (*pctxt).am.as_mut().unwrap().new_state();
                     if (*wild).any == 1 {
                         (*pctxt).state = (*pctxt).am.as_mut().unwrap().new_transition2(
                             start,
-                            null_mut(),
+                            usize::MAX,
                             "*",
                             Some("*"),
                             wild as _,
@@ -12700,7 +12698,7 @@ unsafe fn xml_schema_build_acontent_model(
                             .new_epsilon((*pctxt).state, hop);
                         (*pctxt).state = (*pctxt).am.as_mut().unwrap().new_transition2(
                             start,
-                            null_mut(),
+                            usize::MAX,
                             "*",
                             None,
                             wild as _,
@@ -12715,7 +12713,7 @@ unsafe fn xml_schema_build_acontent_model(
                         while {
                             (*pctxt).state = (*pctxt).am.as_mut().unwrap().new_transition2(
                                 start,
-                                null_mut(),
+                                usize::MAX,
                                 "*",
                                 (!(*ns).value.is_null())
                                     .then(|| {
@@ -12783,7 +12781,7 @@ unsafe fn xml_schema_build_acontent_model(
                         sub = (*sub).next;
                     }
                 } else {
-                    let mut oldstate: XmlAutomataStatePtr = (*pctxt).state;
+                    let mut oldstate = (*pctxt).state;
 
                     if (*particle).max_occurs >= UNBOUNDED as i32 {
                         if (*particle).min_occurs > 1 {
@@ -12791,7 +12789,7 @@ unsafe fn xml_schema_build_acontent_model(
                                 .am
                                 .as_mut()
                                 .unwrap()
-                                .new_epsilon(oldstate, null_mut());
+                                .new_epsilon(oldstate, usize::MAX);
                             oldstate = (*pctxt).state;
 
                             let counter: i32 = (*pctxt)
@@ -12811,7 +12809,7 @@ unsafe fn xml_schema_build_acontent_model(
                                 }
                                 sub = (*sub).next;
                             }
-                            let tmp: XmlAutomataStatePtr = (*pctxt).state;
+                            let tmp = (*pctxt).state;
                             (*pctxt)
                                 .am
                                 .as_mut()
@@ -12819,7 +12817,7 @@ unsafe fn xml_schema_build_acontent_model(
                                 .new_counted_trans(tmp, oldstate, counter);
                             (*pctxt).state = (*pctxt).am.as_mut().unwrap().new_counter_trans(
                                 tmp,
-                                null_mut(),
+                                usize::MAX,
                                 counter,
                             );
                             if ret == 1 {
@@ -12834,7 +12832,7 @@ unsafe fn xml_schema_build_acontent_model(
                                 .am
                                 .as_mut()
                                 .unwrap()
-                                .new_epsilon(oldstate, null_mut());
+                                .new_epsilon(oldstate, usize::MAX);
                             oldstate = (*pctxt).state;
 
                             sub = (*(*particle).children).children;
@@ -12859,7 +12857,7 @@ unsafe fn xml_schema_build_acontent_model(
                                 .am
                                 .as_mut()
                                 .unwrap()
-                                .new_epsilon((*pctxt).state, null_mut());
+                                .new_epsilon((*pctxt).state, usize::MAX);
                             if (*particle).min_occurs == 0 {
                                 (*pctxt)
                                     .am
@@ -12874,7 +12872,7 @@ unsafe fn xml_schema_build_acontent_model(
                             .am
                             .as_mut()
                             .unwrap()
-                            .new_epsilon(oldstate, null_mut());
+                            .new_epsilon(oldstate, usize::MAX);
                         oldstate = (*pctxt).state;
 
                         let counter: i32 = (*pctxt)
@@ -12892,7 +12890,7 @@ unsafe fn xml_schema_build_acontent_model(
                             }
                             sub = (*sub).next;
                         }
-                        let tmp: XmlAutomataStatePtr = (*pctxt).state;
+                        let tmp = (*pctxt).state;
                         (*pctxt)
                             .am
                             .as_mut()
@@ -12900,7 +12898,7 @@ unsafe fn xml_schema_build_acontent_model(
                             .new_counted_trans(tmp, oldstate, counter);
                         (*pctxt).state = (*pctxt).am.as_mut().unwrap().new_counter_trans(
                             tmp,
-                            null_mut(),
+                            usize::MAX,
                             counter,
                         );
                         if (*particle).min_occurs == 0 || ret == 1 {
@@ -12928,7 +12926,7 @@ unsafe fn xml_schema_build_acontent_model(
                             .am
                             .as_mut()
                             .unwrap()
-                            .new_epsilon((*pctxt).state, null_mut());
+                            .new_epsilon((*pctxt).state, usize::MAX);
 
                         if (*particle).min_occurs == 0 {
                             (*pctxt)
@@ -12945,8 +12943,8 @@ unsafe fn xml_schema_build_acontent_model(
                 let mut sub: XmlSchemaTreeItemPtr;
 
                 ret = 0;
-                let start: XmlAutomataStatePtr = (*pctxt).state;
-                let end: XmlAutomataStatePtr = (*pctxt).am.as_mut().unwrap().new_state();
+                let start = (*pctxt).state;
+                let end = (*pctxt).am.as_mut().unwrap().new_state();
 
                 // iterate over the subtypes and remerge the end with an
                 // epsilon transition
@@ -12984,8 +12982,8 @@ unsafe fn xml_schema_build_acontent_model(
                         .as_mut()
                         .unwrap()
                         .new_counter(min_occurs, max_occurs);
-                    let hop: XmlAutomataStatePtr = (*pctxt).am.as_mut().unwrap().new_state();
-                    let base: XmlAutomataStatePtr = (*pctxt).am.as_mut().unwrap().new_state();
+                    let hop = (*pctxt).am.as_mut().unwrap().new_state();
+                    let base = (*pctxt).am.as_mut().unwrap().new_state();
 
                     sub = (*(*particle).children).children;
                     while !sub.is_null() {
@@ -13023,8 +13021,6 @@ unsafe fn xml_schema_build_acontent_model(
                 (*pctxt).state = end;
             }
             XmlSchemaTypeType::XmlSchemaTypeAll => {
-                let start: XmlAutomataStatePtr;
-                let tmp: XmlAutomataStatePtr;
                 let mut sub: XmlSchemaParticlePtr;
                 let mut elem_decl: XmlSchemaElementPtr;
 
@@ -13036,8 +13032,8 @@ unsafe fn xml_schema_build_acontent_model(
                 } else {
                     ret = 0;
 
-                    start = (*pctxt).state;
-                    tmp = (*pctxt).am.as_mut().unwrap().new_state();
+                    let start = (*pctxt).state;
+                    let tmp = (*pctxt).am.as_mut().unwrap().new_state();
                     (*pctxt)
                         .am
                         .as_mut()
@@ -13117,7 +13113,7 @@ unsafe fn xml_schema_build_acontent_model(
                             .am
                             .as_mut()
                             .unwrap()
-                            .new_all_trans((*pctxt).state, null_mut(), 0);
+                            .new_all_trans((*pctxt).state, usize::MAX, 0);
                     if (*particle).min_occurs == 0 {
                         (*pctxt)
                             .am
@@ -13178,7 +13174,13 @@ unsafe fn xml_schema_build_content_model(typ: XmlSchemaTypePtr, ctxt: XmlSchemaP
         (*ctxt).state = (*ctxt).am.as_mut().unwrap().get_init_state();
         // Build the automaton.
         xml_schema_build_acontent_model(ctxt, WXS_TYPE_PARTICLE!(typ));
-        (*(*ctxt).state).set_final_state();
+        (*ctxt)
+            .am
+            .as_mut()
+            .unwrap()
+            .get_state_mut((*ctxt).state)
+            .unwrap()
+            .set_final_state();
         (*typ).cont_model = (*ctxt).am.as_mut().unwrap().compile();
         if (*typ).cont_model.is_null() {
             xml_schema_pcustom_err(
@@ -13202,7 +13204,7 @@ unsafe fn xml_schema_build_content_model(typ: XmlSchemaTypePtr, ctxt: XmlSchemaP
         } else {
             // no-op
         }
-        (*ctxt).state = null_mut();
+        (*ctxt).state = usize::MAX;
         (*ctxt).am.take();
     }
 }
