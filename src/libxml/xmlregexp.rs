@@ -215,7 +215,7 @@ pub enum XmlRegMarkedType {
 #[repr(C)]
 #[derive(Default)]
 pub struct XmlRegRange {
-    neg: i32, /* 0 normal, 1 not, 2 exclude */
+    neg: u8, /* 0 normal, 1 not, 2 exclude */
     typ: XmlRegAtomType,
     start: i32,
     end: i32,
@@ -633,7 +633,7 @@ impl XmlRegParserCtxt {
     ///
     /// Returns the new range or NULL in case of error
     #[doc(alias = "xmlRegNewRange")]
-    fn reg_new_range(&self, neg: i32, typ: XmlRegAtomType, start: i32, end: i32) -> XmlRegRange {
+    fn reg_new_range(&self, neg: u8, typ: XmlRegAtomType, start: i32, end: i32) -> XmlRegRange {
         XmlRegRange {
             neg,
             typ,
@@ -647,7 +647,7 @@ impl XmlRegParserCtxt {
     fn reg_atom_add_range(
         &mut self,
         atom_index: usize,
-        neg: i32,
+        neg: u8,
         typ: XmlRegAtomType,
         start: i32,
         end: i32,
@@ -1342,59 +1342,53 @@ impl XmlRegParserCtxt {
     /// Check whether the associated regexp is determinist,
     /// should be called after xmlFAEliminateEpsilonTransitions()
     #[doc(alias = "xmlFARecurseDeterminism")]
-    unsafe fn fa_recurse_determinism(&mut self, state: usize, to: usize, atom_index: usize) -> i32 {
-        unsafe {
-            let mut ret: i32 = 1;
-            let mut res: i32;
-            let mut deep: i32 = 1;
+    fn fa_recurse_determinism(&mut self, state: usize, to: usize, atom_index: usize) -> i32 {
+        let mut ret: i32 = 1;
+        let mut res: i32;
+        let mut deep: i32 = 1;
 
-            if state == usize::MAX
-                || self.states[state].as_ref().is_none_or(|state| {
-                    matches!(state.markd, XmlRegMarkedType::XmlRegexpMarkVisited)
-                })
-            {
-                return ret;
-            }
-
-            if self.flags & AM_AUTOMATA_RNG as i32 != 0 {
-                deep = 0;
-            }
-
-            // don't recurse on transitions potentially added in the course of the elimination.
-            for t1 in 0..self.states[state].as_ref().unwrap().trans.len() {
-                // check transitions conflicting with the one looked at
-                let t1 = &mut self.states[state].as_mut().unwrap().trans[t1];
-                if t1.atom_index == usize::MAX {
-                    if t1.to < 0 {
-                        continue;
-                    }
-                    let t1_to = t1.to as usize;
-                    self.states[state].as_mut().unwrap().markd =
-                        XmlRegMarkedType::XmlRegexpMarkVisited;
-                    res = self.fa_recurse_determinism(t1_to, to, atom_index);
-                    if res == 0 {
-                        ret = 0;
-                    }
-                    continue;
-                }
-                if t1.to != to as i32 {
-                    continue;
-                }
-                if t1.atom_index != usize::MAX
-                    && atom_index != usize::MAX
-                    && xml_fa_compare_atoms(
-                        &self.atoms[t1.atom_index],
-                        &self.atoms[atom_index],
-                        deep,
-                    ) != 0
-                {
-                    ret = 0;
-                    // mark the transition as non-deterministic
-                    t1.nd = 1;
-                }
-            }
-            ret
+        if state == usize::MAX
+            || self.states[state]
+                .as_ref()
+                .is_none_or(|state| matches!(state.markd, XmlRegMarkedType::XmlRegexpMarkVisited))
+        {
+            return ret;
         }
+
+        if self.flags & AM_AUTOMATA_RNG as i32 != 0 {
+            deep = 0;
+        }
+
+        // don't recurse on transitions potentially added in the course of the elimination.
+        for t1 in 0..self.states[state].as_ref().unwrap().trans.len() {
+            // check transitions conflicting with the one looked at
+            let t1 = &mut self.states[state].as_mut().unwrap().trans[t1];
+            if t1.atom_index == usize::MAX {
+                if t1.to < 0 {
+                    continue;
+                }
+                let t1_to = t1.to as usize;
+                self.states[state].as_mut().unwrap().markd = XmlRegMarkedType::XmlRegexpMarkVisited;
+                res = self.fa_recurse_determinism(t1_to, to, atom_index);
+                if res == 0 {
+                    ret = 0;
+                }
+                continue;
+            }
+            if t1.to != to as i32 {
+                continue;
+            }
+            if t1.atom_index != usize::MAX
+                && atom_index != usize::MAX
+                && xml_fa_compare_atoms(&self.atoms[t1.atom_index], &self.atoms[atom_index], deep)
+                    != 0
+            {
+                ret = 0;
+                // mark the transition as non-deterministic
+                t1.nd = 1;
+            }
+        }
+        ret
     }
 
     /// Reset flags after checking determinism.
@@ -1424,165 +1418,163 @@ impl XmlRegParserCtxt {
     /// Check whether the associated regexp is determinist,
     /// should be called after xmlFAEliminateEpsilonTransitions()
     #[doc(alias = "xmlFAComputesDeterminism")]
-    pub(crate) unsafe fn fa_computes_determinism(&mut self) -> i32 {
-        unsafe {
-            let mut ret: i32 = 1;
-            let mut deep: i32 = 1;
+    pub(crate) fn fa_computes_determinism(&mut self) -> i32 {
+        let mut ret: i32 = 1;
+        let mut deep: i32 = 1;
 
-            if self.determinist != -1 {
-                return self.determinist;
+        if self.determinist != -1 {
+            return self.determinist;
+        }
+
+        if self.flags & AM_AUTOMATA_RNG as i32 != 0 {
+            deep = 0;
+        }
+
+        // First cleanup the automata removing cancelled transitions
+        for state in self.states.iter_mut().filter_map(|state| state.as_mut()) {
+            if state.trans.len() < 2 {
+                continue;
             }
-
-            if self.flags & AM_AUTOMATA_RNG as i32 != 0 {
-                deep = 0;
-            }
-
-            // First cleanup the automata removing cancelled transitions
-            for state in self.states.iter_mut().filter_map(|state| state.as_mut()) {
-                if state.trans.len() < 2 {
+            for transnr in 0..state.trans.len() {
+                let (trans, rem) = state.trans.split_at_mut(transnr);
+                let t1 = &rem[0];
+                // Determinism checks in case of counted or all transitions
+                // will have to be handled separately
+                if t1.atom_index == usize::MAX {
+                    /* (*t1).nd = 1; */
                     continue;
                 }
-                for transnr in 0..state.trans.len() {
-                    let (trans, rem) = state.trans.split_at_mut(transnr);
-                    let t1 = &rem[0];
-                    // Determinism checks in case of counted or all transitions
-                    // will have to be handled separately
-                    if t1.atom_index == usize::MAX {
-                        /* (*t1).nd = 1; */
-                        continue;
-                    }
-                    if t1.to == -1 {
+                if t1.to == -1 {
+                    // eliminated
+                    continue;
+                }
+                for t2 in trans {
+                    if t2.to == -1 {
                         // eliminated
                         continue;
                     }
-                    for t2 in trans {
-                        if t2.to == -1 {
-                            // eliminated
-                            continue;
-                        }
-                        if t2.atom_index != usize::MAX && t1.to == t2.to {
-                            // Here we use deep because we want to keep the
-                            // transitions which indicate a conflict
-                            if xml_fa_equal_atoms(
-                                &self.atoms[t1.atom_index],
-                                &self.atoms[t2.atom_index],
-                                deep,
-                            ) != 0
-                                && t1.counter == t2.counter
-                                && t1.count == t2.count
-                            {
-                                t2.to = -1; /* eliminated */
-                            }
+                    if t2.atom_index != usize::MAX && t1.to == t2.to {
+                        // Here we use deep because we want to keep the
+                        // transitions which indicate a conflict
+                        if xml_fa_equal_atoms(
+                            &self.atoms[t1.atom_index],
+                            &self.atoms[t2.atom_index],
+                            deep,
+                        ) != 0
+                            && t1.counter == t2.counter
+                            && t1.count == t2.count
+                        {
+                            t2.to = -1; /* eliminated */
                         }
                     }
                 }
             }
+        }
 
-            // Check for all states that there aren't 2 transitions
-            // with the same atom and a different target.
-            for statenr in 0..self.states.len() {
-                if self.states[statenr]
-                    .as_ref()
-                    .is_none_or(|state| state.trans.len() < 2)
-                {
+        // Check for all states that there aren't 2 transitions
+        // with the same atom and a different target.
+        for statenr in 0..self.states.len() {
+            if self.states[statenr]
+                .as_ref()
+                .is_none_or(|state| state.trans.len() < 2)
+            {
+                continue;
+            }
+            let mut last = None::<usize>;
+            for transnr in 0..self.states[statenr].as_ref().unwrap().trans.len() {
+                let t1 = &self.states[statenr].as_ref().unwrap().trans[transnr];
+                let mut t1_to = t1.to;
+                let mut t1_atom_index = t1.atom_index;
+                // Determinism checks in case of counted or all transitions
+                // will have to be handled separately
+                if t1_atom_index == usize::MAX {
                     continue;
                 }
-                let mut last = None::<usize>;
-                for transnr in 0..self.states[statenr].as_ref().unwrap().trans.len() {
-                    let t1 = &self.states[statenr].as_ref().unwrap().trans[transnr];
-                    let mut t1_to = t1.to;
-                    let mut t1_atom_index = t1.atom_index;
-                    // Determinism checks in case of counted or all transitions
-                    // will have to be handled separately
-                    if t1_atom_index == usize::MAX {
-                        continue;
-                    }
-                    if t1_to == -1 {
+                if t1_to == -1 {
+                    // eliminated
+                    continue;
+                }
+                for transnr2 in 0..transnr {
+                    let t2 = &self.states[statenr].as_ref().unwrap().trans[transnr2];
+                    let t2_to = t2.to;
+                    let t2_atom_index = t2.atom_index;
+                    if t2_to == -1 {
                         // eliminated
                         continue;
                     }
-                    for transnr2 in 0..transnr {
-                        let t2 = &self.states[statenr].as_ref().unwrap().trans[transnr2];
-                        let t2_to = t2.to;
-                        let t2_atom_index = t2.atom_index;
-                        if t2_to == -1 {
-                            // eliminated
-                            continue;
+                    if t2_atom_index != usize::MAX {
+                        // But here we don't use deep because we want to
+                        // find transitions which indicate a conflict
+                        if xml_fa_compare_atoms(
+                            &self.atoms[t1_atom_index],
+                            &self.atoms[t2.atom_index],
+                            1,
+                        ) != 0
+                        {
+                            ret = 0;
+                            // mark the transitions as non-deterministic ones
+                            self.states[statenr].as_mut().unwrap().trans[transnr].nd = 1;
+                            self.states[statenr].as_mut().unwrap().trans[transnr2].nd = 1;
+                            last = Some(transnr);
                         }
-                        if t2_atom_index != usize::MAX {
-                            // But here we don't use deep because we want to
-                            // find transitions which indicate a conflict
-                            if xml_fa_compare_atoms(
-                                &self.atoms[t1_atom_index],
-                                &self.atoms[t2.atom_index],
-                                1,
-                            ) != 0
-                            {
-                                ret = 0;
-                                // mark the transitions as non-deterministic ones
-                                self.states[statenr].as_mut().unwrap().trans[transnr].nd = 1;
-                                self.states[statenr].as_mut().unwrap().trans[transnr2].nd = 1;
-                                last = Some(transnr);
-                            }
-                        } else if t1_to != -1 {
-                            // do the closure in case of remaining specific
-                            // epsilon transitions like choices or all
-                            ret = self.fa_recurse_determinism(
-                                t1_to as usize,
-                                t2_to as usize,
-                                t2_atom_index,
-                            );
-                            let t1 = &self.states[statenr].as_ref().unwrap().trans[transnr];
-                            t1_to = t1.to;
-                            self.fa_finish_recurse_determinism(t1_to as usize);
-                            let t1 = &self.states[statenr].as_ref().unwrap().trans[transnr];
-                            t1_to = t1.to;
-                            t1_atom_index = t1.atom_index;
-                            // don't shortcut the computation so all non deterministic
-                            // transition get marked down
-                            // if (ret == 0)
-                            // return(0);
-                            if ret == 0 {
-                                self.states[statenr].as_mut().unwrap().trans[transnr].nd = 1;
-                                // (*t2).nd = 1;
-                                last = Some(transnr);
-                            }
+                    } else if t1_to != -1 {
+                        // do the closure in case of remaining specific
+                        // epsilon transitions like choices or all
+                        ret = self.fa_recurse_determinism(
+                            t1_to as usize,
+                            t2_to as usize,
+                            t2_atom_index,
+                        );
+                        let t1 = &self.states[statenr].as_ref().unwrap().trans[transnr];
+                        t1_to = t1.to;
+                        self.fa_finish_recurse_determinism(t1_to as usize);
+                        let t1 = &self.states[statenr].as_ref().unwrap().trans[transnr];
+                        t1_to = t1.to;
+                        t1_atom_index = t1.atom_index;
+                        // don't shortcut the computation so all non deterministic
+                        // transition get marked down
+                        // if (ret == 0)
+                        // return(0);
+                        if ret == 0 {
+                            self.states[statenr].as_mut().unwrap().trans[transnr].nd = 1;
+                            // (*t2).nd = 1;
+                            last = Some(transnr);
                         }
                     }
-                    // don't shortcut the computation so all non deterministic
-                    // transition get marked down
-                    // if (ret == 0)
-                    // break;
                 }
-                // mark specifically the last non-deterministic transition
-                // from a state since there is no need to set-up rollback from it
-                if let Some(last) = last {
-                    self.states[statenr].as_mut().unwrap().trans[last].nd = 2;
-                }
-
                 // don't shortcut the computation so all non deterministic
                 // transition get marked down
                 // if (ret == 0)
-                //     break;
+                // break;
+            }
+            // mark specifically the last non-deterministic transition
+            // from a state since there is no need to set-up rollback from it
+            if let Some(last) = last {
+                self.states[statenr].as_mut().unwrap().trans[last].nd = 2;
             }
 
-            self.determinist = ret;
-            ret
+            // don't shortcut the computation so all non deterministic
+            // transition get marked down
+            // if (ret == 0)
+            //     break;
         }
+
+        self.determinist = ret;
+        ret
     }
 
     /// ```text
-    /// [27]   charProp   ::=   IsCategory | IsBlock
-    /// [28]   IsCategory ::= Letters | Marks | Numbers | Punctuation |
+    /// [27]   charProp    ::=   IsCategory | IsBlock
+    /// [28]   IsCategory  ::= Letters | Marks | Numbers | Punctuation |
     ///                       Separators | Symbols | Others
-    /// [29]   Letters   ::=   'L' [ultmo]?
-    /// [30]   Marks   ::=   'M' [nce]?
-    /// [31]   Numbers   ::=   'N' [dlo]?
-    /// [32]   Punctuation   ::=   'P' [cdseifo]?
-    /// [33]   Separators   ::=   'Z' [slp]?
-    /// [34]   Symbols   ::=   'S' [mcko]?
-    /// [35]   Others   ::=   'C' [cfon]?
-    /// [36]   IsBlock   ::=   'Is' [a-zA-Z0-9#x2D]+
+    /// [29]   Letters     ::=   'L' [ultmo]?
+    /// [30]   Marks       ::=   'M' [nce]?
+    /// [31]   Numbers     ::=   'N' [dlo]?
+    /// [32]   Punctuation ::=   'P' [cdseifo]?
+    /// [33]   Separators  ::=   'Z' [slp]?
+    /// [34]   Symbols     ::=   'S' [mcko]?
+    /// [35]   Others      ::=   'C' [cfon]?
+    /// [36]   IsBlock     ::=   'Is' [a-zA-Z0-9#x2D]+
     /// ```
     #[doc(alias = "xmlFAParseCharProp")]
     fn fa_parse_char_prop(&mut self) {
@@ -2051,7 +2043,9 @@ impl XmlRegParserCtxt {
         }
     }
 
-    /// `[14]   posCharGroup ::= ( charRange | charClassEsc  )+`
+    /// ```text
+    /// [14]   posCharGroup ::= ( charRange | charClassEsc  )+
+    /// ```
     #[doc(alias = "xmlFAParsePosCharGroup")]
     fn fa_parse_pos_char_group(&mut self) {
         if self.current_byte() == Some(b'\\') {
@@ -2069,128 +2063,126 @@ impl XmlRegParserCtxt {
     }
 
     /// ```text
-    /// [13]   charGroup    ::= posCharGroup | negCharGroup | charClassSub
-    /// [15]   negCharGroup ::= '^' posCharGroup
-    /// [16]   charClassSub ::= ( posCharGroup | negCharGroup ) '-' charClassExpr
+    /// [13]   charGroup     ::= posCharGroup | negCharGroup | charClassSub
+    /// [15]   negCharGroup  ::= '^' posCharGroup
+    /// [16]   charClassSub  ::= ( posCharGroup | negCharGroup ) '-' charClassExpr
     /// [12]   charClassExpr ::= '[' charGroup ']'
     /// ```
     #[doc(alias = "xmlFAParseCharGroup")]
-    unsafe fn fa_parse_char_group(&mut self) {
-        unsafe {
-            let neg: i32 = self.neg;
+    fn fa_parse_char_group(&mut self) {
+        let neg = self.neg;
 
-            if self.current_byte() == Some(b'^') {
-                self.cur += 1;
-                self.neg = (self.neg == 0) as i32;
-                self.fa_parse_pos_char_group();
+        if self.current_byte() == Some(b'^') {
+            self.cur += 1;
+            self.neg = (self.neg == 0) as u8;
+            self.fa_parse_pos_char_group();
+            self.neg = neg;
+        }
+        while self.current_byte() != Some(b']') && self.error == 0 {
+            if self.current_byte() == Some(b'-') && self.nth_byte(1) == Some(b'[') {
+                self.cur += 1; /* eat the '-' */
+                self.cur += 1; /* eat the '[' */
+                self.neg = 2;
+                self.fa_parse_char_group();
                 self.neg = neg;
-            }
-            while self.current_byte() != Some(b']') && self.error == 0 {
-                if self.current_byte() == Some(b'-') && self.nth_byte(1) == Some(b'[') {
-                    self.cur += 1; /* eat the '-' */
-                    self.cur += 1; /* eat the '[' */
-                    self.neg = 2;
-                    self.fa_parse_char_group();
-                    self.neg = neg;
-                    if self.current_byte() == Some(b']') {
-                        self.cur += 1;
-                    } else {
-                        ERROR!(self, "charClassExpr: ']' expected");
-                    }
-                    break;
+                if self.current_byte() == Some(b']') {
+                    self.cur += 1;
                 } else {
-                    self.fa_parse_pos_char_group();
+                    ERROR!(self, "charClassExpr: ']' expected");
                 }
+                break;
+            } else {
+                self.fa_parse_pos_char_group();
             }
         }
     }
 
     /// ```text
-    /// [11]   charClass   ::=     charClassEsc | charClassExpr
+    /// [11]   charClass       ::=     charClassEsc | charClassExpr
     /// [12]   charClassExpr   ::=   '[' charGroup ']'
     /// ```
     #[doc(alias = "xmlFAParseCharClass")]
-    unsafe fn fa_parse_char_class(&mut self) {
-        unsafe {
-            if self.current_byte() == Some(b'[') {
+    fn fa_parse_char_class(&mut self) {
+        if self.current_byte() == Some(b'[') {
+            self.cur += 1;
+            self.atom = self.reg_new_atom(XmlRegAtomType::XmlRegexpRanges);
+            if self.atom == usize::MAX {
+                return;
+            }
+            self.fa_parse_char_group();
+            if self.current_byte() == Some(b']') {
                 self.cur += 1;
-                self.atom = self.reg_new_atom(XmlRegAtomType::XmlRegexpRanges);
-                if self.atom == usize::MAX {
-                    return;
-                }
-                self.fa_parse_char_group();
-                if self.current_byte() == Some(b']') {
-                    self.cur += 1;
-                } else {
-                    ERROR!(self, "xmlFAParseCharClass: ']' expected");
-                }
             } else {
-                self.fa_parse_char_class_esc();
+                ERROR!(self, "xmlFAParseCharClass: ']' expected");
             }
+        } else {
+            self.fa_parse_char_class_esc();
         }
     }
 
-    /// `[9]   atom   ::=   Char | charClass | ( '(' regExp ')' )`
+    /// ```text
+    /// [9]   atom   ::=   Char | charClass | ( '(' regExp ')' )
+    /// ```
     #[doc(alias = "xmlFAParseAtom")]
-    unsafe fn fa_parse_atom(&mut self) -> i32 {
-        unsafe {
-            if let Some(codepoint) = self.fa_is_char() {
-                self.atom = self.reg_new_atom(XmlRegAtomType::XmlRegexpCharval);
-                if self.atom == usize::MAX {
-                    return -1;
-                }
-                self.atoms[self.atom].codepoint = codepoint as i32;
-                self.cur += codepoint.len_utf8();
-                return 1;
-            } else if self.current_byte() == Some(b'|')
-                || self.current_byte().is_none()
-                || self.current_byte() == Some(b')')
-            {
-                return 0;
-            } else if self.current_byte() == Some(b'(') {
-                self.cur += 1;
-                if self.depth >= 50 {
-                    ERROR!(self, "xmlFAParseAtom: maximum nesting depth exceeded");
-                    return -1;
-                }
-                // this extra Epsilon transition is needed if we count with 0 allowed
-                // unfortunately this can't be known at that point
-                self.fa_generate_epsilon_transition(self.state, usize::MAX);
-                let start0 = self.state;
-                self.fa_generate_epsilon_transition(self.state, usize::MAX);
-                let start = self.state;
-                let oldend = self.end;
-                self.end = usize::MAX;
-                self.atom = usize::MAX;
-                self.depth += 1;
-                self.fa_parse_reg_exp(0);
-                self.depth -= 1;
-                if self.current_byte() == Some(b')') {
-                    self.cur += 1;
-                } else {
-                    ERROR!(self, "xmlFAParseAtom: expecting ')'");
-                }
-                self.atom = self.reg_new_atom(XmlRegAtomType::XmlRegexpSubReg);
-                if self.atom == usize::MAX {
-                    return -1;
-                }
-                self.atoms[self.atom].start = start;
-                self.atoms[self.atom].start0 = start0;
-                self.atoms[self.atom].stop = self.state;
-                self.end = oldend;
-                return 1;
-            } else if self.current_byte() == Some(b'[')
-                || self.current_byte() == Some(b'\\')
-                || self.current_byte() == Some(b'.')
-            {
-                self.fa_parse_char_class();
-                return 1;
+    fn fa_parse_atom(&mut self) -> i32 {
+        if let Some(codepoint) = self.fa_is_char() {
+            self.atom = self.reg_new_atom(XmlRegAtomType::XmlRegexpCharval);
+            if self.atom == usize::MAX {
+                return -1;
             }
-            0
+            self.atoms[self.atom].codepoint = codepoint as i32;
+            self.cur += codepoint.len_utf8();
+            return 1;
+        } else if self.current_byte() == Some(b'|')
+            || self.current_byte().is_none()
+            || self.current_byte() == Some(b')')
+        {
+            return 0;
+        } else if self.current_byte() == Some(b'(') {
+            self.cur += 1;
+            if self.depth >= 50 {
+                ERROR!(self, "xmlFAParseAtom: maximum nesting depth exceeded");
+                return -1;
+            }
+            // this extra Epsilon transition is needed if we count with 0 allowed
+            // unfortunately this can't be known at that point
+            self.fa_generate_epsilon_transition(self.state, usize::MAX);
+            let start0 = self.state;
+            self.fa_generate_epsilon_transition(self.state, usize::MAX);
+            let start = self.state;
+            let oldend = self.end;
+            self.end = usize::MAX;
+            self.atom = usize::MAX;
+            self.depth += 1;
+            self.fa_parse_reg_exp(0);
+            self.depth -= 1;
+            if self.current_byte() == Some(b')') {
+                self.cur += 1;
+            } else {
+                ERROR!(self, "xmlFAParseAtom: expecting ')'");
+            }
+            self.atom = self.reg_new_atom(XmlRegAtomType::XmlRegexpSubReg);
+            if self.atom == usize::MAX {
+                return -1;
+            }
+            self.atoms[self.atom].start = start;
+            self.atoms[self.atom].start0 = start0;
+            self.atoms[self.atom].stop = self.state;
+            self.end = oldend;
+            return 1;
+        } else if self.current_byte() == Some(b'[')
+            || self.current_byte() == Some(b'\\')
+            || self.current_byte() == Some(b'.')
+        {
+            self.fa_parse_char_class();
+            return 1;
         }
+        0
     }
 
-    /// `[8]   QuantExact   ::=   [0-9]+`
+    /// ```text
+    /// [8]   QuantExact   ::=   [0-9]+
+    /// ```
     ///
     /// Returns 0 if success or -1 in case of error
     #[doc(alias = "xmlFAParseQuantExact")]
@@ -2212,11 +2204,11 @@ impl XmlRegParserCtxt {
     }
 
     /// ```text
-    /// [4]   quantifier   ::=   [?*+] | ( '{' quantity '}' )
+    /// [4]   quantifier ::=   [?*+] | ( '{' quantity '}' )
     /// [5]   quantity   ::=   quantRange | quantMin | QuantExact
-    /// [6]   quantRange   ::=   QuantExact ',' QuantExact
+    /// [6]   quantRange ::=   QuantExact ',' QuantExact
     /// [7]   quantMin   ::=   QuantExact ','
-    /// [8]   QuantExact   ::=   [0-9]+
+    /// [8]   QuantExact ::=   [0-9]+
     /// ```
     #[doc(alias = "xmlFAParseQuantifier")]
     fn fa_parse_quantifier(&mut self) -> i32 {
@@ -2272,38 +2264,61 @@ impl XmlRegParserCtxt {
         0
     }
 
-    /// `[3]   piece   ::=   atom quantifier?`
+    /// ```text
+    /// [3]   piece   ::=   atom quantifier?
+    /// ```
     #[doc(alias = "xmlFAParsePiece")]
-    unsafe fn fa_parse_piece(&mut self) -> i32 {
-        unsafe {
-            self.atom = usize::MAX;
-            let ret: i32 = self.fa_parse_atom();
-            if ret == 0 {
-                return 0;
-            }
-            if self.atom == usize::MAX {
-                ERROR!(self, "internal: no atom generated");
-            }
-            self.fa_parse_quantifier();
-            1
+    fn fa_parse_piece(&mut self) -> i32 {
+        self.atom = usize::MAX;
+        let ret: i32 = self.fa_parse_atom();
+        if ret == 0 {
+            return 0;
         }
+        if self.atom == usize::MAX {
+            ERROR!(self, "internal: no atom generated");
+        }
+        self.fa_parse_quantifier();
+        1
     }
 
     /// @to is used to optimize by removing duplicate path in automata
     /// in expressions like (a|b)(c|d)
     ///
-    /// `[2]   branch   ::=   piece*`
+    /// ```text
+    /// [2]   branch   ::=   piece*
+    /// ```
     #[doc(alias = "xmlFAParseBranch")]
-    unsafe fn fa_parse_branch(&mut self, to: usize) -> i32 {
-        unsafe {
-            let mut ret: i32;
+    fn fa_parse_branch(&mut self, to: usize) -> i32 {
+        let mut ret: i32;
 
-            let mut previous = self.state;
+        let mut previous = self.state;
+        ret = self.fa_parse_piece();
+        if ret == 0 {
+            // Empty branch
+            self.fa_generate_epsilon_transition(previous, to);
+        } else {
+            if self.fa_generate_transitions(
+                previous,
+                if self.current_byte() == Some(b'|')
+                    || self.current_byte() == Some(b')')
+                    || self.current_byte().is_none()
+                {
+                    to
+                } else {
+                    usize::MAX
+                },
+                self.atom,
+            ) < 0
+            {
+                self.atom = usize::MAX;
+                return -1;
+            }
+            previous = self.state;
+            self.atom = usize::MAX;
+        }
+        while ret != 0 && self.error == 0 {
             ret = self.fa_parse_piece();
-            if ret == 0 {
-                // Empty branch
-                self.fa_generate_epsilon_transition(previous, to);
-            } else {
+            if ret != 0 {
                 if self.fa_generate_transitions(
                     previous,
                     if self.current_byte() == Some(b'|')
@@ -2323,60 +2338,36 @@ impl XmlRegParserCtxt {
                 previous = self.state;
                 self.atom = usize::MAX;
             }
-            while ret != 0 && self.error == 0 {
-                ret = self.fa_parse_piece();
-                if ret != 0 {
-                    if self.fa_generate_transitions(
-                        previous,
-                        if self.current_byte() == Some(b'|')
-                            || self.current_byte() == Some(b')')
-                            || self.current_byte().is_none()
-                        {
-                            to
-                        } else {
-                            usize::MAX
-                        },
-                        self.atom,
-                    ) < 0
-                    {
-                        self.atom = usize::MAX;
-                        return -1;
-                    }
-                    previous = self.state;
-                    self.atom = usize::MAX;
-                }
-            }
-            0
         }
+        0
     }
 
-    /// `[1]   regExp   ::=     branch  ( '|' branch )*`
+    /// ```text
+    /// [1]   regExp   ::=     branch  ( '|' branch )*
+    /// ```
     #[doc(alias = "xmlFAParseRegExp")]
-    unsafe fn fa_parse_reg_exp(&mut self, top: i32) {
-        unsafe {
-            // if not top start should have been generated by an epsilon trans
-            let start = self.state;
+    fn fa_parse_reg_exp(&mut self, top: i32) {
+        // if not top start should have been generated by an epsilon trans
+        let start = self.state;
+        self.end = usize::MAX;
+        self.fa_parse_branch(usize::MAX);
+        if top != 0 {
+            self.states[self.state].as_mut().unwrap().typ = XmlRegStateType::XmlRegexpFinalState;
+        }
+        if self.current_byte() != Some(b'|') {
+            self.end = self.state;
+            return;
+        }
+        let end = self.state;
+        while self.current_byte() == Some(b'|') as _ && self.error == 0 {
+            self.cur += 1;
+            self.state = start;
             self.end = usize::MAX;
-            self.fa_parse_branch(usize::MAX);
-            if top != 0 {
-                self.states[self.state].as_mut().unwrap().typ =
-                    XmlRegStateType::XmlRegexpFinalState;
-            }
-            if self.current_byte() != Some(b'|') {
-                self.end = self.state;
-                return;
-            }
-            let end = self.state;
-            while self.current_byte() == Some(b'|') as _ && self.error == 0 {
-                self.cur += 1;
-                self.state = start;
-                self.end = usize::MAX;
-                self.fa_parse_branch(end);
-            }
-            if top == 0 {
-                self.state = end;
-                self.end = end;
-            }
+            self.fa_parse_branch(end);
+        }
+        if top == 0 {
+            self.state = end;
+            self.end = end;
         }
     }
 }
@@ -3730,7 +3721,7 @@ fn xml_fa_compare_atom_types(mut type1: XmlRegAtomType, mut type2: XmlRegAtomTyp
 ///
 /// Returns 1 if the comparison is satisfied and the number of substrings is equal, 0 otherwise.
 #[doc(alias = "xmlRegStrEqualWildcard")]
-unsafe fn xml_reg_str_equal_wildcard(exp_str: Option<&str>, val_str: Option<&str>) -> i32 {
+fn xml_reg_str_equal_wildcard(exp_str: Option<&str>, val_str: Option<&str>) -> i32 {
     if exp_str == val_str {
         return 1;
     }
@@ -3964,98 +3955,96 @@ fn xml_fa_compare_ranges(range1: &XmlRegRange, range2: &XmlRegRange) -> i32 {
 ///
 /// Returns 1 if yes and 0 otherwise
 #[doc(alias = "xmlFACompareAtoms")]
-unsafe fn xml_fa_compare_atoms(atom1: &XmlRegAtom, atom2: &XmlRegAtom, deep: i32) -> i32 {
-    unsafe {
-        let mut ret: i32 = 1;
+fn xml_fa_compare_atoms(atom1: &XmlRegAtom, atom2: &XmlRegAtom, deep: i32) -> i32 {
+    let mut ret: i32 = 1;
 
-        if std::ptr::eq(atom1, atom2) {
-            return 1;
-        }
+    if std::ptr::eq(atom1, atom2) {
+        return 1;
+    }
 
-        if matches!(atom1.typ, XmlRegAtomType::XmlRegexpAnyChar)
-            || matches!(atom2.typ, XmlRegAtomType::XmlRegexpAnyChar)
-        {
-            return 1;
-        }
+    if matches!(atom1.typ, XmlRegAtomType::XmlRegexpAnyChar)
+        || matches!(atom2.typ, XmlRegAtomType::XmlRegexpAnyChar)
+    {
+        return 1;
+    }
 
-        let (atom1, atom2) = if atom1.typ > atom2.typ {
-            (atom2, atom1)
-        } else {
-            (atom1, atom2)
-        };
-        if atom1.typ != atom2.typ {
-            ret = xml_fa_compare_atom_types(atom1.typ, atom2.typ);
-            // if they can't intersect at the type level break now
-            if ret == 0 {
-                return 0;
-            }
-        }
-        'done: {
-            match atom1.typ {
-                XmlRegAtomType::XmlRegexpString => {
-                    if deep == 0 {
-                        ret = (atom1.valuep != atom2.valuep) as i32;
-                    } else {
-                        let val1 = atom1.valuep.as_deref();
-                        let val2 = atom2.valuep.as_deref();
-                        let compound1 = val1.is_some_and(|v| v.contains('|'));
-                        let compound2 = val2.is_some_and(|v| v.contains('|'));
-
-                        // Ignore negative match flag for ##other namespaces
-                        if compound1 != compound2 {
-                            return 0;
-                        }
-
-                        ret = xml_reg_str_equal_wildcard(val1, val2);
-                    }
-                }
-                XmlRegAtomType::XmlRegexpEpsilon => {
-                    // goto not_determinist;
-                    return 1;
-                }
-                XmlRegAtomType::XmlRegexpCharval => {
-                    if matches!(atom2.typ, XmlRegAtomType::XmlRegexpCharval) {
-                        ret = (atom1.codepoint == atom2.codepoint) as i32;
-                    } else {
-                        ret = atom2.check_character(atom1.codepoint);
-                        if ret < 0 {
-                            ret = 1;
-                        }
-                    }
-                }
-                XmlRegAtomType::XmlRegexpRanges => {
-                    if matches!(atom2.typ, XmlRegAtomType::XmlRegexpRanges) {
-                        let mut res: i32;
-
-                        // need to check that none of the ranges eventually matches
-                        for r1 in &atom1.ranges {
-                            for r2 in &atom2.ranges {
-                                res = xml_fa_compare_ranges(r1, r2);
-                                if res == 1 {
-                                    ret = 1;
-                                    break 'done;
-                                }
-                            }
-                        }
-                        ret = 0;
-                    }
-                }
-                _ => {
-                    // goto not_determinist;
-                    return 1;
-                }
-            }
-        }
-        // done:
-        if atom1.neg != atom2.neg {
-            ret = (ret == 0) as i32;
-        }
+    let (atom1, atom2) = if atom1.typ > atom2.typ {
+        (atom2, atom1)
+    } else {
+        (atom1, atom2)
+    };
+    if atom1.typ != atom2.typ {
+        ret = xml_fa_compare_atom_types(atom1.typ, atom2.typ);
+        // if they can't intersect at the type level break now
         if ret == 0 {
             return 0;
         }
-        // not_determinist:
-        1
     }
+    'done: {
+        match atom1.typ {
+            XmlRegAtomType::XmlRegexpString => {
+                if deep == 0 {
+                    ret = (atom1.valuep != atom2.valuep) as i32;
+                } else {
+                    let val1 = atom1.valuep.as_deref();
+                    let val2 = atom2.valuep.as_deref();
+                    let compound1 = val1.is_some_and(|v| v.contains('|'));
+                    let compound2 = val2.is_some_and(|v| v.contains('|'));
+
+                    // Ignore negative match flag for ##other namespaces
+                    if compound1 != compound2 {
+                        return 0;
+                    }
+
+                    ret = xml_reg_str_equal_wildcard(val1, val2);
+                }
+            }
+            XmlRegAtomType::XmlRegexpEpsilon => {
+                // goto not_determinist;
+                return 1;
+            }
+            XmlRegAtomType::XmlRegexpCharval => {
+                if matches!(atom2.typ, XmlRegAtomType::XmlRegexpCharval) {
+                    ret = (atom1.codepoint == atom2.codepoint) as i32;
+                } else {
+                    ret = atom2.check_character(atom1.codepoint);
+                    if ret < 0 {
+                        ret = 1;
+                    }
+                }
+            }
+            XmlRegAtomType::XmlRegexpRanges => {
+                if matches!(atom2.typ, XmlRegAtomType::XmlRegexpRanges) {
+                    let mut res: i32;
+
+                    // need to check that none of the ranges eventually matches
+                    for r1 in &atom1.ranges {
+                        for r2 in &atom2.ranges {
+                            res = xml_fa_compare_ranges(r1, r2);
+                            if res == 1 {
+                                ret = 1;
+                                break 'done;
+                            }
+                        }
+                    }
+                    ret = 0;
+                }
+            }
+            _ => {
+                // goto not_determinist;
+                return 1;
+            }
+        }
+    }
+    // done:
+    if atom1.neg != atom2.neg {
+        ret = (ret == 0) as i32;
+    }
+    if ret == 0 {
+        return 0;
+    }
+    // not_determinist:
+    1
 }
 
 /// Check if the regular expression is determinist

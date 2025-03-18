@@ -43,7 +43,7 @@ pub struct XmlAutomata {
     pub(crate) string: Box<str>,
     pub(crate) cur: usize,
     pub(crate) error: i32,
-    pub(crate) neg: i32,
+    pub(crate) neg: u8,
     pub(crate) start: usize,
     pub(crate) end: usize,
     pub(crate) state: usize,
@@ -119,11 +119,8 @@ impl XmlAutomata {
     ///
     /// Returns 1 if true, 0 if not, and -1 in case of error
     #[doc(alias = "xmlAutomataIsDeterminist")]
-    pub unsafe fn is_determinist(&mut self) -> i32 {
-        unsafe {
-            let ret: i32 = self.fa_computes_determinism();
-            ret
-        }
+    pub fn is_determinist(&mut self) -> i32 {
+        self.fa_computes_determinism()
     }
 
     pub fn get_state(&self, index: usize) -> Option<&XmlAutomataState> {
