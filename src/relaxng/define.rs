@@ -1,11 +1,15 @@
-use std::{ffi::c_void, ptr::null_mut};
+use std::{
+    ffi::c_void,
+    ptr::{drop_in_place, null_mut},
+    rc::Rc,
+};
 
 use crate::{
     hash::{XmlHashTablePtr, xml_hash_free},
     libxml::{
         globals::{xml_free, xml_malloc},
         relaxng::{XmlRelaxNGPartitionPtr, XmlRelaxNGType, xml_relaxng_free_partition},
-        xmlregexp::{XmlRegexpPtr, xml_reg_free_regexp},
+        xmlregexp::XmlRegexp,
     },
     tree::XmlNodePtr,
 };
@@ -17,21 +21,21 @@ pub type XmlRelaxNGDefinePtr = *mut XmlRelaxNGDefine;
 // TODO: all fieleds are used in only relaxng module.
 #[repr(C)]
 pub struct XmlRelaxNGDefine {
-    pub(crate) typ: XmlRelaxNGType,             // the type of definition
-    pub(crate) node: Option<XmlNodePtr>,        // the node in the source
-    pub(crate) name: *mut u8,                   // the element local name if present
-    pub(crate) ns: *mut u8,                     // the namespace local name if present
-    pub(crate) value: *mut u8,                  // value when available
-    pub(crate) data: *mut c_void,               // data lib or specific pointer
-    pub(crate) content: XmlRelaxNGDefinePtr,    // the expected content
-    pub(crate) parent: XmlRelaxNGDefinePtr,     // the parent definition, if any
-    pub(crate) next: XmlRelaxNGDefinePtr,       // list within grouping sequences
-    pub(crate) attrs: XmlRelaxNGDefinePtr,      // list of attributes for elements
-    pub(crate) name_class: XmlRelaxNGDefinePtr, // the nameClass definition if any
-    pub(crate) next_hash: XmlRelaxNGDefinePtr,  // next define in defs/refs hash tables
-    pub(crate) depth: i16,                      // used for the cycle detection
-    pub(crate) dflags: i16,                     // define related flags
-    pub(crate) cont_model: XmlRegexpPtr,        // a compiled content model if available
+    pub(crate) typ: XmlRelaxNGType,               // the type of definition
+    pub(crate) node: Option<XmlNodePtr>,          // the node in the source
+    pub(crate) name: *mut u8,                     // the element local name if present
+    pub(crate) ns: *mut u8,                       // the namespace local name if present
+    pub(crate) value: *mut u8,                    // value when available
+    pub(crate) data: *mut c_void,                 // data lib or specific pointer
+    pub(crate) content: XmlRelaxNGDefinePtr,      // the expected content
+    pub(crate) parent: XmlRelaxNGDefinePtr,       // the parent definition, if any
+    pub(crate) next: XmlRelaxNGDefinePtr,         // list within grouping sequences
+    pub(crate) attrs: XmlRelaxNGDefinePtr,        // list of attributes for elements
+    pub(crate) name_class: XmlRelaxNGDefinePtr,   // the nameClass definition if any
+    pub(crate) next_hash: XmlRelaxNGDefinePtr,    // next define in defs/refs hash tables
+    pub(crate) depth: i16,                        // used for the cycle detection
+    pub(crate) dflags: i16,                       // define related flags
+    pub(crate) cont_model: Option<Rc<XmlRegexp>>, // a compiled content model if available
 }
 
 impl XmlRelaxNGDefine {
@@ -81,7 +85,7 @@ impl Default for XmlRelaxNGDefine {
             next_hash: null_mut(),
             depth: 0,
             dflags: 0,
-            cont_model: null_mut(),
+            cont_model: None,
         }
     }
 }
@@ -139,9 +143,7 @@ pub(crate) unsafe fn xml_relaxng_free_define(define: XmlRelaxNGDefinePtr) {
         if !(*define).value.is_null() {
             xml_free((*define).value as _);
         }
-        if !(*define).cont_model.is_null() {
-            xml_reg_free_regexp((*define).cont_model);
-        }
+        drop_in_place(define);
         xml_free(define as _);
     }
 }

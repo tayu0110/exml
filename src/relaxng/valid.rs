@@ -148,12 +148,12 @@ impl XmlRelaxNGValidCtxt {
                     return -1;
                 }
                 let define: XmlRelaxNGDefinePtr = (*grammar).start;
-                if (*define).cont_model.is_null() {
+                let Some(cont_model) = (*define).cont_model.clone() else {
                     self.pdef = define;
                     return 0;
-                }
+                };
                 let exec: XmlRegExecCtxtPtr = xml_reg_new_exec_ctxt(
-                    (*define).cont_model,
+                    cont_model,
                     Some(xml_relaxng_validate_progressive_callback),
                     self as *mut Self as _,
                 );

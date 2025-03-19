@@ -2,6 +2,7 @@ use std::{
     borrow::Cow,
     ffi::{CStr, c_void},
     ptr::null,
+    rc::Rc,
 };
 
 use crate::{
@@ -15,7 +16,7 @@ use crate::{
             XmlSchemaAnnotPtr, XmlSchemaContentType, XmlSchemaFacetLinkPtr, XmlSchemaFacetPtr,
             XmlSchemaTypeLinkPtr, XmlSchemaTypeType, XmlSchemaValType, XmlSchemaWildcardPtr,
         },
-        xmlregexp::XmlRegexpPtr,
+        xmlregexp::XmlRegexp,
         xmlschemas::XmlSchemaIdcselectPtr,
         xmlschemastypes::{XmlSchemaValPtr, XmlSchemaWhitespaceValueType},
     },
@@ -553,7 +554,7 @@ pub struct XmlSchemaElement {
     pub(crate) value: *const u8, /* The original value of the value constraint. */
     pub(crate) ref_decl: *mut XmlSchemaElement, /* This will now be used for the
                                  substitution group affiliation */
-    pub(crate) cont_model: XmlRegexpPtr, /* Obsolete for WXS, maybe used for RelaxNG */
+    pub(crate) cont_model: Option<Rc<XmlRegexp>>, /* Obsolete for WXS, maybe used for RelaxNG */
     pub(crate) content_type: XmlSchemaContentType,
     pub(crate) def_val: XmlSchemaValPtr, /* The compiled value constraint. */
     pub(crate) idcs: *mut c_void,        /* The identity-constraint defs */
@@ -635,7 +636,7 @@ pub struct XmlSchemaType {
     pub(crate) facet_set: XmlSchemaFacetLinkPtr, /* All facets (incl. inherited) */
     pub(crate) content_type_def: XmlSchemaTypePtr, /* Used for the simple content of complex types.
                                    Could we use @subtypes for this? */
-    pub(crate) cont_model: XmlRegexpPtr, /* Holds the automaton of the content model */
+    pub(crate) cont_model: Option<Rc<XmlRegexp>>, /* Holds the automaton of the content model */
     pub(crate) target_namespace: *const u8,
     pub(crate) attr_uses: *mut c_void,
 }

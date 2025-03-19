@@ -24,10 +24,11 @@ use std::{
     ops::{Deref, DerefMut},
     os::raw::c_void,
     ptr::{NonNull, null_mut},
+    rc::Rc,
 };
 
 #[cfg(feature = "libxml_regexp")]
-use crate::libxml::xmlregexp::{XmlRegexpPtr, xml_reg_free_regexp};
+use crate::libxml::xmlregexp::XmlRegexp;
 use crate::{
     libxml::valid::xml_free_doc_element_content,
     tree::{
@@ -55,7 +56,7 @@ pub struct XmlElement {
     pub(crate) attributes: Option<XmlAttributePtr>, /* List of the declared attributes */
     pub(crate) prefix: Option<String>,              /* the namespace prefix if any */
     #[cfg(feature = "libxml_regexp")]
-    pub(crate) cont_model: XmlRegexpPtr, /* the validating regexp */
+    pub(crate) cont_model: Option<Rc<XmlRegexp>>, /* the validating regexp */
     #[cfg(not(feature = "libxml_regexp"))]
     pub(crate) cont_model: *mut c_void,
 }
@@ -76,7 +77,7 @@ impl Default for XmlElement {
             content: null_mut(),
             attributes: None,
             prefix: None,
-            cont_model: null_mut(),
+            cont_model: None,
         }
     }
 }
@@ -284,10 +285,6 @@ pub(crate) unsafe fn xml_free_element(elem: Option<XmlElementPtr>) {
         xml_free_doc_element_content(elem.doc, elem.content);
         elem.name = None;
         elem.prefix = None;
-        #[cfg(feature = "libxml_regexp")]
-        if !elem.cont_model.is_null() {
-            xml_reg_free_regexp(elem.cont_model);
-        }
         elem.free();
     }
 }

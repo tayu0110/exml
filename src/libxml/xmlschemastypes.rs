@@ -24,7 +24,8 @@ use std::{
     ffi::{CStr, CString, c_char},
     mem::size_of,
     os::raw::c_void,
-    ptr::{addr_of_mut, null, null_mut},
+    ptr::{addr_of_mut, drop_in_place, null, null_mut},
+    rc::Rc,
 };
 
 use libc::{memcpy, memmove, memset, snprintf, sscanf};
@@ -46,7 +47,7 @@ use crate::{
         },
         uri::{XmlURIPtr, xml_free_uri, xml_parse_uri},
         valid::{xml_add_id, xml_add_ref, xml_validate_notation_use},
-        xmlregexp::{xml_reg_free_regexp, xml_regexp_compile, xml_regexp_exec},
+        xmlregexp::xml_regexp_exec,
         xmlschemas::{
             XmlSchemaAbstractCtxtPtr, xml_schema_facet_type_to_string, xml_schema_format_qname,
             xml_schema_vcheck_cvc_simple_type,
@@ -74,6 +75,7 @@ use crate::{
 use super::{
     chvalid::{xml_is_blank_char, xml_is_digit},
     hash::CVoidWrapper,
+    xmlregexp::XmlRegexp,
 };
 
 #[repr(C)]
@@ -5434,7 +5436,7 @@ unsafe fn xml_schema_validate_facet_internal(
                 {
                     value = (*val).value.str;
                 }
-                ret = xml_regexp_exec((*facet).regexp, value);
+                ret = xml_regexp_exec((*facet).regexp.clone().unwrap(), value);
                 if ret == 1 {
                     return 0;
                 }
@@ -5943,12 +5945,13 @@ pub unsafe fn xml_schema_check_facet(
                 }
             }
             XmlSchemaTypeType::XmlSchemaFacetPattern => {
-                (*facet).regexp = xml_regexp_compile(
+                (*facet).regexp = XmlRegexp::compile(
                     CStr::from_ptr((*facet).value as *const i8)
                         .to_string_lossy()
                         .as_ref(),
-                );
-                if (*facet).regexp.is_null() {
+                )
+                .map(Rc::new);
+                if (*facet).regexp.is_none() {
                     ret = XmlParserErrors::XmlSchemapRegexpInvalid as i32;
                     // No error message for RelaxNG.
                     if ctxt_given != 0 {
@@ -6075,12 +6078,10 @@ pub unsafe fn xml_schema_free_facet(facet: XmlSchemaFacetPtr) {
         if !(*facet).val.is_null() {
             xml_schema_free_value((*facet).val);
         }
-        if !(*facet).regexp.is_null() {
-            xml_reg_free_regexp((*facet).regexp);
-        }
         if !(*facet).annot.is_null() {
             xml_schema_free_annot((*facet).annot);
         }
+        drop_in_place(facet);
         xml_free(facet as _);
     }
 }

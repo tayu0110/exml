@@ -36,7 +36,6 @@ use crate::libxml::xmlautomata::XmlAutomata;
 #[cfg(feature = "libxml_regexp")]
 use crate::libxml::xmlregexp::{
     XmlRegExecCtxtPtr, xml_reg_exec_push_string, xml_reg_free_exec_ctxt, xml_reg_new_exec_ctxt,
-    xml_regexp_is_determinist,
 };
 #[cfg(feature = "libxml_regexp")]
 use crate::libxml::xmlstring::xml_strncmp;
@@ -4441,97 +4440,95 @@ unsafe fn xml_validate_element_content(
         #[cfg(feature = "libxml_regexp")]
         {
             // Build the regexp associated to the content model
-            if elem_decl.cont_model.is_null() {
+            if elem_decl.cont_model.is_none() {
                 ret = xml_valid_build_content_model(ctxt, elem_decl);
             }
-            if elem_decl.cont_model.is_null() {
+            let Some(cont_model) = elem_decl.cont_model.clone() else {
                 return -1;
-            } else {
-                if xml_regexp_is_determinist(elem_decl.cont_model) == 0 {
-                    return -1;
-                }
-                (*ctxt).node_tab.clear();
-                let exec: XmlRegExecCtxtPtr =
-                    xml_reg_new_exec_ctxt(elem_decl.cont_model, None, null_mut());
-                if !exec.is_null() {
-                    let mut cur = child;
-                    'fail: {
-                        while let Some(cur_node) = cur {
-                            match cur_node.element_type() {
-                                XmlElementType::XmlEntityRefNode => {
-                                    let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                                    // Push the current node to be able to roll back
-                                    // and process within the entity
-                                    if let Some(children) = cur_node
-                                        .children
-                                        .filter(|children| children.children().is_some())
-                                    {
-                                        node_vpush(ctxt, cur_node);
-                                        cur = children.children();
-                                        continue;
-                                    }
+            };
+            if cont_model.is_determinist() == 0 {
+                return -1;
+            }
+            (*ctxt).node_tab.clear();
+            let exec: XmlRegExecCtxtPtr = xml_reg_new_exec_ctxt(cont_model, None, null_mut());
+            if !exec.is_null() {
+                let mut cur = child;
+                'fail: {
+                    while let Some(cur_node) = cur {
+                        match cur_node.element_type() {
+                            XmlElementType::XmlEntityRefNode => {
+                                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                                // Push the current node to be able to roll back
+                                // and process within the entity
+                                if let Some(children) = cur_node
+                                    .children
+                                    .filter(|children| children.children().is_some())
+                                {
+                                    node_vpush(ctxt, cur_node);
+                                    cur = children.children();
+                                    continue;
                                 }
-                                XmlElementType::XmlTextNode => {
-                                    let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                                    if cur_node.is_blank_node() {
-                                        //  break;
-                                    } else {
-                                        ret = 0;
-                                        break 'fail;
-                                    }
-                                }
-                                XmlElementType::XmlCDATASectionNode => {
-                                    // TODO
+                            }
+                            XmlElementType::XmlTextNode => {
+                                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                                if cur_node.is_blank_node() {
+                                    //  break;
+                                } else {
                                     ret = 0;
                                     break 'fail;
                                 }
-                                XmlElementType::XmlElementNode => {
-                                    let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                                    if let Some(prefix) =
-                                        cur_node.ns.map(|ns| ns.prefix).filter(|p| !p.is_null())
-                                    {
-                                        let mut fname: [XmlChar; 50] = [0; 50];
+                            }
+                            XmlElementType::XmlCDATASectionNode => {
+                                // TODO
+                                ret = 0;
+                                break 'fail;
+                            }
+                            XmlElementType::XmlElementNode => {
+                                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                                if let Some(prefix) =
+                                    cur_node.ns.map(|ns| ns.prefix).filter(|p| !p.is_null())
+                                {
+                                    let mut fname: [XmlChar; 50] = [0; 50];
 
-                                        let fullname: *mut XmlChar = xml_build_qname(
-                                            cur_node.name,
-                                            prefix as _,
-                                            fname.as_mut_ptr(),
-                                            50,
-                                        );
-                                        if fullname.is_null() {
-                                            ret = -1;
-                                            break 'fail;
-                                        }
-                                        // ret =
-                                        xml_reg_exec_push_string(exec, fullname, null_mut());
-                                        if fullname != fname.as_ptr() as _
-                                            && fullname != cur_node.name as _
-                                        {
-                                            xml_free(fullname as _);
-                                        }
-                                    } else {
-                                        // ret =
-                                        xml_reg_exec_push_string(exec, cur_node.name, null_mut());
+                                    let fullname: *mut XmlChar = xml_build_qname(
+                                        cur_node.name,
+                                        prefix as _,
+                                        fname.as_mut_ptr(),
+                                        50,
+                                    );
+                                    if fullname.is_null() {
+                                        ret = -1;
+                                        break 'fail;
                                     }
+                                    // ret =
+                                    xml_reg_exec_push_string(exec, fullname, null_mut());
+                                    if fullname != fname.as_ptr() as _
+                                        && fullname != cur_node.name as _
+                                    {
+                                        xml_free(fullname as _);
+                                    }
+                                } else {
+                                    // ret =
+                                    xml_reg_exec_push_string(exec, cur_node.name, null_mut());
                                 }
-                                _ => {}
                             }
-                            // Switch to next element
-                            cur = cur_node.next();
-                            while cur.is_none() {
-                                cur = node_vpop(ctxt).map(|node| node.into());
-                                if cur.is_none() {
-                                    break;
-                                }
-                                cur = cur_node.next();
-                            }
+                            _ => {}
                         }
-
-                        ret = xml_reg_exec_push_string(exec, null_mut(), null_mut());
+                        // Switch to next element
+                        cur = cur_node.next();
+                        while cur.is_none() {
+                            cur = node_vpop(ctxt).map(|node| node.into());
+                            if cur.is_none() {
+                                break;
+                            }
+                            cur = cur_node.next();
+                        }
                     }
-                    // fail:
-                    xml_reg_free_exec_ctxt(exec);
+
+                    ret = xml_reg_exec_push_string(exec, null_mut(), null_mut());
                 }
+                // fail:
+                xml_reg_free_exec_ctxt(exec);
             }
         }
 
@@ -6842,8 +6839,8 @@ pub unsafe fn xml_valid_build_content_model(ctxt: XmlValidCtxtPtr, mut elem: Xml
             return 1;
         }
         // TODO: should we rebuild in this case ?
-        if !elem.cont_model.is_null() {
-            if xml_regexp_is_determinist(elem.cont_model) == 0 {
+        if let Some(cont_model) = elem.cont_model.as_deref() {
+            if cont_model.is_determinist() == 0 {
                 (*ctxt).valid = 0;
                 return 0;
             }
@@ -6881,8 +6878,12 @@ pub unsafe fn xml_valid_build_content_model(ctxt: XmlValidCtxtPtr, mut elem: Xml
             .get_state_mut((*ctxt).state)
             .unwrap()
             .set_final_state();
-        elem.cont_model = (*ctxt).am.as_mut().unwrap().compile();
-        if xml_regexp_is_determinist(elem.cont_model) != 1 {
+        elem.cont_model = (*ctxt).am.as_mut().unwrap().compile().map(Rc::new);
+        if elem
+            .cont_model
+            .as_deref()
+            .is_none_or(|cont_model| cont_model.is_determinist() != 1)
+        {
             let mut expr = String::with_capacity(5000);
             xml_snprintf_element_content(&mut expr, 5000, elem.content, 1);
             let name = elem.name.as_deref().unwrap();
@@ -7011,12 +7012,12 @@ unsafe fn vstate_vpush(
         if let Some(elem_decl) =
             elem_decl.filter(|decl| matches!(decl.etype, XmlElementTypeVal::XmlElementTypeElement))
         {
-            if elem_decl.cont_model.is_null() {
+            if elem_decl.cont_model.is_none() {
                 xml_valid_build_content_model(ctxt, elem_decl);
             }
-            if !elem_decl.cont_model.is_null() {
+            if let Some(cont_model) = elem_decl.cont_model.clone() {
                 (*ctxt).vstate_tab.last_mut().unwrap().exec =
-                    xml_reg_new_exec_ctxt(elem_decl.cont_model, None, null_mut());
+                    xml_reg_new_exec_ctxt(cont_model, None, null_mut());
             } else {
                 (*ctxt).vstate_tab.last_mut().unwrap().exec = null_mut();
                 let node_name = (*node).name().unwrap();

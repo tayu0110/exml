@@ -25,7 +25,7 @@
 //
 // Daniel Veillard <veillard@redhat.com>
 
-use std::{os::raw::c_void, ptr::null_mut};
+use std::os::raw::c_void;
 
 use crate::libxml::xmlregexp::{
     XmlRegAtomType, XmlRegCounter, XmlRegMarkedType, XmlRegQuantType, XmlRegStateType, XmlRegTrans,
@@ -104,15 +104,13 @@ impl XmlAutomata {
     ///
     /// Returns the compiled regexp or NULL in case of error
     #[doc(alias = "xmlAutomataCompile")]
-    pub unsafe fn compile(&mut self) -> *mut XmlRegexp {
-        unsafe {
-            if self.error != 0 {
-                return null_mut();
-            }
-            self.fa_eliminate_epsilon_transitions();
-            /* xmlFAComputesDeterminism(self); */
-            self.parse()
+    pub fn compile(&mut self) -> Option<XmlRegexp> {
+        if self.error != 0 {
+            return None;
         }
+        self.fa_eliminate_epsilon_transitions();
+        /* xmlFAComputesDeterminism(self); */
+        self.parse()
     }
 
     /// Checks if an automata is determinist.

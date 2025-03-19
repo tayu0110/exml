@@ -30,10 +30,12 @@
 use std::{
     borrow::Cow,
     ffi::{CStr, c_char},
+    fmt::Debug,
     io::Write,
     mem::{size_of, take},
     os::raw::c_void,
     ptr::{addr_of_mut, drop_in_place, null, null_mut},
+    rc::Rc,
 };
 
 use libc::{memcpy, memset, snprintf, strlen};
@@ -45,7 +47,7 @@ use crate::{
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         parser_internals::xml_string_current_char,
         xmlautomata::{XmlAutomata, XmlAutomataState},
-        xmlstring::{XmlChar, xml_strdup, xml_strndup},
+        xmlstring::{XmlChar, xml_strdup},
         xmlunicode::{
             xml_ucs_is_block, xml_ucs_is_cat_c, xml_ucs_is_cat_cc, xml_ucs_is_cat_cf,
             xml_ucs_is_cat_co, xml_ucs_is_cat_l, xml_ucs_is_cat_ll, xml_ucs_is_cat_lm,
@@ -174,6 +176,67 @@ pub enum XmlRegAtomType {
     XmlRegexpBlockName,
 }
 
+impl std::fmt::Display for XmlRegAtomType {
+    #[doc(alias = "xmlRegPrintAtomType")]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            XmlRegAtomType::XmlRegexpEpsilon => write!(f, "epsilon"),
+            XmlRegAtomType::XmlRegexpCharval => write!(f, "charval"),
+            XmlRegAtomType::XmlRegexpRanges => write!(f, "ranges"),
+            XmlRegAtomType::XmlRegexpSubReg => write!(f, "subexpr"),
+            XmlRegAtomType::XmlRegexpString => write!(f, "string"),
+            XmlRegAtomType::XmlRegexpAnyChar => write!(f, "anychar"),
+            XmlRegAtomType::XmlRegexpAnySpace => write!(f, "anyspace"),
+            XmlRegAtomType::XmlRegexpNotSpace => write!(f, "notspace"),
+            XmlRegAtomType::XmlRegexpInitName => write!(f, "initname"),
+            XmlRegAtomType::XmlRegexpNotInitName => write!(f, "notinitname"),
+            XmlRegAtomType::XmlRegexpNameChar => write!(f, "namechar"),
+            XmlRegAtomType::XmlRegexpNotNameChar => write!(f, "notnamechar"),
+            XmlRegAtomType::XmlRegexpDecimal => write!(f, "decimal"),
+            XmlRegAtomType::XmlRegexpNotDecimal => write!(f, "notdecimal"),
+            XmlRegAtomType::XmlRegexpRealChar => write!(f, "realchar"),
+            XmlRegAtomType::XmlRegexpNotRealChar => write!(f, "notrealchar"),
+            XmlRegAtomType::XmlRegexpLetter => write!(f, "LETTER"),
+            XmlRegAtomType::XmlRegexpLetterUppercase => write!(f, "LETTER_UPPERCASE"),
+            XmlRegAtomType::XmlRegexpLetterLowercase => write!(f, "LETTER_LOWERCASE"),
+            XmlRegAtomType::XmlRegexpLetterTitlecase => write!(f, "LETTER_TITLECASE"),
+            XmlRegAtomType::XmlRegexpLetterModifier => write!(f, "LETTER_MODIFIER"),
+            XmlRegAtomType::XmlRegexpLetterOthers => write!(f, "LETTER_OTHERS"),
+            XmlRegAtomType::XmlRegexpMark => write!(f, "MARK"),
+            XmlRegAtomType::XmlRegexpMarkNonSpacing => write!(f, "MARK_NONSPACING"),
+            XmlRegAtomType::XmlRegexpMarkSpaceCombining => write!(f, "MARK_SPACECOMBINING"),
+            XmlRegAtomType::XmlRegexpMarkEnclosing => write!(f, "MARK_ENCLOSING"),
+            XmlRegAtomType::XmlRegexpNumber => write!(f, "NUMBER"),
+            XmlRegAtomType::XmlRegexpNumberDecimal => write!(f, "NUMBER_DECIMAL"),
+            XmlRegAtomType::XmlRegexpNumberLetter => write!(f, "NUMBER_LETTER"),
+            XmlRegAtomType::XmlRegexpNumberOthers => write!(f, "NUMBER_OTHERS"),
+            XmlRegAtomType::XmlRegexpPunct => write!(f, "PUNCT"),
+            XmlRegAtomType::XmlRegexpPunctConnector => write!(f, "PUNCT_CONNECTOR"),
+            XmlRegAtomType::XmlRegexpPunctDash => write!(f, "PUNCT_DASH"),
+            XmlRegAtomType::XmlRegexpPunctOpen => write!(f, "PUNCT_OPEN"),
+            XmlRegAtomType::XmlRegexpPunctClose => write!(f, "PUNCT_CLOSE"),
+            XmlRegAtomType::XmlRegexpPunctInitQuote => write!(f, "PUNCT_INITQUOTE"),
+            XmlRegAtomType::XmlRegexpPunctFinQuote => write!(f, "PUNCT_FINQUOTE"),
+            XmlRegAtomType::XmlRegexpPunctOthers => write!(f, "PUNCT_OTHERS"),
+            XmlRegAtomType::XmlRegexpSepar => write!(f, "SEPAR"),
+            XmlRegAtomType::XmlRegexpSeparSpace => write!(f, "SEPAR_SPACE"),
+            XmlRegAtomType::XmlRegexpSeparLine => write!(f, "SEPAR_LINE"),
+            XmlRegAtomType::XmlRegexpSeparPara => write!(f, "SEPAR_PARA"),
+            XmlRegAtomType::XmlRegexpSymbol => write!(f, "SYMBOL"),
+            XmlRegAtomType::XmlRegexpSymbolMath => write!(f, "SYMBOL_MATH"),
+            XmlRegAtomType::XmlRegexpSymbolCurrency => write!(f, "SYMBOL_CURRENCY"),
+            XmlRegAtomType::XmlRegexpSymbolModifier => write!(f, "SYMBOL_MODIFIER"),
+            XmlRegAtomType::XmlRegexpSymbolOthers => write!(f, "SYMBOL_OTHERS"),
+            XmlRegAtomType::XmlRegexpOther => write!(f, "OTHER"),
+            XmlRegAtomType::XmlRegexpOtherControl => write!(f, "OTHER_CONTROL"),
+            XmlRegAtomType::XmlRegexpOtherFormat => write!(f, "OTHER_FORMAT"),
+            XmlRegAtomType::XmlRegexpOtherPrivate => write!(f, "OTHER_PRIVATE"),
+            XmlRegAtomType::XmlRegexpOtherNa => write!(f, "OTHER_NA"),
+            XmlRegAtomType::XmlRegexpBlockName => write!(f, "BLOCK"),
+        }
+    }
+}
+
 #[doc(alias = "xmlRegQuantType")]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -187,6 +250,22 @@ pub enum XmlRegQuantType {
     XmlRegexpQuantOnceonly,
     XmlRegexpQuantAll,
     XmlRegexpQuantRange,
+}
+
+impl std::fmt::Display for XmlRegQuantType {
+    #[doc(alias = "xmlRegPrintQuantType")]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            XmlRegQuantType::XmlRegexpQuantEpsilon => write!(f, "epsilon"),
+            XmlRegQuantType::XmlRegexpQuantOnce => write!(f, "once"),
+            XmlRegQuantType::XmlRegexpQuantOpt => write!(f, "?"),
+            XmlRegQuantType::XmlRegexpQuantMult => write!(f, "*"),
+            XmlRegQuantType::XmlRegexpQuantPlus => write!(f, "+"),
+            XmlRegQuantType::XmlRegexpQuantRange => write!(f, "range"),
+            XmlRegQuantType::XmlRegexpQuantOnceonly => write!(f, "onceonly"),
+            XmlRegQuantType::XmlRegexpQuantAll => write!(f, "all"),
+        }
+    }
 }
 
 #[doc(alias = "xmlRegStateType")]
@@ -220,6 +299,30 @@ pub struct XmlRegRange {
     start: i32,
     end: i32,
     block_name: Option<String>,
+}
+
+impl Debug for XmlRegRange {
+    #[doc(alias = "xmlRegPrintRange")]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "  range: ")?;
+        if self.neg != 0 {
+            write!(f, "negative ")?;
+        }
+        write!(f, "{} ", self.typ)?;
+        writeln!(
+            f,
+            "{} - {}",
+            char::from_u32(self.start as u32).unwrap(),
+            char::from_u32(self.end as u32).unwrap()
+        )?;
+        Ok(())
+    }
+}
+
+impl std::fmt::Display for XmlRegRange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self:?}")
+    }
 }
 
 pub type XmlRegState = XmlAutomataState;
@@ -377,6 +480,43 @@ impl XmlRegAtom {
     }
 }
 
+impl Debug for XmlRegAtom {
+    #[doc(alias = "xmlRegPrintAtom")]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, " atom: ")?;
+        if self.neg != 0 {
+            write!(f, "not ")?;
+        }
+        write!(f, "{} ", self.typ)?;
+        write!(f, "{} ", self.quant)?;
+        if matches!(self.quant, XmlRegQuantType::XmlRegexpQuantRange) {
+            write!(f, "{}-{} ", self.min, self.max)?;
+        }
+        if matches!(self.typ, XmlRegAtomType::XmlRegexpString) {
+            write!(f, "'{}' ", self.valuep.as_deref().unwrap())?;
+        }
+        if matches!(self.typ, XmlRegAtomType::XmlRegexpCharval) {
+            writeln!(f, "char {}", char::from_u32(self.codepoint as u32).unwrap())?;
+        } else if matches!(self.typ, XmlRegAtomType::XmlRegexpRanges) {
+            writeln!(f, "{} entries", self.ranges.len())?;
+            for range in &self.ranges {
+                write!(f, "{range:?}")?;
+            }
+        } else if matches!(self.typ, XmlRegAtomType::XmlRegexpSubReg) {
+            writeln!(f, "start {} end {}", self.start, self.stop)?;
+        } else {
+            writeln!(f)?;
+        }
+        Ok(())
+    }
+}
+
+impl std::fmt::Display for XmlRegAtom {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+
 impl Default for XmlRegAtom {
     fn default() -> Self {
         Self {
@@ -444,142 +584,135 @@ impl XmlRegParserCtxt {
     ///
     /// Returns the new regexp or NULL in case of error
     #[doc(alias = "xmlRegEpxFromParse")]
-    pub(crate) unsafe fn parse(&mut self) -> XmlRegexpPtr {
-        unsafe {
-            let ret: XmlRegexpPtr = xml_malloc(size_of::<XmlRegexp>()) as XmlRegexpPtr;
-            if ret.is_null() {
-                xml_regexp_err_memory(self, "compiling regexp");
-                return null_mut();
+    pub(crate) fn parse(&mut self) -> Option<XmlRegexp> {
+        let mut ret = XmlRegexp {
+            string: self.string.clone(),
+            states: take(&mut self.states),
+            atoms: take(&mut self.atoms),
+            counters: take(&mut self.counters),
+            determinist: self.determinist,
+            flags: self.flags,
+            ..Default::default()
+        };
+        if ret.determinist == -1 {
+            ret.computes_determinism();
+        }
+
+        if ret.determinist != 0
+            && ret.counters.is_empty()
+            && self.negs == 0
+            && !ret.atoms.is_empty()
+            && matches!(ret.atoms[0].typ, XmlRegAtomType::XmlRegexpString)
+        {
+            let mut nbstates: i32 = 0;
+            let mut nbatoms: i32 = 0;
+
+            // Switch to a compact representation
+            // 1/ counting the effective number of states left
+            // 2/ counting the unique number of atoms, and check that
+            //    they are all of the string type
+            // 3/ build a table state x atom for the transitions
+
+            let mut state_remap = vec![0; ret.states.len()];
+            for (i, state) in ret.states.iter().enumerate() {
+                if state.is_some() {
+                    state_remap[i] = nbstates;
+                    nbstates += 1;
+                } else {
+                    state_remap[i] = -1;
+                }
             }
-            std::ptr::write(&mut *ret, XmlRegexp::default());
-            (*ret).string = xml_strndup(self.string.as_ptr(), self.string.len() as i32);
-            (*ret).states = take(&mut self.states);
-            (*ret).atoms = take(&mut self.atoms);
-            (*ret).counters = take(&mut self.counters);
-            (*ret).determinist = self.determinist;
-            (*ret).flags = self.flags;
-            if (*ret).determinist == -1 {
-                xml_regexp_is_determinist(ret);
-            }
 
-            if (*ret).determinist != 0
-                && (*ret).counters.is_empty()
-                && self.negs == 0
-                && !(*ret).atoms.is_empty()
-                && matches!((*ret).atoms[0].typ, XmlRegAtomType::XmlRegexpString)
-            {
-                let mut nbstates: i32 = 0;
-                let mut nbatoms: i32 = 0;
-
-                // Switch to a compact representation
-                // 1/ counting the effective number of states left
-                // 2/ counting the unique number of atoms, and check that
-                //    they are all of the string type
-                // 3/ build a table state x atom for the transitions
-
-                let mut state_remap = vec![0; (*ret).states.len()];
-                for (i, state) in (*ret).states.iter().enumerate() {
-                    if state.is_some() {
-                        state_remap[i] = nbstates;
-                        nbstates += 1;
-                    } else {
-                        state_remap[i] = -1;
+            let mut string_map = Vec::with_capacity(ret.atoms.len());
+            let mut string_remap = vec![0; ret.atoms.len()];
+            for (i, atom) in ret.atoms.iter().enumerate() {
+                if matches!(atom.typ, XmlRegAtomType::XmlRegexpString)
+                    && matches!(atom.quant, XmlRegQuantType::XmlRegexpQuantOnce)
+                {
+                    let mut k = nbatoms;
+                    let value = atom.valuep.as_deref().unwrap();
+                    for j in 0..nbatoms {
+                        if string_map[j as usize] == value {
+                            string_remap[i] = j;
+                            k = j;
+                            break;
+                        }
                     }
+                    if k >= nbatoms {
+                        string_remap[i] = nbatoms;
+                        string_map.push(value.to_owned());
+                        nbatoms += 1;
+                    }
+                } else {
+                    self.states = take(&mut ret.states);
+                    self.counters = take(&mut ret.counters);
+                    self.atoms = take(&mut ret.atoms);
+                    return None;
+                }
+            }
+            let mut transitions = vec![vec![0; (nbatoms + 1) as usize]; (nbstates + 1) as usize];
+
+            // Allocate the transition table. The first entry for each
+            // state corresponds to the state type.
+            let mut transdata = vec![];
+
+            for (i, state) in ret.states.iter().enumerate() {
+                let mut atomno: i32;
+                let mut targetno: i32;
+                let mut prev: i32;
+
+                let stateno: i32 = state_remap[i];
+                if stateno == -1 {
+                    continue;
                 }
 
-                let mut string_map = Vec::with_capacity((*ret).atoms.len());
-                let mut string_remap = vec![0; (*ret).atoms.len()];
-                for (i, atom) in (*ret).atoms.iter().enumerate() {
-                    if matches!(atom.typ, XmlRegAtomType::XmlRegexpString)
-                        && matches!(atom.quant, XmlRegQuantType::XmlRegexpQuantOnce)
-                    {
-                        let mut k = nbatoms;
-                        let value = atom.valuep.as_deref().unwrap();
-                        for j in 0..nbatoms {
-                            if string_map[j as usize] == value {
-                                string_remap[i] = j;
-                                k = j;
-                                break;
-                            }
-                        }
-                        if k >= nbatoms {
-                            string_remap[i] = nbatoms;
-                            string_map.push(value.to_owned());
-                            nbatoms += 1;
-                        }
-                    } else {
-                        self.states = take(&mut (*ret).states);
-                        self.counters = take(&mut (*ret).counters);
-                        self.atoms = take(&mut (*ret).atoms);
-                        xml_free(ret as _);
-                        return null_mut();
-                    }
-                }
-                let mut transitions =
-                    vec![vec![0; (nbatoms + 1) as usize]; (nbstates + 1) as usize];
+                transitions[stateno as usize][0] = state.as_ref().unwrap().typ as i32;
 
-                // Allocate the transition table. The first entry for each
-                // state corresponds to the state type.
-                let mut transdata = vec![];
-
-                for (i, state) in (*ret).states.iter().enumerate() {
-                    let mut atomno: i32;
-                    let mut targetno: i32;
-                    let mut prev: i32;
-
-                    let stateno: i32 = state_remap[i];
-                    if stateno == -1 {
+                for trans in &state.as_ref().unwrap().trans {
+                    if trans.to == -1 || trans.atom_index == usize::MAX {
                         continue;
                     }
-
-                    transitions[stateno as usize][0] = state.as_ref().unwrap().typ as i32;
-
-                    for trans in &state.as_ref().unwrap().trans {
-                        if trans.to == -1 || trans.atom_index == usize::MAX {
-                            continue;
+                    atomno = string_remap[ret.atoms[trans.atom_index].no as usize];
+                    if !ret.atoms[trans.atom_index].data.is_null() && transdata.is_empty() {
+                        transdata = vec![vec![null_mut(); nbatoms as usize]; nbstates as usize];
+                    }
+                    targetno = state_remap[trans.to as usize];
+                    // if the same atom can generate transitions to 2 different
+                    // states then it means the automata is not deterministic and
+                    // the compact form can't be used !
+                    prev = transitions[stateno as usize][(atomno + 1) as usize];
+                    if prev != 0 {
+                        if prev != targetno + 1 {
+                            ret.determinist = 0;
+                            self.string = "".to_owned().into_boxed_str();
+                            self.states.clear();
+                            self.atoms.clear();
+                            self.counters.clear();
+                            return Some(ret);
                         }
-                        atomno = string_remap[(*ret).atoms[trans.atom_index].no as usize];
-                        if !(*ret).atoms[trans.atom_index].data.is_null() && transdata.is_empty() {
-                            transdata = vec![vec![null_mut(); nbatoms as usize]; nbstates as usize];
-                        }
-                        targetno = state_remap[trans.to as usize];
-                        // if the same atom can generate transitions to 2 different
-                        // states then it means the automata is not deterministic and
-                        // the compact form can't be used !
-                        prev = transitions[stateno as usize][(atomno + 1) as usize];
-                        if prev != 0 {
-                            if prev != targetno + 1 {
-                                (*ret).determinist = 0;
-                                self.string = "".to_owned().into_boxed_str();
-                                self.states.clear();
-                                self.atoms.clear();
-                                self.counters.clear();
-                                return ret;
-                            }
-                        } else {
-                            transitions[stateno as usize][(atomno + 1) as usize] = targetno + 1; /* to avoid 0 */
-                            if !transdata.is_empty() {
-                                transdata[stateno as usize][atomno as usize] =
-                                    (*ret).atoms[trans.atom_index].data;
-                            }
+                    } else {
+                        transitions[stateno as usize][(atomno + 1) as usize] = targetno + 1; /* to avoid 0 */
+                        if !transdata.is_empty() {
+                            transdata[stateno as usize][atomno as usize] =
+                                ret.atoms[trans.atom_index].data;
                         }
                     }
                 }
-                (*ret).determinist = 1;
-                // Cleanup of the old data
-                (*ret).states.clear();
-                (*ret).compact = transitions;
-                (*ret).transdata = transdata;
-                (*ret).string_map = string_map;
-                (*ret).nbstates = nbstates;
             }
-            // not_determ:
-            self.string = "".to_owned().into_boxed_str();
-            self.states.clear();
-            self.atoms.clear();
-            self.counters.clear();
-            ret
+            ret.determinist = 1;
+            // Cleanup of the old data
+            ret.states.clear();
+            ret.compact = transitions;
+            ret.transdata = transdata;
+            ret.string_map = string_map;
+            ret.nbstates = nbstates;
         }
+        // not_determ:
+        self.string = "".to_owned().into_boxed_str();
+        self.states.clear();
+        self.atoms.clear();
+        self.counters.clear();
+        Some(ret)
     }
 
     #[doc(alias = "xmlRegGetCounter")]
@@ -2371,12 +2504,10 @@ const AM_AUTOMATA_RNG: usize = 1;
 
 /// A libxml regular expression, they can actually be far more complex
 /// thank the POSIX regex expressions.
-#[doc(alias = "xmlRegexpPtr")]
-pub type XmlRegexpPtr = *mut XmlRegexp;
 #[doc(alias = "xmlRegexp")]
 #[repr(C)]
 pub struct XmlRegexp {
-    string: *mut XmlChar,
+    string: Box<str>,
     states: Vec<Option<XmlRegState>>,
     atoms: Vec<XmlRegAtom>,
     counters: Vec<XmlRegCounter>,
@@ -2389,10 +2520,186 @@ pub struct XmlRegexp {
     string_map: Vec<String>,
 }
 
+impl XmlRegexp {
+    /// Parses a regular expression conforming to XML Schemas Part 2 Datatype
+    /// Appendix F and builds an automata suitable for testing strings against
+    /// that regular expression
+    ///
+    /// Returns the compiled expression or NULL in case of error
+    #[doc(alias = "xmlRegexpCompile")]
+    pub fn compile(regexp: &str) -> Option<Self> {
+        let mut ctxt = XmlRegParserCtxt::new_parser(Some(regexp));
+
+        // initialize the parser
+        ctxt.state = ctxt.reg_state_push();
+        if ctxt.state == usize::MAX {
+            return None;
+        }
+        ctxt.start = ctxt.state;
+        ctxt.end = usize::MAX;
+
+        // parse the expression building an automata
+        ctxt.fa_parse_reg_exp(1);
+        if ctxt.current_byte().is_some() {
+            ERROR!(&mut ctxt, "xmlFAParseRegExp: extra characters");
+        }
+        if ctxt.error != 0 {
+            return None;
+        }
+        ctxt.end = ctxt.state;
+        ctxt.get_state_mut(ctxt.start).unwrap().typ = XmlRegStateType::XmlRegexpStartState;
+        ctxt.get_state_mut(ctxt.end).unwrap().typ = XmlRegStateType::XmlRegexpFinalState;
+
+        // remove the Epsilon except for counted transitions
+        ctxt.fa_eliminate_epsilon_transitions();
+
+        if ctxt.error != 0 {
+            return None;
+        }
+        ctxt.parse()
+    }
+
+    pub(crate) fn computes_determinism(&mut self) -> i32 {
+        if self.determinist != -1 {
+            return self.determinist;
+        }
+
+        let Some(mut am) = XmlAutomata::new() else {
+            return -1;
+        };
+        am.states.clear();
+        am.atoms = take(&mut self.atoms);
+        am.states = take(&mut self.states);
+        am.determinist = -1;
+        am.flags = self.flags;
+        let ret: i32 = am.fa_computes_determinism();
+        self.atoms = take(&mut am.atoms);
+        self.states = take(&mut am.states);
+        self.determinist = ret;
+        ret
+    }
+
+    /// Check if the regular expression is determinist
+    ///
+    /// Returns 1 if it yes, 0 if not and a negative value in case of error
+    #[doc(alias = "xmlRegexpIsDeterminist")]
+    pub fn is_determinist(&self) -> i32 {
+        // The original `xmlRegexpIsDeterminist` performed the same process
+        // as `XmlRegexp::computes_determinism`.
+        // Therefore, this function did not return -1.
+        assert_ne!(self.determinist, -1);
+        self.determinist
+    }
+
+    #[doc(alias = "xmlRegPrintState")]
+    fn print_state(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+        state: Option<&XmlRegState>,
+    ) -> std::fmt::Result {
+        write!(f, " state: ")?;
+        let Some(state) = state else {
+            writeln!(f, "NULL")?;
+            return Ok(());
+        };
+        if matches!(state.typ, XmlRegStateType::XmlRegexpStartState) {
+            write!(f, "START ")?;
+        }
+        if matches!(state.typ, XmlRegStateType::XmlRegexpFinalState) {
+            write!(f, "FINAL ")?;
+        }
+
+        writeln!(f, "{}, {} transitions:", state.no, state.trans.len(),)?;
+        for trans in &state.trans {
+            self.print_trans(f, trans);
+        }
+        Ok(())
+    }
+
+    #[doc(alias = "xmlRegPrintState")]
+    fn print_trans(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+        trans: &XmlRegTrans,
+    ) -> std::fmt::Result {
+        write!(f, "  trans: ")?;
+        if trans.to < 0 {
+            writeln!(f, "removed")?;
+            return Ok(());
+        }
+        if trans.nd != 0 {
+            if trans.nd == 2 {
+                write!(f, "last not determinist, ")?;
+            } else {
+                write!(f, "not determinist, ")?;
+            }
+        }
+        if trans.counter >= 0 {
+            write!(f, "counted {}, ", trans.counter)?;
+        }
+        if trans.count as usize == REGEXP_ALL_COUNTER {
+            write!(f, "all transition, ")?;
+        } else if trans.count >= 0 {
+            write!(f, "count based {}, ", trans.count)?;
+        }
+        if trans.atom_index == usize::MAX {
+            writeln!(f, "epsilon to {}", trans.to)?;
+            return Ok(());
+        }
+        if matches!(
+            self.atoms[trans.atom_index].typ,
+            XmlRegAtomType::XmlRegexpCharval
+        ) {
+            write!(
+                f,
+                "char {} ",
+                char::from_u32(self.atoms[trans.atom_index].codepoint as u32).unwrap()
+            )?;
+        }
+        writeln!(
+            f,
+            "atom {}, to {}",
+            self.atoms[trans.atom_index].no, trans.to
+        )?;
+        Ok(())
+    }
+}
+
+impl Debug for XmlRegexp {
+    /// Print the content of the compiled regular expression
+    #[doc(alias = "xmlRegexpPrint")]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, " regexp: ")?;
+        write!(f, "'{}' ", self.string)?;
+        writeln!(f)?;
+        writeln!(f, "{} atoms:", self.atoms.len())?;
+        for (i, atom) in self.atoms.iter().enumerate() {
+            write!(f, " {i:02} ")?;
+            write!(f, "{atom}")?;
+        }
+        write!(f, "{} states:", self.states.len())?;
+        writeln!(f)?;
+        for state in &self.states {
+            self.print_state(f, state.as_ref())?;
+        }
+        writeln!(f, "{} counters:", self.counters.len())?;
+        for (i, counter) in self.counters.iter().enumerate() {
+            writeln!(f, " {i}: min {} max {}", counter.min, counter.max)?;
+        }
+        Ok(())
+    }
+}
+
+impl std::fmt::Display for XmlRegexp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+
 impl Default for XmlRegexp {
     fn default() -> Self {
         Self {
-            string: null_mut(),
+            string: "".to_owned().into_boxed_str(),
             states: vec![],
             atoms: vec![],
             counters: vec![],
@@ -2430,9 +2737,9 @@ pub type XmlRegExecCtxtPtr = *mut XmlRegExecCtxt;
 #[doc(alias = "xmlRegExecCtxt")]
 #[repr(C)]
 pub struct XmlRegExecCtxt {
-    status: i32,        /* execution status != 0 indicate an error */
-    determinist: i32,   /* did we find an indeterministic behaviour */
-    comp: XmlRegexpPtr, /* the compiled regexp */
+    status: i32,         /* execution status != 0 indicate an error */
+    determinist: i32,    /* did we find an indeterministic behaviour */
+    comp: Rc<XmlRegexp>, /* the compiled regexp */
     callback: Option<XmlRegExecCallbacks>,
     data: *mut c_void,
 
@@ -2466,7 +2773,7 @@ impl Default for XmlRegExecCtxt {
         Self {
             status: 0,
             determinist: 0,
-            comp: null_mut(),
+            comp: Rc::new(Default::default()),
             callback: None,
             data: null_mut(),
             state: usize::MAX,
@@ -2563,63 +2870,6 @@ fn xml_regexp_err_compile(ctxt: &mut XmlRegParserCtxt, extra: &str) {
     );
 }
 
-/// Parses a regular expression conforming to XML Schemas Part 2 Datatype
-/// Appendix F and builds an automata suitable for testing strings against
-/// that regular expression
-///
-/// Returns the compiled expression or NULL in case of error
-#[doc(alias = "xmlRegexpCompile")]
-pub unsafe fn xml_regexp_compile(regexp: &str) -> XmlRegexpPtr {
-    unsafe {
-        let mut ctxt = XmlRegParserCtxt::new_parser(Some(regexp));
-
-        // initialize the parser
-        ctxt.state = ctxt.reg_state_push();
-        if ctxt.state == usize::MAX {
-            return null_mut();
-        }
-        ctxt.start = ctxt.state;
-        ctxt.end = usize::MAX;
-
-        // parse the expression building an automata
-        ctxt.fa_parse_reg_exp(1);
-        if ctxt.current_byte().is_some() {
-            ERROR!(&mut ctxt, "xmlFAParseRegExp: extra characters");
-        }
-        if ctxt.error != 0 {
-            return null_mut();
-        }
-        ctxt.end = ctxt.state;
-        ctxt.get_state_mut(ctxt.start).unwrap().typ = XmlRegStateType::XmlRegexpStartState;
-        ctxt.get_state_mut(ctxt.end).unwrap().typ = XmlRegStateType::XmlRegexpFinalState;
-
-        // remove the Epsilon except for counted transitions
-        ctxt.fa_eliminate_epsilon_transitions();
-
-        if ctxt.error != 0 {
-            return null_mut();
-        }
-        ctxt.parse()
-    }
-}
-
-/// Free a regexp
-#[doc(alias = "xmlRegFreeRegexp")]
-pub unsafe fn xml_reg_free_regexp(regexp: XmlRegexpPtr) {
-    unsafe {
-        if regexp.is_null() {
-            return;
-        }
-
-        if !(*regexp).string.is_null() {
-            xml_free((*regexp).string as _);
-        }
-
-        drop_in_place(regexp);
-        xml_free(regexp as _);
-    }
-}
-
 unsafe fn xml_fa_reg_exec_rollback(exec: XmlRegExecCtxtPtr) {
     unsafe {
         let Some(rollback) = (*exec).rollbacks.pop() else {
@@ -2629,11 +2879,11 @@ unsafe fn xml_fa_reg_exec_rollback(exec: XmlRegExecCtxtPtr) {
         (*exec).state = rollback.state;
         (*exec).index = rollback.index;
         (*exec).transno = rollback.nextbranch;
-        if !(*(*exec).comp).counters.is_empty() {
+        if !(*exec).comp.counters.is_empty() {
             (*exec).counts.clear();
             (*exec)
                 .counts
-                .extend_from_slice(&rollback.counts[..(*(*exec).comp).counters.len()]);
+                .extend_from_slice(&rollback.counts[..(*exec).comp.counters.len()]);
         }
     }
 }
@@ -2776,10 +3026,10 @@ unsafe fn xml_fa_reg_exec_save(exec: XmlRegExecCtxtPtr) {
             nextbranch: (*exec).transno + 1,
             counts: vec![],
         };
-        if !(*(*exec).comp).counters.is_empty() {
+        if !(*exec).comp.counters.is_empty() {
             rollback
                 .counts
-                .extend_from_slice(&(*exec).counts[..(*(*exec).comp).counters.len()]);
+                .extend_from_slice(&(*exec).counts[..(*exec).comp.counters.len()]);
         }
         (*exec).rollbacks.push(rollback);
     }
@@ -2787,7 +3037,7 @@ unsafe fn xml_fa_reg_exec_save(exec: XmlRegExecCtxtPtr) {
 
 pub(crate) const REGEXP_ALL_COUNTER: usize = 0x123456;
 
-unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
+unsafe fn xml_fa_reg_exec(comp: Rc<XmlRegexp>, content: *const XmlChar) -> i32 {
     unsafe {
         let mut execval = XmlRegExecCtxt::default();
         let exec: XmlRegExecCtxtPtr = addr_of_mut!(execval);
@@ -2808,9 +3058,9 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
         (*exec).transcount = 0;
         (*exec).input_stack = null_mut();
         (*exec).input_stack_max = 0;
-        if !(*comp).counters.is_empty() {
+        if !(*exec).comp.counters.is_empty() {
             (*exec).counts.clear();
-            (*exec).counts.resize((*comp).counters.len(), 0);
+            (*exec).counts.resize((*exec).comp.counters.len(), 0);
         } else {
             (*exec).counts.clear();
         }
@@ -2819,7 +3069,7 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
                 || (*exec).state == usize::MAX
                 || *(*exec).input_string.add((*exec).index as usize) == 0
                     && matches!(
-                        (*(*exec).comp).states[(*exec).state].as_ref().unwrap().typ,
+                        (*exec).comp.states[(*exec).state].as_ref().unwrap().typ,
                         XmlRegStateType::XmlRegexpFinalState
                     ))
             {
@@ -2836,18 +3086,16 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
                         // if there is a transition, we must check if
                         //  atom allows minOccurs of 0
                         if (*exec).transno
-                            < (*(*exec).comp).states[(*exec).state]
+                            < (*exec).comp.states[(*exec).state]
                                 .as_ref()
                                 .unwrap()
                                 .trans
                                 .len() as i32
                         {
-                            let trans = &(*(*exec).comp).states[(*exec).state]
-                                .as_ref()
-                                .unwrap()
-                                .trans[(*exec).transno as usize];
+                            let trans = &(*exec).comp.states[(*exec).state].as_ref().unwrap().trans
+                                [(*exec).transno as usize];
                             if trans.to >= 0 {
-                                let atom = &(*comp).atoms[trans.atom_index];
+                                let atom = &(*exec).comp.atoms[trans.atom_index];
                                 if !(atom.min == 0 && atom.max > 0) {
                                     break 'rollback;
                                 }
@@ -2862,16 +3110,14 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
                     while {
                         (*exec).transno += 1;
                         (*exec).transno
-                            < (*(*exec).comp).states[(*exec).state]
+                            < (*exec).comp.states[(*exec).state]
                                 .as_ref()
                                 .unwrap()
                                 .trans
                                 .len() as i32
                     } {
-                        let trans = &(*(*exec).comp).states[(*exec).state]
-                            .as_ref()
-                            .unwrap()
-                            .trans[(*exec).transno as usize];
+                        let trans = &(*exec).comp.states[(*exec).state].as_ref().unwrap().trans
+                            [(*exec).transno as usize];
                         if trans.to < 0 {
                             continue;
                         }
@@ -2885,7 +3131,7 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
                             // A counted transition.
 
                             let count = (*exec).counts[trans.count as usize];
-                            let counter = (*(*exec).comp).counters[trans.count as usize];
+                            let counter = (*exec).comp.counters[trans.count as usize];
                             ret = (count >= counter.min && count <= counter.max) as i32;
                             if ret != 0 && counter.min != counter.max {
                                 deter = 0;
@@ -2895,7 +3141,7 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
                             (*exec).status = -2;
                             break;
                         } else {
-                            let atom = &(*comp).atoms[trans.atom_index];
+                            let atom = &(*exec).comp.atoms[trans.atom_index];
                             if *(*exec).input_string.add((*exec).index as usize) != 0 {
                                 codepoint = CUR_SCHAR!(
                                     (*exec).input_string.add((*exec).index as usize),
@@ -2910,19 +3156,18 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
                                     // do not increment if the counter is already over the
                                     // maximum limit in which case get to next transition
                                     if trans.counter >= 0 {
-                                        if (*exec).counts.is_empty() || (*exec).comp.is_null() {
+                                        if (*exec).counts.is_empty() {
                                             (*exec).status = -1;
                                             break 'error;
                                         }
-                                        let counter =
-                                            (*(*exec).comp).counters[trans.counter as usize];
+                                        let counter = (*exec).comp.counters[trans.counter as usize];
                                         if (*exec).counts[trans.counter as usize] >= counter.max {
                                             // for loop on transitions
                                             continue;
                                         }
                                     }
                                     // Save before incrementing
-                                    if (*(*exec).comp).states[(*exec).state]
+                                    if (*exec).comp.states[(*exec).state]
                                         .as_ref()
                                         .unwrap()
                                         .trans
@@ -3003,7 +3248,7 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
                             if trans.nd == 1
                                 || (trans.count >= 0
                                     && deter == 0
-                                    && (*(*exec).comp).states[(*exec).state]
+                                    && (*exec).comp.states[(*exec).state]
                                         .as_ref()
                                         .unwrap()
                                         .trans
@@ -3014,11 +3259,11 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
                             }
                             if trans.counter >= 0 {
                                 // make sure we don't go over the counter maximum value
-                                if (*exec).counts.is_empty() || (*exec).comp.is_null() {
+                                if (*exec).counts.is_empty() {
                                     (*exec).status = -1;
                                     break 'error;
                                 }
-                                let counter = (*(*exec).comp).counters[trans.counter as usize];
+                                let counter = (*exec).comp.counters[trans.counter as usize];
                                 if (*exec).counts[trans.counter as usize] >= counter.max {
                                     // for loop on transitions
                                     continue;
@@ -3044,7 +3289,7 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
                         }
                     }
                     if (*exec).transno != 0
-                        || (*(*exec).comp).states[(*exec).state]
+                        || (*exec).comp.states[(*exec).state]
                             .as_ref()
                             .unwrap()
                             .trans
@@ -3083,361 +3328,12 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
 ///
 /// Returns 1 if it matches, 0 if not and a negative value in case of error
 #[doc(alias = "xmlRegexpExec")]
-pub unsafe fn xml_regexp_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
+pub unsafe fn xml_regexp_exec(comp: Rc<XmlRegexp>, content: *const XmlChar) -> i32 {
     unsafe {
-        if comp.is_null() || content.is_null() {
+        if content.is_null() {
             return -1;
         }
         xml_fa_reg_exec(comp, content)
-    }
-}
-
-fn xml_reg_print_atom_type<'a>(output: &mut (impl Write + 'a), typ: XmlRegAtomType) {
-    match typ {
-        XmlRegAtomType::XmlRegexpEpsilon => {
-            write!(output, "epsilon ").ok();
-        }
-        XmlRegAtomType::XmlRegexpCharval => {
-            write!(output, "charval ").ok();
-        }
-        XmlRegAtomType::XmlRegexpRanges => {
-            write!(output, "ranges ").ok();
-        }
-        XmlRegAtomType::XmlRegexpSubReg => {
-            write!(output, "subexpr ").ok();
-        }
-        XmlRegAtomType::XmlRegexpString => {
-            write!(output, "string ").ok();
-        }
-        XmlRegAtomType::XmlRegexpAnyChar => {
-            write!(output, "anychar ").ok();
-        }
-        XmlRegAtomType::XmlRegexpAnySpace => {
-            write!(output, "anyspace ").ok();
-        }
-        XmlRegAtomType::XmlRegexpNotSpace => {
-            write!(output, "notspace ").ok();
-        }
-        XmlRegAtomType::XmlRegexpInitName => {
-            write!(output, "initname ").ok();
-        }
-        XmlRegAtomType::XmlRegexpNotInitName => {
-            write!(output, "notinitname ").ok();
-        }
-        XmlRegAtomType::XmlRegexpNameChar => {
-            write!(output, "namechar ").ok();
-        }
-        XmlRegAtomType::XmlRegexpNotNameChar => {
-            write!(output, "notnamechar ").ok();
-        }
-        XmlRegAtomType::XmlRegexpDecimal => {
-            write!(output, "decimal ").ok();
-        }
-        XmlRegAtomType::XmlRegexpNotDecimal => {
-            write!(output, "notdecimal ").ok();
-        }
-        XmlRegAtomType::XmlRegexpRealChar => {
-            write!(output, "realchar ").ok();
-        }
-        XmlRegAtomType::XmlRegexpNotRealChar => {
-            write!(output, "notrealchar ").ok();
-        }
-        XmlRegAtomType::XmlRegexpLetter => {
-            write!(output, "LETTER ").ok();
-        }
-        XmlRegAtomType::XmlRegexpLetterUppercase => {
-            write!(output, "LETTER_UPPERCASE ").ok();
-        }
-        XmlRegAtomType::XmlRegexpLetterLowercase => {
-            write!(output, "LETTER_LOWERCASE ").ok();
-        }
-        XmlRegAtomType::XmlRegexpLetterTitlecase => {
-            write!(output, "LETTER_TITLECASE ").ok();
-        }
-        XmlRegAtomType::XmlRegexpLetterModifier => {
-            write!(output, "LETTER_MODIFIER ").ok();
-        }
-        XmlRegAtomType::XmlRegexpLetterOthers => {
-            write!(output, "LETTER_OTHERS ").ok();
-        }
-        XmlRegAtomType::XmlRegexpMark => {
-            write!(output, "MARK ").ok();
-        }
-        XmlRegAtomType::XmlRegexpMarkNonSpacing => {
-            write!(output, "MARK_NONSPACING ").ok();
-        }
-        XmlRegAtomType::XmlRegexpMarkSpaceCombining => {
-            write!(output, "MARK_SPACECOMBINING ").ok();
-        }
-        XmlRegAtomType::XmlRegexpMarkEnclosing => {
-            write!(output, "MARK_ENCLOSING ").ok();
-        }
-        XmlRegAtomType::XmlRegexpNumber => {
-            write!(output, "NUMBER ").ok();
-        }
-        XmlRegAtomType::XmlRegexpNumberDecimal => {
-            write!(output, "NUMBER_DECIMAL ").ok();
-        }
-        XmlRegAtomType::XmlRegexpNumberLetter => {
-            write!(output, "NUMBER_LETTER ").ok();
-        }
-        XmlRegAtomType::XmlRegexpNumberOthers => {
-            write!(output, "NUMBER_OTHERS ").ok();
-        }
-        XmlRegAtomType::XmlRegexpPunct => {
-            write!(output, "PUNCT ").ok();
-        }
-        XmlRegAtomType::XmlRegexpPunctConnector => {
-            write!(output, "PUNCT_CONNECTOR ").ok();
-        }
-        XmlRegAtomType::XmlRegexpPunctDash => {
-            write!(output, "PUNCT_DASH ").ok();
-        }
-        XmlRegAtomType::XmlRegexpPunctOpen => {
-            write!(output, "PUNCT_OPEN ").ok();
-        }
-        XmlRegAtomType::XmlRegexpPunctClose => {
-            write!(output, "PUNCT_CLOSE ").ok();
-        }
-        XmlRegAtomType::XmlRegexpPunctInitQuote => {
-            write!(output, "PUNCT_INITQUOTE ").ok();
-        }
-        XmlRegAtomType::XmlRegexpPunctFinQuote => {
-            write!(output, "PUNCT_FINQUOTE ").ok();
-        }
-        XmlRegAtomType::XmlRegexpPunctOthers => {
-            write!(output, "PUNCT_OTHERS ").ok();
-        }
-        XmlRegAtomType::XmlRegexpSepar => {
-            write!(output, "SEPAR ").ok();
-        }
-        XmlRegAtomType::XmlRegexpSeparSpace => {
-            write!(output, "SEPAR_SPACE ").ok();
-        }
-        XmlRegAtomType::XmlRegexpSeparLine => {
-            write!(output, "SEPAR_LINE ").ok();
-        }
-        XmlRegAtomType::XmlRegexpSeparPara => {
-            write!(output, "SEPAR_PARA ").ok();
-        }
-        XmlRegAtomType::XmlRegexpSymbol => {
-            write!(output, "SYMBOL ").ok();
-        }
-        XmlRegAtomType::XmlRegexpSymbolMath => {
-            write!(output, "SYMBOL_MATH ").ok();
-        }
-        XmlRegAtomType::XmlRegexpSymbolCurrency => {
-            write!(output, "SYMBOL_CURRENCY ").ok();
-        }
-        XmlRegAtomType::XmlRegexpSymbolModifier => {
-            write!(output, "SYMBOL_MODIFIER ").ok();
-        }
-        XmlRegAtomType::XmlRegexpSymbolOthers => {
-            write!(output, "SYMBOL_OTHERS ").ok();
-        }
-        XmlRegAtomType::XmlRegexpOther => {
-            write!(output, "OTHER ").ok();
-        }
-        XmlRegAtomType::XmlRegexpOtherControl => {
-            write!(output, "OTHER_CONTROL ").ok();
-        }
-        XmlRegAtomType::XmlRegexpOtherFormat => {
-            write!(output, "OTHER_FORMAT ").ok();
-        }
-        XmlRegAtomType::XmlRegexpOtherPrivate => {
-            write!(output, "OTHER_PRIVATE ").ok();
-        }
-        XmlRegAtomType::XmlRegexpOtherNa => {
-            write!(output, "OTHER_NA ").ok();
-        }
-        XmlRegAtomType::XmlRegexpBlockName => {
-            write!(output, "BLOCK ").ok();
-        }
-    }
-}
-
-fn xml_reg_print_quant_type<'a>(output: &mut (impl Write + 'a), typ: XmlRegQuantType) {
-    match typ {
-        XmlRegQuantType::XmlRegexpQuantEpsilon => {
-            write!(output, "epsilon ").ok();
-        }
-        XmlRegQuantType::XmlRegexpQuantOnce => {
-            write!(output, "once ").ok();
-        }
-        XmlRegQuantType::XmlRegexpQuantOpt => {
-            write!(output, "? ").ok();
-        }
-        XmlRegQuantType::XmlRegexpQuantMult => {
-            write!(output, "* ").ok();
-        }
-        XmlRegQuantType::XmlRegexpQuantPlus => {
-            write!(output, "+ ").ok();
-        }
-        XmlRegQuantType::XmlRegexpQuantRange => {
-            write!(output, "range ").ok();
-        }
-        XmlRegQuantType::XmlRegexpQuantOnceonly => {
-            write!(output, "onceonly ").ok();
-        }
-        XmlRegQuantType::XmlRegexpQuantAll => {
-            write!(output, "all ").ok();
-        }
-    }
-}
-
-fn xml_reg_print_range<'a>(output: &mut (impl Write + 'a), range: &XmlRegRange) {
-    write!(output, "  range: ").ok();
-    if range.neg != 0 {
-        write!(output, "negative ").ok();
-    }
-    xml_reg_print_atom_type(output, range.typ);
-    writeln!(
-        output,
-        "{} - {}",
-        char::from_u32(range.start as u32).unwrap(),
-        char::from_u32(range.end as u32).unwrap()
-    )
-    .ok();
-}
-
-fn xml_reg_print_atom<'a>(output: &mut (impl Write + 'a), atom: &XmlRegAtom) {
-    write!(output, " atom: ").ok();
-    if atom.neg != 0 {
-        write!(output, "not ").ok();
-    }
-    xml_reg_print_atom_type(output, atom.typ);
-    xml_reg_print_quant_type(output, atom.quant);
-    if matches!(atom.quant, XmlRegQuantType::XmlRegexpQuantRange) {
-        write!(output, "{}-{} ", atom.min, atom.max).ok();
-    }
-    if matches!(atom.typ, XmlRegAtomType::XmlRegexpString) {
-        write!(output, "'{}' ", atom.valuep.as_deref().unwrap()).ok();
-    }
-    if matches!(atom.typ, XmlRegAtomType::XmlRegexpCharval) {
-        writeln!(
-            output,
-            "char {}",
-            char::from_u32(atom.codepoint as u32).unwrap()
-        )
-        .ok();
-    } else if matches!(atom.typ, XmlRegAtomType::XmlRegexpRanges) {
-        writeln!(output, "{} entries", atom.ranges.len()).ok();
-        for range in &atom.ranges {
-            xml_reg_print_range(output, range);
-        }
-    } else if matches!(atom.typ, XmlRegAtomType::XmlRegexpSubReg) {
-        writeln!(output, "start {} end {}", atom.start, atom.stop).ok();
-    } else {
-        writeln!(output).ok();
-    }
-}
-
-unsafe fn xml_reg_print_trans<'a>(
-    output: &mut (impl Write + 'a),
-    regexp: XmlRegexpPtr,
-    trans: &XmlRegTrans,
-) {
-    unsafe {
-        write!(output, "  trans: ").ok();
-        if trans.to < 0 {
-            writeln!(output, "removed").ok();
-            return;
-        }
-        if trans.nd != 0 {
-            if trans.nd == 2 {
-                write!(output, "last not determinist, ").ok();
-            } else {
-                write!(output, "not determinist, ").ok();
-            }
-        }
-        if trans.counter >= 0 {
-            write!(output, "counted {}, ", trans.counter).ok();
-        }
-        if trans.count as usize == REGEXP_ALL_COUNTER {
-            write!(output, "all transition, ").ok();
-        } else if trans.count >= 0 {
-            write!(output, "count based {}, ", trans.count).ok();
-        }
-        if trans.atom_index == usize::MAX {
-            writeln!(output, "epsilon to {}", trans.to).ok();
-            return;
-        }
-        if matches!(
-            (*regexp).atoms[trans.atom_index].typ,
-            XmlRegAtomType::XmlRegexpCharval
-        ) {
-            write!(
-                output,
-                "char {} ",
-                char::from_u32((*regexp).atoms[trans.atom_index].codepoint as u32).unwrap()
-            )
-            .ok();
-        }
-        writeln!(
-            output,
-            "atom {}, to {}",
-            (*regexp).atoms[trans.atom_index].no,
-            trans.to
-        )
-        .ok();
-    }
-}
-
-unsafe fn xml_reg_print_state<'a>(
-    output: &mut (impl Write + 'a),
-    regexp: XmlRegexpPtr,
-    state: Option<&XmlRegState>,
-) {
-    unsafe {
-        write!(output, " state: ").ok();
-        let Some(state) = state else {
-            writeln!(output, "NULL").ok();
-            return;
-        };
-        if matches!(state.typ, XmlRegStateType::XmlRegexpStartState) {
-            write!(output, "START ").ok();
-        }
-        if matches!(state.typ, XmlRegStateType::XmlRegexpFinalState) {
-            write!(output, "FINAL ").ok();
-        }
-
-        writeln!(output, "{}, {} transitions:", state.no, state.trans.len(),).ok();
-        for trans in &state.trans {
-            xml_reg_print_trans(output, regexp, trans);
-        }
-    }
-}
-
-/// Print the content of the compiled regular expression
-#[doc(alias = "xmlRegexpPrint")]
-pub unsafe fn xml_regexp_print<'a>(output: &mut (impl Write + 'a), regexp: XmlRegexpPtr) {
-    unsafe {
-        write!(output, " regexp: ").ok();
-        if regexp.is_null() {
-            writeln!(output, "NULL").ok();
-            return;
-        }
-        write!(
-            output,
-            "'{}' ",
-            CStr::from_ptr((*regexp).string as *const i8).to_string_lossy()
-        )
-        .ok();
-        writeln!(output).ok();
-        writeln!(output, "{} atoms:", (*regexp).atoms.len()).ok();
-        for (i, atom) in (*regexp).atoms.iter().enumerate() {
-            write!(output, " {i:02} ").ok();
-            xml_reg_print_atom(output, atom);
-        }
-        write!(output, "{} states:", (*regexp).states.len()).ok();
-        writeln!(output).ok();
-        for state in &(*regexp).states {
-            xml_reg_print_state(output, regexp, state.as_ref());
-        }
-        writeln!(output, "{} counters:", (*regexp).counters.len()).ok();
-        for (i, counter) in (*regexp).counters.iter().enumerate() {
-            writeln!(output, " {i}: min {} max {}", counter.min, counter.max).ok();
-        }
     }
 }
 
@@ -4042,35 +3938,6 @@ fn xml_fa_compare_atoms(atom1: &XmlRegAtom, atom2: &XmlRegAtom, deep: i32) -> i3
     1
 }
 
-/// Check if the regular expression is determinist
-///
-/// Returns 1 if it yes, 0 if not and a negative value in case of error
-#[doc(alias = "xmlRegexpIsDeterminist")]
-pub unsafe fn xml_regexp_is_determinist(comp: XmlRegexpPtr) -> i32 {
-    unsafe {
-        if comp.is_null() {
-            return -1;
-        }
-        if (*comp).determinist != -1 {
-            return (*comp).determinist;
-        }
-
-        let Some(mut am) = XmlAutomata::new() else {
-            return -1;
-        };
-        am.states.clear();
-        am.atoms = take(&mut (*comp).atoms);
-        am.states = take(&mut (*comp).states);
-        am.determinist = -1;
-        am.flags = (*comp).flags;
-        let ret: i32 = am.fa_computes_determinism();
-        (*comp).atoms = take(&mut am.atoms);
-        (*comp).states = take(&mut am.states);
-        (*comp).determinist = ret;
-        ret
-    }
-}
-
 /// Callback function when doing a transition in the automata
 #[doc(alias = "xmlRegExecCallbacks")]
 pub type XmlRegExecCallbacks =
@@ -4081,15 +3948,12 @@ pub type XmlRegExecCallbacks =
 /// Returns the new context
 #[doc(alias = "xmlRegNewExecCtxt")]
 pub unsafe fn xml_reg_new_exec_ctxt(
-    comp: XmlRegexpPtr,
+    comp: Rc<XmlRegexp>,
     callback: Option<XmlRegExecCallbacks>,
     data: *mut c_void,
 ) -> XmlRegExecCtxtPtr {
     unsafe {
-        if comp.is_null() {
-            return null_mut();
-        }
-        if (*comp).compact.is_empty() && (*comp).states.is_empty() {
+        if comp.compact.is_empty() && comp.states.is_empty() {
             return null_mut();
         }
         let exec: XmlRegExecCtxtPtr = xml_malloc(size_of::<XmlRegExecCtxt>()) as XmlRegExecCtxtPtr;
@@ -4104,18 +3968,18 @@ pub unsafe fn xml_reg_new_exec_ctxt(
         (*exec).rollbacks.clear();
         (*exec).status = 0;
         (*exec).comp = comp;
-        if (*comp).compact.is_empty() {
+        if (*exec).comp.compact.is_empty() {
             (*exec).state = 0;
         }
         (*exec).transno = 0;
         (*exec).transcount = 0;
         (*exec).callback = callback;
         (*exec).data = data;
-        if !(*comp).counters.is_empty() {
+        if !(*exec).comp.counters.is_empty() {
             (*exec).counts.clear();
-            (*exec).counts.resize((*comp).counters.len(), 0);
+            (*exec).counts.resize((*exec).comp.counters.len(), 0);
             (*exec).err_counts.clear();
-            (*exec).err_counts.resize((*comp).counters.len(), 0);
+            (*exec).err_counts.resize((*exec).comp.counters.len(), 0);
         } else {
             (*exec).counts.clear();
             (*exec).err_counts.clear();
@@ -4165,7 +4029,7 @@ pub(crate) const REGEXP_ALL_LAX_COUNTER: usize = 0x123457;
 #[doc(alias = "xmlRegCompactPushString")]
 unsafe fn xml_reg_compact_push_string(
     exec: XmlRegExecCtxtPtr,
-    comp: XmlRegexpPtr,
+    comp: Rc<XmlRegexp>,
     value: *const XmlChar,
     data: *mut c_void,
 ) -> i32 {
@@ -4173,25 +4037,25 @@ unsafe fn xml_reg_compact_push_string(
         let state: i32 = (*exec).index;
         let mut target: i32;
 
-        if comp.is_null() || (*comp).compact.is_empty() {
+        if comp.compact.is_empty() {
             return -1;
         }
 
         if value.is_null() {
             // are we at a final state ?
-            if (*comp).compact[state as usize][0] == XmlRegStateType::XmlRegexpFinalState as i32 {
+            if comp.compact[state as usize][0] == XmlRegStateType::XmlRegexpFinalState as i32 {
                 return 1;
             }
             return 0;
         }
 
         // Examine all outside transitions from current state
-        for i in 0..(*comp).string_map.len() {
-            target = (*comp).compact[state as usize][i + 1];
-            if target > 0 && target <= (*comp).nbstates {
+        for i in 0..comp.string_map.len() {
+            target = comp.compact[state as usize][i + 1];
+            if target > 0 && target <= comp.nbstates {
                 target -= 1; /* to avoid 0 */
                 if xml_reg_str_equal_wildcard(
-                    Some(&(*comp).string_map[i]),
+                    Some(&comp.string_map[i]),
                     Some(
                         CStr::from_ptr(value as *const i8)
                             .to_string_lossy()
@@ -4201,25 +4065,25 @@ unsafe fn xml_reg_compact_push_string(
                 {
                     (*exec).index = target;
                     if let Some(callback) = (*exec).callback {
-                        if !(*comp).transdata.is_empty() {
+                        if !comp.transdata.is_empty() {
                             callback(
                                 (*exec).data as _,
                                 CStr::from_ptr(value as *const i8)
                                     .to_string_lossy()
                                     .as_ref(),
-                                (*comp).transdata[state as usize][i],
+                                comp.transdata[state as usize][i],
                                 data,
                             );
                         }
                     }
-                    if (*comp).compact[target as usize][0]
+                    if comp.compact[target as usize][0]
                         == XmlRegStateType::XmlRegexpSinkState as i32
                     {
                         // goto error;
                         break;
                     }
 
-                    if (*comp).compact[target as usize][0]
+                    if comp.compact[target as usize][0]
                         == XmlRegStateType::XmlRegexpFinalState as i32
                     {
                         return 1;
@@ -4296,20 +4160,17 @@ unsafe fn xml_reg_exec_push_string_internal(
         if exec.is_null() {
             return -1;
         }
-        if (*exec).comp.is_null() {
-            return -1;
-        }
         if (*exec).status != 0 {
             return (*exec).status;
         }
 
-        if !(*(*exec).comp).compact.is_empty() {
-            return xml_reg_compact_push_string(exec, (*exec).comp, value, data);
+        if !(*exec).comp.compact.is_empty() {
+            return xml_reg_compact_push_string(exec, (*exec).comp.clone(), value, data);
         }
 
         if value.is_null() {
             if matches!(
-                (*(*exec).comp).states[(*exec).state].as_ref().unwrap().typ,
+                (*exec).comp.states[(*exec).state].as_ref().unwrap().typ,
                 XmlRegStateType::XmlRegexpFinalState
             ) {
                 return 1;
@@ -4329,7 +4190,7 @@ unsafe fn xml_reg_exec_push_string_internal(
             && (!value.is_null()
                 || (is_final == 1
                     && !matches!(
-                        (*(*exec).comp).states[(*exec).state].as_ref().unwrap().typ,
+                        (*exec).comp.states[(*exec).state].as_ref().unwrap().typ,
                         XmlRegStateType::XmlRegexpFinalState
                     )))
         {
@@ -4347,16 +4208,14 @@ unsafe fn xml_reg_exec_push_string_internal(
                     while {
                         (*exec).transno += 1;
                         (*exec).transno
-                            < (*(*exec).comp).states[(*exec).state]
+                            < (*exec).comp.states[(*exec).state]
                                 .as_ref()
                                 .unwrap()
                                 .trans
                                 .len() as i32
                     } {
-                        let trans = &(*(*exec).comp).states[(*exec).state]
-                            .as_ref()
-                            .unwrap()
-                            .trans[(*exec).transno as usize];
+                        let trans = &(*exec).comp.states[(*exec).state].as_ref().unwrap().trans
+                            [(*exec).transno as usize];
                         if trans.to < 0 {
                             continue;
                         }
@@ -4370,7 +4229,7 @@ unsafe fn xml_reg_exec_push_string_internal(
                             if value.is_null() && is_final != 0 {
                                 ret = 1;
                             } else if !value.is_null() {
-                                for (i, t) in (*(*exec).comp).states[(*exec).state]
+                                for (i, t) in (*exec).comp.states[(*exec).state]
                                     .as_ref()
                                     .unwrap()
                                     .trans
@@ -4380,7 +4239,7 @@ unsafe fn xml_reg_exec_push_string_internal(
                                     if t.counter < 0 || i == (*exec).transno as usize {
                                         continue;
                                     }
-                                    let counter = (*(*exec).comp).counters[t.counter as usize];
+                                    let counter = (*exec).comp.counters[t.counter as usize];
                                     count = (*exec).counts[t.counter as usize];
                                     if count < counter.max
                                         && t.atom_index != usize::MAX
@@ -4388,9 +4247,7 @@ unsafe fn xml_reg_exec_push_string_internal(
                                             CStr::from_ptr(value as *const i8)
                                                 .to_string_lossy()
                                                 .as_ref(),
-                                        ) == (*(*exec).comp).atoms[t.atom_index]
-                                            .valuep
-                                            .as_deref()
+                                        ) == (*exec).comp.atoms[t.atom_index].valuep.as_deref()
                                     {
                                         ret = 0;
                                         break;
@@ -4402,9 +4259,7 @@ unsafe fn xml_reg_exec_push_string_internal(
                                             CStr::from_ptr(value as *const i8)
                                                 .to_string_lossy()
                                                 .as_ref(),
-                                        ) == (*(*exec).comp).atoms[t.atom_index]
-                                            .valuep
-                                            .as_deref()
+                                        ) == (*exec).comp.atoms[t.atom_index].valuep.as_deref()
                                     {
                                         ret = 1;
                                         break;
@@ -4417,7 +4272,7 @@ unsafe fn xml_reg_exec_push_string_internal(
                             ret = 1;
 
                             // Check all counted transitions from the current state
-                            for (i, t) in (*(*exec).comp).states[(*exec).state]
+                            for (i, t) in (*exec).comp.states[(*exec).state]
                                 .as_ref()
                                 .unwrap()
                                 .trans
@@ -4427,7 +4282,7 @@ unsafe fn xml_reg_exec_push_string_internal(
                                 if t.counter < 0 || i == (*exec).transno as usize {
                                     continue;
                                 }
-                                let counter = (*(*exec).comp).counters[t.counter as usize];
+                                let counter = (*exec).comp.counters[t.counter as usize];
                                 count = (*exec).counts[t.counter as usize];
                                 if count < counter.min || count > counter.max {
                                     ret = 0;
@@ -4437,14 +4292,14 @@ unsafe fn xml_reg_exec_push_string_internal(
                         } else if trans.count >= 0 {
                             // A counted transition.
                             let count = (*exec).counts[trans.count as usize];
-                            let counter = (*(*exec).comp).counters[trans.count as usize];
+                            let counter = (*exec).comp.counters[trans.count as usize];
                             ret = (count >= counter.min && count <= counter.max) as _;
                         } else if trans.atom_index == usize::MAX {
                             eprintln!("epsilon transition left at runtime");
                             (*exec).status = -2;
                             break;
                         } else {
-                            let atom = &(*(*exec).comp).atoms[trans.atom_index];
+                            let atom = &(*exec).comp.atoms[trans.atom_index];
                             if !value.is_null() {
                                 ret = xml_reg_str_equal_wildcard(
                                     atom.valuep.as_deref(),
@@ -4462,7 +4317,7 @@ unsafe fn xml_reg_exec_push_string_internal(
                                 }
                                 if ret == 1 && trans.counter >= 0 {
                                     let count = (*exec).counts[trans.counter as usize];
-                                    let counter = (*(*exec).comp).counters[trans.counter as usize];
+                                    let counter = (*exec).comp.counters[trans.counter as usize];
                                     if count >= counter.max {
                                         ret = 0;
                                     }
@@ -4472,7 +4327,7 @@ unsafe fn xml_reg_exec_push_string_internal(
                                     let to = trans.to as usize;
 
                                     // this is a multiple input sequence
-                                    if (*(*exec).comp).states[(*exec).state]
+                                    if (*exec).comp.states[(*exec).state]
                                         .as_ref()
                                         .unwrap()
                                         .trans
@@ -4544,7 +4399,7 @@ unsafe fn xml_reg_exec_push_string_internal(
                         if ret == 1 {
                             if let Some(callback) = (*exec).callback {
                                 if !data.is_null() && trans.atom_index != usize::MAX {
-                                    let atom = &(*(*exec).comp).atoms[trans.atom_index];
+                                    let atom = &(*exec).comp.atoms[trans.atom_index];
                                     callback(
                                         (*exec).data as _,
                                         atom.valuep.as_deref().unwrap(),
@@ -4553,7 +4408,7 @@ unsafe fn xml_reg_exec_push_string_internal(
                                     );
                                 }
                             }
-                            if (*(*exec).comp).states[(*exec).state]
+                            if (*exec).comp.states[(*exec).state]
                                 .as_ref()
                                 .unwrap()
                                 .trans
@@ -4572,12 +4427,9 @@ unsafe fn xml_reg_exec_push_string_internal(
                                 (*exec).counts[trans.count as usize] = 0;
                             }
                             if trans.to != -1
-                                && (*(*exec).comp).states[trans.to as usize].is_some()
+                                && (*exec).comp.states[trans.to as usize].is_some()
                                 && matches!(
-                                    (*(*exec).comp).states[trans.to as usize]
-                                        .as_ref()
-                                        .unwrap()
-                                        .typ,
+                                    (*exec).comp.states[trans.to as usize].as_ref().unwrap().typ,
                                     XmlRegStateType::XmlRegexpSinkState
                                 )
                             {
@@ -4615,7 +4467,7 @@ unsafe fn xml_reg_exec_push_string_internal(
                         }
                     }
                     if (*exec).transno != 0
-                        || (*(*exec).comp).states[(*exec).state]
+                        || (*exec).comp.states[(*exec).state]
                             .as_ref()
                             .unwrap()
                             .trans
@@ -4634,7 +4486,7 @@ unsafe fn xml_reg_exec_push_string_internal(
             if progress != 0
                 && (*exec).state != usize::MAX
                 && !matches!(
-                    (*(*exec).comp).states[(*exec).state].as_ref().unwrap().typ,
+                    (*exec).comp.states[(*exec).state].as_ref().unwrap().typ,
                     XmlRegStateType::XmlRegexpSinkState
                 )
             {
@@ -4644,7 +4496,7 @@ unsafe fn xml_reg_exec_push_string_internal(
                 }
                 (*exec).err_string = xml_strdup(value);
                 (*exec).err_state = (*exec).state;
-                if !(*(*exec).comp).counters.is_empty() {
+                if !(*exec).comp.counters.is_empty() {
                     (*exec).err_counts.copy_from_slice(&(*exec).counts);
                 }
             }
@@ -4659,7 +4511,7 @@ unsafe fn xml_reg_exec_push_string_internal(
         }
         if (*exec).status == 0 {
             return matches!(
-                (*(*exec).comp).states[(*exec).state].as_ref().unwrap().typ,
+                (*exec).comp.states[(*exec).state].as_ref().unwrap().typ,
                 XmlRegStateType::XmlRegexpFinalState
             ) as _;
         }
@@ -4700,9 +4552,6 @@ pub unsafe fn xml_reg_exec_push_string2(
         if exec.is_null() {
             return -1;
         }
-        if (*exec).comp.is_null() {
-            return -1;
-        }
         if (*exec).status != 0 {
             return (*exec).status;
         }
@@ -4728,8 +4577,8 @@ pub unsafe fn xml_reg_exec_push_string2(
         memcpy(str.add(lenp as usize + 1) as _, value2 as _, lenn as usize);
         *str.add(lenn as usize + lenp as usize + 1) = 0;
 
-        let ret = if !(*(*exec).comp).compact.is_empty() {
-            xml_reg_compact_push_string(exec, (*exec).comp, str, data)
+        let ret = if !(*exec).comp.compact.is_empty() {
+            xml_reg_compact_push_string(exec, (*exec).comp.clone(), str, data)
         } else {
             xml_reg_exec_push_string_internal(exec, str, data, 1)
         };
@@ -4762,9 +4611,9 @@ unsafe fn xml_reg_exec_get_values<'a>(
         let mut nb = 0;
         let mut nbval = 0;
         let mut nbneg = 0;
-        if !(*exec).comp.is_null() && !(*(*exec).comp).compact.is_empty() {
+        if !(*exec).comp.compact.is_empty() {
             let mut target: i32;
-            let comp: XmlRegexpPtr = (*exec).comp;
+            let comp = (*exec).comp.clone();
 
             let state = if err != 0 {
                 if (*exec).err_state_no == -1 {
@@ -4775,22 +4624,21 @@ unsafe fn xml_reg_exec_get_values<'a>(
                 (*exec).index
             };
             if !terminal.is_null() {
-                if (*comp).compact[state as usize][0] == XmlRegStateType::XmlRegexpFinalState as i32
-                {
+                if comp.compact[state as usize][0] == XmlRegStateType::XmlRegexpFinalState as i32 {
                     *terminal = 1;
                 } else {
                     *terminal = 0;
                 }
             }
             if nb < maxval {
-                for i in 0..(*comp).string_map.len() {
-                    target = (*comp).compact[state as usize][i + 1];
+                for i in 0..comp.string_map.len() {
+                    target = comp.compact[state as usize][i + 1];
                     if target > 0
-                        && target <= (*comp).nbstates
-                        && (*comp).compact[(target - 1) as usize][0]
+                        && target <= comp.nbstates
+                        && comp.compact[(target - 1) as usize][0]
                             != XmlRegStateType::XmlRegexpSinkState as i32
                     {
-                        values[nb] = Cow::Owned((*comp).string_map[i].clone());
+                        values[nb] = Cow::Owned(comp.string_map[i].clone());
                         nb += 1;
                         nbval += 1;
                     }
@@ -4800,14 +4648,14 @@ unsafe fn xml_reg_exec_get_values<'a>(
                 }
             }
             if nb < maxval {
-                for i in 0..(*comp).string_map.len() {
-                    target = (*comp).compact[state as usize][i + 1];
+                for i in 0..comp.string_map.len() {
+                    target = comp.compact[state as usize][i + 1];
                     if target > 0
-                        && target <= (*comp).nbstates
-                        && (*comp).compact[(target - 1) as usize][0]
+                        && target <= comp.nbstates
+                        && comp.compact[(target - 1) as usize][0]
                             == XmlRegStateType::XmlRegexpSinkState as i32
                     {
-                        values[nb] = Cow::Owned((*comp).string_map[i].clone());
+                        values[nb] = Cow::Owned(comp.string_map[i].clone());
                         nb += 1;
                         nbneg += 1;
                     }
@@ -4819,7 +4667,7 @@ unsafe fn xml_reg_exec_get_values<'a>(
         } else {
             if !terminal.is_null() {
                 if matches!(
-                    (*(*exec).comp).states[(*exec).state].as_ref().unwrap().typ,
+                    (*exec).comp.states[(*exec).state].as_ref().unwrap().typ,
                     XmlRegStateType::XmlRegexpFinalState
                 ) {
                     *terminal = 1;
@@ -4830,26 +4678,26 @@ unsafe fn xml_reg_exec_get_values<'a>(
 
             let state = if err != 0 {
                 if (*exec).err_state == usize::MAX
-                    || (*(*exec).comp).states[(*exec).err_state].is_none()
+                    || (*exec).comp.states[(*exec).err_state].is_none()
                 {
                     return None;
                 }
                 (*exec).err_state
             } else {
-                if (*exec).state == usize::MAX || (*(*exec).comp).states[(*exec).state].is_none() {
+                if (*exec).state == usize::MAX || (*exec).comp.states[(*exec).state].is_none() {
                     return None;
                 }
                 (*exec).state
             };
             if nb < maxval {
-                for trans in &(*(*exec).comp).states[state].as_ref().unwrap().trans {
+                for trans in &(*exec).comp.states[state].as_ref().unwrap().trans {
                     if trans.to < 0 {
                         continue;
                     }
                     if trans.atom_index == usize::MAX {
                         continue;
                     }
-                    let atom = &(*(*exec).comp).atoms[trans.atom_index];
+                    let atom = &(*exec).comp.atoms[trans.atom_index];
                     if atom.valuep.is_none() {
                         continue;
                     }
@@ -4860,17 +4708,13 @@ unsafe fn xml_reg_exec_get_values<'a>(
                         // this should not be reached but ...
                         todo!()
                     } else if trans.counter >= 0 {
-                        let mut counter = None;
-
                         let count = if err != 0 {
                             (*exec).err_counts[trans.counter as usize]
                         } else {
                             (*exec).counts[trans.counter as usize]
                         };
-                        if !(*exec).comp.is_null() {
-                            counter = Some((*(*exec).comp).counters[trans.counter as usize]);
-                        }
-                        if counter.is_none_or(|c| count < c.max) {
+                        let counter = (*exec).comp.counters[trans.counter as usize];
+                        if count < counter.max {
                             if atom.neg != 0 {
                                 values[nb] =
                                     Cow::Owned(atom.valuep2.as_deref().unwrap().to_owned());
@@ -4881,13 +4725,9 @@ unsafe fn xml_reg_exec_get_values<'a>(
                             }
                             nbval += 1;
                         }
-                    } else if !(*exec).comp.is_null()
-                        && (*(*exec).comp).states[trans.to as usize].is_some()
+                    } else if (*exec).comp.states[trans.to as usize].is_some()
                         && !matches!(
-                            (*(*exec).comp).states[trans.to as usize]
-                                .as_ref()
-                                .unwrap()
-                                .typ,
+                            (*exec).comp.states[trans.to as usize].as_ref().unwrap().typ,
                             XmlRegStateType::XmlRegexpSinkState,
                         )
                     {
@@ -4906,14 +4746,14 @@ unsafe fn xml_reg_exec_get_values<'a>(
                 }
             }
             if nb < maxval {
-                for trans in &(*(*exec).comp).states[state].as_ref().unwrap().trans {
+                for trans in &(*exec).comp.states[state].as_ref().unwrap().trans {
                     if trans.to < 0 {
                         continue;
                     }
                     if trans.atom_index == usize::MAX {
                         continue;
                     }
-                    let atom = &(*(*exec).comp).atoms[trans.atom_index];
+                    let atom = &(*exec).comp.atoms[trans.atom_index];
                     if atom.valuep.is_none() {
                         continue;
                     }
@@ -4922,12 +4762,9 @@ unsafe fn xml_reg_exec_get_values<'a>(
                         || trans.counter >= 0
                     {
                         continue;
-                    } else if ((*(*exec).comp).states[trans.to as usize]).is_some()
+                    } else if ((*exec).comp.states[trans.to as usize]).is_some()
                         && matches!(
-                            (*(*exec).comp).states[trans.to as usize]
-                                .as_ref()
-                                .unwrap()
-                                .typ,
+                            (*exec).comp.states[trans.to as usize].as_ref().unwrap().typ,
                             XmlRegStateType::XmlRegexpSinkState
                         )
                     {
@@ -7352,110 +7189,6 @@ mod tests {
                                 eprintln!(" {}", n_data);
                             }
                         }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_reg_new_exec_ctxt() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_regexp_compile() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_regexp_exec() {
-        #[cfg(feature = "libxml_regexp")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_comp in 0..GEN_NB_XML_REGEXP_PTR {
-                for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let comp = gen_xml_regexp_ptr(n_comp, 0);
-                    let content = gen_const_xml_char_ptr(n_content, 1);
-
-                    let ret_val = xml_regexp_exec(comp, content);
-                    desret_int(ret_val);
-                    des_xml_regexp_ptr(n_comp, comp, 0);
-                    des_const_xml_char_ptr(n_content, content, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlRegexpExec",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlRegexpExec()");
-                        eprint!(" {}", n_comp);
-                        eprintln!(" {}", n_content);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_regexp_is_determinist() {
-        #[cfg(feature = "libxml_regexp")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_comp in 0..GEN_NB_XML_REGEXP_PTR {
-                let mem_base = xml_mem_blocks();
-                let comp = gen_xml_regexp_ptr(n_comp, 0);
-
-                let ret_val = xml_regexp_is_determinist(comp);
-                desret_int(ret_val);
-                des_xml_regexp_ptr(n_comp, comp, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlRegexpIsDeterminist",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlRegexpIsDeterminist()"
-                    );
-                    eprintln!(" {}", n_comp);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_regexp_print() {
-        #[cfg(feature = "libxml_regexp")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_output in 0..GEN_NB_FILE_PTR {
-                for n_regexp in 0..GEN_NB_XML_REGEXP_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let mut output = gen_file_ptr(n_output, 0).unwrap();
-                    let regexp = gen_xml_regexp_ptr(n_regexp, 1);
-
-                    xml_regexp_print(&mut output, regexp);
-                    des_xml_regexp_ptr(n_regexp, regexp, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlRegexpPrint",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlRegexpPrint()");
-                        eprint!(" {}", n_output);
-                        eprintln!(" {}", n_regexp);
                     }
                 }
             }

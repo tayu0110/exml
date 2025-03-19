@@ -11,6 +11,7 @@ use std::{
     os::raw::c_void,
     path::Path,
     ptr::{addr_of_mut, null, null_mut},
+    rc::Rc,
     slice::from_raw_parts,
     str::from_utf8,
     sync::{
@@ -22,6 +23,8 @@ use std::{
 use const_format::concatcp;
 #[cfg(feature = "c14n")]
 use exml::c14n::XmlC14NMode;
+#[cfg(feature = "libxml_regexp")]
+use exml::libxml::xmlregexp::XmlRegexp;
 #[cfg(feature = "libxml_pattern")]
 use exml::pattern::{XmlPattern, XmlStreamCtxt};
 #[cfg(feature = "schematron")]
@@ -61,7 +64,6 @@ use exml::{
             xml_memory_dump, xml_memory_strdup,
         },
         xmlreader::XmlTextReaderPtr,
-        xmlregexp::XmlRegexpPtr,
         xmlschemastypes::xml_schema_init_types,
         xmlstring::XmlChar,
     },
@@ -4881,7 +4883,7 @@ unsafe fn threads_test(
 }
 
 #[cfg(feature = "libxml_regexp")]
-unsafe fn test_regexp(output: &mut File, comp: XmlRegexpPtr, value: *const c_char) {
+unsafe fn test_regexp(output: &mut File, comp: Rc<XmlRegexp>, value: *const c_char) {
     unsafe {
         use exml::libxml::xmlregexp::xml_regexp_exec;
 
@@ -4909,15 +4911,16 @@ unsafe fn regexp_test(
     err: Option<String>,
     _options: i32,
 ) -> i32 {
+    use std::rc::Rc;
+
+    use exml::libxml::xmlregexp::XmlRegexp;
+
     unsafe {
         use std::io::{BufRead, BufReader};
 
-        use exml::{
-            generic_error,
-            libxml::xmlregexp::{xml_reg_free_regexp, xml_regexp_compile},
-        };
+        use exml::generic_error;
 
-        let mut comp: XmlRegexpPtr = null_mut();
+        let mut comp = None;
         let mut ret: i32;
         let mut res: i32 = 0;
 
@@ -4971,50 +4974,44 @@ unsafe fn regexp_test(
                 }
                 if expression[0] == b'=' && expression[1] == b'>' {
                     let pattern: *mut c_char = expression.as_mut_ptr().add(2) as _;
-
-                    if !comp.is_null() {
-                        xml_reg_free_regexp(comp);
-                        // comp = null_mut();
-                    }
                     writeln!(
                         output,
                         "Regexp: {}",
                         CStr::from_ptr(pattern).to_string_lossy()
                     )
                     .ok();
-                    comp = xml_regexp_compile(
+                    comp = XmlRegexp::compile(
                         CStr::from_ptr(pattern as *const i8)
                             .to_string_lossy()
                             .as_ref(),
-                    );
-                    if comp.is_null() {
+                    )
+                    .map(Rc::new);
+                    if comp.is_none() {
                         writeln!(output, "   failed to compile").ok();
                         break;
                     }
-                } else if comp.is_null() {
+                } else if comp.is_none() {
                     writeln!(
                         output,
                         "Regexp: {}",
                         CStr::from_ptr(expression.as_ptr() as _).to_string_lossy()
                     )
                     .ok();
-                    comp = xml_regexp_compile(
+                    comp = XmlRegexp::compile(
                         CStr::from_ptr(expression.as_ptr() as *const i8)
                             .to_string_lossy()
                             .as_ref(),
-                    );
-                    if comp.is_null() {
+                    )
+                    .map(Rc::new);
+                    if comp.is_none() {
                         writeln!(output, "   failed to compile").ok();
                         break;
                     }
-                } else if !comp.is_null() {
+                } else if let Some(comp) = comp.clone() {
                     test_regexp(&mut output, comp, expression.as_ptr() as _);
                 }
             }
             expression.clear();
-        }
-        if !comp.is_null() {
-            xml_reg_free_regexp(comp);
         }
 
         ret = compare_files(temp.as_str(), result.as_deref().unwrap());
@@ -5068,14 +5065,14 @@ unsafe fn automata_test(
             generic_error,
             libxml::xmlregexp::{
                 XmlRegExecCtxtPtr, xml_reg_exec_push_string, xml_reg_free_exec_ctxt,
-                xml_reg_free_regexp, xml_reg_new_exec_ctxt,
+                xml_reg_new_exec_ctxt,
             },
         };
 
         let mut ret: i32;
         let mut res: i32 = 0;
         let mut states: [usize; 1000] = [usize::MAX; 1000];
-        let mut regexp: XmlRegexpPtr = null_mut();
+        let mut regexp = None;
         let mut exec: XmlRegExecCtxtPtr = null_mut();
 
         NB_TESTS.set(NB_TESTS.get() + 1);
@@ -5241,17 +5238,15 @@ unsafe fn automata_test(
                         );
                     } else if expr[0] == b'-' && expr[1] == b'-' {
                         // end of the automata
-                        regexp = am.compile();
+                        regexp = am.compile().map(Rc::new);
                         nam = None;
-                        if regexp.is_null() {
+                        if regexp.is_none() {
                             generic_error!("Failed to compile the automata");
                             break;
                         }
                     }
                 } else if expr[0] == b'=' && expr[1] == b'>' {
-                    if regexp.is_null() {
-                        writeln!(output, "=> failed not compiled").ok();
-                    } else {
+                    if let Some(regexp) = regexp.clone() {
                         if exec.is_null() {
                             exec = xml_reg_new_exec_ctxt(regexp, None, null_mut());
                         }
@@ -5267,9 +5262,11 @@ unsafe fn automata_test(
                         }
                         xml_reg_free_exec_ctxt(exec);
                         exec = null_mut();
+                    } else {
+                        writeln!(output, "=> failed not compiled").ok();
                     }
                     ret = 0;
-                } else if !regexp.is_null() {
+                } else if let Some(regexp) = regexp.clone() {
                     if exec.is_null() {
                         exec = xml_reg_new_exec_ctxt(regexp, None, null_mut());
                     }
@@ -5280,9 +5277,6 @@ unsafe fn automata_test(
                 }
             }
             expr.clear();
-        }
-        if !regexp.is_null() {
-            xml_reg_free_regexp(regexp);
         }
         if !exec.is_null() {
             xml_reg_free_exec_ctxt(exec);

@@ -26,6 +26,7 @@ use std::{
     mem::{size_of, take},
     os::raw::c_void,
     ptr::{addr_of_mut, drop_in_place, null, null_mut},
+    rc::Rc,
     slice::from_raw_parts,
 };
 
@@ -42,9 +43,8 @@ use crate::{
         },
         valid::{XmlValidCtxt, xml_validate_document_final},
         xmlregexp::{
-            XmlRegExecCtxtPtr, XmlRegexpPtr, xml_reg_exec_push_string, xml_reg_exec_push_string2,
-            xml_reg_free_exec_ctxt, xml_reg_free_regexp, xml_reg_new_exec_ctxt,
-            xml_regexp_is_determinist,
+            XmlRegExecCtxtPtr, xml_reg_exec_push_string, xml_reg_exec_push_string2,
+            xml_reg_free_exec_ctxt, xml_reg_new_exec_ctxt,
         },
         xmlstring::{XmlChar, xml_str_equal, xml_strcat, xml_strdup, xml_strlen},
     },
@@ -68,7 +68,10 @@ use crate::{
     uri::{XmlURI, build_uri, escape_url_except},
 };
 
-use super::{chvalid::xml_is_blank_char, xmlautomata::XmlAutomata, xmlstring::xml_strndup};
+use super::{
+    chvalid::xml_is_blank_char, xmlautomata::XmlAutomata, xmlregexp::XmlRegexp,
+    xmlstring::xml_strndup,
+};
 
 /// Signature of an error callback from a Relax-NG validation
 #[doc(alias = "xmlRelaxNGValidityErrorFunc")]
@@ -5810,7 +5813,7 @@ unsafe fn xml_relaxng_compile(ctxt: XmlRelaxNGParserCtxtPtr, def: XmlRelaxNGDefi
                         .unwrap()
                         .set_final_state();
                     if (*ctxt).am.as_mut().unwrap().is_determinist() != 0 {
-                        (*def).cont_model = (*ctxt).am.as_mut().unwrap().compile();
+                        (*def).cont_model = (*ctxt).am.as_mut().unwrap().compile().map(Rc::new);
                     }
 
                     (*ctxt).state = oldstate;
@@ -5857,11 +5860,16 @@ unsafe fn xml_relaxng_compile(ctxt: XmlRelaxNGParserCtxtPtr, def: XmlRelaxNGDefi
                         .get_state_mut((*ctxt).state)
                         .unwrap()
                         .set_final_state();
-                    (*def).cont_model = (*ctxt).am.as_mut().unwrap().compile();
-                    if xml_regexp_is_determinist((*def).cont_model) == 0 {
+                    if let Some(mut model) = (*ctxt).am.as_mut().unwrap().compile() {
+                        model.computes_determinism();
                         // we can only use the automata if it is determinist
-                        xml_reg_free_regexp((*def).cont_model);
-                        (*def).cont_model = null_mut();
+                        if model.is_determinist() != 0 {
+                            (*def).cont_model = Some(Rc::new(model));
+                        } else {
+                            (*def).cont_model = None;
+                        }
+                    } else {
+                        (*def).cont_model = None;
                     }
                     (*ctxt).state = oldstate;
                     (*ctxt).am = oldam;
@@ -7304,13 +7312,13 @@ unsafe fn xml_relaxng_validate_compiled_callback(
 #[doc(alias = "xmlRelaxNGValidateCompiledContent")]
 unsafe fn xml_relaxng_validate_compiled_content(
     ctxt: XmlRelaxNGValidCtxtPtr,
-    regexp: XmlRegexpPtr,
+    regexp: Rc<XmlRegexp>,
     content: Option<XmlNodePtr>,
 ) -> i32 {
     unsafe {
         let mut ret: i32 = 0;
 
-        if ctxt.is_null() || regexp.is_null() {
+        if ctxt.is_null() {
             return -1;
         }
         let oldperr: i32 = (*ctxt).perr;
@@ -8133,7 +8141,7 @@ unsafe fn xml_relaxng_validate_state(
                         VALID_ERR2!(ctxt, XmlRelaxNGValidErr::XmlRelaxngErrAttrvalid, node.name);
                     }
                 }
-                if !(*define).cont_model.is_null() {
+                if let Some(cont_model) = (*define).cont_model.clone() {
                     let tmpstate: XmlRelaxNGValidStatePtr = (*ctxt).state;
                     let tmpstates: XmlRelaxNGStatesPtr = (*ctxt).states;
 
@@ -8144,7 +8152,7 @@ unsafe fn xml_relaxng_validate_state(
 
                     tmp = xml_relaxng_validate_compiled_content(
                         ctxt,
-                        (*define).cont_model,
+                        cont_model,
                         (*(*ctxt).state)
                             .seq
                             .map(|seq| XmlNodePtr::try_from(seq).unwrap()),
@@ -9074,14 +9082,14 @@ pub(crate) unsafe fn xml_relaxng_validate_progressive_callback(
             (*ctxt).pstate = -1;
             return;
         }
-        if (*define).cont_model.is_null() {
+        let Some(cont_model) = (*define).cont_model.clone() else {
             // this node cannot be validated in a streamable fashion
             (*ctxt).pstate = 0;
             (*ctxt).pdef = define;
             return;
-        }
+        };
         let exec = xml_reg_new_exec_ctxt(
-            (*define).cont_model,
+            cont_model,
             Some(xml_relaxng_validate_progressive_callback),
             ctxt as _,
         );

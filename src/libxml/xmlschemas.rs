@@ -90,8 +90,8 @@ use crate::{
         valid::xml_add_id,
         xmlregexp::{
             XmlRegExecCtxtPtr, xml_reg_exec_err_info, xml_reg_exec_next_values,
-            xml_reg_exec_push_string, xml_reg_exec_push_string2, xml_reg_free_regexp,
-            xml_reg_new_exec_ctxt, xml_regexp_exec, xml_regexp_is_determinist,
+            xml_reg_exec_push_string, xml_reg_exec_push_string2, xml_reg_new_exec_ctxt,
+            xml_regexp_exec,
         },
         xmlschemastypes::{
             XmlSchemaValPtr, XmlSchemaWhitespaceValueType, xml_schema_check_facet,
@@ -1767,7 +1767,7 @@ unsafe fn xml_schema_validate_facets(
                 }
                 found = 1;
                 // NOTE that for patterns, @value needs to be the normalized value.
-                ret = xml_regexp_exec((*(*facet_link).facet).regexp, value);
+                ret = xml_regexp_exec((*(*facet_link).facet).regexp.clone().unwrap(), value);
                 if ret == 1 {
                     break;
                 } else if ret < 0 {
@@ -2733,12 +2733,10 @@ unsafe fn xml_schema_free_element(elem: XmlSchemaElementPtr) {
         if !(*elem).annot.is_null() {
             xml_schema_free_annot((*elem).annot);
         }
-        if !(*elem).cont_model.is_null() {
-            xml_reg_free_regexp((*elem).cont_model);
-        }
         if !(*elem).def_val.is_null() {
             xml_schema_free_value((*elem).def_val);
         }
+        drop_in_place(elem);
         xml_free(elem as _);
     }
 }
@@ -13153,7 +13151,7 @@ unsafe fn xml_schema_build_acontent_model(
 unsafe fn xml_schema_build_content_model(typ: XmlSchemaTypePtr, ctxt: XmlSchemaParserCtxtPtr) {
     unsafe {
         if (*typ).typ != XmlSchemaTypeType::XmlSchemaTypeComplex
-            || !(*typ).cont_model.is_null()
+            || (*typ).cont_model.is_some()
             || !matches!(
                 (*typ).content_type,
                 XmlSchemaContentType::XmlSchemaContentElements
@@ -13181,8 +13179,22 @@ unsafe fn xml_schema_build_content_model(typ: XmlSchemaTypePtr, ctxt: XmlSchemaP
             .get_state_mut((*ctxt).state)
             .unwrap()
             .set_final_state();
-        (*typ).cont_model = (*ctxt).am.as_mut().unwrap().compile();
-        if (*typ).cont_model.is_null() {
+        let mut cont_model = (*ctxt).am.as_mut().unwrap().compile();
+        if let Some(cont_model) = cont_model.as_mut() {
+            if cont_model.is_determinist() != 1 {
+                // XML_SCHEMAS_ERR_NOTDETERMINIST,
+                xml_schema_pcustom_err(
+                    ctxt,
+                    XmlParserErrors::XmlSchemapNotDeterministic,
+                    typ as XmlSchemaBasicItemPtr,
+                    (*typ).node.map(|node| node.into()),
+                    "The content model is not determinist",
+                    None,
+                );
+            } else {
+                // no-op
+            }
+        } else {
             xml_schema_pcustom_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapInternal,
@@ -13191,19 +13203,8 @@ unsafe fn xml_schema_build_content_model(typ: XmlSchemaTypePtr, ctxt: XmlSchemaP
                 "Failed to compile the content model",
                 None,
             );
-        } else if xml_regexp_is_determinist((*typ).cont_model) != 1 {
-            // XML_SCHEMAS_ERR_NOTDETERMINIST,
-            xml_schema_pcustom_err(
-                ctxt,
-                XmlParserErrors::XmlSchemapNotDeterministic,
-                typ as XmlSchemaBasicItemPtr,
-                (*typ).node.map(|node| node.into()),
-                "The content model is not determinist",
-                None,
-            );
-        } else {
-            // no-op
         }
+        (*typ).cont_model = cont_model.map(Rc::new);
         (*ctxt).state = usize::MAX;
         (*ctxt).am.take();
     }
@@ -14726,14 +14727,14 @@ unsafe fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
 
                     // VAL TODO: Optimized "anyType" validation.
 
-                    if (*ptype).cont_model.is_null() {
+                    let Some(cont_model) = (*ptype).cont_model.clone() else {
                         VERROR_INT!(
                             vctxt,
                             "xmlSchemaValidateChildElem",
                             "type has elem content but no content model"
                         );
                         return -1;
-                    }
+                    };
                     // Safety belt for evaluation if the cont. model was already
                     // examined to be invalid.
                     if (*pielem).flags & XML_SCHEMA_ELEM_INFO_ERR_BAD_CONTENT != 0 {
@@ -14749,7 +14750,7 @@ unsafe fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                     if regex_ctxt.is_null() {
                         // Create the regex context.
                         regex_ctxt = xml_reg_new_exec_ctxt(
-                            (*ptype).cont_model,
+                            cont_model,
                             Some(xml_schema_vcontent_model_callback),
                             vctxt as _,
                         );
@@ -17980,7 +17981,7 @@ unsafe fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                                 if (*inode).regex_ctxt.is_null() {
                                     // Create the regex context.
                                     (*inode).regex_ctxt = xml_reg_new_exec_ctxt(
-                                        (*(*inode).type_def).cont_model,
+                                        (*(*inode).type_def).cont_model.clone().unwrap(),
                                         Some(xml_schema_vcontent_model_callback),
                                         vctxt as _,
                                     );

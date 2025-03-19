@@ -20,7 +20,7 @@
 //
 // Daniel Veillard <veillard@redhat.com>
 
-use std::{any::type_name, ffi::c_void};
+use std::{any::type_name, ffi::c_void, ptr::drop_in_place, rc::Rc};
 
 use crate::{
     tree::XmlNodePtr,
@@ -32,7 +32,7 @@ use crate::{
 
 use super::{
     globals::xml_free,
-    xmlregexp::{XmlRegexpPtr, xml_reg_free_regexp},
+    xmlregexp::XmlRegexp,
     xmlschemastypes::{XmlSchemaValPtr, xml_schema_free_facet},
 };
 
@@ -497,8 +497,8 @@ pub struct XmlSchemaFacet {
     pub(crate) node: Option<XmlNodePtr>,
     pub(crate) fixed: i32, /* XML_SCHEMAS_FACET_PRESERVE, etc. */
     pub(crate) whitespace: i32,
-    pub(crate) val: XmlSchemaValPtr, /* The compiled value */
-    pub(crate) regexp: XmlRegexpPtr, /* The regex for patterns */
+    pub(crate) val: XmlSchemaValPtr,          /* The compiled value */
+    pub(crate) regexp: Option<Rc<XmlRegexp>>, /* The regex for patterns */
 }
 
 // TODO: Actually all those flags used for the schema should sit
@@ -603,9 +603,8 @@ pub unsafe fn xml_schema_free_type(typ: XmlSchemaTypePtr) {
                 !link.is_null()
             } {}
         }
-        if !(*typ).cont_model.is_null() {
-            xml_reg_free_regexp((*typ).cont_model);
-        }
+        (*typ).cont_model.take();
+        drop_in_place(typ);
         xml_free(typ as _);
     }
 }

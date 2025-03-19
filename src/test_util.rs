@@ -26,7 +26,7 @@ use crate::{
         xmlautomata::XmlAutomataPtr,
         xmlmodule::XmlModulePtr,
         xmlreader::{XmlTextReaderLocatorPtr, XmlTextReaderPtr},
-        xmlregexp::{XmlExpCtxtPtr, XmlExpNodePtr, XmlRegExecCtxtPtr, XmlRegexpPtr},
+        xmlregexp::{XmlExpCtxtPtr, XmlExpNodePtr, XmlRegExecCtxtPtr},
         xmlschemastypes::{XmlSchemaValPtr, XmlSchemaWhitespaceValueType},
         xmlstring::XmlChar,
     },
@@ -406,14 +406,6 @@ pub(crate) fn gen_xml_reg_exec_ctxt_ptr(_no: i32, _nr: i32) -> XmlRegExecCtxtPtr
 
 #[cfg(feature = "libxml_regexp")]
 pub(crate) fn des_xml_reg_exec_ctxt_ptr(_no: i32, _val: XmlRegExecCtxtPtr, _nr: i32) {}
-
-#[cfg(feature = "libxml_regexp")]
-pub(crate) fn gen_xml_regexp_ptr(_no: i32, _nr: i32) -> XmlRegexpPtr {
-    null_mut()
-}
-
-#[cfg(feature = "libxml_regexp")]
-pub(crate) fn des_xml_regexp_ptr(_no: i32, _val: XmlRegexpPtr, _nr: i32) {}
 
 #[cfg(feature = "schema")]
 pub(crate) fn gen_xml_schema_ptr(_no: i32, _nr: i32) -> XmlSchemaPtr {
