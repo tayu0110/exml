@@ -4883,24 +4883,16 @@ unsafe fn threads_test(
 }
 
 #[cfg(feature = "libxml_regexp")]
-unsafe fn test_regexp(output: &mut File, comp: Rc<XmlRegexp>, value: *const c_char) {
-    unsafe {
-        use exml::libxml::xmlregexp::xml_regexp_exec;
+fn test_regexp(output: &mut File, comp: Rc<XmlRegexp>, value: &str) {
+    use exml::libxml::xmlregexp::xml_regexp_exec;
 
-        let ret: i32 = xml_regexp_exec(comp, value as _);
-        if ret == 1 {
-            writeln!(output, "{}: Ok", CStr::from_ptr(value).to_string_lossy()).ok();
-        } else if ret == 0 {
-            writeln!(output, "{}: Fail", CStr::from_ptr(value).to_string_lossy()).ok();
-        } else {
-            writeln!(
-                output,
-                "{}: Error: {}",
-                CStr::from_ptr(value).to_string_lossy(),
-                ret
-            )
-            .ok();
-        }
+    let ret: i32 = xml_regexp_exec(comp, value);
+    if ret == 1 {
+        writeln!(output, "{}: Ok", value).ok();
+    } else if ret == 0 {
+        writeln!(output, "{}: Fail", value).ok();
+    } else {
+        writeln!(output, "{}: Error: {}", value, ret).ok();
     }
 }
 
@@ -5008,7 +5000,13 @@ unsafe fn regexp_test(
                         break;
                     }
                 } else if let Some(comp) = comp.clone() {
-                    test_regexp(&mut output, comp, expression.as_ptr() as _);
+                    test_regexp(
+                        &mut output,
+                        comp,
+                        CStr::from_ptr(expression.as_ptr() as _)
+                            .to_string_lossy()
+                            .as_ref(),
+                    );
                 }
             }
             expression.clear();

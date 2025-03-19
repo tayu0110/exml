@@ -5436,7 +5436,12 @@ unsafe fn xml_schema_validate_facet_internal(
                 {
                     value = (*val).value.str;
                 }
-                ret = xml_regexp_exec((*facet).regexp.clone().unwrap(), value);
+                ret = xml_regexp_exec(
+                    (*facet).regexp.clone().unwrap(),
+                    CStr::from_ptr(value as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                );
                 if ret == 1 {
                     return 0;
                 }

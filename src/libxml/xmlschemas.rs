@@ -1767,7 +1767,12 @@ unsafe fn xml_schema_validate_facets(
                 }
                 found = 1;
                 // NOTE that for patterns, @value needs to be the normalized value.
-                ret = xml_regexp_exec((*(*facet_link).facet).regexp.clone().unwrap(), value);
+                ret = xml_regexp_exec(
+                    (*(*facet_link).facet).regexp.clone().unwrap(),
+                    CStr::from_ptr(value as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                );
                 if ret == 1 {
                     break;
                 } else if ret < 0 {
