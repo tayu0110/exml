@@ -5061,10 +5061,7 @@ unsafe fn automata_test(
 
         use exml::{
             generic_error,
-            libxml::xmlregexp::{
-                XmlRegExecCtxtPtr, xml_reg_exec_push_string, xml_reg_free_exec_ctxt,
-                xml_reg_new_exec_ctxt,
-            },
+            libxml::xmlregexp::{XmlRegExecCtxtPtr, xml_reg_free_exec_ctxt, xml_reg_new_exec_ctxt},
         };
 
         let mut ret: i32;
@@ -5249,7 +5246,7 @@ unsafe fn automata_test(
                             exec = xml_reg_new_exec_ctxt(regexp, None, null_mut());
                         }
                         if ret == 0 {
-                            ret = xml_reg_exec_push_string(exec, null_mut(), null_mut());
+                            ret = (*exec).push_string(None, null_mut());
                         }
                         if ret == 1 {
                             writeln!(output, "=> Passed").ok();
@@ -5268,7 +5265,14 @@ unsafe fn automata_test(
                     if exec.is_null() {
                         exec = xml_reg_new_exec_ctxt(regexp, None, null_mut());
                     }
-                    ret = xml_reg_exec_push_string(exec, expr.as_ptr(), null_mut());
+                    ret = (*exec).push_string(
+                        Some(
+                            CStr::from_ptr(expr.as_ptr() as *const i8)
+                                .to_string_lossy()
+                                .as_ref(),
+                        ),
+                        null_mut(),
+                    );
                 } else {
                     let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
                     generic_error!("Unexpected line {expr}\n");

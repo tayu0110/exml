@@ -34,9 +34,7 @@ use libc::{memset, strcat, strlen, strncat};
 #[cfg(feature = "libxml_regexp")]
 use crate::libxml::xmlautomata::XmlAutomata;
 #[cfg(feature = "libxml_regexp")]
-use crate::libxml::xmlregexp::{
-    XmlRegExecCtxtPtr, xml_reg_exec_push_string, xml_reg_free_exec_ctxt, xml_reg_new_exec_ctxt,
-};
+use crate::libxml::xmlregexp::{XmlRegExecCtxtPtr, xml_reg_free_exec_ctxt, xml_reg_new_exec_ctxt};
 #[cfg(feature = "libxml_regexp")]
 use crate::libxml::xmlstring::xml_strncmp;
 #[cfg(feature = "libxml_valid")]
@@ -4501,7 +4499,13 @@ unsafe fn xml_validate_element_content(
                                         break 'fail;
                                     }
                                     // ret =
-                                    xml_reg_exec_push_string(exec, fullname, null_mut());
+                                    (*exec).push_string(
+                                        Some(
+                                            CStr::from_ptr(fullname as *const i8).to_string_lossy(),
+                                        )
+                                        .as_deref(),
+                                        null_mut(),
+                                    );
                                     if fullname != fname.as_ptr() as _
                                         && fullname != cur_node.name as _
                                     {
@@ -4509,7 +4513,10 @@ unsafe fn xml_validate_element_content(
                                     }
                                 } else {
                                     // ret =
-                                    xml_reg_exec_push_string(exec, cur_node.name, null_mut());
+                                    (*exec).push_string(
+                                        cur_node.name().as_deref(),
+                                        null_mut(),
+                                    );
                                 }
                             }
                             _ => {}
@@ -4525,7 +4532,7 @@ unsafe fn xml_validate_element_content(
                         }
                     }
 
-                    ret = xml_reg_exec_push_string(exec, null_mut(), null_mut());
+                    ret = (*exec).push_string(None, null_mut());
                 }
                 // fail:
                 xml_reg_free_exec_ctxt(exec);
@@ -7185,7 +7192,12 @@ pub unsafe fn xml_validate_push_element(
                         //     - element types with element content, if white space
                         //       occurs directly within any instance of those types.
                         if !state.exec.is_null() {
-                            ret = xml_reg_exec_push_string(state.exec, qname, null_mut());
+                            ret = (*state.exec).push_string(
+                                (!qname.is_null())
+                                    .then(|| CStr::from_ptr(qname as *const i8).to_string_lossy())
+                                    .as_deref(),
+                                null_mut(),
+                            );
                             if ret < 0 {
                                 let name = (*state.node).name().unwrap();
                                 let qname = CStr::from_ptr(qname as *const i8).to_string_lossy();
@@ -7343,7 +7355,7 @@ pub unsafe fn xml_validate_pop_element(
                 if matches!(elem_decl.etype, XmlElementTypeVal::XmlElementTypeElement)
                     && !state.exec.is_null()
                 {
-                    ret = xml_reg_exec_push_string(state.exec, null_mut(), null_mut());
+                    ret = (*state.exec).push_string(None, null_mut());
                     if ret <= 0 {
                         let name = (*state.node).name().unwrap();
                         xml_err_valid_node(

@@ -12,13 +12,10 @@ use crate::{
             XmlRelaxNGGrammarPtr, XmlRelaxNGPtr, XmlRelaxNGValidErr, XmlRelaxNGValidError,
             xml_relaxng_add_states_uniq, xml_relaxng_validate_progressive_callback,
         },
-        xmlregexp::{
-            XmlRegExecCtxtPtr, xml_reg_exec_push_string, xml_reg_exec_push_string2,
-            xml_reg_free_exec_ctxt, xml_reg_new_exec_ctxt,
-        },
+        xmlregexp::{XmlRegExecCtxtPtr, xml_reg_free_exec_ctxt, xml_reg_new_exec_ctxt},
     },
     relaxng::{VALID_ERR, VALID_ERR2},
-    tree::{XmlAttrPtr, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNodePtr},
+    tree::{NodeCommon, XmlAttrPtr, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNodePtr},
 };
 
 use super::{XmlRelaxNGDefinePtr, xml_rng_verr_memory};
@@ -165,14 +162,13 @@ impl XmlRelaxNGValidCtxt {
             self.pnode = Some(elem);
             self.pstate = 0;
             if let Some(ns) = elem.ns {
-                ret = xml_reg_exec_push_string2(
-                    self.elem,
-                    elem.name,
-                    ns.href,
+                ret = (*self.elem).push_string2(
+                    elem.name().as_deref().unwrap(),
+                    ns.href().as_deref(),
                     self as *mut Self as _,
                 );
             } else {
-                ret = xml_reg_exec_push_string(self.elem, elem.name, self as *mut Self as _);
+                ret = (*self.elem).push_string(elem.name().as_deref(), self as *mut Self as _);
             }
             if ret < 0 {
                 VALID_ERR2!(self, XmlRelaxNGValidErr::XmlRelaxngErrElemwrong, elem.name);
@@ -200,7 +196,7 @@ impl XmlRelaxNGValidCtxt {
             }
             // verify that we reached a terminal state of the content model.
             let exec: XmlRegExecCtxtPtr = self.elem_pop();
-            ret = xml_reg_exec_push_string(exec, null_mut(), null_mut());
+            ret = (*exec).push_string(None, null_mut());
             match ret.cmp(&0) {
                 std::cmp::Ordering::Equal => {
                     // TODO: get some of the names needed to exit the current state of exec

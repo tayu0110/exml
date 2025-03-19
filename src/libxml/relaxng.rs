@@ -42,10 +42,7 @@ use crate::{
             XmlHashTablePtr, xml_hash_add_entry2, xml_hash_create, xml_hash_free, xml_hash_lookup2,
         },
         valid::{XmlValidCtxt, xml_validate_document_final},
-        xmlregexp::{
-            XmlRegExecCtxtPtr, xml_reg_exec_push_string, xml_reg_exec_push_string2,
-            xml_reg_free_exec_ctxt, xml_reg_new_exec_ctxt,
-        },
+        xmlregexp::{XmlRegExecCtxtPtr, xml_reg_free_exec_ctxt, xml_reg_new_exec_ctxt},
         xmlstring::{XmlChar, xml_str_equal, xml_strcat, xml_strdup, xml_strlen},
     },
     parser::{split_qname2, xml_read_file, xml_read_memory},
@@ -7334,7 +7331,7 @@ unsafe fn xml_relaxng_validate_compiled_content(
             match now.element_type() {
                 XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode => {
                     if !now.is_blank_node() {
-                        ret = xml_reg_exec_push_string(exec, c"#text".as_ptr() as _, ctxt as _);
+                        ret = (*exec).push_string(Some("#text"), ctxt as _);
                         if ret < 0 {
                             VALID_ERR2!(
                                 ctxt,
@@ -7346,9 +7343,13 @@ unsafe fn xml_relaxng_validate_compiled_content(
                 }
                 XmlElementType::XmlElementNode => {
                     if let Some(ns) = now.ns {
-                        ret = xml_reg_exec_push_string2(exec, now.name, ns.href, ctxt as _);
+                        ret = (*exec).push_string2(
+                            now.name().as_deref().unwrap(),
+                            ns.href().as_deref(),
+                            ctxt as _,
+                        );
                     } else {
-                        ret = xml_reg_exec_push_string(exec, now.name, ctxt as _);
+                        ret = (*exec).push_string(now.name().as_deref(), ctxt as _);
                     }
                     if ret < 0 {
                         VALID_ERR2!(ctxt, XmlRelaxNGValidErr::XmlRelaxngErrElemwrong, now.name);
@@ -7362,7 +7363,7 @@ unsafe fn xml_relaxng_validate_compiled_content(
             // Switch to next element
             cur = now.next.map(|node| XmlNodePtr::try_from(node).unwrap());
         }
-        ret = xml_reg_exec_push_string(exec, null_mut(), null_mut());
+        ret = (*exec).push_string(None, null_mut());
         if ret == 1 {
             ret = 0;
             (*(*ctxt).state).seq = None;
@@ -9181,7 +9182,7 @@ pub unsafe fn xml_relaxng_validate_push_cdata(
             return 1;
         }
 
-        let ret: i32 = xml_reg_exec_push_string((*ctxt).elem, c"#text".as_ptr() as _, ctxt as _);
+        let ret: i32 = (*(*ctxt).elem).push_string(Some("#text"), ctxt as _);
         if ret < 0 {
             VALID_ERR2!(
                 ctxt,

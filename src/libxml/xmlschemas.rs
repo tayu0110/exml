@@ -88,11 +88,7 @@ use crate::{
             xml_schema_free_wildcard_ns_set,
         },
         valid::xml_add_id,
-        xmlregexp::{
-            XmlRegExecCtxtPtr, xml_reg_exec_err_info, xml_reg_exec_next_values,
-            xml_reg_exec_push_string, xml_reg_exec_push_string2, xml_reg_new_exec_ctxt,
-            xml_regexp_exec,
-        },
+        xmlregexp::{XmlRegExecCtxtPtr, xml_reg_new_exec_ctxt, xml_regexp_exec},
         xmlschemastypes::{
             XmlSchemaValPtr, XmlSchemaWhitespaceValueType, xml_schema_check_facet,
             xml_schema_compare_values, xml_schema_compare_values_whtsp, xml_schema_copy_value,
@@ -14776,10 +14772,16 @@ unsafe fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                     // order, is `valid` with respect to the {content type}'s
                     // particle, as defined in Element Sequence Locally Valid
                     // (Particle) ($3.9.4)."
-                    ret = xml_reg_exec_push_string2(
-                        regex_ctxt,
-                        (*(*vctxt).inode).local_name,
-                        (*(*vctxt).inode).ns_name,
+                    ret = (*regex_ctxt).push_string2(
+                        CStr::from_ptr((*(*vctxt).inode).local_name as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                        (!(*(*vctxt).inode).ns_name.is_null())
+                            .then(|| {
+                                CStr::from_ptr((*(*vctxt).inode).ns_name as *const i8)
+                                    .to_string_lossy()
+                            })
+                            .as_deref(),
                         (*vctxt).inode as _,
                     );
                     if (*vctxt).err == XmlParserErrors::XmlSchemavInternal as i32 {
@@ -14791,12 +14793,9 @@ unsafe fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                         return -1;
                     }
                     if ret < 0 {
-                        if let Some((nbval, nbneg, values)) = xml_reg_exec_err_info(
-                            regex_ctxt,
-                            null_mut(),
-                            &mut values,
-                            &raw mut terminal,
-                        ) {
+                        if let Some((nbval, nbneg, values)) =
+                            (*regex_ctxt).err_info(None, &mut values, &raw mut terminal)
+                        {
                             xml_schema_complex_type_err(
                                 vctxt as XmlSchemaAbstractCtxtPtr,
                                 XmlParserErrors::XmlSchemavElementContent,
@@ -18007,16 +18006,9 @@ unsafe fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                                 }
                                 // Get hold of the still expected content, since a further
                                 // call to xmlRegExecPushString() will lose this information.
-                                let values = xml_reg_exec_next_values(
-                                    (*inode).regex_ctxt,
-                                    &mut values,
-                                    &raw mut terminal,
-                                );
-                                ret = xml_reg_exec_push_string(
-                                    (*inode).regex_ctxt,
-                                    null_mut(),
-                                    null_mut(),
-                                );
+                                let values = (*(*inode).regex_ctxt)
+                                    .next_values(&mut values, &raw mut terminal);
+                                ret = (*(*inode).regex_ctxt).push_string(None, null_mut());
                                 if ret < 0 || (ret == 0 && !INODE_NILLED!(inode)) {
                                     // Still missing something.
                                     ret = 1;

@@ -38,15 +38,15 @@ use std::{
     rc::Rc,
 };
 
-use libc::{memcpy, memset, snprintf, strlen};
+use libc::{memset, snprintf};
 
 use crate::{
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     libxml::{
         dict::{XmlDictPtr, xml_dict_lookup},
-        globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
+        globals::{xml_free, xml_malloc, xml_realloc},
         xmlautomata::{XmlAutomata, XmlAutomataState},
-        xmlstring::{XmlChar, xml_strdup},
+        xmlstring::XmlChar,
         xmlunicode::{
             xml_ucs_is_block, xml_ucs_is_cat_c, xml_ucs_is_cat_cc, xml_ucs_is_cat_cf,
             xml_ucs_is_cat_co, xml_ucs_is_cat_l, xml_ucs_is_cat_ll, xml_ucs_is_cat_lm,
@@ -2720,7 +2720,7 @@ pub type XmlRegInputTokenPtr = *mut XmlRegInputToken;
 #[doc(alias = "xmlRegInputToken")]
 #[repr(C)]
 pub struct XmlRegInputToken {
-    value: *mut XmlChar,
+    value: Option<Rc<str>>,
     data: *mut c_void,
 }
 
@@ -2746,18 +2746,16 @@ pub struct XmlRegExecCtxt {
     counts: Vec<i32>,
 
     // The input stack
-    input_stack_max: i32,
-    input_stack_nr: i32,
     index: usize,
     char_stack: *mut i32,
-    input_string: Box<str>,           /* when operating on characters */
-    input_stack: XmlRegInputTokenPtr, /* when operating on strings */
+    input_string: Box<str>,             /* when operating on characters */
+    input_stack: Vec<XmlRegInputToken>, /* when operating on strings */
 
     // error handling
-    err_state_no: i32,        /* the error state number */
-    err_state: usize,         /* the error state */
-    err_string: *mut XmlChar, /* the string raising the error */
-    err_counts: Vec<i32>,     /* counters at the error state */
+    err_state_no: i32,            /* the error state number */
+    err_state: usize,             /* the error state */
+    err_string: Option<Box<str>>, /* the string raising the error */
+    err_counts: Vec<i32>,         /* counters at the error state */
     nb_push: i32,
 }
 
@@ -2848,15 +2846,20 @@ impl XmlRegExecCtxt {
         self.rollbacks.push(rollback);
     }
 
+    #[doc(alias = "xmlFARegExecSaveInputString")]
+    fn save_input_string(&mut self, value: Option<Rc<str>>, data: *mut c_void) {
+        self.input_stack.push(XmlRegInputToken { value, data });
+    }
+
     /// Push one input token in the execution context
     ///
     /// Returns: 1 if the regexp reached a final state, 0 if non-final,
     /// and a negative value in case of error.
     #[doc(alias = "xmlRegCompactPushString")]
-    unsafe fn push_string(
+    unsafe fn compact_push_string(
         &mut self,
         comp: Rc<XmlRegexp>,
-        value: *const XmlChar,
+        value: Option<&str>,
         data: *mut c_void,
     ) -> i32 {
         unsafe {
@@ -2866,39 +2869,24 @@ impl XmlRegExecCtxt {
                 return -1;
             }
 
-            if value.is_null() {
+            let Some(value) = value else {
                 // are we at a final state ?
                 if comp.compact[state][0] == XmlRegStateType::XmlRegexpFinalState as i32 {
                     return 1;
                 }
                 return 0;
-            }
+            };
 
             // Examine all outside transitions from current state
             for i in 0..comp.string_map.len() {
                 let mut target = comp.compact[state][i + 1];
                 if target > 0 && target <= comp.nbstates {
                     target -= 1; /* to avoid 0 */
-                    if xml_reg_str_equal_wildcard(
-                        Some(&comp.string_map[i]),
-                        Some(
-                            CStr::from_ptr(value as *const i8)
-                                .to_string_lossy()
-                                .as_ref(),
-                        ),
-                    ) != 0
-                    {
+                    if xml_reg_str_equal_wildcard(Some(&comp.string_map[i]), Some(value)) != 0 {
                         self.index = target as usize;
                         if let Some(callback) = self.callback {
                             if !comp.transdata.is_empty() {
-                                callback(
-                                    self.data as _,
-                                    CStr::from_ptr(value as *const i8)
-                                        .to_string_lossy()
-                                        .as_ref(),
-                                    comp.transdata[state][i],
-                                    data,
-                                );
+                                callback(self.data as _, value, comp.transdata[state][i], data);
                             }
                         }
                         if comp.compact[target as usize][0]
@@ -2919,13 +2907,621 @@ impl XmlRegExecCtxt {
             }
             // Failed to find an exit transition out from current state for the current token
             // error:
-            if !self.err_string.is_null() {
-                xml_free(self.err_string as _);
-            }
-            self.err_string = xml_strdup(value);
+            self.err_string = Some(value.to_owned().into_boxed_str());
             self.err_state_no = state as i32;
             self.status = -1;
             -1
+        }
+    }
+
+    /// Push one input token in the execution context
+    ///
+    /// Returns: 1 if the regexp reached a final state, 0 if non-final,
+    /// and a negative value in case of error.
+    #[doc(alias = "xmlRegExecPushStringInternal")]
+    unsafe fn push_string_internal(
+        &mut self,
+        value: Option<&str>,
+        mut data: *mut c_void,
+        compound: i32,
+    ) -> i32 {
+        unsafe {
+            let mut ret: i32;
+            let mut is_final: i32 = 0;
+            let mut progress: i32 = 1;
+
+            if self.status != 0 {
+                return self.status;
+            }
+
+            if !self.comp.compact.is_empty() {
+                return self.compact_push_string(self.comp.clone(), value, data);
+            }
+
+            if value.is_none() {
+                if matches!(
+                    self.comp.states[self.state].as_ref().unwrap().typ,
+                    XmlRegStateType::XmlRegexpFinalState
+                ) {
+                    return 1;
+                }
+                is_final = 1;
+            }
+
+            let mut value = value.map(Rc::from);
+
+            // If we have an active rollback stack push the new value there
+            // and get back to where we were left
+            if value.is_some() && !self.input_stack.is_empty() {
+                self.save_input_string(value, data);
+                value = self.input_stack[self.index].value.clone();
+                data = self.input_stack[self.index].data;
+            }
+
+            'b: while self.status == 0
+                && (value.is_some()
+                    || (is_final == 1
+                        && !matches!(self.state_type(), XmlRegStateType::XmlRegexpFinalState)))
+            {
+                'rollback: {
+                    'progress: {
+                        // End of input on non-terminal state, rollback, however we may
+                        // still have epsilon like transition for counted transitions
+                        // on counters, in that case don't break too early.
+                        if value.is_none() && self.counts.is_empty() {
+                            break 'rollback;
+                        }
+
+                        self.transcount = 0;
+                        self.transno -= 1;
+                        while {
+                            self.transno += 1;
+                            self.transno < self.num_transes() as i32
+                        } {
+                            if self.trans().to < 0 {
+                                continue;
+                            }
+                            ret = 0;
+                            if self.trans().count as usize == REGEXP_ALL_LAX_COUNTER {
+                                let mut count: i32;
+
+                                ret = 0;
+
+                                // Check all counted transitions from the current state
+                                if value.is_none() && is_final != 0 {
+                                    ret = 1;
+                                } else if let Some(value) = value.as_deref() {
+                                    for (i, t) in self.state().trans.iter().enumerate() {
+                                        if t.counter < 0 || i == self.transno as usize {
+                                            continue;
+                                        }
+                                        let counter = self.comp.counters[t.counter as usize];
+                                        count = self.counts[t.counter as usize];
+                                        if count < counter.max
+                                            && t.atom_index != usize::MAX
+                                            && Some(value)
+                                                == self.comp.atoms[t.atom_index].valuep.as_deref()
+                                        {
+                                            ret = 0;
+                                            break;
+                                        }
+                                        if count >= counter.min
+                                            && count < counter.max
+                                            && t.atom_index != usize::MAX
+                                            && Some(value)
+                                                == self.comp.atoms[t.atom_index].valuep.as_deref()
+                                        {
+                                            ret = 1;
+                                            break;
+                                        }
+                                    }
+                                }
+                            } else if self.trans().count as usize == REGEXP_ALL_COUNTER {
+                                let mut count: i32;
+
+                                ret = 1;
+
+                                // Check all counted transitions from the current state
+                                for (i, t) in self.state().trans.iter().enumerate() {
+                                    if t.counter < 0 || i == self.transno as usize {
+                                        continue;
+                                    }
+                                    let counter = self.comp.counters[t.counter as usize];
+                                    count = self.counts[t.counter as usize];
+                                    if count < counter.min || count > counter.max {
+                                        ret = 0;
+                                        break;
+                                    }
+                                }
+                            } else if self.trans().count >= 0 {
+                                // A counted transition.
+                                let count = self.counts[self.trans().count as usize];
+                                let counter = self.comp.counters[self.trans().count as usize];
+                                ret = (count >= counter.min && count <= counter.max) as _;
+                            } else if self.trans().atom_index == usize::MAX {
+                                eprintln!("epsilon transition left at runtime");
+                                self.status = -2;
+                                break;
+                            } else if value.is_some() {
+                                ret = xml_reg_str_equal_wildcard(
+                                    self.atom().valuep.as_deref(),
+                                    value.as_deref(),
+                                );
+                                if self.atom().neg != 0 {
+                                    ret = (ret == 0) as i32;
+                                    if compound == 0 {
+                                        ret = 0;
+                                    }
+                                }
+                                if ret == 1 && self.trans().counter >= 0 {
+                                    let count = self.counts[self.trans().counter as usize];
+                                    let counter = self.comp.counters[self.trans().counter as usize];
+                                    if count >= counter.max {
+                                        ret = 0;
+                                    }
+                                }
+
+                                if ret == 1 && self.atom().min > 0 && self.atom().max > 0 {
+                                    let to = self.trans().to as usize;
+
+                                    // this is a multiple input sequence
+                                    if self.num_transes() as i32 > self.transno + 1 {
+                                        if self.input_stack.is_empty() {
+                                            self.save_input_string(value.clone(), data);
+                                        }
+                                        self.save();
+                                    }
+                                    self.transcount = 1;
+                                    'inner: while {
+                                        // Try to progress as much as possible on the input
+                                        if self.transcount == self.atom().max {
+                                            break 'inner;
+                                        }
+                                        self.index += 1;
+                                        // End of input: stop here
+                                        if self.index == self.input_stack.len() {
+                                            self.index -= 1;
+                                            value = None;
+                                            data = null_mut();
+                                            break 'inner;
+                                        }
+                                        value = self.input_stack[self.index].value.clone();
+                                        data = self.input_stack[self.index].data;
+
+                                        // End of input: stop here
+                                        if value.is_none() {
+                                            self.index -= 1;
+                                            break 'inner;
+                                        }
+                                        if self.transcount >= self.atom().min {
+                                            let transno: i32 = self.transno;
+                                            let state = self.state;
+
+                                            // The transition is acceptable save it
+                                            self.transno = -1; /* trick */
+                                            self.state = to;
+                                            if self.input_stack.is_empty() {
+                                                self.save_input_string(value.clone(), data);
+                                            }
+                                            self.save();
+                                            self.transno = transno;
+                                            self.state = state;
+                                        }
+                                        ret = (value.as_deref() == self.atom().valuep.as_deref())
+                                            as i32;
+                                        self.transcount += 1;
+                                        ret == 1
+                                    } {}
+                                    if self.transcount < self.atom().min {
+                                        ret = 0;
+                                    }
+
+                                    // If the last check failed but one transition was found
+                                    // possible, rollback
+                                    if ret < 0 {
+                                        ret = 0;
+                                    }
+                                    if ret == 0 {
+                                        break 'rollback;
+                                    }
+                                }
+                            }
+                            if ret == 1 {
+                                if let Some(callback) = self.callback {
+                                    if !data.is_null() && self.trans().atom_index != usize::MAX {
+                                        callback(
+                                            self.data as _,
+                                            self.atom().valuep.as_deref().unwrap(),
+                                            self.atom().data as _,
+                                            data,
+                                        );
+                                    }
+                                }
+                                if self.num_transes() as i32 > self.transno + 1 {
+                                    if self.input_stack.is_empty() {
+                                        self.save_input_string(value.clone(), data);
+                                    }
+                                    self.save();
+                                }
+                                if self.trans().counter >= 0 {
+                                    let counter = self.trans().counter as usize;
+                                    self.counts[counter] += 1;
+                                }
+                                if self.trans().count >= 0
+                                    && (self.trans().count as usize) < REGEXP_ALL_COUNTER
+                                {
+                                    let count = self.trans().count as usize;
+                                    self.counts[count] = 0;
+                                }
+                                if self.trans().to != -1
+                                    && self.comp.states[self.trans().to as usize].is_some()
+                                    && matches!(
+                                        self.state_type(),
+                                        XmlRegStateType::XmlRegexpSinkState
+                                    )
+                                {
+                                    // entering a sink state, save the current state as error state.
+                                    self.err_string = value
+                                        .as_deref()
+                                        .map(|value| value.to_owned().into_boxed_str());
+                                    self.err_state = self.state;
+                                    self.err_counts.copy_from_slice(&self.counts);
+                                }
+                                if self.trans().atom_index != usize::MAX {
+                                    if !self.input_stack.is_empty() {
+                                        self.index += 1;
+                                        if self.index < self.input_stack.len() {
+                                            value = self.input_stack[self.index].value.clone();
+                                            data = self.input_stack[self.index].data;
+                                        } else {
+                                            value = None;
+                                            data = null_mut();
+                                        }
+                                    } else {
+                                        value = None;
+                                        data = null_mut();
+                                    }
+                                }
+                                self.next_state();
+                                break 'progress;
+                            } else if ret < 0 {
+                                self.status = -4;
+                                break;
+                            }
+                        }
+                        if self.transno != 0
+                            || self.comp.states[self.state]
+                                .as_ref()
+                                .unwrap()
+                                .trans
+                                .is_empty()
+                        {
+                            break 'rollback;
+                        }
+                        continue 'b;
+                    }
+                    // progress:
+                    progress = 1;
+                    continue 'b;
+                }
+                // if we didn't yet rollback on the current input
+                // store the current state as the error state.
+                if progress != 0
+                    && self.state != usize::MAX
+                    && !matches!(self.state_type(), XmlRegStateType::XmlRegexpSinkState)
+                {
+                    progress = 0;
+                    self.err_string = value
+                        .as_deref()
+                        .map(|value| value.to_owned().into_boxed_str());
+                    self.err_state = self.state;
+                    if !self.comp.counters.is_empty() {
+                        self.err_counts.copy_from_slice(&self.counts);
+                    }
+                }
+
+                // Failed to find a way out
+                self.determinist = 0;
+                self.rollback();
+                if !self.input_stack.is_empty() && self.status == 0 {
+                    if self.index < self.input_stack.len() {
+                        value = self.input_stack[self.index].value.clone();
+                        data = self.input_stack[self.index].data;
+                    } else {
+                        value = None;
+                        data = null_mut();
+                    }
+                }
+            }
+            if self.status == 0 {
+                return matches!(self.state_type(), XmlRegStateType::XmlRegexpFinalState) as _;
+            }
+            self.status
+        }
+    }
+
+    /// Push one input token in the execution context
+    ///
+    /// Returns: 1 if the regexp reached a final state, 0 if non-final,
+    /// and a negative value in case of error.
+    #[doc(alias = "xmlRegExecPushString")]
+    pub unsafe fn push_string(&mut self, value: Option<&str>, data: *mut c_void) -> i32 {
+        unsafe { self.push_string_internal(value, data, 0) }
+    }
+
+    /// Push one input token in the execution context
+    ///
+    /// Returns: 1 if the regexp reached a final state, 0 if non-final,
+    /// and a negative value in case of error.
+    #[doc(alias = "xmlRegExecPushString2")]
+    pub unsafe fn push_string2(
+        &mut self,
+        value: &str,
+        value2: Option<&str>,
+        data: *mut c_void,
+    ) -> i32 {
+        unsafe {
+            if self.status != 0 {
+                return self.status;
+            }
+
+            let Some(value2) = value2 else {
+                return self.push_string(Some(value), data);
+            };
+
+            let s = format!("{value}{}{value2}", XML_REG_STRING_SEPARATOR);
+            let ret = if !self.comp.compact.is_empty() {
+                self.compact_push_string(self.comp.clone(), Some(s.as_str()), data)
+            } else {
+                self.push_string_internal(Some(s.as_str()), data, 1)
+            };
+
+            ret
+        }
+    }
+
+    /// Extract information from the regexp execution, internal routine to
+    /// implement xmlRegExecNextValues() and xmlRegExecErrInfo()
+    ///
+    /// If successfully collected, return `Some((num_val, num_neg, values_slice))`.  
+    /// Otherwise, return `None`.
+    #[doc(alias = "xmlRegExecGetValues")]
+    unsafe fn get_values<'a>(
+        &self,
+        err: i32,
+        values: &'a mut [Cow<'static, str>],
+        terminal: *mut i32,
+    ) -> Option<(usize, usize, &'a [Cow<'static, str>])> {
+        unsafe {
+            if values.is_empty() {
+                return None;
+            }
+
+            let maxval = values.len();
+            let mut nb = 0;
+            let mut nbval = 0;
+            let mut nbneg = 0;
+            if !self.comp.compact.is_empty() {
+                let mut target: i32;
+                let comp = self.comp.clone();
+
+                let state = if err != 0 {
+                    if self.err_state_no == -1 {
+                        return None;
+                    }
+                    self.err_state_no
+                } else {
+                    self.index as i32
+                };
+                if !terminal.is_null() {
+                    if comp.compact[state as usize][0]
+                        == XmlRegStateType::XmlRegexpFinalState as i32
+                    {
+                        *terminal = 1;
+                    } else {
+                        *terminal = 0;
+                    }
+                }
+                if nb < maxval {
+                    for i in 0..comp.string_map.len() {
+                        target = comp.compact[state as usize][i + 1];
+                        if target > 0
+                            && target <= comp.nbstates
+                            && comp.compact[(target - 1) as usize][0]
+                                != XmlRegStateType::XmlRegexpSinkState as i32
+                        {
+                            values[nb] = Cow::Owned(comp.string_map[i].clone());
+                            nb += 1;
+                            nbval += 1;
+                        }
+                        if nb >= maxval {
+                            break;
+                        }
+                    }
+                }
+                if nb < maxval {
+                    for i in 0..comp.string_map.len() {
+                        target = comp.compact[state as usize][i + 1];
+                        if target > 0
+                            && target <= comp.nbstates
+                            && comp.compact[(target - 1) as usize][0]
+                                == XmlRegStateType::XmlRegexpSinkState as i32
+                        {
+                            values[nb] = Cow::Owned(comp.string_map[i].clone());
+                            nb += 1;
+                            nbneg += 1;
+                        }
+                        if nb >= maxval {
+                            break;
+                        }
+                    }
+                }
+            } else {
+                if !terminal.is_null() {
+                    if matches!(
+                        self.comp.states[self.state].as_ref().unwrap().typ,
+                        XmlRegStateType::XmlRegexpFinalState
+                    ) {
+                        *terminal = 1;
+                    } else {
+                        *terminal = 0;
+                    }
+                }
+
+                let state = if err != 0 {
+                    if self.err_state == usize::MAX || self.comp.states[self.err_state].is_none() {
+                        return None;
+                    }
+                    self.err_state
+                } else {
+                    if self.state == usize::MAX || self.comp.states[self.state].is_none() {
+                        return None;
+                    }
+                    self.state
+                };
+                if nb < maxval {
+                    for trans in &self.comp.states[state].as_ref().unwrap().trans {
+                        if trans.to < 0 {
+                            continue;
+                        }
+                        if trans.atom_index == usize::MAX {
+                            continue;
+                        }
+                        let atom = &self.comp.atoms[trans.atom_index];
+                        if atom.valuep.is_none() {
+                            continue;
+                        }
+                        if trans.count as usize == REGEXP_ALL_LAX_COUNTER {
+                            // this should not be reached but ...
+                            todo!()
+                        } else if trans.count as usize == REGEXP_ALL_COUNTER {
+                            // this should not be reached but ...
+                            todo!()
+                        } else if trans.counter >= 0 {
+                            let count = if err != 0 {
+                                self.err_counts[trans.counter as usize]
+                            } else {
+                                self.counts[trans.counter as usize]
+                            };
+                            let counter = self.comp.counters[trans.counter as usize];
+                            if count < counter.max {
+                                if atom.neg != 0 {
+                                    values[nb] =
+                                        Cow::Owned(atom.valuep2.as_deref().unwrap().to_owned());
+                                    nb += 1;
+                                } else {
+                                    values[nb] =
+                                        Cow::Owned(atom.valuep.as_deref().unwrap().to_owned());
+                                    nb += 1;
+                                }
+                                nbval += 1;
+                            }
+                        } else if self.comp.states[trans.to as usize].is_some()
+                            && !matches!(
+                                self.comp.states[trans.to as usize].as_ref().unwrap().typ,
+                                XmlRegStateType::XmlRegexpSinkState,
+                            )
+                        {
+                            if atom.neg != 0 {
+                                values[nb] =
+                                    Cow::Owned(atom.valuep2.as_deref().unwrap().to_owned());
+                                nb += 1;
+                            } else {
+                                values[nb] = Cow::Owned(atom.valuep.as_deref().unwrap().to_owned());
+                                nb += 1;
+                            }
+                            nbval += 1;
+                        }
+                        if nb >= maxval {
+                            break;
+                        }
+                    }
+                }
+                if nb < maxval {
+                    for trans in &self.comp.states[state].as_ref().unwrap().trans {
+                        if trans.to < 0 {
+                            continue;
+                        }
+                        if trans.atom_index == usize::MAX {
+                            continue;
+                        }
+                        let atom = &self.comp.atoms[trans.atom_index];
+                        if atom.valuep.is_none() {
+                            continue;
+                        }
+                        if trans.count as usize == REGEXP_ALL_LAX_COUNTER
+                            || trans.count as usize == REGEXP_ALL_COUNTER
+                            || trans.counter >= 0
+                        {
+                            continue;
+                        } else if (self.comp.states[trans.to as usize]).is_some()
+                            && matches!(
+                                self.comp.states[trans.to as usize].as_ref().unwrap().typ,
+                                XmlRegStateType::XmlRegexpSinkState
+                            )
+                        {
+                            if atom.neg != 0 {
+                                values[nb] =
+                                    Cow::Owned(atom.valuep2.as_deref().unwrap().to_owned());
+                                nb += 1
+                            } else {
+                                values[nb] = Cow::Owned(atom.valuep.as_deref().unwrap().to_owned());
+                                nb += 1;
+                            }
+                            nbneg += 1;
+                        }
+                        if nb >= maxval {
+                            break;
+                        }
+                    }
+                }
+            }
+            Some((nbval, nbneg, &values[..nb]))
+        }
+    }
+
+    /// Extract information from the regexp execution,
+    /// the parameter @values must point to an array of @nbval string pointers
+    /// on return nbval will contain the number of possible strings in that
+    /// state and the @values array will be updated with them. The string values
+    /// returned will be freed with the @exec context and don't need to be deallocated.
+    ///
+    /// If successfully collected, return `Some((num_val, num_neg, values_slice))`.  
+    /// Otherwise, return `None`.
+    #[doc(alias = "xmlRegExecNextValues")]
+    pub unsafe fn next_values<'a>(
+        &self,
+        values: &'a mut [Cow<'static, str>],
+        terminal: *mut i32,
+    ) -> Option<(usize, usize, &'a [Cow<'static, str>])> {
+        unsafe { self.get_values(0, values, terminal) }
+    }
+
+    /// Extract error information from the regexp execution, the parameter
+    /// @string will be updated with the value pushed and not accepted,
+    /// the parameter @values must point to an array of @nbval string pointers
+    /// on return nbval will contain the number of possible strings in that
+    /// state and the @values array will be updated with them. The string values
+    /// returned will be freed with the @exec context and don't need to be deallocated.
+    ///
+    /// If successfully collected, return `Some((num_val, num_neg, values_slice))`.  
+    /// Otherwise, return `None`.
+    #[doc(alias = "xmlRegExecErrInfo")]
+    pub unsafe fn err_info<'a>(
+        &self,
+        string: Option<&mut Option<Box<str>>>,
+        values: &'a mut [Cow<'static, str>],
+        terminal: *mut i32,
+    ) -> Option<(usize, usize, &'a [Cow<'static, str>])> {
+        unsafe {
+            if let Some(string) = string {
+                if self.status != 0 {
+                    *string = self.err_string.clone();
+                } else {
+                    *string = None;
+                }
+            }
+            self.get_values(1, values, terminal)
         }
     }
 }
@@ -2943,15 +3539,13 @@ impl Default for XmlRegExecCtxt {
             transcount: 0,
             rollbacks: vec![],
             counts: vec![],
-            input_stack_max: 0,
-            input_stack_nr: 0,
             index: 0,
             char_stack: null_mut(),
             input_string: "".to_owned().into_boxed_str(),
-            input_stack: null_mut(),
+            input_stack: vec![],
             err_state_no: 0,
             err_state: usize::MAX,
-            err_string: null_mut(),
+            err_string: None,
             err_counts: vec![],
             nb_push: 0,
         }
@@ -3177,8 +3771,6 @@ pub fn xml_regexp_exec(comp: Rc<XmlRegexp>, content: &str) -> i32 {
     exec.state = 0;
     exec.transno = 0;
     exec.transcount = 0;
-    exec.input_stack = null_mut();
-    exec.input_stack_max = 0;
     if !exec.comp.counters.is_empty() {
         exec.counts.clear();
         exec.counts.resize(exec.comp.counters.len(), 0);
@@ -4053,11 +4645,8 @@ pub unsafe fn xml_reg_new_exec_ctxt(
             (*exec).counts.clear();
             (*exec).err_counts.clear();
         }
-        (*exec).input_stack_max = 0;
-        (*exec).input_stack_nr = 0;
-        (*exec).input_stack = null_mut();
         (*exec).err_state_no = -1;
-        (*exec).err_string = null_mut();
+        (*exec).err_string = None;
         (*exec).nb_push = 0;
         exec
     }
@@ -4071,19 +4660,6 @@ pub unsafe fn xml_reg_free_exec_ctxt(exec: XmlRegExecCtxtPtr) {
             return;
         }
 
-        (*exec).counts.clear();
-        (*exec).rollbacks.clear();
-        if !(*exec).input_stack.is_null() {
-            for i in 0..(*exec).input_stack_nr {
-                if !(*(*exec).input_stack.add(i as usize)).value.is_null() {
-                    xml_free((*(*exec).input_stack.add(i as usize)).value as _);
-                }
-            }
-            xml_free((*exec).input_stack as _);
-        }
-        if !(*exec).err_string.is_null() {
-            xml_free((*exec).err_string as _);
-        }
         drop_in_place(exec);
         xml_free(exec as _);
     }
@@ -4091,732 +4667,7 @@ pub unsafe fn xml_reg_free_exec_ctxt(exec: XmlRegExecCtxtPtr) {
 
 pub(crate) const REGEXP_ALL_LAX_COUNTER: usize = 0x123457;
 
-unsafe fn xml_fa_reg_exec_save_input_string(
-    exec: XmlRegExecCtxtPtr,
-    value: *const XmlChar,
-    data: *mut c_void,
-) {
-    unsafe {
-        if (*exec).input_stack_max == 0 {
-            (*exec).input_stack_max = 4;
-            (*exec).input_stack =
-                xml_malloc((*exec).input_stack_max as usize * size_of::<XmlRegInputToken>())
-                    as XmlRegInputTokenPtr;
-            if (*exec).input_stack.is_null() {
-                xml_regexp_err_memory(null_mut(), "pushing input string");
-                (*exec).input_stack_max = 0;
-                return;
-            }
-        } else if (*exec).input_stack_nr + 1 >= (*exec).input_stack_max {
-            (*exec).input_stack_max *= 2;
-            let tmp: XmlRegInputTokenPtr = xml_realloc(
-                (*exec).input_stack as _,
-                (*exec).input_stack_max as usize * size_of::<XmlRegInputToken>(),
-            ) as XmlRegInputTokenPtr;
-            if tmp.is_null() {
-                xml_regexp_err_memory(null_mut(), "pushing input string");
-                (*exec).input_stack_max /= 2;
-                return;
-            }
-            (*exec).input_stack = tmp;
-        }
-        (*(*exec).input_stack.add((*exec).input_stack_nr as usize)).value = xml_strdup(value);
-        (*(*exec).input_stack.add((*exec).input_stack_nr as usize)).data = data;
-        (*exec).input_stack_nr += 1;
-        (*(*exec).input_stack.add((*exec).input_stack_nr as usize)).value = null_mut();
-        (*(*exec).input_stack.add((*exec).input_stack_nr as usize)).data = null_mut();
-    }
-}
-
-/// Push one input token in the execution context
-///
-/// Returns: 1 if the regexp reached a final state, 0 if non-final,
-/// and a negative value in case of error.
-#[doc(alias = "xmlRegExecPushStringInternal")]
-unsafe fn xml_reg_exec_push_string_internal(
-    exec: XmlRegExecCtxtPtr,
-    mut value: *const XmlChar,
-    mut data: *mut c_void,
-    compound: i32,
-) -> i32 {
-    unsafe {
-        let mut ret: i32;
-        let mut is_final: i32 = 0;
-        let mut progress: i32 = 1;
-
-        if exec.is_null() {
-            return -1;
-        }
-        if (*exec).status != 0 {
-            return (*exec).status;
-        }
-
-        if !(*exec).comp.compact.is_empty() {
-            return (*exec).push_string((*exec).comp.clone(), value, data);
-        }
-
-        if value.is_null() {
-            if matches!(
-                (*exec).comp.states[(*exec).state].as_ref().unwrap().typ,
-                XmlRegStateType::XmlRegexpFinalState
-            ) {
-                return 1;
-            }
-            is_final = 1;
-        }
-
-        // If we have an active rollback stack push the new value there
-        // and get back to where we were left
-        if !value.is_null() && (*exec).input_stack_nr > 0 {
-            xml_fa_reg_exec_save_input_string(exec, value, data);
-            value = (*(*exec).input_stack.add((*exec).index)).value;
-            data = (*(*exec).input_stack.add((*exec).index)).data;
-        }
-
-        'b: while (*exec).status == 0
-            && (!value.is_null()
-                || (is_final == 1
-                    && !matches!(
-                        (*exec).comp.states[(*exec).state].as_ref().unwrap().typ,
-                        XmlRegStateType::XmlRegexpFinalState
-                    )))
-        {
-            'rollback: {
-                'progress: {
-                    // End of input on non-terminal state, rollback, however we may
-                    // still have epsilon like transition for counted transitions
-                    // on counters, in that case don't break too early.
-                    if value.is_null() && (*exec).counts.is_empty() {
-                        break 'rollback;
-                    }
-
-                    (*exec).transcount = 0;
-                    (*exec).transno -= 1;
-                    while {
-                        (*exec).transno += 1;
-                        (*exec).transno
-                            < (*exec).comp.states[(*exec).state]
-                                .as_ref()
-                                .unwrap()
-                                .trans
-                                .len() as i32
-                    } {
-                        let trans = &(*exec).comp.states[(*exec).state].as_ref().unwrap().trans
-                            [(*exec).transno as usize];
-                        if trans.to < 0 {
-                            continue;
-                        }
-                        ret = 0;
-                        if trans.count as usize == REGEXP_ALL_LAX_COUNTER {
-                            let mut count: i32;
-
-                            ret = 0;
-
-                            // Check all counted transitions from the current state
-                            if value.is_null() && is_final != 0 {
-                                ret = 1;
-                            } else if !value.is_null() {
-                                for (i, t) in (*exec).comp.states[(*exec).state]
-                                    .as_ref()
-                                    .unwrap()
-                                    .trans
-                                    .iter()
-                                    .enumerate()
-                                {
-                                    if t.counter < 0 || i == (*exec).transno as usize {
-                                        continue;
-                                    }
-                                    let counter = (*exec).comp.counters[t.counter as usize];
-                                    count = (*exec).counts[t.counter as usize];
-                                    if count < counter.max
-                                        && t.atom_index != usize::MAX
-                                        && Some(
-                                            CStr::from_ptr(value as *const i8)
-                                                .to_string_lossy()
-                                                .as_ref(),
-                                        ) == (*exec).comp.atoms[t.atom_index].valuep.as_deref()
-                                    {
-                                        ret = 0;
-                                        break;
-                                    }
-                                    if count >= counter.min
-                                        && count < counter.max
-                                        && t.atom_index != usize::MAX
-                                        && Some(
-                                            CStr::from_ptr(value as *const i8)
-                                                .to_string_lossy()
-                                                .as_ref(),
-                                        ) == (*exec).comp.atoms[t.atom_index].valuep.as_deref()
-                                    {
-                                        ret = 1;
-                                        break;
-                                    }
-                                }
-                            }
-                        } else if trans.count as usize == REGEXP_ALL_COUNTER {
-                            let mut count: i32;
-
-                            ret = 1;
-
-                            // Check all counted transitions from the current state
-                            for (i, t) in (*exec).comp.states[(*exec).state]
-                                .as_ref()
-                                .unwrap()
-                                .trans
-                                .iter()
-                                .enumerate()
-                            {
-                                if t.counter < 0 || i == (*exec).transno as usize {
-                                    continue;
-                                }
-                                let counter = (*exec).comp.counters[t.counter as usize];
-                                count = (*exec).counts[t.counter as usize];
-                                if count < counter.min || count > counter.max {
-                                    ret = 0;
-                                    break;
-                                }
-                            }
-                        } else if trans.count >= 0 {
-                            // A counted transition.
-                            let count = (*exec).counts[trans.count as usize];
-                            let counter = (*exec).comp.counters[trans.count as usize];
-                            ret = (count >= counter.min && count <= counter.max) as _;
-                        } else if trans.atom_index == usize::MAX {
-                            eprintln!("epsilon transition left at runtime");
-                            (*exec).status = -2;
-                            break;
-                        } else {
-                            let atom = &(*exec).comp.atoms[trans.atom_index];
-                            if !value.is_null() {
-                                ret = xml_reg_str_equal_wildcard(
-                                    atom.valuep.as_deref(),
-                                    Some(
-                                        CStr::from_ptr(value as *const i8)
-                                            .to_string_lossy()
-                                            .as_ref(),
-                                    ),
-                                );
-                                if atom.neg != 0 {
-                                    ret = (ret == 0) as i32;
-                                    if compound == 0 {
-                                        ret = 0;
-                                    }
-                                }
-                                if ret == 1 && trans.counter >= 0 {
-                                    let count = (*exec).counts[trans.counter as usize];
-                                    let counter = (*exec).comp.counters[trans.counter as usize];
-                                    if count >= counter.max {
-                                        ret = 0;
-                                    }
-                                }
-
-                                if ret == 1 && atom.min > 0 && atom.max > 0 {
-                                    let to = trans.to as usize;
-
-                                    // this is a multiple input sequence
-                                    if (*exec).comp.states[(*exec).state]
-                                        .as_ref()
-                                        .unwrap()
-                                        .trans
-                                        .len() as i32
-                                        > (*exec).transno + 1
-                                    {
-                                        if (*exec).input_stack_nr <= 0 {
-                                            xml_fa_reg_exec_save_input_string(exec, value, data);
-                                        }
-                                        (*exec).save();
-                                    }
-                                    (*exec).transcount = 1;
-                                    'inner: while {
-                                        // Try to progress as much as possible on the input
-                                        if (*exec).transcount == atom.max {
-                                            break 'inner;
-                                        }
-                                        (*exec).index += 1;
-                                        value = (*(*exec).input_stack.add((*exec).index)).value;
-                                        data = (*(*exec).input_stack.add((*exec).index)).data;
-
-                                        // End of input: stop here
-                                        if value.is_null() {
-                                            (*exec).index -= 1;
-                                            break 'inner;
-                                        }
-                                        if (*exec).transcount >= atom.min {
-                                            let transno: i32 = (*exec).transno;
-                                            let state = (*exec).state;
-
-                                            // The transition is acceptable save it
-                                            (*exec).transno = -1; /* trick */
-                                            (*exec).state = to;
-                                            if (*exec).input_stack_nr <= 0 {
-                                                xml_fa_reg_exec_save_input_string(
-                                                    exec, value, data,
-                                                );
-                                            }
-                                            (*exec).save();
-                                            (*exec).transno = transno;
-                                            (*exec).state = state;
-                                        }
-                                        ret = (Some(
-                                            CStr::from_ptr(value as *const i8)
-                                                .to_string_lossy()
-                                                .as_ref(),
-                                        ) == atom.valuep.as_deref())
-                                            as i32;
-                                        (*exec).transcount += 1;
-                                        ret == 1
-                                    } {}
-                                    if (*exec).transcount < atom.min {
-                                        ret = 0;
-                                    }
-
-                                    // If the last check failed but one transition was found
-                                    // possible, rollback
-                                    if ret < 0 {
-                                        ret = 0;
-                                    }
-                                    if ret == 0 {
-                                        break 'rollback;
-                                    }
-                                }
-                            }
-                        }
-                        if ret == 1 {
-                            if let Some(callback) = (*exec).callback {
-                                if !data.is_null() && trans.atom_index != usize::MAX {
-                                    let atom = &(*exec).comp.atoms[trans.atom_index];
-                                    callback(
-                                        (*exec).data as _,
-                                        atom.valuep.as_deref().unwrap(),
-                                        atom.data as _,
-                                        data,
-                                    );
-                                }
-                            }
-                            if (*exec).comp.states[(*exec).state]
-                                .as_ref()
-                                .unwrap()
-                                .trans
-                                .len() as i32
-                                > (*exec).transno + 1
-                            {
-                                if (*exec).input_stack_nr <= 0 {
-                                    xml_fa_reg_exec_save_input_string(exec, value, data);
-                                }
-                                (*exec).save();
-                            }
-                            if trans.counter >= 0 {
-                                (*exec).counts[trans.counter as usize] += 1;
-                            }
-                            if trans.count >= 0 && (trans.count as usize) < REGEXP_ALL_COUNTER {
-                                (*exec).counts[trans.count as usize] = 0;
-                            }
-                            if trans.to != -1
-                                && (*exec).comp.states[trans.to as usize].is_some()
-                                && matches!(
-                                    (*exec).comp.states[trans.to as usize].as_ref().unwrap().typ,
-                                    XmlRegStateType::XmlRegexpSinkState
-                                )
-                            {
-                                // entering a sink state, save the current state as error state.
-                                if !(*exec).err_string.is_null() {
-                                    xml_free((*exec).err_string as _);
-                                }
-                                (*exec).err_string = xml_strdup(value);
-                                (*exec).err_state = (*exec).state;
-                                (*exec).err_counts.copy_from_slice(&(*exec).counts);
-                            }
-                            (*exec).state = trans.to as usize;
-                            (*exec).transno = 0;
-                            if trans.atom_index != usize::MAX {
-                                if !(*exec).input_stack.is_null() {
-                                    (*exec).index += 1;
-                                    if ((*exec).index as i32) < (*exec).input_stack_nr {
-                                        value = (*(*exec).input_stack.add((*exec).index)).value;
-                                        data = (*(*exec).input_stack.add((*exec).index)).data;
-                                    } else {
-                                        value = null_mut();
-                                        data = null_mut();
-                                    }
-                                } else {
-                                    value = null_mut();
-                                    data = null_mut();
-                                }
-                            }
-                            break 'progress;
-                        } else if ret < 0 {
-                            (*exec).status = -4;
-                            break;
-                        }
-                    }
-                    if (*exec).transno != 0
-                        || (*exec).comp.states[(*exec).state]
-                            .as_ref()
-                            .unwrap()
-                            .trans
-                            .is_empty()
-                    {
-                        break 'rollback;
-                    }
-                    continue 'b;
-                }
-                // progress:
-                progress = 1;
-                continue 'b;
-            }
-            // if we didn't yet rollback on the current input
-            // store the current state as the error state.
-            if progress != 0
-                && (*exec).state != usize::MAX
-                && !matches!(
-                    (*exec).comp.states[(*exec).state].as_ref().unwrap().typ,
-                    XmlRegStateType::XmlRegexpSinkState
-                )
-            {
-                progress = 0;
-                if !(*exec).err_string.is_null() {
-                    xml_free((*exec).err_string as _);
-                }
-                (*exec).err_string = xml_strdup(value);
-                (*exec).err_state = (*exec).state;
-                if !(*exec).comp.counters.is_empty() {
-                    (*exec).err_counts.copy_from_slice(&(*exec).counts);
-                }
-            }
-
-            // Failed to find a way out
-            (*exec).determinist = 0;
-            (*exec).rollback();
-            if !(*exec).input_stack.is_null() && (*exec).status == 0 {
-                value = (*(*exec).input_stack.add((*exec).index)).value;
-                data = (*(*exec).input_stack.add((*exec).index)).data;
-            }
-        }
-        if (*exec).status == 0 {
-            return matches!(
-                (*exec).comp.states[(*exec).state].as_ref().unwrap().typ,
-                XmlRegStateType::XmlRegexpFinalState
-            ) as _;
-        }
-        (*exec).status
-    }
-}
-
-/// Push one input token in the execution context
-///
-/// Returns: 1 if the regexp reached a final state, 0 if non-final,
-/// and a negative value in case of error.
-#[doc(alias = "xmlRegExecPushString")]
-pub unsafe fn xml_reg_exec_push_string(
-    exec: XmlRegExecCtxtPtr,
-    value: *const XmlChar,
-    data: *mut c_void,
-) -> i32 {
-    unsafe { xml_reg_exec_push_string_internal(exec, value, data, 0) }
-}
-
 const XML_REG_STRING_SEPARATOR: char = '|';
-
-/// Push one input token in the execution context
-///
-/// Returns: 1 if the regexp reached a final state, 0 if non-final,
-/// and a negative value in case of error.
-#[doc(alias = "xmlRegExecPushString2")]
-pub unsafe fn xml_reg_exec_push_string2(
-    exec: XmlRegExecCtxtPtr,
-    value: *const XmlChar,
-    value2: *const XmlChar,
-    data: *mut c_void,
-) -> i32 {
-    unsafe {
-        let mut buf: [XmlChar; 150] = [0; 150];
-        let str: *mut XmlChar;
-
-        if exec.is_null() {
-            return -1;
-        }
-        if (*exec).status != 0 {
-            return (*exec).status;
-        }
-
-        if value2.is_null() {
-            return xml_reg_exec_push_string(exec, value, data);
-        }
-
-        let lenn: i32 = strlen(value2 as _) as _;
-        let lenp: i32 = strlen(value as _) as _;
-
-        if 150 < lenn + lenp + 2 {
-            str = xml_malloc_atomic(lenn as usize + lenp as usize + 2) as *mut XmlChar;
-            if str.is_null() {
-                (*exec).status = -1;
-                return -1;
-            }
-        } else {
-            str = buf.as_mut_ptr();
-        }
-        memcpy(str as _, value as _, lenp as usize);
-        *str.add(lenp as usize) = XML_REG_STRING_SEPARATOR as _;
-        memcpy(str.add(lenp as usize + 1) as _, value2 as _, lenn as usize);
-        *str.add(lenn as usize + lenp as usize + 1) = 0;
-
-        let ret = if !(*exec).comp.compact.is_empty() {
-            (*exec).push_string((*exec).comp.clone(), str, data)
-        } else {
-            xml_reg_exec_push_string_internal(exec, str, data, 1)
-        };
-
-        if str != buf.as_mut_ptr() {
-            xml_free(str as _);
-        }
-        ret
-    }
-}
-
-/// Extract information from the regexp execution, internal routine to
-/// implement xmlRegExecNextValues() and xmlRegExecErrInfo()
-///
-/// If successfully collected, return `Some((num_val, num_neg, values_slice))`.  
-/// Otherwise, return `None`.
-#[doc(alias = "xmlRegExecGetValues")]
-unsafe fn xml_reg_exec_get_values<'a>(
-    exec: XmlRegExecCtxtPtr,
-    err: i32,
-    values: &'a mut [Cow<'static, str>],
-    terminal: *mut i32,
-) -> Option<(usize, usize, &'a [Cow<'static, str>])> {
-    unsafe {
-        if exec.is_null() || values.is_empty() {
-            return None;
-        }
-
-        let maxval = values.len();
-        let mut nb = 0;
-        let mut nbval = 0;
-        let mut nbneg = 0;
-        if !(*exec).comp.compact.is_empty() {
-            let mut target: i32;
-            let comp = (*exec).comp.clone();
-
-            let state = if err != 0 {
-                if (*exec).err_state_no == -1 {
-                    return None;
-                }
-                (*exec).err_state_no
-            } else {
-                (*exec).index as i32
-            };
-            if !terminal.is_null() {
-                if comp.compact[state as usize][0] == XmlRegStateType::XmlRegexpFinalState as i32 {
-                    *terminal = 1;
-                } else {
-                    *terminal = 0;
-                }
-            }
-            if nb < maxval {
-                for i in 0..comp.string_map.len() {
-                    target = comp.compact[state as usize][i + 1];
-                    if target > 0
-                        && target <= comp.nbstates
-                        && comp.compact[(target - 1) as usize][0]
-                            != XmlRegStateType::XmlRegexpSinkState as i32
-                    {
-                        values[nb] = Cow::Owned(comp.string_map[i].clone());
-                        nb += 1;
-                        nbval += 1;
-                    }
-                    if nb >= maxval {
-                        break;
-                    }
-                }
-            }
-            if nb < maxval {
-                for i in 0..comp.string_map.len() {
-                    target = comp.compact[state as usize][i + 1];
-                    if target > 0
-                        && target <= comp.nbstates
-                        && comp.compact[(target - 1) as usize][0]
-                            == XmlRegStateType::XmlRegexpSinkState as i32
-                    {
-                        values[nb] = Cow::Owned(comp.string_map[i].clone());
-                        nb += 1;
-                        nbneg += 1;
-                    }
-                    if nb >= maxval {
-                        break;
-                    }
-                }
-            }
-        } else {
-            if !terminal.is_null() {
-                if matches!(
-                    (*exec).comp.states[(*exec).state].as_ref().unwrap().typ,
-                    XmlRegStateType::XmlRegexpFinalState
-                ) {
-                    *terminal = 1;
-                } else {
-                    *terminal = 0;
-                }
-            }
-
-            let state = if err != 0 {
-                if (*exec).err_state == usize::MAX
-                    || (*exec).comp.states[(*exec).err_state].is_none()
-                {
-                    return None;
-                }
-                (*exec).err_state
-            } else {
-                if (*exec).state == usize::MAX || (*exec).comp.states[(*exec).state].is_none() {
-                    return None;
-                }
-                (*exec).state
-            };
-            if nb < maxval {
-                for trans in &(*exec).comp.states[state].as_ref().unwrap().trans {
-                    if trans.to < 0 {
-                        continue;
-                    }
-                    if trans.atom_index == usize::MAX {
-                        continue;
-                    }
-                    let atom = &(*exec).comp.atoms[trans.atom_index];
-                    if atom.valuep.is_none() {
-                        continue;
-                    }
-                    if trans.count as usize == REGEXP_ALL_LAX_COUNTER {
-                        // this should not be reached but ...
-                        todo!()
-                    } else if trans.count as usize == REGEXP_ALL_COUNTER {
-                        // this should not be reached but ...
-                        todo!()
-                    } else if trans.counter >= 0 {
-                        let count = if err != 0 {
-                            (*exec).err_counts[trans.counter as usize]
-                        } else {
-                            (*exec).counts[trans.counter as usize]
-                        };
-                        let counter = (*exec).comp.counters[trans.counter as usize];
-                        if count < counter.max {
-                            if atom.neg != 0 {
-                                values[nb] =
-                                    Cow::Owned(atom.valuep2.as_deref().unwrap().to_owned());
-                                nb += 1;
-                            } else {
-                                values[nb] = Cow::Owned(atom.valuep.as_deref().unwrap().to_owned());
-                                nb += 1;
-                            }
-                            nbval += 1;
-                        }
-                    } else if (*exec).comp.states[trans.to as usize].is_some()
-                        && !matches!(
-                            (*exec).comp.states[trans.to as usize].as_ref().unwrap().typ,
-                            XmlRegStateType::XmlRegexpSinkState,
-                        )
-                    {
-                        if atom.neg != 0 {
-                            values[nb] = Cow::Owned(atom.valuep2.as_deref().unwrap().to_owned());
-                            nb += 1;
-                        } else {
-                            values[nb] = Cow::Owned(atom.valuep.as_deref().unwrap().to_owned());
-                            nb += 1;
-                        }
-                        nbval += 1;
-                    }
-                    if nb >= maxval {
-                        break;
-                    }
-                }
-            }
-            if nb < maxval {
-                for trans in &(*exec).comp.states[state].as_ref().unwrap().trans {
-                    if trans.to < 0 {
-                        continue;
-                    }
-                    if trans.atom_index == usize::MAX {
-                        continue;
-                    }
-                    let atom = &(*exec).comp.atoms[trans.atom_index];
-                    if atom.valuep.is_none() {
-                        continue;
-                    }
-                    if trans.count as usize == REGEXP_ALL_LAX_COUNTER
-                        || trans.count as usize == REGEXP_ALL_COUNTER
-                        || trans.counter >= 0
-                    {
-                        continue;
-                    } else if ((*exec).comp.states[trans.to as usize]).is_some()
-                        && matches!(
-                            (*exec).comp.states[trans.to as usize].as_ref().unwrap().typ,
-                            XmlRegStateType::XmlRegexpSinkState
-                        )
-                    {
-                        if atom.neg != 0 {
-                            values[nb] = Cow::Owned(atom.valuep2.as_deref().unwrap().to_owned());
-                            nb += 1
-                        } else {
-                            values[nb] = Cow::Owned(atom.valuep.as_deref().unwrap().to_owned());
-                            nb += 1;
-                        }
-                        nbneg += 1;
-                    }
-                    if nb >= maxval {
-                        break;
-                    }
-                }
-            }
-        }
-        Some((nbval, nbneg, &values[..nb]))
-    }
-}
-
-/// Extract information from the regexp execution,
-/// the parameter @values must point to an array of @nbval string pointers
-/// on return nbval will contain the number of possible strings in that
-/// state and the @values array will be updated with them. The string values
-/// returned will be freed with the @exec context and don't need to be deallocated.
-///
-/// If successfully collected, return `Some((num_val, num_neg, values_slice))`.  
-/// Otherwise, return `None`.
-#[doc(alias = "xmlRegExecNextValues")]
-pub unsafe fn xml_reg_exec_next_values<'a>(
-    exec: XmlRegExecCtxtPtr,
-    values: &'a mut [Cow<'static, str>],
-    terminal: *mut i32,
-) -> Option<(usize, usize, &'a [Cow<'static, str>])> {
-    unsafe { xml_reg_exec_get_values(exec, 0, values, terminal) }
-}
-
-/// Extract error information from the regexp execution, the parameter
-/// @string will be updated with the value pushed and not accepted,
-/// the parameter @values must point to an array of @nbval string pointers
-/// on return nbval will contain the number of possible strings in that
-/// state and the @values array will be updated with them. The string values
-/// returned will be freed with the @exec context and don't need to be deallocated.
-///
-/// If successfully collected, return `Some((num_val, num_neg, values_slice))`.  
-/// Otherwise, return `None`.
-#[doc(alias = "xmlRegExecErrInfo")]
-pub unsafe fn xml_reg_exec_err_info<'a>(
-    exec: XmlRegExecCtxtPtr,
-    string: *mut *const XmlChar,
-    values: &'a mut [Cow<'static, str>],
-    terminal: *mut i32,
-) -> Option<(usize, usize, &'a [Cow<'static, str>])> {
-    unsafe {
-        if exec.is_null() {
-            return None;
-        }
-        if !string.is_null() {
-            if (*exec).status != 0 {
-                *string = (*exec).err_string;
-            } else {
-                *string = null_mut();
-            }
-        }
-        xml_reg_exec_get_values(exec, 1, values, terminal)
-    }
-}
 
 // expressions are used within a context
 #[cfg(feature = "libxml_expr")]
@@ -6989,42 +6840,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_exp_new_atom() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_exp_new_ctxt() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_exp_new_or() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_exp_new_range() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_exp_new_seq() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_exp_parse() {
-
-        /* missing type support */
-    }
-
-    #[test]
     fn test_xml_exp_ref() {
         #[cfg(all(feature = "libxml_regexp", feature = "libxml_expr"))]
         unsafe {
@@ -7086,91 +6901,6 @@ mod tests {
                             eprint!(" {}", n_ctxt);
                             eprint!(" {}", n_exp);
                             eprintln!(" {}", n_sub);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_reg_exec_push_string() {
-        #[cfg(feature = "libxml_regexp")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_exec in 0..GEN_NB_XML_REG_EXEC_CTXT_PTR {
-                for n_value in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_data in 0..GEN_NB_USERDATA {
-                        let mem_base = xml_mem_blocks();
-                        let exec = gen_xml_reg_exec_ctxt_ptr(n_exec, 0);
-                        let value = gen_const_xml_char_ptr(n_value, 1);
-                        let data = gen_userdata(n_data, 2);
-
-                        let ret_val = xml_reg_exec_push_string(exec, value, data);
-                        desret_int(ret_val);
-                        des_xml_reg_exec_ctxt_ptr(n_exec, exec, 0);
-                        des_const_xml_char_ptr(n_value, value, 1);
-                        des_userdata(n_data, data, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlRegExecPushString",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlRegExecPushString()"
-                            );
-                            eprint!(" {}", n_exec);
-                            eprint!(" {}", n_value);
-                            eprintln!(" {}", n_data);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_reg_exec_push_string2() {
-        #[cfg(feature = "libxml_regexp")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_exec in 0..GEN_NB_XML_REG_EXEC_CTXT_PTR {
-                for n_value in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_value2 in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        for n_data in 0..GEN_NB_USERDATA {
-                            let mem_base = xml_mem_blocks();
-                            let exec = gen_xml_reg_exec_ctxt_ptr(n_exec, 0);
-                            let value = gen_const_xml_char_ptr(n_value, 1);
-                            let value2 = gen_const_xml_char_ptr(n_value2, 2);
-                            let data = gen_userdata(n_data, 3);
-
-                            let ret_val = xml_reg_exec_push_string2(exec, value, value2, data);
-                            desret_int(ret_val);
-                            des_xml_reg_exec_ctxt_ptr(n_exec, exec, 0);
-                            des_const_xml_char_ptr(n_value, value, 1);
-                            des_const_xml_char_ptr(n_value2, value2, 2);
-                            des_userdata(n_data, data, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlRegExecPushString2",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                assert!(
-                                    leaks == 0,
-                                    "{leaks} Leaks are found in xmlRegExecPushString2()"
-                                );
-                                eprint!(" {}", n_exec);
-                                eprint!(" {}", n_value);
-                                eprint!(" {}", n_value2);
-                                eprintln!(" {}", n_data);
-                            }
                         }
                     }
                 }
