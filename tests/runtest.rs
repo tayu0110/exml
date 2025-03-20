@@ -4897,138 +4897,83 @@ fn test_regexp(output: &mut File, comp: Rc<XmlRegexp>, value: &str) {
 }
 
 #[cfg(feature = "libxml_regexp")]
-unsafe fn regexp_test(
-    filename: &str,
-    result: Option<String>,
-    err: Option<String>,
-    _options: i32,
-) -> i32 {
-    use std::rc::Rc;
+fn regexp_test(filename: &str, result: Option<String>, err: Option<String>, _options: i32) -> i32 {
+    use std::{io::BufReader, rc::Rc};
 
-    use exml::libxml::xmlregexp::XmlRegexp;
+    use exml::{generic_error, libxml::xmlregexp::XmlRegexp};
 
-    unsafe {
-        use std::io::{BufRead, BufReader};
+    let mut comp = None;
+    let mut ret: i32;
+    let mut res: i32 = 0;
 
-        use exml::generic_error;
+    NB_TESTS.set(NB_TESTS.get() + 1);
 
-        let mut comp = None;
-        let mut ret: i32;
-        let mut res: i32 = 0;
-
-        NB_TESTS.set(NB_TESTS.get() + 1);
-
-        let mut input = match File::open(filename) {
-            Ok(file) => BufReader::new(file),
-            _ => {
-                generic_error!("Cannot open {filename} for reading\n");
-                return -1;
+    let mut input = match File::open(filename) {
+        Ok(file) => BufReader::new(file),
+        _ => {
+            generic_error!("Cannot open {filename} for reading\n");
+            return -1;
+        }
+    };
+    let temp = result_filename(filename, Some(""), Some(".res"));
+    let mut output = match File::options()
+        .write(true)
+        .truncate(true)
+        .create(true)
+        .open(temp.as_str())
+    {
+        Ok(file) => file,
+        _ => {
+            eprintln!("failed to open output file {temp}",);
+            return -1;
+        }
+    };
+    let mut expression = String::new();
+    input.read_to_string(&mut expression).ok();
+    for expression in expression.lines() {
+        let expression = expression
+            .trim_end_matches(['\n', '\t', '\r', ' '])
+            .to_owned();
+        if !expression.is_empty() {
+            if expression.starts_with('#') {
+                continue;
             }
-        };
-        let temp = result_filename(filename, Some(""), Some(".res"));
-        let mut output = match File::options()
-            .write(true)
-            .truncate(true)
-            .create(true)
-            .open(temp.as_str())
-        {
-            Ok(file) => file,
-            _ => {
-                eprintln!("failed to open output file {temp}",);
-                return -1;
-            }
-        };
-        let mut expression = vec![];
-        while let Some(mut len) = input
-            .read_until(b'\n', &mut expression)
-            .ok()
-            .filter(|&len| len > 0)
-            .map(|len| len as i32)
-        {
-            len -= 1;
-            while len >= 0
-                && (expression[len as usize] == b'\n'
-                    || expression[len as usize] == b'\t'
-                    || expression[len as usize] == b'\r'
-                    || expression[len as usize] == b' ')
-            {
-                len -= 1;
-            }
-            if len + 1 == expression.len() as i32 {
-                expression.push(0);
-            } else {
-                expression[(len + 1) as usize] = 0;
-            }
-            if len >= 0 {
-                if expression[0] == b'#' {
-                    expression.clear();
-                    continue;
+            if let Some(pattern) = expression.strip_prefix("=>") {
+                writeln!(output, "Regexp: {pattern}").ok();
+                comp = XmlRegexp::compile(pattern).map(Rc::new);
+                if comp.is_none() {
+                    writeln!(output, "   failed to compile").ok();
+                    break;
                 }
-                if expression[0] == b'=' && expression[1] == b'>' {
-                    let pattern: *mut c_char = expression.as_mut_ptr().add(2) as _;
-                    writeln!(
-                        output,
-                        "Regexp: {}",
-                        CStr::from_ptr(pattern).to_string_lossy()
-                    )
-                    .ok();
-                    comp = XmlRegexp::compile(
-                        CStr::from_ptr(pattern as *const i8)
-                            .to_string_lossy()
-                            .as_ref(),
-                    )
-                    .map(Rc::new);
-                    if comp.is_none() {
-                        writeln!(output, "   failed to compile").ok();
-                        break;
-                    }
-                } else if comp.is_none() {
-                    writeln!(
-                        output,
-                        "Regexp: {}",
-                        CStr::from_ptr(expression.as_ptr() as _).to_string_lossy()
-                    )
-                    .ok();
-                    comp = XmlRegexp::compile(
-                        CStr::from_ptr(expression.as_ptr() as *const i8)
-                            .to_string_lossy()
-                            .as_ref(),
-                    )
-                    .map(Rc::new);
-                    if comp.is_none() {
-                        writeln!(output, "   failed to compile").ok();
-                        break;
-                    }
-                } else if let Some(comp) = comp.clone() {
-                    test_regexp(
-                        &mut output,
-                        comp,
-                        CStr::from_ptr(expression.as_ptr() as _)
-                            .to_string_lossy()
-                            .as_ref(),
-                    );
+            } else if comp.is_none() {
+                writeln!(output, "Regexp: {expression}").ok();
+                comp = XmlRegexp::compile(&expression).map(Rc::new);
+                if comp.is_none() {
+                    writeln!(output, "   failed to compile").ok();
+                    break;
                 }
+            } else if let Some(comp) = comp.clone() {
+                test_regexp(&mut output, comp, &expression);
             }
-            expression.clear();
         }
-
-        ret = compare_files(temp.as_str(), result.as_deref().unwrap());
-        if ret != 0 {
-            eprintln!("Result for {filename} failed in {}", result.unwrap());
-            res = 1;
-        }
-        remove_file(temp).ok();
-
-        ret = TEST_ERRORS.with_borrow(|errors| {
-            compare_file_mem(err.as_deref().unwrap(), &errors[..TEST_ERRORS_SIZE.get()])
-        });
-        if ret != 0 {
-            eprintln!("Error for {filename} failed",);
-            res = 1;
-        }
-
-        res
     }
+
+    ret = compare_files(temp.as_str(), result.as_deref().unwrap());
+    if ret != 0 {
+        eprintln!("Result for {filename} failed in {}", result.unwrap());
+        res = 1;
+    }
+    remove_file(temp).ok();
+
+    ret = TEST_ERRORS.with_borrow(|errors| {
+        compare_file_mem(err.as_deref().unwrap(), &errors[..TEST_ERRORS_SIZE.get()])
+    });
+    if ret != 0 {
+        eprintln!("Error for {filename} failed",);
+        res = 1;
+    }
+
+    res
 }
 
 #[cfg(feature = "libxml_automata")]
@@ -5041,7 +4986,7 @@ unsafe fn automata_test(
     use exml::libxml::{xmlautomata::XmlAutomata, xmlregexp::XmlRegExecCtxt};
 
     unsafe {
-        use std::io::{BufRead, BufReader};
+        use std::io::BufReader;
 
         use exml::generic_error;
 
@@ -5084,12 +5029,12 @@ unsafe fn automata_test(
         ret = 0;
 
         let mut expr = String::new();
-        while input.read_line(&mut expr).is_ok_and(|len| len > 0) {
+        input.read_to_string(&mut expr).ok();
+        for expr in expr.lines() {
             if expr.starts_with('#') {
-                expr.clear();
                 continue;
             }
-            expr = expr.trim_end_matches(['\n', '\t', '\r', ' ']).to_owned();
+            let expr = expr.trim_end_matches(['\n', '\t', '\r', ' ']);
             if !expr.is_empty() {
                 if let Some(am) = nam.as_mut() {
                     if let Some(rem) = expr.strip_prefix("t ") {
@@ -5215,12 +5160,11 @@ unsafe fn automata_test(
                 } else if let Some(regexp) = regexp.clone() {
                     let exec =
                         exec.get_or_insert_with(|| XmlRegExecCtxt::new(regexp, None, null_mut()));
-                    ret = exec.push_string(Some(&expr), null_mut());
+                    ret = exec.push_string(Some(expr), null_mut());
                 } else {
                     generic_error!("Unexpected line {expr}\n");
                 }
             }
-            expr.clear();
         }
 
         ret = compare_files(temp.as_str(), result.as_deref().unwrap());
