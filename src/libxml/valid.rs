@@ -51,14 +51,14 @@ use crate::{
         xmlstring::{XmlChar, xml_str_equal, xml_strdup, xml_strlen, xml_strndup},
     },
     list::XmlList,
-    parser::{XmlParserCtxtPtr, split_qname2},
+    parser::{XmlParserCtxtPtr, build_qname, split_qname2},
     tree::{
         NodeCommon, XmlAttrPtr, XmlAttribute, XmlAttributeDefault, XmlAttributePtr,
         XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElement,
         XmlElementContent, XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType,
         XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlID,
-        XmlNodePtr, XmlNotation, XmlRef, xml_build_qname, xml_free_attribute, xml_free_element,
-        xml_free_node, xml_get_doc_entity, xml_new_doc_node,
+        XmlNodePtr, XmlNotation, XmlRef, xml_free_attribute, xml_free_element, xml_free_node,
+        xml_get_doc_entity, xml_new_doc_node,
     },
 };
 
@@ -2072,54 +2072,24 @@ pub unsafe fn xml_is_id(
             }
             return 0;
         } else if let Some(elem) = elem {
-            let felem: [XmlChar; 50] = [0; 50];
-            let fattr: [XmlChar; 50] = [0; 50];
+            let elemname = elem.name().unwrap();
+            let attrname = attr.name().unwrap();
+            let fullelemname = build_qname(
+                &elemname,
+                elem.ns.as_deref().and_then(|ns| ns.prefix()).as_deref(),
+            );
+            let fullattrname = build_qname(
+                &attrname,
+                attr.ns.as_deref().and_then(|ns| ns.prefix()).as_deref(),
+            );
 
-            let fullelemname: *mut XmlChar =
-                if let Some(prefix) = elem.ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) {
-                    xml_build_qname(elem.name, prefix, felem.as_ptr() as _, 50)
-                } else {
-                    elem.name as *mut XmlChar
-                };
-
-            let fullattrname: *mut XmlChar =
-                if let Some(prefix) = attr.ns.map(|ns| ns.prefix).filter(|pre| !pre.is_null()) {
-                    xml_build_qname(attr.name, prefix, fattr.as_ptr() as _, 50)
-                } else {
-                    attr.name as *mut XmlChar
-                };
-
-            let mut attr_decl = None;
-            if !fullelemname.is_null() && !fullattrname.is_null() {
-                attr_decl = doc.int_subset.and_then(|dtd| {
-                    dtd.get_attr_desc(
-                        CStr::from_ptr(fullelemname as *const i8)
-                            .to_string_lossy()
-                            .as_ref(),
-                        CStr::from_ptr(fullattrname as *const i8)
-                            .to_string_lossy()
-                            .as_ref(),
-                    )
-                });
-                if attr_decl.is_none() {
-                    if let Some(ext_subset) = doc.ext_subset {
-                        attr_decl = ext_subset.get_attr_desc(
-                            CStr::from_ptr(fullelemname as *const i8)
-                                .to_string_lossy()
-                                .as_ref(),
-                            CStr::from_ptr(fullattrname as *const i8)
-                                .to_string_lossy()
-                                .as_ref(),
-                        );
-                    }
+            let mut attr_decl = doc
+                .int_subset
+                .and_then(|dtd| dtd.get_attr_desc(&fullelemname, &fullattrname));
+            if attr_decl.is_none() {
+                if let Some(ext_subset) = doc.ext_subset {
+                    attr_decl = ext_subset.get_attr_desc(&fullelemname, &fullattrname);
                 }
-            }
-
-            if fullattrname != fattr.as_ptr() as _ && fullattrname != attr.name as _ {
-                xml_free(fullattrname as _);
-            }
-            if fullelemname != felem.as_ptr() as _ && fullelemname != elem.name as _ {
-                xml_free(fullelemname as _);
             }
 
             if attr_decl.is_some_and(|attr_decl| {
@@ -2655,24 +2625,10 @@ pub unsafe fn xml_valid_normalize_attribute_value(
     value: *const XmlChar,
 ) -> *mut XmlChar {
     unsafe {
-        // if elem.is_null() {
-        //     return null_mut();
-        // }
         if value.is_null() {
             return null_mut();
         }
 
-        if let Some(prefix) = elem.ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) {
-            let mut fname: [XmlChar; 50] = [0; 50];
-
-            let fullname: *mut XmlChar = xml_build_qname(elem.name, prefix, fname.as_mut_ptr(), 50);
-            if fullname.is_null() {
-                return null_mut();
-            }
-            if fullname != fname.as_ptr() as _ && fullname != elem.name as _ {
-                xml_free(fullname as _);
-            }
-        }
         let mut attr_decl = doc
             .int_subset
             .and_then(|dtd| dtd.get_attr_desc(elem.name().as_deref().unwrap(), name));
@@ -2722,44 +2678,24 @@ pub unsafe fn xml_valid_ctxt_normalize_attribute_value(
     unsafe {
         let mut extsubset: i32 = 0;
 
-        // if elem.is_null() {
-        //     return null_mut();
-        // }
         if value.is_null() {
             return null_mut();
         }
 
         let mut attr_decl = None;
-        if let Some(prefix) = elem.ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) {
-            let mut fname: [XmlChar; 50] = [0; 50];
-
-            let fullname: *mut XmlChar = xml_build_qname(elem.name, prefix, fname.as_mut_ptr(), 50);
-            if fullname.is_null() {
-                return null_mut();
-            }
-            attr_decl = doc.int_subset.and_then(|dtd| {
-                dtd.get_attr_desc(
-                    CStr::from_ptr(fullname as *const i8)
-                        .to_string_lossy()
-                        .as_ref(),
-                    name,
-                )
-            });
+        if let Some(prefix) = elem.ns.as_deref().and_then(|ns| ns.prefix()) {
+            let elemname = elem.name().unwrap();
+            let fullname = build_qname(&elemname, Some(&prefix));
+            attr_decl = doc
+                .int_subset
+                .and_then(|dtd| dtd.get_attr_desc(&fullname, name));
             if attr_decl.is_none() {
                 if let Some(ext_subset) = doc.ext_subset {
-                    attr_decl = ext_subset.get_attr_desc(
-                        CStr::from_ptr(fullname as *const i8)
-                            .to_string_lossy()
-                            .as_ref(),
-                        name,
-                    );
+                    attr_decl = ext_subset.get_attr_desc(&fullname, name);
                     if attr_decl.is_some() {
                         extsubset = 1;
                     }
                 }
-            }
-            if fullname != fname.as_ptr() as _ && fullname != elem.name as _ {
-                xml_free(fullname as _);
             }
         }
         if attr_decl.is_none() {
@@ -4421,31 +4357,12 @@ unsafe fn xml_validate_element_content(
                         }
                         XmlElementType::XmlElementNode => {
                             let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                            if let Some(prefix) =
-                                cur_node.ns.map(|ns| ns.prefix).filter(|p| !p.is_null())
+                            if let Some(prefix) = cur_node.ns.as_deref().and_then(|ns| ns.prefix())
                             {
-                                let mut fname: [XmlChar; 50] = [0; 50];
-
-                                let fullname: *mut XmlChar = xml_build_qname(
-                                    cur_node.name,
-                                    prefix as _,
-                                    fname.as_mut_ptr(),
-                                    50,
-                                );
-                                if fullname.is_null() {
-                                    ret = -1;
-                                    break 'fail;
-                                }
+                                let name = cur_node.name().unwrap();
+                                let fullname = build_qname(&name, Some(&prefix));
                                 // ret =
-                                exec.push_string(
-                                    Some(CStr::from_ptr(fullname as *const i8).to_string_lossy())
-                                        .as_deref(),
-                                    null_mut(),
-                                );
-                                if fullname != fname.as_ptr() as _ && fullname != cur_node.name as _
-                                {
-                                    xml_free(fullname as _);
-                                }
+                                exec.push_string(Some(&fullname), null_mut());
                             } else {
                                 // ret =
                                 exec.push_string(cur_node.name().as_deref(), null_mut());
@@ -4922,32 +4839,24 @@ pub unsafe fn xml_validate_one_element(
                         let mut child = elem.children;
                         // Hum, this start to get messy
                         while let Some(cur_node) = child {
-                            'child_ok: {
-                                if matches!(cur_node.element_type(), XmlElementType::XmlElementNode)
+                            if matches!(cur_node.element_type(), XmlElementType::XmlElementNode) {
+                                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                                name = cur_node.name;
+                                if let Some(prefix) =
+                                    cur_node.ns.as_deref().and_then(|ns| ns.prefix())
                                 {
-                                    let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                                    name = cur_node.name;
-                                    if let Some(prefix) =
-                                        cur_node.ns.map(|ns| ns.prefix).filter(|p| !p.is_null())
-                                    {
-                                        let mut fname: [XmlChar; 50] = [0; 50];
-
-                                        let fullname: *mut XmlChar = xml_build_qname(
-                                            cur_node.name,
-                                            prefix,
-                                            fname.as_mut_ptr() as _,
-                                            50,
-                                        );
-                                        if fullname.is_null() {
-                                            return 0;
-                                        }
-                                        cont = elem_decl.content;
-                                        while !cont.is_null() {
-                                            if matches!(
+                                    let cur_node_name = cur_node.name().unwrap();
+                                    let fullname = build_qname(&cur_node_name, Some(&prefix));
+                                    cont = elem_decl.content;
+                                    while !cont.is_null() {
+                                        if matches!(
                                             (*cont).typ,
                                             XmlElementContentType::XmlElementContentElement
                                         ) {
-                                            if xml_str_equal((*cont).name, fullname) {
+                                            if CStr::from_ptr((*cont).name as *const i8)
+                                                .to_string_lossy()
+                                                == fullname
+                                            {
                                                 break;
                                             }
                                         } else if matches!(
@@ -4957,7 +4866,10 @@ pub unsafe fn xml_validate_one_element(
                                             && (*(*cont).c1).typ
                                                 == XmlElementContentType::XmlElementContentElement
                                         {
-                                            if xml_str_equal((*(*cont).c1).name, fullname) {
+                                            if CStr::from_ptr((*(*cont).c1).name as *const i8)
+                                                .to_string_lossy()
+                                                == fullname
+                                            {
                                                 break;
                                             }
                                         } else if !matches!(
@@ -4976,72 +4888,66 @@ pub unsafe fn xml_validate_one_element(
                                             );
                                             break;
                                         }
-                                            cont = (*cont).c2;
-                                        }
-                                        if fullname != fname.as_ptr() as _
-                                            && fullname != cur_node.name as _
-                                        {
-                                            xml_free(fullname as _);
-                                        }
-                                        if !cont.is_null() {
-                                            break 'child_ok;
-                                        }
-                                    }
-
-                                    cont = elem_decl.content;
-                                    while !cont.is_null() {
-                                        if matches!(
-                                            (*cont).typ,
-                                            XmlElementContentType::XmlElementContentElement
-                                        ) {
-                                            if xml_str_equal((*cont).name, name) {
-                                                break;
-                                            }
-                                        } else if matches!(
-                                            (*cont).typ,
-                                            XmlElementContentType::XmlElementContentOr
-                                        ) && !(*cont).c1.is_null()
-                                            && matches!(
-                                                (*(*cont).c1).typ,
-                                                XmlElementContentType::XmlElementContentElement
-                                            )
-                                        {
-                                            if xml_str_equal((*(*cont).c1).name, name) {
-                                                break;
-                                            }
-                                        } else if !matches!(
-                                            (*cont).typ,
-                                            XmlElementContentType::XmlElementContentOr
-                                        ) || (*cont).c1.is_null()
-                                            || !matches!(
-                                                (*(*cont).c1).typ,
-                                                XmlElementContentType::XmlElementContentPCDATA
-                                            )
-                                        {
-                                            xml_err_valid!(
-                                                ctxt,
-                                                XmlParserErrors::XmlDTDMixedCorrupt,
-                                                "Internal: MIXED struct corrupted\n"
-                                            );
-                                            break;
-                                        }
                                         cont = (*cont).c2;
                                     }
-                                    if cont.is_null() {
-                                        let name =
-                                            CStr::from_ptr(name as *const i8).to_string_lossy();
-                                        let elem_name = elem.name().unwrap();
-                                        xml_err_valid_node(
-                                        ctxt,
-                                        Some(elem.into()),
-                                        XmlParserErrors::XmlDTDInvalidChild,
-                                        format!("Element {name} is not declared in {elem_name} list of possible children\n").as_str(),
-                                        Some(&name),
-                                        Some(&elem_name),
-                                        None
-                                    );
-                                        ret = 0;
+                                    if !cont.is_null() {
+                                        child = cur_node.next();
+                                        continue;
                                     }
+                                }
+
+                                cont = elem_decl.content;
+                                while !cont.is_null() {
+                                    if matches!(
+                                        (*cont).typ,
+                                        XmlElementContentType::XmlElementContentElement
+                                    ) {
+                                        if xml_str_equal((*cont).name, name) {
+                                            break;
+                                        }
+                                    } else if matches!(
+                                        (*cont).typ,
+                                        XmlElementContentType::XmlElementContentOr
+                                    ) && !(*cont).c1.is_null()
+                                        && matches!(
+                                            (*(*cont).c1).typ,
+                                            XmlElementContentType::XmlElementContentElement
+                                        )
+                                    {
+                                        if xml_str_equal((*(*cont).c1).name, name) {
+                                            break;
+                                        }
+                                    } else if !matches!(
+                                        (*cont).typ,
+                                        XmlElementContentType::XmlElementContentOr
+                                    ) || (*cont).c1.is_null()
+                                        || !matches!(
+                                            (*(*cont).c1).typ,
+                                            XmlElementContentType::XmlElementContentPCDATA
+                                        )
+                                    {
+                                        xml_err_valid!(
+                                            ctxt,
+                                            XmlParserErrors::XmlDTDMixedCorrupt,
+                                            "Internal: MIXED struct corrupted\n"
+                                        );
+                                        break;
+                                    }
+                                    cont = (*cont).c2;
+                                }
+                                if cont.is_null() {
+                                    let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+                                    let elem_name = elem.name().unwrap();
+                                    xml_err_valid_node(
+                                    ctxt,
+                                    Some(elem.into()),
+                                    XmlParserErrors::XmlDTDInvalidChild,
+                                    format!("Element {name} is not declared in {elem_name} list of possible children\n").as_str(),
+                                    Some(&name),
+                                    Some(&elem_name),
+                                    None
+                                );
+                                    ret = 0;
                                 }
                             }
                             // child_ok:
@@ -5285,15 +5191,9 @@ pub unsafe fn xml_validate_one_attribute(
     unsafe {
         let mut ret: i32 = 1;
 
-        // if doc.is_null() {
-        //     return 0;
-        // }
         if doc.int_subset.is_none() && doc.ext_subset.is_none() {
             return 0;
         };
-        // if elem.is_null() {
-        //     return 0;
-        // }
         if elem.name.is_null() {
             return 0;
         }
@@ -5302,20 +5202,14 @@ pub unsafe fn xml_validate_one_attribute(
         };
 
         let mut attr_decl = None;
-        if let Some(prefix) = elem.ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) {
-            let mut fname: [XmlChar; 50] = [0; 50];
+        if let Some(prefix) = elem.ns.as_deref().and_then(|ns| ns.prefix()) {
+            let name = elem.name().unwrap();
+            let fullname = build_qname(&name, Some(&prefix));
 
-            let fullname: *mut XmlChar =
-                xml_build_qname(elem.name, prefix as _, fname.as_mut_ptr(), 50);
-            if fullname.is_null() {
-                return 0;
-            }
             if let Some(attr_ns) = attr.ns {
                 attr_decl = doc.int_subset.and_then(|dtd| {
                     dtd.get_qattr_desc(
-                        CStr::from_ptr(fullname as *const i8)
-                            .to_string_lossy()
-                            .as_ref(),
+                        &fullname,
                         attr.name().as_deref().unwrap(),
                         attr_ns.prefix().as_deref(),
                     )
@@ -5323,36 +5217,21 @@ pub unsafe fn xml_validate_one_attribute(
                 if attr_decl.is_none() && doc.ext_subset.is_some() {
                     attr_decl = doc.ext_subset.and_then(|dtd| {
                         dtd.get_qattr_desc(
-                            CStr::from_ptr(fullname as *const i8)
-                                .to_string_lossy()
-                                .as_ref(),
+                            &fullname,
                             attr.name().as_deref().unwrap(),
                             attr_ns.prefix().as_deref(),
                         )
                     });
                 }
             } else {
-                attr_decl = doc.int_subset.and_then(|dtd| {
-                    dtd.get_attr_desc(
-                        CStr::from_ptr(fullname as *const i8)
-                            .to_string_lossy()
-                            .as_ref(),
-                        attr.name().as_deref().unwrap(),
-                    )
-                });
+                attr_decl = doc
+                    .int_subset
+                    .and_then(|dtd| dtd.get_attr_desc(&fullname, attr.name().as_deref().unwrap()));
                 if attr_decl.is_none() && doc.ext_subset.is_some() {
                     attr_decl = doc.ext_subset.and_then(|dtd| {
-                        dtd.get_attr_desc(
-                            CStr::from_ptr(fullname as *const i8)
-                                .to_string_lossy()
-                                .as_ref(),
-                            attr.name().as_deref().unwrap(),
-                        )
+                        dtd.get_attr_desc(&fullname, attr.name().as_deref().unwrap())
                     });
                 }
-            }
-            if fullname != fname.as_ptr() as _ && fullname != elem.name as _ {
-                xml_free(fullname as _);
             }
         }
         if attr_decl.is_none() {
@@ -5612,19 +5491,11 @@ pub unsafe fn xml_validate_one_namespace(
     value: *const XmlChar,
 ) -> i32 {
     unsafe {
-        // let elemDecl: xmlElementPtr;
-
         let mut ret: i32 = 1;
 
-        // if doc.is_null() {
-        //     return 0;
-        // }
         if doc.int_subset.is_none() && doc.ext_subset.is_none() {
             return 0;
         };
-        // if elem.is_null() {
-        //     return 0;
-        // }
         if elem.name.is_null() {
             return 0;
         }
@@ -5634,66 +5505,31 @@ pub unsafe fn xml_validate_one_namespace(
 
         let mut attr_decl = None;
         if let Some(prefix) = prefix {
-            let mut fname: [XmlChar; 50] = [0; 50];
-            let prefix = CString::new(prefix).unwrap();
+            let name = elem.name().unwrap();
+            let fullname = build_qname(&name, Some(prefix));
 
-            let fullname: *mut XmlChar = xml_build_qname(
-                elem.name,
-                prefix.as_ptr() as *const u8,
-                fname.as_mut_ptr(),
-                50,
-            );
-            if fullname.is_null() {
-                xml_verr_memory(ctxt, Some("Validating namespace"));
-                return 0;
-            }
-            if let Some(prefix) = (*ns).prefix() {
-                attr_decl = doc.int_subset.and_then(|dtd| {
-                    dtd.get_qattr_desc(
-                        CStr::from_ptr(fullname as *const i8)
-                            .to_string_lossy()
-                            .as_ref(),
-                        &prefix,
-                        Some("xmlns"),
-                    )
-                });
+            if let Some(prefix) = ns.prefix() {
+                attr_decl = doc
+                    .int_subset
+                    .and_then(|dtd| dtd.get_qattr_desc(&fullname, &prefix, Some("xmlns")));
                 if attr_decl.is_none() && doc.ext_subset.is_some() {
-                    attr_decl = doc.ext_subset.and_then(|dtd| {
-                        dtd.get_qattr_desc(
-                            CStr::from_ptr(fullname as *const i8)
-                                .to_string_lossy()
-                                .as_ref(),
-                            &prefix,
-                            Some("xmlns"),
-                        )
-                    });
+                    attr_decl = doc
+                        .ext_subset
+                        .and_then(|dtd| dtd.get_qattr_desc(&fullname, &prefix, Some("xmlns")));
                 }
             } else {
-                attr_decl = doc.int_subset.and_then(|dtd| {
-                    dtd.get_attr_desc(
-                        CStr::from_ptr(fullname as *const i8)
-                            .to_string_lossy()
-                            .as_ref(),
-                        "xmlns",
-                    )
-                });
+                attr_decl = doc
+                    .int_subset
+                    .and_then(|dtd| dtd.get_attr_desc(&fullname, "xmlns"));
                 if attr_decl.is_none() && doc.ext_subset.is_some() {
-                    attr_decl = doc.ext_subset.and_then(|dtd| {
-                        dtd.get_attr_desc(
-                            CStr::from_ptr(fullname as *const i8)
-                                .to_string_lossy()
-                                .as_ref(),
-                            "xmlns",
-                        )
-                    });
+                    attr_decl = doc
+                        .ext_subset
+                        .and_then(|dtd| dtd.get_attr_desc(&fullname, "xmlns"));
                 }
-            }
-            if fullname != fname.as_ptr() as _ && fullname != elem.name as _ {
-                xml_free(fullname as _);
             }
         }
         if attr_decl.is_none() {
-            if let Some(prefix) = (*ns).prefix() {
+            if let Some(prefix) = ns.prefix() {
                 attr_decl = doc.int_subset.and_then(|dtd| {
                     dtd.get_qattr_desc(elem.name().unwrap().as_ref(), &prefix, Some("xmlns"))
                 });
@@ -5716,7 +5552,7 @@ pub unsafe fn xml_validate_one_namespace(
 
         // Validity Constraint: Attribute Value Type
         let Some(attr_decl) = attr_decl else {
-            if let Some(prefix) = (*ns).prefix() {
+            if let Some(prefix) = ns.prefix() {
                 let elem_name = elem.name().unwrap();
                 xml_err_valid_node(
                     ctxt,
@@ -5745,7 +5581,7 @@ pub unsafe fn xml_validate_one_namespace(
 
         let val: i32 = xml_validate_attribute_value_internal(Some(doc), attr_decl.atype, value);
         if val == 0 {
-            if let Some(prefix) = (*ns).prefix() {
+            if let Some(prefix) = ns.prefix() {
                 let elem_name = elem.name().unwrap();
                 xml_err_valid_node(
                     ctxt,
@@ -5779,7 +5615,7 @@ pub unsafe fn xml_validate_one_namespace(
         if matches!(attr_decl.def, XmlAttributeDefault::XmlAttributeFixed)
             && !xml_str_equal(value, attr_decl.default_value)
         {
-            if let Some(prefix) = (*ns).prefix() {
+            if let Some(prefix) = ns.prefix() {
                 let elem_name = elem.name().unwrap();
                 let def_value =
                     CStr::from_ptr(attr_decl.default_value as *const i8).to_string_lossy();
@@ -5835,7 +5671,7 @@ pub unsafe fn xml_validate_one_namespace(
                 .or_else(|| xml_get_dtd_notation_desc(doc.ext_subset.as_deref(), &value));
 
             if nota.is_none() {
-                if let Some(prefix) = (*ns).prefix() {
+                if let Some(prefix) = ns.prefix() {
                     let elem_name = elem.name().unwrap();
                     xml_err_valid_node(
                     ctxt,
@@ -5870,7 +5706,7 @@ pub unsafe fn xml_validate_one_namespace(
             }
             if tree.is_none() {
                 let elem_name = elem.name().unwrap();
-                if let Some(prefix) = (*ns).prefix() {
+                if let Some(prefix) = ns.prefix() {
                     xml_err_valid_node(
                     ctxt,
                     Some(elem.into()),
@@ -5905,7 +5741,7 @@ pub unsafe fn xml_validate_one_namespace(
                 tree = now.next.as_deref();
             }
             if tree.is_none() {
-                if let Some(prefix) = (*ns).prefix() {
+                if let Some(prefix) = ns.prefix() {
                     let value = CStr::from_ptr(value as *const i8).to_string_lossy();
                     let elem_name = elem.name().unwrap();
                     xml_err_valid_node(
@@ -5941,7 +5777,7 @@ pub unsafe fn xml_validate_one_namespace(
         if matches!(attr_decl.def, XmlAttributeDefault::XmlAttributeFixed)
             && !xml_str_equal(attr_decl.default_value, value)
         {
-            if let Some(prefix) = (*ns).prefix() {
+            if let Some(prefix) = ns.prefix() {
                 let elem_name = elem.name().unwrap();
                 let def_value =
                     CStr::from_ptr(attr_decl.default_value as *const i8).to_string_lossy();
@@ -5977,7 +5813,7 @@ pub unsafe fn xml_validate_one_namespace(
 
         // Extra check for the attribute value
         let value = CStr::from_ptr(value as *const i8).to_string_lossy();
-        if let Some(prefix) = (*ns).prefix() {
+        if let Some(prefix) = ns.prefix() {
             ret &= xml_validate_attribute_value2(ctxt, doc, &prefix, attr_decl.atype, &value);
         } else {
             ret &= xml_validate_attribute_value2(ctxt, doc, "xmlns", attr_decl.atype, &value);
@@ -6530,27 +6366,20 @@ unsafe fn xml_valid_build_acontent_model(
             }
             XmlElementContentType::XmlElementContentElement => {
                 let oldstate = (*ctxt).state;
-                let mut fname: [XmlChar; 50] = [0; 50];
-
-                let fullname: *mut XmlChar = xml_build_qname(
-                    (*content).name,
-                    (*content).prefix,
-                    fname.as_mut_ptr() as _,
-                    50,
+                let content_name = CStr::from_ptr((*content).name as *const i8).to_string_lossy();
+                let fullname = build_qname(
+                    &content_name,
+                    (!(*content).prefix.is_null())
+                        .then(|| CStr::from_ptr((*content).prefix as *const i8).to_string_lossy())
+                        .as_deref(),
                 );
-                if fullname.is_null() {
-                    xml_verr_memory(ctxt, Some("Building content model"));
-                    return 0;
-                }
 
                 match (*content).ocur {
                     XmlElementContentOccur::XmlElementContentOnce => {
                         (*ctxt).state = (*ctxt).am.as_mut().unwrap().new_transition(
                             (*ctxt).state,
                             usize::MAX,
-                            CStr::from_ptr(fullname as *const i8)
-                                .to_string_lossy()
-                                .as_ref(),
+                            &fullname,
                             null_mut(),
                         );
                     }
@@ -6558,9 +6387,7 @@ unsafe fn xml_valid_build_acontent_model(
                         (*ctxt).state = (*ctxt).am.as_mut().unwrap().new_transition(
                             (*ctxt).state,
                             usize::MAX,
-                            CStr::from_ptr(fullname as *const i8)
-                                .to_string_lossy()
-                                .as_ref(),
+                            &fullname,
                             null_mut(),
                         );
                         (*ctxt)
@@ -6573,17 +6400,13 @@ unsafe fn xml_valid_build_acontent_model(
                         (*ctxt).state = (*ctxt).am.as_mut().unwrap().new_transition(
                             (*ctxt).state,
                             usize::MAX,
-                            CStr::from_ptr(fullname as *const i8)
-                                .to_string_lossy()
-                                .as_ref(),
+                            &fullname,
                             null_mut(),
                         );
                         (*ctxt).am.as_mut().unwrap().new_transition(
                             (*ctxt).state,
                             (*ctxt).state,
-                            CStr::from_ptr(fullname as *const i8)
-                                .to_string_lossy()
-                                .as_ref(),
+                            &fullname,
                             null_mut(),
                         );
                     }
@@ -6596,15 +6419,10 @@ unsafe fn xml_valid_build_acontent_model(
                         (*ctxt).am.as_mut().unwrap().new_transition(
                             (*ctxt).state,
                             (*ctxt).state,
-                            CStr::from_ptr(fullname as *const i8)
-                                .to_string_lossy()
-                                .as_ref(),
+                            &fullname,
                             null_mut(),
                         );
                     }
-                }
-                if fullname != fname.as_ptr() as _ && fullname != (*content).name as _ {
-                    xml_free(fullname as _);
                 }
             }
             XmlElementContentType::XmlElementContentSeq => {
