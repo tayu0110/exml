@@ -5032,22 +5032,6 @@ unsafe fn regexp_test(
 }
 
 #[cfg(feature = "libxml_automata")]
-unsafe extern "C" fn scan_number(ptr: *mut *mut c_char) -> i32 {
-    unsafe {
-        let mut ret: i32 = 0;
-        let mut cur: *mut c_char;
-
-        cur = *ptr;
-        while *cur >= b'0' as _ && *cur <= b'9' as _ {
-            ret = ret * 10 + (*cur - b'0' as i8) as i32;
-            cur = cur.add(1);
-        }
-        *ptr = cur;
-        ret
-    }
-}
-
-#[cfg(feature = "libxml_automata")]
 unsafe fn automata_test(
     filename: &str,
     result: Option<String>,
@@ -5099,136 +5083,108 @@ unsafe fn automata_test(
         }
         ret = 0;
 
-        let mut expr = vec![];
-        while let Some(mut len) = input
-            .read_until(b'\n', &mut expr)
-            .ok()
-            .filter(|&len| len > 0)
-            .map(|len| len as i32)
-        {
-            if expr[0] == b'#' {
+        let mut expr = String::new();
+        while input.read_line(&mut expr).is_ok_and(|len| len > 0) {
+            if expr.starts_with('#') {
                 expr.clear();
                 continue;
             }
-            len -= 1;
-            while len >= 0
-                && (expr[len as usize] == b'\n'
-                    || expr[len as usize] == b'\t'
-                    || expr[len as usize] == b'\r'
-                    || expr[len as usize] == b' ')
-            {
-                len -= 1;
-            }
-            if len + 1 == expr.len() as i32 {
-                expr.push(0);
-            } else {
-                expr[(len + 1) as usize] = 0;
-            }
-            if len >= 0 {
+            expr = expr.trim_end_matches(['\n', '\t', '\r', ' ']).to_owned();
+            if !expr.is_empty() {
                 if let Some(am) = nam.as_mut() {
-                    if expr[0] == b't' && expr[1] == b' ' {
-                        let mut ptr: *mut c_char = expr.as_mut_ptr().add(2) as _;
-
-                        let from: usize = scan_number(addr_of_mut!(ptr)) as _;
-                        if *ptr != b' ' as i8 {
-                            let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
+                    if let Some(rem) = expr.strip_prefix("t ") {
+                        let Some((from, rem)) = rem
+                            .split_once(' ')
+                            .and_then(|(from, rem)| from.parse::<usize>().ok().zip(Some(rem)))
+                        else {
                             generic_error!("Bad line {expr}\n");
                             break;
-                        }
+                        };
                         if states[from] == usize::MAX {
                             states[from] = am.new_state();
                         }
-                        ptr = ptr.add(1);
-                        let to: usize = scan_number(addr_of_mut!(ptr)) as _;
-                        if *ptr != b' ' as i8 {
-                            let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
+                        let Some((to, rem)) = rem
+                            .split_once(' ')
+                            .and_then(|(to, rem)| to.parse::<usize>().ok().zip(Some(rem)))
+                        else {
                             generic_error!("Bad line {expr}\n");
                             break;
-                        }
+                        };
                         if states[to] == usize::MAX {
                             states[to] = am.new_state();
                         }
-                        ptr = ptr.add(1);
-                        am.new_transition(
-                            states[from],
-                            states[to],
-                            CStr::from_ptr(ptr as *const i8).to_string_lossy().as_ref(),
-                            null_mut(),
-                        );
-                    } else if expr[0] == b'e' && expr[1] == b' ' {
-                        let mut ptr: *mut c_char = expr.as_mut_ptr().add(2) as _;
-
-                        let from: usize = scan_number(addr_of_mut!(ptr)) as _;
-                        if *ptr != b' ' as i8 {
-                            let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
+                        am.new_transition(states[from], states[to], rem, null_mut());
+                    } else if let Some(rem) = expr.strip_prefix("e ") {
+                        let Some((from, rem)) = rem
+                            .split_once(' ')
+                            .and_then(|(from, rem)| from.parse::<usize>().ok().zip(Some(rem)))
+                        else {
                             generic_error!("Bad line {expr}\n");
                             break;
-                        }
+                        };
                         if states[from] == usize::MAX {
                             states[from] = am.new_state();
                         }
-                        ptr = ptr.add(1);
-                        let to: usize = scan_number(addr_of_mut!(ptr)) as _;
+                        let Ok(to) = rem.parse::<usize>() else {
+                            generic_error!("Bad line {expr}\n");
+                            break;
+                        };
                         if states[to] == usize::MAX {
                             states[to] = am.new_state();
                         }
                         am.new_epsilon(states[from], states[to]);
-                    } else if expr[0] == b'f' && expr[1] == b' ' {
-                        let mut ptr: *mut c_char = expr.as_mut_ptr().add(2) as _;
-
-                        let state: usize = scan_number(addr_of_mut!(ptr)) as _;
+                    } else if let Some(rem) = expr.strip_prefix("f ") {
+                        let Ok(state) = rem.parse::<usize>() else {
+                            generic_error!("Bad line {expr}\n");
+                            break;
+                        };
                         if states[state] == usize::MAX {
-                            let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
                             generic_error!("Bad state {state} : {expr}\n");
                             break;
                         }
                         am.get_state_mut(states[state]).unwrap().set_final_state();
-                    } else if expr[0] == b'c' && expr[1] == b' ' {
-                        let mut ptr: *mut c_char = expr.as_mut_ptr().add(2) as _;
-
-                        let from: usize = scan_number(addr_of_mut!(ptr)) as _;
-                        if *ptr != b' ' as i8 {
-                            let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
+                    } else if let Some(rem) = expr.strip_prefix("c ") {
+                        let Some((from, rem)) = rem
+                            .split_once(' ')
+                            .and_then(|(from, rem)| from.parse::<usize>().ok().zip(Some(rem)))
+                        else {
                             generic_error!("Bad line {expr}\n");
                             break;
-                        }
+                        };
+
                         if states[from] == usize::MAX {
                             states[from] = am.new_state();
                         }
-                        ptr = ptr.add(1);
-                        let to: usize = scan_number(addr_of_mut!(ptr)) as _;
-                        if *ptr != b' ' as i8 {
-                            let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
+
+                        let Some((to, rem)) = rem
+                            .split_once(' ')
+                            .and_then(|(to, rem)| to.parse::<usize>().ok().zip(Some(rem)))
+                        else {
                             generic_error!("Bad line {expr}\n");
                             break;
-                        }
+                        };
+
                         if states[to] == usize::MAX {
                             states[to] = am.new_state();
                         }
-                        ptr = ptr.add(1);
-                        let min: i32 = scan_number(addr_of_mut!(ptr));
-                        if *ptr != b' ' as i8 {
-                            let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
+
+                        let Some((min, rem)) = rem
+                            .split_once(' ')
+                            .and_then(|(min, rem)| min.parse::<i32>().ok().zip(Some(rem)))
+                        else {
                             generic_error!("Bad line {expr}\n");
                             break;
-                        }
-                        ptr = ptr.add(1);
-                        let max: i32 = scan_number(addr_of_mut!(ptr));
-                        if *ptr != b' ' as i8 {
-                            let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
+                        };
+
+                        let Some((max, rem)) = rem
+                            .split_once(' ')
+                            .and_then(|(max, rem)| max.parse::<i32>().ok().zip(Some(rem)))
+                        else {
                             generic_error!("Bad line {expr}\n");
                             break;
-                        }
-                        ptr = ptr.add(1);
-                        am.new_count_trans(
-                            states[from],
-                            states[to],
-                            CStr::from_ptr(ptr as *const i8).to_string_lossy().as_ref(),
-                            min,
-                            max,
-                            null_mut(),
-                        );
-                    } else if expr[0] == b'-' && expr[1] == b'-' {
+                        };
+                        am.new_count_trans(states[from], states[to], rem, min, max, null_mut());
+                    } else if expr.starts_with("--") {
                         // end of the automata
                         regexp = am.compile().map(Rc::new);
                         nam = None;
@@ -5237,12 +5193,11 @@ unsafe fn automata_test(
                             break;
                         }
                     }
-                } else if expr[0] == b'=' && expr[1] == b'>' {
+                } else if expr.starts_with("=>") {
                     if let Some(regexp) = regexp.clone() {
                         let mut exec = exec.take();
-                        let exec = exec.get_or_insert_with(|| {
-                            XmlRegExecCtxt::new(regexp, None, null_mut())
-                        });
+                        let exec = exec
+                            .get_or_insert_with(|| XmlRegExecCtxt::new(regexp, None, null_mut()));
                         if ret == 0 {
                             ret = exec.push_string(None, null_mut());
                         }
@@ -5258,19 +5213,10 @@ unsafe fn automata_test(
                     }
                     ret = 0;
                 } else if let Some(regexp) = regexp.clone() {
-                    let exec = exec.get_or_insert_with(|| {
-                        XmlRegExecCtxt::new(regexp, None, null_mut())
-                    });
-                    ret = exec.push_string(
-                        Some(
-                            CStr::from_ptr(expr.as_ptr() as *const i8)
-                                .to_string_lossy()
-                                .as_ref(),
-                        ),
-                        null_mut(),
-                    );
+                    let exec =
+                        exec.get_or_insert_with(|| XmlRegExecCtxt::new(regexp, None, null_mut()));
+                    ret = exec.push_string(Some(&expr), null_mut());
                 } else {
-                    let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
                     generic_error!("Unexpected line {expr}\n");
                 }
             }
