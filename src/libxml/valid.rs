@@ -310,7 +310,7 @@ pub unsafe fn xml_add_notation_decl<'a>(
 /// Returns the new xmlNotationTablePtr or null_mut() in case of error.
 #[doc(alias = "xmlCopyNotationTable")]
 #[cfg(feature = "libxml_tree")]
-pub unsafe fn xml_copy_notation_table<'a>(
+pub fn xml_copy_notation_table<'a>(
     table: &XmlHashTable<'a, XmlNotation>,
 ) -> XmlHashTable<'a, XmlNotation> {
     table.clone_with(|data, _| data.clone())
@@ -390,15 +390,7 @@ pub unsafe fn xml_new_doc_element_content(
                         "xmlNewElementContent : name != NULL !\n"
                     );
                 }
-            } // _ => {
-              //     xml_err_valid!(
-              //         null_mut(),
-              //         XmlParserErrors::XmlErrInternalError,
-              //         c"Internal: ELEMENT content corrupted invalid type\n".as_ptr() as _,
-              //         null_mut(),
-              //     );
-              //     return null_mut();
-              // }
+            }
         }
         let ret: XmlElementContentPtr =
             xml_malloc(size_of::<XmlElementContent>()) as XmlElementContentPtr;
@@ -518,15 +510,7 @@ pub unsafe fn xml_free_doc_element_content(_doc: Option<XmlDocPtr>, mut cur: Xml
                 XmlElementContentType::XmlElementContentPCDATA
                 | XmlElementContentType::XmlElementContentElement
                 | XmlElementContentType::XmlElementContentSeq
-                | XmlElementContentType::XmlElementContentOr => {} // _ => {
-                                                                   //     xml_err_valid!(
-                                                                   //         null_mut(),
-                                                                   //         XmlParserErrors::XmlErrInternalError,
-                                                                   //         c"Internal: ELEMENT content corrupted invalid type\n".as_ptr() as _,
-                                                                   //         null_mut(),
-                                                                   //     );
-                                                                   //     return;
-                                                                   // }
+                | XmlElementContentType::XmlElementContentOr => {}
             }
             if !(*cur).name.is_null() {
                 xml_free((*cur).name as _);
@@ -984,95 +968,87 @@ unsafe fn xml_dump_element_content<'a>(buf: &mut (impl Write + 'a), content: Xml
 
         write!(buf, "(").ok();
         let mut cur = content;
+        let mut init = false;
 
-        while {
-            'to_continue: {
-                if cur.is_null() {
-                    return;
+        while cur != content || !init {
+            init = true;
+            if cur.is_null() {
+                return;
+            }
+
+            match (*cur).typ {
+                XmlElementContentType::XmlElementContentPCDATA => {
+                    write!(buf, "#PCDATA").ok();
                 }
-
-                match (*cur).typ {
-                    XmlElementContentType::XmlElementContentPCDATA => {
-                        write!(buf, "#PCDATA").ok();
-                    }
-                    XmlElementContentType::XmlElementContentElement => {
-                        if !(*cur).prefix.is_null() {
-                            write!(
-                                buf,
-                                "{}:",
-                                CStr::from_ptr((*cur).prefix as *const i8)
-                                    .to_string_lossy()
-                                    .as_ref()
-                            )
-                            .ok();
-                        }
+                XmlElementContentType::XmlElementContentElement => {
+                    if !(*cur).prefix.is_null() {
                         write!(
                             buf,
-                            "{}",
-                            CStr::from_ptr((*cur).name as *const i8)
+                            "{}:",
+                            CStr::from_ptr((*cur).prefix as *const i8)
                                 .to_string_lossy()
-                                .as_ref(),
+                                .as_ref()
                         )
                         .ok();
                     }
-                    XmlElementContentType::XmlElementContentSeq
-                    | XmlElementContentType::XmlElementContentOr => {
-                        if cur != content
-                            && !(*cur).parent.is_null()
-                            && ((*cur).typ != (*(*cur).parent).typ
-                                || !matches!(
-                                    (*cur).ocur,
-                                    XmlElementContentOccur::XmlElementContentOnce
-                                ))
-                        {
-                            write!(buf, "(").ok();
-                        }
-                        cur = (*cur).c1;
-                        break 'to_continue;
-                    } // _ => {
-                      //     xml_err_valid!(
-                      //         null_mut(),
-                      //         XmlParserErrors::XmlErrInternalError,
-                      //         c"Internal: ELEMENT cur corrupted invalid type\n".as_ptr() as _,
-                      //         null_mut(),
-                      //     );
-                      // }
+                    write!(
+                        buf,
+                        "{}",
+                        CStr::from_ptr((*cur).name as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    )
+                    .ok();
                 }
-
-                while cur != content {
-                    let parent: XmlElementContentPtr = (*cur).parent;
-
-                    if parent.is_null() {
-                        return;
-                    }
-
-                    if matches!(
-                        (*cur).typ,
-                        XmlElementContentType::XmlElementContentOr
-                            | XmlElementContentType::XmlElementContentSeq
-                    ) && ((*cur).typ != (*parent).typ
-                        || !matches!((*cur).ocur, XmlElementContentOccur::XmlElementContentOnce))
+                XmlElementContentType::XmlElementContentSeq
+                | XmlElementContentType::XmlElementContentOr => {
+                    if cur != content
+                        && !(*cur).parent.is_null()
+                        && ((*cur).typ != (*(*cur).parent).typ
+                            || !matches!(
+                                (*cur).ocur,
+                                XmlElementContentOccur::XmlElementContentOnce
+                            ))
                     {
-                        write!(buf, ")").ok();
+                        write!(buf, "(").ok();
                     }
-                    xml_dump_element_occur(buf, cur);
-
-                    if cur == (*parent).c1 {
-                        if (*parent).typ == XmlElementContentType::XmlElementContentSeq {
-                            write!(buf, " , ").ok();
-                        } else if (*parent).typ == XmlElementContentType::XmlElementContentOr {
-                            write!(buf, " | ").ok();
-                        }
-
-                        cur = (*parent).c2;
-                        break;
-                    }
-
-                    cur = parent;
+                    cur = (*cur).c1;
+                    continue;
                 }
             }
-            cur != content
-        } {}
+
+            while cur != content {
+                let parent: XmlElementContentPtr = (*cur).parent;
+
+                if parent.is_null() {
+                    return;
+                }
+
+                if matches!(
+                    (*cur).typ,
+                    XmlElementContentType::XmlElementContentOr
+                        | XmlElementContentType::XmlElementContentSeq
+                ) && ((*cur).typ != (*parent).typ
+                    || !matches!((*cur).ocur, XmlElementContentOccur::XmlElementContentOnce))
+                {
+                    write!(buf, ")").ok();
+                }
+                xml_dump_element_occur(buf, cur);
+
+                if cur == (*parent).c1 {
+                    if (*parent).typ == XmlElementContentType::XmlElementContentSeq {
+                        write!(buf, " , ").ok();
+                    } else if (*parent).typ == XmlElementContentType::XmlElementContentOr {
+                        write!(buf, " | ").ok();
+                    }
+
+                    cur = (*parent).c2;
+                    break;
+                }
+
+                cur = parent;
+            }
+        }
 
         write!(buf, ")").ok();
         xml_dump_element_occur(buf, content);
@@ -1130,7 +1106,7 @@ pub unsafe fn xml_dump_element_decl<'a>(buf: &mut (impl Write + 'a), elem: XmlEl
 }
 
 #[cfg(feature = "libxml_valid")]
-unsafe fn xml_is_doc_name_start_char(doc: Option<XmlDocPtr>, c: i32) -> i32 {
+fn xml_is_doc_name_start_char(doc: Option<XmlDocPtr>, c: i32) -> i32 {
     use super::parser_internals::xml_is_letter;
 
     if doc.is_none_or(|doc| doc.properties & XmlDocProperties::XmlDocOld10 as i32 == 0) {
@@ -1162,7 +1138,7 @@ unsafe fn xml_is_doc_name_start_char(doc: Option<XmlDocPtr>, c: i32) -> i32 {
 }
 
 #[cfg(feature = "libxml_valid")]
-unsafe fn xml_is_doc_name_char(doc: Option<XmlDocPtr>, c: i32) -> i32 {
+fn xml_is_doc_name_char(doc: Option<XmlDocPtr>, c: i32) -> i32 {
     use crate::libxml::{
         chvalid::{xml_is_digit, xml_is_extender},
         parser_internals::xml_is_letter,
