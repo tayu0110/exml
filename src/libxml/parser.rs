@@ -5542,7 +5542,7 @@ unsafe fn are_blanks(
             return 0;
         };
         if let Some(my_doc) = (*ctxt).my_doc {
-            ret = xml_is_mixed_element(my_doc, context_node.name);
+            ret = xml_is_mixed_element(my_doc, &context_node.name().unwrap());
             if ret == 0 {
                 return 1;
             }
