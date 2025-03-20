@@ -17,7 +17,7 @@ use crate::{
     libxml::{
         globals::xml_free,
         xmlreader::{XmlTextReaderPtr, xml_text_reader_lookup_namespace},
-        xmlregexp::{XmlRegExecCtxtPtr, xml_reg_free_exec_ctxt},
+        xmlregexp::XmlRegExecCtxtPtr,
         xmlschemas::{
             XML_SCHEMA_CTXT_PARSER, XML_SCHEMA_CTXT_VALIDATOR,
             XML_SCHEMA_NODE_INFO_FLAG_OWNED_NAMES, XML_SCHEMA_NODE_INFO_FLAG_OWNED_VALUES,
@@ -741,10 +741,7 @@ impl XmlSchemaValidCtxt {
                 xml_schema_idcfree_idc_table((*ielem).idc_table);
                 (*ielem).idc_table = null_mut();
             }
-            if !(*ielem).regex_ctxt.is_null() {
-                xml_reg_free_exec_ctxt((*ielem).regex_ctxt);
-                (*ielem).regex_ctxt = null_mut();
-            }
+            (*ielem).regex_ctxt.take();
             if !(*ielem).ns_bindings.is_null() {
                 xml_free((*ielem).ns_bindings as _);
                 (*ielem).ns_bindings = null_mut();

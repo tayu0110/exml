@@ -34,7 +34,7 @@ use libc::{memset, strcat, strlen, strncat};
 #[cfg(feature = "libxml_regexp")]
 use crate::libxml::xmlautomata::XmlAutomata;
 #[cfg(feature = "libxml_regexp")]
-use crate::libxml::xmlregexp::{XmlRegExecCtxtPtr, xml_reg_free_exec_ctxt, xml_reg_new_exec_ctxt};
+use crate::libxml::xmlregexp::XmlRegExecCtxt;
 #[cfg(feature = "libxml_regexp")]
 use crate::libxml::xmlstring::xml_strncmp;
 #[cfg(feature = "libxml_valid")]
@@ -76,9 +76,9 @@ pub type XmlValidStatePtr = *mut XmlValidState;
 #[cfg(feature = "libxml_regexp")]
 #[repr(C)]
 pub struct XmlValidState {
-    elem_decl: Option<XmlElementPtr>, /* pointer to the content model */
-    node: XmlNodePtr,                 /* pointer to the current node */
-    exec: XmlRegExecCtxtPtr,          /* regexp runtime */
+    elem_decl: Option<XmlElementPtr>,  /* pointer to the content model */
+    node: XmlNodePtr,                  /* pointer to the current node */
+    exec: Option<Box<XmlRegExecCtxt>>, /* regexp runtime */
 }
 #[cfg(not(feature = "libxml_regexp"))]
 #[repr(C)]
@@ -4418,7 +4418,7 @@ unsafe fn xml_validate_element_content(
     parent: XmlNodePtr,
 ) -> i32 {
     unsafe {
-        let mut ret: i32 = 1;
+        let mut ret: i32;
         #[cfg(not(feature = "libxml_regexp"))]
         let mut repl: Option<XmlGenericNodePtr> = None;
         #[cfg(not(feature = "libxml_regexp"))]
@@ -4439,7 +4439,7 @@ unsafe fn xml_validate_element_content(
         {
             // Build the regexp associated to the content model
             if elem_decl.cont_model.is_none() {
-                ret = xml_valid_build_content_model(ctxt, elem_decl);
+                xml_valid_build_content_model(ctxt, elem_decl);
             }
             let Some(cont_model) = elem_decl.cont_model.clone() else {
                 return -1;
@@ -4448,94 +4448,84 @@ unsafe fn xml_validate_element_content(
                 return -1;
             }
             (*ctxt).node_tab.clear();
-            let exec: XmlRegExecCtxtPtr = xml_reg_new_exec_ctxt(cont_model, None, null_mut());
-            if !exec.is_null() {
-                let mut cur = child;
-                'fail: {
-                    while let Some(cur_node) = cur {
-                        match cur_node.element_type() {
-                            XmlElementType::XmlEntityRefNode => {
-                                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                                // Push the current node to be able to roll back
-                                // and process within the entity
-                                if let Some(children) = cur_node
-                                    .children
-                                    .filter(|children| children.children().is_some())
-                                {
-                                    node_vpush(ctxt, cur_node);
-                                    cur = children.children();
-                                    continue;
-                                }
+            let mut exec = XmlRegExecCtxt::new(cont_model, None, null_mut());
+            let mut cur = child;
+            'fail: {
+                while let Some(cur_node) = cur {
+                    match cur_node.element_type() {
+                        XmlElementType::XmlEntityRefNode => {
+                            let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                            // Push the current node to be able to roll back
+                            // and process within the entity
+                            if let Some(children) = cur_node
+                                .children
+                                .filter(|children| children.children().is_some())
+                            {
+                                node_vpush(ctxt, cur_node);
+                                cur = children.children();
+                                continue;
                             }
-                            XmlElementType::XmlTextNode => {
-                                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                                if cur_node.is_blank_node() {
-                                    //  break;
-                                } else {
-                                    ret = 0;
-                                    break 'fail;
-                                }
-                            }
-                            XmlElementType::XmlCDATASectionNode => {
-                                // TODO
+                        }
+                        XmlElementType::XmlTextNode => {
+                            let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                            if cur_node.is_blank_node() {
+                                //  break;
+                            } else {
                                 ret = 0;
                                 break 'fail;
                             }
-                            XmlElementType::XmlElementNode => {
-                                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                                if let Some(prefix) =
-                                    cur_node.ns.map(|ns| ns.prefix).filter(|p| !p.is_null())
-                                {
-                                    let mut fname: [XmlChar; 50] = [0; 50];
+                        }
+                        XmlElementType::XmlCDATASectionNode => {
+                            // TODO
+                            ret = 0;
+                            break 'fail;
+                        }
+                        XmlElementType::XmlElementNode => {
+                            let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                            if let Some(prefix) =
+                                cur_node.ns.map(|ns| ns.prefix).filter(|p| !p.is_null())
+                            {
+                                let mut fname: [XmlChar; 50] = [0; 50];
 
-                                    let fullname: *mut XmlChar = xml_build_qname(
-                                        cur_node.name,
-                                        prefix as _,
-                                        fname.as_mut_ptr(),
-                                        50,
-                                    );
-                                    if fullname.is_null() {
-                                        ret = -1;
-                                        break 'fail;
-                                    }
-                                    // ret =
-                                    (*exec).push_string(
-                                        Some(
-                                            CStr::from_ptr(fullname as *const i8).to_string_lossy(),
-                                        )
-                                        .as_deref(),
-                                        null_mut(),
-                                    );
-                                    if fullname != fname.as_ptr() as _
-                                        && fullname != cur_node.name as _
-                                    {
-                                        xml_free(fullname as _);
-                                    }
-                                } else {
-                                    // ret =
-                                    (*exec).push_string(
-                                        cur_node.name().as_deref(),
-                                        null_mut(),
-                                    );
+                                let fullname: *mut XmlChar = xml_build_qname(
+                                    cur_node.name,
+                                    prefix as _,
+                                    fname.as_mut_ptr(),
+                                    50,
+                                );
+                                if fullname.is_null() {
+                                    ret = -1;
+                                    break 'fail;
                                 }
+                                // ret =
+                                exec.push_string(
+                                    Some(CStr::from_ptr(fullname as *const i8).to_string_lossy())
+                                        .as_deref(),
+                                    null_mut(),
+                                );
+                                if fullname != fname.as_ptr() as _ && fullname != cur_node.name as _
+                                {
+                                    xml_free(fullname as _);
+                                }
+                            } else {
+                                // ret =
+                                exec.push_string(cur_node.name().as_deref(), null_mut());
                             }
-                            _ => {}
                         }
-                        // Switch to next element
-                        cur = cur_node.next();
-                        while cur.is_none() {
-                            cur = node_vpop(ctxt).map(|node| node.into());
-                            if cur.is_none() {
-                                break;
-                            }
-                            cur = cur_node.next();
-                        }
+                        _ => {}
                     }
-
-                    ret = (*exec).push_string(None, null_mut());
+                    // Switch to next element
+                    cur = cur_node.next();
+                    while cur.is_none() {
+                        cur = node_vpop(ctxt).map(|node| node.into());
+                        if cur.is_none() {
+                            break;
+                        }
+                        cur = cur_node.next();
+                    }
                 }
-                // fail:
-                xml_reg_free_exec_ctxt(exec);
+
+                ret = exec.push_string(None, null_mut());
             }
         }
 
@@ -7014,7 +7004,7 @@ unsafe fn vstate_vpush(
         (*ctxt).vstate_tab.push(XmlValidState {
             elem_decl,
             node,
-            exec: null_mut(),
+            exec: None,
         });
         if let Some(elem_decl) =
             elem_decl.filter(|decl| matches!(decl.etype, XmlElementTypeVal::XmlElementTypeElement))
@@ -7024,9 +7014,9 @@ unsafe fn vstate_vpush(
             }
             if let Some(cont_model) = elem_decl.cont_model.clone() {
                 (*ctxt).vstate_tab.last_mut().unwrap().exec =
-                    xml_reg_new_exec_ctxt(cont_model, None, null_mut());
+                    Some(Box::new(XmlRegExecCtxt::new(cont_model, None, null_mut())));
             } else {
-                (*ctxt).vstate_tab.last_mut().unwrap().exec = null_mut();
+                (*ctxt).vstate_tab.last_mut().unwrap().exec = None;
                 let node_name = (*node).name().unwrap();
                 xml_err_valid_node(
                     ctxt,
@@ -7125,7 +7115,7 @@ pub unsafe fn xml_validate_push_element(
             return 0;
         }
 
-        if let Some(state) = (*ctxt).vstate_tab.last() {
+        if let Some(state) = (*ctxt).vstate_tab.last_mut() {
             // Check the new element against the content model of the new elem.
             if let Some(elem_decl) = state.elem_decl {
                 match elem_decl.etype {
@@ -7191,8 +7181,8 @@ pub unsafe fn xml_validate_push_element(
                         // VC: Standalone Document Declaration
                         //     - element types with element content, if white space
                         //       occurs directly within any instance of those types.
-                        if !state.exec.is_null() {
-                            ret = (*state.exec).push_string(
+                        if state.exec.is_some() {
+                            ret = state.exec.as_mut().unwrap().push_string(
                                 (!qname.is_null())
                                     .then(|| CStr::from_ptr(qname as *const i8).to_string_lossy())
                                     .as_deref(),
@@ -7305,12 +7295,12 @@ unsafe fn vstate_vpop(ctxt: XmlValidCtxtPtr) -> i32 {
         if (*ctxt).vstate_tab.is_empty() {
             return -1;
         }
-        let state = (*ctxt).vstate_tab.pop().unwrap();
+        let mut state = (*ctxt).vstate_tab.pop().unwrap();
         let elem_decl = state.elem_decl;
         if elem_decl.is_some_and(|elem_decl| {
             matches!(elem_decl.etype, XmlElementTypeVal::XmlElementTypeElement)
         }) {
-            xml_reg_free_exec_ctxt(state.exec);
+            state.exec.take();
         }
         (*ctxt).vstate_tab.len() as i32
     }
@@ -7349,13 +7339,13 @@ pub unsafe fn xml_validate_pop_element(
             return 0;
         }
         // printf("PopElem %s\n", qname);
-        if let Some(state) = (*ctxt).vstate_tab.last() {
+        if let Some(state) = (*ctxt).vstate_tab.last_mut() {
             // Check the new element against the content model of the new elem.
             if let Some(elem_decl) = state.elem_decl {
                 if matches!(elem_decl.etype, XmlElementTypeVal::XmlElementTypeElement)
-                    && !state.exec.is_null()
+                    && state.exec.is_some()
                 {
-                    ret = (*state.exec).push_string(None, null_mut());
+                    ret = state.exec.as_mut().unwrap().push_string(None, null_mut());
                     if ret <= 0 {
                         let name = (*state.node).name().unwrap();
                         xml_err_valid_node(

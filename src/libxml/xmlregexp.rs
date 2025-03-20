@@ -34,7 +34,7 @@ use std::{
     io::Write,
     mem::{size_of, take},
     os::raw::c_void,
-    ptr::{addr_of_mut, drop_in_place, null, null_mut},
+    ptr::{addr_of_mut, null, null_mut},
     rc::Rc,
 };
 
@@ -2760,6 +2760,44 @@ pub struct XmlRegExecCtxt {
 }
 
 impl XmlRegExecCtxt {
+    /// Build a context used for progressive evaluation of a regexp.
+    ///
+    /// Returns the new context
+    #[doc(alias = "xmlRegNewExecCtxt")]
+    pub fn new(
+        comp: Rc<XmlRegexp>,
+        callback: Option<XmlRegExecCallbacks>,
+        data: *mut c_void,
+    ) -> Self {
+        let mut exec = XmlRegExecCtxt {
+            index: 0,
+            determinist: 1,
+            status: 0,
+            comp,
+            transno: 0,
+            transcount: 0,
+            callback,
+            data,
+            err_state_no: -1,
+            err_string: None,
+            nb_push: 0,
+            ..Default::default()
+        };
+        if exec.comp.compact.is_empty() {
+            exec.state = 0;
+        }
+        if !exec.comp.counters.is_empty() {
+            exec.counts.clear();
+            exec.counts.resize(exec.comp.counters.len(), 0);
+            exec.err_counts.clear();
+            exec.err_counts.resize(exec.comp.counters.len(), 0);
+        } else {
+            exec.counts.clear();
+            exec.err_counts.clear();
+        }
+        exec
+    }
+
     fn current_str(&self) -> &str {
         &self.input_string[self.index..]
     }
@@ -4604,66 +4642,6 @@ fn xml_fa_compare_atoms(atom1: &XmlRegAtom, atom2: &XmlRegAtom, deep: i32) -> i3
 #[doc(alias = "xmlRegExecCallbacks")]
 pub type XmlRegExecCallbacks =
     unsafe fn(exec: XmlRegExecCtxtPtr, token: &str, transdata: *mut c_void, inputdata: *mut c_void);
-
-/// Build a context used for progressive evaluation of a regexp.
-///
-/// Returns the new context
-#[doc(alias = "xmlRegNewExecCtxt")]
-pub unsafe fn xml_reg_new_exec_ctxt(
-    comp: Rc<XmlRegexp>,
-    callback: Option<XmlRegExecCallbacks>,
-    data: *mut c_void,
-) -> XmlRegExecCtxtPtr {
-    unsafe {
-        if comp.compact.is_empty() && comp.states.is_empty() {
-            return null_mut();
-        }
-        let exec: XmlRegExecCtxtPtr = xml_malloc(size_of::<XmlRegExecCtxt>()) as XmlRegExecCtxtPtr;
-        if exec.is_null() {
-            xml_regexp_err_memory(null_mut(), "creating execution context");
-            return null_mut();
-        }
-        std::ptr::write(&mut *exec, XmlRegExecCtxt::default());
-        (*exec).index = 0;
-        (*exec).determinist = 1;
-        (*exec).rollbacks.clear();
-        (*exec).status = 0;
-        (*exec).comp = comp;
-        if (*exec).comp.compact.is_empty() {
-            (*exec).state = 0;
-        }
-        (*exec).transno = 0;
-        (*exec).transcount = 0;
-        (*exec).callback = callback;
-        (*exec).data = data;
-        if !(*exec).comp.counters.is_empty() {
-            (*exec).counts.clear();
-            (*exec).counts.resize((*exec).comp.counters.len(), 0);
-            (*exec).err_counts.clear();
-            (*exec).err_counts.resize((*exec).comp.counters.len(), 0);
-        } else {
-            (*exec).counts.clear();
-            (*exec).err_counts.clear();
-        }
-        (*exec).err_state_no = -1;
-        (*exec).err_string = None;
-        (*exec).nb_push = 0;
-        exec
-    }
-}
-
-/// Free the structures associated to a regular expression evaluation context.
-#[doc(alias = "xmlRegFreeExecCtxt")]
-pub unsafe fn xml_reg_free_exec_ctxt(exec: XmlRegExecCtxtPtr) {
-    unsafe {
-        if exec.is_null() {
-            return;
-        }
-
-        drop_in_place(exec);
-        xml_free(exec as _);
-    }
-}
 
 pub(crate) const REGEXP_ALL_LAX_COUNTER: usize = 0x123457;
 

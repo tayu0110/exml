@@ -42,7 +42,7 @@ use crate::{
             XmlHashTablePtr, xml_hash_add_entry2, xml_hash_create, xml_hash_free, xml_hash_lookup2,
         },
         valid::{XmlValidCtxt, xml_validate_document_final},
-        xmlregexp::{XmlRegExecCtxtPtr, xml_reg_free_exec_ctxt, xml_reg_new_exec_ctxt},
+        xmlregexp::XmlRegExecCtxtPtr,
         xmlstring::{XmlChar, xml_str_equal, xml_strcat, xml_strdup, xml_strlen},
     },
     parser::{split_qname2, xml_read_file, xml_read_memory},
@@ -66,7 +66,9 @@ use crate::{
 };
 
 use super::{
-    chvalid::xml_is_blank_char, xmlautomata::XmlAutomata, xmlregexp::XmlRegexp,
+    chvalid::xml_is_blank_char,
+    xmlautomata::XmlAutomata,
+    xmlregexp::{XmlRegExecCtxt, XmlRegexp},
     xmlstring::xml_strndup,
 };
 
@@ -7319,7 +7321,7 @@ unsafe fn xml_relaxng_validate_compiled_content(
             return -1;
         }
         let oldperr: i32 = (*ctxt).perr;
-        let exec: XmlRegExecCtxtPtr = xml_reg_new_exec_ctxt(
+        let mut exec = XmlRegExecCtxt::new(
             regexp,
             Some(xml_relaxng_validate_compiled_callback),
             ctxt as _,
@@ -7331,7 +7333,7 @@ unsafe fn xml_relaxng_validate_compiled_content(
             match now.element_type() {
                 XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode => {
                     if !now.is_blank_node() {
-                        ret = (*exec).push_string(Some("#text"), ctxt as _);
+                        ret = exec.push_string(Some("#text"), ctxt as _);
                         if ret < 0 {
                             VALID_ERR2!(
                                 ctxt,
@@ -7343,13 +7345,13 @@ unsafe fn xml_relaxng_validate_compiled_content(
                 }
                 XmlElementType::XmlElementNode => {
                     if let Some(ns) = now.ns {
-                        ret = (*exec).push_string2(
+                        ret = exec.push_string2(
                             now.name().as_deref().unwrap(),
                             ns.href().as_deref(),
                             ctxt as _,
                         );
                     } else {
-                        ret = (*exec).push_string(now.name().as_deref(), ctxt as _);
+                        ret = exec.push_string(now.name().as_deref(), ctxt as _);
                     }
                     if ret < 0 {
                         VALID_ERR2!(ctxt, XmlRelaxNGValidErr::XmlRelaxngErrElemwrong, now.name);
@@ -7363,7 +7365,7 @@ unsafe fn xml_relaxng_validate_compiled_content(
             // Switch to next element
             cur = now.next.map(|node| XmlNodePtr::try_from(node).unwrap());
         }
-        ret = (*exec).push_string(None, null_mut());
+        ret = exec.push_string(None, null_mut());
         if ret == 1 {
             ret = 0;
             (*(*ctxt).state).seq = None;
@@ -7381,7 +7383,7 @@ unsafe fn xml_relaxng_validate_compiled_content(
         } else {
             ret = -1;
         }
-        xml_reg_free_exec_ctxt(exec);
+
         // There might be content model errors outside of the pure
         // regexp validation, e.g. for attribute values.
         if ret == 0 && (*ctxt).perr != 0 {
@@ -9089,15 +9091,11 @@ pub(crate) unsafe fn xml_relaxng_validate_progressive_callback(
             (*ctxt).pdef = define;
             return;
         };
-        let exec = xml_reg_new_exec_ctxt(
+        let exec = XmlRegExecCtxt::new(
             cont_model,
             Some(xml_relaxng_validate_progressive_callback),
             ctxt as _,
         );
-        if exec.is_null() {
-            (*ctxt).pstate = -1;
-            return;
-        }
         (*ctxt).elem_push(exec);
 
         // Validate the attributes part of the content.
@@ -9168,7 +9166,7 @@ pub unsafe fn xml_relaxng_validate_push_cdata(
     _len: i32,
 ) -> i32 {
     unsafe {
-        if ctxt.is_null() || (*ctxt).elem.is_null() || data.is_null() {
+        if ctxt.is_null() || (*ctxt).elem().is_none() || data.is_null() {
             return -1;
         }
 
@@ -9182,7 +9180,10 @@ pub unsafe fn xml_relaxng_validate_push_cdata(
             return 1;
         }
 
-        let ret: i32 = (*(*ctxt).elem).push_string(Some("#text"), ctxt as _);
+        let ret: i32 = (*ctxt)
+            .elem_mut()
+            .unwrap()
+            .push_string(Some("#text"), ctxt as _);
         if ret < 0 {
             VALID_ERR2!(
                 ctxt,

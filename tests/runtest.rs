@@ -5054,21 +5054,18 @@ unsafe fn automata_test(
     _err: Option<String>,
     _options: i32,
 ) -> i32 {
-    use exml::libxml::xmlautomata::XmlAutomata;
+    use exml::libxml::{xmlautomata::XmlAutomata, xmlregexp::XmlRegExecCtxt};
 
     unsafe {
         use std::io::{BufRead, BufReader};
 
-        use exml::{
-            generic_error,
-            libxml::xmlregexp::{XmlRegExecCtxtPtr, xml_reg_free_exec_ctxt, xml_reg_new_exec_ctxt},
-        };
+        use exml::generic_error;
 
         let mut ret: i32;
         let mut res: i32 = 0;
         let mut states: [usize; 1000] = [usize::MAX; 1000];
         let mut regexp = None;
-        let mut exec: XmlRegExecCtxtPtr = null_mut();
+        let mut exec = None;
 
         NB_TESTS.set(NB_TESTS.get() + 1);
 
@@ -5242,11 +5239,12 @@ unsafe fn automata_test(
                     }
                 } else if expr[0] == b'=' && expr[1] == b'>' {
                     if let Some(regexp) = regexp.clone() {
-                        if exec.is_null() {
-                            exec = xml_reg_new_exec_ctxt(regexp, None, null_mut());
-                        }
+                        let mut exec = exec.take();
+                        let exec = exec.get_or_insert_with(|| {
+                            XmlRegExecCtxt::new(regexp, None, null_mut())
+                        });
                         if ret == 0 {
-                            ret = (*exec).push_string(None, null_mut());
+                            ret = exec.push_string(None, null_mut());
                         }
                         if ret == 1 {
                             writeln!(output, "=> Passed").ok();
@@ -5255,17 +5253,15 @@ unsafe fn automata_test(
                         } else if ret < 0 {
                             writeln!(output, "=> Error").ok();
                         }
-                        xml_reg_free_exec_ctxt(exec);
-                        exec = null_mut();
                     } else {
                         writeln!(output, "=> failed not compiled").ok();
                     }
                     ret = 0;
                 } else if let Some(regexp) = regexp.clone() {
-                    if exec.is_null() {
-                        exec = xml_reg_new_exec_ctxt(regexp, None, null_mut());
-                    }
-                    ret = (*exec).push_string(
+                    let exec = exec.get_or_insert_with(|| {
+                        XmlRegExecCtxt::new(regexp, None, null_mut())
+                    });
+                    ret = exec.push_string(
                         Some(
                             CStr::from_ptr(expr.as_ptr() as *const i8)
                                 .to_string_lossy()
@@ -5279,9 +5275,6 @@ unsafe fn automata_test(
                 }
             }
             expr.clear();
-        }
-        if !exec.is_null() {
-            xml_reg_free_exec_ctxt(exec);
         }
 
         ret = compare_files(temp.as_str(), result.as_deref().unwrap());

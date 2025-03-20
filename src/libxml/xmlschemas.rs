@@ -88,7 +88,7 @@ use crate::{
             xml_schema_free_wildcard_ns_set,
         },
         valid::xml_add_id,
-        xmlregexp::{XmlRegExecCtxtPtr, xml_reg_new_exec_ctxt, xml_regexp_exec},
+        xmlregexp::{XmlRegExecCtxtPtr, xml_regexp_exec},
         xmlschemastypes::{
             XmlSchemaValPtr, XmlSchemaWhitespaceValueType, xml_schema_check_facet,
             xml_schema_compare_values, xml_schema_compare_values_whtsp, xml_schema_copy_value,
@@ -151,6 +151,8 @@ use crate::{
     },
     xmlschemastypes::{xml_schema_collapse_string, xml_schema_white_space_replace},
 };
+
+use super::xmlregexp::XmlRegExecCtxt;
 
 /// This error codes are obsolete; not used any more.
 #[repr(C)]
@@ -797,7 +799,7 @@ pub struct XmlSchemaNodeInfo {
     // the IDC matchers for the scope element
     pub(crate) idc_matchers: XmlSchemaIDCMatcherPtr,
 
-    pub(crate) regex_ctxt: XmlRegExecCtxtPtr,
+    pub(crate) regex_ctxt: Option<Box<XmlRegExecCtxt>>,
 
     pub(crate) ns_bindings: *mut *const XmlChar, /* Namespace bindings on this element */
     pub(crate) nb_ns_bindings: i32,
@@ -14722,7 +14724,6 @@ unsafe fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                 }
                 XmlSchemaContentType::XmlSchemaContentMixed
                 | XmlSchemaContentType::XmlSchemaContentElements => {
-                    let mut regex_ctxt: XmlRegExecCtxtPtr;
                     let mut values = [const { Cow::Borrowed("") }; 10];
                     let mut terminal: i32 = 0;
 
@@ -14747,24 +14748,14 @@ unsafe fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                         return -1;
                     }
 
-                    regex_ctxt = (*pielem).regex_ctxt;
-                    if regex_ctxt.is_null() {
+                    let regex_ctxt = (*pielem).regex_ctxt.get_or_insert_with(|| {
                         // Create the regex context.
-                        regex_ctxt = xml_reg_new_exec_ctxt(
+                        Box::new(XmlRegExecCtxt::new(
                             cont_model,
                             Some(xml_schema_vcontent_model_callback),
                             vctxt as _,
-                        );
-                        if regex_ctxt.is_null() {
-                            VERROR_INT!(
-                                vctxt,
-                                "xmlSchemaValidateChildElem",
-                                "failed to create a regex context"
-                            );
-                            return -1;
-                        }
-                        (*pielem).regex_ctxt = regex_ctxt;
-                    }
+                        ))
+                    });
 
                     // SPEC (2.4) "If the {content type} is element-only or mixed,
                     // then the sequence of the element information item's
@@ -14772,7 +14763,7 @@ unsafe fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                     // order, is `valid` with respect to the {content type}'s
                     // particle, as defined in Element Sequence Locally Valid
                     // (Particle) ($3.9.4)."
-                    ret = (*regex_ctxt).push_string2(
+                    ret = regex_ctxt.push_string2(
                         CStr::from_ptr((*(*vctxt).inode).local_name as *const i8)
                             .to_string_lossy()
                             .as_ref(),
@@ -14794,7 +14785,7 @@ unsafe fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                     }
                     if ret < 0 {
                         if let Some((nbval, nbneg, values)) =
-                            (*regex_ctxt).err_info(None, &mut values, &raw mut terminal)
+                            regex_ctxt.err_info(None, &mut values, &raw mut terminal)
                         {
                             xml_schema_complex_type_err(
                                 vctxt as XmlSchemaAbstractCtxtPtr,
@@ -17982,22 +17973,14 @@ unsafe fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                                 let mut values = [const { Cow::Borrowed("") }; 10];
                                 let mut terminal: i32 = 0;
 
-                                if (*inode).regex_ctxt.is_null() {
+                                let regex_ctxt = (*inode).regex_ctxt.get_or_insert_with(|| {
                                     // Create the regex context.
-                                    (*inode).regex_ctxt = xml_reg_new_exec_ctxt(
+                                    Box::new(XmlRegExecCtxt::new(
                                         (*(*inode).type_def).cont_model.clone().unwrap(),
                                         Some(xml_schema_vcontent_model_callback),
                                         vctxt as _,
-                                    );
-                                    if (*inode).regex_ctxt.is_null() {
-                                        VERROR_INT!(
-                                            vctxt,
-                                            "xmlSchemaValidatorPopElem",
-                                            "failed to create a regex context"
-                                        );
-                                        break 'internal_error;
-                                    }
-                                }
+                                    ))
+                                });
 
                                 // Do not check further content if the node has been nilled
                                 if INODE_NILLED!(inode) {
@@ -18006,9 +17989,8 @@ unsafe fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                                 }
                                 // Get hold of the still expected content, since a further
                                 // call to xmlRegExecPushString() will lose this information.
-                                let values = (*(*inode).regex_ctxt)
-                                    .next_values(&mut values, &raw mut terminal);
-                                ret = (*(*inode).regex_ctxt).push_string(None, null_mut());
+                                let values = regex_ctxt.next_values(&mut values, &raw mut terminal);
+                                ret = regex_ctxt.push_string(None, null_mut());
                                 if ret < 0 || (ret == 0 && !INODE_NILLED!(inode)) {
                                     // Still missing something.
                                     ret = 1;
