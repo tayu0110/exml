@@ -1226,6 +1226,8 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderValidatePush")]
     #[cfg(all(feature = "libxml_reader", feature = "libxml_regexp"))]
     unsafe fn validate_push(&mut self) {
+        use crate::tree::NodeCommon;
+
         unsafe {
             use crate::tree::XmlNodePtr;
 
@@ -1239,26 +1241,21 @@ impl XmlTextReader {
                 && !self.ctxt.is_null()
                 && (*self.ctxt).validate == 1
             {
-                if let Some(prefix) = node.ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) {
+                if let Some(prefix) = node.ns.as_deref().and_then(|ns| ns.prefix()) {
                     // TODO use the BuildQName interface
-                    let mut qname = xml_strdup(prefix);
-                    qname = xml_strcat(qname, c":".as_ptr() as _);
-                    qname = xml_strcat(qname, node.name);
+                    let qname = format!("{prefix}:{}", node.name().unwrap());
                     (*self.ctxt).valid &= xml_validate_push_element(
                         &raw mut (*self.ctxt).vctxt,
                         (*self.ctxt).my_doc.unwrap(),
                         node,
-                        qname,
+                        &qname,
                     );
-                    if !qname.is_null() {
-                        xml_free(qname as _);
-                    }
                 } else {
                     (*self.ctxt).valid &= xml_validate_push_element(
                         &raw mut (*self.ctxt).vctxt,
                         (*self.ctxt).my_doc.unwrap(),
                         node,
-                        node.name,
+                        &node.name().unwrap(),
                     );
                 }
             }

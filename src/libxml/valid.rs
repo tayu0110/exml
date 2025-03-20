@@ -35,8 +35,6 @@ use libc::{memset, strcat, strlen, strncat};
 use crate::libxml::xmlautomata::XmlAutomata;
 #[cfg(feature = "libxml_regexp")]
 use crate::libxml::xmlregexp::XmlRegExecCtxt;
-#[cfg(feature = "libxml_regexp")]
-use crate::libxml::xmlstring::xml_strncmp;
 #[cfg(feature = "libxml_valid")]
 use crate::tree::{XmlElementPtr, XmlGenericNodePtr, XmlNsPtr};
 #[cfg(not(feature = "libxml_regexp"))]
@@ -60,7 +58,7 @@ use crate::{
         XmlElementContent, XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType,
         XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlID,
         XmlNodePtr, XmlNotation, XmlRef, xml_build_qname, xml_free_attribute, xml_free_element,
-        xml_free_node, xml_get_doc_entity, xml_new_doc_node, xml_split_qname2, xml_split_qname3,
+        xml_free_node, xml_get_doc_entity, xml_new_doc_node, xml_split_qname2,
     },
 };
 
@@ -6912,50 +6910,15 @@ pub unsafe fn xml_valid_build_content_model(ctxt: XmlValidCtxtPtr, mut elem: Xml
 unsafe fn xml_validate_check_mixed(
     ctxt: XmlValidCtxtPtr,
     mut cont: XmlElementContentPtr,
-    qname: *const XmlChar,
+    qname: &str,
 ) -> i32 {
     unsafe {
-        let mut plen: i32 = 0;
-        let name: *const XmlChar = xml_split_qname3(qname, addr_of_mut!(plen));
-
-        if name.is_null() {
-            while !cont.is_null() {
-                if matches!((*cont).typ, XmlElementContentType::XmlElementContentElement) {
-                    if (*cont).prefix.is_null() && xml_str_equal((*cont).name, qname) {
-                        return 1;
-                    }
-                } else if matches!((*cont).typ, XmlElementContentType::XmlElementContentOr)
-                    && !(*cont).c1.is_null()
-                    && matches!(
-                        (*(*cont).c1).typ,
-                        XmlElementContentType::XmlElementContentElement
-                    )
-                {
-                    if (*(*cont).c1).prefix.is_null() && xml_str_equal((*(*cont).c1).name, qname) {
-                        return 1;
-                    }
-                } else if !matches!((*cont).typ, XmlElementContentType::XmlElementContentOr)
-                    || (*cont).c1.is_null()
-                    || !matches!(
-                        (*(*cont).c1).typ,
-                        XmlElementContentType::XmlElementContentPCDATA
-                    )
-                {
-                    xml_err_valid!(
-                        null_mut(),
-                        XmlParserErrors::XmlDTDMixedCorrupt,
-                        "Internal: MIXED struct corrupted\n"
-                    );
-                    break;
-                }
-                cont = (*cont).c2;
-            }
-        } else {
+        if let Some((prefix, local)) = split_qname2(qname) {
             while !cont.is_null() {
                 if matches!((*cont).typ, XmlElementContentType::XmlElementContentElement) {
                     if !(*cont).prefix.is_null()
-                        && xml_strncmp((*cont).prefix, qname, plen) == 0
-                        && xml_str_equal((*cont).name, name)
+                        && CStr::from_ptr((*cont).prefix as *const i8).to_string_lossy() == prefix
+                        && CStr::from_ptr((*cont).name as *const i8).to_string_lossy() == local
                     {
                         return 1;
                     }
@@ -6967,8 +6930,10 @@ unsafe fn xml_validate_check_mixed(
                     )
                 {
                     if !(*(*cont).c1).prefix.is_null()
-                        && xml_strncmp((*(*cont).c1).prefix, qname, plen) == 0
-                        && xml_str_equal((*(*cont).c1).name, name)
+                        && CStr::from_ptr((*(*cont).c1).prefix as *const i8).to_string_lossy()
+                            == prefix
+                        && CStr::from_ptr((*(*cont).c1).name as *const i8).to_string_lossy()
+                            == local
                     {
                         return 1;
                     }
@@ -6981,6 +6946,43 @@ unsafe fn xml_validate_check_mixed(
                 {
                     xml_err_valid!(
                         ctxt,
+                        XmlParserErrors::XmlDTDMixedCorrupt,
+                        "Internal: MIXED struct corrupted\n"
+                    );
+                    break;
+                }
+                cont = (*cont).c2;
+            }
+        } else {
+            while !cont.is_null() {
+                if matches!((*cont).typ, XmlElementContentType::XmlElementContentElement) {
+                    if (*cont).prefix.is_null()
+                        && CStr::from_ptr((*cont).name as *const i8).to_string_lossy() == qname
+                    {
+                        return 1;
+                    }
+                } else if matches!((*cont).typ, XmlElementContentType::XmlElementContentOr)
+                    && !(*cont).c1.is_null()
+                    && matches!(
+                        (*(*cont).c1).typ,
+                        XmlElementContentType::XmlElementContentElement
+                    )
+                {
+                    if (*(*cont).c1).prefix.is_null()
+                        && CStr::from_ptr((*(*cont).c1).name as *const i8).to_string_lossy()
+                            == qname
+                    {
+                        return 1;
+                    }
+                } else if !matches!((*cont).typ, XmlElementContentType::XmlElementContentOr)
+                    || (*cont).c1.is_null()
+                    || !matches!(
+                        (*(*cont).c1).typ,
+                        XmlElementContentType::XmlElementContentPCDATA
+                    )
+                {
+                    xml_err_valid!(
+                        null_mut(),
                         XmlParserErrors::XmlDTDMixedCorrupt,
                         "Internal: MIXED struct corrupted\n"
                     );
@@ -7105,7 +7107,7 @@ pub unsafe fn xml_validate_push_element(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
     elem: XmlNodePtr,
-    qname: *const XmlChar,
+    qname: &str,
 ) -> i32 {
     unsafe {
         let mut ret: i32 = 1;
@@ -7162,14 +7164,13 @@ pub unsafe fn xml_validate_push_element(
                         } else {
                             ret = xml_validate_check_mixed(ctxt, elem_decl.content, qname);
                             if ret != 1 {
-                                let qname = CStr::from_ptr(qname as *const i8).to_string_lossy();
                                 let name = (*state.node).name().unwrap();
                                 xml_err_valid_node(
                                 ctxt,
                                 Some(state.node.into()),
                                 XmlParserErrors::XmlDTDInvalidChild,
                                 format!("Element {qname} is not declared in {name} list of possible children\n").as_str(),
-                                Some(&qname),
+                                Some(qname),
                                 Some(&name),
                                 None,
                             );
@@ -7182,22 +7183,20 @@ pub unsafe fn xml_validate_push_element(
                         //     - element types with element content, if white space
                         //       occurs directly within any instance of those types.
                         if state.exec.is_some() {
-                            ret = state.exec.as_mut().unwrap().push_string(
-                                (!qname.is_null())
-                                    .then(|| CStr::from_ptr(qname as *const i8).to_string_lossy())
-                                    .as_deref(),
-                                null_mut(),
-                            );
+                            ret = state
+                                .exec
+                                .as_mut()
+                                .unwrap()
+                                .push_string(Some(qname), null_mut());
                             if ret < 0 {
                                 let name = (*state.node).name().unwrap();
-                                let qname = CStr::from_ptr(qname as *const i8).to_string_lossy();
                                 xml_err_valid_node(
                                 ctxt,
                                 Some(state.node.into()),
                                 XmlParserErrors::XmlDTDContentModel,
                                 format!("Element {name} content does not follow the DTD, Misplaced {qname}\n").as_str(),
                                 Some(&name),
-                                Some(&qname),
+                                Some(qname),
                                 None,
                             );
                                 ret = 0;
