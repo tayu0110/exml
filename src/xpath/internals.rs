@@ -4995,7 +4995,10 @@ pub(super) unsafe fn xml_xpath_get_elements_by_ids(
                 // me and Aleksey Sanin, people blatantly violated that
                 // constraint, like Visa3D spec.
                 // if (xmlValidateNCName(ID, 1) == 0)
-                if let Some(attr) = xml_get_id(doc, id) {
+                if let Some(attr) = xml_get_id(
+                    doc,
+                    CStr::from_ptr(id as *const i8).to_string_lossy().as_ref(),
+                ) {
                     let elem = if let Ok(attr) = attr {
                         attr.parent.map(XmlGenericNodePtr::from)
                     // The following branch can not be reachable
