@@ -26,7 +26,7 @@
 
 use std::{
     borrow::Cow,
-    ffi::CStr,
+    ffi::{CStr, CString},
     mem::{size_of, take},
     os::raw::c_void,
     ptr::{addr_of_mut, drop_in_place, null_mut},
@@ -148,8 +148,8 @@ pub struct XmlXIncludeDoc {
 #[doc(alias = "xmlXIncludeTxt")]
 #[repr(C)]
 pub struct XmlXIncludeTxt {
-    text: *mut XmlChar, /* text string */
-    url: *mut XmlChar,  /* the URL */
+    text: Box<str>, /* text string */
+    url: Box<str>,  /* the URL */
 }
 
 pub type XmlXIncludeCtxtPtr = *mut XmlXIncludeCtxt;
@@ -1550,9 +1550,9 @@ impl XmlXIncludeCtxt {
 
             // Prevent reloading the document twice.
             for txt in &self.txt_tab {
-                if url == CStr::from_ptr(txt.url as *const i8).to_string_lossy() {
-                    let node = xml_new_doc_text(self.doc, txt.text);
-                    // goto loaded;
+                if *url == *txt.url {
+                    let text = CString::new(&*txt.text).unwrap();
+                    let node = xml_new_doc_text(self.doc, text.as_ptr() as *const u8);
                     (*refe).inc = node;
                     return 0;
                 }
@@ -1642,11 +1642,14 @@ impl XmlXIncludeCtxt {
                 i += l;
             }
 
-            (*node).add_content_len(content, len);
+            node.add_content_len(content, len);
 
             self.txt_tab.push(XmlXIncludeTxt {
-                text: xml_strdup(node.content),
-                url: xml_strndup(url.as_ptr(), url.len() as i32),
+                text: CStr::from_ptr(node.content as *const i8)
+                    .to_string_lossy()
+                    .into_owned()
+                    .into_boxed_str(),
+                url: url.into_boxed_str(),
             });
 
             // loaded:
@@ -2271,10 +2274,6 @@ pub unsafe fn xml_xinclude_free_context(ctxt: XmlXIncludeCtxtPtr) {
             if !inc.is_null() {
                 xml_xinclude_free_ref(inc);
             }
-        }
-        for txt in (*ctxt).txt_tab.drain(..) {
-            xml_free(txt.text as _);
-            xml_free(txt.url as _);
         }
         drop_in_place(ctxt);
         xml_free(ctxt as _);
