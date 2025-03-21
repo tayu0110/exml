@@ -26,10 +26,10 @@
 
 use std::{
     borrow::Cow,
-    ffi::{CStr, CString},
+    ffi::CStr,
     mem::{size_of, take},
     os::raw::c_void,
-    ptr::{addr_of_mut, drop_in_place, null, null_mut},
+    ptr::{addr_of_mut, drop_in_place, null_mut},
 };
 
 #[cfg(feature = "libxml_xptr_locs")]
@@ -164,11 +164,11 @@ pub struct XmlXIncludeCtxt {
 
     url_tab: Vec<XmlXIncludeDoc>, /* document stack */
 
-    nb_errors: i32,     /* the number of errors detected */
-    fatal_err: i32,     /* abort processing */
-    legacy: i32,        /* using XINCLUDE_OLD_NS */
-    parse_flags: i32,   /* the flags used for parsing XML documents */
-    base: *mut XmlChar, /* the current xml:base */
+    nb_errors: i32,         /* the number of errors detected */
+    fatal_err: i32,         /* abort processing */
+    legacy: i32,            /* using XINCLUDE_OLD_NS */
+    parse_flags: i32,       /* the flags used for parsing XML documents */
+    base: Option<Box<str>>, /* the current xml:base */
 
     _private: *mut c_void, /* application data */
 
@@ -1432,12 +1432,7 @@ impl XmlXIncludeCtxt {
                 if base.is_none() {
                     // No xml:base on the xinclude node, so we check whether the
                     // URI base is different than (relative to) the context base
-                    if let Some(cur_base) = build_relative_uri(
-                        &url,
-                        (!self.base.is_null())
-                            .then(|| CStr::from_ptr(self.base as *const i8).to_string_lossy())
-                            .as_deref(),
-                    ) {
+                    if let Some(cur_base) = build_relative_uri(&url, self.base.as_deref()) {
                         // If the URI doesn't contain a slash, it's not relative
                         if cur_base.contains('/') {
                             base = Some(cur_base.into_owned());
@@ -1761,10 +1756,8 @@ impl XmlXIncludeCtxt {
             };
 
             // Save the base for this include (saving the current one)
-            let old_base: *mut XmlChar = self.base;
-            self.base = base
-                .as_deref()
-                .map_or(null_mut(), |b| xml_strndup(b.as_ptr(), b.len() as i32));
+            let old_base = self.base.take();
+            self.base = base.map(|base| base.into());
 
             if xml != 0 {
                 ret = self.load_doc(&uri, refe);
@@ -1774,7 +1767,6 @@ impl XmlXIncludeCtxt {
             }
 
             // Restore the original base before checking for fallback
-            xml_free(self.base as _);
             self.base = old_base;
 
             if ret < 0 {
@@ -2000,7 +1992,7 @@ impl Default for XmlXIncludeCtxt {
             fatal_err: 0,
             legacy: 0,
             parse_flags: 0,
-            base: null_mut(),
+            base: None,
             _private: null_mut(),
             depth: 0,
             is_stream: 0,
@@ -2189,8 +2181,7 @@ pub unsafe fn xml_xinclude_process_tree_flags_data(
             return -1;
         }
         (*ctxt)._private = data;
-        let url = doc.url.as_deref().map(|u| CString::new(u).unwrap());
-        (*ctxt).base = xml_strdup(url.as_ref().map_or(null(), |u| u.as_ptr() as *const u8));
+        (*ctxt).base = doc.url.as_deref().map(|url| url.into());
         (*ctxt).set_flags(flags);
         let mut ret = (*ctxt).do_process(tree);
         if ret >= 0 && (*ctxt).nb_errors > 0 {
@@ -2228,10 +2219,7 @@ pub unsafe fn xml_xinclude_process_tree_flags(tree: XmlNodePtr, flags: i32) -> i
         if ctxt.is_null() {
             return -1;
         }
-        let tmp = tree.get_base(Some(doc)).map(|c| CString::new(c).unwrap());
-        (*ctxt).base = tmp
-            .as_ref()
-            .map_or(null_mut(), |c| xml_strdup(c.as_ptr() as *const u8));
+        (*ctxt).base = tree.get_base(Some(doc)).map(|base| base.into());
         (*ctxt).set_flags(flags);
         let mut ret = (*ctxt).do_process(tree);
         if ret >= 0 && (*ctxt).nb_errors > 0 {
@@ -2287,9 +2275,6 @@ pub unsafe fn xml_xinclude_free_context(ctxt: XmlXIncludeCtxtPtr) {
         for txt in (*ctxt).txt_tab.drain(..) {
             xml_free(txt.text as _);
             xml_free(txt.url as _);
-        }
-        if !(*ctxt).base.is_null() {
-            xml_free((*ctxt).base as _);
         }
         drop_in_place(ctxt);
         xml_free(ctxt as _);
