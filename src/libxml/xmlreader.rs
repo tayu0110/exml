@@ -70,7 +70,7 @@ use crate::{
             XmlSchemaSAXPlugPtr, xml_schema_is_valid, xml_schema_sax_plug, xml_schema_sax_unplug,
             xml_schema_validate_set_locator,
         },
-        xmlstring::{XmlChar, xml_str_equal, xml_strcat, xml_strdup, xml_strlen},
+        xmlstring::{XmlChar, xml_str_equal, xml_strdup},
     },
     parser::XmlParserCtxtPtr,
     tree::{
@@ -337,6 +337,8 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderRead")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn read(&mut self) -> i32 {
+        use std::ffi::CStr;
+
         unsafe {
             use crate::{
                 libxml::xinclude::{XINCLUDE_NS, XINCLUDE_OLD_NS},
@@ -748,7 +750,9 @@ impl XmlTextReader {
                         node.element_type(),
                         XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
                     ) {
-                        self.validate_cdata(node.content, xml_strlen(node.content));
+                        self.validate_cdata(
+                            &CStr::from_ptr(node.content as *const i8).to_string_lossy(),
+                        );
                     }
                 }
             }
@@ -1292,6 +1296,8 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderValidatePop")]
     #[cfg(feature = "libxml_reader")]
     unsafe fn validate_pop(&mut self) {
+        use crate::tree::NodeCommon;
+
         unsafe {
             use crate::tree::XmlNodePtr;
 
@@ -1305,27 +1311,21 @@ impl XmlTextReader {
                 && !self.ctxt.is_null()
                 && (*self.ctxt).validate == 1
             {
-                if let Some(prefix) = node.ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) {
+                if let Some(prefix) = node.ns.as_deref().and_then(|ns| ns.prefix()) {
                     // TODO use the BuildQName interface
-
-                    let mut qname = xml_strdup(prefix);
-                    qname = xml_strcat(qname, c":".as_ptr() as _);
-                    qname = xml_strcat(qname, node.name);
+                    let qname = format!("{prefix}:{}", node.name().unwrap());
                     (*self.ctxt).valid &= xml_validate_pop_element(
                         &raw mut (*self.ctxt).vctxt,
                         (*self.ctxt).my_doc,
                         Some(node),
-                        qname,
+                        &qname,
                     );
-                    if !qname.is_null() {
-                        xml_free(qname as _);
-                    }
                 } else {
                     (*self.ctxt).valid &= xml_validate_pop_element(
                         &raw mut (*self.ctxt).vctxt,
                         (*self.ctxt).my_doc,
                         Some(node),
-                        node.name,
+                        &node.name().unwrap(),
                     );
                 }
             }
@@ -1352,6 +1352,8 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderValidateEntity")]
     #[cfg(all(feature = "libxml_reader", feature = "libxml_regexp"))]
     unsafe fn validate_entity(&mut self) {
+        use std::ffi::CStr;
+
         unsafe {
             use crate::tree::{NodeCommon, XmlEntityPtr};
 
@@ -1394,7 +1396,9 @@ impl XmlTextReader {
                                 XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
                             ) {
                                 let node = XmlNodePtr::try_from(node).unwrap();
-                                self.validate_cdata(node.content, xml_strlen(node.content));
+                                self.validate_cdata(
+                                    &CStr::from_ptr(node.content as *const i8).to_string_lossy(),
+                                );
                             }
                         }
                         // go to next node
@@ -1467,15 +1471,14 @@ impl XmlTextReader {
     /// Push some CData for validation
     #[doc(alias = "xmlTextReaderValidateCData")]
     #[cfg(all(feature = "libxml_reader", feature = "libxml_regexp"))]
-    unsafe fn validate_cdata(&mut self, data: *const XmlChar, len: i32) {
+    unsafe fn validate_cdata(&mut self, data: &str) {
         unsafe {
             #[cfg(feature = "libxml_valid")]
             if self.validate == XmlTextReaderValidate::ValidateDtd
                 && !self.ctxt.is_null()
                 && (*self.ctxt).validate == 1
             {
-                (*self.ctxt).valid &=
-                    xml_validate_push_cdata(&raw mut (*self.ctxt).vctxt, data, len);
+                (*self.ctxt).valid &= xml_validate_push_cdata(&raw mut (*self.ctxt).vctxt, data);
             }
             #[cfg(feature = "schema")]
             if self.validate == XmlTextReaderValidate::ValidateRng && !self.rng_valid_ctxt.is_null()
@@ -1483,7 +1486,7 @@ impl XmlTextReader {
                 if self.rng_full_node.is_some() {
                     return;
                 }
-                let ret: i32 = xml_relaxng_validate_push_cdata(self.rng_valid_ctxt, data, len);
+                let ret: i32 = xml_relaxng_validate_push_cdata(self.rng_valid_ctxt, data);
                 if ret != 1 {
                     self.rng_valid_errors += 1;
                 }
@@ -4216,12 +4219,7 @@ pub unsafe fn xml_text_reader_close(reader: &mut XmlTextReader) -> i32 {
         if !reader.ctxt.is_null() {
             #[cfg(all(feature = "libxml_regexp", feature = "libxml_valid"))]
             while !(*reader.ctxt).vctxt.vstate_tab.is_empty() {
-                xml_validate_pop_element(
-                    addr_of_mut!((*reader.ctxt).vctxt),
-                    None,
-                    None,
-                    null_mut(),
-                );
+                xml_validate_pop_element(addr_of_mut!((*reader.ctxt).vctxt), None, None, "");
             }
             (*reader.ctxt).vctxt.vstate_tab.clear();
             (*reader.ctxt).stop();

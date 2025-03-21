@@ -2251,9 +2251,6 @@ pub unsafe fn xml_validate_element_decl(
     unsafe {
         let mut ret: i32 = 1;
 
-        // if doc.is_null() {
-        //     return 0;
-        // }
         if doc.int_subset.is_none() && doc.ext_subset.is_none() {
             return 0;
         };
@@ -2911,25 +2908,11 @@ unsafe fn xml_validate_attribute_value2(
                 }
             }
             XmlAttributeType::XmlAttributeEntities => {
-                let mut cur: *mut XmlChar;
-                let mut save: XmlChar;
-                let value = CString::new(value).unwrap();
-                let value = value.as_ptr() as *const u8;
-
-                let dup: *mut XmlChar = xml_strdup(value);
-                if dup.is_null() {
-                    return 0;
-                }
-                cur = dup;
-                while *cur != 0 {
-                    let nam = cur;
-                    while *cur != 0 && !xml_is_blank_char(*cur as u32) {
-                        cur = cur.add(1);
-                    }
-                    save = *cur;
-                    *cur = 0;
-                    let nam = CStr::from_ptr(nam as *const i8).to_string_lossy();
-                    if let Some(ent) = xml_get_doc_entity(Some(doc), &nam) {
+                for nam in value
+                    .split(|c: char| xml_is_blank_char(c as u32))
+                    .filter(|nam| !nam.is_empty())
+                {
+                    if let Some(ent) = xml_get_doc_entity(Some(doc), nam) {
                         if !matches!(ent.etype, XmlEntityType::XmlExternalGeneralUnparsedEntity) {
                             xml_err_valid_node(
                             ctxt,
@@ -2938,7 +2921,7 @@ unsafe fn xml_validate_attribute_value2(
                             format!("ENTITIES attribute {name} reference an entity \"{nam}\" of wrong type\n")
                                 .as_str(),
                             Some(name),
-                            Some(&nam),
+                            Some(nam),
                             None,
                         );
                             ret = 0;
@@ -2953,21 +2936,12 @@ unsafe fn xml_validate_attribute_value2(
                             )
                             .as_str(),
                             Some(name),
-                            Some(&nam),
+                            Some(nam),
                             None,
                         );
                         ret = 0;
                     }
-
-                    if save == 0 {
-                        break;
-                    }
-                    *cur = save;
-                    while xml_is_blank_char(*cur as u32) {
-                        cur = cur.add(1);
-                    }
                 }
-                xml_free(dup as _);
             }
             XmlAttributeType::XmlAttributeNotation => {
                 let nota = xml_get_dtd_notation_desc(doc.int_subset.as_deref(), value)
@@ -6081,17 +6055,16 @@ pub fn xml_validate_nmtokens_value(value: &str) -> i32 {
 unsafe fn xml_valid_build_acontent_model(
     mut content: XmlElementContentPtr,
     ctxt: XmlValidCtxtPtr,
-    name: *const XmlChar,
+    name: &str,
 ) -> i32 {
     unsafe {
         if content.is_null() {
-            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
             xml_err_valid_node(
                 ctxt,
                 None,
                 XmlParserErrors::XmlErrInternalError,
                 format!("Found NULL content in content model of {name}\n").as_str(),
-                Some(&name),
+                Some(name),
                 None,
                 None,
             );
@@ -6099,13 +6072,12 @@ unsafe fn xml_valid_build_acontent_model(
         }
         match (*content).typ {
             XmlElementContentType::XmlElementContentPCDATA => {
-                let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                 xml_err_valid_node(
                     ctxt,
                     None,
                     XmlParserErrors::XmlErrInternalError,
                     format!("Found PCDATA in content model of {name}\n").as_str(),
-                    Some(&name),
+                    Some(name),
                     None,
                     None,
                 );
@@ -6312,10 +6284,7 @@ pub unsafe fn xml_valid_build_content_model(ctxt: XmlValidCtxtPtr, mut elem: Xml
         }
 
         (*ctxt).am = XmlAutomata::new();
-        let name = elem
-            .name
-            .as_ref()
-            .map(|n| CString::new(n.as_str()).unwrap());
+
         if (*ctxt).am.is_none() {
             let name = elem.name.as_deref().unwrap();
             xml_err_valid_node(
@@ -6330,11 +6299,7 @@ pub unsafe fn xml_valid_build_content_model(ctxt: XmlValidCtxtPtr, mut elem: Xml
             return 0;
         }
         (*ctxt).state = (*ctxt).am.as_mut().unwrap().get_init_state();
-        xml_valid_build_acontent_model(
-            elem.content,
-            ctxt,
-            name.as_ref().map_or(null(), |n| n.as_ptr() as *const u8),
-        );
+        xml_valid_build_acontent_model(elem.content, ctxt, elem.name.as_deref().unwrap());
         (*ctxt)
             .am
             .as_mut()
@@ -6688,11 +6653,7 @@ pub unsafe fn xml_validate_push_element(
 /// Returns 1 if no validation problem was found or 0 otherwise
 #[doc(alias = "xmlValidatePushCData")]
 #[cfg(all(feature = "libxml_valid", feature = "libxml_regexp"))]
-pub unsafe fn xml_validate_push_cdata(
-    ctxt: XmlValidCtxtPtr,
-    data: *const XmlChar,
-    len: i32,
-) -> i32 {
+pub unsafe fn xml_validate_push_cdata(ctxt: XmlValidCtxtPtr, data: &str) -> i32 {
     unsafe {
         let mut ret: i32 = 1;
 
@@ -6700,9 +6661,10 @@ pub unsafe fn xml_validate_push_cdata(
         if ctxt.is_null() {
             return 0;
         }
-        if len <= 0 {
+        if data.is_empty() {
             return ret;
         }
+
         if let Some(state) = (*ctxt).vstate_tab.last() {
             // Check the new element against the content model of the new elem.
             if let Some(elem_decl) = state.elem_decl {
@@ -6711,7 +6673,7 @@ pub unsafe fn xml_validate_push_cdata(
                         ret = 0;
                     }
                     XmlElementTypeVal::XmlElementTypeEmpty => {
-                        let name = (*state.node).name().unwrap();
+                        let name = state.node.name().unwrap();
                         xml_err_valid_node(
                             ctxt,
                             Some(state.node.into()),
@@ -6727,22 +6689,21 @@ pub unsafe fn xml_validate_push_cdata(
                     XmlElementTypeVal::XmlElementTypeAny => {}
                     XmlElementTypeVal::XmlElementTypeMixed => {}
                     XmlElementTypeVal::XmlElementTypeElement => {
-                        for i in 0..len {
-                            if !xml_is_blank_char(*data.add(i as usize) as u32) {
-                                let name = (*state.node).name().unwrap();
-                                xml_err_valid_node(
+                        if data.contains(|c: char| !xml_is_blank_char(c as u32)) {
+                            let name = state.node.name().unwrap();
+                            xml_err_valid_node(
                                 ctxt,
                                 Some(state.node.into()),
                                 XmlParserErrors::XmlDTDContentModel,
-                                format!("Element {name} content does not follow the DTD, Text not allowed\n").as_str(),
+                                format!(
+                                    "Element {} content does not follow the DTD, Text not allowed\n",
+                                    name
+                                ).as_str(),
                                 Some(&name),
                                 None,
                                 None,
                             );
-                                ret = 0;
-                                // goto done;
-                                return ret;
-                            }
+                            return 0;
                         }
                         // TODO:
                         // VC: Standalone Document Declaration
@@ -6798,7 +6759,7 @@ pub unsafe fn xml_validate_pop_element(
     ctxt: XmlValidCtxtPtr,
     _doc: Option<XmlDocPtr>,
     _elem: Option<XmlNodePtr>,
-    _qname: *const XmlChar,
+    _qname: &str,
 ) -> i32 {
     unsafe {
         let mut ret: i32 = 1;
@@ -6815,7 +6776,7 @@ pub unsafe fn xml_validate_pop_element(
                 {
                     ret = state.exec.as_mut().unwrap().push_string(None, null_mut());
                     if ret <= 0 {
-                        let name = (*state.node).name().unwrap();
+                        let name = state.node.name().unwrap();
                         xml_err_valid_node(
                         ctxt,
                         Some(state.node.into()),
@@ -6993,49 +6954,6 @@ mod tests {
                                 eprint!(" {}", n_len);
                                 eprintln!(" {}", n_max);
                             }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_validate_push_cdata() {
-        #[cfg(all(feature = "libxml_valid", feature = "libxml_regexp"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_VALID_CTXT_PTR {
-                for n_data in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_len in 0..GEN_NB_INT {
-                        let mem_base = xml_mem_blocks();
-                        let ctxt = gen_xml_valid_ctxt_ptr(n_ctxt, 0);
-                        let data = gen_const_xml_char_ptr(n_data, 1);
-                        let mut len = gen_int(n_len, 2);
-                        if !data.is_null() && len > xml_strlen(data) {
-                            len = 0;
-                        }
-
-                        let ret_val = xml_validate_push_cdata(ctxt, data, len);
-                        desret_int(ret_val);
-                        des_xml_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-                        des_const_xml_char_ptr(n_data, data, 1);
-                        des_int(n_len, len, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlValidatePushCData",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlValidatePushCData()"
-                            );
-                            eprint!(" {}", n_ctxt);
-                            eprint!(" {}", n_data);
-                            eprintln!(" {}", n_len);
                         }
                     }
                 }

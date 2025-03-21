@@ -9160,23 +9160,14 @@ pub(crate) unsafe fn xml_relaxng_validate_progressive_callback(
 ///
 /// Returns 1 if no validation problem was found or -1 otherwise
 #[doc(alias = "xmlRelaxNGValidatePushCData")]
-pub unsafe fn xml_relaxng_validate_push_cdata(
-    ctxt: XmlRelaxNGValidCtxtPtr,
-    mut data: *const XmlChar,
-    _len: i32,
-) -> i32 {
+pub unsafe fn xml_relaxng_validate_push_cdata(ctxt: XmlRelaxNGValidCtxtPtr, mut data: &str) -> i32 {
     unsafe {
-        if ctxt.is_null() || (*ctxt).elem().is_none() || data.is_null() {
+        if ctxt.is_null() || (*ctxt).elem().is_none() {
             return -1;
         }
 
-        while *data != 0 {
-            if !xml_is_blank_char(*data as u32) {
-                break;
-            }
-            data = data.add(1);
-        }
-        if *data == 0 {
+        data = data.trim_start_matches(|c: char| xml_is_blank_char(c as u32));
+        if data.is_empty() {
             return 1;
         }
 
@@ -9322,49 +9313,6 @@ mod tests {
                     leaks == 0,
                     "{leaks} Leaks are found in xmlRelaxNGInitTypes()"
                 );
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_relaxng_validate_push_cdata() {
-        #[cfg(feature = "schema")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_RELAXNG_VALID_CTXT_PTR {
-                for n_data in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_len in 0..GEN_NB_INT {
-                        let mem_base = xml_mem_blocks();
-                        let ctxt = gen_xml_relaxng_valid_ctxt_ptr(n_ctxt, 0);
-                        let data = gen_const_xml_char_ptr(n_data, 1);
-                        let mut len = gen_int(n_len, 2);
-                        if !data.is_null() && len > xml_strlen(data) {
-                            len = 0;
-                        }
-
-                        let ret_val = xml_relaxng_validate_push_cdata(ctxt, data, len);
-                        desret_int(ret_val);
-                        des_xml_relaxng_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-                        des_const_xml_char_ptr(n_data, data, 1);
-                        des_int(n_len, len, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlRelaxNGValidatePushCData",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlRelaxNGValidatePushCData()"
-                            );
-                            eprint!(" {}", n_ctxt);
-                            eprint!(" {}", n_data);
-                            eprintln!(" {}", n_len);
-                        }
-                    }
-                }
             }
         }
     }
