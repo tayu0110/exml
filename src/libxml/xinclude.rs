@@ -45,8 +45,7 @@ use crate::{
             xml_load_external_entity, xml_parse_document,
         },
         parser_internals::xml_string_current_char,
-        uri::{XmlURIPtr, xml_free_uri, xml_parse_uri, xml_save_uri},
-        xmlstring::{XmlChar, xml_str_equal, xml_strcmp, xml_strdup},
+        xmlstring::{XmlChar, xml_str_equal, xml_strdup},
         xpointer::{xml_xptr_eval, xml_xptr_new_context},
     },
     parser::{XmlParserInputPtr, xml_free_input_stream, xml_free_parser_ctxt, xml_new_parser_ctxt},
@@ -1509,23 +1508,19 @@ impl XmlXIncludeCtxt {
     ///
     /// Returns 0 in case of success, -1 in case of failure
     #[doc(alias = "xmlXIncludeLoadTxt")]
-    unsafe fn load_txt(&mut self, mut url: *const XmlChar, refe: XmlXIncludeRefPtr) -> i32 {
+    unsafe fn load_txt(&mut self, mut url: &str, refe: XmlXIncludeRefPtr) -> i32 {
         unsafe {
             let mut i: i32;
             let mut ret: i32 = -1;
             let mut enc = XmlCharEncoding::None;
-            let mut pctxt = null_mut();
-            let mut input_stream: XmlParserInputPtr = null_mut();
 
-            /* Don't read from stdin. */
-            if xml_strcmp(url, c"-".as_ptr() as _) == 0 {
-                url = c"./-".as_ptr() as _;
+            // Don't read from stdin.
+            if url == "-" {
+                url = "./-";
             }
 
             // Check the URL and remove any fragment identifier
-            let uri: XmlURIPtr = xml_parse_uri(url as _);
-            if uri.is_null() {
-                let url = CStr::from_ptr(url as *const i8).to_string_lossy();
+            let Some(uri) = XmlURI::parse(url) else {
                 xml_xinclude_err!(
                     self,
                     (*refe).elem.map(|node| node.into()),
@@ -1533,14 +1528,9 @@ impl XmlXIncludeCtxt {
                     "invalid value URI {}\n",
                     url
                 );
-                // goto error;
-                xml_free_input_stream(input_stream);
-                xml_free_parser_ctxt(pctxt);
-                xml_free_uri(uri);
                 return ret;
-            }
-            if !(*uri).fragment.is_null() {
-                let fragment = CStr::from_ptr((*uri).fragment as *const i8).to_string_lossy();
+            };
+            if let Some(fragment) = uri.fragment.as_deref() {
                 xml_xinclude_err!(
                     self,
                     (*refe).elem.map(|node| node.into()),
@@ -1548,58 +1538,27 @@ impl XmlXIncludeCtxt {
                     "fragment identifier forbidden for text: {}\n",
                     fragment
                 );
-                // goto error;
-                xml_free_input_stream(input_stream);
-                xml_free_parser_ctxt(pctxt);
-                xml_free_uri(uri);
                 return ret;
             }
-            let url = {
-                let tmp = xml_save_uri(uri);
-                if tmp.is_null() {
-                    let url = CStr::from_ptr(url as *const i8).to_string_lossy();
-                    xml_xinclude_err!(
-                        self,
-                        (*refe).elem.map(|node| node.into()),
-                        XmlParserErrors::XmlXIncludeHrefURI,
-                        "invalid value URI {}\n",
-                        url
-                    );
-                    // goto error;
-                    xml_free_input_stream(input_stream);
-                    xml_free_parser_ctxt(pctxt);
-                    xml_free_uri(uri);
-                    return ret;
-                }
-                tmp
-            };
+            let url = uri.save();
 
             // Handling of references to the local document are done directly through (*ctxt).doc.
-            if *url.add(0) == 0 {
+            if url.is_empty() {
                 xml_xinclude_err!(
                     self,
                     (*refe).elem.map(|node| node.into()),
                     XmlParserErrors::XmlXIncludeTextDocument,
                     "text serialization of document not available\n"
                 );
-                // goto error;
-                xml_free_input_stream(input_stream);
-                xml_free_parser_ctxt(pctxt);
-                xml_free_uri(uri);
-                xml_free(url as _);
                 return ret;
             }
 
             // Prevent reloading the document twice.
             for txt in &self.txt_tab {
-                if xml_str_equal(url, txt.url) {
+                if url == CStr::from_ptr(txt.url as *const i8).to_string_lossy() {
                     let node = xml_new_doc_text(self.doc, txt.text);
                     // goto loaded;
                     (*refe).inc = node;
-                    xml_free_input_stream(input_stream);
-                    xml_free_parser_ctxt(pctxt);
-                    xml_free_uri(uri);
-                    xml_free(url as _);
                     return 0;
                 }
             }
@@ -1624,37 +1583,24 @@ impl XmlXIncludeCtxt {
                             "encoding {} not supported\n",
                             encoding
                         );
-                        // goto error;
-                        xml_free_input_stream(input_stream);
-                        xml_free_parser_ctxt(pctxt);
-                        xml_free_uri(uri);
-                        xml_free(url as _);
                         return ret;
                     }
                 }
             }
 
             // Load it.
-            pctxt = xml_new_parser_ctxt();
-            input_stream = xml_load_external_entity(
-                Some(CStr::from_ptr(url as *const i8).to_string_lossy().as_ref()),
-                None,
-                pctxt,
-            );
+            let pctxt = xml_new_parser_ctxt();
+            let input_stream = xml_load_external_entity(Some(&url), None, pctxt);
             if input_stream.is_null() {
                 // goto error;
                 xml_free_input_stream(input_stream);
                 xml_free_parser_ctxt(pctxt);
-                xml_free_uri(uri);
-                xml_free(url as _);
                 return ret;
             }
             let Some(buf) = (*input_stream).buf.as_mut() else {
                 // goto error;
                 xml_free_input_stream(input_stream);
                 xml_free_parser_ctxt(pctxt);
-                xml_free_uri(uri);
-                xml_free(url as _);
                 return ret;
             };
             buf.borrow_mut().encoder = get_encoding_handler(enc);
@@ -1663,8 +1609,6 @@ impl XmlXIncludeCtxt {
                 // goto error;
                 xml_free_input_stream(input_stream);
                 xml_free_parser_ctxt(pctxt);
-                xml_free_uri(uri);
-                xml_free(url as _);
                 return ret;
             };
 
@@ -1686,20 +1630,17 @@ impl XmlXIncludeCtxt {
                 let cur: i32 =
                     xml_string_current_char(null_mut(), content.add(i as usize), addr_of_mut!(l));
                 if !xml_is_char(cur as u32) {
-                    let u = CStr::from_ptr(url as *const i8).to_string_lossy();
                     xml_xinclude_err!(
                         self,
                         (*refe).elem.map(|node| node.into()),
                         XmlParserErrors::XmlXIncludeInvalidChar,
                         "{} contains invalid char\n",
-                        u
+                        url
                     );
                     // goto error;
                     xml_free_node(node);
                     xml_free_input_stream(input_stream);
                     xml_free_parser_ctxt(pctxt);
-                    xml_free_uri(uri);
-                    xml_free(url as _);
                     return ret;
                 }
 
@@ -1710,7 +1651,7 @@ impl XmlXIncludeCtxt {
 
             self.txt_tab.push(XmlXIncludeTxt {
                 text: xml_strdup(node.content),
-                url: xml_strdup(url),
+                url: xml_strndup(url.as_ptr(), url.len() as i32),
             });
 
             // loaded:
@@ -1721,8 +1662,6 @@ impl XmlXIncludeCtxt {
             // error:
             xml_free_input_stream(input_stream);
             xml_free_parser_ctxt(pctxt);
-            xml_free_uri(uri);
-            xml_free(url as _);
             ret
         }
     }
@@ -1831,8 +1770,7 @@ impl XmlXIncludeCtxt {
                 ret = self.load_doc(&uri, refe);
                 // xmlXIncludeGetFragment(self, cur, URI);
             } else {
-                let uri = CString::new(uri.as_str()).unwrap();
-                ret = self.load_txt(uri.as_ptr() as *const u8, refe);
+                ret = self.load_txt(&uri, refe);
             }
 
             // Restore the original base before checking for fallback
