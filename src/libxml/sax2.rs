@@ -1406,24 +1406,30 @@ unsafe fn xml_sax2_attribute_internal(
             value = nval;
         } else {
             #[cfg(feature = "libxml_valid")]
-            {
+            if !value.is_null() {
                 // Do the last stage of the attribute normalization
                 // Needed for HTML too:
                 //   http://www.w3.org/TR/html4/types.html#h-6.2
                 (*ctxt).vctxt.valid = 1;
-                nval = xml_valid_ctxt_normalize_attribute_value(
+                let v = CStr::from_ptr(value as *const i8).to_string_lossy();
+                let val = xml_valid_ctxt_normalize_attribute_value(
                     &raw mut (*ctxt).vctxt,
                     (*ctxt).my_doc.unwrap(),
                     (*ctxt).node.unwrap(),
                     fullname,
-                    value,
+                    &v,
                 );
                 if (*ctxt).vctxt.valid != 1 {
                     (*ctxt).valid = 0;
                 }
-                if !nval.is_null() {
-                    value = nval;
+                if let Some(val) = val {
+                    value = xml_strndup(val.as_ptr(), val.len() as i32);
+                    nval = value as *mut u8;
+                } else {
+                    nval = null_mut();
                 }
+            } else {
+                nval = null_mut();
             }
             #[cfg(not(feature = "libxml_valid"))]
             {
@@ -1683,15 +1689,15 @@ unsafe fn xml_sax2_attribute_internal(
                         // Do the last stage of the attribute normalization
                         // It need to be done twice ... it's an extra burden related
                         // to the ability to keep xmlSAX2References in attributes
-                        let nvalnorm: *mut XmlChar = xml_valid_normalize_attribute_value(
+                        if let Some(nvalnorm) = xml_valid_normalize_attribute_value(
                             my_doc,
                             (*ctxt).node.unwrap(),
                             fullname,
-                            val,
-                        );
-                        if !nvalnorm.is_null() {
+                            CStr::from_ptr(val as *const i8).to_string_lossy().as_ref(),
+                        ) {
+                            let new = xml_strndup(nvalnorm.as_ptr(), nvalnorm.len() as i32);
                             xml_free(val as _);
-                            val = nvalnorm;
+                            val = new;
                         }
 
                         (*ctxt).valid &= xml_validate_one_attribute(
@@ -1714,14 +1720,17 @@ unsafe fn xml_sax2_attribute_internal(
                 }
             }
             _ => {
+                // Don't create IDs containing entity references
                 if (*ctxt).loadsubset & XML_SKIP_IDS as i32 == 0
-        && (((*ctxt).replace_entities == 0 && (*ctxt).external != 2)
-            || ((*ctxt).replace_entities != 0 && (*ctxt).in_subset == 0))
-            // Don't create IDs containing entity references
-        && ret
-            .children()
-            .filter(|c| matches!(c.element_type(), XmlElementType::XmlTextNode) && c.next().is_none())
-            .is_some()
+                    && (((*ctxt).replace_entities == 0 && (*ctxt).external != 2)
+                        || ((*ctxt).replace_entities != 0 && (*ctxt).in_subset == 0))
+                    && ret
+                        .children()
+                        .filter(|c| {
+                            matches!(c.element_type(), XmlElementType::XmlTextNode)
+                                && c.next().is_none()
+                        })
+                        .is_some()
                 {
                     let content: *mut XmlChar = XmlNodePtr::try_from(ret.children().unwrap())
                         .unwrap()
@@ -2561,21 +2570,21 @@ unsafe fn xml_sax2_attribute_ns(
                         // It need to be done twice ... it's an extra burden related
                         // to the ability to keep references in attributes
                         if (*ctxt).atts_special.is_some() {
-                            let nvalnorm: *mut XmlChar;
                             let mut fname: [XmlChar; 50] = [0; 50];
 
                             let fullname: *mut XmlChar =
                                 xml_build_qname(localname, prefix, fname.as_mut_ptr() as _, 50);
                             if !fullname.is_null() {
                                 (*ctxt).vctxt.valid = 1;
-                                nvalnorm = xml_valid_ctxt_normalize_attribute_value(
+                                let d = CStr::from_ptr(dup as *const i8).to_string_lossy();
+                                let nvalnorm = xml_valid_ctxt_normalize_attribute_value(
                                     &raw mut (*ctxt).vctxt,
                                     (*ctxt).my_doc.unwrap(),
                                     (*ctxt).node.unwrap(),
                                     CStr::from_ptr(fullname as *const i8)
                                         .to_string_lossy()
                                         .as_ref(),
-                                    dup,
+                                    &d,
                                 );
                                 if (*ctxt).vctxt.valid != 1 {
                                     (*ctxt).valid = 0;
@@ -2584,9 +2593,10 @@ unsafe fn xml_sax2_attribute_ns(
                                 if fullname != fname.as_mut_ptr() && fullname != localname as _ {
                                     xml_free(fullname as _);
                                 }
-                                if !nvalnorm.is_null() {
+                                if let Some(nvalnorm) = nvalnorm {
+                                    let new = xml_strndup(nvalnorm.as_ptr(), nvalnorm.len() as i32);
                                     xml_free(dup as _);
-                                    dup = nvalnorm;
+                                    dup = new;
                                 }
                             }
                         }

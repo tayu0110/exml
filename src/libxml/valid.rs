@@ -21,6 +21,7 @@
 #[cfg(feature = "libxml_output")]
 use std::io::Write;
 use std::{
+    borrow::Cow,
     collections::HashMap,
     ffi::{CStr, CString, c_char},
     mem::size_of,
@@ -2082,37 +2083,19 @@ pub unsafe fn xml_is_id(
 
 /// Normalize a string in-place.
 #[doc(alias = "xmlValidNormalizeString")]
-unsafe fn xml_valid_normalize_string(str: *mut XmlChar) {
-    unsafe {
-        let mut dst: *mut XmlChar;
-        let mut src: *const XmlChar;
-
-        if str.is_null() {
-            return;
-        }
-        src = str;
-        dst = str;
-
-        while *src == 0x20 {
-            src = src.add(1);
-        }
-        while *src != 0 {
-            if *src == 0x20 {
-                while *src == 0x20 {
-                    src = src.add(1);
-                }
-                if *src != 0 {
-                    *dst = 0x20;
-                    dst = dst.add(1);
-                }
-            } else {
-                *dst = *src;
-                dst = dst.add(1);
-                src = src.add(1);
-            }
-        }
-        *dst = 0;
+fn xml_valid_normalize_string(s: &str) -> Cow<'_, str> {
+    if !s.contains("\x20\x20") {
+        return Cow::Borrowed(s);
     }
+
+    let mut buf = String::with_capacity(s.len());
+    let mut s = s.split('\x20');
+    buf.push_str(s.next().unwrap());
+    for s in s {
+        buf.push('\x20');
+        buf.push_str(s);
+    }
+    Cow::Owned(buf)
 }
 
 /// Remove the given attribute from the ID table maintained internally.
@@ -2127,28 +2110,17 @@ pub unsafe fn xml_remove_id(mut doc: XmlDocPtr, mut attr: XmlAttrPtr) -> i32 {
         let Some(id) = attr.children().and_then(|c| c.get_string(Some(doc), 1)) else {
             return -1;
         };
-        let id = CString::new(id).unwrap();
-        let id = xml_strdup(id.as_ptr() as *const u8);
-        xml_valid_normalize_string(id);
+        let id = xml_valid_normalize_string(&id);
 
         let table = doc.ids.as_deref_mut().unwrap();
-        let Some(id_ptr) = table.lookup(CStr::from_ptr(id as *const i8).to_string_lossy().as_ref())
-        else {
-            xml_free(id as _);
+        let Some(id_ptr) = table.lookup(&id) else {
             return -1;
         };
         if id_ptr.attr != Some(attr) {
-            xml_free(id as _);
             return -1;
         }
 
-        table
-            .remove_entry(
-                CStr::from_ptr(id as *const i8).to_string_lossy().as_ref(),
-                |_, _| {},
-            )
-            .ok();
-        xml_free(id as _);
+        table.remove_entry(&id, |_, _| {}).ok();
         attr.atype = None;
         0
     }
@@ -2594,40 +2566,25 @@ pub unsafe fn xml_validate_element_decl(
 /// the caller must free the returned value.
 #[doc(alias = "xmlValidNormalizeAttributeValue")]
 #[cfg(feature = "libxml_valid")]
-pub unsafe fn xml_valid_normalize_attribute_value(
+pub fn xml_valid_normalize_attribute_value<'a>(
     doc: XmlDocPtr,
     elem: XmlNodePtr,
     name: &str,
-    value: *const XmlChar,
-) -> *mut XmlChar {
-    unsafe {
-        if value.is_null() {
-            return null_mut();
+    value: &'a str,
+) -> Option<Cow<'a, str>> {
+    let mut attr_decl = doc
+        .int_subset
+        .and_then(|dtd| dtd.get_attr_desc(elem.name().as_deref().unwrap(), name));
+    if attr_decl.is_none() {
+        if let Some(ext_subset) = doc.ext_subset {
+            attr_decl = ext_subset.get_attr_desc(elem.name().as_deref().unwrap(), name);
         }
-
-        let mut attr_decl = doc
-            .int_subset
-            .and_then(|dtd| dtd.get_attr_desc(elem.name().as_deref().unwrap(), name));
-        if attr_decl.is_none() {
-            if let Some(ext_subset) = doc.ext_subset {
-                attr_decl = ext_subset.get_attr_desc(elem.name().as_deref().unwrap(), name);
-            }
-        }
-
-        let Some(attr_decl) = attr_decl else {
-            return null_mut();
-        };
-        if matches!(attr_decl.atype, XmlAttributeType::XmlAttributeCDATA) {
-            return null_mut();
-        }
-
-        let ret: *mut XmlChar = xml_strdup(value);
-        if ret.is_null() {
-            return null_mut();
-        }
-        xml_valid_normalize_string(ret);
-        ret
     }
+
+    if matches!(attr_decl?.atype, XmlAttributeType::XmlAttributeCDATA) {
+        return None;
+    }
+    Some(xml_valid_normalize_string(value))
 }
 
 /// Does the validation related extra step of the normalization of attribute values:
@@ -2644,19 +2601,15 @@ pub unsafe fn xml_valid_normalize_attribute_value(
 /// the caller must free the returned value.
 #[doc(alias = "xmlValidCtxtNormalizeAttributeValue")]
 #[cfg(feature = "libxml_valid")]
-pub unsafe fn xml_valid_ctxt_normalize_attribute_value(
+pub unsafe fn xml_valid_ctxt_normalize_attribute_value<'a>(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
     elem: XmlNodePtr,
     name: &str,
-    value: *const XmlChar,
-) -> *mut XmlChar {
+    value: &'a str,
+) -> Option<Cow<'a, str>> {
     unsafe {
         let mut extsubset: i32 = 0;
-
-        if value.is_null() {
-            return null_mut();
-        }
 
         let mut attr_decl = None;
         if let Some(prefix) = elem.ns.as_deref().and_then(|ns| ns.prefix()) {
@@ -2688,32 +2641,29 @@ pub unsafe fn xml_valid_ctxt_normalize_attribute_value(
             }
         }
 
-        let Some(attr_decl) = attr_decl else {
-            return null_mut();
-        };
-        if matches!(attr_decl.atype, XmlAttributeType::XmlAttributeCDATA) {
-            return null_mut();
+        if matches!(attr_decl?.atype, XmlAttributeType::XmlAttributeCDATA) {
+            return None;
         }
 
-        let ret: *mut XmlChar = xml_strdup(value);
-        if ret.is_null() {
-            return null_mut();
-        }
-        xml_valid_normalize_string(ret);
-        if doc.standalone != 0 && extsubset == 1 && !xml_str_equal(value, ret) {
+        let ret = xml_valid_normalize_string(value);
+        if doc.standalone != 0 && extsubset == 1 && value != ret {
             let elem_name = elem.name().unwrap();
             xml_err_valid_node(
-            ctxt,
-            Some(XmlGenericNodePtr::from(elem)),
-            XmlParserErrors::XmlDTDNotStandalone,
-            format!("standalone: {name} on {elem_name} value had to be normalized based on external subset declaration\n").as_str(),
-            Some(name),
-            Some(&elem_name),
-            None
-        );
+                ctxt,
+                Some(XmlGenericNodePtr::from(elem)),
+                XmlParserErrors::XmlDTDNotStandalone,
+                format!(
+                    "standalone: {} on {} value had to be normalized based on external subset declaration\n",
+                    name,
+                    elem_name
+                ).as_str(),
+                Some(name),
+                Some(&elem_name),
+                None
+            );
             (*ctxt).valid = 0;
         }
-        ret
+        Some(ret)
     }
 }
 
