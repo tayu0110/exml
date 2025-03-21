@@ -25,13 +25,12 @@
 // daniel@veillard.com
 
 use std::{
+    borrow::Cow,
     ffi::{CStr, CString},
     mem::{size_of, take, zeroed},
     os::raw::c_void,
     ptr::{addr_of_mut, drop_in_place, null, null_mut},
 };
-
-use libc::memset;
 
 #[cfg(feature = "libxml_xptr_locs")]
 use crate::libxml::xpointer::XmlLocationSetPtr;
@@ -87,20 +86,20 @@ pub const XINCLUDE_PARSE_ENCODING: &str = "encoding";
 /// A constant defining "xpointer"
 pub const XINCLUDE_PARSE_XPOINTER: &CStr = c"xpointer";
 
-pub type XmlURL = *mut XmlChar;
-
 pub type XmlXIncludeRefPtr = *mut XmlXIncludeRef;
+#[doc(alias = "xmlXIncludeRef")]
 #[repr(C)]
+#[derive(Default)]
 pub struct XmlXIncludeRef {
-    uri: *mut XmlChar,        /* the fully resolved resource URL */
-    fragment: *mut XmlChar,   /* the fragment in the URI */
-    elem: Option<XmlNodePtr>, /* the xi:include element */
-    inc: Option<XmlNodePtr>,  /* the included copy */
-    xml: i32,                 /* xml or txt */
-    fallback: i32,            /* fallback was loaded */
-    empty_fb: i32,            /* flag to show fallback empty */
-    expanding: i32,           /* flag to detect inclusion loops */
-    replace: i32,             /* should the node be replaced? */
+    uri: Option<Box<str>>,      /* the fully resolved resource URL */
+    fragment: Option<Box<str>>, /* the fragment in the URI */
+    elem: Option<XmlNodePtr>,   /* the xi:include element */
+    inc: Option<XmlNodePtr>,    /* the included copy */
+    xml: i32,                   /* xml or txt */
+    fallback: i32,              /* fallback was loaded */
+    empty_fb: i32,              /* flag to show fallback empty */
+    expanding: i32,             /* flag to detect inclusion loops */
+    replace: i32,               /* should the node be replaced? */
 }
 
 pub type XmlXIncludeDocPtr = *mut XmlXIncludeDoc;
@@ -120,19 +119,14 @@ pub struct XmlXIncludeTxt {
 
 pub type XmlXIncludeCtxtPtr = *mut XmlXIncludeCtxt;
 /// An XInclude context
+#[doc(alias = "xmlXIncludeCtxt")]
 #[repr(C)]
 pub struct XmlXIncludeCtxt {
-    doc: Option<XmlDocPtr>, /* the source document */
-    // inc_nr: i32,                     /* number of includes */
-    // inc_max: i32,                    /* size of includes tab */
+    doc: Option<XmlDocPtr>,          /* the source document */
     inc_tab: Vec<XmlXIncludeRefPtr>, /* array of included references */
 
-    // txt_nr: i32,                  /* number of unparsed documents */
-    // txt_max: i32,                 /* size of unparsed documents tab */
     txt_tab: Vec<XmlXIncludeTxt>, /* array of unparsed documents */
 
-    // url_nr: i32,                  /* number of documents stacked */
-    // url_max: i32,                 /* size of document stack */
     url_tab: Vec<XmlXIncludeDoc>, /* document stack */
 
     nb_errors: i32,     /* the number of errors detected */
@@ -143,9 +137,6 @@ pub struct XmlXIncludeCtxt {
 
     _private: *mut c_void, /* application data */
 
-    // #ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
-    //     c_ulong    incTotal; /* total number of processed inclusions */
-    // #endif
     depth: i32,     /* recursion depth */
     is_stream: i32, /* streaming mode */
 }
@@ -414,12 +405,7 @@ unsafe fn xml_xinclude_free_ref(refe: XmlXIncludeRefPtr) {
         if refe.is_null() {
             return;
         }
-        if !(*refe).uri.is_null() {
-            xml_free((*refe).uri as _);
-        }
-        if !(*refe).fragment.is_null() {
-            xml_free((*refe).fragment as _);
-        }
+        drop_in_place(refe);
         xml_free(refe as _);
     }
 }
@@ -430,7 +416,7 @@ unsafe fn xml_xinclude_free_ref(refe: XmlXIncludeRefPtr) {
 #[doc(alias = "xmlXIncludeNewRef")]
 unsafe fn xml_xinclude_new_ref(
     ctxt: XmlXIncludeCtxtPtr,
-    uri: *const XmlChar,
+    uri: Option<&str>,
     elem: XmlNodePtr,
 ) -> XmlXIncludeRefPtr {
     unsafe {
@@ -439,13 +425,9 @@ unsafe fn xml_xinclude_new_ref(
             xml_xinclude_err_memory(ctxt, Some(elem.into()), Some("growing XInclude context"));
             return null_mut();
         }
-        memset(ret as _, 0, size_of::<XmlXIncludeRef>());
-        if uri.is_null() {
-            (*ret).uri = null_mut();
-        } else {
-            (*ret).uri = xml_strdup(uri);
-        }
-        (*ret).fragment = null_mut();
+        std::ptr::write(&mut *ret, XmlXIncludeRef::default());
+        (*ret).uri = uri.map(|uri| uri.into());
+        (*ret).fragment = None;
         (*ret).elem = Some(elem);
         (*ret).xml = 0;
         (*ret).inc = None;
@@ -564,16 +546,12 @@ unsafe fn xml_xinclude_add_node(ctxt: XmlXIncludeCtxtPtr, cur: XmlNodePtr) -> Xm
             );
             return null_mut();
         }
-        let url = CString::new(url).unwrap();
 
-        let refe: XmlXIncludeRefPtr = xml_xinclude_new_ref(ctxt, url.as_ptr() as *const u8, cur);
+        let refe: XmlXIncludeRefPtr = xml_xinclude_new_ref(ctxt, Some(&url), cur);
         if refe.is_null() {
             return null_mut();
         }
-        let fragment = fragment.map(|f| CString::new(f).unwrap());
-        (*refe).fragment = fragment
-            .as_ref()
-            .map_or(null_mut(), |f| xml_strdup(f.as_ptr() as *const u8));
+        (*refe).fragment = fragment.map(|fragment| fragment.into());
         (*refe).xml = xml;
         refe
     }
@@ -816,7 +794,7 @@ unsafe fn xml_xinclude_merge_entities(
 
 /// The XInclude recursive nature is handled at this point.
 #[doc(alias = "xmlXIncludeRecurseDoc")]
-unsafe fn xml_xinclude_recurse_doc(ctxt: XmlXIncludeCtxtPtr, doc: XmlDocPtr, _url: XmlURL) {
+unsafe fn xml_xinclude_recurse_doc(ctxt: XmlXIncludeCtxtPtr, doc: XmlDocPtr, _url: &str) {
     unsafe {
         let old_doc = (*ctxt).doc;
         let old_inc_tab = take(&mut (*ctxt).inc_tab);
@@ -1321,21 +1299,18 @@ unsafe fn xml_xinclude_copy_xpointer(
 #[doc(alias = "xmlXIncludeLoadDoc")]
 unsafe fn xml_xinclude_load_doc(
     ctxt: XmlXIncludeCtxtPtr,
-    url: *const XmlChar,
+    url: &str,
     refe: XmlXIncludeRefPtr,
 ) -> i32 {
     unsafe {
         let mut cache: XmlXIncludeDocPtr;
-        let mut fragment: *mut XmlChar = null_mut();
-        let mut ret: i32 = -1;
+        let ret: i32 = -1;
         let cache_nr: i32;
         #[cfg(feature = "xpointer")]
         let save_flags: i32;
 
         // Check the URL and remove any fragment identifier
-        let uri: XmlURIPtr = xml_parse_uri(url as _);
-        if uri.is_null() {
-            let url = CStr::from_ptr(url as *const i8).to_string_lossy();
+        let Some(mut uri) = XmlURI::parse(url) else {
             xml_xinclude_err!(
                 ctxt,
                 (*refe).elem.map(|node| node.into()),
@@ -1343,410 +1318,356 @@ unsafe fn xml_xinclude_load_doc(
                 "invalid value URI {}\n",
                 url
             );
-            // goto error;
             return ret;
+        };
+        let mut fragment = uri.fragment.take();
+        if let Some(frag) = (*refe).fragment.as_deref() {
+            fragment = Some(Cow::Owned(frag.to_owned()));
         }
-        if !(*uri).fragment.is_null() {
-            fragment = (*uri).fragment as _;
-            (*uri).fragment = null_mut();
-        }
-        if !(*refe).fragment.is_null() {
-            if !fragment.is_null() {
-                xml_free(fragment as _);
+        let mut url = uri.save();
+
+        // Handling of references to the local document are done
+        // directly through (*ctxt).doc.
+        let doc = 'load: {
+            if url.is_empty()
+                || url.starts_with('#')
+                || (*ctxt)
+                    .doc
+                    .is_some_and(|doc| doc.url.as_deref() == Some(&url))
+            {
+                break 'load (*ctxt).doc;
             }
-            fragment = xml_strdup((*refe).fragment);
-        }
-        let mut url = {
-            let tmp = xml_save_uri(uri);
-            xml_free_uri(uri);
-            if tmp.is_null() {
-                let url = CStr::from_ptr(url as *const i8).to_string_lossy();
-                xml_xinclude_err!(
-                    ctxt,
-                    (*refe).elem.map(|node| node.into()),
-                    XmlParserErrors::XmlXIncludeHrefURI,
-                    "invalid value URI {}\n",
-                    url
-                );
-                // goto error;
-                xml_free(fragment as _);
+            // Prevent reloading the document twice.
+            for inc_doc in &(*ctxt).url_tab {
+                if url == CStr::from_ptr(inc_doc.url as *const i8).to_string_lossy() {
+                    if inc_doc.expanding != 0 {
+                        xml_xinclude_err!(
+                            ctxt,
+                            (*refe).elem.map(|node| node.into()),
+                            XmlParserErrors::XmlXIncludeRecursion,
+                            "inclusion loop detected\n"
+                        );
+                        return ret;
+                    }
+                    let Some(doc) = inc_doc.doc else {
+                        return ret;
+                    };
+                    break 'load Some(doc);
+                }
+            }
+
+            // Load it.
+            #[cfg(feature = "xpointer")]
+            {
+                // If this is an XPointer evaluation, we want to assure that
+                // all entities have been resolved prior to processing the
+                // referenced document
+                save_flags = (*ctxt).parse_flags;
+                if fragment.is_some() {
+                    // if this is an XPointer eval
+                    (*ctxt).parse_flags |= XmlParserOption::XmlParseNoEnt as i32;
+                }
+            }
+
+            let doc = xml_xinclude_parse_file(ctxt, &url);
+            #[cfg(feature = "xpointer")]
+            {
+                (*ctxt).parse_flags = save_flags;
+            }
+
+            // Also cache NULL docs
+            cache_nr = (*ctxt).url_tab.len() as i32;
+            (*ctxt).url_tab.push(XmlXIncludeDoc {
+                doc,
+                url: xml_strndup(url.as_ptr(), url.len() as i32),
+                expanding: 0,
+            });
+            cache = &raw mut (*ctxt).url_tab[cache_nr as usize];
+
+            let Some(doc) = doc else {
                 return ret;
+            };
+            // It's possible that the requested URL has been mapped to a
+            // completely different location (e.g. through a catalog entry).
+            // To check for this, we compare the URL with that of the doc
+            // and change it if they disagree (bug 146988).
+            if doc.url.as_deref() != Some(&url) {
+                url = doc.url.clone().unwrap();
             }
-            tmp
+
+            // Make sure we have all entities fixed up
+            xml_xinclude_merge_entities(ctxt, (*ctxt).doc.unwrap(), doc);
+
+            // We don't need the DTD anymore, free up space
+            // if ((*doc).intSubset != null_mut()) {
+            //     xmlUnlinkNode((xmlNodePtr) (*doc).intSubset);
+            //     xmlFreeNode((xmlNodePtr) (*doc).intSubset);
+            //     (*doc).intSubset = NULL;
+            // }
+            // if ((*doc).extSubset != null_mut()) {
+            //     xmlUnlinkNode((xmlNodePtr) (*doc).extSubset);
+            //     xmlFreeNode((xmlNodePtr) (*doc).extSubset);
+            //     (*doc).extSubset = NULL;
+            // }
+            (*cache).expanding = 1;
+            xml_xinclude_recurse_doc(ctxt, doc, &url);
+            // urlTab might be reallocated.
+            cache = &raw mut (*ctxt).url_tab[cache_nr as usize];
+            (*cache).expanding = 0;
+            Some(doc)
         };
 
-        'error: {
-            // Handling of references to the local document are done
-            // directly through (*ctxt).doc.
-            let doc = 'load: {
-                if *url.add(0) == 0
-                    || *url.add(0) == b'#'
-                    || (*ctxt).doc.is_some_and(|doc| {
-                        doc.url.as_deref() == CStr::from_ptr(url as *const i8).to_str().ok()
-                    })
-                {
-                    break 'load (*ctxt).doc;
-                }
-                // Prevent reloading the document twice.
-                for inc_doc in &(*ctxt).url_tab {
-                    if xml_str_equal(url, inc_doc.url) {
-                        if inc_doc.expanding != 0 {
-                            xml_xinclude_err!(
-                                ctxt,
-                                (*refe).elem.map(|node| node.into()),
-                                XmlParserErrors::XmlXIncludeRecursion,
-                                "inclusion loop detected\n"
-                            );
-                            break 'error;
-                        }
-                        let Some(doc) = inc_doc.doc else {
-                            break 'error;
-                        };
-                        break 'load Some(doc);
-                    }
-                }
+        // loaded:
+        if let Some(fragment) = fragment {
+            #[cfg(feature = "xpointer")]
+            {
+                // Computes the XPointer expression and make a copy used
+                // as the replacement copy.
 
-                // Load it.
-                #[cfg(feature = "xpointer")]
-                {
-                    // If this is an XPointer evaluation, we want to assure that
-                    // all entities have been resolved prior to processing the
-                    // referenced document
-                    save_flags = (*ctxt).parse_flags;
-                    if !fragment.is_null() {
-                        /* if this is an XPointer eval */
-                        (*ctxt).parse_flags |= XmlParserOption::XmlParseNoEnt as i32;
-                    }
-                }
-
-                let doc = xml_xinclude_parse_file(
-                    ctxt,
-                    CStr::from_ptr(url as *const i8).to_string_lossy().as_ref(),
-                );
-                #[cfg(feature = "xpointer")]
-                {
-                    (*ctxt).parse_flags = save_flags;
-                }
-
-                // Also cache NULL docs
-                cache_nr = (*ctxt).url_tab.len() as i32;
-                (*ctxt).url_tab.push(XmlXIncludeDoc {
-                    doc,
-                    url: xml_strdup(url),
-                    expanding: 0,
-                });
-                cache = &raw mut (*ctxt).url_tab[cache_nr as usize];
-
-                let Some(doc) = doc else {
-                    break 'error;
-                };
-                // It's possible that the requested URL has been mapped to a
-                // completely different location (e.g. through a catalog entry).
-                // To check for this, we compare the URL with that of the doc
-                // and change it if they disagree (bug 146988).
-                if doc.url.as_deref() != CStr::from_ptr(url as *const i8).to_str().ok() {
-                    xml_free(url as _);
-                    let new = CString::new(doc.url.as_deref().unwrap()).unwrap();
-                    url = xml_strdup(new.as_ptr() as *const u8);
-                }
-
-                // Make sure we have all entities fixed up
-                xml_xinclude_merge_entities(ctxt, (*ctxt).doc.unwrap(), doc);
-
-                // We don't need the DTD anymore, free up space
-                // if ((*doc).intSubset != null_mut()) {
-                //     xmlUnlinkNode((xmlNodePtr) (*doc).intSubset);
-                //     xmlFreeNode((xmlNodePtr) (*doc).intSubset);
-                //     (*doc).intSubset = NULL;
-                // }
-                // if ((*doc).extSubset != null_mut()) {
-                //     xmlUnlinkNode((xmlNodePtr) (*doc).extSubset);
-                //     xmlFreeNode((xmlNodePtr) (*doc).extSubset);
-                //     (*doc).extSubset = NULL;
-                // }
-                (*cache).expanding = 1;
-                xml_xinclude_recurse_doc(ctxt, doc, url);
-                // urlTab might be reallocated.
-                cache = &raw mut (*ctxt).url_tab[cache_nr as usize];
-                (*cache).expanding = 0;
-                Some(doc)
-            };
-
-            // loaded:
-            if fragment.is_null() {
-                // Add the top children list as the replacement copy.
-                (*refe).inc = doc
-                    .and_then(|doc| {
-                        xml_doc_copy_node(doc.get_root_element().unwrap().into(), (*ctxt).doc, 1)
-                    })
-                    .and_then(|node| XmlNodePtr::try_from(node).ok());
-            } else {
-                #[cfg(feature = "xpointer")]
-                {
-                    // Computes the XPointer expression and make a copy used
-                    // as the replacement copy.
-
-                    if (*ctxt).is_stream != 0 && doc == (*ctxt).doc {
-                        xml_xinclude_err!(
-                            ctxt,
-                            (*refe).elem.map(|node| node.into()),
-                            XmlParserErrors::XmlXIncludeXPtrFailed,
-                            "XPointer expressions not allowed in streaming mode\n"
-                        );
-                        break 'error;
-                    }
-
-                    let xptrctxt: XmlXPathContextPtr = xml_xptr_new_context(doc, None, None);
-                    if xptrctxt.is_null() {
-                        xml_xinclude_err!(
-                            ctxt,
-                            (*refe).elem.map(|node| node.into()),
-                            XmlParserErrors::XmlXIncludeXPtrFailed,
-                            "could not create XPointer context\n"
-                        );
-                        break 'error;
-                    }
-                    let xptr: XmlXPathObjectPtr = xml_xptr_eval(
-                        CStr::from_ptr(fragment as *const i8)
-                            .to_string_lossy()
-                            .as_ref(),
-                        xptrctxt,
+                if (*ctxt).is_stream != 0 && doc == (*ctxt).doc {
+                    xml_xinclude_err!(
+                        ctxt,
+                        (*refe).elem.map(|node| node.into()),
+                        XmlParserErrors::XmlXIncludeXPtrFailed,
+                        "XPointer expressions not allowed in streaming mode\n"
                     );
-                    if xptr.is_null() {
-                        let fragment = CStr::from_ptr(fragment as *const i8).to_string_lossy();
+                    return ret;
+                }
+
+                let xptrctxt: XmlXPathContextPtr = xml_xptr_new_context(doc, None, None);
+                if xptrctxt.is_null() {
+                    xml_xinclude_err!(
+                        ctxt,
+                        (*refe).elem.map(|node| node.into()),
+                        XmlParserErrors::XmlXIncludeXPtrFailed,
+                        "could not create XPointer context\n"
+                    );
+                    return ret;
+                }
+                let xptr: XmlXPathObjectPtr = xml_xptr_eval(&fragment, xptrctxt);
+                if xptr.is_null() {
+                    xml_xinclude_err!(
+                        ctxt,
+                        (*refe).elem.map(|node| node.into()),
+                        XmlParserErrors::XmlXIncludeXPtrFailed,
+                        "XPointer evaluation failed: #{}\n",
+                        fragment
+                    );
+                    xml_xpath_free_context(xptrctxt);
+                    return ret;
+                }
+                match (*xptr).typ {
+                    XmlXPathObjectType::XPathUndefined
+                    | XmlXPathObjectType::XPathBoolean
+                    | XmlXPathObjectType::XPathNumber
+                    | XmlXPathObjectType::XPathString
+                    | XmlXPathObjectType::XPathUsers
+                    | XmlXPathObjectType::XPathXSLTTree => {
                         xml_xinclude_err!(
                             ctxt,
                             (*refe).elem.map(|node| node.into()),
-                            XmlParserErrors::XmlXIncludeXPtrFailed,
-                            "XPointer evaluation failed: #{}\n",
+                            XmlParserErrors::XmlXIncludeXPtrResult,
+                            "XPointer is not a range: #{}\n",
                             fragment
                         );
+                        xml_xpath_free_object(xptr);
                         xml_xpath_free_context(xptrctxt);
-                        break 'error;
+                        return ret;
                     }
-                    match (*xptr).typ {
-                        XmlXPathObjectType::XPathUndefined
-                        | XmlXPathObjectType::XPathBoolean
-                        | XmlXPathObjectType::XPathNumber
-                        | XmlXPathObjectType::XPathString
-                        | XmlXPathObjectType::XPathUsers
-                        | XmlXPathObjectType::XPathXSLTTree => {
-                            let fragment = CStr::from_ptr(fragment as *const i8).to_string_lossy();
-                            xml_xinclude_err!(
-                                ctxt,
-                                (*refe).elem.map(|node| node.into()),
-                                XmlParserErrors::XmlXIncludeXPtrResult,
-                                "XPointer is not a range: #{}\n",
-                                fragment
-                            );
-                            xml_xpath_free_object(xptr);
-                            xml_xpath_free_context(xptrctxt);
-                            break 'error;
-                        }
-                        #[cfg(feature = "libxml_xptr_locs")]
-                        XmlXPathObjectType::XPathPoint => {
-                            let fragment = CStr::from_ptr(fragment as *const i8).to_string_lossy();
-                            xml_xinclude_err!(
-                                ctxt,
-                                (*refe).elem.map(|node| node.into()),
-                                XmlParserErrors::XmlXIncludeXPtrResult,
-                                "XPointer is not a range: #{}\n",
-                                fragment
-                            );
-                            xml_xpath_free_object(xptr);
-                            xml_xpath_free_context(xptrctxt);
-                            break 'error;
-                        }
-                        XmlXPathObjectType::XPathNodeset => {
-                            if (*xptr).nodesetval.as_deref().is_none_or(|n| n.is_empty()) {
-                                xml_xpath_free_object(xptr);
-                                xml_xpath_free_context(xptrctxt);
-                                break 'error;
-                            }
-                        }
-                        #[cfg(feature = "libxml_xptr_locs")]
-                        XmlXPathObjectType::XPathRange | XmlXPathObjectType::XPathLocationset => {} // _ => {}
-                    }
-                    if let Some(set) = (*xptr).nodesetval.as_deref_mut() {
-                        let mut i = 0;
-                        while i < set.node_tab.len() {
-                            let node = set.node_tab[i];
-                            match node.element_type() {
-                                XmlElementType::XmlElementNode
-                                | XmlElementType::XmlTextNode
-                                | XmlElementType::XmlCDATASectionNode
-                                | XmlElementType::XmlEntityRefNode
-                                | XmlElementType::XmlEntityNode
-                                | XmlElementType::XmlPINode
-                                | XmlElementType::XmlCommentNode
-                                | XmlElementType::XmlDocumentNode
-                                | XmlElementType::XmlHTMLDocumentNode => {
-                                    // continue to next loop
-                                }
-
-                                XmlElementType::XmlAttributeNode => {
-                                    let fragment =
-                                        CStr::from_ptr(fragment as *const i8).to_string_lossy();
-                                    xml_xinclude_err!(
-                                        ctxt,
-                                        (*refe).elem.map(|node| node.into()),
-                                        XmlParserErrors::XmlXIncludeXPtrResult,
-                                        "XPointer selects an attribute: #{}\n",
-                                        fragment
-                                    );
-                                    set.node_tab.swap_remove(i);
-                                    continue;
-                                }
-                                XmlElementType::XmlNamespaceDecl => {
-                                    let fragment =
-                                        CStr::from_ptr(fragment as *const i8).to_string_lossy();
-                                    xml_xinclude_err!(
-                                        ctxt,
-                                        (*refe).elem.map(|node| node.into()),
-                                        XmlParserErrors::XmlXIncludeXPtrResult,
-                                        "XPointer selects a namespace: #{}\n",
-                                        fragment
-                                    );
-                                    set.node_tab.swap_remove(i);
-                                    continue;
-                                }
-                                XmlElementType::XmlDocumentTypeNode
-                                | XmlElementType::XmlDocumentFragNode
-                                | XmlElementType::XmlNotationNode
-                                | XmlElementType::XmlDTDNode
-                                | XmlElementType::XmlElementDecl
-                                | XmlElementType::XmlAttributeDecl
-                                | XmlElementType::XmlEntityDecl
-                                | XmlElementType::XmlXIncludeStart
-                                | XmlElementType::XmlXIncludeEnd => {
-                                    let fragment =
-                                        CStr::from_ptr(fragment as *const i8).to_string_lossy();
-                                    xml_xinclude_err!(
-                                        ctxt,
-                                        (*refe).elem.map(|node| node.into()),
-                                        XmlParserErrors::XmlXIncludeXPtrResult,
-                                        "XPointer selects unexpected nodes: #{}\n",
-                                        fragment
-                                    );
-                                    set.node_tab.swap_remove(i);
-                                    continue; /* for */
-                                }
-                                _ => unreachable!(),
-                            }
-                            i += 1;
-                        }
-                    }
-                    (*refe).inc = xml_xinclude_copy_xpointer(ctxt, xptr);
-                    xml_xpath_free_object(xptr);
-                    xml_xpath_free_context(xptrctxt);
-                }
-            }
-
-            // Do the xml:base fixup if needed
-            if doc
-                .is_some_and(|doc| doc.parse_flags & XmlParserOption::XmlParseNoBasefix as i32 == 0)
-                && !url.is_null()
-                && (*ctxt).parse_flags & XmlParserOption::XmlParseNoBasefix as i32 == 0
-            {
-                // The base is only adjusted if "necessary", i.e. if the xinclude node
-                // has a base specified, or the URL is relative
-                let base = (*refe)
-                    .elem
-                    .unwrap()
-                    .get_ns_prop("base", XML_XML_NAMESPACE.to_str().ok());
-                let mut cbase = base
-                    .as_deref()
-                    .map_or(null_mut(), |b| xml_strndup(b.as_ptr(), b.len() as i32));
-                if cbase.is_null() {
-                    // No xml:base on the xinclude node, so we check whether the
-                    // URI base is different than (relative to) the context base
-                    let url = CStr::from_ptr(url as *const i8).to_string_lossy();
-                    if let Some(cur_base) = build_relative_uri(
-                        &url,
-                        (!(*ctxt).base.is_null())
-                            .then(|| CStr::from_ptr((*ctxt).base as *const i8).to_string_lossy())
-                            .as_deref(),
-                    ) {
-                        // If the URI doesn't contain a slash, it's not relative
-                        if cur_base.contains('/') {
-                            cbase = xml_strndup(cur_base.as_ptr(), cur_base.len() as i32);
-                        }
-                    } else {
-                        // Error return
+                    #[cfg(feature = "libxml_xptr_locs")]
+                    XmlXPathObjectType::XPathPoint => {
                         xml_xinclude_err!(
                             ctxt,
                             (*refe).elem.map(|node| node.into()),
-                            XmlParserErrors::XmlXIncludeHrefURI,
-                            "trying to build relative URI from {}\n",
-                            url
+                            XmlParserErrors::XmlXIncludeXPtrResult,
+                            "XPointer is not a range: #{}\n",
+                            fragment
                         );
+                        xml_xpath_free_object(xptr);
+                        xml_xpath_free_context(xptrctxt);
+                        return ret;
+                    }
+                    XmlXPathObjectType::XPathNodeset => {
+                        if (*xptr).nodesetval.as_deref().is_none_or(|n| n.is_empty()) {
+                            xml_xpath_free_object(xptr);
+                            xml_xpath_free_context(xptrctxt);
+                            return ret;
+                        }
+                    }
+                    #[cfg(feature = "libxml_xptr_locs")]
+                    XmlXPathObjectType::XPathRange | XmlXPathObjectType::XPathLocationset => {} // _ => {}
+                }
+                if let Some(set) = (*xptr).nodesetval.as_deref_mut() {
+                    let mut i = 0;
+                    while i < set.node_tab.len() {
+                        let node = set.node_tab[i];
+                        match node.element_type() {
+                            XmlElementType::XmlElementNode
+                            | XmlElementType::XmlTextNode
+                            | XmlElementType::XmlCDATASectionNode
+                            | XmlElementType::XmlEntityRefNode
+                            | XmlElementType::XmlEntityNode
+                            | XmlElementType::XmlPINode
+                            | XmlElementType::XmlCommentNode
+                            | XmlElementType::XmlDocumentNode
+                            | XmlElementType::XmlHTMLDocumentNode => {
+                                // continue to next loop
+                            }
+
+                            XmlElementType::XmlAttributeNode => {
+                                xml_xinclude_err!(
+                                    ctxt,
+                                    (*refe).elem.map(|node| node.into()),
+                                    XmlParserErrors::XmlXIncludeXPtrResult,
+                                    "XPointer selects an attribute: #{}\n",
+                                    fragment
+                                );
+                                set.node_tab.swap_remove(i);
+                                continue;
+                            }
+                            XmlElementType::XmlNamespaceDecl => {
+                                xml_xinclude_err!(
+                                    ctxt,
+                                    (*refe).elem.map(|node| node.into()),
+                                    XmlParserErrors::XmlXIncludeXPtrResult,
+                                    "XPointer selects a namespace: #{}\n",
+                                    fragment
+                                );
+                                set.node_tab.swap_remove(i);
+                                continue;
+                            }
+                            XmlElementType::XmlDocumentTypeNode
+                            | XmlElementType::XmlDocumentFragNode
+                            | XmlElementType::XmlNotationNode
+                            | XmlElementType::XmlDTDNode
+                            | XmlElementType::XmlElementDecl
+                            | XmlElementType::XmlAttributeDecl
+                            | XmlElementType::XmlEntityDecl
+                            | XmlElementType::XmlXIncludeStart
+                            | XmlElementType::XmlXIncludeEnd => {
+                                xml_xinclude_err!(
+                                    ctxt,
+                                    (*refe).elem.map(|node| node.into()),
+                                    XmlParserErrors::XmlXIncludeXPtrResult,
+                                    "XPointer selects unexpected nodes: #{}\n",
+                                    fragment
+                                );
+                                set.node_tab.swap_remove(i);
+                                continue; /* for */
+                            }
+                            _ => unreachable!(),
+                        }
+                        i += 1;
                     }
                 }
-                if !cbase.is_null() {
-                    // Adjustment may be needed
-                    let mut node = (*refe).inc;
-                    while let Some(mut cur_node) = node {
-                        // Only work on element nodes
-                        if cur_node.element_type() == XmlElementType::XmlElementNode {
-                            if let Some(cur_base) = cur_node.get_base(cur_node.doc) {
-                                // If the current base is the same as the
-                                // URL of the document, then reset it to be
-                                // the specified xml:base or the relative URI
-                                if cur_node.doc.as_deref().and_then(|doc| doc.url.as_deref())
-                                    == Some(cur_base.as_str())
-                                {
-                                    cur_node.set_base(Some(
-                                        CStr::from_ptr(cbase as *const i8)
-                                            .to_string_lossy()
-                                            .as_ref(),
-                                    ));
-                                } else {
-                                    // If the element already has an xml:base set,
-                                    // then relativise it if necessary
+                (*refe).inc = xml_xinclude_copy_xpointer(ctxt, xptr);
+                xml_xpath_free_object(xptr);
+                xml_xpath_free_context(xptrctxt);
+            }
+        } else {
+            // Add the top children list as the replacement copy.
+            (*refe).inc = doc
+                .and_then(|doc| {
+                    xml_doc_copy_node(doc.get_root_element().unwrap().into(), (*ctxt).doc, 1)
+                })
+                .and_then(|node| XmlNodePtr::try_from(node).ok());
+        }
 
-                                    if let Some(xml_base) = cur_node
-                                        .get_ns_prop("base", XML_XML_NAMESPACE.to_str().ok())
-                                    {
-                                        let base =
-                                            CStr::from_ptr(cbase as *const i8).to_string_lossy();
-                                        let rel_base = build_uri(&xml_base, &base);
-                                        if let Some(rel_base) = rel_base {
-                                            cur_node.set_base(Some(&rel_base));
-                                        } else {
-                                            // error
-                                            xml_xinclude_err!(
-                                                ctxt,
-                                                (*refe).elem.map(|node| node.into()),
-                                                XmlParserErrors::XmlXIncludeHrefURI,
-                                                "trying to rebuild base from {}\n",
-                                                xml_base
-                                            );
-                                        }
-                                    }
-                                }
-                            } else {
-                                // If no current base, set it
+        // Do the xml:base fixup if needed
+        if doc.is_some_and(|doc| doc.parse_flags & XmlParserOption::XmlParseNoBasefix as i32 == 0)
+            && (*ctxt).parse_flags & XmlParserOption::XmlParseNoBasefix as i32 == 0
+        {
+            // The base is only adjusted if "necessary", i.e. if the xinclude node
+            // has a base specified, or the URL is relative
+            let base = (*refe)
+                .elem
+                .unwrap()
+                .get_ns_prop("base", XML_XML_NAMESPACE.to_str().ok());
+            let mut cbase = base
+                .as_deref()
+                .map_or(null_mut(), |b| xml_strndup(b.as_ptr(), b.len() as i32));
+            if cbase.is_null() {
+                // No xml:base on the xinclude node, so we check whether the
+                // URI base is different than (relative to) the context base
+                if let Some(cur_base) = build_relative_uri(
+                    &url,
+                    (!(*ctxt).base.is_null())
+                        .then(|| CStr::from_ptr((*ctxt).base as *const i8).to_string_lossy())
+                        .as_deref(),
+                ) {
+                    // If the URI doesn't contain a slash, it's not relative
+                    if cur_base.contains('/') {
+                        cbase = xml_strndup(cur_base.as_ptr(), cur_base.len() as i32);
+                    }
+                } else {
+                    // Error return
+                    xml_xinclude_err!(
+                        ctxt,
+                        (*refe).elem.map(|node| node.into()),
+                        XmlParserErrors::XmlXIncludeHrefURI,
+                        "trying to build relative URI from {}\n",
+                        url
+                    );
+                }
+            }
+            if !cbase.is_null() {
+                // Adjustment may be needed
+                let mut node = (*refe).inc;
+                while let Some(mut cur_node) = node {
+                    // Only work on element nodes
+                    if cur_node.element_type() == XmlElementType::XmlElementNode {
+                        if let Some(cur_base) = cur_node.get_base(cur_node.doc) {
+                            // If the current base is the same as the
+                            // URL of the document, then reset it to be
+                            // the specified xml:base or the relative URI
+                            if cur_node.doc.as_deref().and_then(|doc| doc.url.as_deref())
+                                == Some(cur_base.as_str())
+                            {
                                 cur_node.set_base(Some(
                                     CStr::from_ptr(cbase as *const i8)
                                         .to_string_lossy()
                                         .as_ref(),
                                 ));
-                            }
-                        }
-                        node = cur_node
-                            .next
-                            .map(|node| XmlNodePtr::try_from(node).unwrap());
-                    }
-                    xml_free(cbase as _);
-                }
-            }
-            ret = 0;
-        }
+                            } else {
+                                // If the element already has an xml:base set,
+                                // then relativise it if necessary
 
-        // error:
-        xml_free(url as _);
-        xml_free(fragment as _);
-        ret
+                                if let Some(xml_base) =
+                                    cur_node.get_ns_prop("base", XML_XML_NAMESPACE.to_str().ok())
+                                {
+                                    let base = CStr::from_ptr(cbase as *const i8).to_string_lossy();
+                                    let rel_base = build_uri(&xml_base, &base);
+                                    if let Some(rel_base) = rel_base {
+                                        cur_node.set_base(Some(&rel_base));
+                                    } else {
+                                        // error
+                                        xml_xinclude_err!(
+                                            ctxt,
+                                            (*refe).elem.map(|node| node.into()),
+                                            XmlParserErrors::XmlXIncludeHrefURI,
+                                            "trying to rebuild base from {}\n",
+                                            xml_base
+                                        );
+                                    }
+                                }
+                            }
+                        } else {
+                            // If no current base, set it
+                            cur_node.set_base(Some(
+                                CStr::from_ptr(cbase as *const i8)
+                                    .to_string_lossy()
+                                    .as_ref(),
+                            ));
+                        }
+                    }
+                    node = cur_node
+                        .next
+                        .map(|node| XmlNodePtr::try_from(node).unwrap());
+                }
+                xml_free(cbase as _);
+            }
+        }
+        0
     }
 }
 
@@ -2074,7 +1995,6 @@ unsafe fn xml_xinclude_load_node(ctxt: XmlXIncludeCtxtPtr, refe: XmlXIncludeRefP
             );
             return -1;
         };
-        let uri = CString::new(uri).unwrap();
 
         // Save the base for this include (saving the current one)
         let old_base: *mut XmlChar = (*ctxt).base;
@@ -2083,9 +2003,10 @@ unsafe fn xml_xinclude_load_node(ctxt: XmlXIncludeCtxtPtr, refe: XmlXIncludeRefP
             .map_or(null_mut(), |b| xml_strndup(b.as_ptr(), b.len() as i32));
 
         if xml != 0 {
-            ret = xml_xinclude_load_doc(ctxt, uri.as_ptr() as *const u8, refe);
-        // xmlXIncludeGetFragment(ctxt, cur, URI);
+            ret = xml_xinclude_load_doc(ctxt, &uri, refe);
+            // xmlXIncludeGetFragment(ctxt, cur, URI);
         } else {
+            let uri = CString::new(uri.as_str()).unwrap();
             ret = xml_xinclude_load_txt(ctxt, uri.as_ptr() as *const u8, refe);
         }
 
@@ -2118,7 +2039,7 @@ unsafe fn xml_xinclude_load_node(ctxt: XmlXIncludeCtxtPtr, refe: XmlXIncludeRefP
                 Some(cur.into()),
                 XmlParserErrors::XmlXIncludeNoFallback,
                 "could not load {}, and no fallback was found\n",
-                uri.to_string_lossy().into_owned()
+                uri
             );
         }
 
