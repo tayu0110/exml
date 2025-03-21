@@ -61,15 +61,12 @@ use crate::{
             xml_relaxng_validate_push_cdata,
         },
         sax2::xml_sax_version,
-        xinclude::{
-            XmlXIncludeCtxtPtr, xml_xinclude_new_context, xml_xinclude_process_node,
-            xml_xinclude_set_flags, xml_xinclude_set_streaming_mode,
-        },
+        xinclude::{XmlXIncludeCtxtPtr, xml_xinclude_new_context},
         xmlschemas::{
             XmlSchemaSAXPlugPtr, xml_schema_is_valid, xml_schema_sax_plug, xml_schema_sax_unplug,
             xml_schema_validate_set_locator,
         },
-        xmlstring::{XmlChar, xml_str_equal, xml_strdup},
+        xmlstring::{XmlChar, xml_strdup},
     },
     parser::XmlParserCtxtPtr,
     tree::{
@@ -654,27 +651,24 @@ impl XmlTextReader {
                             })
                             .is_some_and(|node| {
                                 node.ns.is_some_and(|ns| {
-                                    xml_str_equal(ns.href, XINCLUDE_NS.as_ptr() as _)
-                                        || xml_str_equal(ns.href, XINCLUDE_OLD_NS.as_ptr() as _)
+                                    ns.href().as_deref() == Some(XINCLUDE_NS)
+                                        || ns.href().as_deref() == Some(XINCLUDE_OLD_NS)
                                 })
                             })
                     {
                         if self.xincctxt.is_null() {
                             self.xincctxt = xml_xinclude_new_context((*self.ctxt).my_doc.unwrap());
-                            xml_xinclude_set_flags(
-                                self.xincctxt,
+                            (*self.xincctxt).set_flags(
                                 self.parser_flags & !(XmlParserOption::XmlParseNoXIncnode as i32),
                             );
-                            xml_xinclude_set_streaming_mode(self.xincctxt, 1);
+                            (*self.xincctxt).set_streaming_mode(1);
                         }
                         // expand that node and process it
                         if self.expand().is_none() {
                             return -1;
                         }
-                        xml_xinclude_process_node(
-                            self.xincctxt,
-                            XmlNodePtr::try_from(self.node.unwrap()).unwrap(),
-                        );
+                        (*self.xincctxt)
+                            .process_node(XmlNodePtr::try_from(self.node.unwrap()).unwrap());
                     }
                     if self
                         .node
