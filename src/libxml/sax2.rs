@@ -72,7 +72,6 @@ use super::{
         XML_MAX_TEXT_LENGTH, XML_STRING_TEXT, XML_SUBSTITUTE_REF, XML_VCTXT_DTD_VALIDATED,
         xml_parse_external_subset, xml_string_decode_entities, xml_string_len_decode_entities,
     },
-    uri::{XmlURIPtr, xml_free_uri, xml_parse_uri},
     valid::{
         xml_add_element_decl, xml_add_id, xml_add_notation_decl, xml_add_ref,
         xml_get_dtd_qelement_desc, xml_is_id, xml_is_ref, xml_valid_ctxt_normalize_attribute_value,
@@ -1354,6 +1353,8 @@ unsafe fn xml_sax2_attribute_internal(
     value: Option<&str>,
     prefix: Option<&str>,
 ) {
+    use crate::uri::XmlURI;
+
     unsafe {
         use super::htmltree::html_is_boolean_attr;
 
@@ -1455,20 +1456,10 @@ unsafe fn xml_sax2_attribute_internal(
             }
 
             if *val.add(0) != 0 {
-                let uri: XmlURIPtr = xml_parse_uri(val as _);
-                if uri.is_null() {
-                    if let Some(warning) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.warning) {
-                        warning(
-                            (*ctxt).user_data.clone(),
-                            format!(
-                                "xmlns: {} not a valid URI\n",
-                                CStr::from_ptr(val as *const i8).to_string_lossy()
-                            )
-                            .as_str(),
-                        );
-                    }
-                } else {
-                    if (*uri).scheme.is_null() {
+                if let Some(uri) =
+                    XmlURI::parse(&CStr::from_ptr(val as *const i8).to_string_lossy())
+                {
+                    if uri.scheme.is_none() {
                         if let Some(warning) =
                             (*ctxt).sax.as_deref_mut().and_then(|sax| sax.warning)
                         {
@@ -1482,7 +1473,16 @@ unsafe fn xml_sax2_attribute_internal(
                             );
                         }
                     }
-                    xml_free_uri(uri);
+                } else if let Some(warning) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.warning)
+                {
+                    warning(
+                        (*ctxt).user_data.clone(),
+                        format!(
+                            "xmlns: {} not a valid URI\n",
+                            CStr::from_ptr(val as *const i8).to_string_lossy()
+                        )
+                        .as_str(),
+                    );
                 }
             }
 
@@ -1538,18 +1538,10 @@ unsafe fn xml_sax2_attribute_internal(
                 );
             }
             if (*ctxt).pedantic != 0 && (*val.add(0) != 0) {
-                let uri: XmlURIPtr = xml_parse_uri(val as _);
-                if uri.is_null() {
-                    let value = CStr::from_ptr(value as *const i8).to_string_lossy();
-                    xml_ns_warn_msg!(
-                        ctxt,
-                        XmlParserErrors::XmlWarNsURI,
-                        "xmlns:{}: {} not a valid URI\n",
-                        name,
-                        value
-                    );
-                } else {
-                    if (*uri).scheme.is_null() {
+                if let Some(uri) =
+                    XmlURI::parse(&CStr::from_ptr(val as *const i8).to_string_lossy())
+                {
+                    if uri.scheme.is_none() {
                         let value = CStr::from_ptr(value as *const i8).to_string_lossy();
                         xml_ns_warn_msg!(
                             ctxt,
@@ -1559,7 +1551,15 @@ unsafe fn xml_sax2_attribute_internal(
                             value
                         );
                     }
-                    xml_free_uri(uri);
+                } else {
+                    let value = CStr::from_ptr(value as *const i8).to_string_lossy();
+                    xml_ns_warn_msg!(
+                        ctxt,
+                        XmlParserErrors::XmlWarNsURI,
+                        "xmlns:{}: {} not a valid URI\n",
+                        name,
+                        value
+                    );
                 }
             }
 

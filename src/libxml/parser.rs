@@ -98,7 +98,6 @@ use crate::{
             xml_parse_reference, xml_parse_start_tag, xml_parse_system_literal,
         },
         sax2::{xml_sax2_entity_decl, xml_sax2_get_entity},
-        uri::{xml_free_uri, xml_parse_uri},
         valid::{
             xml_free_doc_element_content, xml_is_mixed_element, xml_new_doc_element_content,
             xml_validate_root,
@@ -8026,20 +8025,13 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                         xml_fatal_err(ctxt, XmlParserErrors::XmlErrValueRequired, None);
                     }
                     if !uri.is_null() {
-                        let parsed_uri = xml_parse_uri(uri as *const c_char);
-                        if parsed_uri.is_null() {
-                            let uri = CStr::from_ptr(uri as *const i8).to_string_lossy();
-                            xml_err_msg_str!(
-                                ctxt,
-                                XmlParserErrors::XmlErrInvalidURI,
-                                "Invalid URI: {}\n",
-                                uri
-                            );
-                        // This really ought to be a well formedness error
-                        // but the XML Core WG decided otherwise c.f. issue
-                        // E26 of the XML erratas.
-                        } else {
-                            if !(*parsed_uri).fragment.is_null() {
+                        if let Some(parsed_uri) =
+                            XmlURI::parse(&CStr::from_ptr(uri as *const i8).to_string_lossy())
+                        {
+                            // This really ought to be a well formedness error
+                            // but the XML Core WG decided otherwise c.f. issue
+                            // E26 of the XML erratas.
+                            if parsed_uri.fragment.is_some() {
                                 // Okay this is foolish to block those but not invalid URIs.
                                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrURIFragment, None);
                             } else if (*ctxt).disable_sax == 0 {
@@ -8065,7 +8057,14 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                                     );
                                 }
                             }
-                            xml_free_uri(parsed_uri);
+                        } else {
+                            let uri = CStr::from_ptr(uri as *const i8).to_string_lossy();
+                            xml_err_msg_str!(
+                                ctxt,
+                                XmlParserErrors::XmlErrInvalidURI,
+                                "Invalid URI: {}\n",
+                                uri
+                            );
                         }
                     }
                 }
@@ -8137,8 +8136,17 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                     xml_fatal_err(ctxt, XmlParserErrors::XmlErrValueRequired, None);
                 }
                 if !uri.is_null() {
-                    let parsed_uri = xml_parse_uri(uri as *const c_char);
-                    if parsed_uri.is_null() {
+                    if let Some(parsed_uri) =
+                        XmlURI::parse(&CStr::from_ptr(uri as *const i8).to_string_lossy())
+                    {
+                        // This really ought to be a well formedness error
+                        // but the XML Core WG decided otherwise c.f. issue
+                        // E26 of the XML erratas.
+                        if parsed_uri.fragment.is_some() {
+                            // Okay this is foolish to block those but not invalid URIs.
+                            xml_fatal_err(ctxt, XmlParserErrors::XmlErrURIFragment, None);
+                        }
+                    } else {
                         let uri = CStr::from_ptr(uri as *const i8).to_string_lossy();
                         xml_err_msg_str!(
                             ctxt,
@@ -8146,15 +8154,6 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                             "Invalid URI: {}\n",
                             uri
                         );
-                    // This really ought to be a well formedness error
-                    // but the XML Core WG decided otherwise c.f. issue
-                    // E26 of the XML erratas.
-                    } else {
-                        if !(*parsed_uri).fragment.is_null() {
-                            // Okay this is foolish to block those but not invalid URIs.
-                            xml_fatal_err(ctxt, XmlParserErrors::XmlErrURIFragment, None);
-                        }
-                        xml_free_uri(parsed_uri);
                     }
                 }
                 if (*ctxt).current_byte() != b'>' && (*ctxt).skip_blanks() == 0 {

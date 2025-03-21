@@ -45,7 +45,6 @@ use crate::{
             XmlSchemaTypeType, XmlSchemaValType, XmlSchemaWildcard, XmlSchemaWildcardPtr,
             xml_schema_free_annot, xml_schema_free_type, xml_schema_free_wildcard,
         },
-        uri::{XmlURIPtr, xml_free_uri, xml_parse_uri},
         valid::{xml_add_id, xml_add_ref, xml_validate_notation_use},
         xmlregexp::xml_regexp_exec,
         xmlschemas::{
@@ -58,6 +57,7 @@ use crate::{
         XmlAttrPtr, XmlAttributeType, XmlEntityType, XmlGenericNodePtr, validate_name,
         validate_ncname, validate_nmtoken, validate_qname, xml_get_doc_entity, xml_split_qname2,
     },
+    uri::XmlURI,
     xmlschemas::{
         context::{
             XmlSchemaParserCtxtPtr, xml_schema_free_parser_ctxt, xml_schema_new_parser_ctxt,
@@ -3195,12 +3195,14 @@ unsafe fn xml_schema_val_atomic_type(
                                             }
                                             cur = cur.add(1);
                                         }
-                                        let uri: XmlURIPtr = xml_parse_uri(tmpval as _);
+                                        let uri = XmlURI::parse(
+                                            &CStr::from_ptr(tmpval as *const i8).to_string_lossy(),
+                                        )
+                                        .map(|uri| uri.save());
                                         xml_free(tmpval as _);
-                                        if uri.is_null() {
+                                        if uri.is_none() {
                                             break 'return1;
                                         }
-                                        xml_free_uri(uri as _);
                                     }
 
                                     if !val.is_null() {
