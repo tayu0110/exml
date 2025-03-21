@@ -61,7 +61,6 @@ use crate::{
             xml_relaxng_validate_push_cdata,
         },
         sax2::xml_sax_version,
-        valid::{xml_validate_pop_element, xml_validate_push_cdata, xml_validate_push_element},
         xinclude::{
             XmlXIncludeCtxtPtr, xml_xinclude_new_context, xml_xinclude_process_node,
             xml_xinclude_set_flags, xml_xinclude_set_streaming_mode,
@@ -1248,15 +1247,12 @@ impl XmlTextReader {
                 if let Some(prefix) = node.ns.as_deref().and_then(|ns| ns.prefix()) {
                     // TODO use the BuildQName interface
                     let qname = format!("{prefix}:{}", node.name().unwrap());
-                    (*self.ctxt).valid &= xml_validate_push_element(
-                        &raw mut (*self.ctxt).vctxt,
-                        (*self.ctxt).my_doc.unwrap(),
-                        node,
-                        &qname,
-                    );
+                    (*self.ctxt).valid &=
+                        (*self.ctxt)
+                            .vctxt
+                            .push_element((*self.ctxt).my_doc.unwrap(), node, &qname);
                 } else {
-                    (*self.ctxt).valid &= xml_validate_push_element(
-                        &raw mut (*self.ctxt).vctxt,
+                    (*self.ctxt).valid &= (*self.ctxt).vctxt.push_element(
                         (*self.ctxt).my_doc.unwrap(),
                         node,
                         &node.name().unwrap(),
@@ -1314,15 +1310,12 @@ impl XmlTextReader {
                 if let Some(prefix) = node.ns.as_deref().and_then(|ns| ns.prefix()) {
                     // TODO use the BuildQName interface
                     let qname = format!("{prefix}:{}", node.name().unwrap());
-                    (*self.ctxt).valid &= xml_validate_pop_element(
-                        &raw mut (*self.ctxt).vctxt,
-                        (*self.ctxt).my_doc,
-                        Some(node),
-                        &qname,
-                    );
+                    (*self.ctxt).valid &=
+                        (*self.ctxt)
+                            .vctxt
+                            .pop_element((*self.ctxt).my_doc, Some(node), &qname);
                 } else {
-                    (*self.ctxt).valid &= xml_validate_pop_element(
-                        &raw mut (*self.ctxt).vctxt,
+                    (*self.ctxt).valid &= (*self.ctxt).vctxt.pop_element(
                         (*self.ctxt).my_doc,
                         Some(node),
                         &node.name().unwrap(),
@@ -1478,7 +1471,7 @@ impl XmlTextReader {
                 && !self.ctxt.is_null()
                 && (*self.ctxt).validate == 1
             {
-                (*self.ctxt).valid &= xml_validate_push_cdata(&raw mut (*self.ctxt).vctxt, data);
+                (*self.ctxt).valid &= (*self.ctxt).vctxt.push_cdata(data);
             }
             #[cfg(feature = "schema")]
             if self.validate == XmlTextReaderValidate::ValidateRng && !self.rng_valid_ctxt.is_null()
@@ -4219,7 +4212,7 @@ pub unsafe fn xml_text_reader_close(reader: &mut XmlTextReader) -> i32 {
         if !reader.ctxt.is_null() {
             #[cfg(all(feature = "libxml_regexp", feature = "libxml_valid"))]
             while !(*reader.ctxt).vctxt.vstate_tab.is_empty() {
-                xml_validate_pop_element(addr_of_mut!((*reader.ctxt).vctxt), None, None, "");
+                (*reader.ctxt).vctxt.pop_element(None, None, "");
             }
             (*reader.ctxt).vctxt.vstate_tab.clear();
             (*reader.ctxt).stop();

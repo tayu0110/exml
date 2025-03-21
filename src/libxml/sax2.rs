@@ -74,11 +74,11 @@ use super::{
     },
     uri::{XmlURIPtr, xml_free_uri, xml_parse_uri},
     valid::{
-        xml_add_attribute_decl, xml_add_element_decl, xml_add_id, xml_add_notation_decl,
-        xml_add_ref, xml_get_dtd_qelement_desc, xml_is_id, xml_is_ref,
-        xml_valid_ctxt_normalize_attribute_value, xml_valid_normalize_attribute_value,
-        xml_validate_dtd_final, xml_validate_element_decl, xml_validate_notation_decl,
-        xml_validate_one_attribute, xml_validate_one_namespace, xml_validate_root,
+        xml_add_element_decl, xml_add_id, xml_add_notation_decl, xml_add_ref,
+        xml_get_dtd_qelement_desc, xml_is_id, xml_is_ref, xml_valid_ctxt_normalize_attribute_value,
+        xml_valid_normalize_attribute_value, xml_validate_dtd_final, xml_validate_element_decl,
+        xml_validate_notation_decl, xml_validate_one_attribute, xml_validate_one_namespace,
+        xml_validate_root,
     },
     xmlstring::{xml_strdup, xml_strlen, xml_strndup},
 };
@@ -823,8 +823,7 @@ pub unsafe fn xml_sax2_attribute_decl(
         let (prefix, name) = split_qname(&mut *ctxt, fullname);
         (*ctxt).vctxt.valid = 1;
         let attr = if (*ctxt).in_subset == 1 {
-            xml_add_attribute_decl(
-                &raw mut (*ctxt).vctxt as _,
+            (*ctxt).vctxt.add_attribute_decl(
                 my_doc.int_subset,
                 elem,
                 name,
@@ -835,8 +834,7 @@ pub unsafe fn xml_sax2_attribute_decl(
                 tree,
             )
         } else if (*ctxt).in_subset == 2 {
-            xml_add_attribute_decl(
-                &raw mut (*ctxt).vctxt as _,
+            (*ctxt).vctxt.add_attribute_decl(
                 my_doc.ext_subset,
                 elem,
                 name,
