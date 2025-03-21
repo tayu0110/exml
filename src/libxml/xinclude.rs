@@ -62,7 +62,7 @@ use crate::{
     },
 };
 
-use super::{chvalid::xml_is_char, xmlstring::xml_strndup};
+use super::chvalid::xml_is_char;
 
 /// A constant defining the Xinclude namespace: `http://www.w3.org/2003/XInclude`
 pub const XINCLUDE_NS: &str = "http://www.w3.org/2003/XInclude";
@@ -141,7 +141,7 @@ pub struct XmlXIncludeRef {
 #[repr(C)]
 pub struct XmlXIncludeDoc {
     doc: Option<XmlDocPtr>, /* the parsed document */
-    url: *mut XmlChar,      /* the URL */
+    url: Box<str>,          /* the URL */
     expanding: i32,         /* flag to detect inclusion loops */
 }
 
@@ -1186,7 +1186,7 @@ impl XmlXIncludeCtxt {
                 }
                 // Prevent reloading the document twice.
                 for inc_doc in &self.url_tab {
-                    if url == CStr::from_ptr(inc_doc.url as *const i8).to_string_lossy() {
+                    if *url == *inc_doc.url {
                         if inc_doc.expanding != 0 {
                             xml_xinclude_err!(
                                 self,
@@ -1226,7 +1226,7 @@ impl XmlXIncludeCtxt {
                 let cache_nr = self.url_tab.len();
                 self.url_tab.push(XmlXIncludeDoc {
                     doc,
-                    url: xml_strndup(url.as_ptr(), url.len() as i32),
+                    url: url.clone().into_boxed_str(),
                     expanding: 0,
                 });
 
@@ -2268,7 +2268,6 @@ pub unsafe fn xml_xinclude_free_context(ctxt: XmlXIncludeCtxtPtr) {
             if let Some(doc) = inc_doc.doc {
                 xml_free_doc(doc);
             }
-            xml_free(inc_doc.url as _);
         }
         for inc in (*ctxt).inc_tab.drain(..) {
             if !inc.is_null() {
