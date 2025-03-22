@@ -99,10 +99,10 @@ pub unsafe fn xml_sax2_get_public_id(_ctx: *mut c_void) -> *const XmlChar {
 pub unsafe fn xml_sax2_get_system_id(ctx: *mut c_void) -> Option<String> {
     unsafe {
         let ctxt: XmlParserCtxtPtr = ctx as _;
-        if ctx.is_null() || (*ctxt).input.is_null() {
+        if ctx.is_null() || (*ctxt).input().is_none() {
             return None;
         };
-        (*(*ctxt).input).filename.clone()
+        (**(*ctxt).input().unwrap()).filename.clone()
     }
 }
 
@@ -123,10 +123,10 @@ pub unsafe fn xml_sax2_set_document_locator(
 pub unsafe fn xml_sax2_get_line_number(ctx: *mut c_void) -> i32 {
     unsafe {
         let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
-        if ctx.is_null() || (*ctxt).input.is_null() {
+        if ctx.is_null() || (*ctxt).input().is_none() {
             return 0;
         }
-        (*(*ctxt).input).line
+        (**(*ctxt).input().unwrap()).line
     }
 }
 
@@ -137,10 +137,10 @@ pub unsafe fn xml_sax2_get_line_number(ctx: *mut c_void) -> i32 {
 pub unsafe fn xml_sax2_get_column_number(ctx: *mut c_void) -> i32 {
     unsafe {
         let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
-        if ctx.is_null() || (*ctxt).input.is_null() {
+        if ctx.is_null() || (*ctxt).input().is_none() {
             return 0;
         }
-        (*(*ctxt).input).col
+        (**(*ctxt).input().unwrap()).col
     }
 }
 
@@ -344,18 +344,16 @@ pub unsafe fn xml_sax2_external_subset(
             // make sure we won't destroy the main document context
 
             // Try to fetch and parse the external subset.
-            let oldinput: XmlParserInputPtr = (*ctxt).input;
             let oldinput_tab = replace(&mut (*ctxt).input_tab, Vec::with_capacity(5));
             let oldcharset = (*ctxt).charset;
             let oldencoding = (*ctxt).encoding.take();
             let oldprogressive: i32 = (*ctxt).progressive;
             (*ctxt).progressive = 0;
-            (*ctxt).input = null_mut();
             (*ctxt).push_input(input);
 
             // On the fly encoding conversion if needed
-            if (*(*ctxt).input).length >= 4 {
-                let input = from_raw_parts((*(*ctxt).input).cur, 4);
+            if (**(*ctxt).input().unwrap()).length >= 4 {
+                let input = from_raw_parts((**(*ctxt).input().unwrap()).cur, 4);
                 let enc = detect_encoding(input);
                 (*ctxt).switch_encoding(enc);
             }
@@ -368,8 +366,8 @@ pub unsafe fn xml_sax2_external_subset(
             }
             (*input).line = 1;
             (*input).col = 1;
-            (*input).base = (*(*ctxt).input).cur;
-            (*input).cur = (*(*ctxt).input).cur;
+            (*input).base = (**(*ctxt).input().unwrap()).cur;
+            (*input).cur = (**(*ctxt).input().unwrap()).cur;
             (*input).free = None;
 
             // let's parse that entity knowing it's an external subset.
@@ -380,8 +378,8 @@ pub unsafe fn xml_sax2_external_subset(
                 (*ctxt).pop_input();
             }
 
-            consumed = (*(*ctxt).input).consumed;
-            let buffered = (*(*ctxt).input).offset_from_base();
+            consumed = (**(*ctxt).input().unwrap()).consumed;
+            let buffered = (**(*ctxt).input().unwrap()).offset_from_base();
             if buffered as u64 > u64::MAX - consumed {
                 consumed = u64::MAX;
             } else {
@@ -393,10 +391,9 @@ pub unsafe fn xml_sax2_external_subset(
                 (*ctxt).sizeentities += consumed;
             }
 
-            xml_free_input_stream((*ctxt).input);
+            xml_free_input_stream(*(*ctxt).input().unwrap());
 
             // Restore the parsing context of the main entity
-            (*ctxt).input = oldinput;
             (*ctxt).input_tab = oldinput_tab;
             (*ctxt).charset = oldcharset;
             (*ctxt).encoding = oldencoding;
@@ -560,8 +557,8 @@ pub unsafe fn xml_sax2_resolve_entity(
             let lock = ctx.lock();
             *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
         };
-        let base = if !(*ctxt).input.is_null() {
-            (*(*ctxt).input)
+        let base = if let Some(input) = (*ctxt).input() {
+            (**input)
                 .filename
                 .as_deref()
                 .or((*ctxt).directory.as_deref())
@@ -647,8 +644,8 @@ pub unsafe fn xml_sax2_entity_decl(
             }
             if let Some(mut ent) = ent.filter(|ent| ent.uri.is_null()) {
                 if let Some(system_id) = system_id {
-                    let base = if !(*ctxt).input.is_null() {
-                        (*(*ctxt).input)
+                    let base = if let Some(input) = (*ctxt).input() {
+                        (**input)
                             .filename
                             .as_deref()
                             .or((*ctxt).directory.as_deref())
@@ -685,8 +682,8 @@ pub unsafe fn xml_sax2_entity_decl(
             }
             if let Some(mut ent) = ent.filter(|ent| ent.uri.is_null()) {
                 if let Some(system_id) = system_id {
-                    let base = if !(*ctxt).input.is_null() {
-                        (*(*ctxt).input)
+                    let base = if let Some(input) = (*ctxt).input() {
+                        (**input)
                             .filename
                             .as_deref()
                             .or((*ctxt).directory.as_deref())
@@ -1036,8 +1033,8 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
             }
             if let Some(mut ent) = ent.filter(|ent| ent.uri.is_null()) {
                 if let Some(system_id) = system_id {
-                    let base = if !(*ctxt).input.is_null() {
-                        (*(*ctxt).input)
+                    let base = if let Some(input) = (*ctxt).input() {
+                        (**input)
                             .filename
                             .as_deref()
                             .or((*ctxt).directory.as_deref())
@@ -1074,8 +1071,8 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
 
             if let Some(mut ent) = ent.filter(|ent| ent.uri.is_null()) {
                 if let Some(system_id) = system_id {
-                    let base = if !(*ctxt).input.is_null() {
-                        (*(*ctxt).input)
+                    let base = if let Some(input) = (*ctxt).input() {
+                        (**input)
                             .filename
                             .as_deref()
                             .or((*ctxt).directory.as_deref())
@@ -1156,9 +1153,9 @@ pub unsafe fn xml_sax2_start_document(ctx: Option<GenericErrorContext>) {
                 return;
             }
         }
-        if !(*ctxt).input.is_null() {
+        if let Some(input) = (*ctxt).input() {
             if let Some(mut my_doc) = (*ctxt).my_doc.filter(|doc| doc.url.is_none()) {
-                if let Some(filename) = (*(*ctxt).input).filename.as_deref() {
+                if let Some(filename) = (**input).filename.as_deref() {
                     let url = path_to_uri(filename);
                     my_doc.url = Some(url.into_owned());
                 }
@@ -1974,9 +1971,9 @@ pub unsafe fn xml_sax2_start_element(
             my_doc.add_child(ret.into());
         }
         (*ctxt).nodemem = -1;
-        if (*ctxt).linenumbers != 0 && !(*ctxt).input.is_null() {
-            if ((*(*ctxt).input).line as u32) < u16::MAX as u32 {
-                ret.line = (*(*ctxt).input).line as _;
+        if (*ctxt).linenumbers != 0 && (*ctxt).input().is_some() {
+            if ((**(*ctxt).input().unwrap()).line as u32) < u16::MAX as u32 {
+                ret.line = (**(*ctxt).input().unwrap()).line as _;
             } else {
                 ret.line = u16::MAX;
             }
@@ -2189,9 +2186,9 @@ pub unsafe fn xml_sax2_start_element_ns(
             };
             ret
         };
-        if (*ctxt).linenumbers != 0 && !(*ctxt).input.is_null() {
-            if ((*(*ctxt).input).line as u32) < u16::MAX as u32 {
-                ret.line = (*(*ctxt).input).line as _;
+        if (*ctxt).linenumbers != 0 && (*ctxt).input().is_some() {
+            if ((**(*ctxt).input().unwrap()).line as u32) < u16::MAX as u32 {
+                ret.line = (**(*ctxt).input().unwrap()).line as _;
             } else {
                 ret.line = u16::MAX;
             }
@@ -2380,13 +2377,13 @@ unsafe fn xml_sax2_text_node(ctxt: XmlParserCtxtPtr, s: &str) -> Option<XmlNodeP
             return None;
         }
 
-        if (*ctxt).linenumbers != 0 && !(*ctxt).input.is_null() {
-            if ((*(*ctxt).input).line as u32) < u32::MAX {
-                ret.line = (*(*ctxt).input).line as _;
+        if (*ctxt).linenumbers != 0 && (*ctxt).input().is_some() {
+            if ((**(*ctxt).input().unwrap()).line as u32) < u32::MAX {
+                ret.line = (**(*ctxt).input().unwrap()).line as _;
             } else {
                 ret.line = u16::MAX;
                 if (*ctxt).options & XmlParserOption::XmlParseBigLines as i32 != 0 {
-                    ret.psvi = (*(*ctxt).input).line as isize as *mut c_void;
+                    ret.psvi = (**(*ctxt).input().unwrap()).line as isize as *mut c_void;
                 }
             }
         }
@@ -2931,9 +2928,9 @@ pub unsafe fn xml_sax2_processing_instruction(
             return;
         };
 
-        if (*ctxt).linenumbers != 0 && !(*ctxt).input.is_null() {
-            if ((*(*ctxt).input).line as u32) < u16::MAX as u32 {
-                ret.line = (*(*ctxt).input).line as _;
+        if (*ctxt).linenumbers != 0 && (*ctxt).input().is_some() {
+            if ((**(*ctxt).input().unwrap()).line as u32) < u16::MAX as u32 {
+                ret.line = (**(*ctxt).input().unwrap()).line as _;
             } else {
                 ret.line = u16::MAX;
             }
@@ -2974,9 +2971,9 @@ pub unsafe fn xml_sax2_comment(ctx: Option<GenericErrorContext>, value: &str) {
         let Some(mut ret) = xml_new_doc_comment((*ctxt).my_doc, value) else {
             return;
         };
-        if (*ctxt).linenumbers != 0 && !(*ctxt).input.is_null() {
-            if ((*(*ctxt).input).line as u32) < u16::MAX as u32 {
-                ret.line = (*(*ctxt).input).line as _;
+        if (*ctxt).linenumbers != 0 && (*ctxt).input().is_some() {
+            if ((**(*ctxt).input().unwrap()).line as u32) < u16::MAX as u32 {
+                ret.line = (**(*ctxt).input().unwrap()).line as _;
             } else {
                 ret.line = u16::MAX;
             }

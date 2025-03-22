@@ -154,8 +154,8 @@ unsafe fn parse_encoding_decl(ctxt: &mut XmlParserCtxt) -> Option<String> {
             // document is apparently UTF-8 compatible, then raise an
             // encoding mismatch fatal error
             if ctxt.encoding.is_none()
-                && (*ctxt.input).buf.is_some()
-                && (*ctxt.input)
+                && (**ctxt.input().unwrap()).buf.is_some()
+                && (**ctxt.input().unwrap())
                     .buf
                     .as_ref()
                     .unwrap()
@@ -177,7 +177,7 @@ unsafe fn parse_encoding_decl(ctxt: &mut XmlParserCtxt) -> Option<String> {
             // TODO: Check for encoding mismatch.
             ctxt.encoding = Some(encoding.to_owned());
         } else if let Some(encoding) = encoding.as_deref() {
-            (*ctxt.input).encoding = Some(encoding.to_owned());
+            (**ctxt.input().unwrap()).encoding = Some(encoding.to_owned());
 
             if let Some(handler) = find_encoding_handler(encoding) {
                 if ctxt.switch_to_encoding(handler) < 0 {
@@ -271,7 +271,7 @@ pub(crate) unsafe fn parse_xmldecl(ctxt: &mut XmlParserCtxt) {
         // This value for standalone indicates that the document has an
         // XML declaration but it does not have a standalone attribute.
         // It will be overwritten later if a standalone attribute is found.
-        (*ctxt.input).standalone = -2;
+        (**ctxt.input().unwrap()).standalone = -2;
 
         // We know that '<?xml' is here.
         assert!(ctxt.content_bytes().starts_with(b"<?xml"));
@@ -339,7 +339,9 @@ pub(crate) unsafe fn parse_xmldecl(ctxt: &mut XmlParserCtxt) {
         }
 
         // We may have the standalone status.
-        if (*ctxt.input).encoding.is_some() && !xml_is_blank_char(ctxt.current_byte() as u32) {
+        if (**ctxt.input().unwrap()).encoding.is_some()
+            && !xml_is_blank_char(ctxt.current_byte() as u32)
+        {
             if ctxt.content_bytes().starts_with(b"?>") {
                 ctxt.advance(2);
                 return;
@@ -355,7 +357,7 @@ pub(crate) unsafe fn parse_xmldecl(ctxt: &mut XmlParserCtxt) {
         ctxt.grow();
 
         ctxt.skip_blanks();
-        (*ctxt.input).standalone = parse_sddecl(ctxt);
+        (**ctxt.input().unwrap()).standalone = parse_sddecl(ctxt);
         ctxt.skip_blanks();
         if ctxt.content_bytes().starts_with(b"?>") {
             ctxt.advance(2);
@@ -420,7 +422,7 @@ pub(crate) unsafe fn parse_text_decl(ctxt: &mut XmlParserCtxt) {
                 "Space needed here\n",
             );
         }
-        (*ctxt.input).version = version.or(Some(XML_DEFAULT_VERSION.to_owned()));
+        (**ctxt.input().unwrap()).version = version.or(Some(XML_DEFAULT_VERSION.to_owned()));
 
         // We must have the encoding declaration
         let encoding = parse_encoding_decl(ctxt);

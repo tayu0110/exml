@@ -2261,12 +2261,12 @@ unsafe fn xml_text_writer_start_document_callback(ctx: Option<GenericErrorContex
                 return;
             }
         }
-        if !(*ctxt).input.is_null() && (*(*ctxt).input).filename.is_some() {
+        if (*ctxt).input().is_some() && (**(*ctxt).input().unwrap()).filename.is_some() {
             if let Some(mut my_doc) = (*ctxt).my_doc.filter(|doc| doc.url.is_none()) {
-                let url = canonic_path((*(*ctxt).input).filename.as_deref().unwrap());
+                let url = canonic_path((**(*ctxt).input().unwrap()).filename.as_deref().unwrap());
                 my_doc.url = Some(url.into_owned());
                 if my_doc.url.is_none() {
-                    my_doc.url = (*(*ctxt).input).filename.clone()
+                    my_doc.url = (**(*ctxt).input().unwrap()).filename.clone()
                 }
             }
         }

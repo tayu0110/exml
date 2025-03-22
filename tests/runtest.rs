@@ -215,7 +215,9 @@ fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlErr
 
         // Maintain the compatibility with the legacy error handling
         if !ctxt.is_null() {
-            input = (*ctxt).input;
+            if let Some(&inp) = (*ctxt).input() {
+                input = inp;
+            }
             if !input.is_null() && (*input).filename.is_none() && (*ctxt).input_tab.len() > 1 {
                 cur = input;
                 input = (*ctxt).input_tab[(*ctxt).input_tab.len() - 2];
@@ -2040,11 +2042,12 @@ unsafe fn push_boundary_test(
             let mut is_text: i32 = 0;
 
             if (*ctxt).instate == XmlParserInputState::XmlParserContent {
-                let first_char: i32 = if (*(*ctxt).input).end > (*(*ctxt).input).cur {
-                    *(*(*ctxt).input).cur as i32
-                } else {
-                    *base.add(cur as usize) as i32
-                };
+                let first_char: i32 =
+                    if (**(*ctxt).input().unwrap()).end > (**(*ctxt).input().unwrap()).cur {
+                        *(**(*ctxt).input().unwrap()).cur as i32
+                    } else {
+                        *base.add(cur as usize) as i32
+                    };
 
                 if first_char != b'<' as i32
                     && (options & XML_PARSE_HTML != 0 || first_char != b'&' as i32)
@@ -2053,8 +2056,10 @@ unsafe fn push_boundary_test(
                 }
             }
 
-            old_consumed = (*(*ctxt).input).consumed
-                + (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as u64;
+            old_consumed = (**(*ctxt).input().unwrap()).consumed
+                + (**(*ctxt).input().unwrap())
+                    .cur
+                    .offset_from((**(*ctxt).input().unwrap()).base) as u64;
 
             PUSH_BOUNDARY_COUNT.set(0);
             PUSH_BOUNDARY_REF_COUNT.set(0);
@@ -2098,15 +2103,19 @@ unsafe fn push_boundary_test(
 
             // Buffer check: If input was consumed, check that the input
             // buffer is (almost) empty.
-            consumed = (*(*ctxt).input).consumed
-                + (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as u64;
+            consumed = (**(*ctxt).input().unwrap()).consumed
+                + (**(*ctxt).input().unwrap())
+                    .cur
+                    .offset_from((**(*ctxt).input().unwrap()).base) as u64;
             if (*ctxt).instate != XmlParserInputState::XmlParserDTD
                 && consumed >= 4
                 && consumed != old_consumed
             {
                 let mut max: size_t = 0;
 
-                avail = (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) as _;
+                avail = (**(*ctxt).input().unwrap())
+                    .end
+                    .offset_from((**(*ctxt).input().unwrap()).cur) as _;
 
                 if options & XML_PARSE_HTML != 0
                     && ((*ctxt).instate == XmlParserInputState::XmlParserEndTag)
@@ -2114,7 +2123,7 @@ unsafe fn push_boundary_test(
                     // Something related to script parsing.
                     max = 3;
                 } else if is_text != 0 {
-                    let c: i32 = *(*(*ctxt).input).cur as i32;
+                    let c: i32 = *(**(*ctxt).input().unwrap()).cur as i32;
 
                     // 3 bytes for partial UTF-8
                     max = if c == b'<' as i32 || c == b'&' as i32 {

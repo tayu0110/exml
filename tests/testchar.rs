@@ -367,7 +367,7 @@ unsafe fn test_document_ranges() -> c_int {
 
 unsafe fn test_char_range_byte1(ctxt: XmlParserCtxtPtr) -> c_int {
     unsafe {
-        let data: *mut c_char = (*(*ctxt).input).cur as *mut c_char;
+        let data: *mut c_char = (**(*ctxt).input().unwrap()).cur as *mut c_char;
 
         *data.add(1) = 0;
         *data.add(2) = 0;
@@ -402,7 +402,7 @@ unsafe fn test_char_range_byte1(ctxt: XmlParserCtxtPtr) -> c_int {
 
 unsafe fn test_char_range_byte2(ctxt: XmlParserCtxtPtr) -> c_int {
     unsafe {
-        let data: *mut c_char = (*(*ctxt).input).cur as *mut c_char;
+        let data: *mut c_char = (**(*ctxt).input().unwrap()).cur as *mut c_char;
 
         *data.add(2) = 0;
         *data.add(3) = 0;
@@ -473,7 +473,7 @@ unsafe fn test_char_range_byte2(ctxt: XmlParserCtxtPtr) -> c_int {
 unsafe fn test_char_range_byte3(ctxt: XmlParserCtxtPtr) -> c_int {
     unsafe {
         let lows: [c_uchar; 6] = [0, 0x80, 0x81, 0xC1, 0xFF, 0xBF];
-        let data: *mut c_char = (*(*ctxt).input).cur as *mut c_char;
+        let data: *mut c_char = (**(*ctxt).input().unwrap()).cur as *mut c_char;
 
         *data.add(3) = 0;
         for i in 0xE0..=0xFF {
@@ -554,7 +554,7 @@ unsafe fn test_char_range_byte3(ctxt: XmlParserCtxtPtr) -> c_int {
 unsafe fn test_char_range_byte4(ctxt: XmlParserCtxtPtr) -> c_int {
     unsafe {
         let lows: [c_uchar; 6] = [0, 0x80, 0x81, 0xC1, 0xFF, 0xBF];
-        let data: *mut c_char = (*(*ctxt).input).cur as *mut c_char;
+        let data: *mut c_char = (**(*ctxt).input().unwrap()).cur as *mut c_char;
 
         *data.add(4) = 0;
         for i in 0xF0..=0xFF {

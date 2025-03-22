@@ -91,7 +91,7 @@ use super::hash::XmlHashTable;
 
 macro_rules! NXT {
     ($ctxt:expr, $val:expr) => {
-        *(*(*$ctxt).input).cur.add($val as usize)
+        *(**(*$ctxt).input().unwrap()).cur.add($val as usize)
     };
 }
 
@@ -151,13 +151,13 @@ macro_rules! COPY_BUF {
 
 macro_rules! NEXTL {
     ($ctxt:expr, $l:expr) => {
-        if *(*(*$ctxt).input).cur == b'\n' {
-            (*(*$ctxt).input).line += 1;
-            (*(*$ctxt).input).col = 1;
+        if *(**(*$ctxt).input().unwrap()).cur == b'\n' {
+            (**(*$ctxt).input().unwrap()).line += 1;
+            (**(*$ctxt).input().unwrap()).col = 1;
         } else {
-            (*(*$ctxt).input).col += 1;
+            (**(*$ctxt).input().unwrap()).col += 1;
         }
-        (*(*$ctxt).input).cur = (*(*$ctxt).input).cur.add($l as usize);
+        (**(*$ctxt).input().unwrap()).cur = (**(*$ctxt).input().unwrap()).cur.add($l as usize);
     };
 }
 
@@ -467,7 +467,7 @@ unsafe fn xml_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
             xml_fatal_err(ctxt, XmlParserErrors::XmlErrNameTooLong, Some("Name"));
             return null_mut();
         }
-        if (*(*ctxt).input).offset_from_base() < len as usize {
+        if (**(*ctxt).input().unwrap()).offset_from_base() < len as usize {
             // There were a couple of bugs where PERefs lead to to a change
             // of the buffer. Check the buffer size to avoid passing an invalid
             // pointer to xmlDictLookup.
@@ -478,14 +478,20 @@ unsafe fn xml_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
             );
             return null_mut();
         }
-        if *(*(*ctxt).input).cur == b'\n' && *(*(*ctxt).input).cur.sub(1) == b'\r' {
+        if *(**(*ctxt).input().unwrap()).cur == b'\n'
+            && *(**(*ctxt).input().unwrap()).cur.sub(1) == b'\r'
+        {
             return xml_dict_lookup(
                 (*ctxt).dict,
-                (*(*ctxt).input).cur.sub(len as usize + 1),
+                (**(*ctxt).input().unwrap()).cur.sub(len as usize + 1),
                 len,
             );
         }
-        xml_dict_lookup((*ctxt).dict, (*(*ctxt).input).cur.sub(len as usize), len)
+        xml_dict_lookup(
+            (*ctxt).dict,
+            (**(*ctxt).input().unwrap()).cur.sub(len as usize),
+            len,
+        )
     }
 }
 
@@ -516,7 +522,7 @@ pub(crate) unsafe fn xml_parse_name(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
         }
 
         // Accelerator for simple ASCII names
-        input = (*(*ctxt).input).cur;
+        input = (**(*ctxt).input().unwrap()).cur;
         if (*input >= 0x61 && *input <= 0x7A)
             || (*input >= 0x41 && *input <= 0x5A)
             || *input == b'_'
@@ -534,14 +540,14 @@ pub(crate) unsafe fn xml_parse_name(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
                 input = input.add(1);
             }
             if *input > 0 && *input < 0x80 {
-                count = input.offset_from((*(*ctxt).input).cur) as _;
+                count = input.offset_from((**(*ctxt).input().unwrap()).cur) as _;
                 if count > max_length {
                     xml_fatal_err(ctxt, XmlParserErrors::XmlErrNameTooLong, Some("Name"));
                     return null_mut();
                 }
-                ret = xml_dict_lookup((*ctxt).dict, (*(*ctxt).input).cur, count as i32);
-                (*(*ctxt).input).cur = input;
-                (*(*ctxt).input).col += count as i32;
+                ret = xml_dict_lookup((*ctxt).dict, (**(*ctxt).input().unwrap()).cur, count as i32);
+                (**(*ctxt).input().unwrap()).cur = input;
+                (**(*ctxt).input().unwrap()).col += count as i32;
                 if ret.is_null() {
                     xml_err_memory(ctxt, None);
                 }
@@ -675,7 +681,7 @@ pub(crate) unsafe fn xml_parse_entity_value(
         // The content of the entity definition is copied in a buffer.
 
         (*ctxt).instate = XmlParserInputState::XmlParserEntityValue;
-        let input: XmlParserInputPtr = (*ctxt).input;
+        let input: XmlParserInputPtr = *(*ctxt).input().unwrap();
         (*ctxt).grow();
         if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
             //  goto error;
@@ -693,7 +699,8 @@ pub(crate) unsafe fn xml_parse_entity_value(
         // terminate the literal.
         // In practice it means we stop the loop only when back at parsing
         // the initial entity and the quote is found
-        while (xml_is_char(c as u32) && (c as i32 != stop as i32 || (*ctxt).input != input))
+        while xml_is_char(c as u32)
+            && (c as i32 != stop as i32 || *(*ctxt).input().unwrap() != input)
             && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
         {
             if len + 5 >= size {
@@ -859,7 +866,7 @@ pub(crate) unsafe fn xml_parse_entity_value(
 #[doc(alias = "xmlParseAttValue")]
 pub(crate) unsafe fn xml_parse_att_value(ctxt: XmlParserCtxtPtr) -> *mut XmlChar {
     unsafe {
-        if ctxt.is_null() || (*ctxt).input.is_null() {
+        if ctxt.is_null() || (*ctxt).input().is_none() {
             return null_mut();
         }
         xml_parse_att_value_internal(ctxt, null_mut(), null_mut(), 0)
@@ -1487,7 +1494,7 @@ pub(crate) unsafe fn xml_parse_element_mixed_content_decl(
             (*ctxt).advance(7);
             (*ctxt).skip_blanks();
             if (*ctxt).current_byte() == b')' {
-                if (*(*ctxt).input).id != inputchk {
+                if (**(*ctxt).input().unwrap()).id != inputchk {
                     xml_fatal_err_msg(
                         ctxt,
                         XmlParserErrors::XmlErrEntityBoundary,
@@ -1592,7 +1599,7 @@ pub(crate) unsafe fn xml_parse_element_mixed_content_decl(
                 if !ret.is_null() {
                     (*ret).ocur = XmlElementContentOccur::XmlElementContentMult;
                 }
-                if (*(*ctxt).input).id != inputchk {
+                if (**(*ctxt).input().unwrap()).id != inputchk {
                     xml_fatal_err_msg(
                         ctxt,
                         XmlParserErrors::XmlErrEntityBoundary,
@@ -1661,7 +1668,7 @@ pub(crate) unsafe fn xml_parse_element_content_decl(
 ) -> Option<XmlElementTypeVal> {
     unsafe {
         let tree: XmlElementContentPtr;
-        let inputid: i32 = (*(*ctxt).input).id;
+        let inputid: i32 = (**(*ctxt).input().unwrap()).id;
 
         *result = null_mut();
 
@@ -2070,9 +2077,10 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
         }
 
         // Also record the size of the entity parsed
-        if !(*ctxt).input.is_null() && !oldctxt.is_null() {
-            let mut consumed: u64 = (*(*ctxt).input).consumed;
-            consumed = consumed.saturating_add((*(*ctxt).input).offset_from_base() as u64);
+        if (*ctxt).input().is_some() && !oldctxt.is_null() {
+            let mut consumed: u64 = (**(*ctxt).input().unwrap()).consumed;
+            consumed =
+                consumed.saturating_add((**(*ctxt).input().unwrap()).offset_from_base() as u64);
 
             (*oldctxt).sizeentcopy = (*oldctxt).sizeentcopy.saturating_add(consumed);
             (*oldctxt).sizeentcopy = (*oldctxt).sizeentcopy.saturating_add((*ctxt).sizeentcopy);
@@ -2672,15 +2680,16 @@ pub(crate) unsafe fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
                 }
 
                 // Must be computed from old input before pushing new input.
-                parent_consumed = (*(*ctxt).input).parent_consumed;
-                let old_ent = (*(*ctxt).input).entity;
+                parent_consumed = (**(*ctxt).input().unwrap()).parent_consumed;
+                let old_ent = (**(*ctxt).input().unwrap()).entity;
                 if old_ent.is_none_or(|old_ent| {
                     matches!(old_ent.etype, XmlEntityType::XmlExternalParameterEntity)
                         && old_ent.flags & XML_ENT_PARSED as i32 == 0
                 }) {
-                    parent_consumed = parent_consumed.saturating_add((*(*ctxt).input).consumed);
                     parent_consumed =
-                        parent_consumed.saturating_add((*(*ctxt).input).offset_from_base() as u64);
+                        parent_consumed.saturating_add((**(*ctxt).input().unwrap()).consumed);
+                    parent_consumed = parent_consumed
+                        .saturating_add((**(*ctxt).input().unwrap()).offset_from_base() as u64);
                 }
 
                 input = xml_new_entity_input_stream(ctxt, entity);
@@ -2705,7 +2714,7 @@ pub(crate) unsafe fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
                     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
                         return;
                     }
-                    if (*(*ctxt).input).remainder_len() >= 4 {
+                    if (**(*ctxt).input().unwrap()).remainder_len() >= 4 {
                         start[0] = (*ctxt).current_byte();
                         start[1] = NXT!(ctxt, 1);
                         start[2] = NXT!(ctxt, 2);
@@ -3124,8 +3133,9 @@ pub(crate) unsafe fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) -> i32 {
         // Capture start position
         let (begin_pos, begin_line) = if (*ctxt).record_info != 0 {
             (
-                (*(*ctxt).input).consumed + (*(*ctxt).input).offset_from_base() as u64,
-                (*(*ctxt).input).line as u64,
+                (**(*ctxt).input().unwrap()).consumed
+                    + (**(*ctxt).input().unwrap()).offset_from_base() as u64,
+                (**(*ctxt).input().unwrap()).line as u64,
             )
         } else {
             (0, 0)
@@ -3137,7 +3147,7 @@ pub(crate) unsafe fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) -> i32 {
             (*ctxt).space_push((*ctxt).space());
         }
 
-        let line: i32 = (*(*ctxt).input).line;
+        let line: i32 = (**(*ctxt).input().unwrap()).line;
         let mut uri = None;
         #[cfg(feature = "sax1")]
         {
@@ -3231,9 +3241,9 @@ pub(crate) unsafe fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) -> i32 {
                         node: Some(cur),
                         begin_pos,
                         begin_line,
-                        end_pos: (*(*ctxt).input).consumed
-                            + (*(*ctxt).input).offset_from_base() as u64,
-                        end_line: (*(*ctxt).input).line as u64,
+                        end_pos: (**(*ctxt).input().unwrap()).consumed
+                            + (**(*ctxt).input().unwrap()).offset_from_base() as u64,
+                        end_line: (**(*ctxt).input().unwrap()).line as u64,
                     };
                     xml_parser_add_node_info(ctxt, Rc::new(RefCell::new(node_info)));
                 }
@@ -3305,9 +3315,9 @@ pub(crate) unsafe fn xml_parse_element_end(ctxt: XmlParserCtxtPtr) {
         if let Some(cur) = cur {
             if (*ctxt).record_info != 0 {
                 if let Some(node_info) = xml_parser_find_node_info(ctxt, cur) {
-                    node_info.borrow_mut().end_pos =
-                        (*(*ctxt).input).consumed + (*(*ctxt).input).offset_from_base() as u64;
-                    node_info.borrow_mut().end_line = (*(*ctxt).input).line as _;
+                    node_info.borrow_mut().end_pos = (**(*ctxt).input().unwrap()).consumed
+                        + (**(*ctxt).input().unwrap()).offset_from_base() as u64;
+                    node_info.borrow_mut().end_line = (**(*ctxt).input().unwrap()).line as _;
                 }
             }
         }
@@ -3324,7 +3334,7 @@ pub(crate) unsafe fn xml_parse_content_internal(ctxt: XmlParserCtxtPtr) {
         while (*ctxt).current_byte() != 0
             && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
         {
-            let cur: *const XmlChar = (*(*ctxt).input).cur;
+            let cur: *const XmlChar = (**(*ctxt).input().unwrap()).cur;
 
             // First case : a Processing Instruction.
             if *cur == b'<' && *cur.add(1) == b'?' {
@@ -3433,7 +3443,7 @@ pub unsafe fn xml_parse_external_subset(
         (*ctxt).detect_sax2();
         (*ctxt).grow();
 
-        if (*ctxt).encoding.is_none() && (*(*ctxt).input).remainder_len() >= 4 {
+        if (*ctxt).encoding.is_none() && (**(*ctxt).input().unwrap()).remainder_len() >= 4 {
             let mut start: [XmlChar; 4] = [0; 4];
 
             start[0] = (*ctxt).current_byte();
@@ -3641,7 +3651,10 @@ pub(crate) unsafe fn xml_string_current_char(
         // An encoding problem may arise from a truncated input buffer
         // splitting a character in the middle. In that case do not raise
         // an error but return 0 to indicate an end of stream problem
-        if ctxt.is_null() || (*ctxt).input.is_null() || (*(*ctxt).input).remainder_len() < 4 {
+        if ctxt.is_null()
+            || (*ctxt).input().is_none()
+            || (**(*ctxt).input().unwrap()).remainder_len() < 4
+        {
             *len = 0;
             return 0;
         }
@@ -3652,10 +3665,10 @@ pub(crate) unsafe fn xml_string_current_char(
         {
             let buffer = format!(
                 "Bytes: 0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}\n",
-                *(*(*ctxt).input).cur.add(0),
-                *(*(*ctxt).input).cur.add(1),
-                *(*(*ctxt).input).cur.add(2),
-                *(*(*ctxt).input).cur.add(3),
+                *(**(*ctxt).input().unwrap()).cur.add(0),
+                *(**(*ctxt).input().unwrap()).cur.add(1),
+                *(**(*ctxt).input().unwrap()).cur.add(2),
+                *(**(*ctxt).input().unwrap()).cur.add(3),
             );
             __xml_err_encoding!(
                 ctxt,

@@ -138,7 +138,7 @@ pub(crate) unsafe fn parse_pi(ctxt: &mut XmlParserCtxt) {
 
         let mut buf = String::new();
         if ctxt.content_bytes().starts_with(b"<?") {
-            let inputid = (*ctxt.input).id;
+            let inputid = (**ctxt.input().unwrap()).id;
             let state = ctxt.instate;
             ctxt.instate = XmlParserInputState::XmlParserPI;
             // this is a Processing Instruction.
@@ -147,7 +147,7 @@ pub(crate) unsafe fn parse_pi(ctxt: &mut XmlParserCtxt) {
             // Parse the target name and check for special support like namespace.
             if let Some(target) = parse_pi_target(ctxt) {
                 if ctxt.content_bytes().starts_with(b"?>") {
-                    if inputid != (*ctxt.input).id {
+                    if inputid != (**ctxt.input().unwrap()).id {
                         xml_fatal_err_msg(
                             ctxt,
                             XmlParserErrors::XmlErrEntityBoundary,
@@ -206,7 +206,7 @@ pub(crate) unsafe fn parse_pi(ctxt: &mut XmlParserCtxt) {
                         target
                     );
                 } else {
-                    if inputid != (*ctxt.input).id {
+                    if inputid != (**ctxt.input().unwrap()).id {
                         xml_fatal_err_msg(
                             ctxt,
                             XmlParserErrors::XmlErrEntityBoundary,

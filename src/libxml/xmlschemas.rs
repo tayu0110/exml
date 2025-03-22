@@ -18750,12 +18750,12 @@ unsafe fn xml_schema_validate_stream_locator(
         }
 
         let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
-        if !(*ctxt).input.is_null() {
+        if (*ctxt).input().is_some() {
             if !file.is_null() {
-                *file = (*(*ctxt).input).filename.clone();
+                *file = (**(*ctxt).input().unwrap()).filename.clone();
             }
             if !line.is_null() {
-                *line = (*(*ctxt).input).line as _;
+                *line = (**(*ctxt).input().unwrap()).line as _;
             }
             return 0;
         }

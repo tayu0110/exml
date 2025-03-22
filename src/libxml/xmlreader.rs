@@ -552,9 +552,11 @@ impl XmlTextReader {
                     (*self.ctxt).switch_to_encoding(handler);
                 }
             }
-            if !(*self.ctxt).input.is_null() && (*(*self.ctxt).input).filename.is_none() {
+            if (*self.ctxt).input().is_some()
+                && (**(*self.ctxt).input().unwrap()).filename.is_none()
+            {
                 if let Some(url) = url {
-                    (*(*self.ctxt).input).filename = Some(url.to_owned());
+                    (**(*self.ctxt).input().unwrap()).filename = Some(url.to_owned());
                 }
             }
 
@@ -2310,10 +2312,10 @@ impl XmlTextReader {
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn get_parser_line_number(&mut self) -> i32 {
         unsafe {
-            if self.ctxt.is_null() || (*self.ctxt).input.is_null() {
+            if self.ctxt.is_null() || (*self.ctxt).input().is_none() {
                 return 0;
             }
-            (*(*self.ctxt).input).line
+            (**(*self.ctxt).input().unwrap()).line
         }
     }
 
@@ -2324,10 +2326,10 @@ impl XmlTextReader {
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn get_parser_column_number(&mut self) -> i32 {
         unsafe {
-            if self.ctxt.is_null() || (*self.ctxt).input.is_null() {
+            if self.ctxt.is_null() || (*self.ctxt).input().is_none() {
                 return 0;
             }
-            (*(*self.ctxt).input).col
+            (**(*self.ctxt).input().unwrap()).col
         }
     }
 
@@ -3851,10 +3853,10 @@ unsafe fn xml_text_reader_start_element(
             if let Some(start_element) = (*reader).start_element {
                 start_element(ctx, fullname, atts);
                 if let Some(mut node) = (*ctxt).node.filter(|_| {
-                    !(*ctxt).input.is_null()
-                        && !(*(*ctxt).input).cur.is_null()
-                        && *(*(*ctxt).input).cur.add(0) == b'/'
-                        && *(*(*ctxt).input).cur.add(1) == b'>'
+                    (*ctxt).input().is_some()
+                        && !(**(*ctxt).input().unwrap()).cur.is_null()
+                        && *(**(*ctxt).input().unwrap()).cur.add(0) == b'/'
+                        && *(**(*ctxt).input().unwrap()).cur.add(1) == b'>'
                 }) {
                     node.extra = NODE_IS_EMPTY as _;
                 }
@@ -3918,10 +3920,10 @@ unsafe fn xml_text_reader_start_element_ns(
                     attributes,
                 );
                 if let Some(mut node) = (*ctxt).node.filter(|_| {
-                    !(*ctxt).input.is_null()
-                        && !(*(*ctxt).input).cur.is_null()
-                        && *(*(*ctxt).input).cur.add(0) == b'/'
-                        && *(*(*ctxt).input).cur.add(1) == b'>'
+                    (*ctxt).input().is_some()
+                        && !(**(*ctxt).input().unwrap()).cur.is_null()
+                        && *(**(*ctxt).input().unwrap()).cur.add(0) == b'/'
+                        && *(**(*ctxt).input().unwrap()).cur.add(1) == b'>'
                 }) {
                     node.extra = NODE_IS_EMPTY as _;
                 }
@@ -4808,12 +4810,12 @@ unsafe fn xml_text_reader_locator(
         }
 
         let reader: XmlTextReaderPtr = ctx as XmlTextReaderPtr;
-        if !(*reader).ctxt.is_null() && !(*(*reader).ctxt).input.is_null() {
+        if !(*reader).ctxt.is_null() && (*(*reader).ctxt).input().is_some() {
             if !file.is_null() {
-                *file = (*(*(*reader).ctxt).input).filename.clone();
+                *file = (**(*(*reader).ctxt).input().unwrap()).filename.clone();
             }
             if !line.is_null() {
-                *line = (*(*(*reader).ctxt).input).line as _;
+                *line = (**(*(*reader).ctxt).input().unwrap()).line as _;
             }
             return 0;
         }
@@ -5091,7 +5093,6 @@ pub unsafe fn xml_text_reader_locator_line_number(locator: XmlTextReaderLocatorP
     unsafe {
         // we know that locator is a xmlParserCtxtPtr
 
-        use crate::parser::XmlParserInputPtr;
         let ctx: XmlParserCtxtPtr = locator as XmlParserCtxtPtr;
         let ret: i32;
 
@@ -5102,8 +5103,7 @@ pub unsafe fn xml_text_reader_locator_line_number(locator: XmlTextReaderLocatorP
             ret = node.get_line_no() as _;
         } else {
             // inspired from error.c
-            let mut input: XmlParserInputPtr;
-            input = (*ctx).input;
+            let mut input = *(*ctx).input().unwrap();
             if (*input).filename.is_none() && (*ctx).input_tab.len() > 1 {
                 input = (*ctx).input_tab[(*ctx).input_tab.len() as usize - 2];
             }
@@ -5129,7 +5129,7 @@ pub unsafe fn xml_text_reader_locator_base_uri(locator: XmlTextReaderLocatorPtr)
 
         use std::ffi::CString;
 
-        use crate::{parser::XmlParserInputPtr, tree::NodeCommon};
+        use crate::tree::NodeCommon;
         let ctx: XmlParserCtxtPtr = locator as XmlParserCtxtPtr;
         let ret: *mut XmlChar;
 
@@ -5141,8 +5141,7 @@ pub unsafe fn xml_text_reader_locator_base_uri(locator: XmlTextReaderLocatorPtr)
             ret = xml_strdup(tmp.as_ref().map_or(null_mut(), |t| t.as_ptr() as *const u8));
         } else {
             // inspired from error.c
-            let mut input: XmlParserInputPtr;
-            input = (*ctx).input;
+            let mut input = *(*ctx).input().unwrap();
             if (*input).filename.is_none() && (*ctx).input_tab.len() > 1 {
                 input = (*ctx).input_tab[(*ctx).input_tab.len() as usize - 2];
             }

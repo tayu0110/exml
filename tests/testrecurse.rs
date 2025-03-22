@@ -265,7 +265,9 @@ fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlErr
 
         // Maintain the compatibility with the legacy error handling
         if !ctxt.is_null() {
-            input = (*ctxt).input;
+            if let Some(&inp) = (*ctxt).input() {
+                input = inp;
+            }
             if !input.is_null() && (*input).filename.is_none() && (*ctxt).input_tab.len() > 1 {
                 cur = input;
                 input = (*ctxt).input_tab[(*ctxt).input_tab.len() - 2];

@@ -3,7 +3,7 @@
 
 use std::{
     cell::{Cell, RefCell},
-    ffi::{CStr, CString},
+    ffi::CStr,
     io::{self, Read},
     os::raw::c_void,
     ptr::null_mut,
@@ -39,7 +39,7 @@ use exml::{
         XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNodePtr, xml_free_doc,
     },
 };
-use libc::{memcpy, strlen, strncmp};
+use libc::{memcpy, strlen};
 
 // maximum time for one parsing before declaring a timeout
 const MAX_TIME: u64 = 2; /* seconds */
@@ -450,7 +450,9 @@ fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlErr
 
         // Maintain the compatibility with the legacy error handling
         if !ctxt.is_null() {
-            input = (*ctxt).input;
+            if let Some(&inp) = (*ctxt).input() {
+                input = inp;
+            }
             if !input.is_null() && (*input).filename.is_none() && (*ctxt).input_tab.len() > 1 {
                 cur = input;
                 input = (*ctxt).input_tab[(*ctxt).input_tab.len() - 2];
@@ -931,7 +933,7 @@ static CALLBACK_SAX2_HANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
 ///
 /// Returns 0 in case of success, an error code otherwise
 #[doc(alias = "readerTest")]
-unsafe fn sax_test(filename: *const i8, limit: usize, options: i32, fail: i32) -> i32 {
+unsafe fn sax_test(filename: &str, limit: usize, options: i32, fail: i32) -> i32 {
     unsafe {
         let res: i32;
 
@@ -944,8 +946,6 @@ unsafe fn sax_test(filename: *const i8, limit: usize, options: i32, fail: i32) -
             eprintln!("Failed to create parser context");
             return 1;
         };
-        let filename = CStr::from_ptr(filename).to_string_lossy();
-        let filename = filename.as_ref();
         if let Some(doc) = xml_ctxt_read_file(ctxt, filename, None, options) {
             eprintln!("SAX parsing generated a document !");
             xml_free_doc(doc);
@@ -974,7 +974,7 @@ unsafe fn sax_test(filename: *const i8, limit: usize, options: i32, fail: i32) -
 /// Returns 0 in case of success, an error code otherwise
 #[doc(alias = "readerTest")]
 #[cfg(feature = "libxml_reader")]
-unsafe fn reader_test(filename: *const i8, limit: usize, options: i32, fail: i32) -> i32 {
+unsafe fn reader_test(filename: &str, limit: usize, options: i32, fail: i32) -> i32 {
     unsafe {
         use exml::libxml::xmlreader::{
             XmlTextReaderPtr, xml_free_text_reader, xml_reader_for_file,
@@ -985,13 +985,9 @@ unsafe fn reader_test(filename: *const i8, limit: usize, options: i32, fail: i32
         NB_TESTS.set(NB_TESTS.get() + 1);
 
         DOCUMENT_CONTEXT.with_borrow_mut(|context| context.maxlen = limit);
-        let reader: XmlTextReaderPtr =
-            xml_reader_for_file(&CStr::from_ptr(filename).to_string_lossy(), None, options);
+        let reader: XmlTextReaderPtr = xml_reader_for_file(filename, None, options);
         if reader.is_null() {
-            eprintln!(
-                "Failed to open '{}' test",
-                CStr::from_ptr(filename).to_string_lossy()
-            );
+            eprintln!("Failed to open '{}' test", filename);
             return 1;
         }
         let mut ret = (*reader).read();
@@ -1002,32 +998,22 @@ unsafe fn reader_test(filename: *const i8, limit: usize, options: i32, fail: i32
             if fail != 0 {
                 res = 0;
             } else {
-                if strncmp(filename, c"crazy:".as_ptr(), 6) == 0 {
-                    eprintln!(
-                        "Failed to parse '{}' {}",
-                        CStr::from_ptr(filename).to_string_lossy(),
-                        CRAZY_INDX.get()
-                    );
+                if filename == "crazy:" {
+                    eprintln!("Failed to parse '{}' {}", filename, CRAZY_INDX.get());
                 } else {
-                    eprintln!(
-                        "Failed to parse '{}' {limit}",
-                        CStr::from_ptr(filename).to_string_lossy()
-                    );
+                    eprintln!("Failed to parse '{}' {limit}", filename);
                 }
                 res = 1;
             }
         } else if fail != 0 {
-            if strncmp(filename, c"crazy:".as_ptr(), 6) == 0 {
+            if filename == "crazy:" {
                 eprintln!(
                     "Failed to get failure for '{}' {}",
-                    CStr::from_ptr(filename).to_string_lossy(),
+                    filename,
                     CRAZY_INDX.get()
                 );
             } else {
-                eprintln!(
-                    "Failed to get failure for '{}' {limit}",
-                    CStr::from_ptr(filename).to_string_lossy()
-                );
+                eprintln!("Failed to get failure for '{}' {limit}", filename);
             }
             res = 1;
         } else {
@@ -1042,7 +1028,7 @@ unsafe fn reader_test(filename: *const i8, limit: usize, options: i32, fail: i32
     }
 }
 
-type Functest = unsafe fn(filename: *const i8, limit: usize, options: i32, fail: i32) -> i32;
+type Functest = unsafe fn(filename: &str, limit: usize, options: i32, fail: i32) -> i32;
 
 struct LimitDesc<'a> {
     name: &'a str, /* the huge generator name */
@@ -1192,8 +1178,7 @@ unsafe fn launch_tests(tst: &TestDesc, test: u32) -> i32 {
                     break;
                 }
             }
-            let name = CString::new(descr.name).unwrap();
-            res = tst.func.unwrap()(name.as_ptr() as _, limit, descr.options, fail);
+            res = tst.func.unwrap()(descr.name, limit, descr.options, fail);
             if res != 0 {
                 NB_ERRORS.set(NB_ERRORS.get() + 1);
                 err += 1;
@@ -1238,12 +1223,7 @@ unsafe fn launch_crazy_sax(test: u32, fail: i32) -> i32 {
 
         CRAZY_INDX.set(test as usize);
 
-        let res = sax_test(
-            c"crazy::test".as_ptr(),
-            XML_MAX_LOOKUP_LIMIT - CHUNK,
-            0,
-            fail,
-        );
+        let res = sax_test("crazy::test", XML_MAX_LOOKUP_LIMIT - CHUNK, 0, fail);
         if res != 0 {
             NB_ERRORS.set(NB_ERRORS.get() + 1);
             err += 1;
@@ -1261,12 +1241,7 @@ unsafe fn launch_crazy(test: u32, fail: i32) -> i32 {
 
         CRAZY_INDX.set(test as usize);
 
-        let res = reader_test(
-            c"crazy::test".as_ptr(),
-            XML_MAX_LOOKUP_LIMIT - CHUNK,
-            0,
-            fail,
-        );
+        let res = reader_test("crazy::test", XML_MAX_LOOKUP_LIMIT - CHUNK, 0, fail);
         if res != 0 {
             NB_ERRORS.set(NB_ERRORS.get() + 1);
             err += 1;

@@ -95,8 +95,6 @@ pub struct XmlParserCtxt {
     pub(crate) html: i32,
 
     // Input stream stack
-    // Current input stream
-    pub input: XmlParserInputPtr,
     // stack of inputs
     pub input_tab: Vec<XmlParserInputPtr>,
 
@@ -273,23 +271,31 @@ impl XmlParserCtxt {
     }
 
     pub(crate) unsafe fn current_byte(&self) -> u8 {
-        unsafe { *(*self.input).cur }
+        unsafe { *(**self.input().unwrap()).cur }
     }
 
     pub(crate) unsafe fn nth_byte(&self, nth: usize) -> u8 {
         unsafe {
-            let ptr = (*self.input).cur.add(nth);
-            // debug_assert!(ptr < (*self.input).end);
+            let ptr = (**self.input().unwrap()).cur.add(nth);
+            // debug_assert!(ptr < (**self.input().unwrap()).end);
             *ptr
         }
     }
 
     pub(crate) unsafe fn current_ptr(&self) -> *const u8 {
-        unsafe { (*self.input).cur }
+        unsafe { (**self.input().unwrap()).cur }
     }
 
     pub(crate) unsafe fn base_ptr(&self) -> *const u8 {
-        unsafe { (*self.input).base }
+        unsafe { (**self.input().unwrap()).base }
+    }
+
+    pub fn input(&self) -> Option<&XmlParserInputPtr> {
+        self.input_tab.last()
+    }
+
+    pub fn input_mut(&mut self) -> Option<&mut XmlParserInputPtr> {
+        self.input_tab.last_mut()
     }
 
     /// This function provides the current index of the parser relative
@@ -304,10 +310,9 @@ impl XmlParserCtxt {
     #[doc(alias = "xmlByteConsumed")]
     pub unsafe fn byte_consumed(&self) -> i64 {
         unsafe {
-            let input: XmlParserInputPtr = self.input;
-            if input.is_null() {
+            let Some(&input) = self.input() else {
                 return -1;
-            }
+            };
             if (*input).buf.is_some() && (*input).buf.as_ref().unwrap().borrow().encoder.is_some() {
                 let mut unused = 0;
                 let mut buf = (*input).buf.as_ref().unwrap().borrow_mut();
@@ -346,7 +351,7 @@ impl XmlParserCtxt {
     #[doc(alias = "xmlParserGrow")]
     pub(crate) unsafe fn force_grow(&mut self) -> i32 {
         unsafe {
-            let input: XmlParserInputPtr = self.input;
+            let input: XmlParserInputPtr = *self.input().unwrap();
             let cur_end: ptrdiff_t = (*input).remainder_len() as isize;
             let cur_base: ptrdiff_t = (*input).offset_from_base() as isize;
 
@@ -389,7 +394,7 @@ impl XmlParserCtxt {
 
     pub(crate) unsafe fn grow(&mut self) {
         unsafe {
-            if self.progressive == 0 && (*self.input).remainder_len() < INPUT_CHUNK {
+            if self.progressive == 0 && (**self.input().unwrap()).remainder_len() < INPUT_CHUNK {
                 self.force_grow();
             }
         }
@@ -398,7 +403,7 @@ impl XmlParserCtxt {
     #[doc(alias = "xmlParserShrink")]
     pub(crate) unsafe fn force_shrink(&mut self) {
         unsafe {
-            let input: XmlParserInputPtr = self.input;
+            let input: XmlParserInputPtr = *self.input().unwrap();
 
             // Don't shrink pull parser memory buffers.
             let Some(buf) = (*input).buf.as_mut() else {
@@ -436,8 +441,8 @@ impl XmlParserCtxt {
     pub(crate) unsafe fn shrink(&mut self) {
         unsafe {
             if self.progressive == 0
-                && (*self.input).offset_from_base() > 2 * INPUT_CHUNK
-                && (*self.input).remainder_len() < 2 * INPUT_CHUNK
+                && (**self.input().unwrap()).offset_from_base() > 2 * INPUT_CHUNK
+                && (**self.input().unwrap()).remainder_len() < 2 * INPUT_CHUNK
             {
                 self.force_shrink();
             }
@@ -453,19 +458,19 @@ impl XmlParserCtxt {
             while self.input_tab.len() > 1 {
                 xml_free_input_stream(self.input_pop());
             }
-            if !self.input.is_null() {
+            if let Some(&input) = self.input() {
                 // in case there was a specific allocation deallocate before overriding base
-                if let Some(free) = (*self.input).free {
-                    free((*self.input).base as *mut u8);
-                    (*self.input).free = None;
+                if let Some(free) = (*input).free {
+                    free((*input).base as *mut u8);
+                    (*input).free = None;
                 }
-                if (*self.input).buf.is_some() {
-                    let _ = (*self.input).buf.take();
+                if (*input).buf.is_some() {
+                    let _ = (*input).buf.take();
                 }
-                (*self.input).cur = c"".as_ptr() as _;
-                (*self.input).length = 0;
-                (*self.input).base = (*self.input).cur;
-                (*self.input).end = (*self.input).cur;
+                (*input).cur = c"".as_ptr() as _;
+                (*input).length = 0;
+                (*input).base = (*input).cur;
+                (*input).end = (*input).cur;
             }
         }
     }
@@ -490,7 +495,6 @@ impl XmlParserCtxt {
                 input = self.input_pop();
             }
             self.input_tab.clear();
-            self.input = null_mut();
 
             self.space_tab.clear();
 
@@ -556,12 +560,12 @@ impl XmlParserCtxt {
 
     pub(crate) unsafe fn advance(&mut self, nth: usize) {
         unsafe {
-            if (*self.input).cur.add(nth) > (*self.input).end {
+            if (**self.input().unwrap()).cur.add(nth) > (**self.input().unwrap()).end {
                 self.force_grow();
             }
-            (*self.input).cur = (*self.input).cur.add(nth);
-            (*self.input).col += nth as i32;
-            assert!((*self.input).cur <= (*self.input).end);
+            (**self.input().unwrap()).cur = (**self.input().unwrap()).cur.add(nth);
+            (**self.input().unwrap()).col += nth as i32;
+            assert!((**self.input().unwrap()).cur <= (**self.input().unwrap()).end);
         }
     }
 
@@ -569,25 +573,25 @@ impl XmlParserCtxt {
     /// If `'\n'` is found, line number is also increased.
     pub(crate) unsafe fn advance_with_line_handling(&mut self, nth: usize) {
         unsafe {
-            if (*self.input).cur.add(nth) > (*self.input).end {
+            if (**self.input().unwrap()).cur.add(nth) > (**self.input().unwrap()).end {
                 self.force_grow();
             }
             for _ in 0..nth {
-                if *(*self.input).cur == b'\n' {
-                    (*self.input).line += 1;
-                    (*self.input).col = 1;
+                if *(**self.input().unwrap()).cur == b'\n' {
+                    (**self.input().unwrap()).line += 1;
+                    (**self.input().unwrap()).col = 1;
                 } else {
-                    (*self.input).col += 1;
+                    (**self.input().unwrap()).col += 1;
                 }
-                (*self.input).cur = (*self.input).cur.add(1);
+                (**self.input().unwrap()).cur = (**self.input().unwrap()).cur.add(1);
             }
         }
     }
 
     pub(crate) unsafe fn content_bytes(&self) -> &[u8] {
         unsafe {
-            let len = (*self.input).remainder_len();
-            from_raw_parts((*self.input).cur, len)
+            let len = (**self.input().unwrap()).remainder_len();
+            from_raw_parts((**self.input().unwrap()).cur, len)
         }
     }
 
@@ -595,11 +599,11 @@ impl XmlParserCtxt {
     #[doc(alias = "xmlNextChar")]
     pub(crate) unsafe fn skip_char(&mut self) {
         unsafe {
-            if matches!(self.instate, XmlParserInputState::XmlParserEOF) || self.input.is_null() {
+            if matches!(self.instate, XmlParserInputState::XmlParserEOF) || self.input().is_none() {
                 return;
             }
 
-            if (*self.input).cur > (*self.input).end {
+            if (**self.input().unwrap()).cur > (**self.input().unwrap()).end {
                 xml_err_internal!(self, "Parser input data memory error\n");
 
                 self.err_no = XmlParserErrors::XmlErrInternalError as i32;
@@ -608,11 +612,11 @@ impl XmlParserCtxt {
                 return;
             }
 
-            if (*self.input).remainder_len() < INPUT_CHUNK {
+            if (**self.input().unwrap()).remainder_len() < INPUT_CHUNK {
                 if self.force_grow() < 0 {
                     return;
                 }
-                if (*self.input).cur >= (*self.input).end {
+                if (**self.input().unwrap()).cur >= (**self.input().unwrap()).end {
                     return;
                 }
             }
@@ -622,13 +626,13 @@ impl XmlParserCtxt {
                 // a compatible encoding for the ASCII set, since
                 // XML constructs only use < 128 chars
 
-                if *((*self.input).cur) == b'\n' {
-                    (*self.input).line += 1;
-                    (*self.input).col = 1;
+                if *((**self.input().unwrap()).cur) == b'\n' {
+                    (**self.input().unwrap()).line += 1;
+                    (**self.input().unwrap()).col = 1;
                 } else {
-                    (*self.input).col += 1;
+                    (**self.input().unwrap()).col += 1;
                 }
-                (*self.input).cur = (*self.input).cur.add(1);
+                (**self.input().unwrap()).cur = (**self.input().unwrap()).cur.add(1);
                 return;
             }
 
@@ -636,11 +640,11 @@ impl XmlParserCtxt {
             //   the literal two-character sequence "#xD#xA" or a standalone
             //   literal #xD, an XML processor must pass to the application
             //   the single character #xA.
-            if *(*self.input).cur == b'\n' {
-                (*self.input).line += 1;
-                (*self.input).col = 1;
+            if *(**self.input().unwrap()).cur == b'\n' {
+                (**self.input().unwrap()).line += 1;
+                (**self.input().unwrap()).col = 1;
             } else {
-                (*self.input).col += 1;
+                (**self.input().unwrap()).col += 1;
             }
 
             let bytes = self.content_bytes();
@@ -648,13 +652,13 @@ impl XmlParserCtxt {
             match from_utf8(&bytes[..len]) {
                 Ok(s) => {
                     let c = s.chars().next().unwrap();
-                    (*self.input).cur = (*self.input).cur.add(c.len_utf8());
+                    (**self.input().unwrap()).cur = (**self.input().unwrap()).cur.add(c.len_utf8());
                     return;
                 }
                 Err(e) if e.valid_up_to() > 0 => {
                     let s = from_utf8_unchecked(&bytes[..e.valid_up_to()]);
                     let c = s.chars().next().unwrap();
-                    (*self.input).cur = (*self.input).cur.add(c.len_utf8());
+                    (**self.input().unwrap()).cur = (**self.input().unwrap()).cur.add(c.len_utf8());
                     return;
                 }
                 Err(_) => {}
@@ -664,7 +668,7 @@ impl XmlParserCtxt {
             // input encoding didn't get properly advertised in the declaration header.
             // Report the error and switch the encoding
             // to ISO-Latin-1 (if you don't like this policy, just declare the encoding !)
-            if self.input.is_null() || (*self.input).remainder_len() < 4 {
+            if self.input().is_none() || (**self.input().unwrap()).remainder_len() < 4 {
                 __xml_err_encoding!(
                     self,
                     XmlParserErrors::XmlErrInvalidChar,
@@ -673,10 +677,10 @@ impl XmlParserCtxt {
             } else {
                 let buffer = format!(
                     "Bytes: 0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}\n",
-                    *(*self.input).cur.add(0),
-                    *(*self.input).cur.add(1),
-                    *(*self.input).cur.add(2),
-                    *(*self.input).cur.add(3),
+                    *(**self.input().unwrap()).cur.add(0),
+                    *(**self.input().unwrap()).cur.add(1),
+                    *(**self.input().unwrap()).cur.add(2),
+                    *(**self.input().unwrap()).cur.add(3),
                 );
                 __xml_err_encoding!(
                     self,
@@ -686,7 +690,7 @@ impl XmlParserCtxt {
                 );
             }
             self.charset = XmlCharEncoding::ISO8859_1;
-            (*self.input).cur = (*self.input).cur.add(1);
+            (**self.input().unwrap()).cur = (**self.input().unwrap()).cur.add(1);
         }
     }
 
@@ -705,23 +709,23 @@ impl XmlParserCtxt {
                 || matches!(self.instate, XmlParserInputState::XmlParserStart)
             {
                 // if we are in the document content, go really fast
-                let mut cur = (*self.input).cur;
+                let mut cur = (**self.input().unwrap()).cur;
                 while xml_is_blank_char(*cur as u32) {
                     if *cur == b'\n' {
-                        (*self.input).line += 1;
-                        (*self.input).col = 1;
+                        (**self.input().unwrap()).line += 1;
+                        (**self.input().unwrap()).col = 1;
                     } else {
-                        (*self.input).col += 1;
+                        (**self.input().unwrap()).col += 1;
                     }
                     cur = cur.add(1);
                     res = res.saturating_add(1);
                     if *cur == 0 {
-                        (*self.input).cur = cur;
+                        (**self.input().unwrap()).cur = cur;
                         self.force_grow();
-                        cur = (*self.input).cur;
+                        cur = (**self.input().unwrap()).cur;
                     }
                 }
-                (*self.input).cur = cur;
+                (**self.input().unwrap()).cur = cur;
             } else {
                 let expand_pe = self.external != 0 || self.input_tab.len() != 1;
 
@@ -745,12 +749,13 @@ impl XmlParserCtxt {
                             break;
                         }
 
-                        consumed = (*self.input).consumed;
-                        consumed = consumed.saturating_add((*self.input).offset_from_base() as u64);
+                        consumed = (**self.input().unwrap()).consumed;
+                        consumed = consumed
+                            .saturating_add((**self.input().unwrap()).offset_from_base() as u64);
 
                         // Add to sizeentities when parsing an external entity for the first time.
                         // Is this `unwrap` OK ????
-                        let mut ent = (*self.input).entity.unwrap();
+                        let mut ent = (**self.input().unwrap()).entity.unwrap();
                         if matches!(ent.etype, XmlEntityType::XmlExternalParameterEntity)
                             && ent.flags & XML_ENT_PARSED as i32 == 0
                         {
@@ -795,20 +800,18 @@ impl XmlParserCtxt {
     #[doc(alias = "xmlCurrentChar")]
     pub unsafe fn current_char(&mut self, len: &mut i32) -> Option<char> {
         unsafe {
-            if self.input.is_null() {
-                return None;
-            }
+            self.input()?;
             if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
                 return None;
             }
 
-            if (*self.input).remainder_len() < INPUT_CHUNK && self.force_grow() < 0 {
+            if (**self.input().unwrap()).remainder_len() < INPUT_CHUNK && self.force_grow() < 0 {
                 return None;
             }
 
-            if *(*self.input).cur >= 0x20 && *(*self.input).cur <= 0x7F {
+            if *(**self.input().unwrap()).cur >= 0x20 && *(**self.input().unwrap()).cur <= 0x7F {
                 *len = 1;
-                return Some(*(*self.input).cur as char);
+                return Some(*(**self.input().unwrap()).cur as char);
             }
 
             if self.charset != XmlCharEncoding::UTF8 {
@@ -816,13 +819,13 @@ impl XmlParserCtxt {
                 // a compatible encoding for the ASCII set, since
                 // XML constructs only use < 128 chars
                 *len = 1;
-                if *(*self.input).cur == 0xD {
-                    if *(*self.input).cur.add(1) == 0xA {
-                        (*self.input).cur = (*self.input).cur.add(1);
+                if *(**self.input().unwrap()).cur == 0xD {
+                    if *(**self.input().unwrap()).cur.add(1) == 0xA {
+                        (**self.input().unwrap()).cur = (**self.input().unwrap()).cur.add(1);
                     }
                     return Some('\u{A}');
                 }
-                return Some(*(*self.input).cur as char);
+                return Some(*(**self.input().unwrap()).cur as char);
             }
             let content = self.content_bytes();
             let l = 4.min(content.len());
@@ -849,7 +852,7 @@ impl XmlParserCtxt {
                             // input encoding didn't get properly advertised in the
                             // declaration header. Report the error and switch the encoding
                             // to ISO-Latin-1 (if you don't like this policy, just declare the encoding !)
-                            if (*self.input).remainder_len() < 4 {
+                            if (**self.input().unwrap()).remainder_len() < 4 {
                                 __xml_err_encoding!(
                                     self,
                                     XmlParserErrors::XmlErrInvalidChar,
@@ -869,7 +872,7 @@ impl XmlParserCtxt {
                             }
                             self.charset = XmlCharEncoding::ISO8859_1;
                             *len = 1;
-                            return Some(*(*self.input).cur as char);
+                            return Some(*(**self.input().unwrap()).cur as char);
                         }
                         None => {
                             *len = 0;
@@ -879,7 +882,9 @@ impl XmlParserCtxt {
                 }
             };
             if (*len > 1 && !xml_is_char(c as u32))
-                || (*len == 1 && c == '\0' && (*self.input).cur < (*self.input).end)
+                || (*len == 1
+                    && c == '\0'
+                    && (**self.input().unwrap()).cur < (**self.input().unwrap()).end)
             {
                 xml_err_encoding_int!(
                     self,
@@ -889,9 +894,9 @@ impl XmlParserCtxt {
                 );
             }
             if c == '\r' {
-                let next = (*self.input).cur.add(1);
-                if next < (*self.input).end && *next == b'\n' {
-                    (*self.input).cur = (*self.input).cur.add(1);
+                let next = (**self.input().unwrap()).cur.add(1);
+                if next < (**self.input().unwrap()).end && *next == b'\n' {
+                    (**self.input().unwrap()).cur = (**self.input().unwrap()).cur.add(1);
                 }
                 return Some('\n');
             }
@@ -908,12 +913,12 @@ impl XmlParserCtxt {
             let c = self.current_char(&mut len)?;
             f(self, c).then(|| {
                 if c == '\n' {
-                    (*self.input).line += 1;
-                    (*self.input).col = 1;
+                    (**self.input().unwrap()).line += 1;
+                    (**self.input().unwrap()).col = 1;
                 } else {
-                    (*self.input).col += 1;
+                    (**self.input().unwrap()).col += 1;
                 }
-                (*self.input).cur = (*self.input).cur.add(c.len_utf8());
+                (**self.input().unwrap()).cur = (**self.input().unwrap()).cur.add(c.len_utf8());
                 c
             })
         }
@@ -927,7 +932,6 @@ impl XmlParserCtxt {
         if value.is_null() {
             return -1;
         }
-        self.input = value;
         self.input_tab.push(value);
         self.input_tab.len() as i32 - 1
     }
@@ -940,9 +944,7 @@ impl XmlParserCtxt {
         if self.input_tab.is_empty() {
             return null_mut();
         }
-        let res = self.input_tab.pop().unwrap_or(null_mut());
-        self.input = *self.input_tab.last().unwrap_or(&null_mut());
-        res
+        self.input_tab.pop().unwrap_or(null_mut())
     }
 
     /// Pushes a new element node on top of the node stack
@@ -1127,11 +1129,11 @@ impl XmlParserCtxt {
     pub unsafe fn push_input(&mut self, input: XmlParserInputPtr) -> i32 {
         unsafe {
             if get_parser_debug_entities() != 0 {
-                if !self.input.is_null() && (*self.input).filename.is_some() {
+                if self.input().is_some() && (**self.input().unwrap()).filename.is_some() {
                     generic_error!(
                         "{}({}): ",
-                        (*self.input).filename.as_ref().unwrap(),
-                        (*self.input).line
+                        (**self.input().unwrap()).filename.as_ref().unwrap(),
+                        (**self.input().unwrap()).line
                     );
                 }
                 let cur = CStr::from_ptr((*input).cur as *const i8).to_string_lossy();
@@ -1187,7 +1189,7 @@ impl XmlParserCtxt {
                 entity.flags &= !XML_ENT_EXPANDING as i32;
             }
             xml_free_input_stream(input);
-            if *(*self.input).cur == 0 {
+            if *(**self.input().unwrap()).cur == 0 {
                 self.force_grow();
             }
             self.current_byte()
@@ -1391,8 +1393,11 @@ impl XmlParserCtxt {
                     self.switch_to_encoding(handler);
                 }
             }
-            if url.is_some() && !self.input.is_null() && (*self.input).filename.is_none() {
-                (*self.input).filename = url.map(|u| u.to_owned());
+            if url.is_some()
+                && self.input().is_some()
+                && (**self.input().unwrap()).filename.is_none()
+            {
+                (**self.input().unwrap()).filename = url.map(|u| u.to_owned());
             }
             xml_parse_document(self);
             if self.well_formed != 0 || self.recovery != 0 {
@@ -1510,7 +1515,7 @@ impl XmlParserCtxt {
     /// Returns 0 in case of success, -1 otherwise
     #[doc(alias = "xmlSwitchToEncoding")]
     pub unsafe fn switch_to_encoding(&mut self, handler: XmlCharEncodingHandler) -> i32 {
-        unsafe { self.switch_input_encoding(self.input, handler) }
+        unsafe { self.switch_input_encoding(*self.input().unwrap(), handler) }
     }
 
     /// Change the input functions when discovering the character encoding of a given entity.
@@ -1524,10 +1529,10 @@ impl XmlParserCtxt {
             // Note that we look for a decoded UTF-8 BOM when switching to UTF-16.
             // This is mostly useless but Webkit/Chromium relies on this behavior.
             // See https://bugs.chromium.org/p/chromium/issues/detail?id=1451026
-            if !self.input.is_null()
-                && (*self.input).consumed == 0
-                && !(*self.input).cur.is_null()
-                && (*self.input).offset_from_base() == 0
+            if self.input().is_some()
+                && (**self.input().unwrap()).consumed == 0
+                && !(**self.input().unwrap()).cur.is_null()
+                && (**self.input().unwrap()).offset_from_base() == 0
                 && matches!(
                     enc,
                     XmlCharEncoding::UTF8 | XmlCharEncoding::UTF16LE | XmlCharEncoding::UTF16BE
@@ -1535,11 +1540,11 @@ impl XmlParserCtxt {
             {
                 // Errata on XML-1.0 June 20 2001
                 // Specific handling of the Byte Order Mark for UTF-8
-                if *(*self.input).cur.add(0) == 0xEF
-                    && *(*self.input).cur.add(1) == 0xBB
-                    && *(*self.input).cur.add(2) == 0xBF
+                if *(**self.input().unwrap()).cur.add(0) == 0xEF
+                    && *(**self.input().unwrap()).cur.add(1) == 0xBB
+                    && *(**self.input().unwrap()).cur.add(2) == 0xBF
                 {
-                    (*self.input).cur = (*self.input).cur.add(3);
+                    (**self.input().unwrap()).cur = (**self.input().unwrap()).cur.add(3);
                 }
             }
 
@@ -1562,7 +1567,7 @@ impl XmlParserCtxt {
                     self.charset = XmlCharEncoding::UTF8;
                     return 0;
                 }
-                XmlCharEncoding::EBCDIC => (*self.input).detect_ebcdic(),
+                XmlCharEncoding::EBCDIC => (**self.input().unwrap()).detect_ebcdic(),
                 _ => get_encoding_handler(enc),
             }) else {
                 // Default handlers.
@@ -1575,10 +1580,10 @@ impl XmlParserCtxt {
                     XmlCharEncoding::ISO8859_1 => {
                         if self.input_tab.len() == 1
                             && self.encoding.is_none()
-                            && !self.input.is_null()
-                            && (*self.input).encoding.is_some()
+                            && self.input().is_some()
+                            && (**self.input().unwrap()).encoding.is_some()
                         {
-                            self.encoding = (*self.input).encoding.clone();
+                            self.encoding = (**self.input().unwrap()).encoding.clone();
                         }
                         self.charset = enc;
                         return 0;
@@ -1599,7 +1604,7 @@ impl XmlParserCtxt {
                     }
                 }
             };
-            let ret: i32 = self.switch_input_encoding(self.input, handler);
+            let ret: i32 = self.switch_input_encoding(*self.input().unwrap(), handler);
             if ret < 0 || self.err_no == XmlParserErrors::XmlI18NConvFailed as i32 {
                 // on encoding conversion errors, stop the parser
                 self.stop();
@@ -1622,7 +1627,6 @@ impl Default for XmlParserCtxt {
             encoding: None,
             standalone: 0,
             html: 0,
-            input: null_mut(),
             input_tab: vec![],
             node: None,
             node_tab: vec![],
@@ -1764,7 +1768,6 @@ unsafe fn xml_init_sax_parser_ctxt(
             // Non consuming
             xml_free_input_stream(input);
         }
-        (*ctxt).input = null_mut();
         (*ctxt).version = None;
         (*ctxt).encoding = None;
         (*ctxt).standalone = -1;

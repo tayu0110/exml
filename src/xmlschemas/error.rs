@@ -798,15 +798,15 @@ pub(crate) unsafe fn xml_schema_err4_line(
                     // Get filename and line if no node-tree.
                     if node.is_none()
                         && !(*vctxt).parser_ctxt.is_null()
-                        && !(*(*vctxt).parser_ctxt).input.is_null()
+                        && (*(*vctxt).parser_ctxt).input().is_some()
                     {
-                        dummy = (*(*(*vctxt).parser_ctxt).input)
+                        dummy = (**(*(*vctxt).parser_ctxt).input().unwrap())
                             .filename
                             .as_deref()
                             .map(|f| CString::new(f).unwrap());
                         file = dummy.as_ref().map_or(null(), |c| c.as_ptr());
-                        line = (*(*(*vctxt).parser_ctxt).input).line;
-                        col = (*(*(*vctxt).parser_ctxt).input).col;
+                        line = (**(*(*vctxt).parser_ctxt).input().unwrap()).line;
+                        col = (**(*(*vctxt).parser_ctxt).input().unwrap()).col;
                     }
                 } else {
                     // Override the given node's (if any) position
@@ -817,9 +817,9 @@ pub(crate) unsafe fn xml_schema_err4_line(
                         dummy = doc.url.as_deref().map(|u| CString::new(u).unwrap());
                         file = dummy.as_ref().map_or(null(), |c| c.as_ptr());
                     } else if !(*vctxt).parser_ctxt.is_null()
-                        && !(*(*vctxt).parser_ctxt).input.is_null()
+                        && (*(*vctxt).parser_ctxt).input().is_some()
                     {
-                        dummy = (*(*(*vctxt).parser_ctxt).input)
+                        dummy = (**(*(*vctxt).parser_ctxt).input().unwrap())
                             .filename
                             .as_deref()
                             .map(|f| CString::new(f).unwrap());

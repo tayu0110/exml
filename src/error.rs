@@ -1114,7 +1114,9 @@ pub unsafe fn report_error(
 
         // Maintain the compatibility with the legacy error handling
         if !ctxt.is_null() {
-            input = (*ctxt).input;
+            if let Some(&inp) = (*ctxt).input() {
+                input = inp;
+            }
             if !input.is_null() && (*input).filename.is_none() && (*ctxt).input_tab.len() > 1 {
                 cur = input;
                 input = (*ctxt).input_tab[(*ctxt).input_tab.len() - 2];
@@ -1248,7 +1250,10 @@ pub(crate) fn parser_error(ctx: Option<GenericErrorContext>, msg: &str) {
             let ctxt = **lock
                 .downcast_ref::<Box<XmlParserCtxtPtr>>()
                 .expect("ctxt is not XmlParserCtxtPtr");
-            let mut input = (*ctxt).input;
+            let mut input = null_mut();
+            if let Some(&inp) = (*ctxt).input() {
+                input = inp;
+            }
             if !input.is_null() && (*input).filename.is_none() && (*ctxt).input_tab.len() > 1 {
                 cur = input;
                 input = (*ctxt).input_tab[(*ctxt).input_tab.len() - 2];
@@ -1277,7 +1282,10 @@ pub(crate) fn parser_warning(ctx: Option<GenericErrorContext>, msg: &str) {
             .downcast_ref::<Box<XmlParserCtxtPtr>>()
             .expect("ctxt is not XmlParserCtxtPtr");
         unsafe {
-            let mut input = (*ctxt).input;
+            let mut input = null_mut();
+            if let Some(&inp) = (*ctxt).input() {
+                input = inp;
+            }
             if !input.is_null() && (*input).filename.is_none() && (*ctxt).input_tab.len() > 1 {
                 cur = input;
                 input = (*ctxt).input_tab[(*ctxt).input_tab.len() - 2];
@@ -1310,7 +1318,9 @@ pub(crate) fn parser_validity_error(ctx: Option<GenericErrorContext>, msg: &str)
                 .downcast_ref::<Box<XmlParserCtxtPtr>>()
                 .expect("ctxt is not XmlParserCtxtPtr");
             if len > 1 && msg.as_bytes()[len - 2] != b':' {
-                input = (*ctxt).input;
+                if let Some(&inp) = (*ctxt).input() {
+                    input = inp;
+                }
                 if (*input).filename.is_none() && (*ctxt).input_tab.len() > 1 {
                     input = (*ctxt).input_tab[(*ctxt).input_tab.len() - 2];
                 }
@@ -1351,7 +1361,9 @@ pub(crate) fn parser_validity_warning(ctx: Option<GenericErrorContext>, msg: &st
             .expect("ctxt is not XmlParserCtxtPtr");
         unsafe {
             if len != 0 && msg.as_bytes()[len - 1] != b':' {
-                input = (*ctxt).input;
+                if let Some(&inp) = (*ctxt).input() {
+                    input = inp;
+                }
                 if (*input).filename.is_none() && (*ctxt).input_tab.len() > 1 {
                     input = (*ctxt).input_tab[(*ctxt).input_tab.len() - 2];
                 }
@@ -1519,7 +1531,10 @@ pub(crate) fn xml_raise_error(
         if !ctxt.is_null() {
             unsafe {
                 if file.is_none() {
-                    input = (*ctxt).input;
+                    input = null_mut();
+                    if let Some(&inp) = (*ctxt).input() {
+                        input = inp;
+                    }
                     if !input.is_null()
                         && (*input).filename.is_none()
                         && (*ctxt).input_tab.len() > 1
