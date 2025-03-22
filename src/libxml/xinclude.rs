@@ -154,7 +154,7 @@ pub struct XmlXIncludeTxt {
 #[doc(alias = "xmlXIncludeCtxt")]
 #[repr(C)]
 pub struct XmlXIncludeCtxt {
-    doc: Option<XmlDocPtr>,       /* the source document */
+    doc: XmlDocPtr,               /* the source document */
     inc_tab: Vec<XmlXIncludeRef>, /* array of included references */
 
     txt_tab: Vec<XmlXIncludeTxt>, /* array of unparsed documents */
@@ -179,10 +179,20 @@ impl XmlXIncludeCtxt {
     /// Returns the new set
     #[doc(alias = "xmlXIncludeNewContext")]
     pub fn new(doc: XmlDocPtr) -> Self {
-        let mut res = Self::default();
-        res.doc = Some(doc);
-        res.nb_errors = 0;
-        res
+        XmlXIncludeCtxt {
+            doc,
+            inc_tab: vec![],
+            txt_tab: vec![],
+            url_tab: vec![],
+            nb_errors: 0,
+            fatal_err: 0,
+            legacy: 0,
+            parse_flags: 0,
+            base: None,
+            _private: null_mut(),
+            depth: 0,
+            is_stream: 0,
+        }
     }
 
     /// Get an XInclude attribute
@@ -250,14 +260,15 @@ impl XmlXIncludeCtxt {
 
             // compute the URI
             let mut base = None;
-            let mut uri = self.doc.and_then(|doc| {
-                if let Some(b) = cur.get_base(Some(doc)) {
-                    base = Some(b);
-                    build_uri(&href, base.as_deref().unwrap())
-                } else {
-                    doc.url.as_deref().and_then(|base| build_uri(&href, base))
-                }
-            });
+            let mut uri = if let Some(b) = cur.get_base(Some(self.doc)) {
+                base = Some(b);
+                build_uri(&href, base.as_deref().unwrap())
+            } else {
+                self.doc
+                    .url
+                    .as_deref()
+                    .and_then(|base| build_uri(&href, base))
+            };
             if uri.is_none() {
                 if let Some(base) = base.as_deref() {
                     // Some escaping may be needed
@@ -308,7 +319,7 @@ impl XmlXIncludeCtxt {
             }
             let url = parsed_uri.save();
 
-            if self.doc.as_deref().and_then(|doc| doc.url.as_deref()) == Some(url.as_str()) {
+            if self.doc.url.as_deref() == Some(url.as_str()) {
                 local = 1;
             }
 
@@ -389,7 +400,7 @@ impl XmlXIncludeCtxt {
                     if let Some(inc) = self.inc_tab[ref_index].inc {
                         let Some(res) = xml_static_copy_node_list(
                             Some(XmlGenericNodePtr::from(inc)),
-                            self.doc,
+                            Some(self.doc),
                             insert_parent.map(|parent| parent.into()),
                         ) else {
                             // goto error;
@@ -401,7 +412,7 @@ impl XmlXIncludeCtxt {
                 } else {
                     let Some(res) = xml_static_copy_node(
                         XmlGenericNodePtr::from(cur),
-                        self.doc,
+                        Some(self.doc),
                         insert_parent.map(|parent| parent.into()),
                         2,
                     ) else {
@@ -972,7 +983,7 @@ impl XmlXIncludeCtxt {
                 .filter(|node| node.element_type() != XmlElementType::XmlNamespaceDecl)?;
 
             let Some(mut end) = XmlGenericNodePtr::from_raw((*range).user2 as *mut XmlNode) else {
-                return xml_doc_copy_node(start, self.doc, 1);
+                return xml_doc_copy_node(start, Some(self.doc), 1);
             };
             if end.element_type() == XmlElementType::XmlNamespaceDecl {
                 return None;
@@ -993,7 +1004,7 @@ impl XmlXIncludeCtxt {
                     while level < 0 {
                         // copy must include namespaces and properties
                         let mut tmp2 =
-                            xml_doc_copy_node(list_parent.unwrap(), self.doc, 2).unwrap();
+                            xml_doc_copy_node(list_parent.unwrap(), Some(self.doc), 2).unwrap();
                         tmp2.add_child(list.unwrap());
                         list = Some(tmp2);
                         list_parent = list_parent.unwrap().parent();
@@ -1015,7 +1026,7 @@ impl XmlXIncludeCtxt {
                         let mut len: i32;
 
                         let tmp = if content.is_null() {
-                            xml_new_doc_text_len(self.doc, null_mut(), 0)
+                            xml_new_doc_text_len(Some(self.doc), null_mut(), 0)
                         } else {
                             len = index2;
                             if start == cur_node.into() && index1 > 1 {
@@ -1024,7 +1035,7 @@ impl XmlXIncludeCtxt {
                             } else {
                                 len = index2;
                             }
-                            xml_new_doc_text_len(self.doc, content, len)
+                            xml_new_doc_text_len(Some(self.doc), content, len)
                         };
                         // single sub text node selection
                         if list.is_none() {
@@ -1042,7 +1053,7 @@ impl XmlXIncludeCtxt {
                         end_level = level; /* remember the level of the end node */
                         end_flag = 1;
                         // last node - need to take care of properties + namespaces
-                        let tmp = xml_doc_copy_node(cur_node, self.doc, 2);
+                        let tmp = xml_doc_copy_node(cur_node, Some(self.doc), 2);
                         if list.is_none() {
                             list = tmp;
                             list_parent = cur_node.parent();
@@ -1079,13 +1090,13 @@ impl XmlXIncludeCtxt {
                         let mut content: *const XmlChar = cur_node.content;
 
                         let tmp = if content.is_null() {
-                            xml_new_doc_text_len(self.doc, null_mut(), 0)
+                            xml_new_doc_text_len(Some(self.doc), null_mut(), 0)
                         } else {
                             if index1 > 1 {
                                 content = content.add(index1 as usize - 1);
                                 index1 = 0;
                             }
-                            xml_new_doc_text(self.doc, content)
+                            xml_new_doc_text(Some(self.doc), content)
                         };
                         last = tmp.map(|node| node.into());
                         list = tmp.map(|node| node.into());
@@ -1095,7 +1106,7 @@ impl XmlXIncludeCtxt {
 
                         // start of the range - need to take care of
                         // properties and namespaces
-                        let tmp = xml_doc_copy_node(cur_node, self.doc, 2);
+                        let tmp = xml_doc_copy_node(cur_node, Some(self.doc), 2);
                         list = tmp;
                         last = tmp;
                         list_parent = cur_node.parent();
@@ -1125,7 +1136,7 @@ impl XmlXIncludeCtxt {
                         _ => {
                             // Middle of the range - need to take care of
                             // properties and namespaces
-                            tmp = xml_doc_copy_node(cur_node, self.doc, 2);
+                            tmp = xml_doc_copy_node(cur_node, Some(self.doc), 2);
                         }
                     }
                     if let Some(tmp) = tmp {
@@ -1154,7 +1165,7 @@ impl XmlXIncludeCtxt {
             let old_doc = self.doc;
             let old_inc_tab = take(&mut self.inc_tab);
             let old_is_stream: i32 = self.is_stream;
-            self.doc = Some(doc);
+            self.doc = doc;
             self.is_stream = 0;
 
             self.do_process(doc.get_root_element().unwrap());
@@ -1195,10 +1206,7 @@ impl XmlXIncludeCtxt {
             // Handling of references to the local document are done
             // directly through (*ctxt).doc.
             let doc = 'load: {
-                if url.is_empty()
-                    || url.starts_with('#')
-                    || self.doc.is_some_and(|doc| doc.url.as_deref() == Some(&url))
-                {
+                if url.is_empty() || url.starts_with('#') || self.doc.url.as_deref() == Some(&url) {
                     break 'load self.doc;
                 }
                 // Prevent reloading the document twice.
@@ -1216,7 +1224,7 @@ impl XmlXIncludeCtxt {
                         let Some(doc) = inc_doc.doc else {
                             return ret;
                         };
-                        break 'load Some(doc);
+                        break 'load doc;
                     }
                 }
 
@@ -1259,7 +1267,7 @@ impl XmlXIncludeCtxt {
                 }
 
                 // Make sure we have all entities fixed up
-                self.merge_entities(self.doc.unwrap(), doc);
+                self.merge_entities(self.doc, doc);
 
                 // We don't need the DTD anymore, free up space
                 // if ((*doc).intSubset != null_mut()) {
@@ -1276,7 +1284,7 @@ impl XmlXIncludeCtxt {
                 self.recurse_doc(doc, &url);
                 // urlTab might be reallocated.
                 self.url_tab[cache_nr].expanding = 0;
-                Some(doc)
+                doc
             };
 
             // loaded:
@@ -1296,7 +1304,7 @@ impl XmlXIncludeCtxt {
                         return ret;
                     }
 
-                    let xptrctxt: XmlXPathContextPtr = xml_xptr_new_context(doc, None, None);
+                    let xptrctxt: XmlXPathContextPtr = xml_xptr_new_context(Some(doc), None, None);
                     if xptrctxt.is_null() {
                         xml_xinclude_err!(
                             self,
@@ -1428,16 +1436,13 @@ impl XmlXIncludeCtxt {
                 }
             } else {
                 // Add the top children list as the replacement copy.
-                self.inc_tab[ref_index].inc = doc
-                    .and_then(|doc| {
-                        xml_doc_copy_node(doc.get_root_element().unwrap().into(), self.doc, 1)
-                    })
-                    .and_then(|node| XmlNodePtr::try_from(node).ok());
+                self.inc_tab[ref_index].inc =
+                    xml_doc_copy_node(doc.get_root_element().unwrap().into(), Some(self.doc), 1)
+                        .and_then(|node| XmlNodePtr::try_from(node).ok());
             }
 
             // Do the xml:base fixup if needed
-            if doc
-                .is_some_and(|doc| doc.parse_flags & XmlParserOption::XmlParseNoBasefix as i32 == 0)
+            if doc.parse_flags & XmlParserOption::XmlParseNoBasefix as i32 == 0
                 && self.parse_flags & XmlParserOption::XmlParseNoBasefix as i32 == 0
             {
                 // The base is only adjusted if "necessary", i.e. if the xinclude node
@@ -1571,7 +1576,7 @@ impl XmlXIncludeCtxt {
             for txt in &self.txt_tab {
                 if *url == *txt.url {
                     let text = CString::new(&*txt.text).unwrap();
-                    let node = xml_new_doc_text(self.doc, text.as_ptr() as *const u8);
+                    let node = xml_new_doc_text(Some(self.doc), text.as_ptr() as *const u8);
                     self.inc_tab[ref_index].inc = node;
                     return 0;
                 }
@@ -1618,7 +1623,7 @@ impl XmlXIncludeCtxt {
                 return ret;
             };
             buf.borrow_mut().encoder = get_encoding_handler(enc);
-            let Some(mut node) = xml_new_doc_text(self.doc, null_mut()) else {
+            let Some(mut node) = xml_new_doc_text(Some(self.doc), null_mut()) else {
                 let node = self.inc_tab[ref_index].elem.map(|node| node.into());
                 xml_xinclude_err_memory(Some(self), node, None);
                 // goto error;
@@ -1752,14 +1757,15 @@ impl XmlXIncludeCtxt {
 
             // compute the URI
             let mut base = None;
-            let mut uri = self.doc.and_then(|doc| {
-                if let Some(b) = cur.get_base(Some(doc)) {
-                    base = Some(b);
-                    build_uri(&href, base.as_deref().unwrap())
-                } else {
-                    doc.url.as_deref().and_then(|base| build_uri(&href, base))
-                }
-            });
+            let mut uri = if let Some(b) = cur.get_base(Some(self.doc)) {
+                base = Some(b);
+                build_uri(&href, base.as_deref().unwrap())
+            } else {
+                self.doc
+                    .url
+                    .as_deref()
+                    .and_then(|base| build_uri(&href, base))
+            };
             if uri.is_none() {
                 if let Some(base) = base.as_deref() {
                     // Some escaping may be needed
@@ -1986,25 +1992,6 @@ impl XmlXIncludeCtxt {
                 ret = -1;
             }
             ret
-        }
-    }
-}
-
-impl Default for XmlXIncludeCtxt {
-    fn default() -> Self {
-        Self {
-            doc: None,
-            inc_tab: vec![],
-            txt_tab: vec![],
-            url_tab: vec![],
-            nb_errors: 0,
-            fatal_err: 0,
-            legacy: 0,
-            parse_flags: 0,
-            base: None,
-            _private: null_mut(),
-            depth: 0,
-            is_stream: 0,
         }
     }
 }
