@@ -121,7 +121,6 @@ macro_rules! xml_xinclude_err {
     };
 }
 
-pub type XmlXIncludeRefPtr = *mut XmlXIncludeRef;
 #[doc(alias = "xmlXIncludeRef")]
 #[repr(C)]
 #[derive(Default)]
@@ -157,8 +156,8 @@ pub type XmlXIncludeCtxtPtr = *mut XmlXIncludeCtxt;
 #[doc(alias = "xmlXIncludeCtxt")]
 #[repr(C)]
 pub struct XmlXIncludeCtxt {
-    doc: Option<XmlDocPtr>,          /* the source document */
-    inc_tab: Vec<XmlXIncludeRefPtr>, /* array of included references */
+    doc: Option<XmlDocPtr>,       /* the source document */
+    inc_tab: Vec<XmlXIncludeRef>, /* array of included references */
 
     txt_tab: Vec<XmlXIncludeTxt>, /* array of unparsed documents */
 
@@ -215,7 +214,7 @@ impl XmlXIncludeCtxt {
 
     /// Add a new node to process to an XInclude context
     #[doc(alias = "xmlXIncludeAddNode")]
-    unsafe fn add_node(&mut self, cur: XmlNodePtr) -> XmlXIncludeRefPtr {
+    unsafe fn add_node(&mut self, cur: XmlNodePtr) -> usize {
         unsafe {
             let mut xml: i32 = 1;
             let mut local: i32 = 0;
@@ -236,7 +235,7 @@ impl XmlXIncludeCtxt {
                         "invalid value {} for 'parse'\n",
                         parse
                     );
-                    return null_mut();
+                    return usize::MAX;
                 }
             }
 
@@ -265,7 +264,7 @@ impl XmlXIncludeCtxt {
                     XmlParserErrors::XmlXIncludeHrefURI,
                     "failed build URL\n"
                 );
-                return null_mut();
+                return usize::MAX;
             };
             let mut fragment = self.get_prop(cur, XINCLUDE_PARSE_XPOINTER);
 
@@ -278,7 +277,7 @@ impl XmlXIncludeCtxt {
                     "invalid value URI {}\n",
                     uri
                 );
-                return null_mut();
+                return usize::MAX;
             };
 
             if parsed_uri.fragment.is_some() {
@@ -294,7 +293,7 @@ impl XmlXIncludeCtxt {
                         "Invalid fragment identifier in URI {} use the xpointer attribute\n",
                         uri
                     );
-                    return null_mut();
+                    return usize::MAX;
                 }
                 parsed_uri.fragment = None;
             }
@@ -313,17 +312,30 @@ impl XmlXIncludeCtxt {
                     "detected a local recursion with no xpointer in {}\n",
                     url
                 );
-                return null_mut();
+                return usize::MAX;
             }
 
-            let refe: XmlXIncludeRefPtr = xml_xinclude_new_ref(self, Some(&url), cur);
-            if refe.is_null() {
-                return null_mut();
-            }
-            (*refe).fragment = fragment.map(|fragment| fragment.into());
-            (*refe).xml = xml;
+            let refe = self.add_ref(Some(&url), cur);
+            self.inc_tab[refe].fragment = fragment.map(|fragment| fragment.into());
+            self.inc_tab[refe].xml = xml;
             refe
         }
+    }
+
+    /// Creates a new reference within an XInclude context
+    ///
+    /// Returns the new set
+    #[doc(alias = "xmlXIncludeNewRef")]
+    fn add_ref(&mut self, uri: Option<&str>, elem: XmlNodePtr) -> usize {
+        self.inc_tab.push(XmlXIncludeRef {
+            uri: uri.map(|uri| uri.into()),
+            fragment: None,
+            elem: Some(elem),
+            xml: 0,
+            inc: None,
+            ..Default::default()
+        });
+        self.inc_tab.len() - 1
     }
 
     /// Make a copy of the node while expanding nested XIncludes.
@@ -357,15 +369,15 @@ impl XmlXIncludeCtxt {
                             || ns.href().as_deref() == Some(XINCLUDE_OLD_NS)
                     })
                 {
-                    let refe: XmlXIncludeRefPtr = self.expand_node(cur);
+                    let ref_index = self.expand_node(cur);
 
-                    if refe.is_null() {
+                    if ref_index == usize::MAX {
                         // goto error;
                         xml_free_node_list(result);
                         return None;
                     }
                     // TODO: Insert xmlElementType::XML_XINCLUDE_START and xmlElementType::XML_XINCLUDE_END nodes
-                    if let Some(inc) = (*refe).inc {
+                    if let Some(inc) = self.inc_tab[ref_index].inc {
                         let Some(res) = xml_static_copy_node_list(
                             Some(XmlGenericNodePtr::from(inc)),
                             self.doc,
@@ -542,12 +554,12 @@ impl XmlXIncludeCtxt {
     /// If the XInclude node wasn't processed yet, create a new RefPtr,
     /// add it to self.incTab and load the included items.
     ///
-    /// Returns the new or existing xmlXIncludeRefPtr, or NULL in case of error.
+    /// Returns the index of new or existing `XmlXIncludeRef` or `usize::MAX` in case of error.
     #[doc(alias = "xmlXIncludeExpandNode")]
-    unsafe fn expand_node(&mut self, node: XmlNodePtr) -> XmlXIncludeRefPtr {
+    unsafe fn expand_node(&mut self, node: XmlNodePtr) -> usize {
         unsafe {
             if self.fatal_err != 0 {
-                return null_mut();
+                return usize::MAX;
             }
             if self.depth >= XINCLUDE_MAX_DEPTH {
                 xml_xinclude_err!(
@@ -557,33 +569,33 @@ impl XmlXIncludeCtxt {
                     "maximum recursion depth exceeded\n"
                 );
                 self.fatal_err = 1;
-                return null_mut();
+                return usize::MAX;
             }
 
-            for &inc in &self.inc_tab {
-                if (*inc).elem == Some(node) {
-                    if (*inc).expanding != 0 {
+            for (i, inc) in self.inc_tab.iter().enumerate() {
+                if inc.elem == Some(node) {
+                    if inc.expanding != 0 {
                         xml_xinclude_err!(
                             self,
                             Some(node.into()),
                             XmlParserErrors::XmlXIncludeRecursion,
                             "inclusion loop detected\n"
                         );
-                        return null_mut();
+                        return usize::MAX;
                     }
-                    return inc;
+                    return i;
                 }
             }
 
-            let refe: XmlXIncludeRefPtr = self.add_node(node);
-            if refe.is_null() {
-                return null_mut();
+            let refe = self.add_node(node);
+            if refe == usize::MAX {
+                return usize::MAX;
             }
-            (*refe).expanding = 1;
+            self.inc_tab[refe].expanding = 1;
             self.depth += 1;
             self.load_node(refe);
             self.depth -= 1;
-            (*refe).expanding = 0;
+            self.inc_tab[refe].expanding = 0;
 
             refe
         }
@@ -593,20 +605,20 @@ impl XmlXIncludeCtxt {
     ///
     /// Returns 0 if substitution succeeded, -1 if some processing failed
     #[doc(alias = "xmlXIncludeIncludeNode")]
-    unsafe fn include_node(&mut self, refe: XmlXIncludeRefPtr) -> i32 {
+    unsafe fn include_node(&mut self, ref_index: usize) -> i32 {
         unsafe {
-            if refe.is_null() {
+            if ref_index == usize::MAX {
                 return -1;
             }
-            let cur = (*refe).elem;
+            let cur = self.inc_tab[ref_index].elem;
             let Some(mut cur) =
                 cur.filter(|cur| cur.element_type() != XmlElementType::XmlNamespaceDecl)
             else {
                 return -1;
             };
 
-            let mut list = (*refe).inc.take();
-            (*refe).empty_fb = 0;
+            let mut list = self.inc_tab[ref_index].inc.take();
+            self.inc_tab[ref_index].empty_fb = 0;
 
             // Check against the risk of generating a multi-rooted document
             if cur
@@ -626,7 +638,7 @@ impl XmlXIncludeCtxt {
                 if nb_elem > 1 {
                     xml_xinclude_err!(
                         self,
-                        (*refe).elem.map(|node| node.into()),
+                        self.inc_tab[ref_index].elem.map(|node| node.into()),
                         XmlParserErrors::XmlXIncludeMultipleRoot,
                         "XInclude error: would result in multiple root nodes\n"
                     );
@@ -649,7 +661,7 @@ impl XmlXIncludeCtxt {
                 xml_free_node(cur);
             } else {
                 // Change the current node as an XInclude start one, and add an XInclude end one
-                if (*refe).fallback != 0 {
+                if self.inc_tab[ref_index].fallback != 0 {
                     cur.unset_prop("href");
                 }
                 cur.typ = XmlElementType::XmlXIncludeStart;
@@ -666,7 +678,7 @@ impl XmlXIncludeCtxt {
                 else {
                     xml_xinclude_err!(
                         self,
-                        (*refe).elem.map(|node| node.into()),
+                        self.inc_tab[ref_index].elem.map(|node| node.into()),
                         XmlParserErrors::XmlXIncludeBuildFailed,
                         "failed to build node\n"
                     );
@@ -1138,10 +1150,6 @@ impl XmlXIncludeCtxt {
 
             self.do_process(doc.get_root_element().unwrap());
 
-            for &inc in &self.inc_tab {
-                xml_xinclude_free_ref(inc);
-            }
-
             self.doc = old_doc;
             self.inc_tab = old_inc_tab;
             self.is_stream = old_is_stream;
@@ -1152,7 +1160,7 @@ impl XmlXIncludeCtxt {
     ///
     /// Returns 0 in case of success, -1 in case of failure
     #[doc(alias = "xmlXIncludeLoadDoc")]
-    unsafe fn load_doc(&mut self, url: &str, refe: XmlXIncludeRefPtr) -> i32 {
+    unsafe fn load_doc(&mut self, url: &str, ref_index: usize) -> i32 {
         unsafe {
             let ret: i32 = -1;
             #[cfg(feature = "xpointer")]
@@ -1162,7 +1170,7 @@ impl XmlXIncludeCtxt {
             let Some(mut uri) = XmlURI::parse(url) else {
                 xml_xinclude_err!(
                     self,
-                    (*refe).elem.map(|node| node.into()),
+                    self.inc_tab[ref_index].elem.map(|node| node.into()),
                     XmlParserErrors::XmlXIncludeHrefURI,
                     "invalid value URI {}\n",
                     url
@@ -1170,7 +1178,7 @@ impl XmlXIncludeCtxt {
                 return ret;
             };
             let mut fragment = uri.fragment.take();
-            if let Some(frag) = (*refe).fragment.as_deref() {
+            if let Some(frag) = self.inc_tab[ref_index].fragment.as_deref() {
                 fragment = Some(Cow::Owned(frag.to_owned()));
             }
             let mut url = uri.save();
@@ -1190,7 +1198,7 @@ impl XmlXIncludeCtxt {
                         if inc_doc.expanding != 0 {
                             xml_xinclude_err!(
                                 self,
-                                (*refe).elem.map(|node| node.into()),
+                                self.inc_tab[ref_index].elem.map(|node| node.into()),
                                 XmlParserErrors::XmlXIncludeRecursion,
                                 "inclusion loop detected\n"
                             );
@@ -1272,7 +1280,7 @@ impl XmlXIncludeCtxt {
                     if self.is_stream != 0 && doc == self.doc {
                         xml_xinclude_err!(
                             self,
-                            (*refe).elem.map(|node| node.into()),
+                            self.inc_tab[ref_index].elem.map(|node| node.into()),
                             XmlParserErrors::XmlXIncludeXPtrFailed,
                             "XPointer expressions not allowed in streaming mode\n"
                         );
@@ -1283,7 +1291,7 @@ impl XmlXIncludeCtxt {
                     if xptrctxt.is_null() {
                         xml_xinclude_err!(
                             self,
-                            (*refe).elem.map(|node| node.into()),
+                            self.inc_tab[ref_index].elem.map(|node| node.into()),
                             XmlParserErrors::XmlXIncludeXPtrFailed,
                             "could not create XPointer context\n"
                         );
@@ -1293,7 +1301,7 @@ impl XmlXIncludeCtxt {
                     if xptr.is_null() {
                         xml_xinclude_err!(
                             self,
-                            (*refe).elem.map(|node| node.into()),
+                            self.inc_tab[ref_index].elem.map(|node| node.into()),
                             XmlParserErrors::XmlXIncludeXPtrFailed,
                             "XPointer evaluation failed: #{}\n",
                             fragment
@@ -1310,7 +1318,7 @@ impl XmlXIncludeCtxt {
                         | XmlXPathObjectType::XPathXSLTTree => {
                             xml_xinclude_err!(
                                 self,
-                                (*refe).elem.map(|node| node.into()),
+                                self.inc_tab[ref_index].elem.map(|node| node.into()),
                                 XmlParserErrors::XmlXIncludeXPtrResult,
                                 "XPointer is not a range: #{}\n",
                                 fragment
@@ -1323,7 +1331,7 @@ impl XmlXIncludeCtxt {
                         XmlXPathObjectType::XPathPoint => {
                             xml_xinclude_err!(
                                 self,
-                                (*refe).elem.map(|node| node.into()),
+                                self.inc_tab[ref_index].elem.map(|node| node.into()),
                                 XmlParserErrors::XmlXIncludeXPtrResult,
                                 "XPointer is not a range: #{}\n",
                                 fragment
@@ -1362,7 +1370,7 @@ impl XmlXIncludeCtxt {
                                 XmlElementType::XmlAttributeNode => {
                                     xml_xinclude_err!(
                                         self,
-                                        (*refe).elem.map(|node| node.into()),
+                                        self.inc_tab[ref_index].elem.map(|node| node.into()),
                                         XmlParserErrors::XmlXIncludeXPtrResult,
                                         "XPointer selects an attribute: #{}\n",
                                         fragment
@@ -1373,7 +1381,7 @@ impl XmlXIncludeCtxt {
                                 XmlElementType::XmlNamespaceDecl => {
                                     xml_xinclude_err!(
                                         self,
-                                        (*refe).elem.map(|node| node.into()),
+                                        self.inc_tab[ref_index].elem.map(|node| node.into()),
                                         XmlParserErrors::XmlXIncludeXPtrResult,
                                         "XPointer selects a namespace: #{}\n",
                                         fragment
@@ -1392,7 +1400,7 @@ impl XmlXIncludeCtxt {
                                 | XmlElementType::XmlXIncludeEnd => {
                                     xml_xinclude_err!(
                                         self,
-                                        (*refe).elem.map(|node| node.into()),
+                                        self.inc_tab[ref_index].elem.map(|node| node.into()),
                                         XmlParserErrors::XmlXIncludeXPtrResult,
                                         "XPointer selects unexpected nodes: #{}\n",
                                         fragment
@@ -1405,13 +1413,13 @@ impl XmlXIncludeCtxt {
                             i += 1;
                         }
                     }
-                    (*refe).inc = self.copy_xpointer(xptr);
+                    self.inc_tab[ref_index].inc = self.copy_xpointer(xptr);
                     xml_xpath_free_object(xptr);
                     xml_xpath_free_context(xptrctxt);
                 }
             } else {
                 // Add the top children list as the replacement copy.
-                (*refe).inc = doc
+                self.inc_tab[ref_index].inc = doc
                     .and_then(|doc| {
                         xml_doc_copy_node(doc.get_root_element().unwrap().into(), self.doc, 1)
                     })
@@ -1425,7 +1433,7 @@ impl XmlXIncludeCtxt {
             {
                 // The base is only adjusted if "necessary", i.e. if the xinclude node
                 // has a base specified, or the URL is relative
-                let mut base = (*refe)
+                let mut base = self.inc_tab[ref_index]
                     .elem
                     .unwrap()
                     .get_ns_prop("base", XML_XML_NAMESPACE.to_str().ok());
@@ -1441,7 +1449,7 @@ impl XmlXIncludeCtxt {
                         // Error return
                         xml_xinclude_err!(
                             self,
-                            (*refe).elem.map(|node| node.into()),
+                            self.inc_tab[ref_index].elem.map(|node| node.into()),
                             XmlParserErrors::XmlXIncludeHrefURI,
                             "trying to build relative URI from {}\n",
                             url
@@ -1450,7 +1458,7 @@ impl XmlXIncludeCtxt {
                 }
                 if let Some(base) = base {
                     // Adjustment may be needed
-                    let mut node = (*refe).inc;
+                    let mut node = self.inc_tab[ref_index].inc;
                     while let Some(mut cur_node) = node {
                         // Only work on element nodes
                         if cur_node.element_type() == XmlElementType::XmlElementNode {
@@ -1476,7 +1484,9 @@ impl XmlXIncludeCtxt {
                                             // error
                                             xml_xinclude_err!(
                                                 self,
-                                                (*refe).elem.map(|node| node.into()),
+                                                self.inc_tab[ref_index]
+                                                    .elem
+                                                    .map(|node| node.into()),
                                                 XmlParserErrors::XmlXIncludeHrefURI,
                                                 "trying to rebuild base from {}\n",
                                                 xml_base
@@ -1503,7 +1513,7 @@ impl XmlXIncludeCtxt {
     ///
     /// Returns 0 in case of success, -1 in case of failure
     #[doc(alias = "xmlXIncludeLoadTxt")]
-    unsafe fn load_txt(&mut self, mut url: &str, refe: XmlXIncludeRefPtr) -> i32 {
+    unsafe fn load_txt(&mut self, mut url: &str, ref_index: usize) -> i32 {
         unsafe {
             let mut i: i32;
             let mut ret: i32 = -1;
@@ -1518,7 +1528,7 @@ impl XmlXIncludeCtxt {
             let Some(uri) = XmlURI::parse(url) else {
                 xml_xinclude_err!(
                     self,
-                    (*refe).elem.map(|node| node.into()),
+                    self.inc_tab[ref_index].elem.map(|node| node.into()),
                     XmlParserErrors::XmlXIncludeHrefURI,
                     "invalid value URI {}\n",
                     url
@@ -1528,7 +1538,7 @@ impl XmlXIncludeCtxt {
             if let Some(fragment) = uri.fragment.as_deref() {
                 xml_xinclude_err!(
                     self,
-                    (*refe).elem.map(|node| node.into()),
+                    self.inc_tab[ref_index].elem.map(|node| node.into()),
                     XmlParserErrors::XmlXIncludeTextFragment,
                     "fragment identifier forbidden for text: {}\n",
                     fragment
@@ -1541,7 +1551,7 @@ impl XmlXIncludeCtxt {
             if url.is_empty() {
                 xml_xinclude_err!(
                     self,
-                    (*refe).elem.map(|node| node.into()),
+                    self.inc_tab[ref_index].elem.map(|node| node.into()),
                     XmlParserErrors::XmlXIncludeTextDocument,
                     "text serialization of document not available\n"
                 );
@@ -1553,14 +1563,14 @@ impl XmlXIncludeCtxt {
                 if *url == *txt.url {
                     let text = CString::new(&*txt.text).unwrap();
                     let node = xml_new_doc_text(self.doc, text.as_ptr() as *const u8);
-                    (*refe).inc = node;
+                    self.inc_tab[ref_index].inc = node;
                     return 0;
                 }
             }
 
             // Try to get the encoding if available
             let mut encoding = None;
-            if let Some(elem) = (*refe).elem {
+            if let Some(elem) = self.inc_tab[ref_index].elem {
                 encoding = elem.get_prop(XINCLUDE_PARSE_ENCODING);
             }
             if let Some(encoding) = encoding {
@@ -1573,7 +1583,7 @@ impl XmlXIncludeCtxt {
                     _ => {
                         xml_xinclude_err!(
                             self,
-                            (*refe).elem.map(|node| node.into()),
+                            self.inc_tab[ref_index].elem.map(|node| node.into()),
                             XmlParserErrors::XmlXIncludeUnknownEncoding,
                             "encoding {} not supported\n",
                             encoding
@@ -1600,7 +1610,11 @@ impl XmlXIncludeCtxt {
             };
             buf.borrow_mut().encoder = get_encoding_handler(enc);
             let Some(mut node) = xml_new_doc_text(self.doc, null_mut()) else {
-                xml_xinclude_err_memory(self, (*refe).elem.map(|node| node.into()), None);
+                xml_xinclude_err_memory(
+                    self,
+                    self.inc_tab[ref_index].elem.map(|node| node.into()),
+                    None,
+                );
                 // goto error;
                 xml_free_input_stream(input_stream);
                 xml_free_parser_ctxt(pctxt);
@@ -1627,7 +1641,7 @@ impl XmlXIncludeCtxt {
                 if !xml_is_char(cur as u32) {
                     xml_xinclude_err!(
                         self,
-                        (*refe).elem.map(|node| node.into()),
+                        self.inc_tab[ref_index].elem.map(|node| node.into()),
                         XmlParserErrors::XmlXIncludeInvalidChar,
                         "{} contains invalid char\n",
                         url
@@ -1654,7 +1668,7 @@ impl XmlXIncludeCtxt {
 
             // loaded:
             // Add the element as the replacement copy.
-            (*refe).inc = Some(node);
+            self.inc_tab[ref_index].inc = Some(node);
             ret = 0;
 
             // error:
@@ -1668,7 +1682,7 @@ impl XmlXIncludeCtxt {
     ///
     /// Returns 0 in case of success, -1 in case of failure
     #[doc(alias = "xmlXIncludeLoadFallback")]
-    unsafe fn load_fallback(&mut self, fallback: XmlNodePtr, refe: XmlXIncludeRefPtr) -> i32 {
+    unsafe fn load_fallback(&mut self, fallback: XmlNodePtr, ref_index: usize) -> i32 {
         unsafe {
             let mut ret: i32 = 0;
 
@@ -1679,17 +1693,17 @@ impl XmlXIncludeCtxt {
                 // It's possible that the fallback also has 'includes'
                 // (Bug 129969), so we re-process the fallback just in case
                 let old_nb_errors = self.nb_errors;
-                (*refe).inc = self.copy_node(fallback, 1);
+                self.inc_tab[ref_index].inc = self.copy_node(fallback, 1);
                 if self.nb_errors > old_nb_errors {
                     ret = -1;
-                } else if (*refe).inc.is_none() {
-                    (*refe).empty_fb = 1;
+                } else if self.inc_tab[ref_index].inc.is_none() {
+                    self.inc_tab[ref_index].empty_fb = 1;
                 }
             } else {
-                (*refe).inc = None;
-                (*refe).empty_fb = 1; /* flag empty callback */
+                self.inc_tab[ref_index].inc = None;
+                self.inc_tab[ref_index].empty_fb = 1; /* flag empty callback */
             }
-            (*refe).fallback = 1;
+            self.inc_tab[ref_index].fallback = 1;
             ret
         }
     }
@@ -1698,15 +1712,15 @@ impl XmlXIncludeCtxt {
     ///
     /// Returns 0 if substitution succeeded, -1 if some processing failed
     #[doc(alias = "xmlXIncludeLoadNode")]
-    unsafe fn load_node(&mut self, refe: XmlXIncludeRefPtr) -> i32 {
+    unsafe fn load_node(&mut self, ref_index: usize) -> i32 {
         unsafe {
             let mut xml: i32 = 1; /* default Issue 64 */
             let mut ret: i32;
 
-            if refe.is_null() {
+            if ref_index == usize::MAX {
                 return -1;
             }
-            let Some(cur) = (*refe).elem else {
+            let Some(cur) = self.inc_tab[ref_index].elem else {
                 return -1;
             };
 
@@ -1763,10 +1777,10 @@ impl XmlXIncludeCtxt {
             self.base = base.map(|base| base.into());
 
             if xml != 0 {
-                ret = self.load_doc(&uri, refe);
+                ret = self.load_doc(&uri, ref_index);
                 // xmlXIncludeGetFragment(self, cur, URI);
             } else {
-                ret = self.load_txt(&uri, refe);
+                ret = self.load_txt(&uri, ref_index);
             }
 
             // Restore the original base before checking for fallback
@@ -1783,7 +1797,7 @@ impl XmlXIncludeCtxt {
                                 || ns.href().as_deref() == Some(XINCLUDE_OLD_NS)
                         })
                     {
-                        ret = self.load_fallback(cur_node, refe);
+                        ret = self.load_fallback(cur_node, ref_index);
                         break;
                     }
                     children = cur_node
@@ -1819,16 +1833,6 @@ impl XmlXIncludeCtxt {
 
             // pass in the application data to the parser context.
             (*pctxt)._private = self._private;
-
-            // try to ensure that new documents included are actually
-            // built with the same dictionary as the including document.
-            // if !self.doc.is_null() && !(*self.doc).dict.is_null() {
-            //     if !(*pctxt).dict.is_null() {
-            //         xml_dict_free((*pctxt).dict);
-            //     }
-            //     (*pctxt).dict = (*self.doc).dict;
-            //     xml_dict_reference((*pctxt).dict);
-            // }
 
             xml_ctxt_use_options(
                 pctxt,
@@ -1878,7 +1882,6 @@ impl XmlXIncludeCtxt {
     #[doc(alias = "xmlXIncludeDoProcess")]
     unsafe fn do_process(&mut self, tree: XmlNodePtr) -> i32 {
         unsafe {
-            let mut refe: XmlXIncludeRefPtr;
             let mut ret: i32 = 0;
 
             if tree.element_type() == XmlElementType::XmlNamespaceDecl {
@@ -1892,10 +1895,10 @@ impl XmlXIncludeCtxt {
                 'inner: {
                     // TODO: need to work on entities -> stack
                     if self.test_node(cur) == 1 {
-                        refe = self.expand_node(cur);
+                        let ref_index = self.expand_node(cur);
                         // Mark direct includes.
-                        if !refe.is_null() {
-                            (*refe).replace = 1;
+                        if ref_index != usize::MAX {
+                            self.inc_tab[ref_index].replace = 1;
                         }
                     } else if let Some(children) = cur
                         .children()
@@ -1934,17 +1937,16 @@ impl XmlXIncludeCtxt {
             // Second phase: extend the original document infoset.
             let len = self.inc_tab.len();
             for i in start..len {
-                let inc = self.inc_tab[i];
-                if (*inc).replace != 0 {
-                    if (*inc).inc.is_some() || (*inc).empty_fb != 0 {
+                if self.inc_tab[i].replace != 0 {
+                    if self.inc_tab[i].inc.is_some() || self.inc_tab[i].empty_fb != 0 {
                         // (empty fallback)
-                        self.include_node(inc);
+                        self.include_node(i);
                     }
-                    (*inc).replace = 0;
+                    self.inc_tab[i].replace = 0;
                 } else {
                     // Ignore includes which were added indirectly, for example
                     // inside xi:fallback elements.
-                    if let Some(inc) = (*inc).inc.take() {
+                    if let Some(inc) = self.inc_tab[i].inc.take() {
                         xml_free_node_list(Some(inc));
                     }
                 }
@@ -1955,9 +1957,7 @@ impl XmlXIncludeCtxt {
                 // incTab references nodes which will eventually be deleted in
                 // streaming mode. The table is only required for XPointer
                 // expressions which aren't allowed in streaming mode.
-                for inc in self.inc_tab.drain(..) {
-                    xml_xinclude_free_ref(inc);
-                }
+                self.inc_tab.clear();
             }
 
             ret
@@ -2095,44 +2095,6 @@ unsafe fn xml_xinclude_err_memory(
     }
 }
 
-/// Free an XInclude reference
-#[doc(alias = "xmlXIncludeFreeRef")]
-unsafe fn xml_xinclude_free_ref(refe: XmlXIncludeRefPtr) {
-    unsafe {
-        if refe.is_null() {
-            return;
-        }
-        drop_in_place(refe);
-        xml_free(refe as _);
-    }
-}
-
-/// Creates a new reference within an XInclude context
-///
-/// Returns the new set
-#[doc(alias = "xmlXIncludeNewRef")]
-unsafe fn xml_xinclude_new_ref(
-    ctxt: XmlXIncludeCtxtPtr,
-    uri: Option<&str>,
-    elem: XmlNodePtr,
-) -> XmlXIncludeRefPtr {
-    unsafe {
-        let ret: XmlXIncludeRefPtr = xml_malloc(size_of::<XmlXIncludeRef>()) as XmlXIncludeRefPtr;
-        if ret.is_null() {
-            xml_xinclude_err_memory(ctxt, Some(elem.into()), Some("growing XInclude context"));
-            return null_mut();
-        }
-        std::ptr::write(&mut *ret, XmlXIncludeRef::default());
-        (*ret).uri = uri.map(|uri| uri.into());
-        (*ret).fragment = None;
-        (*ret).elem = Some(elem);
-        (*ret).xml = 0;
-        (*ret).inc = None;
-        (*ctxt).inc_tab.push(ret);
-        ret
-    }
-}
-
 /// Returns the @n'th element child of @cur or NULL
 #[doc(alias = "xmlXIncludeGetNthChild")]
 #[cfg(feature = "libxml_xptr_locs")]
@@ -2267,11 +2229,6 @@ pub unsafe fn xml_xinclude_free_context(ctxt: XmlXIncludeCtxtPtr) {
         for inc_doc in (*ctxt).url_tab.drain(..) {
             if let Some(doc) = inc_doc.doc {
                 xml_free_doc(doc);
-            }
-        }
-        for inc in (*ctxt).inc_tab.drain(..) {
-            if !inc.is_null() {
-                xml_xinclude_free_ref(inc);
             }
         }
         drop_in_place(ctxt);
