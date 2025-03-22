@@ -42,6 +42,8 @@ pub mod tree;
 pub mod uri;
 #[cfg(feature = "libxml_writer")]
 pub mod writer;
+#[cfg(feature = "xinclude")]
+pub mod xinclude;
 #[cfg(feature = "schema")]
 pub mod xmlschemas;
 #[cfg(feature = "schema")]

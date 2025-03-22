@@ -32,14 +32,14 @@ use std::{
     sync::atomic::Ordering,
 };
 
-#[cfg(feature = "xinclude")]
-use crate::libxml::xinclude::XmlXIncludeCtxt;
 #[cfg(feature = "libxml_pattern")]
 use crate::pattern::{XmlPattern, xml_pattern_compile};
 #[cfg(feature = "schema")]
 use crate::relaxng::{XmlRelaxNGValidCtxtPtr, xml_relaxng_new_parser_ctxt};
 #[cfg(feature = "libxml_reader")]
 use crate::tree::{XmlAttrPtr, XmlDocPtr};
+#[cfg(feature = "xinclude")]
+use crate::xinclude::XmlXIncludeCtxt;
 #[cfg(feature = "schema")]
 use crate::xmlschemas::schema::XmlSchemaPtr;
 use crate::{
@@ -338,8 +338,8 @@ impl XmlTextReader {
 
         unsafe {
             use crate::{
-                libxml::xinclude::{XINCLUDE_NS, XINCLUDE_OLD_NS},
                 tree::{NodeCommon, XmlEntityPtr},
+                xinclude::{XINCLUDE_NS, XINCLUDE_OLD_NS},
             };
 
             let mut val: i32;
@@ -3263,9 +3263,9 @@ pub unsafe fn xml_text_reader_setup(
         use crate::{
             encoding::{XmlCharEncoding, find_encoding_handler},
             generic_error,
-            libxml::xinclude::XINCLUDE_NODE,
             parser::{XmlParserInputPtr, xml_new_input_stream},
             uri::canonic_path,
+            xinclude::XINCLUDE_NODE,
         };
 
         if reader.is_null() {

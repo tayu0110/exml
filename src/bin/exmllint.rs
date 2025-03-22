@@ -37,6 +37,8 @@ use exml::pattern::{XmlPattern, XmlStreamCtxt, xml_pattern_compile};
 use exml::schematron::{
     XmlSchematron, XmlSchematronParserCtxt, XmlSchematronValidCtxt, XmlSchematronValidOptions,
 };
+#[cfg(feature = "xinclude")]
+use exml::xinclude::xml_xinclude_process_flags;
 #[cfg(feature = "schema")]
 use exml::xmlschemas::schema::XmlSchema;
 use exml::{
@@ -71,7 +73,6 @@ use exml::{
             xml_free_valid_ctxt, xml_new_valid_ctxt, xml_valid_get_valid_elements,
             xml_validate_document, xml_validate_dtd,
         },
-        xinclude::xml_xinclude_process_flags,
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_size,
             xml_mem_used, xml_memory_dump, xml_memory_strdup,

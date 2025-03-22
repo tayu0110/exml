@@ -20,8 +20,6 @@ pub mod schemas_internals;
 pub mod threads;
 pub mod uri;
 pub mod valid;
-#[cfg(feature = "xinclude")]
-pub mod xinclude;
 #[cfg(feature = "xpointer")]
 pub mod xlink;
 #[cfg(any(feature = "libxml_regexp", feature = "libxml_automata"))]

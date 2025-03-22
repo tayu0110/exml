@@ -29,6 +29,8 @@ use exml::libxml::xmlregexp::XmlRegexp;
 use exml::pattern::{XmlPattern, XmlStreamCtxt};
 #[cfg(feature = "schematron")]
 use exml::schematron::XmlSchematron;
+#[cfg(feature = "xinclude")]
+use exml::xinclude::xml_xinclude_process_flags;
 #[cfg(feature = "schema")]
 use exml::xmlschemas::schema::XmlSchemaPtr;
 use exml::{
@@ -58,7 +60,6 @@ use exml::{
             xml_set_external_entity_loader,
         },
         relaxng::XmlRelaxNGPtr,
-        xinclude::xml_xinclude_process_flags,
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
             xml_memory_dump, xml_memory_strdup,

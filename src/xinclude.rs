@@ -39,6 +39,7 @@ use crate::{
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     io::xml_parser_get_directory,
     libxml::{
+        chvalid::xml_is_char,
         parser::{
             XML_DETECT_IDS, XmlParserOption, xml_ctxt_use_options, xml_init_parser,
             xml_load_external_entity, xml_parse_document,
@@ -60,8 +61,6 @@ use crate::{
         xml_xpath_free_object,
     },
 };
-
-use super::chvalid::xml_is_char;
 
 /// A constant defining the Xinclude namespace: `http://www.w3.org/2003/XInclude`
 pub const XINCLUDE_NS: &str = "http://www.w3.org/2003/XInclude";
