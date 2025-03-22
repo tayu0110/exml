@@ -2393,36 +2393,28 @@ unsafe fn err_parse_test(
 }
 
 #[cfg(feature = "libxml_reader")]
-unsafe extern "C" fn process_node(out: &mut File, reader: XmlTextReaderPtr) {
+unsafe fn process_node(out: &mut File, reader: XmlTextReaderPtr) {
     unsafe {
-        use exml::libxml::xmlreader::{xml_text_reader_const_name, xml_text_reader_const_value};
-
-        let mut name: *const XmlChar;
-
         let typ = (*reader).node_type();
         let empty = (*reader).is_empty_element();
 
-        name = xml_text_reader_const_name(&mut *reader);
-        if name.is_null() {
-            name = c"--".as_ptr() as _;
-        }
-
-        let value: *const XmlChar = xml_text_reader_const_value(&mut *reader);
+        let name = (*reader).name().unwrap_or_else(|| "--".to_owned());
+        let value = (*reader).text_value();
 
         write!(
             out,
             "{} {} {} {} {}",
             (*reader).depth(),
             typ as i32,
-            CStr::from_ptr(name as _).to_string_lossy(),
+            name,
             empty.map_or(-1, |e| e as i32),
             (*reader).has_value() as i32,
         )
         .ok();
-        if value.is_null() {
-            writeln!(out).ok();
+        if let Some(value) = value {
+            writeln!(out, " {value}").ok();
         } else {
-            writeln!(out, " {}", CStr::from_ptr(value as _).to_string_lossy()).ok();
+            writeln!(out).ok();
         }
     }
 }
@@ -2437,8 +2429,6 @@ unsafe fn stream_process_test(
     _options: i32,
 ) -> i32 {
     unsafe {
-        use exml::libxml::xmlreader::xml_text_reader_relaxng_validate;
-
         let mut ret: i32;
         let mut temp = None;
 
@@ -2470,7 +2460,7 @@ unsafe fn stream_process_test(
         }
         #[cfg(feature = "schema")]
         if !rng.is_null() {
-            ret = xml_text_reader_relaxng_validate(reader, rng);
+            ret = (*reader).relaxng_validate(rng);
             if ret < 0 {
                 let rng = CStr::from_ptr(rng).to_string_lossy();
                 test_error_handler(
@@ -4146,9 +4136,7 @@ unsafe fn pattern_node(
     patstream: Option<&mut XmlStreamCtxt>,
 ) {
     unsafe {
-        use exml::libxml::xmlreader::{
-            XmlReaderTypes, xml_text_reader_const_local_name, xml_text_reader_const_namespace_uri,
-        };
+        use exml::libxml::xmlreader::XmlReaderTypes;
 
         let mut path = None;
         let mut is_match: i32 = -1;
@@ -4174,17 +4162,9 @@ unsafe fn pattern_node(
             let mut ret: i32;
 
             if typ == XmlReaderTypes::XmlReaderTypeElement {
-                let ns = xml_text_reader_const_namespace_uri(&mut *reader);
-                ret = stream.push(
-                    Some(
-                        CStr::from_ptr(xml_text_reader_const_local_name(&mut *reader) as *const i8)
-                            .to_string_lossy()
-                            .as_ref(),
-                    ),
-                    (!ns.is_null())
-                        .then(|| CStr::from_ptr(ns as *const i8).to_string_lossy())
-                        .as_deref(),
-                );
+                let name = (*reader).local_name();
+                let ns = (*reader).namespace_uri();
+                ret = stream.push(name.as_deref(), ns.as_deref());
                 if ret < 0 {
                     writeln!(out, "xmlStreamPush() failure").ok();
                 } else if ret != is_match {

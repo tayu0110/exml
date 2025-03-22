@@ -1971,13 +1971,7 @@ unsafe fn test_sax(filename: &str) {
 #[cfg(feature = "libxml_reader")]
 unsafe fn process_node(reader: XmlTextReaderPtr) {
     unsafe {
-        use exml::{
-            libxml::xmlreader::{
-                XmlReaderTypes, xml_text_reader_const_local_name, xml_text_reader_const_name,
-                xml_text_reader_const_namespace_uri, xml_text_reader_const_value,
-            },
-            tree::XmlGenericNodePtr,
-        };
+        use exml::{libxml::xmlreader::XmlReaderTypes, tree::XmlGenericNodePtr};
 
         let mut name: *const XmlChar;
         let value: *const XmlChar;
@@ -1986,25 +1980,21 @@ unsafe fn process_node(reader: XmlTextReaderPtr) {
         let empty = (*reader).is_empty_element();
 
         if CMD_ARGS.debug {
-            name = xml_text_reader_const_name(&mut *reader);
-            if name.is_null() {
-                name = c"--".as_ptr() as _;
-            }
-
-            value = xml_text_reader_const_value(&mut *reader);
+            let name = (*reader).name().unwrap_or_else(|| "--".to_owned());
+            let value = (*reader).text_value();
 
             print!(
                 "{} {} {} {} {}",
                 (*reader).depth(),
                 typ as i32,
-                CStr::from_ptr(name as _).to_string_lossy(),
+                name,
                 empty.map_or(-1, |e| e as i32),
                 (*reader).has_value() as i32
             );
-            if value.is_null() {
-                println!();
+            if let Some(value) = value {
+                println!(" {value}");
             } else {
-                println!(" {}", CStr::from_ptr(value as _).to_string_lossy());
+                println!();
             }
         }
         #[cfg(feature = "libxml_pattern")]
@@ -2039,22 +2029,9 @@ unsafe fn process_node(reader: XmlTextReaderPtr) {
                 let mut ret: i32;
 
                 if typ == XmlReaderTypes::XmlReaderTypeElement {
-                    ret = stream.push(
-                        Some(
-                            CStr::from_ptr(
-                                xml_text_reader_const_local_name(&mut *reader) as *const i8
-                            )
-                            .to_string_lossy()
-                            .as_ref(),
-                        ),
-                        Some(
-                            CStr::from_ptr(
-                                xml_text_reader_const_namespace_uri(&mut *reader) as *const i8
-                            )
-                            .to_string_lossy()
-                            .as_ref(),
-                        ),
-                    );
+                    let name = (*reader).local_name();
+                    let ns = (*reader).namespace_uri();
+                    ret = stream.push(name.as_deref(), ns.as_deref());
                     if ret < 0 {
                         eprintln!("xmlStreamPush() failure");
                     } else if ret != is_match {
@@ -2067,11 +2044,7 @@ unsafe fn process_node(reader: XmlTextReaderPtr) {
                         if let Some(path) = path.as_deref() {
                             eprintln!("  pattern {pattern} node {path}",);
                         } else {
-                            eprintln!(
-                                "  pattern {pattern} node {}",
-                                CStr::from_ptr(xml_text_reader_const_name(&mut *reader) as _)
-                                    .to_string_lossy()
-                            );
+                            eprintln!("  pattern {pattern} node {}", (*reader).name().unwrap(),);
                         }
                     }
                 }
@@ -2095,8 +2068,6 @@ unsafe fn stream_file(filename: *mut c_char) {
 
         use exml::libxml::xmlreader::{
             XmlParserProperties, xml_free_text_reader, xml_reader_for_file, xml_reader_for_memory,
-            xml_text_reader_relaxng_validate, xml_text_reader_schema_validate,
-            xml_text_reader_set_parser_prop,
         };
         use libc::{MAP_FAILED, MAP_SHARED, PROT_READ, close, mmap, munmap, stat};
 
@@ -2155,17 +2126,9 @@ unsafe fn stream_file(filename: *mut c_char) {
         if !reader.is_null() {
             #[cfg(feature = "libxml_valid")]
             if CMD_ARGS.valid {
-                xml_text_reader_set_parser_prop(
-                    &mut *reader,
-                    XmlParserProperties::XmlParserValidate as i32,
-                    1,
-                );
+                (*reader).set_parser_prop(XmlParserProperties::XmlParserValidate, 1);
             } else if CMD_ARGS.loaddtd {
-                xml_text_reader_set_parser_prop(
-                    &mut *reader,
-                    XmlParserProperties::XmlParserLoadDTD as i32,
-                    1,
-                );
+                (*reader).set_parser_prop(XmlParserProperties::XmlParserLoadDTD, 1);
             }
             #[cfg(not(feature = "libxml_valid"))]
             if CMD_ARGS.loaddtd {
@@ -2177,7 +2140,7 @@ unsafe fn stream_file(filename: *mut c_char) {
                     start_timer();
                 }
                 let crelaxng = CString::new(relaxng).unwrap();
-                ret = xml_text_reader_relaxng_validate(reader, crelaxng.as_ptr());
+                ret = (*reader).relaxng_validate(crelaxng.as_ptr());
                 if ret < 0 {
                     generic_error!("Relax-NG schema {relaxng} failed to compile\n");
                     PROGRESULT.store(ERR_SCHEMACOMP, Ordering::Relaxed);
@@ -2192,7 +2155,7 @@ unsafe fn stream_file(filename: *mut c_char) {
                     start_timer();
                 }
                 let cschema = CString::new(schema).unwrap();
-                ret = xml_text_reader_schema_validate(reader, cschema.as_ptr());
+                ret = (*reader).schema_validate(cschema.as_ptr());
                 if ret < 0 {
                     generic_error!("XSD schema {schema} failed to compile\n");
                     PROGRESULT.store(ERR_SCHEMACOMP, Ordering::Relaxed);

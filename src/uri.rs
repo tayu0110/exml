@@ -1,4 +1,9 @@
-// Copyright of the original code is the following.
+//! Provide methods and data structures for handling URIs.
+//!
+//! This module is based on `libxml/uri.h`, `uri.c`, and so on in `libxml2-v2.11.8`.  
+//! Please refer to original libxml2 documents also.
+
+//Copyright of the original code is the following.
 // --------
 // Summary: library of generic URI related routines
 // Description: library of generic URI related routines

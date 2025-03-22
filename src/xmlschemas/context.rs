@@ -1,6 +1,21 @@
+// Copyright of the original code is the following.
+// --------
+// Summary: incomplete XML Schemas structure implementation
+// Description: interface to the XML Schemas handling and schema validity
+//              checking, it is incomplete right now.
+//
+// Copy: See Copyright for the status of this software.
+//
+// Author: Daniel Veillard
+// --------
+// schemas.c : implementation of the XML Schema handling and schema validity checking
+//
+// See Copyright for the status of this software.
+//
+// Daniel Veillard <veillard@redhat.com>
 use std::{
     cell::RefCell,
-    ffi::{CStr, CString, c_void},
+    ffi::{CStr, c_void},
     ptr::{null, null_mut},
     rc::Rc,
 };
@@ -16,7 +31,7 @@ use crate::{
     io::XmlParserInputBuffer,
     libxml::{
         globals::xml_free,
-        xmlreader::{XmlTextReaderPtr, xml_text_reader_lookup_namespace},
+        xmlreader::XmlTextReaderPtr,
         xmlregexp::XmlRegExecCtxtPtr,
         xmlschemas::{
             XML_SCHEMA_CTXT_PARSER, XML_SCHEMA_CTXT_VALIDATOR,
@@ -443,17 +458,8 @@ impl XmlSchemaValidCtxt {
                 }
                 #[cfg(feature = "libxml_reader")]
                 _ if !self.reader.is_null() => {
-                    let prefix = prefix.map(|prefix| CString::new(prefix).unwrap());
-                    let ns_name: *mut u8 = xml_text_reader_lookup_namespace(
-                        &mut *self.reader,
-                        prefix
-                            .as_deref()
-                            .map_or(null_mut(), |prefix| prefix.as_ptr() as *const u8),
-                    );
-                    if !ns_name.is_null() {
-                        let ret: *const u8 = xml_dict_lookup(self.dict, ns_name, -1);
-                        xml_free(ns_name as _);
-                        ret
+                    if let Some(ns_name) = (*self.reader).lookup_namespace(prefix) {
+                        xml_dict_lookup(self.dict, ns_name.as_ptr(), ns_name.len() as i32)
                     } else {
                         null_mut()
                     }
