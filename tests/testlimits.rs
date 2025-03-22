@@ -12,16 +12,16 @@ use std::{
 };
 
 use exml::{
-    error::{parser_print_file_context_internal, XmlError, XmlErrorDomain, XmlErrorLevel},
+    error::{XmlError, XmlErrorDomain, XmlErrorLevel, parser_print_file_context_internal},
     globals::{
-        set_get_warnings_default_value, set_pedantic_parser_default_value, set_structured_error,
-        GenericErrorContext,
+        GenericErrorContext, set_get_warnings_default_value, set_pedantic_parser_default_value,
+        set_structured_error,
     },
-    io::{register_input_callbacks, xml_no_net_external_entity_loader, XmlInputCallback},
+    io::{XmlInputCallback, register_input_callbacks, xml_no_net_external_entity_loader},
     libxml::{
         parser::{
-            xml_cleanup_parser, xml_init_parser, xml_set_external_entity_loader, XmlParserOption,
-            XmlSAXHandler, XmlSAXLocatorPtr, XML_SAX2_MAGIC,
+            XML_SAX2_MAGIC, XmlParserOption, XmlSAXHandler, XmlSAXLocatorPtr, xml_cleanup_parser,
+            xml_init_parser, xml_set_external_entity_loader,
         },
         parser_internals::{XML_MAX_LOOKUP_LIMIT, XML_MAX_TEXT_LENGTH},
         xmlmemory::{
@@ -31,12 +31,12 @@ use exml::{
         xmlstring::XmlChar,
     },
     parser::{
-        xml_ctxt_read_file, xml_free_parser_ctxt, xml_new_sax_parser_ctxt, XmlParserCtxtPtr,
-        XmlParserInputPtr,
+        XmlParserCtxtPtr, XmlParserInputPtr, xml_ctxt_read_file, xml_free_parser_ctxt,
+        xml_new_sax_parser_ctxt,
     },
     tree::{
-        xml_free_doc, XmlAttributeDefault, XmlAttributeType, XmlElementContentPtr, XmlElementType,
-        XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNodePtr,
+        XmlAttributeDefault, XmlAttributeType, XmlElementContentPtr, XmlElementType,
+        XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNodePtr, xml_free_doc,
     },
 };
 use libc::{memcpy, strlen, strncmp};
@@ -200,59 +200,61 @@ fn fill_filling() {
 ///
 /// Returns the number of bytes read or -1 in case of error
 #[doc(alias = "hugeRead")]
-unsafe fn huge_read(context: *mut c_void, buffer: *mut i8, mut len: i32) -> i32 { unsafe {
-    if context.is_null() || buffer.is_null() || len < 0 {
-        return -1;
-    }
-
-    DOCUMENT_CONTEXT.with_borrow_mut(|context| {
-        if context.instate == 0 {
-            if len >= context.rlen as i32 {
-                len = context.rlen as i32;
-                context.rlen = 0;
-                memcpy(buffer as _, context.current as _, len as usize);
-                context.instate = 1;
-                context.curlen = 0;
-                context.dotlen = context.maxlen / 10;
-            } else {
-                memcpy(buffer as _, context.current as _, len as usize);
-                context.rlen -= len as usize;
-                context.current = context.current.add(len as usize);
-            }
-        } else if context.instate == 2 {
-            if len >= context.rlen as i32 {
-                len = context.rlen as i32;
-                context.rlen = 0;
-                memcpy(buffer as _, context.current as _, len as usize);
-                context.instate = 3;
-                context.curlen = 0;
-            } else {
-                memcpy(buffer as _, context.current as _, len as usize);
-                context.rlen -= len as usize;
-                context.current = context.current.add(len as usize);
-            }
-        } else if context.instate == 1 {
-            if len as usize > CHUNK {
-                len = CHUNK as i32;
-            }
-            FILLING.with_borrow_mut(|filling| {
-                memcpy(buffer as _, filling.as_ptr() as _, len as usize);
-            });
-            context.curlen += len as usize;
-            if context.curlen >= context.maxlen {
-                context.rlen = strlen(HUGE_TESTS[context.current_test].end.as_ptr() as _) as _;
-                context.current = HUGE_TESTS[context.current_test].end.as_ptr() as _;
-                context.instate = 2;
-            } else if context.curlen > context.dotlen {
-                print!(".");
-                context.dotlen += context.maxlen / 10;
-            }
-        } else {
-            len = 0;
+unsafe fn huge_read(context: *mut c_void, buffer: *mut i8, mut len: i32) -> i32 {
+    unsafe {
+        if context.is_null() || buffer.is_null() || len < 0 {
+            return -1;
         }
-        len
-    })
-}}
+
+        DOCUMENT_CONTEXT.with_borrow_mut(|context| {
+            if context.instate == 0 {
+                if len >= context.rlen as i32 {
+                    len = context.rlen as i32;
+                    context.rlen = 0;
+                    memcpy(buffer as _, context.current as _, len as usize);
+                    context.instate = 1;
+                    context.curlen = 0;
+                    context.dotlen = context.maxlen / 10;
+                } else {
+                    memcpy(buffer as _, context.current as _, len as usize);
+                    context.rlen -= len as usize;
+                    context.current = context.current.add(len as usize);
+                }
+            } else if context.instate == 2 {
+                if len >= context.rlen as i32 {
+                    len = context.rlen as i32;
+                    context.rlen = 0;
+                    memcpy(buffer as _, context.current as _, len as usize);
+                    context.instate = 3;
+                    context.curlen = 0;
+                } else {
+                    memcpy(buffer as _, context.current as _, len as usize);
+                    context.rlen -= len as usize;
+                    context.current = context.current.add(len as usize);
+                }
+            } else if context.instate == 1 {
+                if len as usize > CHUNK {
+                    len = CHUNK as i32;
+                }
+                FILLING.with_borrow_mut(|filling| {
+                    memcpy(buffer as _, filling.as_ptr() as _, len as usize);
+                });
+                context.curlen += len as usize;
+                if context.curlen >= context.maxlen {
+                    context.rlen = strlen(HUGE_TESTS[context.current_test].end.as_ptr() as _) as _;
+                    context.current = HUGE_TESTS[context.current_test].end.as_ptr() as _;
+                    context.instate = 2;
+                } else if context.curlen > context.dotlen {
+                    print!(".");
+                    context.dotlen += context.maxlen / 10;
+                }
+            } else {
+                len = 0;
+            }
+            len
+        })
+    }
+}
 
 thread_local! {
     static CRAZY_INDX: Cell<usize> = const { Cell::new(0) };
@@ -305,61 +307,63 @@ fn crazy_close(context: *mut c_void) -> i32 {
 ///
 /// Returns the number of bytes read or -1 in case of error
 #[doc(alias = "crazyRead")]
-unsafe fn crazy_read(context: *mut c_void, buffer: *mut i8, mut len: i32) -> i32 { unsafe {
-    if context.is_null() || buffer.is_null() || len < 0 {
-        return -1;
-    }
-
-    DOCUMENT_CONTEXT.with_borrow_mut(|context| {
-        if check_time() <= 0 && context.instate == 1 {
-            eprintln!("\ntimeout in crazy({})", CRAZY_INDX.get());
-            context.rlen = CRAZY.to_bytes().len() - CRAZY_INDX.get();
-            context.current = CRAZY.as_ptr().add(CRAZY_INDX.get()) as _;
-            context.instate = 2;
+unsafe fn crazy_read(context: *mut c_void, buffer: *mut i8, mut len: i32) -> i32 {
+    unsafe {
+        if context.is_null() || buffer.is_null() || len < 0 {
+            return -1;
         }
-        if context.instate == 0 {
-            if len >= context.rlen as i32 {
-                len = context.rlen as i32;
-                context.rlen = 0;
-                memcpy(buffer as _, context.current as _, len as _);
-                context.instate = 1;
-                context.curlen = 0;
-            } else {
-                memcpy(buffer as _, context.current as _, len as _);
-                context.rlen -= len as usize;
-                context.current = context.current.add(len as usize);
-            }
-        } else if context.instate == 2 {
-            if len >= context.rlen as i32 {
-                len = context.rlen as i32;
-                context.rlen = 0;
-                memcpy(buffer as _, context.current as _, len as _);
-                context.instate = 3;
-                context.curlen = 0;
-            } else {
-                memcpy(buffer as _, context.current as _, len as _);
-                context.rlen -= len as usize;
-                context.current = context.current.add(len as usize);
-            }
-        } else if context.instate == 1 {
-            if len as usize > CHUNK {
-                len = CHUNK as i32;
-            }
-            FILLING.with_borrow_mut(|filling| {
-                memcpy(buffer as _, filling.as_ptr() as _, len as _);
-            });
-            context.curlen += len as usize;
-            if context.curlen >= context.maxlen {
+
+        DOCUMENT_CONTEXT.with_borrow_mut(|context| {
+            if check_time() <= 0 && context.instate == 1 {
+                eprintln!("\ntimeout in crazy({})", CRAZY_INDX.get());
                 context.rlen = CRAZY.to_bytes().len() - CRAZY_INDX.get();
                 context.current = CRAZY.as_ptr().add(CRAZY_INDX.get()) as _;
                 context.instate = 2;
             }
-        } else {
-            len = 0;
-        }
-        len
-    })
-}}
+            if context.instate == 0 {
+                if len >= context.rlen as i32 {
+                    len = context.rlen as i32;
+                    context.rlen = 0;
+                    memcpy(buffer as _, context.current as _, len as _);
+                    context.instate = 1;
+                    context.curlen = 0;
+                } else {
+                    memcpy(buffer as _, context.current as _, len as _);
+                    context.rlen -= len as usize;
+                    context.current = context.current.add(len as usize);
+                }
+            } else if context.instate == 2 {
+                if len >= context.rlen as i32 {
+                    len = context.rlen as i32;
+                    context.rlen = 0;
+                    memcpy(buffer as _, context.current as _, len as _);
+                    context.instate = 3;
+                    context.curlen = 0;
+                } else {
+                    memcpy(buffer as _, context.current as _, len as _);
+                    context.rlen -= len as usize;
+                    context.current = context.current.add(len as usize);
+                }
+            } else if context.instate == 1 {
+                if len as usize > CHUNK {
+                    len = CHUNK as i32;
+                }
+                FILLING.with_borrow_mut(|filling| {
+                    memcpy(buffer as _, filling.as_ptr() as _, len as _);
+                });
+                context.curlen += len as usize;
+                if context.curlen >= context.maxlen {
+                    context.rlen = CRAZY.to_bytes().len() - CRAZY_INDX.get();
+                    context.current = CRAZY.as_ptr().add(CRAZY_INDX.get()) as _;
+                    context.instate = 2;
+                }
+            } else {
+                len = 0;
+            }
+            len
+        })
+    }
+}
 
 thread_local! {
     static NB_TESTS: Cell<i32> = const { Cell::new(0) };
@@ -375,14 +379,16 @@ unsafe fn test_external_entity_loader(
     url: Option<&str>,
     id: Option<&str>,
     ctxt: XmlParserCtxtPtr,
-) -> XmlParserInputPtr { unsafe {
-    let memused: i32 = xml_mem_used();
+) -> XmlParserInputPtr {
+    unsafe {
+        let memused: i32 = xml_mem_used();
 
-    let ret: XmlParserInputPtr = xml_no_net_external_entity_loader(url, id, ctxt);
-    EXTRA_MEMORY_FROM_RESOLVER.set(EXTRA_MEMORY_FROM_RESOLVER.get() + xml_mem_used() - memused);
+        let ret: XmlParserInputPtr = xml_no_net_external_entity_loader(url, id, ctxt);
+        EXTRA_MEMORY_FROM_RESOLVER.set(EXTRA_MEMORY_FROM_RESOLVER.get() + xml_mem_used() - memused);
 
-    ret
-}}
+        ret
+    }
+}
 
 // Trapping the error messages at the generic level to grab the equivalent of
 // stderr messages on CLI tools.
@@ -539,91 +545,95 @@ fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlErr
     }
 }
 
-unsafe fn initialize_libxml2() { unsafe {
-    set_get_warnings_default_value(0);
-    set_pedantic_parser_default_value(0);
+unsafe fn initialize_libxml2() {
+    unsafe {
+        set_get_warnings_default_value(0);
+        set_pedantic_parser_default_value(0);
 
-    xml_mem_setup(
-        Some(xml_mem_free),
-        Some(xml_mem_malloc),
-        Some(xml_mem_realloc),
-        Some(xml_memory_strdup),
-    );
-    xml_init_parser();
-    xml_set_external_entity_loader(test_external_entity_loader);
-    set_structured_error(Some(test_structured_error_handler), None);
-    // register the new I/O handlers
-    struct HugeTestIO(*mut c_void);
-    impl Read for HugeTestIO {
-        fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-            let res = unsafe { huge_read(self.0, buf.as_mut_ptr() as *mut i8, buf.len() as i32) };
-            if res < 0 {
-                Err(io::Error::last_os_error())
-            } else {
-                Ok(res as usize)
+        xml_mem_setup(
+            Some(xml_mem_free),
+            Some(xml_mem_malloc),
+            Some(xml_mem_realloc),
+            Some(xml_memory_strdup),
+        );
+        xml_init_parser();
+        xml_set_external_entity_loader(test_external_entity_loader);
+        set_structured_error(Some(test_structured_error_handler), None);
+        // register the new I/O handlers
+        struct HugeTestIO(*mut c_void);
+        impl Read for HugeTestIO {
+            fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+                let res =
+                    unsafe { huge_read(self.0, buf.as_mut_ptr() as *mut i8, buf.len() as i32) };
+                if res < 0 {
+                    Err(io::Error::last_os_error())
+                } else {
+                    Ok(res as usize)
+                }
             }
         }
-    }
-    unsafe impl Send for HugeTestIO {}
-    impl Drop for HugeTestIO {
-        fn drop(&mut self) {
-            if !self.0.is_null() {
-                huge_close(self.0);
+        unsafe impl Send for HugeTestIO {}
+        impl Drop for HugeTestIO {
+            fn drop(&mut self) {
+                if !self.0.is_null() {
+                    huge_close(self.0);
+                }
             }
         }
-    }
-    impl XmlInputCallback for HugeTestIO {
-        fn is_match(&self, filename: &str) -> bool {
-            huge_match(filename) != 0
-        }
-        fn open(&mut self, filename: &str) -> std::io::Result<Box<dyn Read>> {
-            let ptr = huge_open(filename);
-            if ptr.is_null() {
-                Err(io::Error::other("Failed to execute huge_open"))
-            } else {
-                Ok(Box::new(Self(ptr)))
+        impl XmlInputCallback for HugeTestIO {
+            fn is_match(&self, filename: &str) -> bool {
+                huge_match(filename) != 0
+            }
+            fn open(&mut self, filename: &str) -> std::io::Result<Box<dyn Read>> {
+                let ptr = huge_open(filename);
+                if ptr.is_null() {
+                    Err(io::Error::other("Failed to execute huge_open"))
+                } else {
+                    Ok(Box::new(Self(ptr)))
+                }
             }
         }
-    }
-    if register_input_callbacks(HugeTestIO(null_mut())).is_err() {
-        panic!("failed to register Huge handlers");
-    }
-    struct CrazyTestIO(*mut c_void);
-    impl Read for CrazyTestIO {
-        fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-            let res = unsafe { crazy_read(self.0, buf.as_mut_ptr() as *mut i8, buf.len() as i32) };
-            if res < 0 {
-                Err(io::Error::last_os_error())
-            } else {
-                Ok(res as usize)
+        if register_input_callbacks(HugeTestIO(null_mut())).is_err() {
+            panic!("failed to register Huge handlers");
+        }
+        struct CrazyTestIO(*mut c_void);
+        impl Read for CrazyTestIO {
+            fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+                let res =
+                    unsafe { crazy_read(self.0, buf.as_mut_ptr() as *mut i8, buf.len() as i32) };
+                if res < 0 {
+                    Err(io::Error::last_os_error())
+                } else {
+                    Ok(res as usize)
+                }
             }
         }
-    }
-    unsafe impl Send for CrazyTestIO {}
-    impl Drop for CrazyTestIO {
-        fn drop(&mut self) {
-            if !self.0.is_null() {
-                crazy_close(self.0);
+        unsafe impl Send for CrazyTestIO {}
+        impl Drop for CrazyTestIO {
+            fn drop(&mut self) {
+                if !self.0.is_null() {
+                    crazy_close(self.0);
+                }
             }
         }
-    }
-    impl XmlInputCallback for CrazyTestIO {
-        fn is_match(&self, filename: &str) -> bool {
-            crazy_match(filename) != 0
-        }
-        fn open(&mut self, filename: &str) -> std::io::Result<Box<dyn Read>> {
-            let ptr = crazy_open(filename);
-            if ptr.is_null() {
-                Err(io::Error::other("Failed to execute crazy_open"))
-            } else {
-                Ok(Box::new(Self(ptr)))
+        impl XmlInputCallback for CrazyTestIO {
+            fn is_match(&self, filename: &str) -> bool {
+                crazy_match(filename) != 0
+            }
+            fn open(&mut self, filename: &str) -> std::io::Result<Box<dyn Read>> {
+                let ptr = crazy_open(filename);
+                if ptr.is_null() {
+                    Err(io::Error::other("Failed to execute crazy_open"))
+                } else {
+                    Ok(Box::new(Self(ptr)))
+                }
             }
         }
+        if register_input_callbacks(CrazyTestIO(null_mut())).is_err() {
+            panic!("failed to register Crazy handlers");
+        }
     }
-    if register_input_callbacks(CrazyTestIO(null_mut())).is_err() {
-        panic!("failed to register Crazy handlers");
-    }
-}}
+}
 
 thread_local! {
     static CALLBACKS: AtomicU64 = const { AtomicU64::new(0) };
@@ -921,113 +931,116 @@ static CALLBACK_SAX2_HANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
 ///
 /// Returns 0 in case of success, an error code otherwise
 #[doc(alias = "readerTest")]
-unsafe fn sax_test(filename: *const i8, limit: usize, options: i32, fail: i32) -> i32 { unsafe {
-    let res: i32;
+unsafe fn sax_test(filename: *const i8, limit: usize, options: i32, fail: i32) -> i32 {
+    unsafe {
+        let res: i32;
 
-    NB_TESTS.set(NB_TESTS.get() + 1);
+        NB_TESTS.set(NB_TESTS.get() + 1);
 
-    DOCUMENT_CONTEXT.with_borrow_mut(|context| context.maxlen = limit);
-    let mut sax = XmlSAXHandler::default();
-    std::ptr::copy(&CALLBACK_SAX2_HANDLER_STRUCT, &mut sax, 1);
-    let Ok(ctxt) = xml_new_sax_parser_ctxt(Some(Box::new(sax)), None) else {
-        eprintln!("Failed to create parser context");
-        return 1;
-    };
-    let filename = CStr::from_ptr(filename).to_string_lossy();
-    let filename = filename.as_ref();
-    if let Some(doc) = xml_ctxt_read_file(ctxt, filename, None, options) {
-        eprintln!("SAX parsing generated a document !");
-        xml_free_doc(doc);
-        res = 0;
-    } else if (*ctxt).well_formed == 0 {
-        if fail != 0 {
+        DOCUMENT_CONTEXT.with_borrow_mut(|context| context.maxlen = limit);
+        let mut sax = XmlSAXHandler::default();
+        std::ptr::copy(&CALLBACK_SAX2_HANDLER_STRUCT, &mut sax, 1);
+        let Ok(ctxt) = xml_new_sax_parser_ctxt(Some(Box::new(sax)), None) else {
+            eprintln!("Failed to create parser context");
+            return 1;
+        };
+        let filename = CStr::from_ptr(filename).to_string_lossy();
+        let filename = filename.as_ref();
+        if let Some(doc) = xml_ctxt_read_file(ctxt, filename, None, options) {
+            eprintln!("SAX parsing generated a document !");
+            xml_free_doc(doc);
             res = 0;
-        } else {
-            eprintln!("Failed to parse '{filename}' {limit}");
+        } else if (*ctxt).well_formed == 0 {
+            if fail != 0 {
+                res = 0;
+            } else {
+                eprintln!("Failed to parse '{filename}' {limit}");
+                res = 1;
+            }
+        } else if fail != 0 {
+            eprintln!("Failed to get failure for '{filename}' {limit}");
             res = 1;
+        } else {
+            res = 0;
         }
-    } else if fail != 0 {
-        eprintln!("Failed to get failure for '{filename}' {limit}");
-        res = 1;
-    } else {
-        res = 0;
-    }
-    xml_free_parser_ctxt(ctxt);
+        xml_free_parser_ctxt(ctxt);
 
-    res
-}}
+        res
+    }
+}
 
 /// Parse a memory generated file using the xmlReader
 ///
 /// Returns 0 in case of success, an error code otherwise
 #[doc(alias = "readerTest")]
 #[cfg(feature = "libxml_reader")]
-unsafe fn reader_test(filename: *const i8, limit: usize, options: i32, fail: i32) -> i32 { unsafe {
-    use exml::libxml::xmlreader::{xml_free_text_reader, xml_reader_for_file, XmlTextReaderPtr};
+unsafe fn reader_test(filename: *const i8, limit: usize, options: i32, fail: i32) -> i32 {
+    unsafe {
+        use exml::libxml::xmlreader::{
+            XmlTextReaderPtr, xml_free_text_reader, xml_reader_for_file,
+        };
 
-    let mut res: i32;
+        let mut res: i32;
 
-    NB_TESTS.set(NB_TESTS.get() + 1);
+        NB_TESTS.set(NB_TESTS.get() + 1);
 
-    DOCUMENT_CONTEXT.with_borrow_mut(|context| context.maxlen = limit);
-    let reader: XmlTextReaderPtr = xml_reader_for_file(
-        &CStr::from_ptr(filename).to_string_lossy(),
-        null_mut(),
-        options,
-    );
-    if reader.is_null() {
-        eprintln!(
-            "Failed to open '{}' test",
-            CStr::from_ptr(filename).to_string_lossy()
-        );
-        return 1;
-    }
-    let mut ret = (*reader).read();
-    while ret == 1 {
-        ret = (*reader).read();
-    }
-    if ret != 0 {
-        if fail != 0 {
-            res = 0;
-        } else {
+        DOCUMENT_CONTEXT.with_borrow_mut(|context| context.maxlen = limit);
+        let reader: XmlTextReaderPtr =
+            xml_reader_for_file(&CStr::from_ptr(filename).to_string_lossy(), None, options);
+        if reader.is_null() {
+            eprintln!(
+                "Failed to open '{}' test",
+                CStr::from_ptr(filename).to_string_lossy()
+            );
+            return 1;
+        }
+        let mut ret = (*reader).read();
+        while ret == 1 {
+            ret = (*reader).read();
+        }
+        if ret != 0 {
+            if fail != 0 {
+                res = 0;
+            } else {
+                if strncmp(filename, c"crazy:".as_ptr(), 6) == 0 {
+                    eprintln!(
+                        "Failed to parse '{}' {}",
+                        CStr::from_ptr(filename).to_string_lossy(),
+                        CRAZY_INDX.get()
+                    );
+                } else {
+                    eprintln!(
+                        "Failed to parse '{}' {limit}",
+                        CStr::from_ptr(filename).to_string_lossy()
+                    );
+                }
+                res = 1;
+            }
+        } else if fail != 0 {
             if strncmp(filename, c"crazy:".as_ptr(), 6) == 0 {
                 eprintln!(
-                    "Failed to parse '{}' {}",
+                    "Failed to get failure for '{}' {}",
                     CStr::from_ptr(filename).to_string_lossy(),
                     CRAZY_INDX.get()
                 );
             } else {
                 eprintln!(
-                    "Failed to parse '{}' {limit}",
+                    "Failed to get failure for '{}' {limit}",
                     CStr::from_ptr(filename).to_string_lossy()
                 );
             }
             res = 1;
-        }
-    } else if fail != 0 {
-        if strncmp(filename, c"crazy:".as_ptr(), 6) == 0 {
-            eprintln!(
-                "Failed to get failure for '{}' {}",
-                CStr::from_ptr(filename).to_string_lossy(),
-                CRAZY_INDX.get()
-            );
         } else {
-            eprintln!(
-                "Failed to get failure for '{}' {limit}",
-                CStr::from_ptr(filename).to_string_lossy()
-            );
+            res = 0;
         }
-        res = 1;
-    } else {
-        res = 0;
-    }
-    if TIMEOUT.get() {
-        res = 1;
-    }
-    xml_free_text_reader(reader);
+        if TIMEOUT.get() {
+            res = 1;
+        }
+        xml_free_text_reader(reader);
 
-    res
-}}
+        res
+    }
+}
 
 type Functest = unsafe fn(filename: *const i8, limit: usize, options: i32, fail: i32) -> i32;
 
@@ -1157,104 +1170,112 @@ static TEST_EXCEPTIONS: &[TestException] = &[
     },
 ];
 
-unsafe fn launch_tests(tst: &TestDesc, test: u32) -> i32 { unsafe {
-    let mut res: i32;
-    let mut err: i32 = 0;
-    let mut limit: usize;
-    let mut fail: i32;
+unsafe fn launch_tests(tst: &TestDesc, test: u32) -> i32 {
+    unsafe {
+        let mut res: i32;
+        let mut err: i32 = 0;
+        let mut limit: usize;
+        let mut fail: i32;
 
-    for (i, descr) in LIMIT_DESCRIPTIONS.iter().enumerate() {
-        limit = descr.limit;
-        fail = descr.fail;
-        // Handle exceptions if any
-        for exception in TEST_EXCEPTIONS {
-            if exception.test == test && exception.limit == i as _ {
-                if exception.fail != -1 {
-                    fail = exception.fail;
+        for (i, descr) in LIMIT_DESCRIPTIONS.iter().enumerate() {
+            limit = descr.limit;
+            fail = descr.fail;
+            // Handle exceptions if any
+            for exception in TEST_EXCEPTIONS {
+                if exception.test == test && exception.limit == i as _ {
+                    if exception.fail != -1 {
+                        fail = exception.fail;
+                    }
+                    if exception.size != 0 {
+                        limit = exception.size;
+                    }
+                    break;
                 }
-                if exception.size != 0 {
-                    limit = exception.size;
-                }
-                break;
+            }
+            let name = CString::new(descr.name).unwrap();
+            res = tst.func.unwrap()(name.as_ptr() as _, limit, descr.options, fail);
+            if res != 0 {
+                NB_ERRORS.set(NB_ERRORS.get() + 1);
+                err += 1;
             }
         }
-        let name = CString::new(descr.name).unwrap();
-        res = tst.func.unwrap()(name.as_ptr() as _, limit, descr.options, fail);
+        err
+    }
+}
+
+unsafe fn runtest(i: u32) -> i32 {
+    unsafe {
+        let mut ret: i32 = 0;
+
+        let old_errors: i32 = NB_ERRORS.get();
+        let old_tests: i32 = NB_TESTS.get();
+        let old_leaks: i32 = NB_LEAKS.get();
+        if TEST_DESCRIPTIONS[i as usize].desc.is_some() {
+            println!("## {}", TEST_DESCRIPTIONS[i as usize].desc.unwrap());
+        }
+        let tmp = TEST_DESCRIPTIONS[i as usize];
+        let res: i32 = launch_tests(&tmp, i);
+        if res != 0 {
+            ret += 1;
+        }
+        if NB_ERRORS.get() == old_errors && NB_LEAKS.get() == old_leaks {
+            println!("Ran {} tests, no errors", NB_TESTS.get() - old_tests);
+        } else {
+            println!(
+                "Ran {} tests, {} errors, {} leaks",
+                NB_TESTS.get() - old_tests,
+                NB_ERRORS.get() - old_errors,
+                NB_LEAKS.get() - old_leaks
+            );
+        }
+        ret
+    }
+}
+
+unsafe fn launch_crazy_sax(test: u32, fail: i32) -> i32 {
+    unsafe {
+        let mut err: i32 = 0;
+
+        CRAZY_INDX.set(test as usize);
+
+        let res = sax_test(
+            c"crazy::test".as_ptr(),
+            XML_MAX_LOOKUP_LIMIT - CHUNK,
+            0,
+            fail,
+        );
         if res != 0 {
             NB_ERRORS.set(NB_ERRORS.get() + 1);
             err += 1;
         }
+        eprintln!("{}", CRAZY.to_bytes()[test as usize] as char);
+
+        err
     }
-    err
-}}
-
-unsafe fn runtest(i: u32) -> i32 { unsafe {
-    let mut ret: i32 = 0;
-
-    let old_errors: i32 = NB_ERRORS.get();
-    let old_tests: i32 = NB_TESTS.get();
-    let old_leaks: i32 = NB_LEAKS.get();
-    if TEST_DESCRIPTIONS[i as usize].desc.is_some() {
-        println!("## {}", TEST_DESCRIPTIONS[i as usize].desc.unwrap());
-    }
-    let tmp = TEST_DESCRIPTIONS[i as usize];
-    let res: i32 = launch_tests(&tmp, i);
-    if res != 0 {
-        ret += 1;
-    }
-    if NB_ERRORS.get() == old_errors && NB_LEAKS.get() == old_leaks {
-        println!("Ran {} tests, no errors", NB_TESTS.get() - old_tests);
-    } else {
-        println!(
-            "Ran {} tests, {} errors, {} leaks",
-            NB_TESTS.get() - old_tests,
-            NB_ERRORS.get() - old_errors,
-            NB_LEAKS.get() - old_leaks
-        );
-    }
-    ret
-}}
-
-unsafe fn launch_crazy_sax(test: u32, fail: i32) -> i32 { unsafe {
-    let mut err: i32 = 0;
-
-    CRAZY_INDX.set(test as usize);
-
-    let res = sax_test(
-        c"crazy::test".as_ptr(),
-        XML_MAX_LOOKUP_LIMIT - CHUNK,
-        0,
-        fail,
-    );
-    if res != 0 {
-        NB_ERRORS.set(NB_ERRORS.get() + 1);
-        err += 1;
-    }
-    eprintln!("{}", CRAZY.to_bytes()[test as usize] as char);
-
-    err
-}}
+}
 
 #[cfg(feature = "libxml_reader")]
-unsafe fn launch_crazy(test: u32, fail: i32) -> i32 { unsafe {
-    let mut err: i32 = 0;
+unsafe fn launch_crazy(test: u32, fail: i32) -> i32 {
+    unsafe {
+        let mut err: i32 = 0;
 
-    CRAZY_INDX.set(test as usize);
+        CRAZY_INDX.set(test as usize);
 
-    let res = reader_test(
-        c"crazy::test".as_ptr(),
-        XML_MAX_LOOKUP_LIMIT - CHUNK,
-        0,
-        fail,
-    );
-    if res != 0 {
-        NB_ERRORS.set(NB_ERRORS.get() + 1);
-        err += 1;
+        let res = reader_test(
+            c"crazy::test".as_ptr(),
+            XML_MAX_LOOKUP_LIMIT - CHUNK,
+            0,
+            fail,
+        );
+        if res != 0 {
+            NB_ERRORS.set(NB_ERRORS.get() + 1);
+            err += 1;
+        }
+        eprintln!("{}", CRAZY.to_bytes()[test as usize] as char);
+
+        err
     }
-    eprintln!("{}", CRAZY.to_bytes()[test as usize] as char);
-
-    err
-}}
+}
 
 unsafe extern "C" fn get_crazy_fail(test: i32) -> i32 {
     // adding 1000000 of character 'a' leads to parser failure mostly

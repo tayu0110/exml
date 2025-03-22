@@ -28,7 +28,7 @@ use std::{
     io::Read,
     mem::size_of,
     os::raw::c_void,
-    ptr::{addr_of_mut, null, null_mut},
+    ptr::{addr_of_mut, null_mut},
     sync::atomic::Ordering,
 };
 
@@ -49,7 +49,7 @@ use crate::{
     globals::{GenericErrorContext, StructuredError},
     io::XmlParserInputBuffer,
     libxml::{
-        dict::{XmlDictPtr, xml_dict_create, xml_dict_free, xml_dict_lookup},
+        dict::{XmlDictPtr, xml_dict_create, xml_dict_free},
         globals::{xml_deregister_node_default_value, xml_free, xml_malloc},
         parser::{
             CDATABlockSAXFunc, CharactersSAXFunc, EndElementNsSAX2Func, EndElementSAXFunc,
@@ -298,7 +298,7 @@ pub struct XmlTextReader {
     xinclude: i32,
     // the xinclude name from dict
     #[cfg(feature = "xinclude")]
-    xinclude_name: *const XmlChar,
+    xinclude_name: Option<&'static str>,
     // the xinclude context
     #[cfg(feature = "xinclude")]
     xincctxt: Option<Box<XmlXIncludeCtxt>>,
@@ -318,6 +318,42 @@ pub struct XmlTextReader {
 }
 
 impl XmlTextReader {
+    /// Setup an xmltextReader to parse a preparsed XML document.
+    /// This reuses the existing @reader xmlTextReader.
+    ///
+    /// Returns 0 in case of success and -1 in case of error
+    #[doc(alias = "xmlReaderNewWalker")]
+    #[cfg(feature = "libxml_reader")]
+    pub unsafe fn new_walker(&mut self, doc: XmlDocPtr) -> i32 {
+        unsafe {
+            if self.input.is_some() {
+                let _ = self.input.take();
+            }
+            if !self.ctxt.is_null() {
+                (*self.ctxt).reset();
+            }
+
+            self.ent_tab.clear();
+            self.input = None;
+            self.mode = XmlTextReaderMode::XmlTextreaderModeInitial;
+            self.node = None;
+            self.curnode = None;
+            self.base = 0;
+            self.cur = 0;
+            self.allocs = XML_TEXTREADER_CTXT;
+            self.doc = Some(doc);
+            self.state = XmlTextReaderState::Start;
+            if self.dict.is_null() {
+                if !self.ctxt.is_null() && !(*self.ctxt).dict.is_null() {
+                    self.dict = (*self.ctxt).dict;
+                } else {
+                    self.dict = xml_dict_create();
+                }
+            }
+            0
+        }
+    }
+
     /// Setup an XML reader with new options
     ///
     /// Returns 0 in case of success and -1 in case of error.
@@ -327,11 +363,11 @@ impl XmlTextReader {
         &mut self,
         input: Option<XmlParserInputBuffer>,
         url: Option<&str>,
-        encoding: *const c_char,
+        encoding: Option<&str>,
         mut options: i32,
     ) -> i32 {
         unsafe {
-            use std::{cell::RefCell, ffi::CStr, rc::Rc};
+            use std::{cell::RefCell, rc::Rc};
 
             use crate::{
                 encoding::{XmlCharEncoding, find_encoding_handler},
@@ -496,8 +532,7 @@ impl XmlTextReader {
                 self.xincctxt.take();
                 if options & XmlParserOption::XmlParseXInclude as i32 != 0 {
                     self.xinclude = 1;
-                    self.xinclude_name =
-                        xml_dict_lookup(self.dict, XINCLUDE_NODE.as_ptr() as _, -1);
+                    self.xinclude_name = Some(XINCLUDE_NODE);
                     options -= XmlParserOption::XmlParseXInclude as i32;
                 } else {
                     self.xinclude = 0;
@@ -512,10 +547,8 @@ impl XmlTextReader {
             }
 
             xml_ctxt_use_options(self.ctxt, options);
-            if !encoding.is_null() {
-                if let Some(handler) =
-                    find_encoding_handler(CStr::from_ptr(encoding).to_str().unwrap())
-                {
+            if let Some(encoding) = encoding {
+                if let Some(handler) = find_encoding_handler(encoding) {
                     (*self.ctxt).switch_to_encoding(handler);
                 }
             }
@@ -3776,7 +3809,6 @@ impl Default for XmlTextReader {
             allocs: 0,
             state: XmlTextReaderState::default(),
             ctxt: null_mut(),
-            // sax: None,
             input: None,
             start_element: None,
             end_element: None,
@@ -3820,7 +3852,7 @@ impl Default for XmlTextReader {
             #[cfg(feature = "xinclude")]
             xinclude: 0,
             #[cfg(feature = "xinclude")]
-            xinclude_name: null(),
+            xinclude_name: None,
             #[cfg(feature = "xinclude")]
             xincctxt: None,
             #[cfg(feature = "xinclude")]
@@ -3837,18 +3869,6 @@ impl Default for XmlTextReader {
 const NODE_IS_EMPTY: i32 = 0x1;
 const NODE_IS_PRESERVED: i32 = 0x2;
 const NODE_IS_SPRESERVED: i32 = 0x4;
-
-/// Macro used to return an interned string
-macro_rules! CONSTSTR {
-    ($reader:expr, $str:expr) => {
-        xml_dict_lookup((*$reader).dict, $str, -1)
-    };
-}
-macro_rules! CONSTQSTR {
-    ($reader:expr, $p:expr, $str:expr) => {
-        $crate::libxml::dict::xml_dict_qlookup((*$reader).dict, $p, $str)
-    };
-}
 
 /// called when an opening tag has been processed.
 #[doc(alias = "xmlTextReaderStartElement")]
@@ -4677,12 +4697,6 @@ fn xml_text_reader_generic_error(
                     ctx as XmlTextReaderLocatorPtr,
                 );
             }
-            // In the original code, `str` is dynamic memory allocated to construct strings from variable-length arguments,
-            // but since variable-length arguments are not available in Rust, it is just a lateral pass of the passed message.
-            //
-            // Since we do not know where the memory of `str` should be handled, it is safe not to free it,
-            // although we expect it to leak memory.
-            // xml_free(str as _);
         }
     }
 }
@@ -4783,11 +4797,9 @@ fn xml_text_reader_structured_error(ctxt: Option<GenericErrorContext>, error: &X
     unsafe {
         let reader: XmlTextReaderPtr = (*ctx)._private as XmlTextReaderPtr;
 
-        // if !error.is_null() {
         if let Some(serror) = (*reader).serror_func {
             serror((*reader).error_func_arg.clone(), error);
         }
-        // }
     }
 }
 
@@ -4909,25 +4921,12 @@ pub unsafe fn xml_reader_walker(doc: XmlDocPtr) -> XmlTextReaderPtr {
 #[doc(alias = "xmlReaderForDoc")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_reader_for_doc(
-    cur: *const XmlChar,
+    cur: &[u8],
     url: Option<&str>,
-    encoding: *const c_char,
+    encoding: Option<&str>,
     options: i32,
 ) -> XmlTextReaderPtr {
-    unsafe {
-        use std::ffi::CStr;
-
-        if cur.is_null() {
-            return null_mut();
-        }
-
-        xml_reader_for_memory(
-            CStr::from_ptr(cur as *const i8).to_bytes().to_vec(),
-            url,
-            encoding,
-            options,
-        )
-    }
+    unsafe { xml_reader_for_memory(cur.to_vec(), url, encoding, options) }
 }
 
 /// Parse an XML file from the filesystem or the network.
@@ -4938,7 +4937,7 @@ pub unsafe fn xml_reader_for_doc(
 #[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_reader_for_file(
     filename: &str,
-    encoding: *const c_char,
+    encoding: Option<&str>,
     options: i32,
 ) -> XmlTextReaderPtr {
     unsafe {
@@ -4960,7 +4959,7 @@ pub unsafe fn xml_reader_for_file(
 pub unsafe fn xml_reader_for_memory(
     buffer: Vec<u8>,
     url: Option<&str>,
-    encoding: *const c_char,
+    encoding: Option<&str>,
     options: i32,
 ) -> XmlTextReaderPtr {
     unsafe {
@@ -4988,7 +4987,7 @@ pub unsafe fn xml_reader_for_memory(
 pub unsafe fn xml_reader_for_io(
     ioctx: impl Read + 'static,
     url: Option<&str>,
-    encoding: *const c_char,
+    encoding: Option<&str>,
     options: i32,
 ) -> XmlTextReaderPtr {
     unsafe {
@@ -5005,46 +5004,6 @@ pub unsafe fn xml_reader_for_io(
     }
 }
 
-/// Setup an xmltextReader to parse a preparsed XML document.
-/// This reuses the existing @reader xmlTextReader.
-///
-/// Returns 0 in case of success and -1 in case of error
-#[doc(alias = "xmlReaderNewWalker")]
-#[cfg(feature = "libxml_reader")]
-pub unsafe fn xml_reader_new_walker(reader: XmlTextReaderPtr, doc: XmlDocPtr) -> i32 {
-    unsafe {
-        if reader.is_null() {
-            return -1;
-        }
-
-        if (*reader).input.is_some() {
-            let _ = (*reader).input.take();
-        }
-        if !(*reader).ctxt.is_null() {
-            (*(*reader).ctxt).reset();
-        }
-
-        (*reader).ent_tab.clear();
-        (*reader).input = None;
-        (*reader).mode = XmlTextReaderMode::XmlTextreaderModeInitial;
-        (*reader).node = None;
-        (*reader).curnode = None;
-        (*reader).base = 0;
-        (*reader).cur = 0;
-        (*reader).allocs = XML_TEXTREADER_CTXT;
-        (*reader).doc = Some(doc);
-        (*reader).state = XmlTextReaderState::Start;
-        if (*reader).dict.is_null() {
-            if !(*reader).ctxt.is_null() && !(*(*reader).ctxt).dict.is_null() {
-                (*reader).dict = (*(*reader).ctxt).dict;
-            } else {
-                (*reader).dict = xml_dict_create();
-            }
-        }
-        0
-    }
-}
-
 /// Setup an xmltextReader to parse an XML in-memory document.
 /// The parsing flags @options are a combination of xmlParserOption.
 /// This reuses the existing @reader xmlTextReader.
@@ -5054,28 +5013,17 @@ pub unsafe fn xml_reader_new_walker(reader: XmlTextReaderPtr, doc: XmlDocPtr) ->
 #[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_reader_new_doc(
     reader: XmlTextReaderPtr,
-    cur: *const XmlChar,
+    cur: &[u8],
     url: Option<&str>,
-    encoding: *const c_char,
+    encoding: Option<&str>,
     options: i32,
 ) -> i32 {
     unsafe {
-        use std::ffi::CStr;
-
-        if cur.is_null() {
-            return -1;
-        }
         if reader.is_null() {
             return -1;
         }
 
-        xml_reader_new_memory(
-            reader,
-            CStr::from_ptr(cur as *const i8).to_bytes().to_vec(),
-            url,
-            encoding,
-            options,
-        )
+        xml_reader_new_memory(reader, cur.to_vec(), url, encoding, options)
     }
 }
 
@@ -5089,7 +5037,7 @@ pub unsafe fn xml_reader_new_doc(
 pub unsafe fn xml_reader_new_file(
     reader: XmlTextReaderPtr,
     filename: &str,
-    encoding: *const c_char,
+    encoding: Option<&str>,
     options: i32,
 ) -> i32 {
     unsafe {
@@ -5117,7 +5065,7 @@ pub unsafe fn xml_reader_new_memory(
     reader: XmlTextReaderPtr,
     buffer: Vec<u8>,
     url: Option<&str>,
-    encoding: *const c_char,
+    encoding: Option<&str>,
     options: i32,
 ) -> i32 {
     unsafe {
@@ -5145,7 +5093,7 @@ pub unsafe fn xml_reader_new_io(
     reader: XmlTextReaderPtr,
     ioctx: impl Read + 'static,
     url: Option<&str>,
-    encoding: *const c_char,
+    encoding: Option<&str>,
     options: i32,
 ) -> i32 {
     unsafe {

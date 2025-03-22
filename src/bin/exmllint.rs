@@ -2102,13 +2102,13 @@ unsafe fn stream_file(filename: *mut c_char) {
                 (!filename.is_null())
                     .then(|| CStr::from_ptr(filename as *const i8).to_string_lossy())
                     .as_deref(),
-                null_mut(),
+                None,
                 OPTIONS.load(Ordering::Relaxed),
             );
         } else {
             reader = xml_reader_for_file(
                 &CStr::from_ptr(filename as *const i8).to_string_lossy(),
-                null_mut(),
+                None,
                 OPTIONS.load(Ordering::Relaxed),
             );
         }

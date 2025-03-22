@@ -2531,7 +2531,7 @@ unsafe fn stream_parse_test(
     unsafe {
         use exml::libxml::xmlreader::{xml_free_text_reader, xml_reader_for_file};
 
-        let reader: XmlTextReaderPtr = xml_reader_for_file(filename, null_mut(), options);
+        let reader: XmlTextReaderPtr = xml_reader_for_file(filename, None, options);
         let ret: i32 = stream_process_test(filename, result, err, reader, null_mut(), options);
         xml_free_text_reader(reader);
         ret
@@ -2587,8 +2587,7 @@ unsafe fn stream_mem_parse_test(
             return -1;
         }
         let buffer = from_raw_parts(base as *const u8, size as usize).to_vec();
-        let reader: XmlTextReaderPtr =
-            xml_reader_for_memory(buffer, Some(filename), null_mut(), options);
+        let reader: XmlTextReaderPtr = xml_reader_for_memory(buffer, Some(filename), None, options);
         let ret: i32 = stream_process_test(filename, result, err, reader, null_mut(), options);
         free(base as _);
         xml_free_text_reader(reader);
@@ -3954,11 +3953,8 @@ unsafe fn rng_stream_test(
                 );
                 continue;
             }
-            reader = xml_reader_for_file(
-                &CStr::from_ptr(instance).to_string_lossy(),
-                null_mut(),
-                options,
-            );
+            reader =
+                xml_reader_for_file(&CStr::from_ptr(instance).to_string_lossy(), None, options);
             if reader.is_null() {
                 eprintln!(
                     "Failed to build reader for {}",
