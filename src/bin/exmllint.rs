@@ -2139,8 +2139,8 @@ unsafe fn stream_file(filename: *mut c_char) {
                 if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
                     start_timer();
                 }
-                let crelaxng = CString::new(relaxng).unwrap();
-                ret = (*reader).relaxng_validate(crelaxng.as_ptr());
+
+                ret = (*reader).relaxng_validate(relaxng);
                 if ret < 0 {
                     generic_error!("Relax-NG schema {relaxng} failed to compile\n");
                     PROGRESULT.store(ERR_SCHEMACOMP, Ordering::Relaxed);
@@ -2154,8 +2154,7 @@ unsafe fn stream_file(filename: *mut c_char) {
                 if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
                     start_timer();
                 }
-                let cschema = CString::new(schema).unwrap();
-                ret = (*reader).schema_validate(cschema.as_ptr());
+                ret = (*reader).schema_validate(schema);
                 if ret < 0 {
                     generic_error!("XSD schema {schema} failed to compile\n");
                     PROGRESULT.store(ERR_SCHEMACOMP, Ordering::Relaxed);

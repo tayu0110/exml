@@ -1026,13 +1026,9 @@ impl XmlTextReader {
     /// string must be deallocated by the caller.
     #[doc(alias = "xmlTextReaderReadInnerXml")]
     #[cfg(all(feature = "libxml_reader", feature = "libxml_writer"))]
-    pub unsafe fn read_inner_xml(&mut self) -> *mut XmlChar {
+    pub unsafe fn read_inner_xml(&mut self) -> Option<String> {
         unsafe {
-            use crate::libxml::xmlstring::xml_strndup;
-
-            if self.expand().is_none() {
-                return null_mut();
-            }
+            self.expand()?;
             let doc = self.node.unwrap().document();
             let mut buff = vec![];
             let mut cur = self.node.unwrap().children();
@@ -1043,13 +1039,13 @@ impl XmlTextReader {
                 let mut buff2 = vec![];
                 if node.dump_memory(&mut buff2, doc, 0, 0) == 0 {
                     xml_free_node(node);
-                    return null_mut();
+                    return None;
                 }
                 buff.extend(buff2);
                 xml_free_node(node);
                 cur = cur_node.next();
             }
-            xml_strndup(buff.as_ptr(), buff.len() as i32)
+            Some(String::from_utf8(buff).unwrap())
         }
     }
 
@@ -1059,13 +1055,11 @@ impl XmlTextReader {
     /// current node cannot be serialized. The string must be deallocated by the caller.
     #[doc(alias = "xmlTextReaderReadOuterXml")]
     #[cfg(all(feature = "libxml_reader", feature = "libxml_writer"))]
-    pub unsafe fn read_outer_xml(&mut self) -> *mut XmlChar {
+    pub unsafe fn read_outer_xml(&mut self) -> Option<String> {
         unsafe {
-            use crate::{libxml::xmlstring::xml_strndup, tree::XmlDtdPtr};
+            use crate::tree::XmlDtdPtr;
 
-            if self.expand().is_none() {
-                return null_mut();
-            }
+            self.expand()?;
             let mut node = self.node.unwrap();
             let doc = node.document();
             // XXX: Why is the node copied?
@@ -1077,10 +1071,10 @@ impl XmlTextReader {
             let mut buff = vec![];
             if node.dump_memory(&mut buff, doc, 0, 0) == 0 {
                 xml_free_node(node);
-                return null_mut();
+                return None;
             }
             xml_free_node(node);
-            xml_strndup(buff.as_ptr(), buff.len() as i32)
+            Some(String::from_utf8(buff).unwrap())
         }
     }
 
@@ -1188,18 +1182,21 @@ impl XmlTextReader {
     /// The string must be deallocated by the caller.
     #[doc(alias = "xmlTextReaderReadString")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn read_string(&mut self) -> *mut XmlChar {
-        unsafe {
-            let Some(current_node) = self.node else {
-                return null_mut();
-            };
+    pub unsafe fn read_string(&mut self) -> Option<String> {
+        use std::ffi::CStr;
 
+        unsafe {
+            let current_node = self.node?;
             let node = self.curnode.unwrap_or(current_node);
             match node.element_type() {
                 XmlElementType::XmlTextNode => {
                     let node = XmlNodePtr::try_from(node).unwrap();
                     if !node.content.is_null() {
-                        return xml_strdup(node.content);
+                        return Some(
+                            CStr::from_ptr(node.content as *const i8)
+                                .to_string_lossy()
+                                .into_owned(),
+                        );
                     }
                 }
                 XmlElementType::XmlElementNode => {
@@ -1213,7 +1210,7 @@ impl XmlTextReader {
                 }
                 _ => {}
             }
-            null_mut()
+            None
         }
     }
 
@@ -1732,12 +1729,10 @@ impl XmlTextReader {
     #[cfg(all(feature = "libxml_reader", feature = "schema"))]
     unsafe fn schema_validate_internal(
         &mut self,
-        xsd: *const c_char,
+        xsd: Option<&str>,
         ctxt: XmlSchemaValidCtxtPtr,
         _options: i32,
     ) -> i32 {
-        use std::ffi::CStr;
-
         use crate::xmlschemas::{
             context::{
                 XmlSchemaParserCtxtPtr, xml_schema_free_parser_ctxt, xml_schema_free_valid_ctxt,
@@ -1747,11 +1742,11 @@ impl XmlTextReader {
         };
 
         unsafe {
-            if !xsd.is_null() && !ctxt.is_null() {
+            if xsd.is_some() && !ctxt.is_null() {
                 return -1;
             }
 
-            if (!xsd.is_null() || !ctxt.is_null())
+            if (xsd.is_some() || !ctxt.is_null())
                 && (self.mode != XmlTextReaderMode::XmlTextreaderModeInitial || self.ctxt.is_null())
             {
                 return -1;
@@ -1774,16 +1769,15 @@ impl XmlTextReader {
                 self.xsd_schemas = null_mut();
             }
 
-            if xsd.is_null() && ctxt.is_null() {
+            if xsd.is_none() && ctxt.is_null() {
                 // We just want to deactivate the validation, so get out.
                 return 0;
             }
 
             let ctx = GenericErrorContext::new(self as *mut Self);
-            if !xsd.is_null() {
+            if let Some(xsd) = xsd {
                 // Parse the schema and create validation environment.
-                let pctxt: XmlSchemaParserCtxtPtr =
-                    xml_schema_new_parser_ctxt(CStr::from_ptr(xsd).to_string_lossy().as_ref());
+                let pctxt: XmlSchemaParserCtxtPtr = xml_schema_new_parser_ctxt(xsd);
                 if self.error_func.is_some() {
                     (*pctxt).set_errors(
                         Some(xml_text_reader_validity_error_relay),
@@ -1864,8 +1858,8 @@ impl XmlTextReader {
     /// Returns 0 in case the schemas validation could be (de)activated and -1 in case of error.
     #[doc(alias = "xmlTextReaderSchemaValidate")]
     #[cfg(all(feature = "libxml_reader", feature = "schema"))]
-    pub unsafe fn schema_validate(&mut self, xsd: *const c_char) -> i32 {
-        unsafe { self.schema_validate_internal(xsd, null_mut(), 0) }
+    pub unsafe fn schema_validate(&mut self, xsd: &str) -> i32 {
+        unsafe { self.schema_validate_internal(Some(xsd), null_mut(), 0) }
     }
 
     /// Use W3C XSD schema context to validate the document as it is processed.
@@ -1880,7 +1874,7 @@ impl XmlTextReader {
         ctxt: XmlSchemaValidCtxtPtr,
         options: i32,
     ) -> i32 {
-        unsafe { self.schema_validate_internal(null_mut(), ctxt, options) }
+        unsafe { self.schema_validate_internal(None, ctxt, options) }
     }
 
     /// Use RelaxNG to validate the document as it is processed.
@@ -1892,23 +1886,21 @@ impl XmlTextReader {
     #[cfg(all(feature = "libxml_reader", feature = "schema"))]
     unsafe fn relaxng_validate_internal(
         &mut self,
-        rng: *const c_char,
+        rng: Option<&str>,
         ctxt: XmlRelaxNGValidCtxtPtr,
         _options: i32,
     ) -> i32 {
         unsafe {
-            use std::ffi::CStr;
-
             use crate::relaxng::{
                 xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt,
                 xml_relaxng_new_valid_ctxt,
             };
 
-            if !rng.is_null() && !ctxt.is_null() {
+            if rng.is_some() && !ctxt.is_null() {
                 return -1;
             }
 
-            if (!rng.is_null() || !ctxt.is_null())
+            if (rng.is_some() || !ctxt.is_null())
                 && (self.mode != XmlTextReaderMode::XmlTextreaderModeInitial || self.ctxt.is_null())
             {
                 return -1;
@@ -1927,16 +1919,15 @@ impl XmlTextReader {
                 self.rng_schemas = null_mut();
             }
 
-            if rng.is_null() && ctxt.is_null() {
+            if rng.is_none() && ctxt.is_null() {
                 // We just want to deactivate the validation, so get out.
                 return 0;
             }
 
-            if !rng.is_null() {
+            if let Some(rng) = rng {
                 // Parse the schema and create validation environment.
 
-                let pctxt =
-                    xml_relaxng_new_parser_ctxt(CStr::from_ptr(rng).to_string_lossy().as_ref());
+                let pctxt = xml_relaxng_new_parser_ctxt(rng);
                 let ctx = GenericErrorContext::new(self as *mut Self);
                 if self.error_func.is_some() {
                     (*pctxt).set_parser_errors(
@@ -2002,8 +1993,8 @@ impl XmlTextReader {
     /// Returns 0 in case the schemas validation could be (de)activated and -1 in case of error.
     #[doc(alias = "xmlTextReaderRelaxNGValidate")]
     #[cfg(all(feature = "libxml_reader", feature = "schema"))]
-    pub unsafe fn relaxng_validate(&mut self, rng: *const c_char) -> i32 {
-        unsafe { self.relaxng_validate_internal(rng, null_mut(), 0) }
+    pub unsafe fn relaxng_validate(&mut self, rng: &str) -> i32 {
+        unsafe { self.relaxng_validate_internal(Some(rng), null_mut(), 0) }
     }
 
     /// Use RelaxNG schema context to validate the document as it is processed.
@@ -2018,7 +2009,7 @@ impl XmlTextReader {
         ctxt: XmlRelaxNGValidCtxtPtr,
         options: i32,
     ) -> i32 {
-        unsafe { self.relaxng_validate_internal(null_mut(), ctxt, options) }
+        unsafe { self.relaxng_validate_internal(None, ctxt, options) }
     }
 
     /// Retrieve the validity status from the parser context
@@ -2154,8 +2145,6 @@ impl XmlTextReader {
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn get_attribute(&mut self, name: &str) -> Option<String> {
         unsafe {
-            use std::ffi::CStr;
-
             use crate::{parser::split_qname2, tree::NodeCommon};
 
             if self.curnode.is_some() {
@@ -2173,11 +2162,7 @@ impl XmlTextReader {
                     let mut ns = current_node.ns_def;
                     while let Some(now) = ns {
                         if now.prefix().is_none() {
-                            return Some(
-                                CStr::from_ptr(now.href as *const i8)
-                                    .to_string_lossy()
-                                    .into_owned(),
-                            );
+                            return now.href().map(|href| href.into_owned());
                         }
                         ns = now.next;
                     }
@@ -2192,11 +2177,7 @@ impl XmlTextReader {
                 let mut ns = current_node.ns_def;
                 while let Some(now) = ns {
                     if now.prefix().as_deref() == Some(localname) {
-                        ret = Some(
-                            CStr::from_ptr(now.href as *const i8)
-                                .to_string_lossy()
-                                .into_owned(),
-                        );
+                        ret = now.href().map(|href| href.into_owned());
                         break;
                     }
                     ns = now.next;
@@ -2204,13 +2185,7 @@ impl XmlTextReader {
             } else if let Some(ns) =
                 current_node.search_ns(self.node.unwrap().document(), Some(prefix))
             {
-                let href = ns.href;
-                ret = current_node.get_ns_prop(
-                    localname,
-                    (!href.is_null())
-                        .then(|| CStr::from_ptr(href as *const i8).to_string_lossy())
-                        .as_deref(),
-                );
+                ret = current_node.get_ns_prop(localname, ns.href().as_deref());
             }
             ret
         }
@@ -2228,8 +2203,6 @@ impl XmlTextReader {
         namespace_uri: Option<&str>,
     ) -> Option<String> {
         unsafe {
-            use std::ffi::CStr;
-
             use crate::tree::NodeCommon;
 
             if self.curnode.is_some() {
@@ -2248,11 +2221,7 @@ impl XmlTextReader {
                     if (prefix.is_none() && now.prefix().is_none())
                         || now.prefix().as_deref() == Some(local_name)
                     {
-                        return Some(
-                            CStr::from_ptr(now.href as *const i8)
-                                .to_string_lossy()
-                                .into_owned(),
-                        );
+                        return now.href().map(|href| href.into_owned());
                     }
                     ns = now.next;
                 }
@@ -2271,8 +2240,6 @@ impl XmlTextReader {
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn get_attribute_no(&mut self, no: i32) -> Option<String> {
         unsafe {
-            use std::ffi::CStr;
-
             use crate::tree::NodeCommon;
 
             if self.curnode.is_some() {
@@ -2291,11 +2258,7 @@ impl XmlTextReader {
             }
 
             if let Some(ns) = ns {
-                return Some(
-                    CStr::from_ptr(ns.href as *const i8)
-                        .to_string_lossy()
-                        .into_owned(),
-                );
+                return ns.href().map(|href| href.into_owned());
             }
             let mut cur = current_node.properties?;
             for _ in i..no {
@@ -3566,7 +3529,6 @@ impl XmlTextReader {
                 | XmlElementType::XmlXIncludeEnd => None,
                 _ => unreachable!(),
             }
-            // return null_mut();
         }
     }
 
@@ -4554,14 +4516,12 @@ fn xml_text_reader_get_successor(cur: XmlGenericNodePtr) -> Option<XmlGenericNod
 ///  Returns a string containing the content, or NULL in case of error.
 #[doc(alias = "xmlTextReaderCollectSiblings")]
 #[cfg(feature = "libxml_reader")]
-unsafe fn xml_text_reader_collect_siblings(node: XmlGenericNodePtr) -> *mut XmlChar {
+unsafe fn xml_text_reader_collect_siblings(node: XmlGenericNodePtr) -> Option<String> {
     unsafe {
         use std::ffi::CStr;
 
-        use crate::libxml::xmlstring::xml_strndup;
-
         if node.element_type() == XmlElementType::XmlNamespaceDecl {
-            return null_mut();
+            return None;
         }
 
         let mut buffer = vec![];
@@ -4574,17 +4534,17 @@ unsafe fn xml_text_reader_collect_siblings(node: XmlGenericNodePtr) -> *mut XmlC
                 }
                 XmlElementType::XmlElementNode => {
                     let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                    let tmp: *mut XmlChar =
-                        xml_text_reader_collect_siblings(cur_node.children.unwrap());
-                    buffer.extend(CStr::from_ptr(tmp as *const i8).to_bytes());
-                    xml_free(tmp as _);
+                    if let Some(tmp) = xml_text_reader_collect_siblings(cur_node.children.unwrap())
+                    {
+                        buffer.extend_from_slice(tmp.as_bytes());
+                    }
                 }
                 _ => {}
             }
 
             cur = cur_node.next();
         }
-        xml_strndup(buffer.as_ptr(), buffer.len() as i32)
+        Some(String::from_utf8(buffer).unwrap())
     }
 }
 

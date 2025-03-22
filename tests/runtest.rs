@@ -2425,7 +2425,7 @@ unsafe fn stream_process_test(
     result: Option<String>,
     err: Option<String>,
     reader: XmlTextReaderPtr,
-    rng: *const c_char,
+    rng: Option<&str>,
     _options: i32,
 ) -> i32 {
     unsafe {
@@ -2459,10 +2459,9 @@ unsafe fn stream_process_test(
             temp = Some(tm);
         }
         #[cfg(feature = "schema")]
-        if !rng.is_null() {
+        if let Some(rng) = rng {
             ret = (*reader).relaxng_validate(rng);
             if ret < 0 {
-                let rng = CStr::from_ptr(rng).to_string_lossy();
                 test_error_handler(
                     None,
                     format!("Relax-NG schema {rng} failed to compile\n").as_str(),
@@ -2476,7 +2475,7 @@ unsafe fn stream_process_test(
         }
         ret = (*reader).read();
         while ret == 1 {
-            if let Some(t) = t.as_mut().filter(|_| rng.is_null()) {
+            if let Some(t) = t.as_mut().filter(|_| rng.is_none()) {
                 process_node(t, reader);
             }
             ret = (*reader).read();
@@ -2484,7 +2483,7 @@ unsafe fn stream_process_test(
         if ret != 0 {
             test_error_handler(None, format!("{filename} : failed to parse\n").as_str());
         }
-        if !rng.is_null() {
+        if rng.is_some() {
             if !(*reader).is_valid().unwrap_or(false) {
                 test_error_handler(None, format!("{filename} fails to validate\n").as_str());
             } else {
@@ -2532,7 +2531,7 @@ unsafe fn stream_parse_test(
         use exml::libxml::xmlreader::{xml_free_text_reader, xml_reader_for_file};
 
         let reader: XmlTextReaderPtr = xml_reader_for_file(filename, None, options);
-        let ret: i32 = stream_process_test(filename, result, err, reader, null_mut(), options);
+        let ret: i32 = stream_process_test(filename, result, err, reader, None, options);
         xml_free_text_reader(reader);
         ret
     }
@@ -2557,7 +2556,7 @@ unsafe fn walker_parse_test(
             return -1;
         };
         let reader: XmlTextReaderPtr = xml_reader_walker(doc);
-        let ret: i32 = stream_process_test(filename, result, err, reader, null_mut(), options);
+        let ret: i32 = stream_process_test(filename, result, err, reader, None, options);
         xml_free_text_reader(reader);
         xml_free_doc(doc);
         ret
@@ -2588,7 +2587,7 @@ unsafe fn stream_mem_parse_test(
         }
         let buffer = from_raw_parts(base as *const u8, size as usize).to_vec();
         let reader: XmlTextReaderPtr = xml_reader_for_memory(buffer, Some(filename), None, options);
-        let ret: i32 = stream_process_test(filename, result, err, reader, null_mut(), options);
+        let ret: i32 = stream_process_test(filename, result, err, reader, None, options);
         free(base as _);
         xml_free_text_reader(reader);
         ret
@@ -3865,7 +3864,6 @@ unsafe fn rng_stream_test(
         use exml::libxml::xmlreader::{xml_free_text_reader, xml_reader_for_file};
         use libc::{GLOB_DOOFFS, glob, glob_t, globfree};
 
-        let cfilename = CString::new(filename).unwrap();
         let base = CString::new(base_filename(filename)).unwrap();
         let base = base.as_ptr();
         let mut instance: *const c_char;
@@ -3972,7 +3970,7 @@ unsafe fn rng_stream_test(
                     ),
                     None,
                     reader,
-                    cfilename.as_ptr(),
+                    Some(filename),
                     options,
                 );
             } else {
@@ -3985,7 +3983,7 @@ unsafe fn rng_stream_test(
                     ),
                     Some(CStr::from_ptr(err.as_ptr()).to_string_lossy().into_owned()),
                     reader,
-                    cfilename.as_ptr(),
+                    Some(filename),
                     options,
                 );
             }
