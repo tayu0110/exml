@@ -27,9 +27,9 @@
 use std::{
     borrow::Cow,
     ffi::{CStr, CString},
-    mem::{size_of, take},
+    mem::take,
     os::raw::c_void,
-    ptr::{addr_of_mut, drop_in_place, null_mut},
+    ptr::{addr_of_mut, null_mut},
 };
 
 #[cfg(feature = "libxml_xptr_locs")]
@@ -39,7 +39,6 @@ use crate::{
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     io::xml_parser_get_directory,
     libxml::{
-        globals::{xml_free, xml_malloc},
         parser::{
             XML_DETECT_IDS, XmlParserOption, xml_ctxt_use_options, xml_init_parser,
             xml_load_external_entity, xml_parse_document,
@@ -151,7 +150,6 @@ pub struct XmlXIncludeTxt {
     url: Box<str>,  /* the URL */
 }
 
-pub type XmlXIncludeCtxtPtr = *mut XmlXIncludeCtxt;
 /// An XInclude context
 #[doc(alias = "xmlXIncludeCtxt")]
 #[repr(C)]
@@ -176,6 +174,17 @@ pub struct XmlXIncludeCtxt {
 }
 
 impl XmlXIncludeCtxt {
+    /// Creates a new XInclude context
+    ///
+    /// Returns the new set
+    #[doc(alias = "xmlXIncludeNewContext")]
+    pub fn new(doc: XmlDocPtr) -> Self {
+        let mut res = Self::default();
+        res.doc = Some(doc);
+        res.nb_errors = 0;
+        res
+    }
+
     /// Get an XInclude attribute
     ///
     /// Returns the value (to be freed) or NULL if not found
@@ -1610,11 +1619,8 @@ impl XmlXIncludeCtxt {
             };
             buf.borrow_mut().encoder = get_encoding_handler(enc);
             let Some(mut node) = xml_new_doc_text(self.doc, null_mut()) else {
-                xml_xinclude_err_memory(
-                    self,
-                    self.inc_tab[ref_index].elem.map(|node| node.into()),
-                    None,
-                );
+                let node = self.inc_tab[ref_index].elem.map(|node| node.into());
+                xml_xinclude_err_memory(Some(self), node, None);
                 // goto error;
                 xml_free_input_stream(input_stream);
                 xml_free_parser_ctxt(pctxt);
@@ -1827,7 +1833,7 @@ impl XmlXIncludeCtxt {
 
             let pctxt = xml_new_parser_ctxt();
             if pctxt.is_null() {
-                xml_xinclude_err_memory(self, None, Some("cannot allocate parser context"));
+                xml_xinclude_err_memory(Some(self), None, Some("cannot allocate parser context"));
                 return None;
             }
 
@@ -2003,6 +2009,20 @@ impl Default for XmlXIncludeCtxt {
     }
 }
 
+impl Drop for XmlXIncludeCtxt {
+    /// Free an XInclude context
+    #[doc(alias = "xmlXIncludeFreeContext")]
+    fn drop(&mut self) {
+        for inc_doc in self.url_tab.drain(..) {
+            if let Some(doc) = inc_doc.doc {
+                unsafe {
+                    xml_free_doc(doc);
+                }
+            }
+        }
+    }
+}
+
 /// Implement the XInclude substitution on the XML document @doc
 ///
 /// Returns 0 if no substitution were done, -1 if some processing failed
@@ -2044,54 +2064,54 @@ const XINCLUDE_MAX_DEPTH: i32 = 40;
 /// Handle an out of memory condition
 #[doc(alias = "xmlXIncludeErrMemory")]
 unsafe fn xml_xinclude_err_memory(
-    ctxt: XmlXIncludeCtxtPtr,
+    ctxt: Option<&mut XmlXIncludeCtxt>,
     node: Option<XmlGenericNodePtr>,
     extra: Option<&str>,
 ) {
-    unsafe {
-        if !ctxt.is_null() {
-            (*ctxt).nb_errors += 1;
-        }
-        if let Some(extra) = extra {
-            __xml_raise_error!(
-                None,
-                None,
-                None,
-                ctxt as _,
-                node,
-                XmlErrorDomain::XmlFromXInclude,
-                XmlParserErrors::XmlErrNoMemory,
-                XmlErrorLevel::XmlErrError,
-                None,
-                0,
-                Some(extra.to_owned().into()),
-                None,
-                None,
-                0,
-                0,
-                "Memory allocation failed : {}\n",
-                extra
-            );
-        } else {
-            __xml_raise_error!(
-                None,
-                None,
-                None,
-                ctxt as _,
-                node,
-                XmlErrorDomain::XmlFromXInclude,
-                XmlParserErrors::XmlErrNoMemory,
-                XmlErrorLevel::XmlErrError,
-                None,
-                0,
-                None,
-                None,
-                None,
-                0,
-                0,
-                "Memory allocation failed\n",
-            );
-        }
+    let mut ptr = null_mut();
+    if let Some(ctxt) = ctxt {
+        ctxt.nb_errors += 1;
+        ptr = ctxt as *mut XmlXIncludeCtxt;
+    }
+    if let Some(extra) = extra {
+        __xml_raise_error!(
+            None,
+            None,
+            None,
+            ptr as _,
+            node,
+            XmlErrorDomain::XmlFromXInclude,
+            XmlParserErrors::XmlErrNoMemory,
+            XmlErrorLevel::XmlErrError,
+            None,
+            0,
+            Some(extra.to_owned().into()),
+            None,
+            None,
+            0,
+            0,
+            "Memory allocation failed : {}\n",
+            extra
+        );
+    } else {
+        __xml_raise_error!(
+            None,
+            None,
+            None,
+            ptr as _,
+            node,
+            XmlErrorDomain::XmlFromXInclude,
+            XmlParserErrors::XmlErrNoMemory,
+            XmlErrorLevel::XmlErrError,
+            None,
+            0,
+            None,
+            None,
+            None,
+            0,
+            0,
+            "Memory allocation failed\n",
+        );
     }
 }
 
@@ -2141,19 +2161,15 @@ pub unsafe fn xml_xinclude_process_tree_flags_data(
             return -1;
         };
 
-        let ctxt: XmlXIncludeCtxtPtr = xml_xinclude_new_context(doc);
-        if ctxt.is_null() {
-            return -1;
-        }
-        (*ctxt)._private = data;
-        (*ctxt).base = doc.url.as_deref().map(|url| url.into());
-        (*ctxt).set_flags(flags);
-        let mut ret = (*ctxt).do_process(tree);
-        if ret >= 0 && (*ctxt).nb_errors > 0 {
+        let mut ctxt = XmlXIncludeCtxt::new(doc);
+        ctxt._private = data;
+        ctxt.base = doc.url.as_deref().map(|url| url.into());
+        ctxt.set_flags(flags);
+        let mut ret = ctxt.do_process(tree);
+        if ret >= 0 && ctxt.nb_errors > 0 {
             ret = -1;
         }
 
-        xml_xinclude_free_context(ctxt);
         ret
     }
 }
@@ -2180,58 +2196,14 @@ pub unsafe fn xml_xinclude_process_tree_flags(tree: XmlNodePtr, flags: i32) -> i
         let Some(doc) = tree.doc else {
             return -1;
         };
-        let ctxt: XmlXIncludeCtxtPtr = xml_xinclude_new_context(doc);
-        if ctxt.is_null() {
-            return -1;
-        }
-        (*ctxt).base = tree.get_base(Some(doc)).map(|base| base.into());
-        (*ctxt).set_flags(flags);
-        let mut ret = (*ctxt).do_process(tree);
-        if ret >= 0 && (*ctxt).nb_errors > 0 {
+        let mut ctxt = XmlXIncludeCtxt::new(doc);
+        ctxt.base = tree.get_base(Some(doc)).map(|base| base.into());
+        ctxt.set_flags(flags);
+        let mut ret = ctxt.do_process(tree);
+        if ret >= 0 && ctxt.nb_errors > 0 {
             ret = -1;
         }
 
-        xml_xinclude_free_context(ctxt);
         ret
-    }
-}
-
-/// Creates a new XInclude context
-///
-/// Returns the new set
-#[doc(alias = "xmlXIncludeNewContext")]
-pub unsafe fn xml_xinclude_new_context(doc: XmlDocPtr) -> XmlXIncludeCtxtPtr {
-    unsafe {
-        let ret: XmlXIncludeCtxtPtr =
-            xml_malloc(size_of::<XmlXIncludeCtxt>()) as XmlXIncludeCtxtPtr;
-        if ret.is_null() {
-            xml_xinclude_err_memory(
-                null_mut(),
-                Some(doc.into()),
-                Some("creating XInclude context"),
-            );
-            return null_mut();
-        }
-        std::ptr::write(&mut *ret, XmlXIncludeCtxt::default());
-        (*ret).doc = Some(doc);
-        (*ret).nb_errors = 0;
-        ret
-    }
-}
-
-/// Free an XInclude context
-#[doc(alias = "xmlXIncludeFreeContext")]
-pub unsafe fn xml_xinclude_free_context(ctxt: XmlXIncludeCtxtPtr) {
-    unsafe {
-        if ctxt.is_null() {
-            return;
-        }
-        for inc_doc in (*ctxt).url_tab.drain(..) {
-            if let Some(doc) = inc_doc.doc {
-                xml_free_doc(doc);
-            }
-        }
-        drop_in_place(ctxt);
-        xml_free(ctxt as _);
     }
 }

@@ -22,7 +22,6 @@ use crate::{
         valid::{
             XmlValidCtxtPtr, xml_free_element_content, xml_free_valid_ctxt, xml_new_valid_ctxt,
         },
-        xinclude::XmlXIncludeCtxtPtr,
         xmlautomata::XmlAutomataPtr,
         xmlmodule::XmlModulePtr,
         xmlreader::{XmlTextReaderLocatorPtr, XmlTextReaderPtr},
@@ -475,14 +474,6 @@ pub(crate) fn gen_xml_automata_ptr(_no: i32, _nr: i32) -> XmlAutomataPtr {
 
 #[cfg(feature = "libxml_automata")]
 pub(crate) fn des_xml_automata_ptr(_no: i32, _val: XmlAutomataPtr, _nr: i32) {}
-
-#[cfg(feature = "xinclude")]
-pub(crate) fn gen_xml_xinclude_ctxt_ptr(_no: i32, _nr: i32) -> XmlXIncludeCtxtPtr {
-    null_mut()
-}
-
-#[cfg(feature = "xinclude")]
-pub(crate) fn des_xml_xinclude_ctxt_ptr(_no: i32, _val: XmlXIncludeCtxtPtr, _nr: i32) {}
 
 pub(crate) fn gen_xml_attribute_type(no: i32, _nr: i32) -> XmlAttributeType {
     if no == 1 {

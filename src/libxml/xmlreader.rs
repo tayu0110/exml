@@ -32,6 +32,8 @@ use std::{
     sync::atomic::Ordering,
 };
 
+#[cfg(feature = "xinclude")]
+use crate::libxml::xinclude::XmlXIncludeCtxt;
 #[cfg(feature = "libxml_pattern")]
 use crate::pattern::{XmlPattern, xml_pattern_compile};
 #[cfg(feature = "schema")]
@@ -61,7 +63,6 @@ use crate::{
             xml_relaxng_validate_push_cdata,
         },
         sax2::xml_sax_version,
-        xinclude::{XmlXIncludeCtxtPtr, xml_xinclude_new_context},
         xmlschemas::{
             XmlSchemaSAXPlugPtr, xml_schema_is_valid, xml_schema_sax_plug, xml_schema_sax_unplug,
             xml_schema_validate_set_locator,
@@ -302,7 +303,7 @@ pub struct XmlTextReader {
     xinclude_name: *const XmlChar,
     // the xinclude context
     #[cfg(feature = "xinclude")]
-    xincctxt: XmlXIncludeCtxtPtr,
+    xincctxt: Option<Box<XmlXIncludeCtxt>>,
     // counts for xinclude
     #[cfg(feature = "xinclude")]
     in_xinclude: i32,
@@ -656,18 +657,21 @@ impl XmlTextReader {
                                 })
                             })
                     {
-                        if self.xincctxt.is_null() {
-                            self.xincctxt = xml_xinclude_new_context((*self.ctxt).my_doc.unwrap());
-                            (*self.xincctxt).set_flags(
+                        if self.xincctxt.is_none() {
+                            let mut ctxt = XmlXIncludeCtxt::new((*self.ctxt).my_doc.unwrap());
+                            ctxt.set_flags(
                                 self.parser_flags & !(XmlParserOption::XmlParseNoXIncnode as i32),
                             );
-                            (*self.xincctxt).set_streaming_mode(1);
+                            ctxt.set_streaming_mode(1);
+                            self.xincctxt = Some(Box::new(ctxt));
                         }
                         // expand that node and process it
                         if self.expand().is_none() {
                             return -1;
                         }
-                        (*self.xincctxt)
+                        self.xincctxt
+                            .as_mut()
+                            .unwrap()
                             .process_node(XmlNodePtr::try_from(self.node.unwrap()).unwrap());
                     }
                     if self
@@ -2833,7 +2837,7 @@ impl Default for XmlTextReader {
             #[cfg(feature = "xinclude")]
             xinclude_name: null(),
             #[cfg(feature = "xinclude")]
-            xincctxt: null_mut(),
+            xincctxt: None,
             #[cfg(feature = "xinclude")]
             in_xinclude: 0,
             #[cfg(feature = "libxml_pattern")]
@@ -3186,8 +3190,6 @@ pub unsafe fn xml_free_text_reader(reader: XmlTextReaderPtr) {
         #[cfg(feature = "schema")]
         use crate::relaxng::xml_relaxng_free_valid_ctxt;
 
-        use super::xinclude::xml_xinclude_free_context;
-
         if reader.is_null() {
             return;
         }
@@ -3219,9 +3221,7 @@ pub unsafe fn xml_free_text_reader(reader: XmlTextReaderPtr) {
             }
         }
         #[cfg(feature = "xinclude")]
-        if !(*reader).xincctxt.is_null() {
-            xml_xinclude_free_context((*reader).xincctxt);
-        }
+        let _ = (*reader).xincctxt.take();
         #[cfg(feature = "libxml_pattern")]
         {
             (*reader).pattern_tab.clear();
@@ -3263,7 +3263,7 @@ pub unsafe fn xml_text_reader_setup(
         use crate::{
             encoding::{XmlCharEncoding, find_encoding_handler},
             generic_error,
-            libxml::xinclude::{XINCLUDE_NODE, xml_xinclude_free_context},
+            libxml::xinclude::XINCLUDE_NODE,
             parser::{XmlParserInputPtr, xml_new_input_stream},
             uri::canonic_path,
         };
@@ -3428,10 +3428,7 @@ pub unsafe fn xml_text_reader_setup(
 
         #[cfg(feature = "xinclude")]
         {
-            if !(*reader).xincctxt.is_null() {
-                xml_xinclude_free_context((*reader).xincctxt);
-                (*reader).xincctxt = null_mut();
-            }
+            (*reader).xincctxt.take();
             if options & XmlParserOption::XmlParseXInclude as i32 != 0 {
                 (*reader).xinclude = 1;
                 (*reader).xinclude_name =
