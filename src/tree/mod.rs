@@ -769,44 +769,6 @@ pub unsafe fn xml_split_qname2(name: *const XmlChar, prefix: *mut *mut XmlChar) 
     }
 }
 
-/// Rarse an XML qualified name string,i
-///
-/// Returns NULL if it is not a Qualified Name, otherwise, update len
-/// with the length in byte of the prefix and return a pointer
-/// to the start of the name without the prefix
-#[doc(alias = "xmlSplitQName3")]
-pub unsafe fn xml_split_qname3(name: *const XmlChar, len: *mut i32) -> *const XmlChar {
-    unsafe {
-        let mut l: i32 = 0;
-
-        if name.is_null() {
-            return null_mut();
-        }
-        if len.is_null() {
-            return null_mut();
-        }
-
-        // nasty but valid
-        if *name.add(0) == b':' {
-            return null_mut();
-        }
-
-        // we are not trying to validate but just to cut, and yes it will
-        // work even if this is as set of UTF-8 encoded chars
-        while *name.add(l as usize) != 0 && *name.add(l as usize) != b':' {
-            l += 1;
-        }
-
-        if *name.add(l as usize) == 0 {
-            return null_mut();
-        }
-
-        *len = l;
-
-        name.add(l as usize + 1)
-    }
-}
-
 /// This function tries to locate a namespace definition in a tree
 /// ancestors, or create a new namespace definition node similar to
 /// @ns trying to reuse the same prefix. However if the given prefix is
@@ -2687,37 +2649,6 @@ mod tests {
                         assert!(leaks == 0, "{leaks} Leaks are found in xmlSplitQName2()");
                         eprint!(" {}", n_name);
                         eprintln!(" {}", n_prefix);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_split_qname3() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                for n_len in 0..GEN_NB_INT_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let name = gen_const_xml_char_ptr(n_name, 0);
-                    let len = gen_int_ptr(n_len, 1);
-
-                    let ret_val = xml_split_qname3(name as *const XmlChar, len);
-                    desret_const_xml_char_ptr(ret_val);
-                    des_const_xml_char_ptr(n_name, name, 0);
-                    des_int_ptr(n_len, len, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlSplitQName3",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlSplitQName3()");
-                        eprint!(" {}", n_name);
-                        eprintln!(" {}", n_len);
                     }
                 }
             }

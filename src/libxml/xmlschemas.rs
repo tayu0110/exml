@@ -107,7 +107,7 @@ use crate::{
         },
     },
     parser::{
-        XmlParserCtxtPtr, XmlParserInput, xml_ctxt_read_file, xml_ctxt_read_memory,
+        XmlParserCtxtPtr, XmlParserInput, split_qname2, xml_ctxt_read_file, xml_ctxt_read_memory,
         xml_free_parser_ctxt, xml_new_parser_ctxt, xml_new_sax_parser_ctxt,
     },
     tree::{
@@ -115,7 +115,7 @@ use crate::{
         XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType,
         XmlEnumeration, XmlGenericNodePtr, XmlNodePtr, validate_ncname, validate_qname,
         xml_free_doc, xml_free_node, xml_new_doc_text, xml_new_ns, xml_new_ns_prop, xml_new_prop,
-        xml_split_qname2, xml_split_qname3,
+        xml_split_qname2,
     },
     uri::build_uri,
     xmlschemas::{
@@ -4162,8 +4162,6 @@ pub(crate) unsafe fn xml_schema_pval_attr_node_qname_value(
     local: *mut *const XmlChar,
 ) -> i32 {
     unsafe {
-        let mut len: i32 = 0;
-
         *uri = null_mut();
         *local = null_mut();
         if validate_qname::<true>(
@@ -4204,14 +4202,14 @@ pub(crate) unsafe fn xml_schema_pval_attr_node_qname_value(
             return 0;
         }
         // At this point xmlSplitQName3 has to return a local name.
-        *local = xml_split_qname3(value, &raw mut len);
-        *local = xml_dict_lookup((*ctxt).dict, *local, -1);
-        let pref: *const XmlChar = xml_dict_lookup((*ctxt).dict, value, len);
+        let value = CStr::from_ptr(value as *const i8).to_string_lossy();
+        let (pre, loc) = split_qname2(&value).unwrap();
+        *local = xml_dict_lookup((*ctxt).dict, loc.as_ptr(), loc.len() as i32);
+        let pref: *const u8 = xml_dict_lookup((*ctxt).dict, pre.as_ptr(), pre.len() as i32);
         let Some(ns) = attr.parent().unwrap().search_ns(
             attr.doc,
             Some(CStr::from_ptr(pref as *const i8).to_string_lossy()).as_deref(),
         ) else {
-            let value = CStr::from_ptr(value as *const i8).to_string_lossy();
             xml_schema_psimple_type_err(
             ctxt,
             XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
@@ -18805,9 +18803,7 @@ pub unsafe fn xml_schema_validate_stream(
         xml_schema_validate_set_locator(ctxt, Some(xml_schema_validate_stream_locator), pctxt as _);
 
         let input = Rc::new(RefCell::new(input));
-        if let Some(input_stream) =
-            XmlParserInput::from_io(pctxt, Rc::clone(&input), enc)
-        {
+        if let Some(input_stream) = XmlParserInput::from_io(pctxt, Rc::clone(&input), enc) {
             (*pctxt).input_push(input_stream);
             (*ctxt).parser_ctxt = pctxt;
             (*ctxt).input = Some(Rc::clone(&input));
