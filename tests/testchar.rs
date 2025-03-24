@@ -656,7 +656,7 @@ unsafe fn test_char_ranges() -> c_int {
             xml_free_parser_ctxt(ctxt);
             panic!("Failed to allocate input buffer");
         };
-        let Some(mut input) = XmlParserInput::xml_new_input_stream(Some(&mut *ctxt)) else {
+        let Some(mut input) = XmlParserInput::new(Some(&mut *ctxt)) else {
             xml_free_parser_ctxt(ctxt);
             return 1;
         };

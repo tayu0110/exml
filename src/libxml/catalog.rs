@@ -3155,7 +3155,7 @@ pub unsafe fn xml_parse_catalog_file(filename: &str) -> Option<XmlDocPtr> {
             return None;
         };
 
-        let Some(mut input_stream) = XmlParserInput::xml_new_input_stream(Some(&mut *ctxt)) else {
+        let Some(mut input_stream) = XmlParserInput::new(Some(&mut *ctxt)) else {
             xml_free_parser_ctxt(ctxt);
             return None;
         };

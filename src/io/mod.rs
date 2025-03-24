@@ -57,7 +57,7 @@ use crate::{
     error::{__xml_simple_error, __xml_simple_oom_error, XmlErrorDomain, XmlParserErrors},
     libxml::parser::XmlParserOption,
     nanohttp::XmlNanoHTTPCtxt,
-    parser::{__xml_err_encoding, XmlParserCtxtPtr, XmlParserInput, xml_new_input_from_file},
+    parser::{__xml_err_encoding, XmlParserCtxtPtr, XmlParserInput},
     uri::canonic_path,
 };
 
@@ -504,7 +504,7 @@ pub(crate) unsafe fn xml_default_external_entity_loader(
             __xml_loader_err!(ctxt, "failed to load external entity \"{}\"\n", id);
             return None;
         };
-        xml_new_input_from_file(&mut *ctxt, &resource)
+        XmlParserInput::from_filename(&mut *ctxt, &resource)
     }
 }
 

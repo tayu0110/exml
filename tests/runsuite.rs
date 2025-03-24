@@ -35,10 +35,7 @@ use exml::{
         xmlschemastypes::xml_schema_init_types,
         xmlstring::{XmlChar, xml_str_equal, xml_strdup, xml_strndup},
     },
-    parser::{
-        XmlParserCtxtPtr, XmlParserInput, xml_new_string_input_stream, xml_read_file,
-        xml_read_memory,
-    },
+    parser::{XmlParserCtxtPtr, XmlParserInput, xml_read_file, xml_read_memory},
     relaxng::{
         XmlRelaxNGValidCtxtPtr, xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt,
         xml_relaxng_init_types, xml_relaxng_new_mem_parser_ctxt, xml_relaxng_new_valid_ctxt,
@@ -142,7 +139,7 @@ unsafe fn test_external_entity_loader(
         for i in 0..NB_ENTITIES {
             let url = CString::new(url.unwrap()).unwrap();
             if strcmp(TEST_ENTITIES_NAME[i], url.as_ptr()) == 0 {
-                let mut ret = xml_new_string_input_stream(
+                let mut ret = XmlParserInput::from_str(
                     (!ctxt.is_null()).then(|| &mut *ctxt),
                     &CStr::from_ptr(TEST_ENTITIES_VALUE[i]).to_string_lossy(),
                 );

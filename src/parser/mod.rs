@@ -385,7 +385,7 @@ pub unsafe fn xml_read_io(
             return None;
         }
         let Some(stream) =
-            xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None)
+            XmlParserInput::from_io(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None)
         else {
             xml_free_parser_ctxt(ctxt);
             return None;
@@ -469,7 +469,7 @@ pub unsafe fn xml_ctxt_read_memory(
 
         let input = XmlParserInputBuffer::from_memory(buffer, XmlCharEncoding::None)?;
         let stream =
-            xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None)?;
+            XmlParserInput::from_io(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None)?;
         (*ctxt).input_push(stream);
         (*ctxt).do_read(url, encoding, options)
     }
@@ -496,7 +496,7 @@ pub unsafe fn xml_ctxt_read_io(
 
         let input = XmlParserInputBuffer::from_reader(ioctx, XmlCharEncoding::None);
         let stream =
-            xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None)?;
+            XmlParserInput::from_io(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None)?;
         (*ctxt).input_push(stream);
         (*ctxt).do_read(url, encoding, options)
     }

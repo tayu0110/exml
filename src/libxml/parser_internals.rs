@@ -63,10 +63,10 @@ use crate::{
         xmlstring::{XmlChar, xml_str_equal, xml_strchr, xml_strdup, xml_strlen, xml_strndup},
     },
     parser::{
-        __xml_err_encoding, XmlParserCharValid, XmlParserCtxtPtr, XmlParserNodeInfo,
-        xml_err_encoding_int, xml_err_memory, xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg,
-        xml_fatal_err_msg_int, xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str,
-        xml_validity_error, xml_warning_msg,
+        __xml_err_encoding, XmlParserCharValid, XmlParserCtxtPtr, XmlParserInput,
+        XmlParserNodeInfo, xml_err_encoding_int, xml_err_memory, xml_err_msg_str, xml_fatal_err,
+        xml_fatal_err_msg, xml_fatal_err_msg_int, xml_fatal_err_msg_str,
+        xml_fatal_err_msg_str_int_str, xml_validity_error, xml_warning_msg,
     },
     tree::{
         NodeCommon, XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
@@ -81,7 +81,7 @@ use crate::{
 use crate::{
     parser::{
         parse_char_ref, parse_comment, parse_name, parse_nmtoken, parse_pi, parse_text_decl,
-        xml_create_memory_parser_ctxt, xml_free_parser_ctxt, xml_new_entity_input_stream,
+        xml_create_memory_parser_ctxt, xml_free_parser_ctxt,
     },
     tree::xml_create_enumeration,
 };
@@ -2686,7 +2686,7 @@ pub(crate) unsafe fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
                         .saturating_add((*ctxt).input().unwrap().offset_from_base() as u64);
                 }
 
-                let Some(mut input) = xml_new_entity_input_stream(ctxt, entity) else {
+                let Some(mut input) = XmlParserInput::from_entity(ctxt, entity) else {
                     return;
                 };
                 input.parent_consumed = parent_consumed;

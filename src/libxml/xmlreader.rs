@@ -484,7 +484,7 @@ impl XmlTextReader {
                     (*self.ctxt).reset();
                     let buf = XmlParserInputBuffer::new(enc);
                     let Some(mut input_stream) =
-                        XmlParserInput::xml_new_input_stream(Some(&mut *self.ctxt))
+                        XmlParserInput::new(Some(&mut *self.ctxt))
                     else {
                         return -1;
                     };

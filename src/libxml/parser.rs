@@ -112,8 +112,8 @@ use crate::{
         parse_xmldecl, xml_create_entity_parser_ctxt_internal, xml_create_memory_parser_ctxt,
         xml_err_attribute_dup, xml_err_memory, xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg,
         xml_fatal_err_msg_int, xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str,
-        xml_free_parser_ctxt, xml_new_entity_input_stream, xml_new_io_input_stream,
-        xml_new_sax_parser_ctxt, xml_ns_err, xml_ns_warn, xml_validity_error, xml_warning_msg,
+        xml_free_parser_ctxt, xml_new_sax_parser_ctxt, xml_ns_err, xml_ns_warn, xml_validity_error,
+        xml_warning_msg,
     },
     tree::{
         NodeCommon, XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
@@ -1970,7 +1970,7 @@ pub unsafe fn xml_io_parse_dtd(
 
         // generate a parser input from the I/O handler
         let Some(pinput) =
-            xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None)
+            XmlParserInput::from_io(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None)
         else {
             xml_free_parser_ctxt(ctxt);
             return None;
@@ -2815,8 +2815,7 @@ pub unsafe fn xml_create_push_parser_ctxt(
             (*ctxt).directory = Some(dir.to_string_lossy().into_owned());
         }
 
-        let Some(mut input_stream) =
-            XmlParserInput::xml_new_input_stream((!ctxt.is_null()).then(|| &mut *ctxt))
+        let Some(mut input_stream) = XmlParserInput::new((!ctxt.is_null()).then(|| &mut *ctxt))
         else {
             return null_mut();
         };
@@ -3798,7 +3797,7 @@ unsafe fn xml_load_entity_content(ctxt: XmlParserCtxtPtr, mut entity: XmlEntityP
             );
         }
 
-        let Some(input) = xml_new_entity_input_stream(ctxt, entity) else {
+        let Some(input) = XmlParserInput::from_entity(ctxt, entity) else {
             xml_fatal_err(
                 ctxt,
                 XmlParserErrors::XmlErrInternalError,
@@ -7363,7 +7362,7 @@ pub unsafe fn xml_create_io_parser_ctxt(
             return null_mut();
         };
 
-        let Some(input_stream) = xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(buf)), enc)
+        let Some(input_stream) = XmlParserInput::from_io(ctxt, Rc::new(RefCell::new(buf)), enc)
         else {
             xml_free_parser_ctxt(ctxt);
             return null_mut();
@@ -7522,8 +7521,7 @@ pub unsafe fn xml_ctxt_reset_push(
             (*ctxt).directory = Some(dir.to_string_lossy().into_owned());
         }
 
-        let Some(mut input_stream) =
-            XmlParserInput::xml_new_input_stream((!ctxt.is_null()).then(|| &mut *ctxt))
+        let Some(mut input_stream) = XmlParserInput::new((!ctxt.is_null()).then(|| &mut *ctxt))
         else {
             return 1;
         };

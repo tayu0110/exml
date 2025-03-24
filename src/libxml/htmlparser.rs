@@ -61,7 +61,7 @@ use crate::{
     },
     parser::{
         XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput, XmlParserInputPtr, XmlParserNodeInfo,
-        xml_free_parser_ctxt, xml_new_io_input_stream,
+        xml_free_parser_ctxt,
     },
     tree::{
         NodeCommon, XmlDocPtr, XmlElementType, XmlNodePtr, xml_create_int_subset, xml_free_doc,
@@ -8743,7 +8743,7 @@ pub unsafe fn html_create_memory_parser_ctxt(buffer: Vec<u8>) -> HtmlParserCtxtP
             return null_mut();
         };
 
-        let Some(mut input) = XmlParserInput::xml_new_input_stream(Some(&mut *ctxt)) else {
+        let Some(mut input) = XmlParserInput::new(Some(&mut *ctxt)) else {
             xml_free_parser_ctxt(ctxt);
             return null_mut();
         };
@@ -10926,9 +10926,11 @@ pub unsafe fn html_read_io(
         if ctxt.is_null() {
             return None;
         }
-        let Some(stream) =
-            xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None)
-        else {
+        let Some(stream) = XmlParserInput::from_io(
+            ctxt,
+            Rc::new(RefCell::new(input)),
+            XmlCharEncoding::None,
+        ) else {
             xml_free_parser_ctxt(ctxt);
             return None;
         };
@@ -11010,8 +11012,11 @@ pub unsafe fn html_ctxt_read_memory(
 
         let input = XmlParserInputBuffer::from_memory(buffer, XmlCharEncoding::None)?;
 
-        let stream =
-            xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None)?;
+        let stream = XmlParserInput::from_io(
+            ctxt,
+            Rc::new(RefCell::new(input)),
+            XmlCharEncoding::None,
+        )?;
         (*ctxt).input_push(stream);
         html_do_read(ctxt, url, encoding, options, 1)
     }
@@ -11038,8 +11043,11 @@ pub unsafe fn html_ctxt_read_io(
         html_ctxt_reset(ctxt);
 
         let input = XmlParserInputBuffer::from_reader(ioctx, XmlCharEncoding::None);
-        let stream =
-            xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None)?;
+        let stream = XmlParserInput::from_io(
+            ctxt,
+            Rc::new(RefCell::new(input)),
+            XmlCharEncoding::None,
+        )?;
         (*ctxt).input_push(stream);
         html_do_read(ctxt, url, encoding, options, 1)
     }

@@ -31,7 +31,7 @@ use exml::{
     },
     parser::{
         XmlParserCtxtPtr, XmlParserInput, xml_ctxt_read_file, xml_free_parser_ctxt,
-        xml_new_input_from_file, xml_new_parser_ctxt, xml_read_file,
+        xml_new_parser_ctxt, xml_read_file,
     },
     tree::{NodeCommon, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr, xml_free_doc},
     xpath::{
@@ -79,7 +79,7 @@ unsafe fn test_external_entity_loader(
     _id: Option<&str>,
     ctxt: XmlParserCtxtPtr,
 ) -> Option<XmlParserInput> {
-    unsafe { xml_new_input_from_file(&mut *ctxt, url.unwrap()) }
+    unsafe { XmlParserInput::from_filename(&mut *ctxt, url.unwrap()) }
 }
 
 // Trapping the error messages at the generic level to grab the equivalent of

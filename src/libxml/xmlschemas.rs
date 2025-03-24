@@ -108,8 +108,7 @@ use crate::{
     },
     parser::{
         XmlParserCtxtPtr, XmlParserInput, xml_ctxt_read_file, xml_ctxt_read_memory,
-        xml_free_parser_ctxt, xml_new_io_input_stream, xml_new_parser_ctxt,
-        xml_new_sax_parser_ctxt,
+        xml_free_parser_ctxt, xml_new_parser_ctxt, xml_new_sax_parser_ctxt,
     },
     tree::{
         NodeCommon, XmlAttrPtr, XmlAttributeDefault, XmlAttributeType, XmlDocPtr,
@@ -18806,7 +18805,9 @@ pub unsafe fn xml_schema_validate_stream(
         xml_schema_validate_set_locator(ctxt, Some(xml_schema_validate_stream_locator), pctxt as _);
 
         let input = Rc::new(RefCell::new(input));
-        if let Some(input_stream) = xml_new_io_input_stream(pctxt, Rc::clone(&input), enc) {
+        if let Some(input_stream) =
+            XmlParserInput::from_io(pctxt, Rc::clone(&input), enc)
+        {
             (*pctxt).input_push(input_stream);
             (*ctxt).parser_ctxt = pctxt;
             (*ctxt).input = Some(Rc::clone(&input));
