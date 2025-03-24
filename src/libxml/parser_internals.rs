@@ -60,12 +60,12 @@ use crate::{
             xml_free_doc_element_content, xml_new_doc_element_content, xml_validate_element,
             xml_validate_root,
         },
-        xmlstring::{XmlChar, xml_str_equal, xml_strchr, xml_strdup, xml_strlen, xml_strndup},
+        xmlstring::{XmlChar, xml_str_equal, xml_strchr, xml_strlen, xml_strndup},
     },
     parser::{
         __xml_err_encoding, XmlParserCharValid, XmlParserCtxtPtr, XmlParserInput,
-        XmlParserNodeInfo, xml_err_encoding_int, xml_err_memory, xml_err_msg_str, xml_fatal_err,
-        xml_fatal_err_msg, xml_fatal_err_msg_int, xml_fatal_err_msg_str,
+        XmlParserNodeInfo, split_qname2, xml_err_encoding_int, xml_err_memory, xml_err_msg_str,
+        xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_int, xml_fatal_err_msg_str,
         xml_fatal_err_msg_str_int_str, xml_validity_error, xml_warning_msg,
     },
     tree::{
@@ -75,7 +75,6 @@ use crate::{
         XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlGenericNodePtr,
         XmlNodePtr, xml_create_int_subset, xml_doc_copy_node, xml_free_doc, xml_free_node,
         xml_free_node_list, xml_get_predefined_entity, xml_new_doc, xml_new_doc_node,
-        xml_split_qname3,
     },
 };
 use crate::{
@@ -181,179 +180,6 @@ macro_rules! CUR_SCHAR {
     ($ctxt:expr, $s:expr, $l:expr) => {
         xml_string_current_char($ctxt, $s, addr_of_mut!($l))
     };
-}
-
-/// parse an UTF8 encoded XML qualified name string
-///
-/// `[NS 5] QName ::= (Prefix ':')? LocalPart`
-///
-/// `[NS 6] Prefix ::= NCName`
-///
-/// `[NS 7] LocalPart ::= NCName`
-///
-/// Returns the local part, and prefix is updated to get the Prefix if any.
-#[doc(alias = "xmlSplitQName")]
-pub unsafe fn xml_split_qname(
-    ctxt: XmlParserCtxtPtr,
-    name: *const XmlChar,
-    prefix: *mut *mut XmlChar,
-) -> *mut XmlChar {
-    unsafe {
-        let mut buf: [XmlChar; XML_MAX_NAMELEN + 5] = [0; XML_MAX_NAMELEN + 5];
-        let mut buffer: *mut XmlChar = null_mut();
-        let mut len: i32 = 0;
-        let mut max: i32 = XML_MAX_NAMELEN as i32;
-        let mut ret: *mut XmlChar;
-        let mut cur: *const XmlChar = name;
-        let mut c: i32;
-
-        if prefix.is_null() {
-            return null_mut();
-        }
-        *prefix = null_mut();
-
-        if cur.is_null() {
-            return null_mut();
-        }
-
-        // nasty but well=formed
-        if *cur.add(0) == b':' {
-            return xml_strdup(name);
-        }
-
-        c = *cur as _;
-        cur = cur.add(1);
-        while c != 0 && c != b':' as i32 && len < max {
-            // tested bigname.xml
-            buf[len as usize] = c as _;
-            len += 1;
-            c = *cur as _;
-            cur = cur.add(1);
-        }
-        if len >= max {
-            // Okay someone managed to make a huge name, so he's ready to pay
-            // for the processing speed.
-            max = len * 2;
-
-            buffer = xml_malloc_atomic(max as usize) as *mut XmlChar;
-            if buffer.is_null() {
-                xml_err_memory(ctxt, None);
-                return null_mut();
-            }
-            memcpy(buffer as _, buf.as_ptr() as _, len as usize);
-            while c != 0 && c != b':' as i32 {
-                // tested bigname.xml
-                if len + 10 > max {
-                    max *= 2;
-                    let tmp: *mut XmlChar = xml_realloc(buffer as _, max as usize) as *mut XmlChar;
-                    if tmp.is_null() {
-                        xml_free(buffer as _);
-                        xml_err_memory(ctxt, None);
-                        return null_mut();
-                    }
-                    buffer = tmp;
-                }
-                *buffer.add(len as usize) = c as _;
-                len += 1;
-                c = *cur as _;
-                cur = cur.add(1);
-            }
-            *buffer.add(len as usize) = 0;
-        }
-
-        if c == b':' as i32 && *cur == 0 {
-            if !buffer.is_null() {
-                xml_free(buffer as _);
-            }
-            *prefix = null_mut();
-            return xml_strdup(name);
-        }
-
-        if buffer.is_null() {
-            ret = xml_strndup(buf.as_mut_ptr() as _, len);
-        } else {
-            ret = buffer;
-            buffer = null_mut();
-            max = XML_MAX_NAMELEN as _;
-        }
-
-        if c == b':' as i32 {
-            c = *cur as _;
-            *prefix = ret;
-            if c == 0 {
-                return xml_strndup(c"".as_ptr() as _, 0);
-            }
-            len = 0;
-
-            // Check that the first character is proper to start a new name
-            if !((0x61..=0x7A).contains(&c)
-                || (0x41..=0x5A).contains(&c)
-                || c == b'_' as i32
-                || c == b':' as i32)
-            {
-                let mut l: i32 = 0;
-                let first: i32 = CUR_SCHAR!(ctxt, cur, l);
-
-                if !xml_is_letter(first as u32) && first != b'_' as i32 {
-                    let name = CStr::from_ptr(name as *const i8).to_string_lossy();
-                    xml_fatal_err_msg_str!(
-                        ctxt,
-                        XmlParserErrors::XmlNsErrQname,
-                        "Name {} is not XML Namespace compliant\n",
-                        name
-                    );
-                }
-            }
-            cur = cur.add(1);
-
-            while c != 0 && len < max {
-                // tested bigname2.xml
-                buf[len as usize] = c as _;
-                len += 1;
-                c = *cur as _;
-                cur = cur.add(1);
-            }
-            if len >= max {
-                // Okay someone managed to make a huge name, so he's ready to pay
-                // for the processing speed.
-                max = len * 2;
-
-                buffer = xml_malloc_atomic(max as usize) as *mut XmlChar;
-                if buffer.is_null() {
-                    xml_err_memory(ctxt, None);
-                    return null_mut();
-                }
-                memcpy(buffer as _, buf.as_ptr() as _, len as usize);
-                while c != 0 {
-                    // tested bigname2.xml
-                    if len + 10 > max {
-                        max *= 2;
-                        let tmp: *mut XmlChar =
-                            xml_realloc(buffer as _, max as usize) as *mut XmlChar;
-                        if tmp.is_null() {
-                            xml_err_memory(ctxt, None);
-                            xml_free(buffer as _);
-                            return null_mut();
-                        }
-                        buffer = tmp;
-                    }
-                    *buffer.add(len as usize) = c as _;
-                    len += 1;
-                    c = *cur as _;
-                    cur = cur.add(1);
-                }
-                *buffer.add(len as usize) = 0;
-            }
-
-            if buffer.is_null() {
-                ret = xml_strndup(buf.as_mut_ptr() as _, len);
-            } else {
-                ret = buffer;
-            }
-        }
-
-        ret
-    }
 }
 
 unsafe fn xml_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
@@ -1264,30 +1090,17 @@ pub(crate) unsafe fn xml_parse_attribute_type(
 #[doc(alias = "xmlAddDefAttrs")]
 pub(crate) unsafe fn xml_add_def_attrs(
     ctxt: XmlParserCtxtPtr,
-    fullname: *const XmlChar,
-    fullattr: *const XmlChar,
+    fullname: &str,
+    fullattr: &str,
     mut value: *const XmlChar,
 ) {
     unsafe {
         let mut defaults: XmlDefAttrsPtr;
-        let mut len: i32 = 0;
-        let mut name: *const XmlChar;
-        let mut prefix: *const XmlChar;
 
         // Allows to detect attribute redefinitions
         if (*ctxt)
             .atts_special
-            .filter(|t| {
-                t.lookup2(
-                    CStr::from_ptr(fullname as *const i8)
-                        .to_string_lossy()
-                        .as_ref(),
-                    (!fullattr.is_null())
-                        .then(|| CStr::from_ptr(fullattr as *const i8).to_string_lossy())
-                        .as_deref(),
-                )
-                .is_some()
-            })
+            .filter(|t| t.lookup2(fullname, Some(fullattr)).is_some())
             .is_some()
         {
             return;
@@ -1307,23 +1120,13 @@ pub(crate) unsafe fn xml_add_def_attrs(
 
             // split the element name into prefix:localname , the string found
             // are within the DTD and then not associated to namespace names.
-            name = xml_split_qname3(fullname, addr_of_mut!(len));
-            if name.is_null() {
-                name = xml_dict_lookup((*ctxt).dict, fullname, -1);
-                prefix = null_mut();
-            } else {
-                name = xml_dict_lookup((*ctxt).dict, name, -1);
-                prefix = xml_dict_lookup((*ctxt).dict, fullname, len);
-            }
+            let (prefix, name) = split_qname2(fullname)
+                .map(|(pre, loc)| (Some(pre), loc))
+                .unwrap_or((None, fullname));
 
             // make sure there is some storage
             defaults = atts_default
-                .lookup2(
-                    CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
-                    (!prefix.is_null())
-                        .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
-                        .as_deref(),
-                )
+                .lookup2(name, prefix)
                 .map_or(null_mut(), |p| *p);
             if defaults.is_null() {
                 defaults =
@@ -1335,14 +1138,7 @@ pub(crate) unsafe fn xml_add_def_attrs(
                 (*defaults).nb_attrs = 0;
                 (*defaults).max_attrs = 4;
                 if atts_default
-                    .update_entry2(
-                        CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
-                        (!prefix.is_null())
-                            .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
-                            .as_deref(),
-                        defaults,
-                        |_, _| {},
-                    )
+                    .update_entry2(name, prefix, defaults, |_, _| {})
                     .is_err()
                 {
                     xml_free(defaults as _);
@@ -1360,14 +1156,7 @@ pub(crate) unsafe fn xml_add_def_attrs(
                 defaults = temp;
                 (*defaults).max_attrs *= 2;
                 if atts_default
-                    .update_entry2(
-                        CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
-                        (!prefix.is_null())
-                            .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
-                            .as_deref(),
-                        defaults,
-                        |_, _| {},
-                    )
+                    .update_entry2(name, prefix, defaults, |_, _| {})
                     .is_err()
                 {
                     xml_free(defaults as _);
@@ -1377,25 +1166,23 @@ pub(crate) unsafe fn xml_add_def_attrs(
 
             // Split the element name into prefix:localname , the string found
             // are within the DTD and hen not associated to namespace names.
-            name = xml_split_qname3(fullattr, addr_of_mut!(len));
-            if name.is_null() {
-                name = xml_dict_lookup((*ctxt).dict, fullattr, -1);
-                prefix = null_mut();
-            } else {
-                name = xml_dict_lookup((*ctxt).dict, name, -1);
-                prefix = xml_dict_lookup((*ctxt).dict, fullattr, len);
-            }
+            let (prefix, name) = split_qname2(fullattr)
+                .map(|(pre, loc)| (Some(pre), loc))
+                .unwrap_or((None, fullattr));
 
             *(*defaults)
                 .values
                 .as_mut_ptr()
-                .add(5 * (*defaults).nb_attrs as usize) = name;
+                .add(5 * (*defaults).nb_attrs as usize) =
+                xml_dict_lookup((*ctxt).dict, name.as_ptr(), name.len() as i32);
             *(*defaults)
                 .values
                 .as_mut_ptr()
-                .add(5 * (*defaults).nb_attrs as usize + 1) = prefix;
+                .add(5 * (*defaults).nb_attrs as usize + 1) = prefix.map_or(null_mut(), |pre| {
+                xml_dict_lookup((*ctxt).dict, pre.as_ptr(), pre.len() as i32)
+            });
             // intern the string and precompute the end
-            len = xml_strlen(value);
+            let len = xml_strlen(value);
             value = xml_dict_lookup((*ctxt).dict, value, len);
             if value.is_null() {
                 break 'mem_error;
@@ -1431,8 +1218,8 @@ pub(crate) unsafe fn xml_add_def_attrs(
 #[doc(alias = "xmlAddSpecialAttr")]
 pub(crate) unsafe fn xml_add_special_attr(
     ctxt: XmlParserCtxtPtr,
-    fullname: *const XmlChar,
-    fullattr: *const XmlChar,
+    fullname: &str,
+    fullattr: &str,
     typ: XmlAttributeType,
 ) {
     unsafe {
@@ -1448,19 +1235,11 @@ pub(crate) unsafe fn xml_add_special_attr(
             table
         };
 
-        let fullname = CStr::from_ptr(fullname as *const i8).to_string_lossy();
-        let fullattr =
-            (!fullattr.is_null()).then(|| CStr::from_ptr(fullattr as *const i8).to_string_lossy());
-        if atts_special
-            .lookup2(&fullname, fullattr.as_deref())
-            .is_some()
-        {
+        if atts_special.lookup2(fullname, Some(fullattr)).is_some() {
             return;
         }
 
-        atts_special
-            .add_entry2(&fullname, fullattr.as_deref(), typ)
-            .ok();
+        atts_special.add_entry2(fullname, Some(fullattr), typ).ok();
     }
 }
 
@@ -4210,42 +3989,6 @@ mod tests {
                         );
                         eprint!(" {}", n_out);
                         eprintln!(" {}", n_val);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_split_qname() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_PARSER_CTXT_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_prefix in 0..GEN_NB_XML_CHAR_PTR_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 0);
-                        let name = gen_const_xml_char_ptr(n_name, 1);
-                        let prefix = gen_xml_char_ptr_ptr(n_prefix, 2);
-
-                        let ret_val = xml_split_qname(ctxt, name, prefix);
-                        desret_xml_char_ptr(ret_val);
-                        des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                        des_const_xml_char_ptr(n_name, name, 1);
-                        des_xml_char_ptr_ptr(n_prefix, prefix, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlSplitQName",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(leaks == 0, "{leaks} Leaks are found in xmlSplitQName()");
-                            eprint!(" {}", n_ctxt);
-                            eprint!(" {}", n_name);
-                            eprintln!(" {}", n_prefix);
-                        }
                     }
                 }
             }

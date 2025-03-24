@@ -8507,9 +8507,7 @@ pub(crate) unsafe fn xml_parse_attribute_list_decl(ctxt: XmlParserCtxtPtr) {
                 {
                     attribute_decl(
                         (*ctxt).user_data.clone(),
-                        CStr::from_ptr(elem_name as *const i8)
-                            .to_string_lossy()
-                            .as_ref(),
+                        &CStr::from_ptr(elem_name as *const i8).to_string_lossy(),
                         &CStr::from_ptr(attr_name as *const i8).to_string_lossy(),
                         typ,
                         def,
@@ -8525,10 +8523,20 @@ pub(crate) unsafe fn xml_parse_attribute_list_decl(ctxt: XmlParserCtxtPtr) {
                     && def != XmlAttributeDefault::XmlAttributeImplied
                     && def != XmlAttributeDefault::XmlAttributeRequired
                 {
-                    xml_add_def_attrs(ctxt, elem_name, attr_name, default_value);
+                    xml_add_def_attrs(
+                        ctxt,
+                        &CStr::from_ptr(elem_name as *const i8).to_string_lossy(),
+                        &CStr::from_ptr(attr_name as *const i8).to_string_lossy(),
+                        default_value,
+                    );
                 }
                 if (*ctxt).sax2 != 0 {
-                    xml_add_special_attr(ctxt, elem_name, attr_name, typ);
+                    xml_add_special_attr(
+                        ctxt,
+                        &CStr::from_ptr(elem_name as *const i8).to_string_lossy(),
+                        &CStr::from_ptr(attr_name as *const i8).to_string_lossy(),
+                        typ,
+                    );
                 }
                 if !default_value.is_null() {
                     xml_free(default_value as _);
