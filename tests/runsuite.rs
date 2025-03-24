@@ -36,7 +36,7 @@ use exml::{
         xmlstring::{XmlChar, xml_str_equal, xml_strdup, xml_strndup},
     },
     parser::{
-        XmlParserCtxtPtr, XmlParserInputPtr, xml_new_string_input_stream, xml_read_file,
+        XmlParserCtxtPtr, XmlParserInput, xml_new_string_input_stream, xml_read_file,
         xml_read_memory,
     },
     relaxng::{
@@ -137,19 +137,17 @@ unsafe fn test_external_entity_loader(
     url: Option<&str>,
     id: Option<&str>,
     ctxt: XmlParserCtxtPtr,
-) -> XmlParserInputPtr {
+) -> Option<XmlParserInput> {
     unsafe {
-        let ret: XmlParserInputPtr;
-
         for i in 0..NB_ENTITIES {
             let url = CString::new(url.unwrap()).unwrap();
             if strcmp(TEST_ENTITIES_NAME[i], url.as_ptr()) == 0 {
-                ret = xml_new_string_input_stream(
+                let mut ret = xml_new_string_input_stream(
                     (!ctxt.is_null()).then(|| &mut *ctxt),
                     &CStr::from_ptr(TEST_ENTITIES_VALUE[i]).to_string_lossy(),
                 );
-                if !ret.is_null() {
-                    (*ret).filename = Some(
+                if let Some(ret) = ret.as_mut() {
+                    ret.filename = Some(
                         CStr::from_ptr(TEST_ENTITIES_NAME[i])
                             .to_string_lossy()
                             .into_owned(),
@@ -159,14 +157,13 @@ unsafe fn test_external_entity_loader(
             }
         }
         if check_test_file(url.unwrap()) {
-            ret = xml_no_net_external_entity_loader(url, id, ctxt);
+            xml_no_net_external_entity_loader(url, id, ctxt)
         } else {
             let memused: c_int = xml_mem_used();
-            ret = xml_no_net_external_entity_loader(url, id, ctxt);
+            let ret = xml_no_net_external_entity_loader(url, id, ctxt);
             EXTRA_MEMORY_FROM_RESOLVER.fetch_add(xml_mem_used() - memused, Ordering::Relaxed);
+            ret
         }
-
-        ret
     }
 }
 

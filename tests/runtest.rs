@@ -69,7 +69,7 @@ use exml::{
         xmlstring::XmlChar,
     },
     parser::{
-        XmlParserCtxtPtr, XmlParserInputPtr, xml_create_file_parser_ctxt, xml_free_parser_ctxt,
+        XmlParserCtxtPtr, XmlParserInput, xml_create_file_parser_ctxt, xml_free_parser_ctxt,
         xml_read_file, xml_read_memory,
     },
     relaxng::xml_relaxng_init_types,
@@ -117,20 +117,17 @@ unsafe fn test_external_entity_loader(
     url: Option<&str>,
     id: Option<&str>,
     ctxt: XmlParserCtxtPtr,
-) -> XmlParserInputPtr {
+) -> Option<XmlParserInput> {
     unsafe {
-        let ret: XmlParserInputPtr;
-
         if check_test_file(url.unwrap()) {
-            ret = xml_no_net_external_entity_loader(url, id, ctxt);
+            xml_no_net_external_entity_loader(url, id, ctxt)
         } else {
             let memused: i32 = xml_mem_used();
-            ret = xml_no_net_external_entity_loader(url, id, ctxt);
+            let ret = xml_no_net_external_entity_loader(url, id, ctxt);
             EXTRA_MEMORY_FROM_RESOLVER
                 .set(EXTRA_MEMORY_FROM_RESOLVER.get() + xml_mem_used() - memused);
+            ret
         }
-
-        ret
     }
 }
 
@@ -182,8 +179,6 @@ fn channel(_ctx: Option<GenericErrorContext>, msg: &str) {
 
 fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlError) {
     let mut name: *const XmlChar = null_mut();
-    let mut input: XmlParserInputPtr = null_mut();
-    let mut cur: XmlParserInputPtr = null_mut();
     let mut ctxt: XmlParserCtxtPtr = null_mut();
 
     let file = err.file();
@@ -214,19 +209,21 @@ fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlErr
         }
 
         // Maintain the compatibility with the legacy error handling
+        let mut input = None;
+        let mut cur = None;
         if !ctxt.is_null() {
-            if let Some(&inp) = (*ctxt).input() {
-                input = inp;
+            input = (*ctxt).input();
+            if let Some(now) = input {
+                if now.filename.is_none() && (*ctxt).input_tab.len() > 1 {
+                    cur = input;
+                    input = Some(&(*ctxt).input_tab[(*ctxt).input_tab.len() - 2]);
+                }
             }
-            if !input.is_null() && (*input).filename.is_none() && (*ctxt).input_tab.len() > 1 {
-                cur = input;
-                input = (*ctxt).input_tab[(*ctxt).input_tab.len() - 2];
-            }
-            if !input.is_null() {
-                if let Some(filename) = (*input).filename.as_deref() {
-                    channel(None, format!("{filename}:{}: ", (*input).line).as_str());
+            if let Some(input) = input {
+                if let Some(filename) = input.filename.as_deref() {
+                    channel(None, format!("{filename}:{}: ", input.line).as_str());
                 } else if line != 0 && domain == XmlErrorDomain::XmlFromParser {
-                    channel(None, format!("Entity: line {}: ", (*input).line).as_str());
+                    channel(None, format!("Entity: line {}: ", input.line).as_str());
                 }
             }
         } else if let Some(file) = file {
@@ -295,13 +292,13 @@ fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlErr
 
         if !ctxt.is_null() {
             parser_print_file_context_internal(input, channel, None);
-            if !cur.is_null() {
-                if let Some(filename) = (*cur).filename.as_deref() {
-                    channel(None, format!("{filename}:{}: \n", (*cur).line).as_str());
+            if let Some(cur) = cur {
+                if let Some(filename) = cur.filename.as_deref() {
+                    channel(None, format!("{filename}:{}: \n", cur.line).as_str());
                 } else if line != 0 && domain == XmlErrorDomain::XmlFromParser {
-                    channel(None, format!("Entity: line {}: \n", (*cur).line).as_str());
+                    channel(None, format!("Entity: line {}: \n", cur.line).as_str());
                 }
-                parser_print_file_context_internal(cur, channel, None);
+                parser_print_file_context_internal(Some(cur), channel, None);
             }
         }
         if let Some(str1) = err.str1().filter(|s| {
@@ -711,9 +708,9 @@ unsafe fn resolve_entity_debug(
     _ctx: Option<GenericErrorContext>,
     public_id: Option<&str>,
     system_id: Option<&str>,
-) -> XmlParserInputPtr {
+) -> Option<XmlParserInput> {
     increment_callbacks_counter();
-    /* xmlParserCtxtPtr ctxt = (xmlParserCtxtPtr) ctx; */
+    // xmlParserCtxtPtr ctxt = (xmlParserCtxtPtr) ctx;
 
     sax_debug!("SAX.resolveEntity(");
     if let Some(public_id) = public_id {
@@ -731,7 +728,7 @@ unsafe fn resolve_entity_debug(
            return(xmlNewInputFromFile(ctxt, systemId as *mut c_char));
        }
     *********/
-    null_mut()
+    None
 }
 
 /// Get an entity by name
@@ -2042,12 +2039,12 @@ unsafe fn push_boundary_test(
             let mut is_text: i32 = 0;
 
             if (*ctxt).instate == XmlParserInputState::XmlParserContent {
-                let first_char: i32 =
-                    if (**(*ctxt).input().unwrap()).end > (**(*ctxt).input().unwrap()).cur {
-                        *(**(*ctxt).input().unwrap()).cur as i32
-                    } else {
-                        *base.add(cur as usize) as i32
-                    };
+                let first_char: i32 = if (*ctxt).input().unwrap().end > (*ctxt).input().unwrap().cur
+                {
+                    *(*ctxt).input().unwrap().cur as i32
+                } else {
+                    *base.add(cur as usize) as i32
+                };
 
                 if first_char != b'<' as i32
                     && (options & XML_PARSE_HTML != 0 || first_char != b'&' as i32)
@@ -2056,10 +2053,12 @@ unsafe fn push_boundary_test(
                 }
             }
 
-            old_consumed = (**(*ctxt).input().unwrap()).consumed
-                + (**(*ctxt).input().unwrap())
+            old_consumed = (*ctxt).input().unwrap().consumed
+                + (*ctxt)
+                    .input()
+                    .unwrap()
                     .cur
-                    .offset_from((**(*ctxt).input().unwrap()).base) as u64;
+                    .offset_from((*ctxt).input().unwrap().base) as u64;
 
             PUSH_BOUNDARY_COUNT.set(0);
             PUSH_BOUNDARY_REF_COUNT.set(0);
@@ -2103,19 +2102,23 @@ unsafe fn push_boundary_test(
 
             // Buffer check: If input was consumed, check that the input
             // buffer is (almost) empty.
-            consumed = (**(*ctxt).input().unwrap()).consumed
-                + (**(*ctxt).input().unwrap())
+            consumed = (*ctxt).input().unwrap().consumed
+                + (*ctxt)
+                    .input()
+                    .unwrap()
                     .cur
-                    .offset_from((**(*ctxt).input().unwrap()).base) as u64;
+                    .offset_from((*ctxt).input().unwrap().base) as u64;
             if (*ctxt).instate != XmlParserInputState::XmlParserDTD
                 && consumed >= 4
                 && consumed != old_consumed
             {
                 let mut max: size_t = 0;
 
-                avail = (**(*ctxt).input().unwrap())
+                avail = (*ctxt)
+                    .input()
+                    .unwrap()
                     .end
-                    .offset_from((**(*ctxt).input().unwrap()).cur) as _;
+                    .offset_from((*ctxt).input().unwrap().cur) as _;
 
                 if options & XML_PARSE_HTML != 0
                     && ((*ctxt).instate == XmlParserInputState::XmlParserEndTag)
@@ -2123,7 +2126,7 @@ unsafe fn push_boundary_test(
                     // Something related to script parsing.
                     max = 3;
                 } else if is_text != 0 {
-                    let c: i32 = *(**(*ctxt).input().unwrap()).cur as i32;
+                    let c: i32 = *(*ctxt).input().unwrap().cur as i32;
 
                     // 3 bytes for partial UTF-8
                     max = if c == b'<' as i32 || c == b'&' as i32 {

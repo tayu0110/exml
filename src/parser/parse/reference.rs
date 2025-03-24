@@ -53,8 +53,8 @@ pub(crate) unsafe fn parse_char_ref(ctxt: &mut XmlParserCtxt) -> Option<char> {
             }
             if ctxt.current_byte() == b';' {
                 // on purpose to avoid reentrancy problems with NEXT and SKIP
-                (**ctxt.input().unwrap()).col += 1;
-                (**ctxt.input().unwrap()).cur = (**ctxt.input().unwrap()).cur.add(1);
+                ctxt.input_mut().unwrap().col += 1;
+                ctxt.input_mut().unwrap().cur = ctxt.input().unwrap().cur.add(1);
             }
         } else if ctxt.current_byte() == b'&' && ctxt.nth_byte(1) == b'#' {
             ctxt.advance(2);
@@ -84,8 +84,8 @@ pub(crate) unsafe fn parse_char_ref(ctxt: &mut XmlParserCtxt) -> Option<char> {
             }
             if ctxt.current_byte() == b';' {
                 // on purpose to avoid reentrancy problems with NEXT and SKIP
-                (**ctxt.input().unwrap()).col += 1;
-                (**ctxt.input().unwrap()).cur = (**ctxt.input().unwrap()).cur.add(1);
+                ctxt.input_mut().unwrap().col += 1;
+                ctxt.input_mut().unwrap().cur = ctxt.input().unwrap().cur.add(1);
             }
         } else {
             if ctxt.current_byte() == b'&' {

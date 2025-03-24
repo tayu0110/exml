@@ -30,8 +30,8 @@ use crate::{
         xmlstring::XmlChar,
     },
     parser::{
-        XmlParserCtxtPtr, XmlParserInputPtr, xml_create_memory_parser_ctxt, xml_free_input_stream,
-        xml_free_parser_ctxt, xml_new_parser_ctxt,
+        XmlParserCtxtPtr, XmlParserInputPtr, xml_create_memory_parser_ctxt, xml_free_parser_ctxt,
+        xml_new_parser_ctxt,
     },
     tree::{XmlAttr, XmlAttributeType, XmlDoc, XmlDtd, XmlElementContentPtr, XmlNode, XmlNs},
     xpath::{
@@ -690,12 +690,6 @@ pub(crate) fn gen_xml_node_set_ptr(_no: i32, _nr: i32) -> Option<Box<XmlNodeSet>
 }
 #[cfg(feature = "xpath")]
 pub(crate) fn des_xml_node_set_ptr(_no: i32, _val: Option<Box<XmlNodeSet>>, _nr: i32) {}
-
-pub(crate) unsafe fn desret_xml_parser_input_ptr(val: XmlParserInputPtr) {
-    unsafe {
-        xml_free_input_stream(val);
-    }
-}
 
 pub(crate) unsafe fn gen_xml_char_ptr(no: i32, _nr: i32) -> *mut XmlChar {
     CHARTAB.with_borrow_mut(|table| {

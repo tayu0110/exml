@@ -48,7 +48,7 @@ use crate::{
         xmlstring::{XmlChar, xml_str_equal, xml_strdup},
         xpointer::{xml_xptr_eval, xml_xptr_new_context},
     },
-    parser::{XmlParserInputPtr, xml_free_input_stream, xml_free_parser_ctxt, xml_new_parser_ctxt},
+    parser::{xml_free_parser_ctxt, xml_new_parser_ctxt},
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlDocPtr, XmlElementType, XmlEntityPtr, XmlEntityType,
         XmlGenericNodePtr, XmlNode, XmlNodePtr, xml_add_doc_entity, xml_create_int_subset,
@@ -1608,16 +1608,11 @@ impl XmlXIncludeCtxt {
 
             // Load it.
             let pctxt = xml_new_parser_ctxt();
-            let input_stream = xml_load_external_entity(Some(&url), None, pctxt);
-            if input_stream.is_null() {
-                // goto error;
-                xml_free_input_stream(input_stream);
+            let Some(mut input_stream) = xml_load_external_entity(Some(&url), None, pctxt) else {
                 xml_free_parser_ctxt(pctxt);
                 return ret;
-            }
-            let Some(buf) = (*input_stream).buf.as_mut() else {
-                // goto error;
-                xml_free_input_stream(input_stream);
+            };
+            let Some(buf) = input_stream.buf.as_mut() else {
                 xml_free_parser_ctxt(pctxt);
                 return ret;
             };
@@ -1625,8 +1620,6 @@ impl XmlXIncludeCtxt {
             let Some(mut node) = xml_new_doc_text(Some(self.doc), null_mut()) else {
                 let node = self.inc_tab[ref_index].elem.map(|node| node.into());
                 xml_xinclude_err_memory(Some(self), node, None);
-                // goto error;
-                xml_free_input_stream(input_stream);
                 xml_free_parser_ctxt(pctxt);
                 return ret;
             };
@@ -1658,7 +1651,6 @@ impl XmlXIncludeCtxt {
                     );
                     // goto error;
                     xml_free_node(node);
-                    xml_free_input_stream(input_stream);
                     xml_free_parser_ctxt(pctxt);
                     return ret;
                 }
@@ -1682,7 +1674,6 @@ impl XmlXIncludeCtxt {
             ret = 0;
 
             // error:
-            xml_free_input_stream(input_stream);
             xml_free_parser_ctxt(pctxt);
             ret
         }
@@ -1855,11 +1846,10 @@ impl XmlXIncludeCtxt {
                 url = "./-";
             }
 
-            let input_stream: XmlParserInputPtr = xml_load_external_entity(Some(url), None, pctxt);
-            if input_stream.is_null() {
+            let Some(input_stream) = xml_load_external_entity(Some(url), None, pctxt) else {
                 xml_free_parser_ctxt(pctxt);
                 return None;
-            }
+            };
 
             (*pctxt).input_push(input_stream);
 

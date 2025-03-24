@@ -25,7 +25,7 @@ use std::{
 use crate::{
     globals::{GLOBAL_STATE, GenericError, GenericErrorContext, StructuredError},
     libxml::parser::XML_SAX2_MAGIC,
-    parser::{XmlParserCtxtPtr, XmlParserInputPtr},
+    parser::{XmlParserCtxtPtr, XmlParserInput},
     tree::{XmlElementType, XmlGenericNodePtr, XmlNodePtr},
 };
 
@@ -976,20 +976,19 @@ macro_rules! generic_error {
 
 #[doc(hidden)]
 pub unsafe fn parser_print_file_context_internal(
-    input: XmlParserInputPtr,
+    input: Option<&XmlParserInput>,
     channel: GenericError,
     data: Option<GenericErrorContext>,
 ) {
     unsafe {
-        let mut cur: *const u8;
         const SIZE: usize = 80;
 
-        if input.is_null() || (*input).cur.is_null() {
+        let Some(input) = input.filter(|input| !input.cur.is_null()) else {
             return;
-        }
+        };
 
-        cur = (*input).cur;
-        let base: *const u8 = (*input).base;
+        let mut cur: *const u8 = input.cur;
+        let base: *const u8 = input.base;
         // skip backwards over any end-of-lines
         while cur > base && (*cur == b'\n' || *cur == b'\r') {
             cur = cur.sub(1);
@@ -1004,11 +1003,11 @@ pub unsafe fn parser_print_file_context_internal(
             cur = cur.add(1);
         } else {
             // skip over continuation bytes
-            while cur < (*input).cur && *cur & 0xC0 == 0x80 {
+            while cur < input.cur && *cur & 0xC0 == 0x80 {
                 cur = cur.add(1);
             }
         }
-        let col = (*input).cur.offset_from(cur) as usize;
+        let col = input.cur.offset_from(cur) as usize;
         let mut content = String::with_capacity(SIZE);
 
         // search forward for end-of-line (to max buff size)
@@ -1051,7 +1050,7 @@ pub unsafe fn parser_print_file_context_internal(
     }
 }
 
-pub unsafe fn parser_print_file_context(input: XmlParserInputPtr) {
+pub unsafe fn parser_print_file_context(input: Option<&XmlParserInput>) {
     unsafe {
         let (channel, data) = GLOBAL_STATE
             .with_borrow(|state| (state.generic_error, state.generic_error_context.clone()));
@@ -1059,18 +1058,12 @@ pub unsafe fn parser_print_file_context(input: XmlParserInputPtr) {
     }
 }
 
-pub unsafe fn parser_print_file_info(input: XmlParserInputPtr) {
-    unsafe {
-        if !input.is_null() {
-            if (*input).filename.is_some() {
-                generic_error!(
-                    "{}:{}: ",
-                    (*input).filename.as_deref().unwrap(),
-                    (*input).line
-                );
-            } else {
-                generic_error!("Entity: line {}: ", (*input).line);
-            }
+pub fn parser_print_file_info(input: Option<&XmlParserInput>) {
+    if let Some(input) = input {
+        if input.filename.is_some() {
+            generic_error!("{}:{}: ", input.filename.as_deref().unwrap(), input.line);
+        } else {
+            generic_error!("Entity: line {}: ", input.line);
         }
     }
 }
@@ -1084,8 +1077,6 @@ pub unsafe fn report_error(
 ) {
     unsafe {
         let mut name: *const u8 = null_mut();
-        let mut input: XmlParserInputPtr = null_mut();
-        let mut cur: XmlParserInputPtr = null_mut();
 
         let channel = GLOBAL_STATE.with_borrow_mut(|state| {
             if let Some(channel) = channel {
@@ -1112,30 +1103,27 @@ pub unsafe fn report_error(
             name = node.name;
         }
 
+        let mut input = None;
+        let mut cur = None;
         // Maintain the compatibility with the legacy error handling
         if !ctxt.is_null() {
-            if let Some(&inp) = (*ctxt).input() {
-                input = inp;
+            input = (*ctxt).input();
+            if let Some(now) = input {
+                if now.filename.is_none() && (*ctxt).input_tab.len() > 1 {
+                    cur = input;
+                    input = Some(&(*ctxt).input_tab[(*ctxt).input_tab.len() - 2]);
+                }
             }
-            if !input.is_null() && (*input).filename.is_none() && (*ctxt).input_tab.len() > 1 {
-                cur = input;
-                input = (*ctxt).input_tab[(*ctxt).input_tab.len() - 2];
-            }
-            if !input.is_null() {
-                if (*input).filename.is_some() {
+            if let Some(input) = input {
+                if input.filename.is_some() {
                     channel(
                         data.clone(),
-                        format!(
-                            "{}:{}: ",
-                            (*input).filename.as_deref().unwrap(),
-                            (*input).line
-                        )
-                        .as_str(),
+                        format!("{}:{}: ", input.filename.as_deref().unwrap(), input.line).as_str(),
                     );
                 } else if line != 0 && domain == XmlErrorDomain::XmlFromParser {
                     channel(
                         data.clone(),
-                        format!("Entity: line {}: ", (*input).line).as_str(),
+                        format!("Entity: line {}: ", input.line).as_str(),
                     );
                 }
             }
@@ -1207,24 +1195,19 @@ pub unsafe fn report_error(
 
         if !ctxt.is_null() {
             parser_print_file_context_internal(input, channel, data.clone());
-            if !cur.is_null() {
-                if (*cur).filename.is_some() {
+            if let Some(cur) = cur {
+                if cur.filename.is_some() {
                     channel(
                         data.clone(),
-                        format!(
-                            "{}:{}: \n",
-                            (*cur).filename.as_deref().unwrap(),
-                            (*cur).line
-                        )
-                        .as_str(),
+                        format!("{}:{}: \n", cur.filename.as_deref().unwrap(), cur.line).as_str(),
                     )
                 } else if line != 0 && domain == XmlErrorDomain::XmlFromParser {
                     channel(
                         data.clone(),
-                        format!("Entity: line {}: \n", (*cur).line).as_str(),
+                        format!("Entity: line {}: \n", cur.line).as_str(),
                     );
                 }
-                parser_print_file_context_internal(cur, channel, data.clone());
+                parser_print_file_context_internal(Some(cur), channel, data.clone());
             }
         }
         if let Some(str1) = err.str1.as_ref() {
@@ -1242,30 +1225,28 @@ pub unsafe fn report_error(
 }
 
 pub(crate) fn parser_error(ctx: Option<GenericErrorContext>, msg: &str) {
-    let mut cur: XmlParserInputPtr = null_mut();
-
     if let Some(ctxt) = ctx {
         unsafe {
             let lock = ctxt.context.lock().unwrap();
             let ctxt = **lock
                 .downcast_ref::<Box<XmlParserCtxtPtr>>()
                 .expect("ctxt is not XmlParserCtxtPtr");
-            let mut input = null_mut();
-            if let Some(&inp) = (*ctxt).input() {
-                input = inp;
-            }
-            if !input.is_null() && (*input).filename.is_none() && (*ctxt).input_tab.len() > 1 {
-                cur = input;
-                input = (*ctxt).input_tab[(*ctxt).input_tab.len() - 2];
+            let mut input = (*ctxt).input();
+            let mut cur = None;
+            if let Some(now) = input {
+                if now.filename.is_none() && (*ctxt).input_tab.len() > 1 {
+                    cur = input;
+                    input = Some(&(*ctxt).input_tab[(*ctxt).input_tab.len() - 2]);
+                }
             }
             parser_print_file_info(input);
 
             generic_error!("error: {msg}");
             parser_print_file_context(input);
-            if !cur.is_null() {
-                parser_print_file_info(cur);
+            if let Some(cur) = cur {
+                parser_print_file_info(Some(cur));
                 generic_error!("\n");
-                parser_print_file_context(cur);
+                parser_print_file_context(Some(cur));
             }
         }
     } else {
@@ -1274,31 +1255,29 @@ pub(crate) fn parser_error(ctx: Option<GenericErrorContext>, msg: &str) {
 }
 
 pub(crate) fn parser_warning(ctx: Option<GenericErrorContext>, msg: &str) {
-    let mut cur: XmlParserInputPtr = null_mut();
-
     if let Some(ctx) = ctx {
         let lock = ctx.context.lock().unwrap();
         let ctxt = **lock
             .downcast_ref::<Box<XmlParserCtxtPtr>>()
             .expect("ctxt is not XmlParserCtxtPtr");
         unsafe {
-            let mut input = null_mut();
-            if let Some(&inp) = (*ctxt).input() {
-                input = inp;
-            }
-            if !input.is_null() && (*input).filename.is_none() && (*ctxt).input_tab.len() > 1 {
-                cur = input;
-                input = (*ctxt).input_tab[(*ctxt).input_tab.len() - 2];
+            let mut input = (*ctxt).input();
+            let mut cur = None;
+            if let Some(now) = input {
+                if now.filename.is_none() && (*ctxt).input_tab.len() > 1 {
+                    cur = input;
+                    input = Some(&(*ctxt).input_tab[(*ctxt).input_tab.len() - 2]);
+                }
             }
             parser_print_file_info(input);
 
             generic_error!("warning: {msg}");
 
             parser_print_file_context(input);
-            if !cur.is_null() {
-                parser_print_file_info(cur);
+            if let Some(cur) = cur {
+                parser_print_file_info(Some(cur));
                 generic_error!("\n");
-                parser_print_file_context(cur);
+                parser_print_file_context(Some(cur));
             }
         }
     } else {
@@ -1307,7 +1286,6 @@ pub(crate) fn parser_warning(ctx: Option<GenericErrorContext>, msg: &str) {
 }
 
 pub(crate) fn parser_validity_error(ctx: Option<GenericErrorContext>, msg: &str) {
-    let mut input: XmlParserInputPtr = std::ptr::null_mut();
     let len = msg.len();
     static HAD_INFO: AtomicBool = AtomicBool::new(false);
 
@@ -1317,12 +1295,13 @@ pub(crate) fn parser_validity_error(ctx: Option<GenericErrorContext>, msg: &str)
             let ctxt = **lock
                 .downcast_ref::<Box<XmlParserCtxtPtr>>()
                 .expect("ctxt is not XmlParserCtxtPtr");
+            let mut input = None;
             if len > 1 && msg.as_bytes()[len - 2] != b':' {
-                if let Some(&inp) = (*ctxt).input() {
-                    input = inp;
-                }
-                if (*input).filename.is_none() && (*ctxt).input_tab.len() > 1 {
-                    input = (*ctxt).input_tab[(*ctxt).input_tab.len() - 2];
+                input = (*ctxt).input();
+                if let Some(now) = input {
+                    if now.filename.is_none() && (*ctxt).input_tab.len() > 1 {
+                        input = Some(&(*ctxt).input_tab[(*ctxt).input_tab.len() - 2]);
+                    }
                 }
 
                 if !HAD_INFO.load(Ordering::Acquire) {
@@ -1351,7 +1330,6 @@ pub(crate) fn parser_validity_error(ctx: Option<GenericErrorContext>, msg: &str)
 }
 
 pub(crate) fn parser_validity_warning(ctx: Option<GenericErrorContext>, msg: &str) {
-    let mut input: XmlParserInputPtr = std::ptr::null_mut();
     let len = msg.len();
 
     if let Some(ctx) = ctx {
@@ -1359,13 +1337,14 @@ pub(crate) fn parser_validity_warning(ctx: Option<GenericErrorContext>, msg: &st
         let ctxt = **lock
             .downcast_ref::<Box<XmlParserCtxtPtr>>()
             .expect("ctxt is not XmlParserCtxtPtr");
+        let mut input = None;
         unsafe {
             if len != 0 && msg.as_bytes()[len - 1] != b':' {
-                if let Some(&inp) = (*ctxt).input() {
-                    input = inp;
-                }
-                if (*input).filename.is_none() && (*ctxt).input_tab.len() > 1 {
-                    input = (*ctxt).input_tab[(*ctxt).input_tab.len() - 2];
+                input = (*ctxt).input();
+                if let Some(now) = input {
+                    if now.filename.is_none() && (*ctxt).input_tab.len() > 1 {
+                        input = Some(&(*ctxt).input_tab[(*ctxt).input_tab.len() - 2]);
+                    }
                 }
 
                 parser_print_file_info(input);
@@ -1471,7 +1450,6 @@ pub(crate) fn xml_raise_error(
     let mut ctxt: XmlParserCtxtPtr = null_mut();
     let Some((channel, error, s, data)) = GLOBAL_STATE.with_borrow_mut(|state| {
         let mut node = nod;
-        let mut input: XmlParserInputPtr;
         let mut to = &mut state.last_error;
         let mut baseptr = None;
 
@@ -1531,20 +1509,16 @@ pub(crate) fn xml_raise_error(
         if !ctxt.is_null() {
             unsafe {
                 if file.is_none() {
-                    input = null_mut();
-                    if let Some(&inp) = (*ctxt).input() {
-                        input = inp;
+                    let mut input = (*ctxt).input();
+                    if let Some(now) = input {
+                        if now.filename.is_none() && (*ctxt).input_tab.len() > 1 {
+                            input = Some(&(*ctxt).input_tab[(*ctxt).input_tab.len() as usize - 2]);
+                        }
                     }
-                    if !input.is_null()
-                        && (*input).filename.is_none()
-                        && (*ctxt).input_tab.len() > 1
-                    {
-                        input = (*ctxt).input_tab[(*ctxt).input_tab.len() as usize - 2];
-                    }
-                    if !input.is_null() {
-                        file = (*input).filename.as_deref().map(|f| f.to_owned().into());
-                        line = (*input).line;
-                        col = (*input).col;
+                    if let Some(input) = input {
+                        file = input.filename.as_deref().map(|f| f.to_owned().into());
+                        line = input.line;
+                        col = input.col;
                     }
                 }
                 to = &mut (*ctxt).last_error;

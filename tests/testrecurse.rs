@@ -34,7 +34,7 @@ use exml::{
         xmlstring::{XmlChar, xml_strlen},
     },
     parser::{
-        XmlParserCtxtPtr, XmlParserInputPtr, xml_ctxt_read_file, xml_free_parser_ctxt,
+        XmlParserCtxtPtr, XmlParserInput, xml_ctxt_read_file, xml_free_parser_ctxt,
         xml_new_parser_ctxt,
     },
     tree::{XmlElementType, XmlNodePtr, xml_free_doc, xml_get_doc_entity},
@@ -187,19 +187,16 @@ unsafe fn test_external_entity_loader(
     url: Option<&str>,
     id: Option<&str>,
     ctxt: XmlParserCtxtPtr,
-) -> XmlParserInputPtr {
+) -> Option<XmlParserInput> {
     unsafe {
-        let ret: XmlParserInputPtr;
-
         if check_test_file(url.unwrap()) != 0 {
-            ret = xml_no_net_external_entity_loader(url, id, ctxt);
+            xml_no_net_external_entity_loader(url, id, ctxt)
         } else {
             let memused: c_int = xml_mem_used();
-            ret = xml_no_net_external_entity_loader(url, id, ctxt);
+            let ret = xml_no_net_external_entity_loader(url, id, ctxt);
             EXTRA_MEMORY_FROM_RESOLVER.fetch_add(xml_mem_used() - memused, Ordering::Relaxed);
+            ret
         }
-
-        ret
     }
 }
 
@@ -232,8 +229,6 @@ fn channel(_ctx: Option<GenericErrorContext>, msg: &str) {
 
 fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlError) {
     let mut name: *const XmlChar = null_mut();
-    let mut input: XmlParserInputPtr = null_mut();
-    let mut cur: XmlParserInputPtr = null_mut();
     let mut ctxt: XmlParserCtxtPtr = null_mut();
 
     let file = err.file();
@@ -264,19 +259,21 @@ fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlErr
         }
 
         // Maintain the compatibility with the legacy error handling
+        let mut input = None;
+        let mut cur = None;
         if !ctxt.is_null() {
-            if let Some(&inp) = (*ctxt).input() {
-                input = inp;
+            input = (*ctxt).input();
+            if let Some(now) = input {
+                if now.filename.is_none() && (*ctxt).input_tab.len() > 1 {
+                    cur = input;
+                    input = Some(&(*ctxt).input_tab[(*ctxt).input_tab.len() - 2]);
+                }
             }
-            if !input.is_null() && (*input).filename.is_none() && (*ctxt).input_tab.len() > 1 {
-                cur = input;
-                input = (*ctxt).input_tab[(*ctxt).input_tab.len() - 2];
-            }
-            if !input.is_null() {
-                if let Some(filename) = (*input).filename.as_deref() {
-                    channel(None, format!("{filename}:{}: ", (*input).line).as_str());
+            if let Some(input) = input {
+                if let Some(filename) = input.filename.as_deref() {
+                    channel(None, format!("{filename}:{}: ", input.line).as_str());
                 } else if line != 0 && domain == XmlErrorDomain::XmlFromParser {
-                    channel(None, format!("Entity: line {}: ", (*input).line).as_str());
+                    channel(None, format!("Entity: line {}: ", input.line).as_str());
                 }
             }
         } else if let Some(file) = file {
@@ -340,13 +337,13 @@ fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlErr
 
         if !ctxt.is_null() {
             parser_print_file_context_internal(input, channel, None);
-            if !cur.is_null() {
-                if let Some(filename) = (*cur).filename.as_deref() {
-                    channel(None, format!("{filename}:{}: \n", (*cur).line).as_str());
+            if let Some(cur) = cur {
+                if let Some(filename) = cur.filename.as_deref() {
+                    channel(None, format!("{filename}:{}: \n", cur.line).as_str());
                 } else if line != 0 && domain == XmlErrorDomain::XmlFromParser {
-                    channel(None, format!("Entity: line {}: \n", (*cur).line).as_str());
+                    channel(None, format!("Entity: line {}: \n", cur.line).as_str());
                 }
-                parser_print_file_context_internal(cur, channel, None);
+                parser_print_file_context_internal(Some(cur), channel, None);
             }
         }
         if let Some(str1) = err.str1().filter(|s| {

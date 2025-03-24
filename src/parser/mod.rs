@@ -61,7 +61,6 @@ use crate::{
         chvalid::{xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender},
         parser::{
             XmlParserOption, xml_create_doc_parser_ctxt, xml_init_parser, xml_load_external_entity,
-            xml_new_io_input_stream,
         },
         parser_internals::xml_is_letter,
     },
@@ -253,7 +252,7 @@ pub(crate) unsafe fn xml_string_current_char(
                     // splitting a character in the middle. In that case do not raise
                     // an error but return 0 to indicate an end of stream problem
                     let Some(ctxt) = ctxt.filter(|ctxt| {
-                        ctxt.input().is_some() && (**ctxt.input().unwrap()).remainder_len() >= 4
+                        ctxt.input().is_some() && ctxt.input().unwrap().remainder_len() >= 4
                     }) else {
                         return Err((0, 0));
                     };
@@ -265,10 +264,10 @@ pub(crate) unsafe fn xml_string_current_char(
                     {
                         let buffer = format!(
                             "Bytes: 0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}\n",
-                            *(**ctxt.input().unwrap()).cur.add(0),
-                            *(**ctxt.input().unwrap()).cur.add(1),
-                            *(**ctxt.input().unwrap()).cur.add(2),
-                            *(**ctxt.input().unwrap()).cur.add(3),
+                            *ctxt.input().unwrap().cur.add(0),
+                            *ctxt.input().unwrap().cur.add(1),
+                            *ctxt.input().unwrap().cur.add(2),
+                            *ctxt.input().unwrap().cur.add(3),
                         );
                         __xml_err_encoding!(
                             ctxt as *mut XmlParserCtxt,
@@ -385,12 +384,12 @@ pub unsafe fn xml_read_io(
         if ctxt.is_null() {
             return None;
         }
-        let stream: XmlParserInputPtr =
-            xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None);
-        if stream.is_null() {
+        let Some(stream) =
+            xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None)
+        else {
             xml_free_parser_ctxt(ctxt);
             return None;
-        }
+        };
         (*ctxt).input_push(stream);
         let res = (*ctxt).do_read(url, encoding, options);
         xml_free_parser_ctxt(ctxt);
@@ -443,10 +442,7 @@ pub unsafe fn xml_ctxt_read_file(
 
         (*ctxt).reset();
 
-        let stream: XmlParserInputPtr = xml_load_external_entity(Some(filename), None, ctxt);
-        if stream.is_null() {
-            return None;
-        }
+        let stream = xml_load_external_entity(Some(filename), None, ctxt)?;
         (*ctxt).input_push(stream);
         (*ctxt).do_read(None, encoding, options)
     }
@@ -472,12 +468,8 @@ pub unsafe fn xml_ctxt_read_memory(
         (*ctxt).reset();
 
         let input = XmlParserInputBuffer::from_memory(buffer, XmlCharEncoding::None)?;
-        let stream: XmlParserInputPtr =
-            xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None);
-        if stream.is_null() {
-            return None;
-        }
-
+        let stream =
+            xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None)?;
         (*ctxt).input_push(stream);
         (*ctxt).do_read(url, encoding, options)
     }
@@ -503,11 +495,8 @@ pub unsafe fn xml_ctxt_read_io(
         (*ctxt).reset();
 
         let input = XmlParserInputBuffer::from_reader(ioctx, XmlCharEncoding::None);
-        let stream: XmlParserInputPtr =
-            xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None);
-        if stream.is_null() {
-            return None;
-        }
+        let stream =
+            xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None)?;
         (*ctxt).input_push(stream);
         (*ctxt).do_read(url, encoding, options)
     }

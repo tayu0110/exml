@@ -44,10 +44,7 @@ use crate::{
         },
         xmlstring::XmlChar,
     },
-    parser::{
-        XmlParserCtxtPtr, XmlParserInputPtr, build_qname, split_qname, xml_err_memory,
-        xml_free_input_stream,
-    },
+    parser::{XmlParserCtxtPtr, XmlParserInput, build_qname, split_qname, xml_err_memory},
     tree::{
         __XML_REGISTER_CALLBACKS, NodeCommon, XmlAttr, XmlAttributeDefault, XmlAttributeType,
         XmlDocProperties, XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr,
@@ -102,7 +99,7 @@ pub unsafe fn xml_sax2_get_system_id(ctx: *mut c_void) -> Option<String> {
         if ctx.is_null() || (*ctxt).input().is_none() {
             return None;
         };
-        (**(*ctxt).input().unwrap()).filename.clone()
+        (*ctxt).input().unwrap().filename.clone()
     }
 }
 
@@ -126,7 +123,7 @@ pub unsafe fn xml_sax2_get_line_number(ctx: *mut c_void) -> i32 {
         if ctx.is_null() || (*ctxt).input().is_none() {
             return 0;
         }
-        (**(*ctxt).input().unwrap()).line
+        (*ctxt).input().unwrap().line
     }
 }
 
@@ -140,7 +137,7 @@ pub unsafe fn xml_sax2_get_column_number(ctx: *mut c_void) -> i32 {
         if ctx.is_null() || (*ctxt).input().is_none() {
             return 0;
         }
-        (**(*ctxt).input().unwrap()).col
+        (*ctxt).input().unwrap().col
     }
 }
 
@@ -324,20 +321,19 @@ pub unsafe fn xml_sax2_external_subset(
             && (((*ctxt).validate != 0 || (*ctxt).loadsubset != 0)
                 && ((*ctxt).well_formed != 0 && (*ctxt).my_doc.is_some()))
         {
-            let mut input: XmlParserInputPtr = null_mut();
             let mut consumed: u64;
 
             // Ask the Entity resolver to load the damn thing
-            if let Some(resolve_entity) = (*ctxt)
+            let Some(input) = (*ctxt)
                 .sax
                 .as_deref_mut()
                 .and_then(|sax| sax.resolve_entity)
-            {
-                input = resolve_entity((*ctxt).user_data.clone(), external_id, system_id);
-            }
-            if input.is_null() {
+                .and_then(|resolve_entity| {
+                    resolve_entity((*ctxt).user_data.clone(), external_id, system_id)
+                })
+            else {
                 return;
-            }
+            };
 
             xml_new_dtd((*ctxt).my_doc, name, external_id, system_id);
 
@@ -352,23 +348,26 @@ pub unsafe fn xml_sax2_external_subset(
             (*ctxt).push_input(input);
 
             // On the fly encoding conversion if needed
-            if (**(*ctxt).input().unwrap()).length >= 4 {
-                let input = from_raw_parts((**(*ctxt).input().unwrap()).cur, 4);
+            if (*ctxt).input().unwrap().length >= 4 {
+                let input = from_raw_parts((*ctxt).input().unwrap().cur, 4);
                 let enc = detect_encoding(input);
                 (*ctxt).switch_encoding(enc);
             }
 
-            if (*input).filename.is_none() {
-                if let Some(system_id) = system_id {
-                    let canonic = canonic_path(system_id);
-                    (*input).filename = Some(canonic.into_owned());
+            let cur = (*ctxt).input().unwrap().cur;
+            if let Some(input) = (*ctxt).input_mut() {
+                if input.filename.is_none() {
+                    if let Some(system_id) = system_id {
+                        let canonic = canonic_path(system_id);
+                        input.filename = Some(canonic.into_owned());
+                    }
                 }
+                input.line = 1;
+                input.col = 1;
+                input.base = cur;
+                input.cur = cur;
+                input.free = None;
             }
-            (*input).line = 1;
-            (*input).col = 1;
-            (*input).base = (**(*ctxt).input().unwrap()).cur;
-            (*input).cur = (**(*ctxt).input().unwrap()).cur;
-            (*input).free = None;
 
             // let's parse that entity knowing it's an external subset.
             xml_parse_external_subset(ctxt, external_id, system_id);
@@ -378,8 +377,8 @@ pub unsafe fn xml_sax2_external_subset(
                 (*ctxt).pop_input();
             }
 
-            consumed = (**(*ctxt).input().unwrap()).consumed;
-            let buffered = (**(*ctxt).input().unwrap()).offset_from_base();
+            consumed = (*ctxt).input().unwrap().consumed;
+            let buffered = (*ctxt).input().unwrap().offset_from_base();
             if buffered as u64 > u64::MAX - consumed {
                 consumed = u64::MAX;
             } else {
@@ -390,8 +389,6 @@ pub unsafe fn xml_sax2_external_subset(
             } else {
                 (*ctxt).sizeentities += consumed;
             }
-
-            xml_free_input_stream(*(*ctxt).input().unwrap());
 
             // Restore the parsing context of the main entity
             (*ctxt).input_tab = oldinput_tab;
@@ -547,18 +544,15 @@ pub unsafe fn xml_sax2_resolve_entity(
     ctx: Option<GenericErrorContext>,
     public_id: Option<&str>,
     system_id: Option<&str>,
-) -> XmlParserInputPtr {
+) -> Option<XmlParserInput> {
     unsafe {
-        if ctx.is_none() {
-            return null_mut();
-        }
+        let ctx = ctx?;
         let ctxt = {
-            let ctx = ctx.unwrap();
             let lock = ctx.lock();
             *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
         };
         let base = if let Some(input) = (*ctxt).input() {
-            (**input)
+            input
                 .filename
                 .as_deref()
                 .or((*ctxt).directory.as_deref())
@@ -645,7 +639,7 @@ pub unsafe fn xml_sax2_entity_decl(
             if let Some(mut ent) = ent.filter(|ent| ent.uri.is_null()) {
                 if let Some(system_id) = system_id {
                     let base = if let Some(input) = (*ctxt).input() {
-                        (**input)
+                        input
                             .filename
                             .as_deref()
                             .or((*ctxt).directory.as_deref())
@@ -683,7 +677,7 @@ pub unsafe fn xml_sax2_entity_decl(
             if let Some(mut ent) = ent.filter(|ent| ent.uri.is_null()) {
                 if let Some(system_id) = system_id {
                     let base = if let Some(input) = (*ctxt).input() {
-                        (**input)
+                        input
                             .filename
                             .as_deref()
                             .or((*ctxt).directory.as_deref())
@@ -1034,7 +1028,7 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
             if let Some(mut ent) = ent.filter(|ent| ent.uri.is_null()) {
                 if let Some(system_id) = system_id {
                     let base = if let Some(input) = (*ctxt).input() {
-                        (**input)
+                        input
                             .filename
                             .as_deref()
                             .or((*ctxt).directory.as_deref())
@@ -1072,7 +1066,7 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
             if let Some(mut ent) = ent.filter(|ent| ent.uri.is_null()) {
                 if let Some(system_id) = system_id {
                     let base = if let Some(input) = (*ctxt).input() {
-                        (**input)
+                        input
                             .filename
                             .as_deref()
                             .or((*ctxt).directory.as_deref())
@@ -1155,7 +1149,7 @@ pub unsafe fn xml_sax2_start_document(ctx: Option<GenericErrorContext>) {
         }
         if let Some(input) = (*ctxt).input() {
             if let Some(mut my_doc) = (*ctxt).my_doc.filter(|doc| doc.url.is_none()) {
-                if let Some(filename) = (**input).filename.as_deref() {
+                if let Some(filename) = input.filename.as_deref() {
                     let url = path_to_uri(filename);
                     my_doc.url = Some(url.into_owned());
                 }
@@ -1193,11 +1187,10 @@ pub unsafe fn xml_sax2_end_document(ctx: Option<GenericErrorContext>) {
             }
         }
         if !(*ctxt).input_tab.is_empty()
-            && !(*ctxt).input_tab[0].is_null()
-            && (*(*ctxt).input_tab[0]).encoding.is_some()
+            && (*ctxt).input_tab[0].encoding.is_some()
             && my_doc.encoding.is_none()
         {
-            my_doc.encoding = (*(*ctxt).input_tab[0]).encoding.clone();
+            my_doc.encoding = (*ctxt).input_tab[0].encoding.clone();
         }
         if (*ctxt).charset != XmlCharEncoding::None && my_doc.charset == XmlCharEncoding::None {
             my_doc.charset = (*ctxt).charset;
@@ -1972,8 +1965,8 @@ pub unsafe fn xml_sax2_start_element(
         }
         (*ctxt).nodemem = -1;
         if (*ctxt).linenumbers != 0 && (*ctxt).input().is_some() {
-            if ((**(*ctxt).input().unwrap()).line as u32) < u16::MAX as u32 {
-                ret.line = (**(*ctxt).input().unwrap()).line as _;
+            if ((*ctxt).input().unwrap().line as u32) < u16::MAX as u32 {
+                ret.line = (*ctxt).input().unwrap().line as _;
             } else {
                 ret.line = u16::MAX;
             }
@@ -2187,8 +2180,8 @@ pub unsafe fn xml_sax2_start_element_ns(
             ret
         };
         if (*ctxt).linenumbers != 0 && (*ctxt).input().is_some() {
-            if ((**(*ctxt).input().unwrap()).line as u32) < u16::MAX as u32 {
-                ret.line = (**(*ctxt).input().unwrap()).line as _;
+            if ((*ctxt).input().unwrap().line as u32) < u16::MAX as u32 {
+                ret.line = (*ctxt).input().unwrap().line as _;
             } else {
                 ret.line = u16::MAX;
             }
@@ -2378,12 +2371,12 @@ unsafe fn xml_sax2_text_node(ctxt: XmlParserCtxtPtr, s: &str) -> Option<XmlNodeP
         }
 
         if (*ctxt).linenumbers != 0 && (*ctxt).input().is_some() {
-            if ((**(*ctxt).input().unwrap()).line as u32) < u32::MAX {
-                ret.line = (**(*ctxt).input().unwrap()).line as _;
+            if ((*ctxt).input().unwrap().line as u32) < u32::MAX {
+                ret.line = (*ctxt).input().unwrap().line as _;
             } else {
                 ret.line = u16::MAX;
                 if (*ctxt).options & XmlParserOption::XmlParseBigLines as i32 != 0 {
-                    ret.psvi = (**(*ctxt).input().unwrap()).line as isize as *mut c_void;
+                    ret.psvi = (*ctxt).input().unwrap().line as isize as *mut c_void;
                 }
             }
         }
@@ -2929,8 +2922,8 @@ pub unsafe fn xml_sax2_processing_instruction(
         };
 
         if (*ctxt).linenumbers != 0 && (*ctxt).input().is_some() {
-            if ((**(*ctxt).input().unwrap()).line as u32) < u16::MAX as u32 {
-                ret.line = (**(*ctxt).input().unwrap()).line as _;
+            if ((*ctxt).input().unwrap().line as u32) < u16::MAX as u32 {
+                ret.line = (*ctxt).input().unwrap().line as _;
             } else {
                 ret.line = u16::MAX;
             }
@@ -2972,8 +2965,8 @@ pub unsafe fn xml_sax2_comment(ctx: Option<GenericErrorContext>, value: &str) {
             return;
         };
         if (*ctxt).linenumbers != 0 && (*ctxt).input().is_some() {
-            if ((**(*ctxt).input().unwrap()).line as u32) < u16::MAX as u32 {
-                ret.line = (**(*ctxt).input().unwrap()).line as _;
+            if ((*ctxt).input().unwrap().line as u32) < u16::MAX as u32 {
+                ret.line = (*ctxt).input().unwrap().line as _;
             } else {
                 ret.line = u16::MAX;
             }

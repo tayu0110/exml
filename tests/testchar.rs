@@ -23,8 +23,8 @@ use exml::{
         xmlstring::XmlChar,
     },
     parser::{
-        XmlParserCtxtPtr, XmlParserInputPtr, xml_free_parser_ctxt, xml_new_input_stream,
-        xml_new_parser_ctxt, xml_read_memory,
+        XmlParserCtxtPtr, XmlParserInput, xml_free_parser_ctxt, xml_new_parser_ctxt,
+        xml_read_memory,
     },
     tree::{NodeCommon, XmlNodePtr, xml_free_doc},
 };
@@ -367,7 +367,7 @@ unsafe fn test_document_ranges() -> c_int {
 
 unsafe fn test_char_range_byte1(ctxt: XmlParserCtxtPtr) -> c_int {
     unsafe {
-        let data: *mut c_char = (**(*ctxt).input().unwrap()).cur as *mut c_char;
+        let data: *mut c_char = (*ctxt).input().unwrap().cur as *mut c_char;
 
         *data.add(1) = 0;
         *data.add(2) = 0;
@@ -402,7 +402,7 @@ unsafe fn test_char_range_byte1(ctxt: XmlParserCtxtPtr) -> c_int {
 
 unsafe fn test_char_range_byte2(ctxt: XmlParserCtxtPtr) -> c_int {
     unsafe {
-        let data: *mut c_char = (**(*ctxt).input().unwrap()).cur as *mut c_char;
+        let data: *mut c_char = (*ctxt).input().unwrap().cur as *mut c_char;
 
         *data.add(2) = 0;
         *data.add(3) = 0;
@@ -473,7 +473,7 @@ unsafe fn test_char_range_byte2(ctxt: XmlParserCtxtPtr) -> c_int {
 unsafe fn test_char_range_byte3(ctxt: XmlParserCtxtPtr) -> c_int {
     unsafe {
         let lows: [c_uchar; 6] = [0, 0x80, 0x81, 0xC1, 0xFF, 0xBF];
-        let data: *mut c_char = (**(*ctxt).input().unwrap()).cur as *mut c_char;
+        let data: *mut c_char = (*ctxt).input().unwrap().cur as *mut c_char;
 
         *data.add(3) = 0;
         for i in 0xE0..=0xFF {
@@ -554,7 +554,7 @@ unsafe fn test_char_range_byte3(ctxt: XmlParserCtxtPtr) -> c_int {
 unsafe fn test_char_range_byte4(ctxt: XmlParserCtxtPtr) -> c_int {
     unsafe {
         let lows: [c_uchar; 6] = [0, 0x80, 0x81, 0xC1, 0xFF, 0xBF];
-        let data: *mut c_char = (**(*ctxt).input().unwrap()).cur as *mut c_char;
+        let data: *mut c_char = (*ctxt).input().unwrap().cur as *mut c_char;
 
         *data.add(4) = 0;
         for i in 0xF0..=0xFF {
@@ -644,7 +644,6 @@ unsafe fn test_char_range_byte4(ctxt: XmlParserCtxtPtr) -> c_int {
 unsafe fn test_char_ranges() -> c_int {
     unsafe {
         let mut data: [u8; 5] = [0; 5];
-        let mut test_ret: c_int = 0;
 
         memset(data.as_mut_ptr() as _, 0, 5);
 
@@ -657,24 +656,21 @@ unsafe fn test_char_ranges() -> c_int {
             xml_free_parser_ctxt(ctxt);
             panic!("Failed to allocate input buffer");
         };
-        let input: XmlParserInputPtr = xml_new_input_stream(Some(&mut *ctxt));
-        if input.is_null() {
-            test_ret = 1;
-            // goto error;
+        let Some(mut input) = XmlParserInput::xml_new_input_stream(Some(&mut *ctxt)) else {
             xml_free_parser_ctxt(ctxt);
-            return test_ret;
-        }
-        (*input).filename = None;
-        (*input).buf = Some(Rc::new(RefCell::new(buf)));
-        (*input).cur = (*input)
+            return 1;
+        };
+        input.filename = None;
+        input.buf = Some(Rc::new(RefCell::new(buf)));
+        input.cur = input
             .buf
             .as_ref()
             .unwrap()
             .borrow()
             .buffer
             .map_or(null_mut(), |buf| buf.as_ref().as_ptr());
-        (*input).base = (*input).cur;
-        (*input).end = (*input).base.add(4);
+        input.base = input.cur;
+        input.end = input.base.add(4);
         (*ctxt).input_push(input);
 
         let mut stdout = stdout();
@@ -695,7 +691,7 @@ unsafe fn test_char_ranges() -> c_int {
 
         // error:
         xml_free_parser_ctxt(ctxt);
-        test_ret
+        0
     }
 }
 

@@ -33,7 +33,7 @@ unsafe fn parse_comment_complex(ctxt: &mut XmlParserCtxt, buf: &mut String) {
             XML_MAX_TEXT_LENGTH
         };
 
-        let inputid = (**ctxt.input().unwrap()).id;
+        let inputid = ctxt.input().unwrap().id;
 
         macro_rules! not_terminated {
             () => {
@@ -113,7 +113,7 @@ unsafe fn parse_comment_complex(ctxt: &mut XmlParserCtxt, buf: &mut String) {
                 cur as i32
             );
         } else {
-            if inputid != (**ctxt.input().unwrap()).id {
+            if inputid != ctxt.input().unwrap().id {
                 xml_fatal_err_msg(
                     ctxt,
                     XmlParserErrors::XmlErrEntityBoundary,
@@ -157,7 +157,7 @@ pub(crate) unsafe fn parse_comment(ctxt: &mut XmlParserCtxt) {
         }
         let state = ctxt.instate;
         ctxt.instate = XmlParserInputState::XmlParserComment;
-        let inputid = (**ctxt.input().unwrap()).id;
+        let inputid = ctxt.input().unwrap().id;
         ctxt.advance(2);
         ctxt.grow();
 
@@ -208,7 +208,7 @@ pub(crate) unsafe fn parse_comment(ctxt: &mut XmlParserCtxt) {
             if !input.is_empty() && input[0] == b'-' {
                 if input.len() >= 2 && input[1] == b'-' {
                     if input.len() >= 3 && input[2] == b'>' {
-                        if (**ctxt.input().unwrap()).id != inputid {
+                        if ctxt.input().unwrap().id != inputid {
                             xml_fatal_err_msg(
                                 ctxt,
                                 XmlParserErrors::XmlErrEntityBoundary,

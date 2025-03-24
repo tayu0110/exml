@@ -213,7 +213,7 @@ unsafe fn parse_name_complex(ctxt: &mut XmlParserCtxt) -> Option<String> {
             xml_fatal_err(ctxt, XmlParserErrors::XmlErrNameTooLong, Some("Name"));
             return None;
         }
-        if (**ctxt.input().unwrap()).offset_from_base() < buf.len() {
+        if (*ctxt.input().unwrap()).offset_from_base() < buf.len() {
             // There were a couple of bugs where PERefs lead to to a change
             // of the buffer. Check the buffer size to avoid passing an invalid
             // pointer to xmlDictLookup.

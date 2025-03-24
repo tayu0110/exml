@@ -57,7 +57,6 @@ use crate::{
     io::{__xml_loader_err, XmlParserInputBuffer, xml_check_http_input, xml_parser_get_directory},
     libxml::{
         chvalid::xml_is_blank_char,
-        globals::{xml_free, xml_malloc},
         parser::{XmlParserInputDeallocate, xml_load_external_entity},
         xmlstring::xml_strlen,
     },
@@ -116,6 +115,33 @@ pub struct XmlParserInput {
 }
 
 impl XmlParserInput {
+    /// Create a new input stream structure.
+    ///
+    /// Returns the new input stream or NULL
+    #[doc(alias = "xmlNewInputStream")]
+    pub unsafe fn xml_new_input_stream(ctxt: Option<&mut XmlParserCtxt>) -> Option<Self> {
+        unsafe {
+            let mut input = XmlParserInput::default();
+            input.line = 1;
+            input.col = 1;
+            input.standalone = -1;
+
+            // If the context is NULL the id cannot be initialized, but that
+            // should not happen while parsing which is the situation where
+            // the id is actually needed.
+            if let Some(ctxt) = ctxt {
+                if input.id == i32::MAX {
+                    xml_err_memory(ctxt, Some("Input ID overflow\n"));
+                    return None;
+                }
+                input.id = ctxt.input_id;
+                ctxt.input_id += 1;
+            }
+
+            Some(input)
+        }
+    }
+
     /// Return the offset of `cur` from `base`.
     pub(crate) unsafe fn offset_from_base(&self) -> usize {
         unsafe { self.cur.offset_from(self.base) as usize }
@@ -338,39 +364,17 @@ impl Default for XmlParserInput {
     }
 }
 
-/// Create a new input stream structure.
-///
-/// Returns the new input stream or NULL
-#[doc(alias = "xmlNewInputStream")]
-pub unsafe fn xml_new_input_stream(ctxt: Option<&mut XmlParserCtxt>) -> XmlParserInputPtr {
-    unsafe {
-        let input: XmlParserInputPtr = xml_malloc(size_of::<XmlParserInput>()) as XmlParserInputPtr;
-        if input.is_null() {
-            xml_err_memory(
-                ctxt.map_or(null_mut(), |ctxt| ctxt as *mut XmlParserCtxt),
-                Some("couldn't allocate a new input stream\n"),
-            );
-            return null_mut();
-        }
-        std::ptr::write(&mut *input, XmlParserInput::default());
-        (*input).line = 1;
-        (*input).col = 1;
-        (*input).standalone = -1;
-        std::ptr::write(&raw mut (*input).buf, None);
-
-        // If the context is NULL the id cannot be initialized, but that
-        // should not happen while parsing which is the situation where
-        // the id is actually needed.
-        if let Some(ctxt) = ctxt {
-            if (*input).id == i32::MAX {
-                xml_err_memory(ctxt, Some("Input ID overflow\n"));
-                return null_mut();
+impl Drop for XmlParserInput {
+    /// Free up an input stream.
+    #[doc(alias = "xmlFreeInputStream")]
+    fn drop(&mut self) {
+        unsafe {
+            if !self.base.is_null() {
+                if let Some(free) = self.free {
+                    free(self.base as _);
+                }
             }
-            (*input).id = ctxt.input_id;
-            ctxt.input_id += 1;
         }
-
-        input
     }
 }
 
@@ -381,7 +385,7 @@ pub unsafe fn xml_new_input_stream(ctxt: Option<&mut XmlParserCtxt>) -> XmlParse
 pub unsafe fn xml_new_string_input_stream(
     mut ctxt: Option<&mut XmlParserCtxt>,
     buffer: &str,
-) -> XmlParserInputPtr {
+) -> Option<XmlParserInput> {
     unsafe {
         let ctxt_ptr = ctxt
             .as_deref_mut()
@@ -393,16 +397,43 @@ pub unsafe fn xml_new_string_input_stream(
             XmlParserInputBuffer::from_memory(buffer.as_bytes().to_vec(), XmlCharEncoding::None)
         else {
             xml_err_memory(ctxt_ptr, None);
-            return null_mut();
+            return None;
         };
-        let input: XmlParserInputPtr = xml_new_input_stream(ctxt);
-        if input.is_null() {
+        let Some(mut input) = XmlParserInput::xml_new_input_stream(ctxt) else {
             xml_err_memory(ctxt_ptr, Some("couldn't allocate a new input stream\n"));
-            return null_mut();
+            return None;
+        };
+        input.buf = Some(Rc::new(RefCell::new(buf)));
+        input.reset_base();
+        Some(input)
+    }
+}
+
+/// Create a new input stream structure encapsulating the @input into
+/// a stream suitable for the parser.
+///
+/// Returns the new input stream or NULL
+#[doc(alias = "xmlNewIOInputStream")]
+pub unsafe fn xml_new_io_input_stream(
+    ctxt: XmlParserCtxtPtr,
+    input: Rc<RefCell<XmlParserInputBuffer>>,
+    enc: XmlCharEncoding,
+) -> Option<XmlParserInput> {
+    unsafe {
+        if get_parser_debug_entities() != 0 {
+            generic_error!("new input from I/O\n");
         }
-        (*input).buf = Some(Rc::new(RefCell::new(buf)));
-        (*input).reset_base();
-        input
+        let mut input_stream =
+            XmlParserInput::xml_new_input_stream((!ctxt.is_null()).then(|| &mut *ctxt))?;
+        input_stream.filename = None;
+        input_stream.buf = Some(input);
+        input_stream.reset_base();
+
+        if !matches!(enc, XmlCharEncoding::None) {
+            (*ctxt).switch_encoding(enc);
+        }
+
+        Some(input_stream)
     }
 }
 
@@ -413,50 +444,41 @@ pub unsafe fn xml_new_string_input_stream(
 pub unsafe fn xml_new_input_from_file(
     ctxt: &mut XmlParserCtxt,
     filename: &str,
-) -> XmlParserInputPtr {
+) -> Option<XmlParserInput> {
     unsafe {
-        let mut input_stream: XmlParserInputPtr;
-
         if get_parser_debug_entities() != 0 {
             generic_error!("new input from file: {filename}\n");
         }
 
         let Some(buf) = XmlParserInputBuffer::from_uri(filename, XmlCharEncoding::None) else {
             __xml_loader_err!(ctxt, "failed to load external entity \"{}\"\n", filename);
-            return null_mut();
+            return None;
         };
 
-        input_stream = xml_new_input_stream(Some(ctxt));
-        if input_stream.is_null() {
-            return null_mut();
-        }
+        let mut input_stream = XmlParserInput::xml_new_input_stream(Some(ctxt))?;
+        input_stream.buf = Some(Rc::new(RefCell::new(buf)));
+        let mut input_stream = xml_check_http_input(ctxt, Some(input_stream))?;
 
-        (*input_stream).buf = Some(Rc::new(RefCell::new(buf)));
-        input_stream = xml_check_http_input(ctxt, input_stream);
-        if input_stream.is_null() {
-            return null_mut();
-        }
-
-        let uri = (*input_stream)
+        let uri = input_stream
             .filename
             .clone()
             .unwrap_or_else(|| filename.to_owned());
         let directory = xml_parser_get_directory(&uri);
         let canonic = canonic_path(&uri);
-        (*input_stream).filename = Some(canonic.into_owned());
+        input_stream.filename = Some(canonic.into_owned());
         if let Some(directory) = directory.as_deref() {
-            (*input_stream).directory = Some(directory.to_string_lossy().into_owned());
+            input_stream.directory = Some(directory.to_string_lossy().into_owned());
         } else {
-            (*input_stream).directory = None;
+            input_stream.directory = None;
         }
-        (*input_stream).reset_base();
+        input_stream.reset_base();
 
         if ctxt.directory.is_none() {
             if let Some(directory) = directory {
                 ctxt.directory = Some(directory.to_string_lossy().into_owned());
             }
         }
-        input_stream
+        Some(input_stream)
     }
 }
 
@@ -467,10 +489,8 @@ pub unsafe fn xml_new_input_from_file(
 pub(crate) unsafe fn xml_new_entity_input_stream(
     ctxt: XmlParserCtxtPtr,
     mut entity: XmlEntityPtr,
-) -> XmlParserInputPtr {
+) -> Option<XmlParserInput> {
     unsafe {
-        let input: XmlParserInputPtr;
-
         if get_parser_debug_entities() != 0 {
             generic_error!(
                 "new input from entity: {}\n",
@@ -487,7 +507,7 @@ pub(crate) unsafe fn xml_new_entity_input_stream(
                 | XmlEntityType::XmlExternalParameterEntity => {
                     let uri = entity.uri;
                     let external_id = entity.external_id;
-                    input = xml_load_external_entity(
+                    let mut input = xml_load_external_entity(
                         (!uri.is_null())
                             .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
                             .as_deref(),
@@ -496,8 +516,8 @@ pub(crate) unsafe fn xml_new_entity_input_stream(
                             .as_deref(),
                         ctxt,
                     );
-                    if !input.is_null() {
-                        (*input).entity = Some(entity);
+                    if let Some(input) = input.as_mut() {
+                        input.entity = Some(entity);
                     }
                     return input;
                 }
@@ -518,49 +538,26 @@ pub(crate) unsafe fn xml_new_entity_input_stream(
                     xml_err_internal!(ctxt, "Predefined entity {} without content !\n", name);
                 }
             }
-            return null_mut();
+            return None;
         }
-        input = xml_new_input_stream((!ctxt.is_null()).then(|| &mut *ctxt));
-        if input.is_null() {
-            return null_mut();
-        }
+        let mut input =
+            XmlParserInput::xml_new_input_stream((!ctxt.is_null()).then(|| &mut *ctxt))?;
+
         if !entity.uri.is_null() {
-            (*input).filename = Some(
+            input.filename = Some(
                 CStr::from_ptr(entity.uri as *const i8)
                     .to_string_lossy()
                     .into_owned(),
             );
         }
-        (*input).base = entity.content as _;
+        input.base = entity.content as _;
         if entity.length == 0 {
             entity.length = xml_strlen(entity.content as _);
         }
-        (*input).cur = entity.content;
-        (*input).length = entity.length;
-        (*input).end = entity.content.add((*input).length as usize);
-        (*input).entity = Some(entity);
-        input
-    }
-}
-
-/// Free up an input stream.
-#[doc(alias = "xmlFreeInputStream")]
-pub unsafe fn xml_free_input_stream(input: XmlParserInputPtr) {
-    unsafe {
-        if input.is_null() {
-            return;
-        }
-
-        (*input).filename = None;
-        (*input).directory = None;
-        (*input).encoding = None;
-        (*input).version = None;
-        if !(*input).base.is_null() {
-            if let Some(free) = (*input).free {
-                free((*input).base as _);
-            }
-        }
-        let _ = (*input).buf.take();
-        xml_free(input as _);
+        input.cur = entity.content;
+        input.length = entity.length;
+        input.end = entity.content.add(input.length as usize);
+        input.entity = Some(entity);
+        Some(input)
     }
 }

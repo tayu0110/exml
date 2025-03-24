@@ -3,10 +3,10 @@
 
 use std::{
     env::args,
-    ffi::{CStr, CString, c_int},
+    ffi::{CStr, c_int},
     fs::{File, metadata},
     os::fd::AsRawFd,
-    ptr::{addr_of_mut, null_mut},
+    ptr::null_mut,
     sync::{
         Mutex,
         atomic::{AtomicI32, AtomicPtr, AtomicUsize, Ordering},
@@ -30,7 +30,7 @@ use exml::{
         xmlstring::xml_str_equal,
     },
     parser::{
-        XmlParserCtxtPtr, XmlParserInputPtr, xml_ctxt_read_file, xml_free_parser_ctxt,
+        XmlParserCtxtPtr, XmlParserInput, xml_ctxt_read_file, xml_free_parser_ctxt,
         xml_new_input_from_file, xml_new_parser_ctxt, xml_read_file,
     },
     tree::{NodeCommon, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr, xml_free_doc},
@@ -38,7 +38,7 @@ use exml::{
         XmlXPathContext, xml_xpath_context_set_cache, xml_xpath_free_context, xml_xpath_new_context,
     },
 };
-use libc::{fdopen, snprintf};
+use libc::fdopen;
 
 static mut VERBOSE: c_int = 0;
 
@@ -78,7 +78,7 @@ unsafe fn test_external_entity_loader(
     url: Option<&str>,
     _id: Option<&str>,
     ctxt: XmlParserCtxtPtr,
-) -> XmlParserInputPtr {
+) -> Option<XmlParserInput> {
     unsafe { xml_new_input_from_file(&mut *ctxt, url.unwrap()) }
 }
 
@@ -109,35 +109,34 @@ macro_rules! test_log {
 }
 
 fn test_error_handler(_user_data: Option<GenericErrorContext>, error: &XmlError) {
-    unsafe {
-        if TEST_ERRORS_SIZE.load(Ordering::Relaxed) >= 32768 {
-            return;
-        }
-        let mut errors = TEST_ERRORS.lock().unwrap();
-        let file = CString::new(error.file().unwrap_or("entity")).unwrap();
-        let message = CString::new(error.message().unwrap_or("")).unwrap();
-        let res: c_int = snprintf(
-            addr_of_mut!(errors[TEST_ERRORS_SIZE.load(Ordering::Relaxed)]) as _,
-            32768 - TEST_ERRORS_SIZE.load(Ordering::Relaxed),
-            c"%s:%d: %s\n".as_ptr(),
-            file.as_ptr(),
-            error.line(),
-            message,
-        );
-        if error.level() == XmlErrorLevel::XmlErrFatal {
-            NB_FATAL.fetch_add(1, Ordering::Relaxed);
-        } else if error.level() == XmlErrorLevel::XmlErrError {
-            NB_ERROR.fetch_add(1, Ordering::Relaxed);
-        }
-        if TEST_ERRORS_SIZE.load(Ordering::Relaxed) + res as usize >= 32768 {
-            // buffer is full
-            TEST_ERRORS_SIZE.store(32768, Ordering::Relaxed);
-            errors[TEST_ERRORS_SIZE.load(Ordering::Relaxed)] = 0;
-        } else {
-            TEST_ERRORS_SIZE.fetch_add(res as usize, Ordering::Relaxed);
-        }
-        errors[TEST_ERRORS_SIZE.load(Ordering::Relaxed)] = 0;
+    if TEST_ERRORS_SIZE.load(Ordering::Relaxed) >= 32768 {
+        return;
     }
+
+    let msg = format!(
+        "{}:{}: {}\n",
+        error.file().unwrap_or("entity"),
+        error.line(),
+        error.message().unwrap_or("")
+    );
+    let mut errors = TEST_ERRORS.lock().unwrap();
+    let written = TEST_ERRORS_SIZE.load(Ordering::Relaxed);
+    let remain = errors.len() - written;
+    let res = remain.min(msg.len());
+    errors[written..written + res].copy_from_slice(&msg.as_bytes()[..res]);
+    if error.level() == XmlErrorLevel::XmlErrFatal {
+        NB_FATAL.fetch_add(1, Ordering::Relaxed);
+    } else if error.level() == XmlErrorLevel::XmlErrError {
+        NB_ERROR.fetch_add(1, Ordering::Relaxed);
+    }
+    if TEST_ERRORS_SIZE.load(Ordering::Relaxed) + res as usize >= 32768 {
+        // buffer is full
+        TEST_ERRORS_SIZE.store(32768, Ordering::Relaxed);
+        errors[TEST_ERRORS_SIZE.load(Ordering::Relaxed)] = 0;
+    } else {
+        TEST_ERRORS_SIZE.fetch_add(res as usize, Ordering::Relaxed);
+    }
+    errors[TEST_ERRORS_SIZE.load(Ordering::Relaxed)] = 0;
 }
 
 static CTXT_XPATH: AtomicPtr<XmlXPathContext> = AtomicPtr::new(null_mut());

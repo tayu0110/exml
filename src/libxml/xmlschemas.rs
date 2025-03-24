@@ -52,7 +52,7 @@ use crate::{
         },
         parser::{
             XML_SAX2_MAGIC, XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr, XmlSAXLocatorPtr,
-            xml_new_io_input_stream, xml_parse_document,
+            xml_parse_document,
         },
         sax2::xml_sax2_get_line_number,
         schemas_internals::{
@@ -107,8 +107,9 @@ use crate::{
         },
     },
     parser::{
-        XmlParserCtxtPtr, XmlParserInputPtr, xml_ctxt_read_file, xml_ctxt_read_memory,
-        xml_free_parser_ctxt, xml_new_parser_ctxt, xml_new_sax_parser_ctxt,
+        XmlParserCtxtPtr, XmlParserInput, xml_ctxt_read_file, xml_ctxt_read_memory,
+        xml_free_parser_ctxt, xml_new_io_input_stream, xml_new_parser_ctxt,
+        xml_new_sax_parser_ctxt,
     },
     tree::{
         NodeCommon, XmlAttrPtr, XmlAttributeDefault, XmlAttributeType, XmlDocPtr,
@@ -18750,12 +18751,12 @@ unsafe fn xml_schema_validate_stream_locator(
         }
 
         let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
-        if (*ctxt).input().is_some() {
+        if let Some(input) = (*ctxt).input() {
             if !file.is_null() {
-                *file = (**(*ctxt).input().unwrap()).filename.clone();
+                *file = input.filename.clone();
             }
             if !line.is_null() {
-                *line = (**(*ctxt).input().unwrap()).line as _;
+                *line = input.line as _;
             }
             return 0;
         }
@@ -18805,12 +18806,7 @@ pub unsafe fn xml_schema_validate_stream(
         xml_schema_validate_set_locator(ctxt, Some(xml_schema_validate_stream_locator), pctxt as _);
 
         let input = Rc::new(RefCell::new(input));
-        let input_stream: XmlParserInputPtr =
-            xml_new_io_input_stream(pctxt, Rc::clone(&input), enc);
-        if input_stream.is_null() {
-            ret = -1;
-        // goto done;
-        } else {
+        if let Some(input_stream) = xml_new_io_input_stream(pctxt, Rc::clone(&input), enc) {
             (*pctxt).input_push(input_stream);
             (*ctxt).parser_ctxt = pctxt;
             (*ctxt).input = Some(Rc::clone(&input));
@@ -18834,6 +18830,8 @@ pub unsafe fn xml_schema_validate_stream(
                     }
                 }
             }
+        } else {
+            ret = -1;
         }
 
         // done:
@@ -19291,7 +19289,7 @@ unsafe fn resolve_entity_split(
     ctx: Option<GenericErrorContext>,
     public_id: Option<&str>,
     system_id: Option<&str>,
-) -> XmlParserInputPtr {
+) -> Option<XmlParserInput> {
     unsafe {
         let ctx = ctx.unwrap();
         let lock = ctx.lock();
@@ -19305,7 +19303,7 @@ unsafe fn resolve_entity_split(
                 return resolve_entity((*ctxt).user_data.clone(), public_id, system_id);
             }
         }
-        null_mut()
+        None
     }
 }
 

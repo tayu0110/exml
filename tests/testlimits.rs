@@ -31,7 +31,7 @@ use exml::{
         xmlstring::XmlChar,
     },
     parser::{
-        XmlParserCtxtPtr, XmlParserInputPtr, xml_ctxt_read_file, xml_free_parser_ctxt,
+        XmlParserCtxtPtr, XmlParserInput, xml_ctxt_read_file, xml_free_parser_ctxt,
         xml_new_sax_parser_ctxt,
     },
     tree::{
@@ -379,11 +379,11 @@ unsafe fn test_external_entity_loader(
     url: Option<&str>,
     id: Option<&str>,
     ctxt: XmlParserCtxtPtr,
-) -> XmlParserInputPtr {
+) -> Option<XmlParserInput> {
     unsafe {
         let memused: i32 = xml_mem_used();
 
-        let ret: XmlParserInputPtr = xml_no_net_external_entity_loader(url, id, ctxt);
+        let ret = xml_no_net_external_entity_loader(url, id, ctxt);
         EXTRA_MEMORY_FROM_RESOLVER.set(EXTRA_MEMORY_FROM_RESOLVER.get() + xml_mem_used() - memused);
 
         ret
@@ -417,8 +417,6 @@ fn channel(_ctx: Option<GenericErrorContext>, msg: &str) {
 
 fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlError) {
     let mut name: *const XmlChar = null_mut();
-    let mut input: XmlParserInputPtr = null_mut();
-    let mut cur: XmlParserInputPtr = null_mut();
     let mut ctxt: XmlParserCtxtPtr = null_mut();
 
     let file = err.file();
@@ -449,19 +447,21 @@ fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlErr
         }
 
         // Maintain the compatibility with the legacy error handling
+        let mut input = None;
+        let mut cur = None;
         if !ctxt.is_null() {
-            if let Some(&inp) = (*ctxt).input() {
-                input = inp;
+            input = (*ctxt).input();
+            if let Some(now) = input {
+                if now.filename.is_none() && (*ctxt).input_tab.len() > 1 {
+                    cur = input;
+                    input = Some(&(*ctxt).input_tab[(*ctxt).input_tab.len() - 2]);
+                }
             }
-            if !input.is_null() && (*input).filename.is_none() && (*ctxt).input_tab.len() > 1 {
-                cur = input;
-                input = (*ctxt).input_tab[(*ctxt).input_tab.len() - 2];
-            }
-            if !input.is_null() {
-                if let Some(filename) = (*input).filename.as_deref() {
-                    channel(None, format!("{filename}:{}: ", (*input).line).as_str());
+            if let Some(input) = input {
+                if let Some(filename) = input.filename.as_deref() {
+                    channel(None, format!("{filename}:{}: ", input.line).as_str());
                 } else if line != 0 && domain == XmlErrorDomain::XmlFromParser {
-                    channel(None, format!("Entity: line {}: ", (*input).line).as_str());
+                    channel(None, format!("Entity: line {}: ", input.line).as_str());
                 }
             }
         } else if let Some(file) = file {
@@ -525,13 +525,13 @@ fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlErr
 
         if !ctxt.is_null() {
             parser_print_file_context_internal(input, channel, None);
-            if !cur.is_null() {
-                if let Some(filename) = (*cur).filename.as_deref() {
-                    channel(None, format!("{filename}:{}: \n", (*cur).line).as_str());
+            if let Some(cur) = cur {
+                if let Some(filename) = cur.filename.as_deref() {
+                    channel(None, format!("{filename}:{}: \n", cur.line).as_str());
                 } else if line != 0 && domain == XmlErrorDomain::XmlFromParser {
-                    channel(None, format!("Entity: line {}: \n", (*cur).line).as_str());
+                    channel(None, format!("Entity: line {}: \n", cur.line).as_str());
                 }
-                parser_print_file_context_internal(cur, channel, None);
+                parser_print_file_context_internal(Some(cur), channel, None);
             }
         }
         if let Some(str1) = err.str1().filter(|s| {
@@ -702,9 +702,9 @@ fn resolve_entity_callback(
     _ctx: Option<GenericErrorContext>,
     _public_id: Option<&str>,
     _system_id: Option<&str>,
-) -> XmlParserInputPtr {
+) -> Option<XmlParserInput> {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
-    null_mut()
+    None
 }
 
 /// Get an entity by name
@@ -955,6 +955,12 @@ unsafe fn sax_test(filename: &str, limit: usize, options: i32, fail: i32) -> i32
                 res = 0;
             } else {
                 eprintln!("Failed to parse '{filename}' {limit}");
+                TEST_ERRORS.with_borrow(|errors| {
+                    let size = TEST_ERRORS_SIZE.get();
+                    if size > 0 {
+                        eprintln!("{}", std::str::from_utf8(&errors[..size]).unwrap());
+                    }
+                });
                 res = 1;
             }
         } else if fail != 0 {
@@ -1252,26 +1258,27 @@ unsafe fn launch_crazy(test: u32, fail: i32) -> i32 {
     }
 }
 
-unsafe extern "C" fn get_crazy_fail(test: i32) -> i32 {
+unsafe fn get_crazy_fail(test: i32) -> i32 {
     // adding 1000000 of character 'a' leads to parser failure mostly
     // everywhere except in those special spots. Need to be updated
     // each time crazy is updated
-    1 - (test == 44 || /* PI in Misc */
-        (50..=55).contains(&test) || /* Comment in Misc */
-        test == 79 || /* PI in DTD */
-        (85..=90).contains(&test) || /* Comment in DTD */
-        test == 154 || /* PI in Misc */
-        (160..=165).contains(&test) || /* Comment in Misc */
-        (178..=181).contains(&test) || /* attribute value */
-        test == 183 || /* Text */
-        test == 189 || /* PI in Content */
-        test == 191 || /* Text */
-        (195..=200).contains(&test) || /* Comment in Content */
-        (203..=206).contains(&test) || /* Text */
-        test == 215 || test == 216 || /* in CDATA */
-        test == 219 || /* Text */
-        test == 231 || /* PI in Misc */
-        (237..=242).contains(&test)/* Comment in Misc */) as i32
+    1 - (test == 44 // PI in Misc
+        || (50..=55).contains(&test) // Comment in Misc
+        || test == 79 // PI in DTD
+        || (85..=90).contains(&test) // Comment in DTD
+        || test == 154 // PI in Misc
+        || (160..=165).contains(&test) // Comment in Misc
+        || (178..=181).contains(&test) // attribute value
+        || test == 183 // Text
+        || test == 189 // PI in Content
+        || test == 191 // Text
+        || (195..=200).contains(&test) // Comment in Content
+        || (203..=206).contains(&test) // Text
+        || test == 215 // in CDATA
+        || test == 216 // in CDATA
+        || test == 219 // Text
+        || test == 231 // PI in Misc
+        || (237..=242).contains(&test)) as i32 // Comment in Misc
 }
 
 fn runcrazy(launch: unsafe fn(u32, i32) -> i32) {

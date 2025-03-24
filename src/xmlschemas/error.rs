@@ -796,17 +796,13 @@ pub(crate) unsafe fn xml_schema_err4_line(
                         node = (*(*vctxt).inode).node.map(|node| node.into());
                     }
                     // Get filename and line if no node-tree.
-                    if node.is_none()
-                        && !(*vctxt).parser_ctxt.is_null()
-                        && (*(*vctxt).parser_ctxt).input().is_some()
-                    {
-                        dummy = (**(*(*vctxt).parser_ctxt).input().unwrap())
-                            .filename
-                            .as_deref()
-                            .map(|f| CString::new(f).unwrap());
-                        file = dummy.as_ref().map_or(null(), |c| c.as_ptr());
-                        line = (**(*(*vctxt).parser_ctxt).input().unwrap()).line;
-                        col = (**(*(*vctxt).parser_ctxt).input().unwrap()).col;
+                    if node.is_none() && !(*vctxt).parser_ctxt.is_null() {
+                        if let Some(input) = (*(*vctxt).parser_ctxt).input() {
+                            dummy = input.filename.as_deref().map(|f| CString::new(f).unwrap());
+                            file = dummy.as_ref().map_or(null(), |c| c.as_ptr());
+                            line = input.line;
+                            col = input.col;
+                        }
                     }
                 } else {
                     // Override the given node's (if any) position
@@ -816,14 +812,11 @@ pub(crate) unsafe fn xml_schema_err4_line(
                     if let Some(doc) = (*vctxt).doc {
                         dummy = doc.url.as_deref().map(|u| CString::new(u).unwrap());
                         file = dummy.as_ref().map_or(null(), |c| c.as_ptr());
-                    } else if !(*vctxt).parser_ctxt.is_null()
-                        && (*(*vctxt).parser_ctxt).input().is_some()
-                    {
-                        dummy = (**(*(*vctxt).parser_ctxt).input().unwrap())
-                            .filename
-                            .as_deref()
-                            .map(|f| CString::new(f).unwrap());
-                        file = dummy.as_ref().map_or(null(), |c| c.as_ptr());
+                    } else if !(*vctxt).parser_ctxt.is_null() {
+                        if let Some(input) = (*(*vctxt).parser_ctxt).input() {
+                            dummy = input.filename.as_deref().map(|f| CString::new(f).unwrap());
+                            file = dummy.as_ref().map_or(null(), |c| c.as_ptr());
+                        }
                     }
                 }
                 if let Some(loc_func) = (*vctxt).loc_func {

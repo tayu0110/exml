@@ -82,7 +82,7 @@ use exml::{
         xmlstring::XmlChar,
     },
     parser::{
-        XmlParserCtxtPtr, XmlParserInputPtr, xml_ctxt_read_file, xml_ctxt_read_io,
+        XmlParserCtxtPtr, XmlParserInput, XmlParserInputPtr, xml_ctxt_read_file, xml_ctxt_read_io,
         xml_ctxt_read_memory, xml_free_parser_ctxt, xml_new_parser_ctxt, xml_new_sax_parser_ctxt,
         xml_read_file, xml_read_io, xml_read_memory,
     },
@@ -802,7 +802,7 @@ unsafe fn xmllint_external_entity_loader(
     url: Option<&str>,
     id: Option<&str>,
     ctxt: XmlParserCtxtPtr,
-) -> XmlParserInputPtr {
+) -> Option<XmlParserInput> {
     unsafe {
         let mut ret: XmlParserInputPtr;
         let mut warning: Option<GenericError> = None;
@@ -827,9 +827,10 @@ unsafe fn xmllint_external_entity_loader(
             }
         }
 
+        let mut ret = None;
         if let Some(loader) = DEFAULT_ENTITY_LOADER {
             ret = loader(url, id, ctxt);
-            if !ret.is_null() {
+            if ret.is_some() {
                 if let Some(sax) = (*ctxt).sax.as_deref_mut() {
                     if warning.is_some() {
                         sax.warning = warning;
@@ -853,7 +854,7 @@ unsafe fn xmllint_external_entity_loader(
                 new_url.push('/');
                 new_url.push_str(lastsegment.unwrap());
                 ret = loader(Some(&new_url), id, ctxt);
-                if !ret.is_null() {
+                if ret.is_some() {
                     if let Some(sax) = (*ctxt).sax.as_deref_mut() {
                         if warning.is_some() {
                             sax.warning = warning;
@@ -900,7 +901,7 @@ unsafe fn xmllint_external_entity_loader(
                 // );
             }
         }
-        null_mut()
+        None
     }
 }
 
@@ -1382,10 +1383,10 @@ fn resolve_entity_debug(
     _ctx: Option<GenericErrorContext>,
     public_id: Option<&str>,
     system_id: Option<&str>,
-) -> XmlParserInputPtr {
+) -> Option<XmlParserInput> {
     CALLBACKS.fetch_add(1, Ordering::Relaxed);
     if CMD_ARGS.noout {
-        return null_mut();
+        return None;
     }
     // let ctxt: xmlParserCtxtPtr = ctx as xmlParserCtxtPtr;
 
@@ -1400,7 +1401,7 @@ fn resolve_entity_debug(
     } else {
         println!(", )");
     }
-    null_mut()
+    None
 }
 
 /// Get an entity by name

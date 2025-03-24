@@ -57,10 +57,7 @@ use crate::{
     error::{__xml_simple_error, __xml_simple_oom_error, XmlErrorDomain, XmlParserErrors},
     libxml::parser::XmlParserOption,
     nanohttp::XmlNanoHTTPCtxt,
-    parser::{
-        __xml_err_encoding, XmlParserCtxtPtr, XmlParserInputPtr, xml_free_input_stream,
-        xml_new_input_from_file,
-    },
+    parser::{__xml_err_encoding, XmlParserCtxtPtr, XmlParserInput, xml_new_input_from_file},
     uri::canonic_path,
 };
 
@@ -411,56 +408,66 @@ pub(crate) use __xml_loader_err;
 #[doc(alias = "xmlCheckHTTPInput")]
 pub unsafe fn xml_check_http_input(
     ctxt: XmlParserCtxtPtr,
-    mut ret: XmlParserInputPtr,
-) -> XmlParserInputPtr {
+    mut ret: Option<XmlParserInput>,
+) -> Option<XmlParserInput> {
     unsafe {
         #[cfg(feature = "http")]
         {
-            if !ret.is_null() {
-                if let Some(buf) = (*ret).buf.as_mut() {
-                    if let Some(context) = buf.borrow_mut().nanohttp_context() {
-                        let code = context.return_code();
-                        if code >= 400 {
-                            // fatal error
-                            if let Some(filename) = (*ret).filename.as_deref() {
-                                __xml_loader_err!(
-                                    ctxt,
-                                    "failed to load HTTP resource \"{}\"\n",
-                                    filename
-                                );
-                            } else {
-                                __xml_loader_err!(ctxt, "failed to load HTTP resource\n");
-                            }
-                            xml_free_input_stream(ret);
-                            ret = null_mut();
+            if ret.is_some()
+                && ret.as_ref().unwrap().buf.is_some()
+                && ret
+                    .as_mut()
+                    .unwrap()
+                    .buf
+                    .as_mut()
+                    .unwrap()
+                    .borrow_mut()
+                    .nanohttp_context()
+                    .is_some()
+            {
+                let mut buf = ret.as_mut().unwrap().buf.as_mut().unwrap().borrow_mut();
+                let context = buf.nanohttp_context().unwrap();
+                let code = context.return_code();
+                if code >= 400 {
+                    drop(buf);
+                    // fatal error
+                    if let Some(filename) = ret.as_ref().unwrap().filename.as_deref() {
+                        __xml_loader_err!(ctxt, "failed to load HTTP resource \"{}\"\n", filename);
+                    } else {
+                        __xml_loader_err!(ctxt, "failed to load HTTP resource\n");
+                    }
+
+                    return None;
+                }
+                let is_mime_xml = context
+                    .mime_type()
+                    .filter(|mime| mime.contains("/xml") || mime.contains("+xml"))
+                    .is_some();
+                let encoding = context.encoding().map(|encoding| encoding.to_owned());
+                let redirection = context
+                    .redirection()
+                    .map(|redirection| redirection.to_owned());
+                drop(buf);
+                if is_mime_xml {
+                    if let Some(encoding) = encoding {
+                        if let Some(handler) = find_encoding_handler(&encoding) {
+                            (*ctxt).switch_input_encoding(ret.as_mut().unwrap(), handler);
                         } else {
-                            if context
-                                .mime_type()
-                                .filter(|mime| mime.contains("/xml") || mime.contains("+xml"))
-                                .is_some()
-                            {
-                                if let Some(encoding) = context.encoding() {
-                                    if let Some(handler) = find_encoding_handler(encoding) {
-                                        (*ctxt).switch_input_encoding(ret, handler);
-                                    } else {
-                                        __xml_err_encoding!(
-                                            ctxt,
-                                            XmlParserErrors::XmlErrUnknownEncoding,
-                                            "Unknown encoding {}",
-                                            encoding
-                                        );
-                                    }
-                                    if (*ret).encoding.is_none() {
-                                        (*ret).encoding = Some(encoding.to_owned());
-                                    }
-                                }
-                            }
-                            if let Some(redir) = context.redirection() {
-                                (*ret).directory = None;
-                                (*ret).filename = Some(redir.to_owned());
-                            }
+                            __xml_err_encoding!(
+                                ctxt,
+                                XmlParserErrors::XmlErrUnknownEncoding,
+                                "Unknown encoding {}",
+                                encoding
+                            );
+                        }
+                        if ret.as_mut().unwrap().encoding.is_none() {
+                            ret.as_mut().unwrap().encoding = Some(encoding);
                         }
                     }
+                }
+                if let Some(redir) = redirection {
+                    ret.as_mut().unwrap().directory = None;
+                    ret.as_mut().unwrap().filename = Some(redir);
                 }
             }
         }
@@ -476,15 +483,13 @@ pub(crate) unsafe fn xml_default_external_entity_loader(
     url: Option<&str>,
     id: Option<&str>,
     ctxt: XmlParserCtxtPtr,
-) -> XmlParserInputPtr {
+) -> Option<XmlParserInput> {
     unsafe {
-        let ret: XmlParserInputPtr;
-
         if !ctxt.is_null() && (*ctxt).options & XmlParserOption::XmlParseNoNet as i32 != 0 {
             let options = (*ctxt).options;
 
             (*ctxt).options -= XmlParserOption::XmlParseNoNet as i32;
-            ret = xml_no_net_external_entity_loader(url, id, ctxt);
+            let ret = xml_no_net_external_entity_loader(url, id, ctxt);
             (*ctxt).options = options;
             return ret;
         }
@@ -497,10 +502,9 @@ pub(crate) unsafe fn xml_default_external_entity_loader(
         let Some(resource) = resource else {
             let id = id.unwrap_or("NULL").to_owned();
             __xml_loader_err!(ctxt, "failed to load external entity \"{}\"\n", id);
-            return null_mut();
+            return None;
         };
-        ret = xml_new_input_from_file(&mut *ctxt, &resource);
-        ret
+        xml_new_input_from_file(&mut *ctxt, &resource)
     }
 }
 
@@ -606,7 +610,7 @@ pub unsafe fn xml_no_net_external_entity_loader(
     url: Option<&str>,
     id: Option<&str>,
     ctxt: XmlParserCtxtPtr,
-) -> XmlParserInputPtr {
+) -> Option<XmlParserInput> {
     unsafe {
         #[cfg(feature = "catalog")]
         let resource =
@@ -619,11 +623,10 @@ pub unsafe fn xml_no_net_external_entity_loader(
                 || (rsrc.len() >= 7 && rsrc[..7].eq_ignore_ascii_case("http://"))
         }) {
             xml_ioerr(XmlParserErrors::XmlIONetworkAttempt, Some(resource));
-            return null_mut();
+            return None;
         }
-        let input: XmlParserInputPtr =
-            xml_default_external_entity_loader(resource.as_deref(), id, ctxt);
-        input
+
+        xml_default_external_entity_loader(resource.as_deref(), id, ctxt)
     }
 }
 
@@ -759,40 +762,9 @@ impl XmlInputCallback for DefaultHTTPIOCallbacks {
 
 #[cfg(test)]
 mod tests {
-    use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
+    use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks};
 
     use super::*;
-
-    #[test]
-    fn test_xml_check_httpinput() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_PARSER_CTXT_PTR {
-                for n_ret in 0..GEN_NB_XML_PARSER_INPUT_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 0);
-                    let ret = gen_xml_parser_input_ptr(n_ret, 1);
-
-                    let ret_val = xml_check_http_input(ctxt, ret);
-                    desret_xml_parser_input_ptr(ret_val);
-                    des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                    des_xml_parser_input_ptr(n_ret, ret, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlCheckHTTPInput",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlCheckHTTPInput()");
-                        eprint!(" {}", n_ctxt);
-                        eprintln!(" {}", n_ret);
-                    }
-                }
-            }
-        }
-    }
 
     #[test]
     fn test_xml_cleanup_input_callbacks() {

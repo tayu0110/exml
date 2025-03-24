@@ -65,7 +65,7 @@ use crate::{
         chvalid::xml_is_blank_char, globals::xml_free, parser::xml_parse_document,
         parser_internals::XML_MAX_NAMELEN, threads::xml_get_thread_id, xmlstring::xml_str_equal,
     },
-    parser::{XmlParserInputPtr, xml_free_parser_ctxt, xml_new_input_stream, xml_new_parser_ctxt},
+    parser::{XmlParserInput, xml_free_parser_ctxt, xml_new_parser_ctxt},
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlDocPtr, XmlGenericNodePtr, XmlNodePtr, xml_free_doc,
         xml_free_ns, xml_new_doc, xml_new_doc_node, xml_new_dtd, xml_new_ns,
@@ -3155,21 +3155,17 @@ pub unsafe fn xml_parse_catalog_file(filename: &str) -> Option<XmlDocPtr> {
             return None;
         };
 
-        let input_stream: XmlParserInputPtr = xml_new_input_stream(Some(&mut *ctxt));
-        if input_stream.is_null() {
+        let Some(mut input_stream) = XmlParserInput::xml_new_input_stream(Some(&mut *ctxt)) else {
             xml_free_parser_ctxt(ctxt);
             return None;
-        }
+        };
 
         {
             let canonic = canonic_path(filename);
-            (*input_stream).filename = Some(canonic.into_owned());
+            input_stream.filename = Some(canonic.into_owned());
         }
-        std::ptr::write(
-            &raw mut (*input_stream).buf,
-            Some(Rc::new(RefCell::new(buf))),
-        );
-        (*input_stream).reset_base();
+        input_stream.buf = Some(Rc::new(RefCell::new(buf)));
+        input_stream.reset_base();
 
         (*ctxt).input_push(input_stream);
         if (*ctxt).directory.is_none() {
