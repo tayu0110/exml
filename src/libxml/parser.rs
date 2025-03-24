@@ -6636,8 +6636,10 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                                     &mut uri,
                                     &raw mut tlen,
                                 );
+                            } else if let Some(n) = xml_parse_start_tag(ctxt) {
+                                name = xml_dict_lookup((*ctxt).dict, n.as_ptr(), n.len() as i32);
                             } else {
-                                name = xml_parse_start_tag(ctxt);
+                                name = null_mut();
                             }
                         }
                         #[cfg(not(feature = "sax1"))]

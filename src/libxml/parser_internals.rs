@@ -2660,21 +2660,20 @@ pub(crate) unsafe fn xml_parse_doc_type_decl(ctxt: XmlParserCtxtPtr) {
 pub(crate) unsafe fn xml_parse_attribute(
     ctxt: XmlParserCtxtPtr,
     value: *mut *mut XmlChar,
-) -> *const XmlChar {
+) -> Option<String> {
     unsafe {
         let val: *mut XmlChar;
 
         *value = null_mut();
         (*ctxt).grow();
-        let name: *const XmlChar = xml_parse_name(ctxt);
-        if name.is_null() {
+        let Some(name) = parse_name(&mut *ctxt) else {
             xml_fatal_err_msg(
                 ctxt,
                 XmlParserErrors::XmlErrNameRequired,
                 "error parsing attribute name\n",
             );
-            return null_mut();
-        }
+            return None;
+        };
 
         // read the value
         (*ctxt).skip_blanks();
@@ -2684,23 +2683,19 @@ pub(crate) unsafe fn xml_parse_attribute(
             val = xml_parse_att_value(ctxt);
             (*ctxt).instate = XmlParserInputState::XmlParserContent;
         } else {
-            let n = CStr::from_ptr(name as *const i8).to_string_lossy();
             xml_fatal_err_msg_str!(
                 ctxt,
                 XmlParserErrors::XmlErrAttributeWithoutValue,
                 "Specification mandates value for attribute {}\n",
-                n
+                name
             );
-            return name;
+            return Some(name);
         }
 
         // Check that xml:lang conforms to the specification
         // No more registered as an error, just generate a warning now
         // since this was deprecated in XML second edition
-        if (*ctxt).pedantic != 0
-            && xml_str_equal(name, c"xml:lang".as_ptr() as _)
-            && xml_check_language_id(val) == 0
-        {
+        if (*ctxt).pedantic != 0 && name == "xml:lang" && xml_check_language_id(val) == 0 {
             let val = CStr::from_ptr(val as *const i8).to_string_lossy();
             xml_warning_msg!(
                 ctxt,
@@ -2711,7 +2706,7 @@ pub(crate) unsafe fn xml_parse_attribute(
         }
 
         // Check that xml:space conforms to the specification
-        if xml_str_equal(name, c"xml:space".as_ptr() as _) {
+        if name == "xml:space" {
             if xml_str_equal(val, c"default".as_ptr() as _) {
                 *(*ctxt).space_mut() = 0;
             } else if xml_str_equal(val, c"preserve".as_ptr() as _) {
@@ -2728,7 +2723,7 @@ pub(crate) unsafe fn xml_parse_attribute(
         }
 
         *value = val;
-        name
+        Some(name)
     }
 }
 
@@ -2753,27 +2748,25 @@ pub(crate) unsafe fn xml_parse_attribute(
 /// Returns the element name parsed
 #[doc(alias = "xmlParseStartTag")]
 #[cfg(feature = "sax1")]
-pub(crate) unsafe fn xml_parse_start_tag(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
+pub(crate) unsafe fn xml_parse_start_tag(ctxt: XmlParserCtxtPtr) -> Option<String> {
     unsafe {
         use crate::parser::xml_err_attribute_dup;
 
-        let mut attname: *const XmlChar;
         let mut attvalue: *mut XmlChar = null_mut();
 
         if (*ctxt).current_byte() != b'<' {
-            return null_mut();
+            return None;
         }
         (*ctxt).advance(1);
 
-        let name: *const XmlChar = xml_parse_name(ctxt);
-        if name.is_null() {
+        let Some(name) = parse_name(&mut *ctxt) else {
             xml_fatal_err_msg(
                 ctxt,
                 XmlParserErrors::XmlErrNameRequired,
                 "xmlParseStartTag: invalid element name\n",
             );
-            return null_mut();
-        }
+            return None;
+        };
 
         // Now parse the attributes, it ends up with the ending
         //
@@ -2787,20 +2780,16 @@ pub(crate) unsafe fn xml_parse_start_tag(ctxt: XmlParserCtxtPtr) -> *const XmlCh
             && xml_is_char((*ctxt).current_byte() as u32)
             && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
         {
-            attname = xml_parse_attribute(ctxt, addr_of_mut!(attvalue));
-            if attname.is_null() {
+            let Some(attname) = xml_parse_attribute(ctxt, addr_of_mut!(attvalue)) else {
                 xml_fatal_err_msg(
                     ctxt,
                     XmlParserErrors::XmlErrInternalError,
                     "xmlParseStartTag: problem parsing attributes\n",
                 );
                 break;
-            }
+            };
 
             'failed: {
-                let attname = CStr::from_ptr(attname as *const i8)
-                    .to_string_lossy()
-                    .into_owned();
                 if !attvalue.is_null() {
                     // [ WFC: Unique Att Spec ]
                     // No attribute name may appear more than once in the same
@@ -2849,7 +2838,6 @@ pub(crate) unsafe fn xml_parse_start_tag(ctxt: XmlParserCtxtPtr) -> *const XmlCh
             if let Some(start_element) =
                 (*ctxt).sax.as_deref_mut().and_then(|sax| sax.start_element)
             {
-                let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                 if !atts.is_empty() {
                     start_element((*ctxt).user_data.clone(), &name, atts.as_slice());
                 } else {
@@ -2858,7 +2846,7 @@ pub(crate) unsafe fn xml_parse_start_tag(ctxt: XmlParserCtxtPtr) -> *const XmlCh
             }
         }
 
-        name
+        Some(name)
     }
 }
 
@@ -2927,8 +2915,10 @@ pub(crate) unsafe fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) -> i32 {
             if (*ctxt).sax2 != 0 {
                 name =
                     xml_parse_start_tag2(ctxt, addr_of_mut!(prefix), &mut uri, addr_of_mut!(tlen));
+            } else if let Some(n) = xml_parse_start_tag(ctxt) {
+                name = xml_dict_lookup((*ctxt).dict, n.as_ptr(), n.len() as i32);
             } else {
-                name = xml_parse_start_tag(ctxt);
+                name = null_mut();
             }
         }
         #[cfg(not(feature = "sax1"))]

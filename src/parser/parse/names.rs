@@ -44,6 +44,7 @@ pub(crate) unsafe fn parse_nmtoken(ctxt: &mut XmlParserCtxt) -> Option<String> {
     }
 }
 
+#[doc(alias = "xmlParseNCNameComplex")]
 pub(crate) unsafe fn parse_ncname_complex(ctxt: &mut XmlParserCtxt) -> Option<String> {
     unsafe {
         let max_length = if ctxt.options & XmlParserOption::XmlParseHuge as i32 != 0 {
@@ -120,6 +121,7 @@ pub(crate) unsafe fn parse_ncname(ctxt: &mut XmlParserCtxt) -> Option<String> {
     }
 }
 
+#[doc(alias = "xmlParseNameComplex")]
 unsafe fn parse_name_complex(ctxt: &mut XmlParserCtxt) -> Option<String> {
     unsafe {
         let max_length = if ctxt.options & XmlParserOption::XmlParseHuge as i32 != 0 {
