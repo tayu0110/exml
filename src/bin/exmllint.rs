@@ -82,7 +82,7 @@ use exml::{
         xmlstring::XmlChar,
     },
     parser::{
-        XmlParserCtxtPtr, XmlParserInput, XmlParserInputPtr, xml_ctxt_read_file, xml_ctxt_read_io,
+        XmlParserCtxtPtr, XmlParserInput, xml_ctxt_read_file, xml_ctxt_read_io,
         xml_ctxt_read_memory, xml_free_parser_ctxt, xml_new_parser_ctxt, xml_new_sax_parser_ctxt,
         xml_read_file, xml_read_io, xml_read_memory,
     },
@@ -804,7 +804,6 @@ unsafe fn xmllint_external_entity_loader(
     ctxt: XmlParserCtxtPtr,
 ) -> Option<XmlParserInput> {
     unsafe {
-        let mut ret: XmlParserInputPtr;
         let mut warning: Option<GenericError> = None;
         let mut err: Option<GenericError> = None;
         let paths = PATHS.lock().unwrap();
@@ -981,116 +980,116 @@ unsafe fn xml_htmlencode_send() {
     }
 }
 
-/// Displays the associated file and line information for the current input
-#[doc(alias = "xmlHTMLPrintFileInfo")]
-unsafe fn xml_htmlprint_file_info(input: XmlParserInputPtr) {
-    unsafe {
-        generic_error!("<p>");
+// /// Displays the associated file and line information for the current input
+// #[doc(alias = "xmlHTMLPrintFileInfo")]
+// unsafe fn xml_htmlprint_file_info(input: XmlParserInputPtr) {
+//     unsafe {
+//         generic_error!("<p>");
 
-        BUFFER.with_borrow_mut(|buffer| {
-            let len = strlen(buffer.as_ptr());
-            if !input.is_null() {
-                if (*input).filename.is_some() {
-                    let filename = CString::new((*input).filename.as_deref().unwrap()).unwrap();
-                    snprintf(
-                        addr_of_mut!(buffer[len]) as _,
-                        buffer.len() - len,
-                        c"%s:%d: ".as_ptr(),
-                        filename.as_ptr(),
-                        (*input).line,
-                    );
-                } else {
-                    snprintf(
-                        addr_of_mut!(buffer[len]) as _,
-                        buffer.len() - len,
-                        c"Entity: line %d: ".as_ptr(),
-                        (*input).line,
-                    );
-                }
-            }
-            xml_htmlencode_send();
-        });
-    }
-}
+//         BUFFER.with_borrow_mut(|buffer| {
+//             let len = strlen(buffer.as_ptr());
+//             if !input.is_null() {
+//                 if (*input).filename.is_some() {
+//                     let filename = CString::new((*input).filename.as_deref().unwrap()).unwrap();
+//                     snprintf(
+//                         addr_of_mut!(buffer[len]) as _,
+//                         buffer.len() - len,
+//                         c"%s:%d: ".as_ptr(),
+//                         filename.as_ptr(),
+//                         (*input).line,
+//                     );
+//                 } else {
+//                     snprintf(
+//                         addr_of_mut!(buffer[len]) as _,
+//                         buffer.len() - len,
+//                         c"Entity: line %d: ".as_ptr(),
+//                         (*input).line,
+//                     );
+//                 }
+//             }
+//             xml_htmlencode_send();
+//         });
+//     }
+// }
 
-/// Displays current context within the input content for error tracking
-#[doc(alias = "xmlHTMLPrintFileContext")]
-unsafe fn xml_htmlprint_file_context(input: XmlParserInputPtr) {
-    unsafe {
-        let mut cur: *const XmlChar;
-        let mut base: *const XmlChar;
-        let mut n: i32;
+// /// Displays current context within the input content for error tracking
+// #[doc(alias = "xmlHTMLPrintFileContext")]
+// unsafe fn xml_htmlprint_file_context(input: XmlParserInputPtr) {
+//     unsafe {
+//         let mut cur: *const XmlChar;
+//         let mut base: *const XmlChar;
+//         let mut n: i32;
 
-        if input.is_null() {
-            return;
-        }
-        generic_error!("<pre>\n");
-        cur = (*input).cur;
-        base = (*input).base;
-        while cur > base && (*cur == b'\n' || *cur == b'\r') {
-            cur = cur.sub(1);
-        }
-        n = 0;
-        while {
-            n += 1;
-            n - 1 < 80
-        } && cur > base
-            && *cur != b'\n'
-            && *cur != b'\r'
-        {
-            cur = cur.sub(1);
-        }
-        if *cur == b'\n' || *cur == b'\r' {
-            cur = cur.add(1);
-        }
-        base = cur;
-        n = 0;
-        BUFFER.with_borrow_mut(|buffer| {
-            while *cur != 0 && *cur != b'\n' && *cur != b'\r' && n < 79 {
-                let len = strlen(buffer.as_ptr());
-                snprintf(
-                    addr_of_mut!(buffer[len]) as _,
-                    buffer.len() - len,
-                    c"%c".as_ptr(),
-                    *cur as i32,
-                );
-                cur = cur.add(1);
-                n += 1;
-            }
-            let len = strlen(buffer.as_ptr());
-            snprintf(
-                addr_of_mut!(buffer[len]) as _,
-                buffer.len() - len,
-                c"\n".as_ptr(),
-            );
-            cur = (*input).cur;
-            while cur > base && (*cur == b'\n' || *cur == b'\r') {
-                cur = cur.sub(1);
-            }
-            n = 0;
-            while cur != base && {
-                n += 1;
-                n - 1 < 80
-            } {
-                let len = strlen(buffer.as_ptr());
-                snprintf(
-                    addr_of_mut!(buffer[len]) as _,
-                    buffer.len() - len,
-                    c" ".as_ptr(),
-                );
-                base = base.add(1);
-            }
-            let len = strlen(buffer.as_ptr());
-            snprintf(
-                addr_of_mut!(buffer[len]) as _,
-                buffer.len() - len,
-                c"^\n".as_ptr(),
-            );
-            xml_htmlencode_send();
-        });
-        generic_error!("</pre>");
-    }
-}
+//         if input.is_null() {
+//             return;
+//         }
+//         generic_error!("<pre>\n");
+//         cur = (*input).cur;
+//         base = (*input).base;
+//         while cur > base && (*cur == b'\n' || *cur == b'\r') {
+//             cur = cur.sub(1);
+//         }
+//         n = 0;
+//         while {
+//             n += 1;
+//             n - 1 < 80
+//         } && cur > base
+//             && *cur != b'\n'
+//             && *cur != b'\r'
+//         {
+//             cur = cur.sub(1);
+//         }
+//         if *cur == b'\n' || *cur == b'\r' {
+//             cur = cur.add(1);
+//         }
+//         base = cur;
+//         n = 0;
+//         BUFFER.with_borrow_mut(|buffer| {
+//             while *cur != 0 && *cur != b'\n' && *cur != b'\r' && n < 79 {
+//                 let len = strlen(buffer.as_ptr());
+//                 snprintf(
+//                     addr_of_mut!(buffer[len]) as _,
+//                     buffer.len() - len,
+//                     c"%c".as_ptr(),
+//                     *cur as i32,
+//                 );
+//                 cur = cur.add(1);
+//                 n += 1;
+//             }
+//             let len = strlen(buffer.as_ptr());
+//             snprintf(
+//                 addr_of_mut!(buffer[len]) as _,
+//                 buffer.len() - len,
+//                 c"\n".as_ptr(),
+//             );
+//             cur = (*input).cur;
+//             while cur > base && (*cur == b'\n' || *cur == b'\r') {
+//                 cur = cur.sub(1);
+//             }
+//             n = 0;
+//             while cur != base && {
+//                 n += 1;
+//                 n - 1 < 80
+//             } {
+//                 let len = strlen(buffer.as_ptr());
+//                 snprintf(
+//                     addr_of_mut!(buffer[len]) as _,
+//                     buffer.len() - len,
+//                     c" ".as_ptr(),
+//                 );
+//                 base = base.add(1);
+//             }
+//             let len = strlen(buffer.as_ptr());
+//             snprintf(
+//                 addr_of_mut!(buffer[len]) as _,
+//                 buffer.len() - len,
+//                 c"^\n".as_ptr(),
+//             );
+//             xml_htmlencode_send();
+//         });
+//         generic_error!("</pre>");
+//     }
+// }
 
 /// Display and format an error messages, gives file, line, position and
 /// extra parameters.

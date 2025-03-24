@@ -30,8 +30,7 @@ use crate::{
         xmlstring::XmlChar,
     },
     parser::{
-        XmlParserCtxtPtr, XmlParserInputPtr, xml_create_memory_parser_ctxt, xml_free_parser_ctxt,
-        xml_new_parser_ctxt,
+        XmlParserCtxtPtr, xml_create_memory_parser_ctxt, xml_free_parser_ctxt, xml_new_parser_ctxt,
     },
     tree::{XmlAttr, XmlAttributeType, XmlDoc, XmlDtd, XmlElementContentPtr, XmlNode, XmlNs},
     xpath::{
@@ -625,12 +624,6 @@ pub(crate) unsafe fn des_xml_parser_ctxt_ptr(_no: i32, val: XmlParserCtxtPtr, _n
         }
     }
 }
-
-pub(crate) fn gen_xml_parser_input_ptr(_no: i32, _nr: i32) -> XmlParserInputPtr {
-    null_mut()
-}
-
-pub(crate) fn des_xml_parser_input_ptr(_no: i32, _val: XmlParserInputPtr, _nr: i32) {}
 
 pub(crate) fn desret_unsigned_long(_val: u64) {}
 

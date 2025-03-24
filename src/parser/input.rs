@@ -67,7 +67,6 @@ use crate::{
 
 use super::{XmlParserCtxt, XmlParserCtxtPtr, xml_err_memory};
 
-pub type XmlParserInputPtr = *mut XmlParserInput;
 /// An xmlParserInput is an input flow for the XML processor.
 /// Each entity parsed is associated an xmlParserInput (except the
 /// few predefined ones). This is the case both for internal entities

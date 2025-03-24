@@ -55,8 +55,7 @@ use crate::{
 };
 
 use super::{
-    XmlParserInput, XmlParserInputPtr, XmlParserNodeInfo, XmlParserNodeInfoSeq, xml_err_memory,
-    xml_fatal_err,
+    XmlParserInput, XmlParserNodeInfo, XmlParserNodeInfoSeq, xml_err_memory, xml_fatal_err,
 };
 
 /// The parser context.
@@ -164,7 +163,7 @@ pub struct XmlParserCtxt {
     // to prevent entity substitution loops
     pub(crate) depth: i32,
     // used to check entities boundaries
-    pub(crate) entity: XmlParserInputPtr,
+    // pub(crate) entity: XmlParserInputPtr,
     // encoding of the in-memory content
     // actually an xmlCharEncoding
     pub charset: XmlCharEncoding,
@@ -1667,7 +1666,7 @@ impl Default for XmlParserCtxt {
             ext_sub_system: None,
             space_tab: vec![],
             depth: 0,
-            entity: null_mut(),
+            // entity: null_mut(),
             charset: XmlCharEncoding::None,
             nodelen: 0,
             nodemem: 0,
