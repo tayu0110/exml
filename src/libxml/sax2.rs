@@ -1343,7 +1343,7 @@ unsafe fn xml_sax2_attribute_internal(
     value: Option<&str>,
     prefix: Option<&str>,
 ) {
-    use crate::uri::XmlURI;
+    use crate::{parser::string_decode_entities, uri::XmlURI};
 
     unsafe {
         use super::htmltree::html_is_boolean_attr;
@@ -1527,7 +1527,7 @@ unsafe fn xml_sax2_attribute_internal(
                     name
                 );
             }
-            if (*ctxt).pedantic != 0 && (*val.add(0) != 0) {
+            if (*ctxt).pedantic != 0 && *val.add(0) != 0 {
                 if let Some(uri) =
                     XmlURI::parse(&CStr::from_ptr(val as *const i8).to_string_lossy())
                 {
@@ -1659,21 +1659,18 @@ unsafe fn xml_sax2_attribute_internal(
                 // If we don't substitute entities, the validation should be
                 // done on a value with replaced entities anyway.
                 if (*ctxt).replace_entities == 0 {
-                    let mut val: *mut XmlChar;
-
                     (*ctxt).depth += 1;
-                    val = xml_string_decode_entities(ctxt, value, XML_SUBSTITUTE_REF as _, 0, 0, 0);
+                    let val = string_decode_entities(
+                        &mut *ctxt,
+                        &CStr::from_ptr(value as *const i8).to_string_lossy(),
+                        XML_SUBSTITUTE_REF as i32,
+                        '\0',
+                        '\0',
+                        '\0',
+                    );
                     (*ctxt).depth -= 1;
 
-                    if val.is_null() {
-                        (*ctxt).valid &= xml_validate_one_attribute(
-                            &raw mut (*ctxt).vctxt,
-                            my_doc,
-                            (*ctxt).node.unwrap(),
-                            Some(ret),
-                            &CStr::from_ptr(value as *const i8).to_string_lossy(),
-                        );
-                    } else {
+                    if let Some(mut val) = val {
                         // Do the last stage of the attribute normalization
                         // It need to be done twice ... it's an extra burden related
                         // to the ability to keep xmlSAX2References in attributes
@@ -1681,11 +1678,9 @@ unsafe fn xml_sax2_attribute_internal(
                             my_doc,
                             (*ctxt).node.unwrap(),
                             fullname,
-                            CStr::from_ptr(val as *const i8).to_string_lossy().as_ref(),
+                            &val,
                         ) {
-                            let new = xml_strndup(nvalnorm.as_ptr(), nvalnorm.len() as i32);
-                            xml_free(val as _);
-                            val = new;
+                            val = nvalnorm.into_owned();
                         }
 
                         (*ctxt).valid &= xml_validate_one_attribute(
@@ -1693,9 +1688,16 @@ unsafe fn xml_sax2_attribute_internal(
                             my_doc,
                             (*ctxt).node.unwrap(),
                             Some(ret),
-                            &CStr::from_ptr(val as *const i8).to_string_lossy(),
+                            &val,
                         );
-                        xml_free(val as _);
+                    } else {
+                        (*ctxt).valid &= xml_validate_one_attribute(
+                            &raw mut (*ctxt).vctxt,
+                            my_doc,
+                            (*ctxt).node.unwrap(),
+                            Some(ret),
+                            &CStr::from_ptr(value as *const i8).to_string_lossy(),
+                        );
                     }
                 } else {
                     (*ctxt).valid &= xml_validate_one_attribute(

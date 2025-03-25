@@ -296,6 +296,209 @@ pub(crate) unsafe fn xml_string_current_char(
     }
 }
 
+/// Checks that the value conforms to the LanguageID production:
+///
+/// # Note
+/// This is somewhat deprecated, those productions were removed from the XML Second edition.
+///
+/// ```text
+/// [33] LanguageID ::= Langcode ('-' Subcode)*
+/// [34] Langcode ::= ISO639Code |  IanaCode |  UserCode
+/// [35] ISO639Code ::= ([a-z] | [A-Z]) ([a-z] | [A-Z])
+/// [36] IanaCode ::= ('i' | 'I') '-' ([a-z] | [A-Z])+
+/// [37] UserCode ::= ('x' | 'X') '-' ([a-z] | [A-Z])+
+/// [38] Subcode ::= ([a-z] | [A-Z])+
+/// ```
+///
+/// The current REC reference the successors of RFC 1766, currently 5646
+///
+/// http://www.rfc-editor.org/rfc/rfc5646.txt
+/// ```text
+/// langtag       = language
+///                 ["-" script]
+///                 ["-" region]
+///                 *("-" variant)
+///                 *("-" extension)
+///                 ["-" privateuse]
+/// language      = 2*3ALPHA            ; shortest ISO 639 code
+///                 ["-" extlang]       ; sometimes followed by
+///                                     ; extended language subtags
+///               / 4ALPHA              ; or reserved for future use
+///               / 5*8ALPHA            ; or registered language subtag
+///
+/// extlang       = 3ALPHA              ; selected ISO 639 codes
+///                 *2("-" 3ALPHA)      ; permanently reserved
+///
+/// script        = 4ALPHA              ; ISO 15924 code
+///
+/// region        = 2ALPHA              ; ISO 3166-1 code
+///               / 3DIGIT              ; UN M.49 code
+///
+/// variant       = 5*8alphanum         ; registered variants
+///               / (DIGIT 3alphanum)
+///
+/// extension     = singleton 1*("-" (2*8alphanum))
+///                                     ; Single alphanumerics
+///                                     ; "x" reserved for private use
+/// singleton     = DIGIT               ; 0 - 9
+///               / %x41-57             ; A - W
+///               / %x59-5A             ; Y - Z
+///               / %x61-77             ; a - w
+///               / %x79-7A             ; y - z
+/// ```
+///
+/// it sounds right to still allow Irregular i-xxx IANA and user codes too
+/// The parser below doesn't try to cope with extension or privateuse
+/// that could be added but that's not interoperable anyway
+///
+/// Returns 1 if correct 0 otherwise
+#[doc(alias = "xmlCheckLanguageID")]
+pub(crate) fn check_language_id(lang: &str) -> bool {
+    let mut cur = lang;
+
+    if cur.starts_with("i-")
+        || cur.starts_with("I-")
+        || cur.starts_with("x-")
+        || cur.starts_with("X-")
+    {
+        // Still allow IANA code and user code which were coming
+        // from the previous version of the XML-1.0 specification
+        // it's deprecated but we should not fail
+        cur = &cur[2..];
+        cur = cur.trim_start_matches(|c: char| c.is_ascii_alphabetic());
+        return cur.is_empty();
+    }
+    let nxt = cur.trim_start_matches(|c: char| c.is_ascii_alphabetic());
+    if cur.len() - nxt.len() >= 4 {
+        // Reserved
+        return cur.len() - nxt.len() <= 8 && nxt.is_empty();
+    }
+    if cur.len() - nxt.len() < 2 {
+        return false;
+    }
+    // we got an ISO 639 code
+    if nxt.is_empty() {
+        return true;
+    }
+    let Some(mut nxt) = nxt.strip_prefix('-') else {
+        return false;
+    };
+
+    cur = nxt;
+    'region_m49: {
+        // now we can have extlang or script or region or variant
+        if nxt.starts_with(|c: char| c.is_ascii_digit()) {
+            break 'region_m49;
+        }
+        nxt = nxt.trim_start_matches(|c: char| c.is_ascii_alphabetic());
+        'variant: {
+            'region: {
+                'script: {
+                    match cur.len() - nxt.len() {
+                        4 => break 'script,
+                        2 => break 'region,
+                        5..=8 => break 'variant,
+                        3 => {}
+                        _ => return false,
+                    }
+                    // we parsed an extlang
+                    if nxt.is_empty() {
+                        return true;
+                    }
+                    let Some(rem) = nxt.strip_prefix('-') else {
+                        return false;
+                    };
+                    nxt = rem;
+                    cur = nxt;
+
+                    // now we can have script or region or variant
+                    if nxt.starts_with(|c: char| c.is_ascii_digit()) {
+                        break 'region_m49;
+                    }
+
+                    nxt = nxt.trim_start_matches(|c: char| c.is_ascii_alphabetic());
+                    match cur.len() - nxt.len() {
+                        2 => break 'region,
+                        5..=8 => break 'variant,
+                        4 => {}
+                        _ => return false,
+                    }
+                    // we parsed a script
+                }
+                if nxt.is_empty() {
+                    return true;
+                }
+                let Some(rem) = nxt.strip_prefix('-') else {
+                    return false;
+                };
+                nxt = rem;
+                cur = nxt;
+                // now we can have region or variant
+                if nxt.starts_with(|c: char| c.is_ascii_digit()) {
+                    break 'region_m49;
+                }
+                nxt = nxt.trim_start_matches(|c: char| c.is_ascii_alphabetic());
+
+                match cur.len() - nxt.len() {
+                    5..=8 => break 'variant,
+                    2 => {}
+                    _ => return false,
+                }
+                // we parsed a region
+            }
+            //  region:
+            if nxt.is_empty() {
+                return true;
+            }
+            let Some(rem) = nxt.strip_prefix('-') else {
+                return false;
+            };
+            nxt = rem;
+            cur = nxt;
+
+            // now we can just have a variant
+            nxt = nxt.trim_start_matches(|c: char| c.is_ascii_alphabetic());
+            match cur.len() - nxt.len() {
+                5..=8 => {}
+                _ => return false,
+            }
+        }
+
+        // we parsed a variant
+        //  variant:
+        // extensions and private use subtags not checked
+        return nxt.is_empty() || nxt.starts_with('-');
+    }
+
+    //  region_m49:
+    if nxt.len() >= 3 && nxt.as_bytes()[1].is_ascii_digit() && nxt.as_bytes()[2].is_ascii_digit() {
+        nxt = &nxt[3..];
+        // goto region;
+        if nxt.is_empty() {
+            return true;
+        }
+        let Some(rem) = nxt.strip_prefix('-') else {
+            return false;
+        };
+        nxt = rem;
+        cur = nxt;
+
+        // now we can just have a variant
+        nxt = nxt.trim_start_matches(|c: char| c.is_ascii_alphabetic());
+
+        match cur.len() - nxt.len() {
+            5..=8 => {}
+            _ => return false,
+        }
+
+        // we parsed a variant
+        //  variant:
+        // extensions and private use subtags not checked
+        return nxt.is_empty() || nxt.starts_with('-');
+    }
+    false
+}
+
 /// Parse an XML in-memory document and build a tree.
 ///
 /// Returns the resulting document tree

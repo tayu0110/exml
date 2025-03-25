@@ -53,7 +53,7 @@ use crate::{
             xml_parse_element_children_content_decl_priv, xml_parse_end_tag1, xml_parse_end_tag2,
             xml_parse_external_entity_private, xml_parse_external_id, xml_parse_markup_decl,
             xml_parse_start_tag2, xml_parse_string_name, xml_parser_add_node_info,
-            xml_parser_entity_check, xml_parser_find_node_info, xml_string_decode_entities_int,
+            xml_parser_find_node_info, xml_string_decode_entities_int,
         },
         sax2::xml_sax2_get_entity,
         valid::{
@@ -64,9 +64,9 @@ use crate::{
     },
     parser::{
         __xml_err_encoding, XmlParserCharValid, XmlParserCtxtPtr, XmlParserInput,
-        XmlParserNodeInfo, split_qname2, xml_err_encoding_int, xml_err_memory, xml_err_msg_str,
-        xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_int, xml_fatal_err_msg_str,
-        xml_fatal_err_msg_str_int_str, xml_validity_error, xml_warning_msg,
+        XmlParserNodeInfo, parser_entity_check, split_qname2, xml_err_encoding_int, xml_err_memory,
+        xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_int,
+        xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str, xml_validity_error, xml_warning_msg,
     },
     tree::{
         NodeCommon, XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
@@ -2074,7 +2074,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 xml_free_node_list(list);
                 return;
             }
-            if xml_parser_entity_check(ctxt, oldsizeentcopy) != 0 {
+            if parser_entity_check(&mut *ctxt, oldsizeentcopy) != 0 {
                 xml_free_node_list(list);
                 return;
             }
@@ -2206,7 +2206,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                     xml_fatal_err(ctxt, XmlParserErrors::XmlErrEntityLoop, None);
                     return;
                 }
-                if xml_parser_entity_check(ctxt, 0) != 0 {
+                if parser_entity_check(&mut *ctxt, 0) != 0 {
                     return;
                 }
             }
@@ -2222,7 +2222,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
 
         // We also check for amplification if entities aren't substituted.
         // They might be expanded later.
-        if was_checked != 0 && xml_parser_entity_check(ctxt, ent.expanded_size) != 0 {
+        if was_checked != 0 && parser_entity_check(&mut *ctxt, ent.expanded_size) != 0 {
             return;
         }
 
@@ -2661,6 +2661,8 @@ pub(crate) unsafe fn xml_parse_attribute(
     ctxt: XmlParserCtxtPtr,
     value: *mut *mut XmlChar,
 ) -> Option<String> {
+    use crate::parser::check_language_id;
+
     unsafe {
         let val: *mut XmlChar;
 
@@ -2695,7 +2697,10 @@ pub(crate) unsafe fn xml_parse_attribute(
         // Check that xml:lang conforms to the specification
         // No more registered as an error, just generate a warning now
         // since this was deprecated in XML second edition
-        if (*ctxt).pedantic != 0 && name == "xml:lang" && xml_check_language_id(val) == 0 {
+        if (*ctxt).pedantic != 0
+            && name == "xml:lang"
+            && !check_language_id(&CStr::from_ptr(val as *const i8).to_string_lossy())
+        {
             let val = CStr::from_ptr(val as *const i8).to_string_lossy();
             xml_warning_msg!(
                 ctxt,
@@ -3542,271 +3547,6 @@ pub(crate) unsafe fn xml_string_current_char(
 //     }
 // }
 
-/// Checks that the value conforms to the LanguageID production:
-///
-/// # Note
-/// This is somewhat deprecated, those productions were removed from the XML Second edition.
-///
-/// ```text
-/// [33] LanguageID ::= Langcode ('-' Subcode)*
-/// [34] Langcode ::= ISO639Code |  IanaCode |  UserCode
-/// [35] ISO639Code ::= ([a-z] | [A-Z]) ([a-z] | [A-Z])
-/// [36] IanaCode ::= ('i' | 'I') '-' ([a-z] | [A-Z])+
-/// [37] UserCode ::= ('x' | 'X') '-' ([a-z] | [A-Z])+
-/// [38] Subcode ::= ([a-z] | [A-Z])+
-/// ```
-///
-/// The current REC reference the successors of RFC 1766, currently 5646
-///
-/// http://www.rfc-editor.org/rfc/rfc5646.txt
-/// ```text
-/// langtag       = language
-///                 ["-" script]
-///                 ["-" region]
-///                 *("-" variant)
-///                 *("-" extension)
-///                 ["-" privateuse]
-/// language      = 2*3ALPHA            ; shortest ISO 639 code
-///                 ["-" extlang]       ; sometimes followed by
-///                                     ; extended language subtags
-///               / 4ALPHA              ; or reserved for future use
-///               / 5*8ALPHA            ; or registered language subtag
-///
-/// extlang       = 3ALPHA              ; selected ISO 639 codes
-///                 *2("-" 3ALPHA)      ; permanently reserved
-///
-/// script        = 4ALPHA              ; ISO 15924 code
-///
-/// region        = 2ALPHA              ; ISO 3166-1 code
-///               / 3DIGIT              ; UN M.49 code
-///
-/// variant       = 5*8alphanum         ; registered variants
-///               / (DIGIT 3alphanum)
-///
-/// extension     = singleton 1*("-" (2*8alphanum))
-///                                     ; Single alphanumerics
-///                                     ; "x" reserved for private use
-/// singleton     = DIGIT               ; 0 - 9
-///               / %x41-57             ; A - W
-///               / %x59-5A             ; Y - Z
-///               / %x61-77             ; a - w
-///               / %x79-7A             ; y - z
-/// ```
-///
-/// it sounds right to still allow Irregular i-xxx IANA and user codes too
-/// The parser below doesn't try to cope with extension or privateuse
-/// that could be added but that's not interoperable anyway
-///
-/// Returns 1 if correct 0 otherwise
-#[doc(alias = "xmlCheckLanguageID")]
-pub(crate) unsafe fn xml_check_language_id(lang: *const XmlChar) -> i32 {
-    unsafe {
-        let mut cur: *const XmlChar = lang;
-        let mut nxt: *const XmlChar;
-
-        if cur.is_null() {
-            return 0;
-        }
-        if (*cur.add(0) == b'i' && *cur.add(1) == b'-')
-            || (*cur.add(0) == b'I' && *cur.add(1) == b'-')
-            || (*cur.add(0) == b'x' && *cur.add(1) == b'-')
-            || (*cur.add(0) == b'X' && *cur.add(1) == b'-')
-        {
-            // Still allow IANA code and user code which were coming
-            // from the previous version of the XML-1.0 specification
-            // it's deprecated but we should not fail
-            cur = cur.add(2);
-            while (*cur.add(0) >= b'A' && *cur.add(0) <= b'Z')
-                || (*cur.add(0) >= b'a' && *cur.add(0) <= b'z')
-            {
-                cur = cur.add(1);
-            }
-            return (*cur.add(0) == 0) as i32;
-        }
-        nxt = cur;
-        while (*nxt.add(0) >= b'A' && *nxt.add(0) <= b'Z')
-            || (*nxt.add(0) >= b'a' && *nxt.add(0) <= b'z')
-        {
-            nxt = nxt.add(1);
-        }
-        if nxt.offset_from(cur) >= 4 {
-            // Reserved
-            if nxt.offset_from(cur) > 8 || *nxt.add(0) != 0 {
-                return 0;
-            }
-            return 1;
-        }
-        if nxt.offset_from(cur) < 2 {
-            return 0;
-        }
-        // we got an ISO 639 code
-        if *nxt.add(0) == 0 {
-            return 1;
-        }
-        if *nxt.add(0) != b'-' {
-            return 0;
-        }
-
-        nxt = nxt.add(1);
-        cur = nxt;
-        'region_m49: {
-            // now we can have extlang or script or region or variant
-            if *nxt.add(0) >= b'0' && *nxt.add(0) <= b'9' {
-                break 'region_m49;
-            }
-            while (*nxt.add(0) >= b'A' && *nxt.add(0) <= b'Z')
-                || (*nxt.add(0) >= b'a' && *nxt.add(0) <= b'z')
-            {
-                nxt = nxt.add(1);
-            }
-            'variant: {
-                'region: {
-                    'script: {
-                        if nxt.offset_from(cur) == 4 {
-                            break 'script;
-                        }
-                        if nxt.offset_from(cur) == 2 {
-                            break 'region;
-                        }
-                        if nxt.offset_from(cur) >= 5 && nxt.offset_from(cur) <= 8 {
-                            break 'variant;
-                        }
-                        if nxt.offset_from(cur) != 3 {
-                            return 0;
-                        }
-                        // we parsed an extlang
-                        if *nxt.add(0) == 0 {
-                            return 1;
-                        }
-                        if *nxt.add(0) != b'-' {
-                            return 0;
-                        }
-                        nxt = nxt.add(1);
-                        cur = nxt;
-
-                        // now we can have script or region or variant
-                        if *nxt.add(0) >= b'0' && *nxt.add(0) <= b'9' {
-                            break 'region_m49;
-                        }
-
-                        while (*nxt.add(0) >= b'A' && *nxt.add(0) <= b'Z')
-                            || (*nxt.add(0) >= b'a' && *nxt.add(0) <= b'z')
-                        {
-                            nxt = nxt.add(1);
-                        }
-                        if nxt.offset_from(cur) == 2 {
-                            break 'region;
-                        }
-                        if nxt.offset_from(cur) >= 5 && nxt.offset_from(cur) <= 8 {
-                            break 'variant;
-                        }
-                        if nxt.offset_from(cur) != 4 {
-                            return 0;
-                        }
-                        // we parsed a script
-                    }
-                    if *nxt.add(0) == 0 {
-                        return 1;
-                    }
-                    if *nxt.add(0) != b'-' {
-                        return 0;
-                    }
-
-                    nxt = nxt.add(1);
-                    cur = nxt;
-                    // now we can have region or variant
-                    if *nxt.add(0) >= b'0' && *nxt.add(0) <= b'9' {
-                        break 'region_m49;
-                    }
-                    while (*nxt.add(0) >= b'A' && *nxt.add(0) <= b'Z')
-                        || (*nxt.add(0) >= b'a' && *nxt.add(0) <= b'z')
-                    {
-                        nxt = nxt.add(1);
-                    }
-
-                    if nxt.offset_from(cur) >= 5 && nxt.offset_from(cur) <= 8 {
-                        break 'variant;
-                    }
-                    if nxt.offset_from(cur) != 2 {
-                        return 0;
-                    }
-                    // we parsed a region
-                }
-                //  region:
-                if *nxt.add(0) == 0 {
-                    return 1;
-                }
-                if *nxt.add(0) != b'-' {
-                    return 0;
-                }
-
-                nxt = nxt.add(1);
-                cur = nxt;
-                // now we can just have a variant
-                while (*nxt.add(0) >= b'A' && *nxt.add(0) <= b'Z')
-                    || (*nxt.add(0) >= b'a' && *nxt.add(0) <= b'z')
-                {
-                    nxt = nxt.add(1);
-                }
-
-                if nxt.offset_from(cur) < 5 || nxt.offset_from(cur) > 8 {
-                    return 0;
-                }
-            }
-
-            // we parsed a variant
-            //  variant:
-            if *nxt.add(0) == 0 {
-                return 1;
-            }
-            if *nxt.add(0) != b'-' {
-                return 0;
-            }
-            // extensions and private use subtags not checked
-            return 1;
-        }
-
-        //  region_m49:
-        if (*nxt.add(1) >= b'0' && *nxt.add(1) <= b'9')
-            && (*nxt.add(2) >= b'0' && *nxt.add(2) <= b'9')
-        {
-            nxt = nxt.add(3);
-            // goto region;
-            if *nxt.add(0) == 0 {
-                return 1;
-            }
-            if *nxt.add(0) != b'-' {
-                return 0;
-            }
-
-            nxt = nxt.add(1);
-            cur = nxt;
-            // now we can just have a variant
-            while (*nxt.add(0) >= b'A' && *nxt.add(0) <= b'Z')
-                || (*nxt.add(0) >= b'a' && *nxt.add(0) <= b'z')
-            {
-                nxt = nxt.add(1);
-            }
-
-            if nxt.offset_from(cur) < 5 || nxt.offset_from(cur) > 8 {
-                return 0;
-            }
-
-            // we parsed a variant
-            //  variant:
-            if *nxt.add(0) == 0 {
-                return 1;
-            }
-            if *nxt.add(0) != b'-' {
-                return 0;
-            }
-            // extensions and private use subtags not checked
-            return 1;
-        }
-        0
-    }
-}
-
 /// Append the char value in the array
 ///
 /// Returns the number of xmlChar written
@@ -3885,35 +3625,6 @@ mod tests {
     use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
-
-    #[test]
-    fn test_xml_check_language_id() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_lang in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                let mem_base = xml_mem_blocks();
-                let lang = gen_const_xml_char_ptr(n_lang, 0);
-
-                let ret_val = xml_check_language_id(lang as *const XmlChar);
-                desret_int(ret_val);
-                des_const_xml_char_ptr(n_lang, lang, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlCheckLanguageID",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlCheckLanguageID()"
-                    );
-                    eprintln!(" {}", n_lang);
-                }
-            }
-        }
-    }
 
     #[test]
     fn test_xml_copy_char() {

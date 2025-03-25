@@ -34,7 +34,7 @@ use crate::{
         parser::{
             XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SAX2_MAGIC, XmlDefAttrsPtr,
             XmlParserInputState, XmlParserMode, XmlParserOption, XmlSAXHandler, XmlStartTag,
-            xml_init_parser, xml_load_external_entity, xml_parse_document, xml_parser_entity_check,
+            xml_init_parser, xml_load_external_entity, xml_parse_document,
         },
         parser_internals::{
             INPUT_CHUNK, LINE_LEN, XML_MAX_DICTIONARY_LIMIT, XML_MAX_LOOKUP_LIMIT,
@@ -55,7 +55,8 @@ use crate::{
 };
 
 use super::{
-    XmlParserInput, XmlParserNodeInfo, XmlParserNodeInfoSeq, xml_err_memory, xml_fatal_err,
+    XmlParserInput, XmlParserNodeInfo, XmlParserNodeInfoSeq, parser_entity_check, xml_err_memory,
+    xml_fatal_err,
 };
 
 /// The parser context.
@@ -775,7 +776,7 @@ impl XmlParserCtxt {
                             self.sizeentities = self.sizeentities.saturating_add(consumed);
                         }
 
-                        xml_parser_entity_check(self, consumed);
+                        parser_entity_check(self, consumed);
 
                         self.pop_input();
                     } else {
