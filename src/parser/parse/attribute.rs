@@ -488,6 +488,40 @@ unsafe fn parse_att_value_complex(ctxt: &mut XmlParserCtxt, normalize: bool) -> 
     }
 }
 
+/// parse a value for an attribute
+/// Note: the parser won't do substitution of entities here, this
+/// will be handled later in xmlStringGetNodeList
+///
+/// `[10] AttValue ::= '"' ([^<&"] | Reference)* '"' | "'" ([^<&'] | Reference)* "'"`
+///
+/// # 3.3.3 Attribute-Value Normalization:
+/// Before the value of an attribute is passed to the application or
+/// checked for validity, the XML processor must normalize it as follows:
+/// - a character reference is processed by appending the referenced
+///   character to the attribute value
+/// - an entity reference is processed by recursively processing the
+///   replacement text of the entity
+/// - a whitespace character (#x20, #xD, #xA, #x9) is processed by
+///   appending #x20 to the normalized value, except that only a single
+///   #x20 is appended for a "#xD#xA" sequence that is part of an external
+///   parsed entity or the literal entity value of an internal parsed entity
+/// - other characters are processed by appending them to the normalized value
+///   If the declared value is not CDATA, then the XML processor must further
+///   process the normalized attribute value by discarding any leading and
+///   trailing space (#x20) characters, and by replacing sequences of space
+///   (#x20) characters by a single space (#x20) character.
+///   All attributes for which no declaration has been read should be treated
+///   by a non-validating parser as if declared CDATA.
+///
+/// Returns the AttValue parsed or NULL. The value has to be freed by the caller.
+#[doc(alias = "xmlParseAttValue")]
+pub(crate) unsafe fn parse_att_value(ctxt: &mut XmlParserCtxt) -> Option<String> {
+    unsafe {
+        ctxt.input()?;
+        parse_att_value_internal(ctxt, false)
+    }
+}
+
 /// Returns (Prefix, LocalPart, AttValue).
 #[doc(alias = "xmlParseAttribute2")]
 pub(crate) unsafe fn parse_attribute2(

@@ -48,25 +48,26 @@ use crate::{
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         parser::{
             XML_SKIP_IDS, XmlDefAttrs, XmlDefAttrsPtr, XmlParserInputState, XmlParserMode,
-            XmlParserOption, xml_parse_att_value_internal, xml_parse_cdsect,
-            xml_parse_char_data_internal, xml_parse_conditional_sections,
-            xml_parse_element_children_content_decl_priv, xml_parse_end_tag1, xml_parse_end_tag2,
-            xml_parse_external_entity_private, xml_parse_external_id, xml_parse_markup_decl,
-            xml_parse_start_tag2, xml_parse_string_name, xml_parser_add_node_info,
-            xml_parser_find_node_info, xml_string_decode_entities_int,
+            XmlParserOption, xml_parse_cdsect, xml_parse_char_data_internal,
+            xml_parse_conditional_sections, xml_parse_element_children_content_decl_priv,
+            xml_parse_end_tag1, xml_parse_end_tag2, xml_parse_external_entity_private,
+            xml_parse_external_id, xml_parse_markup_decl, xml_parse_start_tag2,
+            xml_parse_string_name, xml_parser_add_node_info, xml_parser_find_node_info,
+            xml_string_decode_entities_int,
         },
         sax2::xml_sax2_get_entity,
         valid::{
             xml_free_doc_element_content, xml_new_doc_element_content, xml_validate_element,
             xml_validate_root,
         },
-        xmlstring::{XmlChar, xml_str_equal, xml_strchr, xml_strlen, xml_strndup},
+        xmlstring::{XmlChar, xml_strchr, xml_strlen, xml_strndup},
     },
     parser::{
         __xml_err_encoding, XmlParserCharValid, XmlParserCtxtPtr, XmlParserInput,
-        XmlParserNodeInfo, parser_entity_check, split_qname2, xml_err_encoding_int, xml_err_memory,
-        xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_int,
-        xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str, xml_validity_error, xml_warning_msg,
+        XmlParserNodeInfo, parse_att_value, parser_entity_check, split_qname2,
+        xml_err_encoding_int, xml_err_memory, xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg,
+        xml_fatal_err_msg_int, xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str,
+        xml_validity_error, xml_warning_msg,
     },
     tree::{
         NodeCommon, XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
@@ -660,42 +661,6 @@ pub(crate) unsafe fn xml_parse_entity_value(
     }
 }
 
-/// parse a value for an attribute
-/// Note: the parser won't do substitution of entities here, this
-/// will be handled later in xmlStringGetNodeList
-///
-/// `[10] AttValue ::= '"' ([^<&"] | Reference)* '"' | "'" ([^<&'] | Reference)* "'"`
-///
-/// # 3.3.3 Attribute-Value Normalization:
-/// Before the value of an attribute is passed to the application or
-/// checked for validity, the XML processor must normalize it as follows:
-/// - a character reference is processed by appending the referenced
-///   character to the attribute value
-/// - an entity reference is processed by recursively processing the
-///   replacement text of the entity
-/// - a whitespace character (#x20, #xD, #xA, #x9) is processed by
-///   appending #x20 to the normalized value, except that only a single
-///   #x20 is appended for a "#xD#xA" sequence that is part of an external
-///   parsed entity or the literal entity value of an internal parsed entity
-/// - other characters are processed by appending them to the normalized value
-///   If the declared value is not CDATA, then the XML processor must further
-///   process the normalized attribute value by discarding any leading and
-///   trailing space (#x20) characters, and by replacing sequences of space
-///   (#x20) characters by a single space (#x20) character.
-///   All attributes for which no declaration has been read should be treated
-///   by a non-validating parser as if declared CDATA.
-///
-/// Returns the AttValue parsed or NULL. The value has to be freed by the caller.
-#[doc(alias = "xmlParseAttValue")]
-pub(crate) unsafe fn xml_parse_att_value(ctxt: XmlParserCtxtPtr) -> *mut XmlChar {
-    unsafe {
-        if ctxt.is_null() || (*ctxt).input().is_none() {
-            return null_mut();
-        }
-        xml_parse_att_value_internal(ctxt, null_mut(), null_mut(), 0)
-    }
-}
-
 /// Parse an XML Literal
 ///
 /// `[11] SystemLiteral ::= ('"' [^"]* '"') | ("'" [^']* "'")`
@@ -830,16 +795,16 @@ pub(crate) unsafe fn xml_parse_default_decl(
                 );
             }
         }
-        let ret: *mut XmlChar = xml_parse_att_value(ctxt);
+        let ret = parse_att_value(&mut *ctxt);
         (*ctxt).instate = XmlParserInputState::XmlParserDTD;
-        if ret.is_null() {
+        if let Some(ret) = ret {
+            *value = xml_strndup(ret.as_ptr(), ret.len() as i32);
+        } else {
             xml_fatal_err_msg(
                 ctxt,
                 XmlParserErrors::try_from((*ctxt).err_no).unwrap(),
                 "Attribute default value declaration error\n",
             );
-        } else {
-            *value = ret;
         }
         val
     }
@@ -2664,8 +2629,6 @@ pub(crate) unsafe fn xml_parse_attribute(
     use crate::parser::check_language_id;
 
     unsafe {
-        let val: *mut XmlChar;
-
         *value = null_mut();
         (*ctxt).grow();
         let Some(name) = parse_name(&mut *ctxt) else {
@@ -2679,12 +2642,7 @@ pub(crate) unsafe fn xml_parse_attribute(
 
         // read the value
         (*ctxt).skip_blanks();
-        if (*ctxt).current_byte() == b'=' {
-            (*ctxt).skip_char();
-            (*ctxt).skip_blanks();
-            val = xml_parse_att_value(ctxt);
-            (*ctxt).instate = XmlParserInputState::XmlParserContent;
-        } else {
+        if (*ctxt).current_byte() != b'=' {
             xml_fatal_err_msg_str!(
                 ctxt,
                 XmlParserErrors::XmlErrAttributeWithoutValue,
@@ -2694,14 +2652,15 @@ pub(crate) unsafe fn xml_parse_attribute(
             return Some(name);
         }
 
+        (*ctxt).skip_char();
+        (*ctxt).skip_blanks();
+        let val = parse_att_value(&mut *ctxt).unwrap();
+        (*ctxt).instate = XmlParserInputState::XmlParserContent;
+
         // Check that xml:lang conforms to the specification
         // No more registered as an error, just generate a warning now
         // since this was deprecated in XML second edition
-        if (*ctxt).pedantic != 0
-            && name == "xml:lang"
-            && !check_language_id(&CStr::from_ptr(val as *const i8).to_string_lossy())
-        {
-            let val = CStr::from_ptr(val as *const i8).to_string_lossy();
+        if (*ctxt).pedantic != 0 && name == "xml:lang" && !check_language_id(&val) {
             xml_warning_msg!(
                 ctxt,
                 XmlParserErrors::XmlWarLangValue,
@@ -2712,12 +2671,11 @@ pub(crate) unsafe fn xml_parse_attribute(
 
         // Check that xml:space conforms to the specification
         if name == "xml:space" {
-            if xml_str_equal(val, c"default".as_ptr() as _) {
+            if val == "default" {
                 *(*ctxt).space_mut() = 0;
-            } else if xml_str_equal(val, c"preserve".as_ptr() as _) {
+            } else if val == "preserve" {
                 *(*ctxt).space_mut() = 1;
             } else {
-                let val = CStr::from_ptr(val as *const i8).to_string_lossy();
                 xml_warning_msg!(
                     ctxt,
                     XmlParserErrors::XmlWarSpaceValue,
@@ -2727,7 +2685,7 @@ pub(crate) unsafe fn xml_parse_attribute(
             }
         }
 
-        *value = val;
+        *value = xml_strndup(val.as_ptr(), val.len() as i32);
         Some(name)
     }
 }
