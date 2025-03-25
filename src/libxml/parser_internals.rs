@@ -3267,31 +3267,6 @@ pub(crate) unsafe fn xml_string_decode_entities(
     }
 }
 
-/// Takes a entity string content and process to do the adequate substitutions.
-///
-/// `[67] Reference ::= EntityRef | CharRef`
-///
-/// `[69] PEReference ::= '%' Name ';'`
-///
-/// Returns A newly allocated string with the substitution done. The caller must deallocate it !
-#[doc(alias = "xmlStringLenDecodeEntities")]
-pub(crate) unsafe fn xml_string_len_decode_entities(
-    ctxt: XmlParserCtxtPtr,
-    str: *const XmlChar,
-    len: i32,
-    what: i32,
-    end: XmlChar,
-    end2: XmlChar,
-    end3: XmlChar,
-) -> *mut XmlChar {
-    unsafe {
-        if ctxt.is_null() || str.is_null() || len < 0 {
-            return null_mut();
-        }
-        xml_string_decode_entities_int(ctxt, str, len, what, end, end2, end3, 0)
-    }
-}
-
 /// The current c_char value, if using UTF-8 this may actually span multiple
 /// bytes in the input buffer.
 ///
@@ -3739,70 +3714,6 @@ mod tests {
                                         eprint!(" {}", n_end);
                                         eprint!(" {}", n_end2);
                                         eprintln!(" {}", n_end3);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_string_len_decode_entities() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_PARSER_CTXT_PTR {
-                for n_str in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_len in 0..GEN_NB_INT {
-                        for n_what in 0..GEN_NB_INT {
-                            for n_end in 0..GEN_NB_XML_CHAR {
-                                for n_end2 in 0..GEN_NB_XML_CHAR {
-                                    for n_end3 in 0..GEN_NB_XML_CHAR {
-                                        let mem_base = xml_mem_blocks();
-                                        let ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 0);
-                                        let str = gen_const_xml_char_ptr(n_str, 1);
-                                        let mut len = gen_int(n_len, 2);
-                                        let what = gen_int(n_what, 3);
-                                        let end = gen_xml_char(n_end, 4);
-                                        let end2 = gen_xml_char(n_end2, 5);
-                                        let end3 = gen_xml_char(n_end3, 6);
-                                        if !str.is_null() && len > xml_strlen(str) {
-                                            len = 0;
-                                        }
-
-                                        let ret_val = xml_string_len_decode_entities(
-                                            ctxt, str, len, what, end, end2, end3,
-                                        );
-                                        desret_xml_char_ptr(ret_val);
-                                        des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                                        des_const_xml_char_ptr(n_str, str, 1);
-                                        des_int(n_len, len, 2);
-                                        des_int(n_what, what, 3);
-                                        des_xml_char(n_end, end, 4);
-                                        des_xml_char(n_end2, end2, 5);
-                                        des_xml_char(n_end3, end3, 6);
-                                        reset_last_error();
-                                        if mem_base != xml_mem_blocks() {
-                                            leaks += 1;
-                                            eprint!(
-                                                "Leak of {} blocks found in xmlStringLenDecodeEntities",
-                                                xml_mem_blocks() - mem_base
-                                            );
-                                            assert!(
-                                                leaks == 0,
-                                                "{leaks} Leaks are found in xmlStringLenDecodeEntities()"
-                                            );
-                                            eprint!(" {}", n_ctxt);
-                                            eprint!(" {}", n_str);
-                                            eprint!(" {}", n_len);
-                                            eprint!(" {}", n_what);
-                                            eprint!(" {}", n_end);
-                                            eprint!(" {}", n_end2);
-                                            eprintln!(" {}", n_end3);
-                                        }
                                     }
                                 }
                             }

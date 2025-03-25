@@ -67,7 +67,7 @@ use super::{
     },
     parser_internals::{
         XML_MAX_TEXT_LENGTH, XML_STRING_TEXT, XML_SUBSTITUTE_REF, XML_VCTXT_DTD_VALIDATED,
-        xml_parse_external_subset, xml_string_decode_entities, xml_string_len_decode_entities,
+        xml_parse_external_subset, xml_string_decode_entities,
     },
     valid::{
         xml_add_element_decl, xml_add_id, xml_add_notation_decl, xml_add_ref,
@@ -2397,38 +2397,17 @@ unsafe fn xml_sax2_text_node(ctxt: XmlParserCtxtPtr, s: &str) -> Option<XmlNodeP
 /// Returns the newly allocated string or NULL if not needed or error
 #[doc(alias = "xmlSAX2DecodeAttrEntities")]
 #[cfg(feature = "libxml_valid")]
-unsafe fn xml_sax2_decode_attr_entities(
-    ctxt: XmlParserCtxtPtr,
-    str: *const XmlChar,
-    end: *const XmlChar,
-) -> *mut XmlChar {
-    unsafe {
-        let mut input: *const XmlChar;
-        let ret: *mut XmlChar;
+unsafe fn xml_sax2_decode_attr_entities(ctxt: XmlParserCtxtPtr, s: &str) -> Option<String> {
+    use crate::parser::string_decode_entities;
 
-        input = str;
-        while input < end {
-            let res = {
-                let f = *input == b'&';
-                input = input.add(1);
-                f
-            };
-            if res {
-                (*ctxt).depth += 1;
-                ret = xml_string_len_decode_entities(
-                    ctxt,
-                    str,
-                    end.offset_from(str) as _,
-                    XML_SUBSTITUTE_REF as _,
-                    0,
-                    0,
-                    0,
-                );
-                (*ctxt).depth -= 1;
-                return ret;
-            }
-        }
-        null_mut()
+    unsafe {
+        let pos = s.find('&')?;
+        let s = &s[pos..];
+        (*ctxt).depth += 1;
+        let ret =
+            string_decode_entities(&mut *ctxt, s, XML_SUBSTITUTE_REF as i32, '\0', '\0', '\0');
+        (*ctxt).depth -= 1;
+        ret
     }
 }
 
@@ -2444,7 +2423,6 @@ unsafe fn xml_sax2_attribute_ns(
 ) {
     unsafe {
         let mut namespace = None;
-        let mut dup: *mut XmlChar = null_mut();
 
         // Note: if prefix.is_null(), the attribute is not in the default namespace
         if !prefix.is_null() {
@@ -2537,23 +2515,11 @@ unsafe fn xml_sax2_attribute_ns(
                     && (*ctxt).well_formed != 0
                     && my_doc.int_subset.is_some() =>
             {
-                let value = CStr::from_ptr(value as *const i8);
-                let len = value.to_bytes().len();
-                let valueend = value.as_ptr().add(len) as *const u8;
+                let value = CStr::from_ptr(value as *const i8).to_string_lossy();
                 // If we don't substitute entities, the validation should be
                 // done on a value with replaced entities anyway.
                 if (*ctxt).replace_entities == 0 {
-                    dup =
-                        xml_sax2_decode_attr_entities(ctxt, value.as_ptr() as *const u8, valueend);
-                    if dup.is_null() {
-                        (*ctxt).valid &= xml_validate_one_attribute(
-                            &raw mut (*ctxt).vctxt,
-                            (*ctxt).my_doc.unwrap(),
-                            (*ctxt).node.unwrap(),
-                            Some(ret),
-                            &value.to_string_lossy(),
-                        );
-                    } else {
+                    if let Some(mut dup) = xml_sax2_decode_attr_entities(ctxt, &value) {
                         // dup now contains a string of the flattened attribute
                         // content with entities substituted. Check if we need to
                         // apply an extra layer of normalization.
@@ -2566,7 +2532,6 @@ unsafe fn xml_sax2_attribute_ns(
                                 xml_build_qname(localname, prefix, fname.as_mut_ptr() as _, 50);
                             if !fullname.is_null() {
                                 (*ctxt).vctxt.valid = 1;
-                                let d = CStr::from_ptr(dup as *const i8).to_string_lossy();
                                 let nvalnorm = xml_valid_ctxt_normalize_attribute_value(
                                     &raw mut (*ctxt).vctxt,
                                     (*ctxt).my_doc.unwrap(),
@@ -2574,7 +2539,7 @@ unsafe fn xml_sax2_attribute_ns(
                                     CStr::from_ptr(fullname as *const i8)
                                         .to_string_lossy()
                                         .as_ref(),
-                                    &d,
+                                    &dup,
                                 );
                                 if (*ctxt).vctxt.valid != 1 {
                                     (*ctxt).valid = 0;
@@ -2584,9 +2549,7 @@ unsafe fn xml_sax2_attribute_ns(
                                     xml_free(fullname as _);
                                 }
                                 if let Some(nvalnorm) = nvalnorm {
-                                    let new = xml_strndup(nvalnorm.as_ptr(), nvalnorm.len() as i32);
-                                    xml_free(dup as _);
-                                    dup = new;
+                                    dup = nvalnorm.into_owned();
                                 }
                             }
                         }
@@ -2596,20 +2559,26 @@ unsafe fn xml_sax2_attribute_ns(
                             (*ctxt).my_doc.unwrap(),
                             (*ctxt).node.unwrap(),
                             Some(ret),
-                            &CStr::from_ptr(dup as *const i8).to_string_lossy(),
+                            &dup,
+                        );
+                    } else {
+                        (*ctxt).valid &= xml_validate_one_attribute(
+                            &raw mut (*ctxt).vctxt,
+                            (*ctxt).my_doc.unwrap(),
+                            (*ctxt).node.unwrap(),
+                            Some(ret),
+                            &value,
                         );
                     }
                 } else {
                     // if entities already have been substituted, then
                     // the attribute as passed is already normalized
-                    dup = xml_strndup(value.as_ptr() as *const u8, len as i32);
-
                     (*ctxt).valid &= xml_validate_one_attribute(
                         &raw mut (*ctxt).vctxt,
                         (*ctxt).my_doc.unwrap(),
                         (*ctxt).node.unwrap(),
                         Some(ret),
-                        &CStr::from_ptr(dup as *const i8).to_string_lossy(),
+                        &value,
                     );
                 }
             }
@@ -2687,10 +2656,6 @@ unsafe fn xml_sax2_attribute_ns(
                     }
                 }
             }
-        }
-
-        if !dup.is_null() {
-            xml_free(dup as _);
         }
     }
 }
