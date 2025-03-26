@@ -327,7 +327,7 @@ pub(crate) fn parse_string_name<'a>(
 /// [8]  LocalPart  ::= NCName
 /// ```
 ///
-/// Returns the Name parsed or NULL
+/// Returns `(Prefix, LocalPart)`,
 #[doc(alias = "xmlParseQName")]
 pub(crate) unsafe fn parse_qname(ctxt: &mut XmlParserCtxt) -> (Option<String>, Option<String>) {
     unsafe {

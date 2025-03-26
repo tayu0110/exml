@@ -107,7 +107,7 @@ use crate::{
     parser::{
         __xml_err_encoding, XmlParserCharValid, XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput,
         XmlParserNodeInfo, parse_attribute2, parse_comment, parse_entity_value, parse_external_id,
-        parse_name, parse_pi, parse_text_decl, parse_xmldecl,
+        parse_name, parse_pi, parse_qname, parse_text_decl, parse_xmldecl,
         xml_create_entity_parser_ctxt_internal, xml_create_memory_parser_ctxt,
         xml_err_attribute_dup, xml_err_memory, xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg,
         xml_fatal_err_msg_int, xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str,
@@ -2565,32 +2565,6 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
     }
 }
 
-// /// Parse an external general entity
-// /// An external general parsed entity is well-formed if it matches the
-// /// production labeled extParsedEnt.
-// ///
-// /// `[78] extParsedEnt ::= TextDecl? content`
-// ///
-// /// Returns 0 if the entity is well formed, -1 in case of args problem and
-// ///    the parser error code otherwise
-// #[doc(alias = "xmlParseExternalEntity")]
-// #[deprecated]
-// #[cfg(feature = "sax1")]
-// pub(crate) unsafe fn xml_parse_external_entity(
-//     doc: XmlDocPtr,
-//     sax: Option<Box<XmlSAXHandler>>,
-//     user_data: Option<GenericErrorContext>,
-//     depth: i32,
-//     url: Option<&str>,
-//     id: Option<&str>,
-//     lst: Option<&mut Option<XmlGenericNodePtr>>,
-// ) -> i32 {
-//     unsafe {
-//         xml_parse_external_entity_private(doc, null_mut(), sax, user_data, depth, url, id, lst).1
-//             as i32
-//     }
-// }
-
 /// Parse an external general entity within an existing parsing context
 /// An external general parsed entity is well-formed if it matches the
 /// production labeled extParsedEnt.
@@ -2639,42 +2613,6 @@ pub unsafe fn xml_parse_ctxt_external_entity(
         error as i32
     }
 }
-
-// /// Setup the parser context to parse a new buffer; Clears any prior
-// /// contents from the parser context. The buffer parameter must not be
-// /// NULL, but the filename parameter can be
-// #[doc(alias = "xmlSetupParserForBuffer")]
-// #[cfg(feature = "sax1")]
-// pub(crate) unsafe fn xml_setup_parser_for_buffer(
-//     ctxt: XmlParserCtxtPtr,
-//     buffer: *const XmlChar,
-//     filename: Option<&str>,
-// ) {
-//     unsafe {
-//         use crate::parser::{xml_clear_parser_ctxt, xml_new_input_stream};
-
-//         if ctxt.is_null() || buffer.is_null() {
-//             return;
-//         }
-
-//         let input: XmlParserInputPtr = xml_new_input_stream((!ctxt.is_null()).then(|| &mut *ctxt));
-//         if input.is_null() {
-//             xml_err_memory(null_mut(), Some("parsing new buffer: out of memory\n"));
-//             xml_clear_parser_ctxt(ctxt);
-//             return;
-//         }
-
-//         xml_clear_parser_ctxt(ctxt);
-//         if let Some(filename) = filename {
-//             let canonic = canonic_path(filename);
-//             (*input).filename = Some(canonic.into_owned());
-//         }
-//         (*input).base = buffer;
-//         (*input).cur = buffer;
-//         (*input).end = buffer.add(xml_strlen(buffer as _) as _);
-//         (*ctxt).input_push(input);
-//     }
-// }
 
 /// Creates a parser context for an XML in-memory document.
 ///
@@ -3175,9 +3113,6 @@ pub(crate) unsafe fn xml_parse_start_tag2(
     tlen: *mut i32,
 ) -> *const XmlChar {
     unsafe {
-        let mut localname: *const XmlChar;
-        let mut prefix: *const XmlChar = null();
-
         if (*ctxt).current_byte() != b'<' {
             return null_mut();
         }
@@ -3190,15 +3125,15 @@ pub(crate) unsafe fn xml_parse_start_tag2(
         // Forget any namespaces added during an earlier parse of this element.
         // (*ctxt).ns_tab.len() = ns_nr;
 
-        localname = xml_parse_qname(ctxt, addr_of_mut!(prefix));
-        if localname.is_null() {
+        let (prefix, localname) = parse_qname(&mut *ctxt);
+        let Some(localname) = localname else {
             xml_fatal_err_msg(
                 &mut *ctxt,
                 XmlParserErrors::XmlErrNameRequired,
                 "StartTag: invalid element name\n",
             );
             return null_mut();
-        }
+        };
         *tlen = ((*ctxt).input().unwrap().offset_from_base() - cur) as _;
 
         // Now parse the attributes, it ends up with the ending
@@ -3209,113 +3144,55 @@ pub(crate) unsafe fn xml_parse_start_tag2(
 
         let mut atts = vec![];
 
-        'done: {
-            while ((*ctxt).current_byte() != b'>'
-                && ((*ctxt).current_byte() != b'/' || (*ctxt).nth_byte(1) != b'>')
-                && xml_is_char((*ctxt).current_byte() as u32))
-                && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
-            {
-                let Some((aprefix, attname, attvalue)) = parse_attribute2(
+        while (*ctxt).current_byte() != b'>'
+            && ((*ctxt).current_byte() != b'/' || (*ctxt).nth_byte(1) != b'>')
+            && xml_is_char((*ctxt).current_byte() as u32)
+            && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+        {
+            let Some((aprefix, attname, attvalue)) =
+                parse_attribute2(&mut *ctxt, prefix.as_deref(), &localname)
+            else {
+                xml_fatal_err(
                     &mut *ctxt,
-                    (!prefix.is_null())
-                        .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
-                        .as_deref(),
-                    &CStr::from_ptr(localname as *const i8).to_string_lossy(),
-                ) else {
-                    xml_fatal_err(
-                        &mut *ctxt,
-                        XmlParserErrors::XmlErrInternalError,
-                        Some("xmlParseStartTag: problem parsing attributes\n"),
-                    );
-                    break;
+                    XmlParserErrors::XmlErrInternalError,
+                    Some("xmlParseStartTag: problem parsing attributes\n"),
+                );
+                break;
+            };
+
+            'next_attr: {
+                let Some(attvalue) = attvalue else {
+                    break 'next_attr;
                 };
 
-                'next_attr: {
-                    let Some(attvalue) = attvalue else {
-                        break 'next_attr;
-                    };
-
-                    if Some(attname.as_str()) == (*ctxt).str_xmlns.as_deref() && aprefix.is_none() {
-                        let url = attvalue.clone();
-                        if !url.is_empty() {
-                            if let Some(uri) = XmlURI::parse(&url) {
-                                if uri.scheme.is_none() {
-                                    xml_ns_warn!(
-                                        ctxt,
-                                        XmlParserErrors::XmlWarNsURIRelative,
-                                        "xmlns: URI {} is not absolute\n",
-                                        url
-                                    );
-                                }
-                            } else {
-                                xml_ns_err!(
+                if Some(attname.as_str()) == (*ctxt).str_xmlns.as_deref() && aprefix.is_none() {
+                    let url = attvalue.clone();
+                    if !url.is_empty() {
+                        if let Some(uri) = XmlURI::parse(&url) {
+                            if uri.scheme.is_none() {
+                                xml_ns_warn!(
                                     ctxt,
-                                    XmlParserErrors::XmlWarNsURI,
-                                    "xmlns: '{}' is not a valid URI\n",
+                                    XmlParserErrors::XmlWarNsURIRelative,
+                                    "xmlns: URI {} is not absolute\n",
                                     url
                                 );
                             }
-                            if Some(url.as_str()) == (*ctxt).str_xml_ns.as_deref() {
-                                if Some(attname.as_str()) != (*ctxt).str_xml.as_deref() {
-                                    xml_ns_err!(
-                                        ctxt,
-                                        XmlParserErrors::XmlNsErrXmlNamespace,
-                                        "xml namespace URI cannot be the default namespace\n"
-                                    );
-                                }
-                                break 'next_attr;
-                            }
-                            if url == "http://www.w3.org/2000/xmlns/" {
-                                xml_ns_err!(
-                                    ctxt,
-                                    XmlParserErrors::XmlNsErrXmlNamespace,
-                                    "reuse of the xmlns namespace name is forbidden\n"
-                                );
-                                break 'next_attr;
-                            }
-                        }
-
-                        // check that it's not a defined namespace
-                        if (*ctxt)
-                            .ns_tab
-                            .iter()
-                            .rev()
-                            .take(nb_ns)
-                            .any(|(pre, _)| pre.is_none())
-                        {
-                            xml_err_attribute_dup(ctxt, None, &attname);
-                        } else if (*ctxt).ns_push(None, &url) > 0 {
-                            nb_ns += 1;
-                        }
-                    } else if aprefix.as_deref() == (*ctxt).str_xmlns.as_deref() {
-                        let url = attvalue.clone();
-                        if Some(attname.as_str()) == (*ctxt).str_xml.as_deref() {
-                            if Some(url.as_str()) != (*ctxt).str_xml_ns.as_deref() {
-                                xml_ns_err!(
-                                    ctxt,
-                                    XmlParserErrors::XmlNsErrXmlNamespace,
-                                    "xml namespace prefix mapped to wrong URI\n"
-                                );
-                            }
-                            // Do not keep a namespace definition node
-                            break 'next_attr;
+                        } else {
+                            xml_ns_err!(
+                                ctxt,
+                                XmlParserErrors::XmlWarNsURI,
+                                "xmlns: '{}' is not a valid URI\n",
+                                url
+                            );
                         }
                         if Some(url.as_str()) == (*ctxt).str_xml_ns.as_deref() {
                             if Some(attname.as_str()) != (*ctxt).str_xml.as_deref() {
                                 xml_ns_err!(
                                     ctxt,
                                     XmlParserErrors::XmlNsErrXmlNamespace,
-                                    "xml namespace URI mapped to wrong prefix\n"
+                                    "xml namespace URI cannot be the default namespace\n"
                                 );
                             }
-                            break 'next_attr;
-                        }
-                        if Some(attname.as_ref()) == (*ctxt).str_xmlns.as_deref() {
-                            xml_ns_err!(
-                                ctxt,
-                                XmlParserErrors::XmlNsErrXmlNamespace,
-                                "redefinition of the xmlns prefix is forbidden\n"
-                            );
                             break 'next_attr;
                         }
                         if url == "http://www.w3.org/2000/xmlns/" {
@@ -3326,235 +3203,271 @@ pub(crate) unsafe fn xml_parse_start_tag2(
                             );
                             break 'next_attr;
                         }
-                        if url.is_empty() {
+                    }
+
+                    // check that it's not a defined namespace
+                    if (*ctxt)
+                        .ns_tab
+                        .iter()
+                        .rev()
+                        .take(nb_ns)
+                        .any(|(pre, _)| pre.is_none())
+                    {
+                        xml_err_attribute_dup(ctxt, None, &attname);
+                    } else if (*ctxt).ns_push(None, &url) > 0 {
+                        nb_ns += 1;
+                    }
+                } else if aprefix.as_deref() == (*ctxt).str_xmlns.as_deref() {
+                    let url = attvalue.clone();
+                    if Some(attname.as_str()) == (*ctxt).str_xml.as_deref() {
+                        if Some(url.as_str()) != (*ctxt).str_xml_ns.as_deref() {
                             xml_ns_err!(
                                 ctxt,
                                 XmlParserErrors::XmlNsErrXmlNamespace,
-                                "xmlns:{}: Empty XML namespace is not allowed\n",
-                                attname
+                                "xml namespace prefix mapped to wrong URI\n"
                             );
-                            break 'next_attr;
                         }
-                        if let Some(uri) = XmlURI::parse(&url) {
-                            if (*ctxt).pedantic != 0 && uri.scheme.is_none() {
-                                xml_ns_warn!(
-                                    ctxt,
-                                    XmlParserErrors::XmlWarNsURIRelative,
-                                    "xmlns:{}: URI {} is not absolute\n",
-                                    attname,
-                                    url
-                                );
-                            }
-                        } else {
+                        // Do not keep a namespace definition node
+                        break 'next_attr;
+                    }
+                    if Some(url.as_str()) == (*ctxt).str_xml_ns.as_deref() {
+                        if Some(attname.as_str()) != (*ctxt).str_xml.as_deref() {
                             xml_ns_err!(
                                 ctxt,
-                                XmlParserErrors::XmlWarNsURI,
-                                "xmlns:{}: '{}' is not a valid URI\n",
+                                XmlParserErrors::XmlNsErrXmlNamespace,
+                                "xml namespace URI mapped to wrong prefix\n"
+                            );
+                        }
+                        break 'next_attr;
+                    }
+                    if Some(attname.as_ref()) == (*ctxt).str_xmlns.as_deref() {
+                        xml_ns_err!(
+                            ctxt,
+                            XmlParserErrors::XmlNsErrXmlNamespace,
+                            "redefinition of the xmlns prefix is forbidden\n"
+                        );
+                        break 'next_attr;
+                    }
+                    if url == "http://www.w3.org/2000/xmlns/" {
+                        xml_ns_err!(
+                            ctxt,
+                            XmlParserErrors::XmlNsErrXmlNamespace,
+                            "reuse of the xmlns namespace name is forbidden\n"
+                        );
+                        break 'next_attr;
+                    }
+                    if url.is_empty() {
+                        xml_ns_err!(
+                            ctxt,
+                            XmlParserErrors::XmlNsErrXmlNamespace,
+                            "xmlns:{}: Empty XML namespace is not allowed\n",
+                            attname
+                        );
+                        break 'next_attr;
+                    }
+                    if let Some(uri) = XmlURI::parse(&url) {
+                        if (*ctxt).pedantic != 0 && uri.scheme.is_none() {
+                            xml_ns_warn!(
+                                ctxt,
+                                XmlParserErrors::XmlWarNsURIRelative,
+                                "xmlns:{}: URI {} is not absolute\n",
                                 attname,
                                 url
                             );
                         }
+                    } else {
+                        xml_ns_err!(
+                            ctxt,
+                            XmlParserErrors::XmlWarNsURI,
+                            "xmlns:{}: '{}' is not a valid URI\n",
+                            attname,
+                            url
+                        );
+                    }
+                    // check that it's not a defined namespace
+                    if (*ctxt)
+                        .ns_tab
+                        .iter()
+                        .take(nb_ns)
+                        .any(|(pre, _)| pre.as_deref() == Some(&attname))
+                    {
+                        xml_err_attribute_dup(ctxt, aprefix.as_deref(), &attname);
+                    } else if (*ctxt).ns_push(Some(&attname), &url) > 0 {
+                        nb_ns += 1;
+                    }
+                } else {
+                    // Add the pair to atts
+                    atts.push((attname, aprefix, None, attvalue));
+                }
+            }
+
+            //  next_attr:
+
+            (*ctxt).grow();
+            if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
+                break;
+            }
+            if (*ctxt).current_byte() == b'>'
+                || ((*ctxt).current_byte() == b'/' && (*ctxt).nth_byte(1) == b'>')
+            {
+                break;
+            }
+            if (*ctxt).skip_blanks() == 0 {
+                xml_fatal_err_msg(
+                    &mut *ctxt,
+                    XmlParserErrors::XmlErrSpaceRequired,
+                    "attributes construct error\n",
+                );
+                break;
+            }
+            (*ctxt).grow();
+        }
+
+        if (*ctxt).input().unwrap().id != inputid {
+            xml_fatal_err(
+                &mut *ctxt,
+                XmlParserErrors::XmlErrInternalError,
+                Some("Unexpected change of input\n"),
+            );
+            return null_mut();
+        }
+
+        // The attributes defaulting
+        if let Some(atts_default) = (*ctxt).atts_default {
+            let defaults = atts_default.lookup2(&localname, prefix.as_deref());
+            if let Some(defaults) = defaults.copied() {
+                'b: for i in 0..(*defaults).nb_attrs as usize {
+                    let attname = *(*defaults).values.as_ptr().add(5 * i);
+                    let aprefix = *(*defaults).values.as_ptr().add(5 * i + 1);
+                    let attname = CStr::from_ptr(attname as *const i8).to_string_lossy();
+
+                    // special work for namespaces defaulted defs
+                    if Some(attname.as_ref()) == (*ctxt).str_xmlns.as_deref() && aprefix.is_null() {
+                        // check that it's not a defined namespace
+                        if (*ctxt).ns_tab.iter().any(|(pre, _)| pre.is_none()) {
+                            continue;
+                        }
+
+                        let nsname = xml_get_namespace(ctxt, None);
+                        let def = CStr::from_ptr(
+                            *(*defaults).values.as_ptr().add(5 * i + 2) as *const i8
+                        )
+                        .to_string_lossy();
+                        if nsname.as_deref() != Some(&def) && (*ctxt).ns_push(None, &def) > 0 {
+                            nb_ns += 1;
+                        }
+                    } else if (!aprefix.is_null())
+                        .then(|| CStr::from_ptr(aprefix as *const i8).to_string_lossy())
+                        == (*ctxt).str_xmlns
+                    {
                         // check that it's not a defined namespace
                         if (*ctxt)
                             .ns_tab
                             .iter()
-                            .take(nb_ns)
                             .any(|(pre, _)| pre.as_deref() == Some(&attname))
                         {
-                            xml_err_attribute_dup(ctxt, aprefix.as_deref(), &attname);
-                        } else if (*ctxt).ns_push(Some(&attname), &url) > 0 {
+                            continue 'b;
+                        }
+
+                        let nsname = xml_get_namespace(ctxt, Some(&attname));
+                        let def = CStr::from_ptr(
+                            *(*defaults).values.as_ptr().add(5 * i + 2) as *const i8
+                        )
+                        .to_string_lossy();
+                        if nsname.as_deref() != Some(&def)
+                            && (*ctxt).ns_push(Some(&attname), &def) > 0
+                        {
                             nb_ns += 1;
                         }
                     } else {
-                        // Add the pair to atts
-                        atts.push((attname, aprefix, None, attvalue));
-                    }
-                }
+                        let aprefix = (!aprefix.is_null()).then(|| {
+                            CStr::from_ptr(aprefix as *const i8)
+                                .to_string_lossy()
+                                .into_owned()
+                        });
 
-                //  next_attr:
-
-                (*ctxt).grow();
-                if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-                    break;
-                }
-                if (*ctxt).current_byte() == b'>'
-                    || ((*ctxt).current_byte() == b'/' && (*ctxt).nth_byte(1) == b'>')
-                {
-                    break;
-                }
-                if (*ctxt).skip_blanks() == 0 {
-                    xml_fatal_err_msg(
-                        &mut *ctxt,
-                        XmlParserErrors::XmlErrSpaceRequired,
-                        "attributes construct error\n",
-                    );
-                    break;
-                }
-                (*ctxt).grow();
-            }
-
-            if (*ctxt).input().unwrap().id != inputid {
-                xml_fatal_err(
-                    &mut *ctxt,
-                    XmlParserErrors::XmlErrInternalError,
-                    Some("Unexpected change of input\n"),
-                );
-                localname = null_mut();
-                break 'done;
-            }
-
-            // The attributes defaulting
-            if let Some(atts_default) = (*ctxt).atts_default {
-                let defaults = atts_default.lookup2(
-                    CStr::from_ptr(localname as *const i8)
-                        .to_string_lossy()
-                        .as_ref(),
-                    (!prefix.is_null())
-                        .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
-                        .as_deref(),
-                );
-                if let Some(defaults) = defaults.copied() {
-                    'b: for i in 0..(*defaults).nb_attrs as usize {
-                        let attname = *(*defaults).values.as_ptr().add(5 * i);
-                        let aprefix = *(*defaults).values.as_ptr().add(5 * i + 1);
-                        let attname = CStr::from_ptr(attname as *const i8).to_string_lossy();
-
-                        // special work for namespaces defaulted defs
-                        if Some(attname.as_ref()) == (*ctxt).str_xmlns.as_deref()
-                            && aprefix.is_null()
-                        {
-                            // check that it's not a defined namespace
-                            if (*ctxt).ns_tab.iter().any(|(pre, _)| pre.is_none()) {
-                                continue;
-                            }
-
-                            let nsname = xml_get_namespace(ctxt, None);
-                            let def = CStr::from_ptr(
-                                *(*defaults).values.as_ptr().add(5 * i + 2) as *const i8
-                            )
-                            .to_string_lossy();
-                            if nsname.as_deref() != Some(&def) && (*ctxt).ns_push(None, &def) > 0 {
-                                nb_ns += 1;
-                            }
-                        } else if (!aprefix.is_null())
-                            .then(|| CStr::from_ptr(aprefix as *const i8).to_string_lossy())
-                            == (*ctxt).str_xmlns
-                        {
-                            // check that it's not a defined namespace
-                            if (*ctxt)
-                                .ns_tab
-                                .iter()
-                                .any(|(pre, _)| pre.as_deref() == Some(&attname))
-                            {
-                                continue 'b;
-                            }
-
-                            let nsname = xml_get_namespace(ctxt, Some(&attname));
-                            let def = CStr::from_ptr(
-                                *(*defaults).values.as_ptr().add(5 * i + 2) as *const i8
-                            )
-                            .to_string_lossy();
-                            if nsname.as_deref() != Some(&def)
-                                && (*ctxt).ns_push(Some(&attname), &def) > 0
-                            {
-                                nb_ns += 1;
-                            }
-                        } else {
-                            let aprefix = (!aprefix.is_null()).then(|| {
-                                CStr::from_ptr(aprefix as *const i8)
-                                    .to_string_lossy()
-                                    .into_owned()
-                            });
-
-                            // check that it's not a defined attribute
-                            if atts.iter().any(|att| att.0 == attname && att.1 == aprefix) {
-                                continue 'b;
-                            }
-
-                            let uri = aprefix
-                                .as_deref()
-                                .and_then(|p| xml_get_namespace(ctxt, Some(p)));
-                            let value1 = *(*defaults).values.as_ptr().add(5 * i + 2);
-                            let value2 = *(*defaults).values.as_ptr().add(5 * i + 3);
-                            let len = value2.offset_from(value1).unsigned_abs();
-                            let value = from_utf8(from_raw_parts(value1, len)).unwrap().to_owned();
-                            atts.push((attname.as_ref().to_owned(), aprefix, uri, value));
-                            if (*ctxt).standalone == 1
-                                && !(*(*defaults).values.as_ptr().add(5 * i + 4)).is_null()
-                            {
-                                xml_validity_error!(
-                                    ctxt,
-                                    XmlParserErrors::XmlDTDStandaloneDefaulted,
-                                    "standalone: attribute {} on {} defaulted from external subset\n",
-                                    attname,
-                                    CStr::from_ptr(localname as *const i8).to_string_lossy()
-                                );
-                            }
-                            nbdef += 1;
+                        // check that it's not a defined attribute
+                        if atts.iter().any(|att| att.0 == attname && att.1 == aprefix) {
+                            continue 'b;
                         }
+
+                        let uri = aprefix
+                            .as_deref()
+                            .and_then(|p| xml_get_namespace(ctxt, Some(p)));
+                        let value1 = *(*defaults).values.as_ptr().add(5 * i + 2);
+                        let value2 = *(*defaults).values.as_ptr().add(5 * i + 3);
+                        let len = value2.offset_from(value1).unsigned_abs();
+                        let value = from_utf8(from_raw_parts(value1, len)).unwrap().to_owned();
+                        atts.push((attname.as_ref().to_owned(), aprefix, uri, value));
+                        if (*ctxt).standalone == 1
+                            && !(*(*defaults).values.as_ptr().add(5 * i + 4)).is_null()
+                        {
+                            xml_validity_error!(
+                                ctxt,
+                                XmlParserErrors::XmlDTDStandaloneDefaulted,
+                                "standalone: attribute {} on {} defaulted from external subset\n",
+                                attname,
+                                localname
+                            );
+                        }
+                        nbdef += 1;
                     }
                 }
             }
+        }
 
-            // The attributes checkings
-            for i in 0..atts.len() {
-                // The default namespace does not apply to attribute names.
-                let nsname = if atts[i].1.is_some() {
-                    let nsname = xml_get_namespace(ctxt, atts[i].1.as_deref());
-                    if nsname.is_none() {
-                        let pre = atts[i].1.as_deref().unwrap();
+        // The attributes checkings
+        for i in 0..atts.len() {
+            // The default namespace does not apply to attribute names.
+            let nsname = if atts[i].1.is_some() {
+                let nsname = xml_get_namespace(ctxt, atts[i].1.as_deref());
+                if nsname.is_none() {
+                    let pre = atts[i].1.as_deref().unwrap();
+                    let loc = atts[i].0.as_str();
+                    xml_ns_err!(
+                        ctxt,
+                        XmlParserErrors::XmlNsErrUndefinedNamespace,
+                        "Namespace prefix {} for {} on {} is not defined\n",
+                        pre,
+                        loc,
+                        localname
+                    );
+                }
+                atts[i].2 = nsname;
+                atts[i].2.as_deref()
+            } else {
+                None
+            };
+            // [ WFC: Unique Att Spec ]
+            // No attribute name may appear more than once in the same
+            // start-tag or empty-element tag.
+            // As extended by the Namespace in XML REC.
+            for j in 0..i {
+                if atts[i].0 == atts[j].0 {
+                    if atts[i].1 == atts[j].1 {
+                        let pre = atts[i].1.as_deref();
                         let loc = atts[i].0.as_str();
-                        let localname = CStr::from_ptr(localname as *const i8).to_string_lossy();
+                        xml_err_attribute_dup(ctxt, pre, loc);
+                        break;
+                    }
+                    if let Some(nsname) = nsname.filter(|&a| Some(a) == atts[j].2.as_deref()) {
+                        let loc = atts[i].0.as_str();
                         xml_ns_err!(
                             ctxt,
-                            XmlParserErrors::XmlNsErrUndefinedNamespace,
-                            "Namespace prefix {} for {} on {} is not defined\n",
-                            pre,
+                            XmlParserErrors::XmlNsErrAttributeRedefined,
+                            "Namespaced Attribute {} in '{}' redefined\n",
                             loc,
-                            localname
+                            nsname
                         );
-                    }
-                    atts[i].2 = nsname;
-                    atts[i].2.as_deref()
-                } else {
-                    None
-                };
-                // [ WFC: Unique Att Spec ]
-                // No attribute name may appear more than once in the same
-                // start-tag or empty-element tag.
-                // As extended by the Namespace in XML REC.
-                for j in 0..i {
-                    if atts[i].0 == atts[j].0 {
-                        if atts[i].1 == atts[j].1 {
-                            let pre = atts[i].1.as_deref();
-                            let loc = atts[i].0.as_str();
-                            xml_err_attribute_dup(ctxt, pre, loc);
-                            break;
-                        }
-                        if let Some(nsname) = nsname.filter(|&a| Some(a) == atts[j].2.as_deref()) {
-                            let loc = atts[i].0.as_str();
-                            xml_ns_err!(
-                                ctxt,
-                                XmlParserErrors::XmlNsErrAttributeRedefined,
-                                "Namespaced Attribute {} in '{}' redefined\n",
-                                loc,
-                                nsname
-                            );
-                            break;
-                        }
+                        break;
                     }
                 }
             }
+        }
 
-            let nsname = xml_get_namespace(
-                ctxt,
-                (!prefix.is_null())
-                    .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
-                    .as_deref(),
-            );
-            if !prefix.is_null() && nsname.is_none() {
-                let prefix = CStr::from_ptr(prefix as *const i8).to_string_lossy();
-                let localname = CStr::from_ptr(localname as *const i8).to_string_lossy();
+        let nsname = xml_get_namespace(ctxt, prefix.as_deref());
+        if let Some(prefix) = prefix.as_deref() {
+            if nsname.is_none() {
                 xml_ns_err!(
                     ctxt,
                     XmlParserErrors::XmlNsErrUndefinedNamespace,
@@ -3563,36 +3476,32 @@ pub(crate) unsafe fn xml_parse_start_tag2(
                     localname
                 );
             }
-            *pref = prefix;
-            *uri = nsname.clone();
+        }
+        *pref = prefix.as_deref().map_or(null_mut(), |pre| {
+            xml_dict_lookup((*ctxt).dict, pre.as_ptr(), pre.len() as i32)
+        });
+        *uri = nsname.clone();
 
-            // SAX: Start of Element !
-            if (*ctxt).disable_sax == 0 {
-                if let Some(start_element_ns) = (*ctxt)
-                    .sax
-                    .as_deref_mut()
-                    .and_then(|sax| sax.start_element_ns)
-                {
-                    let localname = &CStr::from_ptr(localname as *const i8)
-                        .to_string_lossy()
-                        .into_owned();
-                    start_element_ns(
-                        (*ctxt).user_data.clone(),
-                        localname.as_str(),
-                        (!prefix.is_null())
-                            .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
-                            .as_deref(),
-                        nsname.as_deref(),
-                        &(*ctxt).ns_tab[(*ctxt).ns_tab.len() - nb_ns..],
-                        nbdef,
-                        &atts,
-                    );
-                }
+        // SAX: Start of Element !
+        if (*ctxt).disable_sax == 0 {
+            if let Some(start_element_ns) = (*ctxt)
+                .sax
+                .as_deref_mut()
+                .and_then(|sax| sax.start_element_ns)
+            {
+                start_element_ns(
+                    (*ctxt).user_data.clone(),
+                    &localname,
+                    prefix.as_deref(),
+                    nsname.as_deref(),
+                    &(*ctxt).ns_tab[(*ctxt).ns_tab.len() - nb_ns..],
+                    nbdef,
+                    &atts,
+                );
             }
         }
 
-        //  done:
-        localname
+        xml_dict_lookup((*ctxt).dict, localname.as_ptr(), localname.len() as i32)
     }
 }
 
