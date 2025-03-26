@@ -3243,30 +3243,6 @@ pub(crate) const XML_SUBSTITUTE_PEREF: usize = 2;
 // /// Both general and parameter entities need to be substituted.
 // const XML_SUBSTITUTE_BOTH: usize = 3;
 
-/// Takes a entity string content and process to do the adequate substitutions.
-///
-/// `[67] Reference ::= EntityRef | CharRef`
-///
-/// `[69] PEReference ::= '%' Name ';'`
-///
-/// Returns A newly allocated string with the substitution done. The caller must deallocate it !
-#[doc(alias = "xmlStringDecodeEntities")]
-pub(crate) unsafe fn xml_string_decode_entities(
-    ctxt: XmlParserCtxtPtr,
-    str: *const XmlChar,
-    what: i32,
-    end: XmlChar,
-    end2: XmlChar,
-    end3: XmlChar,
-) -> *mut XmlChar {
-    unsafe {
-        if ctxt.is_null() || str.is_null() {
-            return null_mut();
-        }
-        xml_string_decode_entities_int(ctxt, str, xml_strlen(str), what, end, end2, end3, 0)
-    }
-}
-
 /// The current c_char value, if using UTF-8 this may actually span multiple
 /// bytes in the input buffer.
 ///
@@ -3661,62 +3637,6 @@ mod tests {
                             eprint!(" {}", n_ctxt);
                             eprint!(" {}", n_cur);
                             eprintln!(" {}", n_len);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_string_decode_entities() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_PARSER_CTXT_PTR {
-                for n_str in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_what in 0..GEN_NB_INT {
-                        for n_end in 0..GEN_NB_XML_CHAR {
-                            for n_end2 in 0..GEN_NB_XML_CHAR {
-                                for n_end3 in 0..GEN_NB_XML_CHAR {
-                                    let mem_base = xml_mem_blocks();
-                                    let ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 0);
-                                    let str = gen_const_xml_char_ptr(n_str, 1);
-                                    let what = gen_int(n_what, 2);
-                                    let end = gen_xml_char(n_end, 3);
-                                    let end2 = gen_xml_char(n_end2, 4);
-                                    let end3 = gen_xml_char(n_end3, 5);
-
-                                    let ret_val = xml_string_decode_entities(
-                                        ctxt, str, what, end, end2, end3,
-                                    );
-                                    desret_xml_char_ptr(ret_val);
-                                    des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                                    des_const_xml_char_ptr(n_str, str, 1);
-                                    des_int(n_what, what, 2);
-                                    des_xml_char(n_end, end, 3);
-                                    des_xml_char(n_end2, end2, 4);
-                                    des_xml_char(n_end3, end3, 5);
-                                    reset_last_error();
-                                    if mem_base != xml_mem_blocks() {
-                                        leaks += 1;
-                                        eprint!(
-                                            "Leak of {} blocks found in xmlStringDecodeEntities",
-                                            xml_mem_blocks() - mem_base
-                                        );
-                                        assert!(
-                                            leaks == 0,
-                                            "{leaks} Leaks are found in xmlStringDecodeEntities()"
-                                        );
-                                        eprint!(" {}", n_ctxt);
-                                        eprint!(" {}", n_str);
-                                        eprint!(" {}", n_what);
-                                        eprint!(" {}", n_end);
-                                        eprint!(" {}", n_end2);
-                                        eprintln!(" {}", n_end3);
-                                    }
-                                }
-                            }
                         }
                     }
                 }

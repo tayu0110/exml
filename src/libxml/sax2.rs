@@ -67,7 +67,7 @@ use super::{
     },
     parser_internals::{
         XML_MAX_TEXT_LENGTH, XML_STRING_TEXT, XML_SUBSTITUTE_REF, XML_VCTXT_DTD_VALIDATED,
-        xml_parse_external_subset, xml_string_decode_entities,
+        xml_parse_external_subset,
     },
     valid::{
         xml_add_element_decl, xml_add_id, xml_add_notation_decl, xml_add_ref,
@@ -1428,38 +1428,40 @@ unsafe fn xml_sax2_attribute_internal(
 
         // Check whether it's a namespace definition
         if (*ctxt).html == 0 && ns.is_none() && name == "xmlns" {
-            let val: *mut XmlChar;
+            let mut val = CStr::from_ptr(value as *const i8)
+                .to_string_lossy()
+                .into_owned();
 
             if (*ctxt).replace_entities == 0 {
                 (*ctxt).depth += 1;
-                val = xml_string_decode_entities(ctxt, value, XML_SUBSTITUTE_REF as _, 0, 0, 0);
+                let value = string_decode_entities(
+                    &mut *ctxt,
+                    &val,
+                    XML_SUBSTITUTE_REF as _,
+                    '\0',
+                    '\0',
+                    '\0',
+                );
                 (*ctxt).depth -= 1;
-                if val.is_null() {
+                let Some(value) = value else {
                     xml_sax2_err_memory(ctxt, "xmlSAX2StartElement");
                     if !nval.is_null() {
                         xml_free(nval as _);
                     }
                     return;
-                }
-            } else {
-                val = value as _;
+                };
+                val = value;
             }
 
-            if *val.add(0) != 0 {
-                if let Some(uri) =
-                    XmlURI::parse(&CStr::from_ptr(val as *const i8).to_string_lossy())
-                {
+            if !val.is_empty() {
+                if let Some(uri) = XmlURI::parse(&val) {
                     if uri.scheme.is_none() {
                         if let Some(warning) =
                             (*ctxt).sax.as_deref_mut().and_then(|sax| sax.warning)
                         {
                             warning(
                                 (*ctxt).user_data.clone(),
-                                format!(
-                                    "xmlns: URI {} is not absolute\n",
-                                    CStr::from_ptr(val as *const i8).to_string_lossy()
-                                )
-                                .as_str(),
+                                format!("xmlns: URI {} is not absolute\n", val).as_str(),
                             );
                         }
                     }
@@ -1467,17 +1469,14 @@ unsafe fn xml_sax2_attribute_internal(
                 {
                     warning(
                         (*ctxt).user_data.clone(),
-                        format!(
-                            "xmlns: {} not a valid URI\n",
-                            CStr::from_ptr(val as *const i8).to_string_lossy()
-                        )
-                        .as_str(),
+                        format!("xmlns: {} not a valid URI\n", val).as_str(),
                     );
                 }
             }
 
             // a default namespace definition
-            let nsret = xml_new_ns((*ctxt).node, val, None);
+            let cval = CString::new(val.as_str()).unwrap();
+            let nsret = xml_new_ns((*ctxt).node, cval.as_ptr() as *const u8, None);
 
             // Validate also for namespace decls, they are attributes from an XML-1.0 perspective
             #[cfg(feature = "libxml_valid")]
@@ -1489,37 +1488,42 @@ unsafe fn xml_sax2_attribute_internal(
                         (*ctxt).node.unwrap(),
                         prefix,
                         nsret.unwrap(),
-                        &CStr::from_ptr(val as *const i8).to_string_lossy(),
+                        &val,
                     );
                 }
             }
             if !nval.is_null() {
                 xml_free(nval as _);
             }
-            if val != value as _ {
-                xml_free(val as _);
-            }
             return;
         }
         if (*ctxt).html != 0 && ns == Some("xmlns") {
-            let val: *mut XmlChar;
+            let mut val = CStr::from_ptr(value as *const i8)
+                .to_string_lossy()
+                .into_owned();
 
             if !(*ctxt).replace_entities != 0 {
                 (*ctxt).depth += 1;
-                val = xml_string_decode_entities(ctxt, value, XML_SUBSTITUTE_REF as _, 0, 0, 0);
+                let value = string_decode_entities(
+                    &mut *ctxt,
+                    &val,
+                    XML_SUBSTITUTE_REF as i32,
+                    '\0',
+                    '\0',
+                    '\0',
+                );
                 (*ctxt).depth -= 1;
-                if val.is_null() {
+                let Some(value) = value else {
                     xml_sax2_err_memory(ctxt, "xmlSAX2StartElement");
                     if !nval.is_null() {
                         xml_free(nval as _);
                     }
                     return;
-                }
-            } else {
-                val = value as _;
+                };
+                val = value;
             }
 
-            if *val.add(0) == 0 {
+            if val.is_empty() {
                 xml_ns_err_msg!(
                     ctxt,
                     XmlParserErrors::XmlNsErrEmpty,
@@ -1527,10 +1531,8 @@ unsafe fn xml_sax2_attribute_internal(
                     name
                 );
             }
-            if (*ctxt).pedantic != 0 && *val.add(0) != 0 {
-                if let Some(uri) =
-                    XmlURI::parse(&CStr::from_ptr(val as *const i8).to_string_lossy())
-                {
+            if (*ctxt).pedantic != 0 && !val.is_empty() {
+                if let Some(uri) = XmlURI::parse(&val) {
                     if uri.scheme.is_none() {
                         let value = CStr::from_ptr(value as *const i8).to_string_lossy();
                         xml_ns_warn_msg!(
@@ -1554,7 +1556,8 @@ unsafe fn xml_sax2_attribute_internal(
             }
 
             // a standard namespace definition
-            let nsret = xml_new_ns((*ctxt).node, val, Some(name));
+            let cval = CString::new(val.as_str()).unwrap();
+            let nsret = xml_new_ns((*ctxt).node, cval.as_ptr() as *const u8, Some(name));
             #[cfg(feature = "libxml_valid")]
             // Validate also for namespace decls, they are attributes from an XML-1.0 perspective
             if nsret.is_some() && (*ctxt).validate != 0 && (*ctxt).well_formed != 0 {
@@ -1571,9 +1574,6 @@ unsafe fn xml_sax2_attribute_internal(
             }
             if !nval.is_null() {
                 xml_free(nval as _);
-            }
-            if val != value as _ {
-                xml_free(val as _);
             }
             return;
         }
