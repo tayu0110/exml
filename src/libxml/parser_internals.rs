@@ -51,8 +51,8 @@ use crate::{
             XmlParserOption, xml_parse_cdsect, xml_parse_char_data_internal,
             xml_parse_conditional_sections, xml_parse_element_children_content_decl_priv,
             xml_parse_end_tag1, xml_parse_end_tag2, xml_parse_external_entity_private,
-            xml_parse_external_id, xml_parse_markup_decl, xml_parse_start_tag2,
-            xml_parser_add_node_info, xml_parser_find_node_info,
+            xml_parse_markup_decl, xml_parse_start_tag2, xml_parser_add_node_info,
+            xml_parser_find_node_info,
         },
         sax2::xml_sax2_get_entity,
         valid::{
@@ -63,7 +63,7 @@ use crate::{
     },
     parser::{
         __xml_err_encoding, XmlParserCharValid, XmlParserCtxtPtr, XmlParserInput,
-        XmlParserNodeInfo, parse_att_value, parser_entity_check, split_qname2,
+        XmlParserNodeInfo, parse_att_value, parse_external_id, parser_entity_check, split_qname2,
         xml_err_encoding_int, xml_err_memory, xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg,
         xml_fatal_err_msg_int, xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str,
         xml_validity_error, xml_warning_msg,
@@ -460,84 +460,6 @@ pub(crate) unsafe fn xml_parse_nmtoken(ctxt: XmlParserCtxtPtr) -> *mut XmlChar {
             return null_mut();
         }
         xml_strndup(buf.as_ptr() as _, len)
-    }
-}
-
-/// Parse an XML Literal
-///
-/// `[11] SystemLiteral ::= ('"' [^"]* '"') | ("'" [^']* "'")`
-///
-/// Returns the SystemLiteral parsed or NULL
-#[doc(alias = "xmlParseSystemLiteral")]
-pub(crate) unsafe fn xml_parse_system_literal(ctxt: XmlParserCtxtPtr) -> *mut XmlChar {
-    unsafe {
-        let mut buf: *mut XmlChar;
-        let mut len: i32 = 0;
-        let mut size: i32 = XML_PARSER_BUFFER_SIZE as _;
-        let mut l: i32 = 0;
-        let max_length: i32 = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
-            XML_MAX_TEXT_LENGTH as i32
-        } else {
-            XML_MAX_NAME_LENGTH as i32
-        };
-        let state: i32 = (*ctxt).instate as i32;
-
-        let stop = if (*ctxt).current_byte() == b'"' {
-            (*ctxt).skip_char();
-            b'"'
-        } else if (*ctxt).current_byte() == b'\'' {
-            (*ctxt).skip_char();
-            b'\''
-        } else {
-            xml_fatal_err(ctxt, XmlParserErrors::XmlErrLiteralNotStarted, None);
-            return null_mut();
-        };
-
-        buf = xml_malloc_atomic(size as usize) as *mut XmlChar;
-        if buf.is_null() {
-            xml_err_memory(ctxt, None);
-            return null_mut();
-        }
-        (*ctxt).instate = XmlParserInputState::XmlParserSystemLiteral;
-        let mut cur = (*ctxt).current_char(&mut l).unwrap_or('\0');
-        while xml_is_char(cur as u32) && cur as i32 != stop as i32 {
-            if len + 5 >= size {
-                size *= 2;
-                let tmp: *mut XmlChar = xml_realloc(buf as _, size as usize) as *mut XmlChar;
-                if tmp.is_null() {
-                    xml_free(buf as _);
-                    xml_err_memory(ctxt, None);
-                    (*ctxt).instate = XmlParserInputState::try_from(state).unwrap();
-                    return null_mut();
-                }
-                buf = tmp;
-            }
-            COPY_BUF!(l, buf, len, cur);
-            if len > max_length {
-                xml_fatal_err(
-                    ctxt,
-                    XmlParserErrors::XmlErrNameTooLong,
-                    Some("SystemLiteral"),
-                );
-                xml_free(buf as _);
-                (*ctxt).instate = XmlParserInputState::try_from(state).unwrap();
-                return null_mut();
-            }
-            NEXTL!(ctxt, l);
-            cur = (*ctxt).current_char(&mut l).unwrap_or('\0');
-        }
-        *buf.add(len as usize) = 0;
-        if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-            xml_free(buf as _);
-            return null_mut();
-        }
-        (*ctxt).instate = XmlParserInputState::try_from(state).unwrap();
-        if !xml_is_char(cur as u32) {
-            xml_fatal_err(ctxt, XmlParserErrors::XmlErrLiteralNotFinished, None);
-        } else {
-            (*ctxt).skip_char();
-        }
-        buf
     }
 }
 
@@ -2325,8 +2247,6 @@ pub(crate) unsafe fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
 #[doc(alias = "xmlParseDocTypeDecl")]
 pub(crate) unsafe fn xml_parse_doc_type_decl(ctxt: XmlParserCtxtPtr) {
     unsafe {
-        let mut external_id: *mut XmlChar = null_mut();
-
         // We know that '<!DOCTYPE' has been detected.
         (*ctxt).advance(9);
 
@@ -2345,23 +2265,13 @@ pub(crate) unsafe fn xml_parse_doc_type_decl(ctxt: XmlParserCtxtPtr) {
         (*ctxt).skip_blanks();
 
         // Check for SystemID and ExternalID
-        let uri: *mut XmlChar = xml_parse_external_id(ctxt, addr_of_mut!(external_id), 1);
+        let (external_id, uri) = parse_external_id(&mut *ctxt, true);
 
-        if !uri.is_null() || !external_id.is_null() {
+        if uri.is_some() || external_id.is_some() {
             (*ctxt).has_external_subset = 1;
         }
-        (*ctxt).ext_sub_uri = (!uri.is_null()).then(|| {
-            CStr::from_ptr(uri as *const i8)
-                .to_string_lossy()
-                .into_owned()
-        });
-        (*ctxt).ext_sub_system = (!external_id.is_null()).then(|| {
-            CStr::from_ptr(external_id as *const i8)
-                .to_string_lossy()
-                .into_owned()
-        });
-        xml_free(uri as _);
-        xml_free(external_id as _);
+        (*ctxt).ext_sub_uri = uri;
+        (*ctxt).ext_sub_system = external_id;
 
         (*ctxt).skip_blanks();
 

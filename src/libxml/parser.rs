@@ -94,7 +94,6 @@ use crate::{
             xml_parse_element_content_decl, xml_parse_element_end, xml_parse_element_start,
             xml_parse_external_subset, xml_parse_misc, xml_parse_name, xml_parse_nmtoken,
             xml_parse_pe_reference, xml_parse_reference, xml_parse_start_tag,
-            xml_parse_system_literal,
         },
         sax2::{xml_sax2_entity_decl, xml_sax2_get_entity},
         valid::{
@@ -107,12 +106,12 @@ use crate::{
     },
     parser::{
         __xml_err_encoding, XmlParserCharValid, XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput,
-        XmlParserNodeInfo, parse_attribute2, parse_comment, parse_entity_value, parse_name,
-        parse_pi, parse_text_decl, parse_xmldecl, xml_create_entity_parser_ctxt_internal,
-        xml_create_memory_parser_ctxt, xml_err_attribute_dup, xml_err_memory, xml_err_msg_str,
-        xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_int, xml_fatal_err_msg_str,
-        xml_fatal_err_msg_str_int_str, xml_free_parser_ctxt, xml_new_sax_parser_ctxt, xml_ns_err,
-        xml_ns_warn, xml_validity_error,
+        XmlParserNodeInfo, parse_attribute2, parse_comment, parse_entity_value, parse_external_id,
+        parse_name, parse_pi, parse_text_decl, parse_xmldecl,
+        xml_create_entity_parser_ctxt_internal, xml_create_memory_parser_ctxt,
+        xml_err_attribute_dup, xml_err_memory, xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg,
+        xml_fatal_err_msg_int, xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str,
+        xml_free_parser_ctxt, xml_new_sax_parser_ctxt, xml_ns_err, xml_ns_warn, xml_validity_error,
     },
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlAttributeDefault, XmlAttributeType, XmlDocProperties,
@@ -126,7 +125,7 @@ use crate::{
 };
 
 use super::{
-    chvalid::{xml_is_blank_char, xml_is_char, xml_is_pubid_char},
+    chvalid::{xml_is_blank_char, xml_is_char},
     threads::{
         __xml_global_init_mutex_lock, __xml_global_init_mutex_unlock, xml_cleanup_threads_internal,
         xml_init_threads_internal,
@@ -532,39 +531,9 @@ pub type XmlExternalEntityLoader = unsafe fn(
  * Dirty macros, i.e. one often need to make assumption on the context to
  * use them
  *
- *   CUR_PTR return the current pointer to the XmlChar to be parsed.
- *           To be used with extreme caution since operations consuming
- *           characters may move the input buffer to a different location !
- *   CUR     returns the current XmlChar value, i.e. a 8 bit value if compiled
- *           This should be used internally by the parser
- *           only to compare to ASCII values otherwise it would break when
- *           running with UTF-8 encoding.
- *   RAW     same as CUR but in the input buffer, bypass any token
- *           extraction that may have been done
- *   NXT(n)  returns the n'th next XmlChar. Same as CUR is should be used only
- *           to compare on ASCII based substring.
- *   SKIP(n) Skip n XmlChar, and must also be used only to skip ASCII defined
- *           strings without newlines within the parser.
- *   NEXT1(l) Skip 1 XmlChar, and must also be used only to skip 1 non-newline ASCII
- *           defined c_char within the parser.
- * Clean macros, not dependent of an ASCII context, expect UTF-8 encoding
- *
- *   NEXT    Skip to the next character, this does the proper decoding
- *           in UTF-8 mode. It also pop-up unfinished entities on the fly.
- *   NEXTL!(ctxt, l) Skip the current unicode character of l xmlChars long.
- *   (*ctxt).xml_current_char( l) returns the current unicode character (int), set l
- *           to the number of xmlChars used for the encoding [0-5].
- *   CUR_SCHAR  same but operate on a string instead of the context
  *   COPY_BUF  copy the current unicode c_char to the target buffer, increment
  *            the index
- *   GROW, SHRINK  handling of input buffers
  */
-
-macro_rules! CUR_SCHAR {
-    ($ctxt:expr, $s:expr, $l:expr) => {
-        crate::libxml::parser_internals::xml_string_current_char($ctxt, $s, addr_of_mut!($l))
-    };
-}
 
 macro_rules! COPY_BUF {
     ($l:expr, $b:expr, $i:expr, $v:expr) => {
@@ -662,68 +631,6 @@ pub unsafe fn xml_cleanup_parser() {
         XML_PARSER_INITIALIZED.store(false, Ordering::Release);
     }
 }
-
-// /// Returns -1 as this is an error to use it.
-// #[doc(alias = "xmlParserInputRead")]
-// pub(crate) unsafe fn xml_parser_input_read(_input: XmlParserInputPtr, _len: i32) -> i32 {
-//     -1
-// }
-
-// /// This function increase the input for the parser. It tries to
-// /// preserve pointers to the input buffer, and keep already read data
-// ///
-// /// Returns the amount of c_char read, or -1 in case of error, 0 indicate the end of this entity
-// #[doc(alias = "xmlParserInputGrow")]
-// pub(crate) unsafe fn xml_parser_input_grow(input: XmlParserInputPtr, len: i32) -> i32 {
-//     unsafe {
-//         if input.is_null() || len < 0 {
-//             return -1;
-//         }
-//         let Some(input_buffer) = (*input).buf.as_mut() else {
-//             return -1;
-//         };
-//         if (*input).base.is_null() {
-//             return -1;
-//         }
-//         if (*input).cur.is_null() {
-//             return -1;
-//         }
-//         let Some(buf) = input_buffer.borrow().buffer else {
-//             return -1;
-//         };
-
-//         // Don't grow memory buffers.
-//         if input_buffer.borrow().encoder.is_none() && input_buffer.borrow().context.is_none() {
-//             return 0;
-//         }
-
-//         let indx = (*input).offset_from_base();
-//         if buf.len() > indx + INPUT_CHUNK {
-//             return 0;
-//         }
-//         let ret: i32 = input_buffer.borrow_mut().grow(len);
-
-//         (*input).base = if buf.is_ok() {
-//             buf.as_ref().as_ptr()
-//         } else {
-//             null_mut()
-//         };
-//         if (*input).base.is_null() {
-//             (*input).base = c"".as_ptr() as _;
-//             (*input).cur = (*input).base;
-//             (*input).end = (*input).base;
-//             return -1;
-//         }
-//         (*input).cur = (*input).base.add(indx);
-//         (*input).end = if buf.is_ok() {
-//             buf.as_ref().as_ptr().add(buf.len())
-//         } else {
-//             null_mut()
-//         };
-
-//         ret
-//     }
-// }
 
 /// Parse an XML in-memory document and build a tree.
 ///
@@ -5844,74 +5751,30 @@ pub enum XmlFeature {
 pub fn xml_has_feature(feature: Option<XmlFeature>) -> bool {
     match feature {
         Some(XmlFeature::XmlWithThread) => true,
-        Some(XmlFeature::XmlWithTree) => {
-            cfg!(feature = "libxml_tree")
-        }
-        Some(XmlFeature::XmlWithOutput) => {
-            cfg!(feature = "libxml_output")
-        }
-        Some(XmlFeature::XmlWithPush) => {
-            cfg!(feature = "libxml_push")
-        }
-        Some(XmlFeature::XmlWithReader) => {
-            cfg!(feature = "libxml_reader")
-        }
-        Some(XmlFeature::XmlWithPattern) => {
-            cfg!(feature = "libxml_pattern")
-        }
-        Some(XmlFeature::XmlWithWriter) => {
-            cfg!(feature = "libxml_writer")
-        }
-        Some(XmlFeature::XmlWithSax1) => {
-            cfg!(feature = "sax1")
-        }
-        Some(XmlFeature::XmlWithFtp) => {
-            cfg!(feature = "ftp")
-        }
-        Some(XmlFeature::XmlWithHttp) => {
-            cfg!(feature = "http")
-        }
-        Some(XmlFeature::XmlWithValid) => {
-            cfg!(feature = "libxml_valid")
-        }
-        Some(XmlFeature::XmlWithHtml) => {
-            cfg!(feature = "html")
-        }
-        Some(XmlFeature::XmlWithC14n) => {
-            cfg!(feature = "c14n")
-        }
-        Some(XmlFeature::XmlWithCatalog) => {
-            cfg!(feature = "catalog")
-        }
-        Some(XmlFeature::XmlWithXpath) => {
-            cfg!(feature = "xpath")
-        }
-        Some(XmlFeature::XmlWithXptr) => {
-            cfg!(feature = "xpointer")
-        }
-        Some(XmlFeature::XmlWithXinclude) => {
-            cfg!(feature = "xinclude")
-        }
+        Some(XmlFeature::XmlWithTree) => cfg!(feature = "libxml_tree"),
+        Some(XmlFeature::XmlWithOutput) => cfg!(feature = "libxml_output"),
+        Some(XmlFeature::XmlWithPush) => cfg!(feature = "libxml_push"),
+        Some(XmlFeature::XmlWithReader) => cfg!(feature = "libxml_reader"),
+        Some(XmlFeature::XmlWithPattern) => cfg!(feature = "libxml_pattern"),
+        Some(XmlFeature::XmlWithWriter) => cfg!(feature = "libxml_writer"),
+        Some(XmlFeature::XmlWithSax1) => cfg!(feature = "sax1"),
+        Some(XmlFeature::XmlWithFtp) => cfg!(feature = "ftp"),
+        Some(XmlFeature::XmlWithHttp) => cfg!(feature = "http"),
+        Some(XmlFeature::XmlWithValid) => cfg!(feature = "libxml_valid"),
+        Some(XmlFeature::XmlWithHtml) => cfg!(feature = "html"),
+        Some(XmlFeature::XmlWithC14n) => cfg!(feature = "c14n"),
+        Some(XmlFeature::XmlWithCatalog) => cfg!(feature = "catalog"),
+        Some(XmlFeature::XmlWithXpath) => cfg!(feature = "xpath"),
+        Some(XmlFeature::XmlWithXptr) => cfg!(feature = "xpointer"),
+        Some(XmlFeature::XmlWithXinclude) => cfg!(feature = "xinclude"),
         //   Some(xmlFeature::XML_WITH_ICONV) => {}
         //   Some(xmlFeature::XML_WITH_ISO8859X) => {}
-        Some(XmlFeature::XmlWithUnicode) => {
-            cfg!(feature = "libxml_unicode")
-        }
-        Some(XmlFeature::XmlWithRegexp) => {
-            cfg!(feature = "libxml_regexp")
-        }
-        Some(XmlFeature::XmlWithAutomata) => {
-            cfg!(feature = "libxml_automata")
-        }
-        Some(XmlFeature::XmlWithExpr) => {
-            cfg!(feature = "libxml_expr")
-        }
-        Some(XmlFeature::XmlWithSchemas) => {
-            cfg!(feature = "schema")
-        }
-        Some(XmlFeature::XmlWithSchematron) => {
-            cfg!(feature = "schematron")
-        }
+        Some(XmlFeature::XmlWithUnicode) => cfg!(feature = "libxml_unicode"),
+        Some(XmlFeature::XmlWithRegexp) => cfg!(feature = "libxml_regexp"),
+        Some(XmlFeature::XmlWithAutomata) => cfg!(feature = "libxml_automata"),
+        Some(XmlFeature::XmlWithExpr) => cfg!(feature = "libxml_expr"),
+        Some(XmlFeature::XmlWithSchemas) => cfg!(feature = "schema"),
+        Some(XmlFeature::XmlWithSchematron) => cfg!(feature = "schematron"),
         //   xmlFeature::XML_WITH_MODULES => {}
         //   xmlFeature::XML_WITH_DEBUG => {}
         //   xmlFeature::XML_WITH_DEBUG_MEM => {}
@@ -5920,159 +5783,6 @@ pub fn xml_has_feature(feature: Option<XmlFeature>) -> bool {
         //   xmlFeature::XML_WITH_LZMA => {}
         //   xmlFeature::XML_WITH_ICU => {}
         _ => false,
-    }
-}
-
-/// Parse an External ID or a Public ID
-///
-/// # Note
-/// Productions [75] and [83] interact badly since [75] can generate
-/// 'PUBLIC' S PubidLiteral S SystemLiteral
-///
-/// `[75] ExternalID ::= 'SYSTEM' S SystemLiteral | 'PUBLIC' S PubidLiteral S SystemLiteral`
-///
-/// `[83] PublicID ::= 'PUBLIC' S PubidLiteral`
-///
-/// Returns the function returns SystemLiteral and in the second
-/// case publicID receives PubidLiteral, is strict is off
-/// it is possible to return NULL and have publicID set.
-#[doc(alias = "xmlParseExternalID")]
-pub(crate) unsafe fn xml_parse_external_id(
-    ctxt: XmlParserCtxtPtr,
-    public_id: *mut *mut XmlChar,
-    strict: i32,
-) -> *mut XmlChar {
-    unsafe {
-        let mut uri: *mut XmlChar = null_mut();
-
-        *public_id = null_mut();
-        if (*ctxt).content_bytes().starts_with(b"SYSTEM") {
-            (*ctxt).advance(6);
-            if (*ctxt).skip_blanks() == 0 {
-                xml_fatal_err_msg(
-                    ctxt,
-                    XmlParserErrors::XmlErrSpaceRequired,
-                    "Space required after b'SYSTEM'\n",
-                );
-            }
-            uri = xml_parse_system_literal(ctxt);
-            if uri.is_null() {
-                xml_fatal_err(ctxt, XmlParserErrors::XmlErrURIRequired, None);
-            }
-        } else if (*ctxt).content_bytes().starts_with(b"PUBLIC") {
-            (*ctxt).advance(6);
-            if (*ctxt).skip_blanks() == 0 {
-                xml_fatal_err_msg(
-                    ctxt,
-                    XmlParserErrors::XmlErrSpaceRequired,
-                    "Space required after 'PUBLIC'\n",
-                );
-            }
-            *public_id = xml_parse_pubid_literal(ctxt);
-            if (*public_id).is_null() {
-                xml_fatal_err(ctxt, XmlParserErrors::XmlErrPubidRequired, None);
-            }
-            if strict != 0 {
-                // We don't handle [83] so "S SystemLiteral" is required.
-                if (*ctxt).skip_blanks() == 0 {
-                    xml_fatal_err_msg(
-                        ctxt,
-                        XmlParserErrors::XmlErrSpaceRequired,
-                        "Space required after the Public Identifier\n",
-                    );
-                }
-            } else {
-                // We handle [83] so we return immediately, if
-                // "S SystemLiteral" is not detected. We skip blanks if no
-                // system literal was found, but this is harmless since we must
-                // be at the end of a NotationDecl.
-                if (*ctxt).skip_blanks() == 0 {
-                    return null_mut();
-                }
-                if (*ctxt).current_byte() != b'\'' && (*ctxt).current_byte() != b'"' {
-                    return null_mut();
-                }
-            }
-            uri = xml_parse_system_literal(ctxt);
-            if uri.is_null() {
-                xml_fatal_err(ctxt, XmlParserErrors::XmlErrURIRequired, None);
-            }
-        }
-        uri
-    }
-}
-
-/// Parse an XML public literal
-///
-/// `[12] PubidLiteral ::= '"' PubidChar* '"' | "'" (PubidChar - "'")* "'"`
-///
-/// Returns the PubidLiteral parsed or NULL.
-#[doc(alias = "xmlParsePubidLiteral")]
-pub(crate) unsafe fn xml_parse_pubid_literal(ctxt: XmlParserCtxtPtr) -> *mut XmlChar {
-    unsafe {
-        let mut buf: *mut XmlChar;
-        let mut len: i32 = 0;
-        let mut size: i32 = XML_PARSER_BUFFER_SIZE as i32;
-        let max_length: i32 = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
-            XML_MAX_TEXT_LENGTH as i32
-        } else {
-            XML_MAX_NAME_LENGTH as i32
-        };
-        let mut cur: XmlChar;
-        let stop: XmlChar;
-        let oldstate: XmlParserInputState = (*ctxt).instate;
-
-        if (*ctxt).current_byte() == b'"' {
-            (*ctxt).skip_char();
-            stop = b'"';
-        } else if (*ctxt).current_byte() == b'\'' {
-            (*ctxt).skip_char();
-            stop = b'\'';
-        } else {
-            xml_fatal_err(ctxt, XmlParserErrors::XmlErrLiteralNotStarted, None);
-            return null_mut();
-        }
-        buf = xml_malloc_atomic(size as usize) as *mut XmlChar;
-        if buf.is_null() {
-            xml_err_memory(ctxt, None);
-            return null_mut();
-        }
-        (*ctxt).instate = XmlParserInputState::XmlParserPublicLiteral;
-        cur = (*ctxt).current_byte();
-        while xml_is_pubid_char(cur as u32) && cur != stop {
-            // checked
-            if len + 1 >= size {
-                size *= 2;
-                let tmp: *mut XmlChar = xml_realloc(buf as _, size as usize) as *mut XmlChar;
-                if tmp.is_null() {
-                    xml_err_memory(ctxt, None);
-                    xml_free(buf as _);
-                    return null_mut();
-                }
-                buf = tmp;
-            }
-            *buf.add(len as usize) = cur;
-            len += 1;
-            if len > max_length {
-                xml_fatal_err(ctxt, XmlParserErrors::XmlErrNameTooLong, Some("Public ID"));
-                xml_free(buf as _);
-                return null_mut();
-            }
-            (*ctxt).skip_char();
-            cur = (*ctxt).current_byte();
-        }
-        *buf.add(len as usize) = 0;
-        if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-            xml_free(buf as _);
-            return null_mut();
-        }
-        if cur != stop {
-            xml_fatal_err(ctxt, XmlParserErrors::XmlErrLiteralNotFinished, None);
-        } else {
-            (*ctxt).advance_with_line_handling(1);
-        }
-        (*ctxt).instate = oldstate;
-        buf
     }
 }
 
@@ -6090,8 +5800,6 @@ pub(crate) unsafe fn xml_parse_pubid_literal(ctxt: XmlParserCtxtPtr) -> *mut Xml
 pub(crate) unsafe fn xml_parse_notation_decl(ctxt: XmlParserCtxtPtr) {
     unsafe {
         let name: *const XmlChar;
-        let mut pubid: *mut XmlChar = null_mut();
-        let systemid: *mut XmlChar;
 
         if (*ctxt).current_byte() != b'<' || (*ctxt).nth_byte(1) != b'!' {
             return;
@@ -6134,7 +5842,7 @@ pub(crate) unsafe fn xml_parse_notation_decl(ctxt: XmlParserCtxtPtr) {
             }
 
             // Parse the IDs.
-            systemid = xml_parse_external_id(ctxt, addr_of_mut!(pubid), 0);
+            let (pubid, systemid) = parse_external_id(&mut *ctxt, false);
             (*ctxt).skip_blanks();
 
             if (*ctxt).current_byte() == b'>' {
@@ -6153,23 +5861,13 @@ pub(crate) unsafe fn xml_parse_notation_decl(ctxt: XmlParserCtxtPtr) {
                         notation_decl(
                             (*ctxt).user_data.clone(),
                             &name,
-                            (!pubid.is_null())
-                                .then(|| CStr::from_ptr(pubid as *const i8).to_string_lossy())
-                                .as_deref(),
-                            (!systemid.is_null())
-                                .then(|| CStr::from_ptr(systemid as *const i8).to_string_lossy())
-                                .as_deref(),
+                            pubid.as_deref(),
+                            systemid.as_deref(),
                         );
                     }
                 }
             } else {
                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrNotationNotFinished, None);
-            }
-            if !systemid.is_null() {
-                xml_free(systemid as _);
-            }
-            if !pubid.is_null() {
-                xml_free(pubid as _);
             }
         }
     }
@@ -6177,17 +5875,14 @@ pub(crate) unsafe fn xml_parse_notation_decl(ctxt: XmlParserCtxtPtr) {
 
 /// Parse an entity declaration. Always consumes '<!'.
 ///
-/// `[70] EntityDecl ::= GEDecl | PEDecl`
-///
-/// `[71] GEDecl ::= '<!ENTITY' S Name S EntityDef S? '>'`
-///
-/// `[72] PEDecl ::= '<!ENTITY' S '%' S Name S PEDef S? '>'`
-///
-/// `[73] EntityDef ::= EntityValue | (ExternalID NDataDecl?)`
-///
-/// `[74] PEDef ::= EntityValue | ExternalID`
-///
-/// `[76] NDataDecl ::= S 'NDATA' S Name`
+/// ```text
+/// [70] EntityDecl ::= GEDecl | PEDecl
+/// [71] GEDecl ::= '<!ENTITY' S Name S EntityDef S? '>'
+/// [72] PEDecl ::= '<!ENTITY' S '%' S Name S PEDef S? '>'
+/// [73] EntityDef ::= EntityValue | (ExternalID NDataDecl?)
+/// [74] PEDef ::= EntityValue | ExternalID
+/// [76] NDataDecl ::= S 'NDATA' S Name
+/// ```
 ///
 /// `[ VC: Notation Declared ]`  
 /// The Name must match the declared name of a notation.
@@ -6195,8 +5890,6 @@ pub(crate) unsafe fn xml_parse_notation_decl(ctxt: XmlParserCtxtPtr) {
 pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
     unsafe {
         let name: *const XmlChar;
-        let mut uri: *mut XmlChar = null_mut();
-        let mut literal: *mut XmlChar = null_mut();
         let ndata: *const XmlChar;
         let mut is_parameter: i32 = 0;
 
@@ -6282,14 +5975,12 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                         }
                     }
                 } else {
-                    uri = xml_parse_external_id(ctxt, addr_of_mut!(literal), 1);
-                    if uri.is_null() && literal.is_null() {
+                    let (literal, uri) = parse_external_id(&mut *ctxt, true);
+                    if uri.is_none() && literal.is_none() {
                         xml_fatal_err(ctxt, XmlParserErrors::XmlErrValueRequired, None);
                     }
-                    if !uri.is_null() {
-                        if let Some(parsed_uri) =
-                            XmlURI::parse(&CStr::from_ptr(uri as *const i8).to_string_lossy())
-                        {
+                    if let Some(uri) = uri {
+                        if let Some(parsed_uri) = XmlURI::parse(&uri) {
                             // This really ought to be a well formedness error
                             // but the XML Core WG decided otherwise c.f. issue
                             // E26 of the XML erratas.
@@ -6304,23 +5995,13 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                                         (*ctxt).user_data.clone(),
                                         &name,
                                         XmlEntityType::XmlExternalParameterEntity,
-                                        (!literal.is_null())
-                                            .then(|| {
-                                                CStr::from_ptr(literal as *const i8)
-                                                    .to_string_lossy()
-                                            })
-                                            .as_deref(),
-                                        (!uri.is_null())
-                                            .then(|| {
-                                                CStr::from_ptr(uri as *const i8).to_string_lossy()
-                                            })
-                                            .as_deref(),
+                                        literal.as_deref(),
+                                        Some(&uri),
                                         None,
                                     );
                                 }
                             }
                         } else {
-                            let uri = CStr::from_ptr(uri as *const i8).to_string_lossy();
                             xml_err_msg_str!(
                                 ctxt,
                                 XmlParserErrors::XmlErrInvalidURI,
@@ -6358,13 +6039,6 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                         (*ctxt).my_doc = xml_new_doc(Some(SAX_COMPAT_MODE));
                         let Some(mut my_doc) = (*ctxt).my_doc else {
                             xml_err_memory(ctxt, Some("New Doc failed"));
-                            // goto done;
-                            if !uri.is_null() {
-                                xml_free(uri as _);
-                            }
-                            if !literal.is_null() {
-                                xml_free(literal as _);
-                            }
                             return;
                         };
                         my_doc.properties = XmlDocProperties::XmlDocInternal as i32;
@@ -6384,14 +6058,12 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                     );
                 }
             } else {
-                uri = xml_parse_external_id(ctxt, addr_of_mut!(literal), 1);
-                if uri.is_null() && literal.is_null() {
+                let (literal, uri) = parse_external_id(&mut *ctxt, true);
+                if uri.is_none() && literal.is_none() {
                     xml_fatal_err(ctxt, XmlParserErrors::XmlErrValueRequired, None);
                 }
-                if !uri.is_null() {
-                    if let Some(parsed_uri) =
-                        XmlURI::parse(&CStr::from_ptr(uri as *const i8).to_string_lossy())
-                    {
+                if let Some(uri) = uri.as_deref() {
+                    if let Some(parsed_uri) = XmlURI::parse(uri) {
                         // This really ought to be a well formedness error
                         // but the XML Core WG decided otherwise c.f. issue
                         // E26 of the XML erratas.
@@ -6400,7 +6072,6 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                             xml_fatal_err(ctxt, XmlParserErrors::XmlErrURIFragment, None);
                         }
                     } else {
-                        let uri = CStr::from_ptr(uri as *const i8).to_string_lossy();
                         xml_err_msg_str!(
                             ctxt,
                             XmlParserErrors::XmlErrInvalidURI,
@@ -6435,12 +6106,8 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                             unparsed_ent(
                                 (*ctxt).user_data.clone(),
                                 &name,
-                                (!literal.is_null())
-                                    .then(|| CStr::from_ptr(literal as *const i8).to_string_lossy())
-                                    .as_deref(),
-                                (!uri.is_null())
-                                    .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
-                                    .as_deref(),
+                                literal.as_deref(),
+                                uri.as_deref(),
                                 (!ndata.is_null())
                                     .then(|| CStr::from_ptr(ndata as *const i8).to_string_lossy())
                                     .as_deref(),
@@ -6456,12 +6123,8 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                                 (*ctxt).user_data.clone(),
                                 &name,
                                 XmlEntityType::XmlExternalGeneralParsedEntity,
-                                (!literal.is_null())
-                                    .then(|| CStr::from_ptr(literal as *const i8).to_string_lossy())
-                                    .as_deref(),
-                                (!uri.is_null())
-                                    .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
-                                    .as_deref(),
+                                literal.as_deref(),
+                                uri.as_deref(),
                                 None,
                             );
                         }
@@ -6479,13 +6142,6 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                             (*ctxt).my_doc = xml_new_doc(Some(SAX_COMPAT_MODE));
                             let Some(mut my_doc) = (*ctxt).my_doc else {
                                 xml_err_memory(ctxt, Some("New Doc failed"));
-                                // goto done;
-                                if !uri.is_null() {
-                                    xml_free(uri as _);
-                                }
-                                if !literal.is_null() {
-                                    xml_free(literal as _);
-                                }
                                 return;
                             };
                             my_doc.properties = XmlDocProperties::XmlDocInternal as i32;
@@ -6500,25 +6156,14 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                             Some(GenericErrorContext::new(ctxt)),
                             &name,
                             XmlEntityType::XmlExternalGeneralParsedEntity,
-                            (!literal.is_null())
-                                .then(|| CStr::from_ptr(literal as *const i8).to_string_lossy())
-                                .as_deref(),
-                            (!uri.is_null())
-                                .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
-                                .as_deref(),
+                            literal.as_deref(),
+                            uri.as_deref(),
                             None,
                         );
                     }
                 }
             }
             if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-                // goto done;
-                if !uri.is_null() {
-                    xml_free(uri as _);
-                }
-                if !literal.is_null() {
-                    xml_free(literal as _);
-                }
                 return;
             }
             (*ctxt).skip_blanks();
@@ -6571,14 +6216,6 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                 if let Some(mut cur) = cur.filter(|cur| cur.orig.is_null()) {
                     cur.orig = xml_strndup(orig.as_ptr(), orig.len() as i32);
                 }
-            }
-
-            //  done:
-            if !uri.is_null() {
-                xml_free(uri as _);
-            }
-            if !literal.is_null() {
-                xml_free(literal as _);
             }
         }
     }

@@ -25,7 +25,7 @@ use crate::{
 use super::{parse_string_entity_ref, parse_string_name, parse_string_pereference};
 
 #[doc(alias = "xmlStringDecodeEntitiesInt")]
-pub(crate) unsafe fn string_decode_entities_int(
+pub(super) unsafe fn string_decode_entities_int(
     ctxt: &mut XmlParserCtxt,
     mut s: &str,
     what: i32,
@@ -198,9 +198,10 @@ pub(crate) unsafe fn string_decode_entities_int(
 
 /// Takes a entity string content and process to do the adequate substitutions.
 ///
-/// `[67] Reference ::= EntityRef | CharRef`
-///
-/// `[69] PEReference ::= '%' Name ';'`
+/// ```text
+/// [67] Reference      ::= EntityRef | CharRef
+/// [69] PEReference    ::= '%' Name ';'
+/// ```
 ///
 /// Returns A newly allocated string with the substitution done. The caller must deallocate it !
 #[doc(alias = "xmlStringDecodeEntities")]
@@ -367,7 +368,7 @@ pub(crate) unsafe fn parser_entity_check(ctxt: &mut XmlParserCtxt, extra: u64) -
 /// ```
 ///
 /// If successfully parsed, return (substituted EntityValue, EntityValue without substituted),
-/// otherwise return `None`.
+/// otherwise return `(None, None)`.
 #[doc(alias = "xmlParseEntityValue")]
 pub(crate) unsafe fn parse_entity_value(
     ctxt: &mut XmlParserCtxt,
