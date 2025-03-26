@@ -289,7 +289,7 @@ unsafe fn xml_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
             return null_mut();
         }
         if len > max_length {
-            xml_fatal_err(ctxt, XmlParserErrors::XmlErrNameTooLong, Some("Name"));
+            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrNameTooLong, Some("Name"));
             return null_mut();
         }
         if (*ctxt).input().unwrap().offset_from_base() < len as usize {
@@ -297,7 +297,7 @@ unsafe fn xml_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
             // of the buffer. Check the buffer size to avoid passing an invalid
             // pointer to xmlDictLookup.
             xml_fatal_err(
-                ctxt,
+                &mut *ctxt,
                 XmlParserErrors::XmlErrInternalError,
                 Some("unexpected change of input buffer"),
             );
@@ -365,7 +365,7 @@ pub(crate) unsafe fn xml_parse_name(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
             if *input > 0 && *input < 0x80 {
                 count = input.offset_from((*ctxt).input().unwrap().cur) as _;
                 if count > max_length {
-                    xml_fatal_err(ctxt, XmlParserErrors::XmlErrNameTooLong, Some("Name"));
+                    xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrNameTooLong, Some("Name"));
                     return null_mut();
                 }
                 ret = xml_dict_lookup((*ctxt).dict, (*ctxt).input().unwrap().cur, count as i32);
@@ -434,7 +434,11 @@ pub(crate) unsafe fn xml_parse_nmtoken(ctxt: XmlParserCtxtPtr) -> *mut XmlChar {
                     }
                     COPY_BUF!(l, buffer, len, c);
                     if len > max_length {
-                        xml_fatal_err(ctxt, XmlParserErrors::XmlErrNameTooLong, Some("NmToken"));
+                        xml_fatal_err(
+                            &mut *ctxt,
+                            XmlParserErrors::XmlErrNameTooLong,
+                            Some("NmToken"),
+                        );
                         xml_free(buffer as _);
                         return null_mut();
                     }
@@ -456,7 +460,11 @@ pub(crate) unsafe fn xml_parse_nmtoken(ctxt: XmlParserCtxtPtr) -> *mut XmlChar {
             return null_mut();
         }
         if len > max_length {
-            xml_fatal_err(ctxt, XmlParserErrors::XmlErrNameTooLong, Some("NmToken"));
+            xml_fatal_err(
+                &mut *ctxt,
+                XmlParserErrors::XmlErrNameTooLong,
+                Some("NmToken"),
+            );
             return null_mut();
         }
         xml_strndup(buf.as_ptr() as _, len)
@@ -513,7 +521,7 @@ pub(crate) unsafe fn xml_parse_default_decl(
             val = XmlAttributeDefault::XmlAttributeFixed;
             if (*ctxt).skip_blanks() == 0 {
                 xml_fatal_err_msg(
-                    ctxt,
+                    &mut *ctxt,
                     XmlParserErrors::XmlErrSpaceRequired,
                     "Space required after '#FIXED'\n",
                 );
@@ -525,7 +533,7 @@ pub(crate) unsafe fn xml_parse_default_decl(
             *value = xml_strndup(ret.as_ptr(), ret.len() as i32);
         } else {
             xml_fatal_err_msg(
-                ctxt,
+                &mut *ctxt,
                 XmlParserErrors::try_from((*ctxt).err_no).unwrap(),
                 "Attribute default value declaration error\n",
             );
@@ -554,7 +562,7 @@ pub(crate) unsafe fn xml_parse_notation_type(
         let mut ret = None::<Box<XmlEnumeration>>;
 
         if (*ctxt).current_byte() != b'(' {
-            xml_fatal_err(ctxt, XmlParserErrors::XmlErrNotationNotStarted, None);
+            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrNotationNotStarted, None);
             return None;
         }
         while {
@@ -562,7 +570,7 @@ pub(crate) unsafe fn xml_parse_notation_type(
             (*ctxt).skip_blanks();
             let Some(name) = parse_name(&mut *ctxt) else {
                 xml_fatal_err_msg(
-                    ctxt,
+                    &mut *ctxt,
                     XmlParserErrors::XmlErrNameRequired,
                     "Name expected in NOTATION declaration\n",
                 );
@@ -596,7 +604,7 @@ pub(crate) unsafe fn xml_parse_notation_type(
             (*ctxt).current_byte() == b'|'
         } {}
         if (*ctxt).current_byte() != b')' {
-            xml_fatal_err(ctxt, XmlParserErrors::XmlErrNotationNotFinished, None);
+            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrNotationNotFinished, None);
             return None;
         }
         (*ctxt).skip_char();
@@ -620,14 +628,14 @@ pub(crate) unsafe fn xml_parse_enumeration_type(
         let mut ret = None::<Box<XmlEnumeration>>;
 
         if (*ctxt).current_byte() != b'(' {
-            xml_fatal_err(ctxt, XmlParserErrors::XmlErrAttlistNotStarted, None);
+            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrAttlistNotStarted, None);
             return None;
         }
         while {
             (*ctxt).skip_char();
             (*ctxt).skip_blanks();
             let Some(name) = parse_nmtoken(&mut *ctxt) else {
-                xml_fatal_err(ctxt, XmlParserErrors::XmlErrNmtokenRequired, None);
+                xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrNmtokenRequired, None);
                 return ret;
             };
             let mut tmp = ret.as_deref();
@@ -658,7 +666,7 @@ pub(crate) unsafe fn xml_parse_enumeration_type(
             (*ctxt).current_byte() == b'|'
         } {}
         if (*ctxt).current_byte() != b')' {
-            xml_fatal_err(ctxt, XmlParserErrors::XmlErrAttlistNotFinished, None);
+            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrAttlistNotFinished, None);
             return ret;
         }
         (*ctxt).skip_char();
@@ -683,7 +691,7 @@ pub(crate) unsafe fn xml_parse_enumerated_type(
             (*ctxt).advance(8);
             if (*ctxt).skip_blanks() == 0 {
                 xml_fatal_err_msg(
-                    ctxt,
+                    &mut *ctxt,
                     XmlParserErrors::XmlErrSpaceRequired,
                     "Space required after 'NOTATION'\n",
                 );
@@ -961,7 +969,7 @@ pub(crate) unsafe fn xml_parse_element_mixed_content_decl(
             if (*ctxt).current_byte() == b')' {
                 if (*ctxt).input().unwrap().id != inputchk {
                     xml_fatal_err_msg(
-                        ctxt,
+                        &mut *ctxt,
                         XmlParserErrors::XmlErrEntityBoundary,
                         "Element content declaration doesn't start and stop in the same entity\n",
                     );
@@ -1040,7 +1048,7 @@ pub(crate) unsafe fn xml_parse_element_mixed_content_decl(
                 elem = parse_name(&mut *ctxt);
                 if elem.is_none() {
                     xml_fatal_err_msg(
-                        ctxt,
+                        &mut *ctxt,
                         XmlParserErrors::XmlErrNameRequired,
                         "xmlParseElementMixedContentDecl : Name expected\n",
                     );
@@ -1066,7 +1074,7 @@ pub(crate) unsafe fn xml_parse_element_mixed_content_decl(
                 }
                 if (*ctxt).input().unwrap().id != inputchk {
                     xml_fatal_err_msg(
-                        ctxt,
+                        &mut *ctxt,
                         XmlParserErrors::XmlErrEntityBoundary,
                         "Element content declaration doesn't start and stop in the same entity\n",
                     );
@@ -1074,11 +1082,11 @@ pub(crate) unsafe fn xml_parse_element_mixed_content_decl(
                 (*ctxt).advance(2);
             } else {
                 xml_free_doc_element_content((*ctxt).my_doc, ret);
-                xml_fatal_err(ctxt, XmlParserErrors::XmlErrMixedNotStarted, None);
+                xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrMixedNotStarted, None);
                 return null_mut();
             }
         } else {
-            xml_fatal_err(ctxt, XmlParserErrors::XmlErrPCDATARequired, None);
+            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrPCDATARequired, None);
         }
         ret
     }
@@ -1203,14 +1211,18 @@ pub(crate) unsafe fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> Option<XmlE
         (*ctxt).skip_char();
         let Some(name) = parse_name(&mut *ctxt) else {
             xml_fatal_err_msg(
-                ctxt,
+                &mut *ctxt,
                 XmlParserErrors::XmlErrNameRequired,
                 "xmlParseEntityRef: no name\n",
             );
             return None;
         };
         if (*ctxt).current_byte() != b';' {
-            xml_fatal_err(ctxt, XmlParserErrors::XmlErrEntityRefSemicolMissing, None);
+            xml_fatal_err(
+                &mut *ctxt,
+                XmlParserErrors::XmlErrEntityRefSemicolMissing,
+                None,
+            );
             return None;
         }
         (*ctxt).skip_char();
@@ -1392,7 +1404,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
             || (*oldctxt).depth > 100
         {
             xml_fatal_err_msg(
-                oldctxt,
+                &mut *oldctxt,
                 XmlParserErrors::XmlErrEntityLoop,
                 "Maximum entity nesting depth exceeded",
             );
@@ -1493,12 +1505,12 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
 
         xml_parse_content(ctxt);
         if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1) == b'/' {
-            xml_fatal_err(ctxt, XmlParserErrors::XmlErrNotWellBalanced, None);
+            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrNotWellBalanced, None);
         } else if (*ctxt).current_byte() != 0 {
-            xml_fatal_err(ctxt, XmlParserErrors::XmlErrExtraContent, None);
+            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrExtraContent, None);
         }
         if my_doc.children != (*ctxt).node.map(|node| node.into()) {
-            xml_fatal_err(ctxt, XmlParserErrors::XmlErrNotWellBalanced, None);
+            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrNotWellBalanced, None);
         }
 
         if (*ctxt).well_formed == 0 {
@@ -1704,7 +1716,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
             (*ctxt).sizeentcopy = 0;
 
             if ent.flags & XML_ENT_EXPANDING as i32 != 0 {
-                xml_fatal_err(ctxt, XmlParserErrors::XmlErrEntityLoop, None);
+                xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrEntityLoop, None);
                 (*ctxt).halt();
                 return;
             }
@@ -1892,7 +1904,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                     );
                 }
                 if matches!(ret, XmlParserErrors::XmlErrEntityLoop) {
-                    xml_fatal_err(ctxt, XmlParserErrors::XmlErrEntityLoop, None);
+                    xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrEntityLoop, None);
                     return;
                 }
                 if parser_entity_check(&mut *ctxt, 0) != 0 {
@@ -2080,7 +2092,7 @@ pub(crate) unsafe fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
         (*ctxt).skip_char();
         let Some(name) = parse_name(&mut *ctxt) else {
             xml_fatal_err_msg(
-                ctxt,
+                &mut *ctxt,
                 XmlParserErrors::XmlErrPERefNoName,
                 "PEReference: no name\n",
             );
@@ -2090,7 +2102,7 @@ pub(crate) unsafe fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
             generic_error!("PEReference: {}\n", name);
         }
         if (*ctxt).current_byte() != b';' {
-            xml_fatal_err(ctxt, XmlParserErrors::XmlErrPERefSemicolMissing, None);
+            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrPERefSemicolMissing, None);
             return;
         }
 
@@ -2136,7 +2148,7 @@ pub(crate) unsafe fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
                 }
 
                 if entity.flags & XML_ENT_EXPANDING as i32 != 0 {
-                    xml_fatal_err(ctxt, XmlParserErrors::XmlErrEntityLoop, None);
+                    xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrEntityLoop, None);
                     (*ctxt).halt();
                     return;
                 }
@@ -2256,7 +2268,7 @@ pub(crate) unsafe fn xml_parse_doc_type_decl(ctxt: XmlParserCtxtPtr) {
         let name = parse_name(&mut *ctxt);
         if name.is_none() {
             xml_fatal_err_msg(
-                ctxt,
+                &mut *ctxt,
                 XmlParserErrors::XmlErrNameRequired,
                 "xmlParseDocTypeDecl : no DOCTYPE name !\n",
             );
@@ -2302,7 +2314,7 @@ pub(crate) unsafe fn xml_parse_doc_type_decl(ctxt: XmlParserCtxtPtr) {
 
         // We should be at the end of the DOCTYPE declaration.
         if (*ctxt).current_byte() != b'>' {
-            xml_fatal_err(ctxt, XmlParserErrors::XmlErrDoctypeNotFinished, None);
+            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrDoctypeNotFinished, None);
         }
         (*ctxt).skip_char();
     }
@@ -2345,7 +2357,7 @@ pub(crate) unsafe fn xml_parse_attribute(
         (*ctxt).grow();
         let Some(name) = parse_name(&mut *ctxt) else {
             xml_fatal_err_msg(
-                ctxt,
+                &mut *ctxt,
                 XmlParserErrors::XmlErrNameRequired,
                 "error parsing attribute name\n",
             );
@@ -2436,7 +2448,7 @@ pub(crate) unsafe fn xml_parse_start_tag(ctxt: XmlParserCtxtPtr) -> Option<Strin
 
         let Some(name) = parse_name(&mut *ctxt) else {
             xml_fatal_err_msg(
-                ctxt,
+                &mut *ctxt,
                 XmlParserErrors::XmlErrNameRequired,
                 "xmlParseStartTag: invalid element name\n",
             );
@@ -2457,7 +2469,7 @@ pub(crate) unsafe fn xml_parse_start_tag(ctxt: XmlParserCtxtPtr) -> Option<Strin
         {
             let Some(attname) = xml_parse_attribute(ctxt, addr_of_mut!(attvalue)) else {
                 xml_fatal_err_msg(
-                    ctxt,
+                    &mut *ctxt,
                     XmlParserErrors::XmlErrInternalError,
                     "xmlParseStartTag: problem parsing attributes\n",
                 );
@@ -2499,7 +2511,7 @@ pub(crate) unsafe fn xml_parse_start_tag(ctxt: XmlParserCtxtPtr) -> Option<Strin
             }
             if (*ctxt).skip_blanks() == 0 {
                 xml_fatal_err_msg(
-                    ctxt,
+                    &mut *ctxt,
                     XmlParserErrors::XmlErrSpaceRequired,
                     "attributes construct error\n",
                 );
@@ -2932,7 +2944,11 @@ pub unsafe fn xml_parse_external_subset(
             {
                 xml_parse_markup_decl(ctxt);
             } else {
-                xml_fatal_err(ctxt, XmlParserErrors::XmlErrExtSubsetNotFinished, None);
+                xml_fatal_err(
+                    &mut *ctxt,
+                    XmlParserErrors::XmlErrExtSubsetNotFinished,
+                    None,
+                );
                 (*ctxt).halt();
                 return;
             }
@@ -2941,7 +2957,11 @@ pub unsafe fn xml_parse_external_subset(
         }
 
         if (*ctxt).current_byte() != 0 {
-            xml_fatal_err(ctxt, XmlParserErrors::XmlErrExtSubsetNotFinished, None);
+            xml_fatal_err(
+                &mut *ctxt,
+                XmlParserErrors::XmlErrExtSubsetNotFinished,
+                None,
+            );
         }
     }
 }
@@ -3116,13 +3136,13 @@ pub(crate) unsafe fn xml_string_current_char(
 //                 return;
 //             }
 //             XmlParserInputState::XmlParserEOF => {
-//                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrPERefAtEOF, None);
+//                 xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrPERefAtEOF, None);
 //                 return;
 //             }
 //             XmlParserInputState::XmlParserProlog
 //             | XmlParserInputState::XmlParserStart
 //             | XmlParserInputState::XmlParserMisc => {
-//                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrPERefInProlog, None);
+//                 xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrPERefInProlog, None);
 //                 return;
 //             }
 //             XmlParserInputState::XmlParserEntityDecl
@@ -3135,7 +3155,7 @@ pub(crate) unsafe fn xml_string_current_char(
 //                 return;
 //             }
 //             XmlParserInputState::XmlParserEpilog => {
-//                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrPERefInEpilog, None);
+//                 xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrPERefInEpilog, None);
 //                 return;
 //             }
 //             XmlParserInputState::XmlParserEntityValue => {

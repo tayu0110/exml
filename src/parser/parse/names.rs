@@ -287,38 +287,36 @@ pub(crate) unsafe fn parse_name(ctxt: &mut XmlParserCtxt) -> Option<String> {
 
 /// Parse an XML name.
 ///
-/// `[4] NameChar ::= Letter | Digit | '.' | '-' | '_' | ':' | CombiningChar | Extender`
-///
-/// `[5] Name ::= (Letter | '_' | ':') (NameChar)*`
-///
-/// `[6] Names ::= Name (#x20 Name)*`
+/// ```text
+/// [4] NameChar ::= Letter | Digit | '.' | '-' | '_' | ':' | CombiningChar | Extender
+/// [5] Name ::= (Letter | '_' | ':') (NameChar)*
+/// [6] Names ::= Name (#x20 Name)*
+/// ```
 ///
 /// Returns the Name parsed or NULL. The @str pointer is updated to the current location in the string.
 #[doc(alias = "xmlParseStringName")]
-pub(crate) unsafe fn parse_string_name<'a>(
+pub(crate) fn parse_string_name<'a>(
     ctxt: &mut XmlParserCtxt,
     s: &'a str,
 ) -> (Option<&'a str>, &'a str) {
-    unsafe {
-        let max_length = if ctxt.options & XmlParserOption::XmlParseHuge as i32 != 0 {
-            XML_MAX_TEXT_LENGTH
-        } else {
-            XML_MAX_NAME_LENGTH
-        };
+    let max_length = if ctxt.options & XmlParserOption::XmlParseHuge as i32 != 0 {
+        XML_MAX_TEXT_LENGTH
+    } else {
+        XML_MAX_NAME_LENGTH
+    };
 
-        if s.starts_with(|c: char| !c.is_name_start_char(ctxt)) {
-            return (None, s);
-        }
-        let pos = s.find(|c: char| !c.is_name_char(ctxt)).unwrap_or(s.len());
-
-        if pos > max_length {
-            xml_fatal_err(ctxt, XmlParserErrors::XmlErrNameTooLong, Some("NCName"));
-            return (None, s);
-        }
-
-        let (name, rem) = s.split_at(pos);
-        (Some(name), rem)
+    if s.starts_with(|c: char| !c.is_name_start_char(ctxt)) {
+        return (None, s);
     }
+    let pos = s.find(|c: char| !c.is_name_char(ctxt)).unwrap_or(s.len());
+
+    if pos > max_length {
+        xml_fatal_err(ctxt, XmlParserErrors::XmlErrNameTooLong, Some("NCName"));
+        return (None, s);
+    }
+
+    let (name, rem) = s.split_at(pos);
+    (Some(name), rem)
 }
 
 /// Parse an XML Namespace QName
