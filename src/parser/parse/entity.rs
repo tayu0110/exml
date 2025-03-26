@@ -10,7 +10,9 @@ use crate::{
             XML_ENT_FIXED_COST, XML_PARSER_ALLOWED_EXPANSION, XML_PARSER_NON_LINEAR,
             XmlParserInputState, XmlParserOption,
         },
-        parser_internals::{XML_SUBSTITUTE_PEREF, XML_SUBSTITUTE_REF},
+        parser_internals::{
+            XML_MAX_HUGE_LENGTH, XML_MAX_TEXT_LENGTH, XML_SUBSTITUTE_PEREF, XML_SUBSTITUTE_REF,
+        },
         xmlstring::xml_strndup,
     },
     parser::{
@@ -20,7 +22,7 @@ use crate::{
     tree::{NodeCommon, XML_ENT_EXPANDING, XML_ENT_PARSED, XmlEntityPtr, XmlEntityType},
 };
 
-use super::{parse_string_entity_ref, parse_string_pereference};
+use super::{parse_string_entity_ref, parse_string_name, parse_string_pereference};
 
 #[doc(alias = "xmlStringDecodeEntitiesInt")]
 pub(crate) unsafe fn string_decode_entities_int(
@@ -219,10 +221,7 @@ pub(crate) unsafe fn string_decode_entities(
 ///
 /// Returns 0 in case of success and -1 in case of failure
 #[doc(alias = "xmlLoadEntityContent")]
-pub(crate) unsafe fn load_entity_content(
-    ctxt: &mut XmlParserCtxt,
-    mut entity: XmlEntityPtr,
-) -> i32 {
+unsafe fn load_entity_content(ctxt: &mut XmlParserCtxt, mut entity: XmlEntityPtr) -> i32 {
     unsafe {
         let mut l: i32 = 0;
 
@@ -358,5 +357,143 @@ pub(crate) unsafe fn parser_entity_check(ctxt: &mut XmlParserCtxt, extra: u64) -
         }
 
         0
+    }
+}
+
+/// Parse a value for ENTITY declarations
+///
+/// ```text
+/// [9] EntityValue ::= '"' ([^%&"] | PEReference | Reference)* '"' | "'" ([^%&'] | PEReference | Reference)* "'"
+/// ```
+///
+/// If successfully parsed, return (substituted EntityValue, EntityValue without substituted),
+/// otherwise return `None`.
+#[doc(alias = "xmlParseEntityValue")]
+pub(crate) unsafe fn parse_entity_value(
+    ctxt: &mut XmlParserCtxt,
+) -> (Option<String>, Option<String>) {
+    unsafe {
+        let mut l: i32 = 0;
+        let max_length = if ctxt.options & XmlParserOption::XmlParseHuge as i32 != 0 {
+            XML_MAX_HUGE_LENGTH
+        } else {
+            XML_MAX_TEXT_LENGTH
+        };
+
+        if !matches!(ctxt.current_byte(), b'"' | b'\'') {
+            xml_fatal_err(ctxt, XmlParserErrors::XmlErrEntityNotStarted, None);
+            return (None, None);
+        }
+
+        let stop = ctxt.current_byte();
+
+        // The content of the entity definition is copied in a buffer.
+        let mut buf = String::new();
+
+        ctxt.instate = XmlParserInputState::XmlParserEntityValue;
+        let inputid = ctxt.input().unwrap().id;
+        ctxt.grow();
+        if matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
+            return (None, None);
+        }
+        ctxt.skip_char();
+        let mut c = ctxt.current_char(&mut l).unwrap_or('\0');
+        // NOTE: 4.4.5 Included in Literal
+        // When a parameter entity reference appears in a literal entity
+        // value, ... a single or double quote character in the replacement
+        // text is always treated as a normal data character and will not
+        // terminate the literal.
+        // In practice it means we stop the loop only when back at parsing
+        // the initial entity and the quote is found
+        while xml_is_char(c as u32)
+            && (c as i32 != stop as i32 || ctxt.input().unwrap().id != inputid)
+            && !matches!(ctxt.instate, XmlParserInputState::XmlParserEOF)
+        {
+            buf.push(c);
+            ctxt.advance_with_line_handling(c.len_utf8());
+            ctxt.grow();
+            c = ctxt.current_char(&mut l).unwrap_or('\0');
+            if c == '\0' {
+                ctxt.grow();
+                c = ctxt.current_char(&mut l).unwrap_or('\0');
+            }
+
+            if buf.len() > max_length {
+                xml_fatal_err_msg(
+                    ctxt,
+                    XmlParserErrors::XmlErrEntityNotFinished,
+                    "entity value too long\n",
+                );
+                return (None, None);
+            }
+        }
+        if matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
+            return (None, None);
+        }
+        if c as i32 != stop as i32 {
+            xml_fatal_err(ctxt, XmlParserErrors::XmlErrEntityNotFinished, None);
+            return (None, None);
+        }
+        ctxt.skip_char();
+
+        // Raise problem w.r.t. '&' and '%' being used in non-entities
+        // reference constructs. Note Charref will be handled in
+        // xmlStringDecodeEntities()
+        let mut cur = buf.as_str();
+        while let Some(pos) = cur.find(['&', '%']) {
+            cur = &cur[pos..];
+            if cur.starts_with("&#") {
+                cur = &cur[1..];
+                continue;
+            }
+
+            let tmp = cur.as_bytes()[0];
+            // trim the head of '&' or '%'
+            cur = &cur[1..];
+            let (name, rem) = parse_string_name(ctxt, cur);
+            cur = rem;
+
+            if name.is_none() || !cur.starts_with(';') {
+                xml_fatal_err_msg_int!(
+                    ctxt,
+                    XmlParserErrors::XmlErrEntityCharError,
+                    format!(
+                        "EntityValue: '{}' forbidden except for entities references\n",
+                        tmp as char
+                    )
+                    .as_str(),
+                    tmp as i32
+                );
+                return (None, None);
+            }
+
+            if tmp == b'%' && ctxt.in_subset == 1 && ctxt.input_tab.len() == 1 {
+                xml_fatal_err(ctxt, XmlParserErrors::XmlErrEntityPEInternal, None);
+                return (None, None);
+            }
+
+            // trim the head of ';'
+            cur = &cur[1..];
+        }
+
+        // Then PEReference entities are substituted.
+        //
+        // NOTE: 4.4.7 Bypassed
+        // When a general entity reference appears in the EntityValue in
+        // an entity declaration, it is bypassed and left as is.
+        // so XML_SUBSTITUTE_REF is not set here.
+        ctxt.depth += 1;
+        let ret = string_decode_entities_int(
+            ctxt,
+            &buf,
+            XML_SUBSTITUTE_PEREF as i32,
+            '\0',
+            '\0',
+            '\0',
+            1,
+        );
+        ctxt.depth -= 1;
+
+        (ret, Some(buf))
     }
 }
