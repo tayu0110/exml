@@ -48,11 +48,10 @@ use crate::{
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         parser::{
             XML_SKIP_IDS, XmlDefAttrs, XmlDefAttrsPtr, XmlParserInputState, XmlParserMode,
-            XmlParserOption, xml_parse_cdsect, xml_parse_char_data_internal,
-            xml_parse_conditional_sections, xml_parse_element_children_content_decl_priv,
-            xml_parse_end_tag1, xml_parse_end_tag2, xml_parse_external_entity_private,
-            xml_parse_markup_decl, xml_parse_start_tag2, xml_parser_add_node_info,
-            xml_parser_find_node_info,
+            XmlParserOption, xml_parse_cdsect, xml_parse_conditional_sections,
+            xml_parse_element_children_content_decl_priv, xml_parse_end_tag1, xml_parse_end_tag2,
+            xml_parse_external_entity_private, xml_parse_markup_decl, xml_parse_start_tag2,
+            xml_parser_add_node_info, xml_parser_find_node_info,
         },
         sax2::xml_sax2_get_entity,
         valid::{
@@ -63,10 +62,10 @@ use crate::{
     },
     parser::{
         __xml_err_encoding, XmlParserCharValid, XmlParserCtxtPtr, XmlParserInput,
-        XmlParserNodeInfo, parse_att_value, parse_external_id, parser_entity_check, split_qname2,
-        xml_err_encoding_int, xml_err_memory, xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg,
-        xml_fatal_err_msg_int, xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str,
-        xml_validity_error, xml_warning_msg,
+        XmlParserNodeInfo, parse_att_value, parse_char_data_internal, parse_external_id,
+        parser_entity_check, split_qname2, xml_err_encoding_int, xml_err_memory, xml_err_msg_str,
+        xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_int, xml_fatal_err_msg_str,
+        xml_fatal_err_msg_str_int_str, xml_validity_error, xml_warning_msg,
     },
     tree::{
         NodeCommon, XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
@@ -474,7 +473,7 @@ pub(crate) unsafe fn xml_parse_nmtoken(ctxt: XmlParserCtxtPtr) -> *mut XmlChar {
 // #[doc(alias = "xmlParseCharData")]
 // pub(crate) unsafe fn xml_parse_char_data(ctxt: XmlParserCtxtPtr, _cdata: i32) {
 //     unsafe {
-//         xml_parse_char_data_internal(ctxt, 0);
+//         parse_char_data_internal(&mut *ctxt, 0);
 //     }
 // }
 
@@ -2822,7 +2821,7 @@ pub(crate) unsafe fn xml_parse_content_internal(ctxt: XmlParserCtxtPtr) {
             }
             // Last case, text. Note that References are handled directly.
             else {
-                xml_parse_char_data_internal(ctxt, 0);
+                parse_char_data_internal(&mut *ctxt, 0);
             }
 
             (*ctxt).shrink();

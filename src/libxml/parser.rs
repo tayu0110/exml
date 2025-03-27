@@ -49,7 +49,7 @@ use std::{
     ffi::{CStr, CString, c_char, c_void},
     io::Read,
     mem::{size_of, take},
-    ptr::{addr_of_mut, fn_addr_eq, null, null_mut},
+    ptr::{addr_of_mut, null, null_mut},
     rc::Rc,
     slice::from_raw_parts,
     str::from_utf8,
@@ -96,22 +96,20 @@ use crate::{
             xml_parse_pe_reference, xml_parse_reference, xml_parse_start_tag,
         },
         sax2::{xml_sax2_entity_decl, xml_sax2_get_entity},
-        valid::{
-            xml_free_doc_element_content, xml_is_mixed_element, xml_new_doc_element_content,
-            xml_validate_root,
-        },
+        valid::{xml_free_doc_element_content, xml_new_doc_element_content, xml_validate_root},
         xmlmemory::{xml_cleanup_memory_internal, xml_init_memory_internal},
         xmlschemastypes::xml_schema_cleanup_types,
         xmlstring::{XmlChar, xml_strndup},
     },
     parser::{
         __xml_err_encoding, XmlParserCharValid, XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput,
-        XmlParserNodeInfo, check_cdata_push, parse_attribute2, parse_comment, parse_entity_value,
-        parse_external_id, parse_name, parse_pi, parse_qname, parse_text_decl, parse_xmldecl,
-        xml_create_entity_parser_ctxt_internal, xml_create_memory_parser_ctxt,
-        xml_err_attribute_dup, xml_err_memory, xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg,
-        xml_fatal_err_msg_int, xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str,
-        xml_free_parser_ctxt, xml_new_sax_parser_ctxt, xml_ns_err, xml_ns_warn, xml_validity_error,
+        XmlParserNodeInfo, check_cdata_push, parse_attribute2, parse_char_data_internal,
+        parse_comment, parse_entity_value, parse_external_id, parse_name, parse_pi, parse_qname,
+        parse_text_decl, parse_xmldecl, xml_create_entity_parser_ctxt_internal,
+        xml_create_memory_parser_ctxt, xml_err_attribute_dup, xml_err_memory, xml_err_msg_str,
+        xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_int, xml_fatal_err_msg_str,
+        xml_fatal_err_msg_str_int_str, xml_free_parser_ctxt, xml_new_sax_parser_ctxt, xml_ns_err,
+        xml_ns_warn, xml_validity_error,
     },
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlAttributeDefault, XmlAttributeType, XmlDocProperties,
@@ -2708,7 +2706,7 @@ pub unsafe fn xml_create_push_parser_ctxt(
     }
 }
 
-const XML_PARSER_BIG_BUFFER_SIZE: usize = 300;
+pub(crate) const XML_PARSER_BIG_BUFFER_SIZE: usize = 300;
 const XML_PARSER_BUFFER_SIZE: usize = 100;
 
 /// Check whether the input buffer contains a string.
@@ -3570,433 +3568,6 @@ unsafe fn xml_parse_lookup_char_data(ctxt: XmlParserCtxtPtr) -> i32 {
     }
 }
 
-// used for the test in the inner loop of the c_char data testing
-const TEST_CHAR_DATA: [u8; 256] = [
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, /* 0x9, CR/LF separated */
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x00, 0x27, /* & */
-    0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37,
-    0x38, 0x39, 0x3A, 0x3B, 0x00, 0x3D, 0x3E, 0x3F, /* < */
-    0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C, 0x4D, 0x4E, 0x4F,
-    0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5A, 0x5B, 0x5C, 0x00, 0x5E,
-    0x5F, /* ] */
-    0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6A, 0x6B, 0x6C, 0x6D, 0x6E, 0x6F,
-    0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7A, 0x7B, 0x7C, 0x7D, 0x7E, 0x7F,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* non-ascii */
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-];
-
-/// Is this a sequence of blank chars that one can ignore ?
-///
-/// Returns 1 if ignorable 0 otherwise.
-#[doc(alias = "areBlanks")]
-unsafe fn are_blanks(
-    ctxt: XmlParserCtxtPtr,
-    str: *const XmlChar,
-    len: i32,
-    blank_chars: i32,
-) -> i32 {
-    unsafe {
-        let ret: i32;
-
-        // Don't spend time trying to differentiate them, the same callback is used !
-        if (*ctxt).sax.as_deref().is_none_or(|sax| {
-            (sax.ignorable_whitespace.is_none() && sax.characters.is_none())
-                || sax
-                    .ignorable_whitespace
-                    .zip(sax.characters)
-                    .is_some_and(|(l, r)| fn_addr_eq(l, r))
-        }) {
-            return 0;
-        }
-
-        // Check for xml:space value.
-        if (*ctxt).space() == 1 || (*ctxt).space() == -2 {
-            return 0;
-        }
-
-        // Check that the string is made of blanks
-        if blank_chars == 0 {
-            for i in 0..len {
-                if !xml_is_blank_char(*str.add(i as usize) as u32) {
-                    return 0;
-                }
-            }
-        }
-
-        // Look if the element is mixed content in the DTD if available
-        let Some(context_node) = (*ctxt).node else {
-            return 0;
-        };
-        if let Some(my_doc) = (*ctxt).my_doc {
-            ret = xml_is_mixed_element(my_doc, &context_node.name().unwrap());
-            if ret == 0 {
-                return 1;
-            }
-            if ret == 1 {
-                return 0;
-            }
-        }
-
-        // Otherwise, heuristic :-\
-        if (*ctxt).current_byte() != b'<' && (*ctxt).current_byte() != 0xD {
-            return 0;
-        }
-        if context_node.children().is_none()
-            && (*ctxt).current_byte() == b'<'
-            && (*ctxt).nth_byte(1) == b'/'
-        // index out of bound may occur at this `nth_byte` ??? It may be necessary to fix.
-        {
-            return 0;
-        }
-
-        if let Some(last_child) = context_node.get_last_child() {
-            if last_child.is_text_node()
-                || context_node
-                    .children()
-                    .filter(|c| c.is_text_node())
-                    .is_some()
-            {
-                return 0;
-            }
-        } else if context_node.element_type() != XmlElementType::XmlElementNode
-            && !context_node.content.is_null()
-        {
-            return 0;
-        }
-        1
-    }
-}
-
-/// Always makes progress if the first c_char isn't '<' or '&'.
-///
-/// parse a CharData section.this is the fallback function
-/// of xmlParseCharData() when the parsing requires handling
-/// of non-ASCII characters.
-#[doc(alias = "xmlParseCharDataComplex")]
-unsafe fn xml_parse_char_data_complex(ctxt: XmlParserCtxtPtr, partial: i32) {
-    unsafe {
-        let mut buf: [XmlChar; XML_PARSER_BIG_BUFFER_SIZE + 5] =
-            [0; XML_PARSER_BIG_BUFFER_SIZE + 5];
-        let mut nbchar: i32 = 0;
-        let mut l: i32 = 0;
-
-        let mut cur = (*ctxt).current_char(&mut l).unwrap_or('\0');
-        // test also done in xmlCurrentChar()
-        while cur != '<' && cur != '&' && xml_is_char(cur as u32) {
-            if cur == ']' && (*ctxt).nth_byte(1) == b']' && (*ctxt).nth_byte(2) == b'>' {
-                xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrMisplacedCDATAEnd, None);
-            }
-            COPY_BUF!(l, buf.as_mut_ptr(), nbchar, cur);
-            // move current position before possible calling of (*(*ctxt).sax).characters
-            (*ctxt).advance_with_line_handling(l as usize);
-            if nbchar >= XML_PARSER_BIG_BUFFER_SIZE as i32 {
-                buf[nbchar as usize] = 0;
-
-                // OK the segment is to be consumed as chars.
-                if (*ctxt).disable_sax == 0 {
-                    if let Some(sax) = (*ctxt).sax.as_deref_mut() {
-                        if are_blanks(ctxt, buf.as_ptr(), nbchar, 0) != 0 {
-                            if let Some(ignorable_whitespace) = sax.ignorable_whitespace {
-                                let s = from_utf8(&buf[..nbchar as usize]).expect("Internal Error");
-                                ignorable_whitespace((*ctxt).user_data.clone(), s);
-                            }
-                        } else {
-                            if let Some(characters) = sax.characters {
-                                let s = from_utf8(&buf[..nbchar as usize]).expect("Internal Error");
-                                characters((*ctxt).user_data.clone(), s);
-                            }
-                            if (sax.ignorable_whitespace.is_some() || sax.characters.is_some())
-                                && sax
-                                    .ignorable_whitespace
-                                    .zip(sax.characters)
-                                    .is_none_or(|(l, r)| !fn_addr_eq(l, r))
-                                && (*ctxt).space() == -1
-                            {
-                                *(*ctxt).space_mut() = -2;
-                            }
-                        }
-                    }
-                }
-                nbchar = 0;
-                // something really bad happened in the SAX callback
-                if !matches!((*ctxt).instate, XmlParserInputState::XmlParserContent) {
-                    return;
-                }
-                (*ctxt).shrink();
-            }
-            cur = (*ctxt).current_char(&mut l).unwrap_or('\0');
-        }
-        if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-            return;
-        }
-        if nbchar != 0 {
-            buf[nbchar as usize] = 0;
-            // OK the segment is to be consumed as chars.
-            if (*ctxt).disable_sax == 0 {
-                if let Some(sax) = (*ctxt).sax.as_deref_mut() {
-                    if are_blanks(ctxt, buf.as_ptr(), nbchar, 0) != 0 {
-                        if let Some(ignorable_whitespace) = sax.ignorable_whitespace {
-                            let s = from_utf8(&buf[..nbchar as usize]).expect("Internal Error");
-                            ignorable_whitespace((*ctxt).user_data.clone(), s);
-                        }
-                    } else {
-                        if let Some(characters) = sax.characters {
-                            let s = from_utf8(&buf[..nbchar as usize]).expect("Internal Error");
-                            characters((*ctxt).user_data.clone(), s);
-                        }
-                        if (sax.ignorable_whitespace.is_some() || sax.characters.is_some())
-                            && sax
-                                .ignorable_whitespace
-                                .zip(sax.characters)
-                                .is_none_or(|(l, r)| !fn_addr_eq(l, r))
-                            && (*ctxt).space() == -1
-                        {
-                            *(*ctxt).space_mut() = -2;
-                        }
-                    }
-                }
-            }
-        }
-        // cur == 0 can mean
-        //
-        // - xmlParserInputState::XmlParserEOF or memory error. This is checked above.
-        // - An actual 0 character.
-        // - End of buffer.
-        // - An incomplete UTF-8 sequence. This is allowed if partial is set.
-        if (*ctxt).input().unwrap().cur < (*ctxt).input().unwrap().end {
-            if cur == '\0' && (*ctxt).current_byte() != 0 {
-                if partial == 0 {
-                    xml_fatal_err_msg_int!(
-                        ctxt,
-                        XmlParserErrors::XmlErrInvalidChar,
-                        format!(
-                            "Incomplete UTF-8 sequence starting with {:02X}\n",
-                            (*ctxt).current_byte()
-                        )
-                        .as_str(),
-                        (*ctxt).current_byte() as i32
-                    );
-                    (*ctxt).advance_with_line_handling(1);
-                }
-            } else if cur != '<' && cur != '&' {
-                // Generate the error and skip the offending character
-                xml_fatal_err_msg_int!(
-                    ctxt,
-                    XmlParserErrors::XmlErrInvalidChar,
-                    format!("PCDATA invalid Char value {}\n", cur as i32).as_str(),
-                    cur as i32
-                );
-                (*ctxt).advance_with_line_handling(l as usize);
-            }
-        }
-    }
-}
-
-/// Parse character data. Always makes progress if the first c_char isn't '<' or '&'.
-///
-/// The right angle bracket (>) may be represented using the string "&gt;".as_ptr() as _,
-/// and must, for compatibility, be escaped using "&gt;" or a character
-/// reference when it appears in the string "]]>" in content, when that
-/// string is not marking the end of a CDATA section.
-///
-/// `[14] CharData ::= [^<&]* - ([^<&]* ']]>' [^<&]*)`
-#[doc(alias = "xmlParseCharDataInternal")]
-pub(crate) unsafe fn xml_parse_char_data_internal(ctxt: XmlParserCtxtPtr, partial: i32) {
-    unsafe {
-        let mut input: *const XmlChar;
-        let mut nbchar: i32;
-        let mut line: i32 = (*ctxt).input().unwrap().line;
-        let mut col: i32 = (*ctxt).input().unwrap().col;
-        let mut ccol: i32;
-
-        (*ctxt).grow();
-        // Accelerated common case where input don't need to be
-        // modified before passing it to the handler.
-        input = (*ctxt).input().unwrap().cur;
-        'main: while {
-            // get_more_space:
-            'get_more_space: loop {
-                while *input == 0x20 {
-                    input = input.add(1);
-                    (*ctxt).input_mut().unwrap().col += 1;
-                }
-                if *input == 0xA {
-                    while {
-                        (*ctxt).input_mut().unwrap().line += 1;
-                        (*ctxt).input_mut().unwrap().col = 1;
-                        input = input.add(1);
-                        *input == 0xA
-                    } {}
-                    // goto get_more_space;
-                    continue 'get_more_space;
-                }
-
-                break;
-            }
-            if *input == b'<' {
-                nbchar = input.offset_from((*ctxt).input().unwrap().cur) as _;
-                if nbchar > 0 {
-                    let tmp: *const XmlChar = (*ctxt).input().unwrap().cur;
-                    (*ctxt).input_mut().unwrap().cur = input;
-
-                    if let Some(sax) = (*ctxt).sax.as_deref_mut().filter(|sax| {
-                        (sax.ignorable_whitespace.is_some() || sax.characters.is_some())
-                            && sax
-                                .ignorable_whitespace
-                                .zip(sax.characters)
-                                .is_none_or(|(l, r)| !fn_addr_eq(l, r))
-                    }) {
-                        if are_blanks(ctxt, tmp, nbchar, 1) != 0 {
-                            if let Some(ignorable_whitespace) = sax.ignorable_whitespace {
-                                let s = from_utf8(from_raw_parts(tmp, nbchar as usize))
-                                    .expect("Internal Error");
-                                ignorable_whitespace((*ctxt).user_data.clone(), s);
-                            }
-                        } else {
-                            if let Some(characters) = sax.characters {
-                                let s = from_utf8(from_raw_parts(tmp, nbchar as usize))
-                                    .expect("Internal Error");
-                                characters((*ctxt).user_data.clone(), s);
-                            }
-                            if (*ctxt).space() == -1 {
-                                *(*ctxt).space_mut() = -2;
-                            }
-                        }
-                    } else if let Some(characters) =
-                        (*ctxt).sax.as_deref_mut().and_then(|sax| sax.characters)
-                    {
-                        let s = from_utf8(from_raw_parts(tmp, nbchar as usize))
-                            .expect("Internal Error");
-                        characters((*ctxt).user_data.clone(), s);
-                    }
-                }
-                return;
-            }
-
-            // get_more:
-            'get_more: loop {
-                ccol = (*ctxt).input().unwrap().col;
-                while TEST_CHAR_DATA[*input as usize] != 0 {
-                    input = input.add(1);
-                    ccol += 1;
-                }
-                (*ctxt).input_mut().unwrap().col = ccol;
-                if *input == 0xA {
-                    while {
-                        (*ctxt).input_mut().unwrap().line += 1;
-                        (*ctxt).input_mut().unwrap().col = 1;
-                        input = input.add(1);
-                        *input == 0xA
-                    } {}
-                    // goto get_more;
-                    continue 'get_more;
-                }
-                if *input == b']' {
-                    if *input.add(1) == b']' && *input.add(2) == b'>' {
-                        xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrMisplacedCDATAEnd, None);
-                        if !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-                            (*ctxt).input_mut().unwrap().cur = input.add(1);
-                        }
-                        return;
-                    }
-                    input = input.add(1);
-                    (*ctxt).input_mut().unwrap().col += 1;
-                    // goto get_more;
-                    continue 'get_more;
-                }
-
-                break;
-            }
-            nbchar = input.offset_from((*ctxt).input().unwrap().cur) as _;
-            if nbchar > 0 {
-                if let Some(sax) = (*ctxt).sax.as_deref_mut().filter(|sax| {
-                    (sax.ignorable_whitespace.is_some() || sax.characters.is_some())
-                        && sax
-                            .ignorable_whitespace
-                            .zip(sax.characters)
-                            .is_none_or(|(l, r)| !fn_addr_eq(l, r))
-                        && xml_is_blank_char(*(*ctxt).input().unwrap().cur as u32)
-                }) {
-                    let tmp: *const XmlChar = (*ctxt).input().unwrap().cur;
-                    (*ctxt).input_mut().unwrap().cur = input;
-
-                    if are_blanks(ctxt, tmp, nbchar, 0) != 0 {
-                        if let Some(ignorable_whitespace) = sax.ignorable_whitespace {
-                            let s = from_utf8(from_raw_parts(tmp, nbchar as usize))
-                                .expect("Internal Error");
-                            ignorable_whitespace((*ctxt).user_data.clone(), s);
-                        }
-                    } else {
-                        if let Some(characters) = sax.characters {
-                            let s = from_utf8(from_raw_parts(tmp, nbchar as usize))
-                                .expect("Internal Error");
-                            characters((*ctxt).user_data.clone(), s);
-                        }
-                        if (*ctxt).space() == -1 {
-                            *(*ctxt).space_mut() = -2;
-                        }
-                    }
-                    line = (*ctxt).input().unwrap().line;
-                    col = (*ctxt).input().unwrap().col;
-                } else if let Some(sax) = (*ctxt).sax.as_deref_mut() {
-                    if let Some(characters) = sax.characters {
-                        let s = from_utf8(from_raw_parts(
-                            (*ctxt).input().unwrap().cur,
-                            nbchar as usize,
-                        ))
-                        .expect("Internal Error");
-                        characters((*ctxt).user_data.clone(), s);
-                    }
-                    line = (*ctxt).input().unwrap().line;
-                    col = (*ctxt).input().unwrap().col;
-                }
-                if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-                    return;
-                }
-            }
-            (*ctxt).input_mut().unwrap().cur = input;
-            if *input == 0xD {
-                input = input.add(1);
-                if *input == 0xA {
-                    (*ctxt).input_mut().unwrap().cur = input;
-                    input = input.add(1);
-                    (*ctxt).input_mut().unwrap().line += 1;
-                    (*ctxt).input_mut().unwrap().col = 1;
-                    continue 'main; /* while */
-                }
-                input = input.sub(1);
-            }
-            if *input == b'<' {
-                return;
-            }
-            if *input == b'&' {
-                return;
-            }
-            (*ctxt).shrink();
-            (*ctxt).grow();
-            if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-                return;
-            }
-            input = (*ctxt).input().unwrap().cur;
-
-            (*input >= 0x20 && *input <= 0x7F) || *input == 0x09 || *input == 0x0a
-        } {}
-
-        (*ctxt).input_mut().unwrap().line = line;
-        (*ctxt).input_mut().unwrap().col = col;
-        xml_parse_char_data_complex(ctxt, partial);
-    }
-}
-
 /// Parse an XML name and compares for match (specialized for endtag parsing)
 ///
 /// Returns NULL for an illegal name, (XmlChar*) 1 for success
@@ -4793,7 +4364,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                                 return ret;
                             }
                             (*ctxt).check_index = 0;
-                            xml_parse_char_data_internal(ctxt, (terminate == 0) as i32);
+                            parse_char_data_internal(&mut *ctxt, (terminate == 0) as i32);
                         }
                     }
                     XmlParserInputState::XmlParserEndTag => {
