@@ -106,8 +106,8 @@ use crate::{
     },
     parser::{
         __xml_err_encoding, XmlParserCharValid, XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput,
-        XmlParserNodeInfo, parse_attribute2, parse_comment, parse_entity_value, parse_external_id,
-        parse_name, parse_pi, parse_qname, parse_text_decl, parse_xmldecl,
+        XmlParserNodeInfo, check_cdata_push, parse_attribute2, parse_comment, parse_entity_value,
+        parse_external_id, parse_name, parse_pi, parse_qname, parse_text_decl, parse_xmldecl,
         xml_create_entity_parser_ctxt_internal, xml_create_memory_parser_ctxt,
         xml_err_attribute_dup, xml_err_memory, xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg,
         xml_fatal_err_msg_int, xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str,
@@ -4237,95 +4237,6 @@ pub(crate) unsafe fn xml_parse_end_tag1(ctxt: XmlParserCtxtPtr, line: i32) {
     }
 }
 
-/// Check that the block of characters is okay as SCdata content [20]
-///
-/// Returns the number of bytes to pass if okay, a negative index where an
-/// UTF-8 error occurred otherwise
-#[doc(alias = "xmlCheckCdataPush")]
-#[cfg(feature = "libxml_push")]
-unsafe fn xml_check_cdata_push(utf: *const XmlChar, len: i32, complete: i32) -> i32 {
-    unsafe {
-        use super::chvalid::xml_is_char;
-
-        let mut ix: i32;
-        let mut c: u8;
-        let mut codepoint: i32;
-
-        if utf.is_null() || len <= 0 {
-            return 0;
-        }
-
-        ix = 0;
-        while ix < len {
-            // string is 0-terminated
-            c = *utf.add(ix as usize);
-            if c & 0x80 == 0x00 {
-                // 1-byte code, starts with 10
-                if c >= 0x20 || (c == 0xA || c == 0xD || c == 0x9) {
-                    ix += 1;
-                } else {
-                    return -ix;
-                }
-            } else if c & 0xe0 == 0xc0 {
-                // 2-byte code, starts with 110
-                if ix + 2 > len {
-                    return if complete != 0 { -ix } else { ix };
-                }
-                if *utf.add(ix as usize + 1) & 0xc0 != 0x80 {
-                    return -ix;
-                }
-                codepoint = (*utf.add(ix as usize) as i32 & 0x1f) << 6;
-                codepoint |= *utf.add(ix as usize + 1) as i32 & 0x3f;
-                if !xml_is_char(codepoint as u32) {
-                    return -ix;
-                }
-                ix += 2;
-            } else if c & 0xf0 == 0xe0 {
-                // 3-byte code, starts with 1110
-                if ix + 3 > len {
-                    return if complete != 0 { -ix } else { ix };
-                }
-                if *utf.add(ix as usize + 1) & 0xc0 != 0x80
-                    || *utf.add(ix as usize + 2) & 0xc0 != 0x80
-                {
-                    return -ix;
-                }
-                codepoint = (*utf.add(ix as usize) as i32 & 0xf) << 12;
-                codepoint |= (*utf.add(ix as usize + 1) as i32 & 0x3f) << 6;
-                codepoint |= *utf.add(ix as usize + 2) as i32 & 0x3f;
-                if !xml_is_char(codepoint as u32) {
-                    return -ix;
-                }
-                ix += 3;
-            } else if c & 0xf8 == 0xf0 {
-                // 4-byte code, starts with 11110
-                if ix + 4 > len {
-                    return if complete != 0 { -ix } else { ix };
-                }
-                if *utf.add(ix as usize + 1) & 0xc0 != 0x80
-                    || *utf.add(ix as usize + 2) & 0xc0 != 0x80
-                    || *utf.add(ix as usize + 3) & 0xc0 != 0x80
-                {
-                    return -ix;
-                }
-                codepoint = (*utf.add(ix as usize) as i32 & 0x7) << 18;
-                codepoint |= (*utf.add(ix as usize + 1) as i32 & 0x3f) << 12;
-                codepoint |= (*utf.add(ix as usize + 2) as i32 & 0x3f) << 6;
-                codepoint |= *utf.add(ix as usize + 3) as i32 & 0x3f;
-                if !xml_is_char(codepoint as u32) {
-                    return -ix;
-                }
-                ix += 4;
-            } else
-            // unknown encoding
-            {
-                return -ix;
-            }
-        }
-        ix
-    }
-}
-
 /// Check whether there's enough data in the input buffer to finish parsing the internal subset.
 #[doc(alias = "xmlParseLookupInternalSubset")]
 #[cfg(feature = "libxml_push")]
@@ -4924,12 +4835,9 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                         };
 
                         if term.is_null() {
-                            let mut tmp: i32;
-                            let size: i32;
-
-                            if terminate != 0 {
+                            let size = if terminate != 0 {
                                 // Unfinished CDATA section
-                                size = (*ctxt).input().unwrap().remainder_len() as i32;
+                                (*ctxt).input().unwrap().remainder_len()
                             } else {
                                 if avail < XML_PARSER_BIG_BUFFER_SIZE + 2 {
                                     // goto done;
@@ -4937,20 +4845,22 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                                 }
                                 (*ctxt).check_index = 0;
                                 // XXX: Why don't we pass the full buffer?
-                                size = XML_PARSER_BIG_BUFFER_SIZE as i32;
-                            }
-                            tmp = xml_check_cdata_push((*ctxt).input().unwrap().cur, size, 0);
-                            if tmp <= 0 {
-                                tmp = -tmp;
-                                (*ctxt).input_mut().unwrap().cur =
-                                    (*ctxt).input().unwrap().cur.add(tmp as usize);
-                                break 'encoding_error;
-                            }
+                                XML_PARSER_BIG_BUFFER_SIZE
+                            };
+                            let tmp =
+                                match check_cdata_push(&(*ctxt).content_bytes()[..size], false) {
+                                    Ok(tmp) => tmp,
+                                    Err(tmp) => {
+                                        (*ctxt).input_mut().unwrap().cur =
+                                            (*ctxt).input().unwrap().cur.add(tmp);
+                                        break 'encoding_error;
+                                    }
+                                };
                             if (*ctxt).disable_sax == 0 {
                                 if let Some(sax) = (*ctxt).sax.as_deref_mut() {
                                     let s = from_utf8(from_raw_parts(
                                         (*ctxt).input().unwrap().cur,
-                                        tmp as usize,
+                                        tmp,
                                     ))
                                     .expect("Internal Error");
                                     if let Some(cdata_block) = sax.cdata_block {
@@ -4966,15 +4876,15 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                             }
                             (*ctxt).advance_with_line_handling(tmp as usize);
                         } else {
-                            let base: i32 = term.offset_from((*ctxt).current_ptr()) as i32;
-                            let mut tmp: i32;
+                            let base = term.offset_from((*ctxt).current_ptr()) as usize;
 
-                            tmp = xml_check_cdata_push((*ctxt).input().unwrap().cur, base, 1);
-                            if tmp < 0 || tmp != base {
-                                tmp = -tmp;
-                                (*ctxt).input_mut().unwrap().cur =
-                                    (*ctxt).input().unwrap().cur.add(tmp as usize);
-                                break 'encoding_error;
+                            match check_cdata_push(&(*ctxt).content_bytes()[..base], true) {
+                                Ok(tmp) if tmp == base => {}
+                                Ok(tmp) | Err(tmp) => {
+                                    (*ctxt).input_mut().unwrap().cur =
+                                        (*ctxt).input().unwrap().cur.add(tmp);
+                                    break 'encoding_error;
+                                }
                             }
                             if (*ctxt).disable_sax == 0 {
                                 if let Some(cdata_block) = (*ctxt)

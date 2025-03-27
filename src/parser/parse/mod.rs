@@ -42,6 +42,7 @@
 //
 // daniel@veillard.com
 mod attribute;
+mod cdata;
 mod comment;
 mod entity;
 mod literal;
@@ -50,8 +51,8 @@ mod pi;
 mod reference;
 mod xmldecl;
 
-#[allow(unused_imports)]
 pub(crate) use attribute::*;
+pub(crate) use cdata::*;
 pub(crate) use comment::*;
 pub(crate) use entity::*;
 pub(crate) use literal::*;
