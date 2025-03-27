@@ -56,7 +56,7 @@ use std::{
     sync::atomic::{AtomicBool, AtomicPtr, Ordering},
 };
 
-use libc::{memchr, size_t, strncmp, strstr};
+use libc::{size_t, strncmp, strstr};
 
 #[cfg(feature = "catalog")]
 use crate::libxml::catalog::xml_catalog_cleanup;
@@ -104,12 +104,12 @@ use crate::{
     parser::{
         __xml_err_encoding, XmlParserCharValid, XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput,
         XmlParserNodeInfo, check_cdata_push, parse_attribute2, parse_char_data_internal,
-        parse_comment, parse_entity_value, parse_external_id, parse_name, parse_pi, parse_qname,
-        parse_text_decl, parse_xmldecl, xml_create_entity_parser_ctxt_internal,
-        xml_create_memory_parser_ctxt, xml_err_attribute_dup, xml_err_memory, xml_err_msg_str,
-        xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_int, xml_fatal_err_msg_str,
-        xml_fatal_err_msg_str_int_str, xml_free_parser_ctxt, xml_new_sax_parser_ctxt, xml_ns_err,
-        xml_ns_warn, xml_validity_error,
+        parse_comment, parse_entity_value, parse_external_id, parse_lookup_char,
+        parse_lookup_char_data, parse_name, parse_pi, parse_qname, parse_text_decl, parse_xmldecl,
+        xml_create_entity_parser_ctxt_internal, xml_create_memory_parser_ctxt,
+        xml_err_attribute_dup, xml_err_memory, xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg,
+        xml_fatal_err_msg_int, xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str,
+        xml_free_parser_ctxt, xml_new_sax_parser_ctxt, xml_ns_err, xml_ns_warn, xml_validity_error,
     },
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlAttributeDefault, XmlAttributeType, XmlDocProperties,
@@ -3503,71 +3503,6 @@ pub(crate) unsafe fn xml_parse_start_tag2(
     }
 }
 
-/// Check whether the input buffer contains a character.
-#[doc(alias = "xmlParseLookupChar")]
-unsafe fn xml_parse_lookup_char(ctxt: XmlParserCtxtPtr, c: i32) -> i32 {
-    unsafe {
-        let cur = if (*ctxt).check_index == 0 {
-            (*ctxt).input().unwrap().cur.add(1)
-        } else {
-            (*ctxt)
-                .input()
-                .unwrap()
-                .cur
-                .add((*ctxt).check_index as usize)
-        };
-
-        if memchr(
-            cur as _,
-            c,
-            (*ctxt).input().unwrap().end.offset_from(cur) as _,
-        )
-        .is_null()
-        {
-            let index = (*ctxt).input().unwrap().remainder_len();
-
-            if index > i64::MAX as usize {
-                (*ctxt).check_index = 0;
-                return 1;
-            }
-            (*ctxt).check_index = index as _;
-            0
-        } else {
-            (*ctxt).check_index = 0;
-            1
-        }
-    }
-}
-
-/// Check whether the input buffer contains terminated c_char data.
-#[doc(alias = "xmlParseLookupCharData")]
-unsafe fn xml_parse_lookup_char_data(ctxt: XmlParserCtxtPtr) -> i32 {
-    unsafe {
-        let mut cur: *const XmlChar = (*ctxt)
-            .input()
-            .unwrap()
-            .cur
-            .add((*ctxt).check_index as usize);
-        let end: *const XmlChar = (*ctxt).input().unwrap().end;
-
-        while cur < end {
-            if *cur == b'<' || *cur == b'&' {
-                (*ctxt).check_index = 0;
-                return 1;
-            }
-            cur = cur.add(1);
-        }
-
-        let index: size_t = cur.offset_from((*ctxt).input().unwrap().cur) as _;
-        if index > i64::MAX as usize {
-            (*ctxt).check_index = 0;
-            return 1;
-        }
-        (*ctxt).check_index = index as _;
-        0
-    }
-}
-
 /// Parse an XML name and compares for match (specialized for endtag parsing)
 ///
 /// Returns NULL for an illegal name, (XmlChar*) 1 for success
@@ -4340,7 +4275,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                             );
                             (*ctxt).advance(1);
                         } else if cur == b'&' {
-                            if terminate == 0 && xml_parse_lookup_char(ctxt, b';' as _) == 0 {
+                            if terminate == 0 && parse_lookup_char(&mut *ctxt, b';') == 0 {
                                 // goto done;
                                 return ret;
                             }
@@ -4358,7 +4293,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                             //    callbacks between the push and pull versions
                             //    of the parser.
                             if ((*ctxt).input_tab.len() == 1 && avail < XML_PARSER_BIG_BUFFER_SIZE)
-                                && (terminate == 0 && xml_parse_lookup_char_data(ctxt) == 0)
+                                && (terminate == 0 && parse_lookup_char_data(&mut *ctxt) == 0)
                             {
                                 // goto done;
                                 return ret;
@@ -4372,7 +4307,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                             // goto done;
                             return ret;
                         }
-                        if terminate == 0 && xml_parse_lookup_char(ctxt, b'>' as _) == 0 {
+                        if terminate == 0 && parse_lookup_char(&mut *ctxt, b'>' as _) == 0 {
                             // goto done;
                             return ret;
                         }

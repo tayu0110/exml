@@ -464,3 +464,40 @@ pub(crate) fn check_cdata_push(utf: &[u8], complete: bool) -> Result<usize, usiz
     s.find(|c: char| !xml_is_char(c as u32))
         .map_or(Ok(s.len()), Err)
 }
+
+/// Check whether the input buffer contains a character.
+#[doc(alias = "xmlParseLookupChar")]
+pub(crate) unsafe fn parse_lookup_char(ctxt: &mut XmlParserCtxt, c: u8) -> i32 {
+    unsafe {
+        let cur = &ctxt.content_bytes()[ctxt.check_index.max(1) as usize..];
+
+        if !cur.contains(&c) {
+            if cur.len() > i64::MAX as usize {
+                ctxt.check_index = 0;
+                1
+            } else {
+                ctxt.check_index = cur.len() as i64;
+                0
+            }
+        } else {
+            ctxt.check_index = 0;
+            1
+        }
+    }
+}
+
+/// Check whether the input buffer contains terminated c_char data.
+#[doc(alias = "xmlParseLookupCharData")]
+pub(crate) unsafe fn parse_lookup_char_data(ctxt: &mut XmlParserCtxt) -> i32 {
+    unsafe {
+        let cur = &ctxt.content_bytes()[ctxt.check_index as usize..];
+
+        if cur.contains(&b'<') || cur.contains(&b'&') || cur.len() > i64::MAX as usize {
+            ctxt.check_index = 0;
+            1
+        } else {
+            ctxt.check_index = cur.len() as i64;
+            0
+        }
+    }
+}
