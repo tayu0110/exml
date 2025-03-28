@@ -518,32 +518,6 @@ pub type XmlExternalEntityLoader = unsafe fn(
     context: XmlParserCtxtPtr,
 ) -> Option<XmlParserInput>;
 
-/*
- * Macros for accessing the content. Those should be used only by the parser,
- * and not exported.
- *
- * Dirty macros, i.e. one often need to make assumption on the context to
- * use them
- *
- *   COPY_BUF  copy the current unicode c_char to the target buffer, increment
- *            the index
- */
-
-macro_rules! COPY_BUF {
-    ($l:expr, $b:expr, $i:expr, $v:expr) => {
-        if $l == 1 {
-            *$b.add($i as usize) = $v as _;
-            $i += 1;
-        } else {
-            $i = ($i as usize
-                + crate::libxml::parser_internals::xml_copy_char_multi_byte(
-                    $b.add($i as usize),
-                    $v as _,
-                ) as usize) as _
-        }
-    };
-}
-
 static XML_PARSER_INITIALIZED: AtomicBool = AtomicBool::new(false);
 
 /// Initialization function for the XML parser.
