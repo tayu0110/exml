@@ -48,7 +48,7 @@ use std::{
     cell::RefCell,
     ffi::{CStr, CString, c_char, c_void},
     io::Read,
-    mem::{size_of, take},
+    mem::take,
     ptr::{addr_of_mut, null, null_mut},
     rc::Rc,
     slice::from_raw_parts,
@@ -84,7 +84,7 @@ use crate::{
         dict::{__xml_initialize_dict, xml_cleanup_dict_internal, xml_dict_free, xml_dict_lookup},
         globals::{
             xml_cleanup_globals_internal, xml_default_sax_locator, xml_free,
-            xml_init_globals_internal, xml_realloc,
+            xml_init_globals_internal,
         },
         htmlparser::{__html_parse_content, HtmlParserOption, html_create_memory_parser_ctxt},
         parser_internals::{
@@ -101,11 +101,12 @@ use crate::{
     parser::{
         __xml_err_encoding, XmlParserCharValid, XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput,
         XmlParserNodeInfo, check_cdata_push, parse_attribute2, parse_char_data_internal,
-        parse_comment, parse_lookup_char, parse_lookup_char_data, parse_markup_decl, parse_pi,
-        parse_qname, parse_text_decl, parse_xmldecl, xml_create_entity_parser_ctxt_internal,
-        xml_create_memory_parser_ctxt, xml_err_attribute_dup, xml_err_memory, xml_fatal_err,
-        xml_fatal_err_msg, xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str,
-        xml_free_parser_ctxt, xml_new_sax_parser_ctxt, xml_ns_err, xml_ns_warn, xml_validity_error,
+        parse_comment, parse_conditional_sections, parse_lookup_char, parse_lookup_char_data,
+        parse_markup_decl, parse_pi, parse_qname, parse_text_decl, parse_xmldecl,
+        xml_create_entity_parser_ctxt_internal, xml_create_memory_parser_ctxt,
+        xml_err_attribute_dup, xml_err_memory, xml_fatal_err, xml_fatal_err_msg,
+        xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str, xml_free_parser_ctxt,
+        xml_new_sax_parser_ctxt, xml_ns_err, xml_ns_warn, xml_validity_error,
     },
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlAttributeDefault, XmlAttributeType, XmlDocProperties,
@@ -741,188 +742,6 @@ pub unsafe fn xml_recover_file(filename: Option<&str>) -> Option<XmlDocPtr> {
     unsafe { xml_sax_parse_file(None, filename, 1) }
 }
 
-/// Parse a conditional section. Always consumes '<!['.
-///
-/// ```text
-/// [61] conditionalSect ::= includeSect | ignoreSect
-/// [62] includeSect ::= '<![' S? 'INCLUDE' S? '[' extSubsetDecl ']]>'
-/// [63] ignoreSect ::= '<![' S? 'IGNORE' S? '[' ignoreSectContents* ']]>'
-/// [64] ignoreSectContents ::= Ignore ('<![' ignoreSectContents ']]>' Ignore)*
-/// [65] Ignore ::= Char* - (Char* ('<![' | ']]>') Char*)
-/// ```
-#[doc(alias = "xmlParseConditionalSections")]
-pub(crate) unsafe fn xml_parse_conditional_sections(ctxt: XmlParserCtxtPtr) {
-    unsafe {
-        let mut input_ids: *mut i32 = null_mut();
-        let mut input_ids_size: size_t = 0;
-        let mut depth: size_t = 0;
-
-        while !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-            if (*ctxt).current_byte() == b'<'
-                && (*ctxt).nth_byte(1) == b'!'
-                && (*ctxt).nth_byte(2) == b'['
-            {
-                let id: i32 = (*ctxt).input().unwrap().id;
-
-                (*ctxt).advance(3);
-                (*ctxt).skip_blanks();
-
-                if (*ctxt).content_bytes().starts_with(b"INCLUDE") {
-                    (*ctxt).advance(7);
-                    (*ctxt).skip_blanks();
-                    if (*ctxt).current_byte() != b'[' {
-                        xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrCondsecInvalid, None);
-                        (*ctxt).halt();
-                        //  goto error;
-                        xml_free(input_ids as _);
-                        return;
-                    }
-                    if (*ctxt).input().unwrap().id != id {
-                        xml_fatal_err_msg(
-                            &mut *ctxt,
-                            XmlParserErrors::XmlErrEntityBoundary,
-                            "All markup of the conditional section is not in the same entity\n",
-                        );
-                    }
-                    (*ctxt).skip_char();
-
-                    if input_ids_size <= depth {
-                        input_ids_size = if input_ids_size == 0 {
-                            4
-                        } else {
-                            input_ids_size * 2
-                        };
-                        let tmp: *mut i32 =
-                            xml_realloc(input_ids as _, input_ids_size as usize * size_of::<i32>())
-                                as _;
-                        if tmp.is_null() {
-                            xml_err_memory(ctxt, None);
-                            //  goto error;
-                            xml_free(input_ids as _);
-                            return;
-                        }
-                        input_ids = tmp;
-                    }
-                    *input_ids.add(depth as usize) = id;
-                    depth += 1;
-                } else if (*ctxt).content_bytes().starts_with(b"IGNORE") {
-                    let mut ignore_depth: size_t = 0;
-
-                    (*ctxt).advance(6);
-                    (*ctxt).skip_blanks();
-                    if (*ctxt).current_byte() != b'[' {
-                        xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrCondsecInvalid, None);
-                        (*ctxt).halt();
-                        //  goto error;
-                        xml_free(input_ids as _);
-                        return;
-                    }
-                    if (*ctxt).input().unwrap().id != id {
-                        xml_fatal_err_msg(
-                            &mut *ctxt,
-                            XmlParserErrors::XmlErrEntityBoundary,
-                            "All markup of the conditional section is not in the same entity\n",
-                        );
-                    }
-                    (*ctxt).skip_char();
-
-                    while (*ctxt).current_byte() != 0 {
-                        if (*ctxt).current_byte() == b'<'
-                            && (*ctxt).nth_byte(1) == b'!'
-                            && (*ctxt).nth_byte(2) == b'['
-                        {
-                            (*ctxt).advance(3);
-                            ignore_depth += 1;
-                            /* Check for integer overflow */
-                            if ignore_depth == 0 {
-                                xml_err_memory(ctxt, None);
-                                //  goto error;
-                                xml_free(input_ids as _);
-                                return;
-                            }
-                        } else if (*ctxt).current_byte() == b']'
-                            && (*ctxt).nth_byte(1) == b']'
-                            && (*ctxt).nth_byte(2) == b'>'
-                        {
-                            if ignore_depth == 0 {
-                                break;
-                            }
-                            (*ctxt).advance(3);
-                            ignore_depth -= 1;
-                        } else {
-                            (*ctxt).skip_char();
-                        }
-                    }
-
-                    if (*ctxt).current_byte() == 0 {
-                        xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrCondsecNotFinished, None);
-                        //  goto error;
-                        xml_free(input_ids as _);
-                        return;
-                    }
-                    if (*ctxt).input().unwrap().id != id {
-                        xml_fatal_err_msg(
-                            &mut *ctxt,
-                            XmlParserErrors::XmlErrEntityBoundary,
-                            "All markup of the conditional section is not in the same entity\n",
-                        );
-                    }
-                    (*ctxt).advance(3);
-                } else {
-                    xml_fatal_err(
-                        &mut *ctxt,
-                        XmlParserErrors::XmlErrCondsecInvalidKeyword,
-                        None,
-                    );
-                    (*ctxt).halt();
-                    //  goto error;
-                    xml_free(input_ids as _);
-                    return;
-                }
-            } else if depth > 0
-                && (*ctxt).current_byte() == b']'
-                && (*ctxt).nth_byte(1) == b']'
-                && (*ctxt).nth_byte(2) == b'>'
-            {
-                depth -= 1;
-                if (*ctxt).input().unwrap().id != *input_ids.add(depth as usize) {
-                    xml_fatal_err_msg(
-                        &mut *ctxt,
-                        XmlParserErrors::XmlErrEntityBoundary,
-                        "All markup of the conditional section is not in the same entity\n",
-                    );
-                }
-                (*ctxt).advance(3);
-            } else if (*ctxt).current_byte() == b'<'
-                && ((*ctxt).nth_byte(1) == b'!' || (*ctxt).nth_byte(1) == b'?')
-            {
-                parse_markup_decl(&mut *ctxt);
-            } else {
-                xml_fatal_err(
-                    &mut *ctxt,
-                    XmlParserErrors::XmlErrExtSubsetNotFinished,
-                    None,
-                );
-                (*ctxt).halt();
-                //  goto error;
-                xml_free(input_ids as _);
-                return;
-            }
-
-            if depth == 0 {
-                break;
-            }
-
-            (*ctxt).skip_blanks();
-            (*ctxt).shrink();
-            (*ctxt).grow();
-        }
-
-        //  error:
-        xml_free(input_ids as _);
-    }
-}
-
 /// Parse the internal subset declaration
 ///
 /// ```test
@@ -952,7 +771,7 @@ unsafe fn xml_parse_internal_subset(ctxt: XmlParserCtxtPtr) {
                     && (*ctxt).nth_byte(1) == b'!'
                     && (*ctxt).nth_byte(2) == b'['
                 {
-                    xml_parse_conditional_sections(ctxt);
+                    parse_conditional_sections(&mut *ctxt);
                 } else if (*ctxt).current_byte() == b'<'
                     && ((*ctxt).nth_byte(1) == b'!' || (*ctxt).nth_byte(1) == b'?')
                 {
@@ -2996,52 +2815,6 @@ pub(crate) const XML_PARSER_ALLOWED_EXPANSION: usize = 1000000;
 // as well to protect, for example, against exponential expansion of empty
 // or very short entities.
 pub(crate) const XML_ENT_FIXED_COST: usize = 20;
-
-/// Normalize the space in non CDATA attribute values:
-/// If the attribute type is not CDATA, then the XML processor MUST further
-/// process the normalized attribute value by discarding any leading and
-/// trailing space (#x20) characters, and by replacing sequences of space
-/// (#x20) characters by a single space (#x20) character.
-/// Note that the size of dst need to be at least src, and if one doesn't need
-/// to preserve dst (and it doesn't come from a dictionary or read-only) then
-/// passing src as dst is just fine.
-///
-/// Returns a pointer to the normalized value (dst) or NULL if no conversion is needed.
-#[doc(alias = "xmlAttrNormalizeSpace")]
-pub(crate) unsafe fn xml_attr_normalize_space(
-    mut src: *const XmlChar,
-    mut dst: *mut XmlChar,
-) -> *mut XmlChar {
-    unsafe {
-        if src.is_null() || dst.is_null() {
-            return null_mut();
-        }
-
-        while *src == 0x20 {
-            src = src.add(1);
-        }
-        while *src != 0 {
-            if *src == 0x20 {
-                while *src == 0x20 {
-                    src = src.add(1);
-                }
-                if *src != 0 {
-                    *dst = 0x20;
-                    dst = dst.add(1);
-                }
-            } else {
-                *dst = *src;
-                dst = dst.add(1);
-                src = src.add(1);
-            }
-        }
-        *dst = 0;
-        if dst == src as _ {
-            return null_mut();
-        }
-        dst
-    }
-}
 
 /// Parse a start tag. Always consumes '<'.
 ///

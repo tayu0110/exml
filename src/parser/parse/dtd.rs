@@ -1306,6 +1306,146 @@ unsafe fn parse_default_decl(ctxt: &mut XmlParserCtxt) -> (XmlAttributeDefault, 
     }
 }
 
+/// Parse a conditional section. Always consumes '<!['.
+///
+/// ```text
+/// [61] conditionalSect ::= includeSect | ignoreSect
+/// [62] includeSect ::= '<![' S? 'INCLUDE' S? '[' extSubsetDecl ']]>'
+/// [63] ignoreSect ::= '<![' S? 'IGNORE' S? '[' ignoreSectContents* ']]>'
+/// [64] ignoreSectContents ::= Ignore ('<![' ignoreSectContents ']]>' Ignore)*
+/// [65] Ignore ::= Char* - (Char* ('<![' | ']]>') Char*)
+/// ```
+#[doc(alias = "xmlParseConditionalSections")]
+pub(crate) unsafe fn parse_conditional_sections(ctxt: &mut XmlParserCtxt) {
+    unsafe {
+        let mut depth = 0;
+        let mut input_ids = vec![];
+
+        while !matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
+            match ctxt.content_bytes() {
+                [b'<', b'!', b'[', ..] => {
+                    let id: i32 = ctxt.input().unwrap().id;
+
+                    ctxt.advance(3);
+                    ctxt.skip_blanks();
+
+                    match ctxt.content_bytes() {
+                        [b'I', b'N', b'C', b'L', b'U', b'D', b'E', ..] => {
+                            ctxt.advance(7);
+                            ctxt.skip_blanks();
+                            if ctxt.current_byte() != b'[' {
+                                xml_fatal_err(ctxt, XmlParserErrors::XmlErrCondsecInvalid, None);
+                                ctxt.halt();
+                                return;
+                            }
+                            if ctxt.input().unwrap().id != id {
+                                xml_fatal_err_msg(
+                                    ctxt,
+                                    XmlParserErrors::XmlErrEntityBoundary,
+                                    "All markup of the conditional section is not in the same entity\n",
+                                );
+                            }
+                            ctxt.skip_char();
+
+                            if input_ids.len() <= depth {
+                                input_ids.resize(depth + 1, 0);
+                            }
+                            input_ids[depth] = id;
+                            depth += 1;
+                        }
+                        [b'I', b'G', b'N', b'O', b'R', b'E', ..] => {
+                            let mut ignore_depth = 0;
+
+                            ctxt.advance(6);
+                            ctxt.skip_blanks();
+                            if ctxt.current_byte() != b'[' {
+                                xml_fatal_err(ctxt, XmlParserErrors::XmlErrCondsecInvalid, None);
+                                ctxt.halt();
+                                return;
+                            }
+                            if ctxt.input().unwrap().id != id {
+                                xml_fatal_err_msg(
+                                    ctxt,
+                                    XmlParserErrors::XmlErrEntityBoundary,
+                                    "All markup of the conditional section is not in the same entity\n",
+                                );
+                            }
+                            ctxt.skip_char();
+
+                            while ctxt.current_byte() != 0 {
+                                if ctxt.content_bytes().starts_with(b"<![") {
+                                    ctxt.advance(3);
+                                    ignore_depth += 1;
+                                    // Check for integer overflow
+                                    if ignore_depth == 0 {
+                                        xml_err_memory(ctxt, None);
+                                        return;
+                                    }
+                                } else if ctxt.content_bytes().starts_with(b"]]>") {
+                                    if ignore_depth == 0 {
+                                        break;
+                                    }
+                                    ctxt.advance(3);
+                                    ignore_depth -= 1;
+                                } else {
+                                    ctxt.skip_char();
+                                }
+                            }
+
+                            if ctxt.current_byte() == 0 {
+                                xml_fatal_err(
+                                    ctxt,
+                                    XmlParserErrors::XmlErrCondsecNotFinished,
+                                    None,
+                                );
+                                return;
+                            }
+                            if ctxt.input().unwrap().id != id {
+                                xml_fatal_err_msg(
+                                    ctxt,
+                                    XmlParserErrors::XmlErrEntityBoundary,
+                                    "All markup of the conditional section is not in the same entity\n",
+                                );
+                            }
+                            ctxt.advance(3);
+                        }
+                        _ => {
+                            xml_fatal_err(ctxt, XmlParserErrors::XmlErrCondsecInvalidKeyword, None);
+                            ctxt.halt();
+                            return;
+                        }
+                    }
+                }
+                [b']', b']', b'>', ..] if depth > 0 => {
+                    depth -= 1;
+                    if ctxt.input().unwrap().id != input_ids[depth] {
+                        xml_fatal_err_msg(
+                            ctxt,
+                            XmlParserErrors::XmlErrEntityBoundary,
+                            "All markup of the conditional section is not in the same entity\n",
+                        );
+                    }
+                    ctxt.advance(3);
+                }
+                [b'<', b'!', ..] | [b'<', b'?', ..] => parse_markup_decl(ctxt),
+                _ => {
+                    xml_fatal_err(ctxt, XmlParserErrors::XmlErrExtSubsetNotFinished, None);
+                    ctxt.halt();
+                    return;
+                }
+            }
+
+            if depth == 0 {
+                break;
+            }
+
+            ctxt.skip_blanks();
+            ctxt.shrink();
+            ctxt.grow();
+        }
+    }
+}
+
 /// Parse an entity declaration. Always consumes '<!'.
 ///
 /// ```text

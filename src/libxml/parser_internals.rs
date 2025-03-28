@@ -46,10 +46,9 @@ use crate::{
         dict::{xml_dict_free, xml_dict_lookup},
         globals::{xml_free, xml_malloc_atomic, xml_realloc},
         parser::{
-            XML_SKIP_IDS, XmlParserInputState, XmlParserMode, XmlParserOption,
-            xml_parse_conditional_sections, xml_parse_end_tag1, xml_parse_end_tag2,
-            xml_parse_external_entity_private, xml_parse_start_tag2, xml_parser_add_node_info,
-            xml_parser_find_node_info,
+            XML_SKIP_IDS, XmlParserInputState, XmlParserMode, XmlParserOption, xml_parse_end_tag1,
+            xml_parse_end_tag2, xml_parse_external_entity_private, xml_parse_start_tag2,
+            xml_parser_add_node_info, xml_parser_find_node_info,
         },
         sax2::xml_sax2_get_entity,
         valid::{
@@ -61,11 +60,11 @@ use crate::{
     parser::{
         __xml_err_encoding, XmlParserCharValid, XmlParserCtxtPtr, XmlParserInput,
         XmlParserNodeInfo, parse_att_value, parse_cdsect, parse_char_data_internal, parse_char_ref,
-        parse_comment, parse_external_id, parse_markup_decl, parse_name, parse_pi, parse_text_decl,
-        parser_entity_check, xml_create_memory_parser_ctxt, xml_err_encoding_int, xml_err_memory,
-        xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_int,
-        xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str, xml_free_parser_ctxt,
-        xml_validity_error, xml_warning_msg,
+        parse_comment, parse_conditional_sections, parse_external_id, parse_markup_decl,
+        parse_name, parse_pi, parse_text_decl, parser_entity_check, xml_create_memory_parser_ctxt,
+        xml_err_encoding_int, xml_err_memory, xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg,
+        xml_fatal_err_msg_int, xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str,
+        xml_free_parser_ctxt, xml_validity_error, xml_warning_msg,
     },
     tree::{
         NodeCommon, XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
@@ -2419,7 +2418,7 @@ pub unsafe fn xml_parse_external_subset(
         {
             (*ctxt).grow();
             if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1) == b'!' && NXT!(ctxt, 2) == b'[' {
-                xml_parse_conditional_sections(ctxt);
+                parse_conditional_sections(&mut *ctxt);
             } else if (*ctxt).current_byte() == b'<'
                 && (NXT!(ctxt, 1) == b'!' || NXT!(ctxt, 1) == b'?')
             {
