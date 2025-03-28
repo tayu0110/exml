@@ -1,6 +1,6 @@
-//! Provide methods and data structures for text writing APIs.  
-//! This module is based on `libxml/xmlwriter.h`, `xmlwriter.c` and so on in `libxml2-v2.11.8`.
+//! Provide methods and data structures for text writing APIs.
 //!
+//! This module is based on `libxml/xmlwriter.h`, `xmlwriter.c` and so on in `libxml2-v2.11.8`.  
 //! Please refer to original libxml2 documents also.
 //!
 //! The original API has functions that support the format, but not here.

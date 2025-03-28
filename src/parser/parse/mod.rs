@@ -44,6 +44,7 @@
 mod attribute;
 mod cdata;
 mod comment;
+mod dtd;
 mod entity;
 mod literal;
 mod names;
@@ -54,6 +55,7 @@ mod xmldecl;
 pub(crate) use attribute::*;
 pub(crate) use cdata::*;
 pub(crate) use comment::*;
+pub(crate) use dtd::*;
 pub(crate) use entity::*;
 pub(crate) use literal::*;
 pub(crate) use names::*;

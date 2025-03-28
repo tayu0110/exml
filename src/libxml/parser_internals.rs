@@ -25,7 +25,6 @@ use std::{
     cell::RefCell,
     ffi::{CStr, CString},
     io::Write,
-    mem::size_of,
     ptr::{addr_of_mut, null, null_mut},
     rc::Rc,
     str::from_utf8_unchecked,
@@ -38,53 +37,45 @@ use crate::{
     error::XmlParserErrors,
     generic_error,
     globals::{GenericErrorContext, get_parser_debug_entities},
-    hash::XmlHashTableRef,
     libxml::{
         chvalid::{
             xml_is_base_char, xml_is_blank_char, xml_is_char, xml_is_combining, xml_is_digit,
             xml_is_extender, xml_is_ideographic,
         },
         dict::{xml_dict_free, xml_dict_lookup},
-        globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
+        globals::{xml_free, xml_malloc_atomic, xml_realloc},
         parser::{
-            XML_SKIP_IDS, XmlDefAttrs, XmlDefAttrsPtr, XmlParserInputState, XmlParserMode,
-            XmlParserOption, xml_parse_cdsect, xml_parse_conditional_sections,
-            xml_parse_element_children_content_decl_priv, xml_parse_end_tag1, xml_parse_end_tag2,
-            xml_parse_external_entity_private, xml_parse_markup_decl, xml_parse_start_tag2,
-            xml_parser_add_node_info, xml_parser_find_node_info,
+            XML_SKIP_IDS, XmlParserInputState, XmlParserMode, XmlParserOption, xml_parse_cdsect,
+            xml_parse_conditional_sections, xml_parse_element_children_content_decl_priv,
+            xml_parse_end_tag1, xml_parse_end_tag2, xml_parse_external_entity_private,
+            xml_parse_markup_decl, xml_parse_start_tag2, xml_parser_add_node_info,
+            xml_parser_find_node_info,
         },
         sax2::xml_sax2_get_entity,
         valid::{
             xml_free_doc_element_content, xml_new_doc_element_content, xml_validate_element,
             xml_validate_root,
         },
-        xmlstring::{XmlChar, xml_strchr, xml_strlen, xml_strndup},
+        xmlstring::{XmlChar, xml_strchr, xml_strndup},
     },
     parser::{
         __xml_err_encoding, XmlParserCharValid, XmlParserCtxtPtr, XmlParserInput,
-        XmlParserNodeInfo, parse_att_value, parse_char_data_internal, parse_external_id,
-        parser_entity_check, split_qname2, xml_err_encoding_int, xml_err_memory, xml_err_msg_str,
-        xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_int, xml_fatal_err_msg_str,
-        xml_fatal_err_msg_str_int_str, xml_validity_error, xml_warning_msg,
+        XmlParserNodeInfo, parse_att_value, parse_char_data_internal, parse_char_ref,
+        parse_comment, parse_external_id, parse_name, parse_pi, parse_text_decl,
+        parser_entity_check, xml_create_memory_parser_ctxt, xml_err_encoding_int, xml_err_memory,
+        xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_int,
+        xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str, xml_free_parser_ctxt,
+        xml_validity_error, xml_warning_msg,
     },
     tree::{
         NodeCommon, XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
-        XML_ENT_PARSED, XML_XML_NAMESPACE, XmlAttributeDefault, XmlAttributeType, XmlDocProperties,
-        XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementType,
-        XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlGenericNodePtr,
-        XmlNodePtr, xml_create_int_subset, xml_doc_copy_node, xml_free_doc, xml_free_node,
-        xml_free_node_list, xml_get_predefined_entity, xml_new_doc, xml_new_doc_node,
+        XML_ENT_PARSED, XML_XML_NAMESPACE, XmlDocProperties, XmlElementContentOccur,
+        XmlElementContentPtr, XmlElementContentType, XmlElementType, XmlElementTypeVal,
+        XmlEntityPtr, XmlEntityType, XmlGenericNodePtr, XmlNodePtr, xml_create_int_subset,
+        xml_doc_copy_node, xml_free_doc, xml_free_node, xml_free_node_list,
+        xml_get_predefined_entity, xml_new_doc, xml_new_doc_node,
     },
 };
-use crate::{
-    parser::{
-        parse_char_ref, parse_comment, parse_name, parse_nmtoken, parse_pi, parse_text_decl,
-        xml_create_memory_parser_ctxt, xml_free_parser_ctxt,
-    },
-    tree::xml_create_enumeration,
-};
-
-use super::hash::XmlHashTable;
 
 macro_rules! NXT {
     ($ctxt:expr, $val:expr) => {
@@ -476,468 +467,6 @@ pub(crate) unsafe fn xml_parse_nmtoken(ctxt: XmlParserCtxtPtr) -> *mut XmlChar {
 //         parse_char_data_internal(&mut *ctxt, 0);
 //     }
 // }
-
-/// Parse an attribute default declaration
-///
-/// `[60] DefaultDecl ::= '#REQUIRED' | '#IMPLIED' | (('#FIXED' S)? AttValue)`
-///
-/// `[ VC: Required Attribute ]`  
-/// if the default declaration is the keyword #REQUIRED, then the
-/// attribute must be specified for all elements of the type in the
-/// attribute-list declaration.
-///
-/// `[ VC: Attribute Default Legal ]`  
-/// The declared default value must meet the lexical constraints of
-/// the declared attribute type c.f. xmlValidateAttributeDecl()
-///
-/// `[ VC: Fixed Attribute Default ]`  
-/// if an attribute has a default value declared with the #FIXED
-/// keyword, instances of that attribute must match the default value.
-///
-/// `[ WFC: No < in Attribute Values ]`  
-/// handled in xmlParseAttValue()
-///
-/// returns: XML_ATTRIBUTE_NONE, XML_ATTRIBUTE_REQUIRED, XML_ATTRIBUTE_IMPLIED
-///  or XML_ATTRIBUTE_FIXED.
-#[doc(alias = "xmlParseDefaultDecl")]
-pub(crate) unsafe fn xml_parse_default_decl(
-    ctxt: XmlParserCtxtPtr,
-    value: *mut *mut XmlChar,
-) -> XmlAttributeDefault {
-    unsafe {
-        *value = null_mut();
-        if (*ctxt).content_bytes().starts_with(b"#REQUIRED") {
-            (*ctxt).advance(9);
-            return XmlAttributeDefault::XmlAttributeRequired;
-        }
-        if (*ctxt).content_bytes().starts_with(b"#IMPLIED") {
-            (*ctxt).advance(8);
-            return XmlAttributeDefault::XmlAttributeImplied;
-        }
-        let mut val = XmlAttributeDefault::XmlAttributeNone;
-        if (*ctxt).content_bytes().starts_with(b"#FIXED") {
-            (*ctxt).advance(6);
-            val = XmlAttributeDefault::XmlAttributeFixed;
-            if (*ctxt).skip_blanks() == 0 {
-                xml_fatal_err_msg(
-                    &mut *ctxt,
-                    XmlParserErrors::XmlErrSpaceRequired,
-                    "Space required after '#FIXED'\n",
-                );
-            }
-        }
-        let ret = parse_att_value(&mut *ctxt);
-        (*ctxt).instate = XmlParserInputState::XmlParserDTD;
-        if let Some(ret) = ret {
-            *value = xml_strndup(ret.as_ptr(), ret.len() as i32);
-        } else {
-            xml_fatal_err_msg(
-                &mut *ctxt,
-                XmlParserErrors::try_from((*ctxt).err_no).unwrap(),
-                "Attribute default value declaration error\n",
-            );
-        }
-        val
-    }
-}
-
-/// Parse an Notation attribute type.
-///
-/// # Note
-/// The leading 'NOTATION' S part has already being parsed...
-///
-/// `[58] NotationType ::= 'NOTATION' S '(' S? Name (S? '|' S? Name)* S? ')'`
-///
-/// `[ VC: Notation Attributes ]`
-/// Values of this type must match one of the notation names included
-/// in the declaration; all notation names in the declaration must be declared.
-///
-/// Returns: the notation attribute tree built while parsing
-#[doc(alias = "xmlParseNotationType")]
-pub(crate) unsafe fn xml_parse_notation_type(
-    ctxt: XmlParserCtxtPtr,
-) -> Option<Box<XmlEnumeration>> {
-    unsafe {
-        let mut ret = None::<Box<XmlEnumeration>>;
-
-        if (*ctxt).current_byte() != b'(' {
-            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrNotationNotStarted, None);
-            return None;
-        }
-        while {
-            (*ctxt).skip_char();
-            (*ctxt).skip_blanks();
-            let Some(name) = parse_name(&mut *ctxt) else {
-                xml_fatal_err_msg(
-                    &mut *ctxt,
-                    XmlParserErrors::XmlErrNameRequired,
-                    "Name expected in NOTATION declaration\n",
-                );
-                return None;
-            };
-            let mut tmp = ret.as_deref();
-            while let Some(now) = tmp {
-                if name == now.name {
-                    xml_validity_error!(
-                        ctxt,
-                        XmlParserErrors::XmlDTDDupToken,
-                        "standalone: attribute notation value token {} duplicated\n",
-                        name
-                    );
-                    break;
-                }
-                tmp = now.next.as_deref();
-            }
-            if tmp.is_none() {
-                let cur = xml_create_enumeration(&name);
-                if let Some(mut ret) = ret.as_deref_mut() {
-                    while ret.next.is_some() {
-                        ret = ret.next.as_deref_mut().unwrap();
-                    }
-                    ret.next = Some(cur);
-                } else {
-                    ret = Some(cur);
-                }
-            }
-            (*ctxt).skip_blanks();
-            (*ctxt).current_byte() == b'|'
-        } {}
-        if (*ctxt).current_byte() != b')' {
-            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrNotationNotFinished, None);
-            return None;
-        }
-        (*ctxt).skip_char();
-        ret
-    }
-}
-
-/// Parse an Enumeration attribute type.
-///
-/// `[59] Enumeration ::= '(' S? Nmtoken (S? '|' S? Nmtoken)* S? ')'`
-///
-/// `[ VC: Enumeration ]`  
-/// Values of this type must match one of the Nmtoken tokens in the declaration
-///
-/// Returns: the enumeration attribute tree built while parsing
-#[doc(alias = "xmlParseEnumerationType")]
-pub(crate) unsafe fn xml_parse_enumeration_type(
-    ctxt: XmlParserCtxtPtr,
-) -> Option<Box<XmlEnumeration>> {
-    unsafe {
-        let mut ret = None::<Box<XmlEnumeration>>;
-
-        if (*ctxt).current_byte() != b'(' {
-            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrAttlistNotStarted, None);
-            return None;
-        }
-        while {
-            (*ctxt).skip_char();
-            (*ctxt).skip_blanks();
-            let Some(name) = parse_nmtoken(&mut *ctxt) else {
-                xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrNmtokenRequired, None);
-                return ret;
-            };
-            let mut tmp = ret.as_deref();
-            while let Some(now) = tmp {
-                if name.as_str() == now.name {
-                    xml_validity_error!(
-                        ctxt,
-                        XmlParserErrors::XmlDTDDupToken,
-                        "standalone: attribute enumeration value token {} duplicated\n",
-                        name
-                    );
-                    break;
-                }
-                tmp = now.next.as_deref();
-            }
-            if tmp.is_none() {
-                let cur = xml_create_enumeration(&name);
-                if let Some(mut ret) = ret.as_deref_mut() {
-                    while ret.next.is_some() {
-                        ret = ret.next.as_deref_mut().unwrap();
-                    }
-                    ret.next = Some(cur);
-                } else {
-                    ret = Some(cur);
-                }
-            }
-            (*ctxt).skip_blanks();
-            (*ctxt).current_byte() == b'|'
-        } {}
-        if (*ctxt).current_byte() != b')' {
-            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrAttlistNotFinished, None);
-            return ret;
-        }
-        (*ctxt).skip_char();
-        ret
-    }
-}
-
-/// Parse an Enumerated attribute type.
-///
-/// `[57] EnumeratedType ::= NotationType | Enumeration`
-///
-/// `[58] NotationType ::= 'NOTATION' S '(' S? Name (S? '|' S? Name)* S? ')'`
-///
-/// Returns: XML_ATTRIBUTE_ENUMERATION or XML_ATTRIBUTE_NOTATION
-#[doc(alias = "xmlParseEnumeratedType")]
-pub(crate) unsafe fn xml_parse_enumerated_type(
-    ctxt: XmlParserCtxtPtr,
-    tree: &mut Option<Box<XmlEnumeration>>,
-) -> Option<XmlAttributeType> {
-    unsafe {
-        if (*ctxt).content_bytes().starts_with(b"NOTATION") {
-            (*ctxt).advance(8);
-            if (*ctxt).skip_blanks() == 0 {
-                xml_fatal_err_msg(
-                    &mut *ctxt,
-                    XmlParserErrors::XmlErrSpaceRequired,
-                    "Space required after 'NOTATION'\n",
-                );
-                return None;
-            }
-            *tree = xml_parse_notation_type(ctxt);
-            if tree.is_none() {
-                return None;
-            }
-            return Some(XmlAttributeType::XmlAttributeNotation);
-        }
-        *tree = xml_parse_enumeration_type(ctxt);
-        if tree.is_none() {
-            return None;
-        }
-        Some(XmlAttributeType::XmlAttributeEnumeration)
-    }
-}
-
-/// Parse the Attribute list def for an element
-///
-/// `[54] AttType ::= StringType | TokenizedType | EnumeratedType`
-///
-/// `[55] StringType ::= 'CDATA'`
-///
-/// `[56] TokenizedType ::= 'ID' | 'IDREF' | 'IDREFS' | 'ENTITY' | 'ENTITIES' | 'NMTOKEN' | 'NMTOKENS'`
-///
-/// Validity constraints for attribute values syntax are checked in xmlValidateAttributeValue()
-///
-/// `[ VC: ID ]`  
-/// Values of type ID must match the Name production. A name must not
-/// appear more than once in an XML document as a value of this type;
-/// i.e., ID values must uniquely identify the elements which bear them.
-///
-/// `[ VC: One ID per Element Type ]`  
-/// No element type may have more than one ID attribute specified.
-///
-/// `[ VC: ID Attribute Default ]`  
-/// An ID attribute must have a declared default of #IMPLIED or #REQUIRED.
-///
-/// `[ VC: IDREF ]`  
-/// Values of type IDREF must match the Name production, and values
-/// of type IDREFS must match Names; each IDREF Name must match the value
-/// of an ID attribute on some element in the XML document; i.e. IDREF
-/// values must match the value of some ID attribute.
-///
-/// `[ VC: Entity Name ]`  
-/// Values of type ENTITY must match the Name production, values
-/// of type ENTITIES must match Names; each Entity Name must match the
-/// name of an unparsed entity declared in the DTD.
-///
-/// `[ VC: Name Token ]`  
-/// Values of type NMTOKEN must match the Nmtoken production; values
-/// of type NMTOKENS must match Nmtokens.
-///
-/// Returns the attribute type
-#[doc(alias = "xmlParseAttributeType")]
-pub(crate) unsafe fn xml_parse_attribute_type(
-    ctxt: XmlParserCtxtPtr,
-    tree: &mut Option<Box<XmlEnumeration>>,
-) -> Option<XmlAttributeType> {
-    unsafe {
-        if (*ctxt).content_bytes().starts_with(b"CDATA") {
-            (*ctxt).advance(5);
-            return Some(XmlAttributeType::XmlAttributeCDATA);
-        } else if (*ctxt).content_bytes().starts_with(b"IDREFS") {
-            (*ctxt).advance(6);
-            return Some(XmlAttributeType::XmlAttributeIDREFS);
-        } else if (*ctxt).content_bytes().starts_with(b"IDREF") {
-            (*ctxt).advance(5);
-            return Some(XmlAttributeType::XmlAttributeIDREF);
-        } else if (*ctxt).current_byte() == b'I' && NXT!(ctxt, 1) == b'D' {
-            (*ctxt).advance(2);
-            return Some(XmlAttributeType::XmlAttributeID);
-        } else if (*ctxt).content_bytes().starts_with(b"ENTITY") {
-            (*ctxt).advance(6);
-            return Some(XmlAttributeType::XmlAttributeEntity);
-        } else if (*ctxt).content_bytes().starts_with(b"ENTITIES") {
-            (*ctxt).advance(8);
-            return Some(XmlAttributeType::XmlAttributeEntities);
-        } else if (*ctxt).content_bytes().starts_with(b"NMTOKENS") {
-            (*ctxt).advance(8);
-            return Some(XmlAttributeType::XmlAttributeNmtokens);
-        } else if (*ctxt).content_bytes().starts_with(b"NMTOKEN") {
-            (*ctxt).advance(7);
-            return Some(XmlAttributeType::XmlAttributeNmtoken);
-        }
-        xml_parse_enumerated_type(ctxt, tree)
-    }
-}
-
-/// Add a defaulted attribute for an element
-#[doc(alias = "xmlAddDefAttrs")]
-pub(crate) unsafe fn xml_add_def_attrs(
-    ctxt: XmlParserCtxtPtr,
-    fullname: &str,
-    fullattr: &str,
-    mut value: *const XmlChar,
-) {
-    unsafe {
-        let mut defaults: XmlDefAttrsPtr;
-
-        // Allows to detect attribute redefinitions
-        if (*ctxt)
-            .atts_special
-            .filter(|t| t.lookup2(fullname, Some(fullattr)).is_some())
-            .is_some()
-        {
-            return;
-        }
-
-        'mem_error: {
-            let mut atts_default = if let Some(table) = (*ctxt).atts_default {
-                table
-            } else {
-                let table = XmlHashTable::with_capacity(10);
-                let Some(table) = XmlHashTableRef::from_table(table) else {
-                    break 'mem_error;
-                };
-                (*ctxt).atts_default = Some(table);
-                table
-            };
-
-            // split the element name into prefix:localname , the string found
-            // are within the DTD and then not associated to namespace names.
-            let (prefix, name) = split_qname2(fullname)
-                .map(|(pre, loc)| (Some(pre), loc))
-                .unwrap_or((None, fullname));
-
-            // make sure there is some storage
-            defaults = atts_default
-                .lookup2(name, prefix)
-                .map_or(null_mut(), |p| *p);
-            if defaults.is_null() {
-                defaults =
-                    xml_malloc(size_of::<XmlDefAttrs>() + (4 * 5) * size_of::<*const XmlChar>())
-                        as _;
-                if defaults.is_null() {
-                    break 'mem_error;
-                }
-                (*defaults).nb_attrs = 0;
-                (*defaults).max_attrs = 4;
-                if atts_default
-                    .update_entry2(name, prefix, defaults, |_, _| {})
-                    .is_err()
-                {
-                    xml_free(defaults as _);
-                    break 'mem_error;
-                }
-            } else if (*defaults).nb_attrs >= (*defaults).max_attrs {
-                let temp: XmlDefAttrsPtr = xml_realloc(
-                    defaults as _,
-                    size_of::<XmlDefAttrs>()
-                        + (2 * (*defaults).max_attrs as usize * 5) * size_of::<*const XmlChar>(),
-                ) as _;
-                if temp.is_null() {
-                    break 'mem_error;
-                }
-                defaults = temp;
-                (*defaults).max_attrs *= 2;
-                if atts_default
-                    .update_entry2(name, prefix, defaults, |_, _| {})
-                    .is_err()
-                {
-                    xml_free(defaults as _);
-                    break 'mem_error;
-                }
-            }
-
-            // Split the element name into prefix:localname , the string found
-            // are within the DTD and hen not associated to namespace names.
-            let (prefix, name) = split_qname2(fullattr)
-                .map(|(pre, loc)| (Some(pre), loc))
-                .unwrap_or((None, fullattr));
-
-            *(*defaults)
-                .values
-                .as_mut_ptr()
-                .add(5 * (*defaults).nb_attrs as usize) =
-                xml_dict_lookup((*ctxt).dict, name.as_ptr(), name.len() as i32);
-            *(*defaults)
-                .values
-                .as_mut_ptr()
-                .add(5 * (*defaults).nb_attrs as usize + 1) = prefix.map_or(null_mut(), |pre| {
-                xml_dict_lookup((*ctxt).dict, pre.as_ptr(), pre.len() as i32)
-            });
-            // intern the string and precompute the end
-            let len = xml_strlen(value);
-            value = xml_dict_lookup((*ctxt).dict, value, len);
-            if value.is_null() {
-                break 'mem_error;
-            }
-            *(*defaults)
-                .values
-                .as_mut_ptr()
-                .add(5 * (*defaults).nb_attrs as usize + 2) = value;
-            *(*defaults)
-                .values
-                .as_mut_ptr()
-                .add(5 * (*defaults).nb_attrs as usize + 3) = value.add(len as usize);
-            if (*ctxt).external != 0 {
-                *(*defaults)
-                    .values
-                    .as_mut_ptr()
-                    .add(5 * (*defaults).nb_attrs as usize + 4) = c"external".as_ptr() as _;
-            } else {
-                *(*defaults)
-                    .values
-                    .as_mut_ptr()
-                    .add(5 * (*defaults).nb_attrs as usize + 4) = null_mut();
-            }
-            (*defaults).nb_attrs += 1;
-            return;
-        }
-
-        xml_err_memory(ctxt, None);
-    }
-}
-
-/// Register this attribute type
-#[doc(alias = "xmlAddSpecialAttr")]
-pub(crate) unsafe fn xml_add_special_attr(
-    ctxt: XmlParserCtxtPtr,
-    fullname: &str,
-    fullattr: &str,
-    typ: XmlAttributeType,
-) {
-    unsafe {
-        let mut atts_special = if let Some(table) = (*ctxt).atts_special {
-            table
-        } else {
-            let table = XmlHashTable::with_capacity(10);
-            let Some(table) = XmlHashTableRef::from_table(table) else {
-                xml_err_memory(ctxt, None);
-                return;
-            };
-            (*ctxt).atts_special = Some(table);
-            table
-        };
-
-        if atts_special.lookup2(fullname, Some(fullattr)).is_some() {
-            return;
-        }
-
-        atts_special.add_entry2(fullname, Some(fullattr), typ).ok();
-    }
-}
 
 /// Parse the declaration for a Mixed Element content
 /// The leading '(' and spaces have been skipped in xmlParseElementContentDecl
