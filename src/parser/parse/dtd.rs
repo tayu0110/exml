@@ -1,19 +1,24 @@
+use std::ptr::null_mut;
+
 use crate::{
     error::XmlParserErrors,
     globals::GenericErrorContext,
     hash::{XmlHashTable, XmlHashTableRef},
     libxml::{
-        parser::{SAX_COMPAT_MODE, XmlParserInputState},
+        parser::{SAX_COMPAT_MODE, XmlParserInputState, XmlParserOption},
         sax2::{xml_sax2_entity_decl, xml_sax2_get_entity},
+        valid::{xml_free_doc_element_content, xml_new_doc_element_content},
         xmlstring::xml_strndup,
     },
     parser::{
         XmlParserCtxt, split_qname2, xml_err_memory, xml_err_msg_str, xml_fatal_err,
-        xml_fatal_err_msg, xml_fatal_err_msg_str, xml_ns_err, xml_validity_error,
+        xml_fatal_err_msg, xml_fatal_err_msg_int, xml_fatal_err_msg_str, xml_ns_err,
+        xml_validity_error,
     },
     tree::{
-        XmlAttributeDefault, XmlAttributeType, XmlDocProperties, XmlEntityType, XmlEnumeration,
-        xml_create_enumeration, xml_new_doc, xml_new_dtd,
+        XmlAttributeDefault, XmlAttributeType, XmlDocProperties, XmlElementContentOccur,
+        XmlElementContentPtr, XmlElementContentType, XmlElementTypeVal, XmlEntityType,
+        XmlEnumeration, xml_create_enumeration, xml_new_doc, xml_new_dtd,
     },
     uri::XmlURI,
 };
@@ -99,11 +104,726 @@ impl XmlParserCtxt {
     }
 }
 
+/// Parse an element declaration. Always consumes '<!'.
+///
+/// ```text
+/// [45] elementdecl ::= '<!ELEMENT' S Name S contentspec S? '>'
+///
+/// [ VC: Unique Element Type Declaration ]
+/// No element type may be declared more than once
+/// ```
+///
+/// Returns the type of the element, or -1 in case of error
+#[doc(alias = "xmlParseElementDecl")]
+pub(crate) unsafe fn parse_element_decl(ctxt: &mut XmlParserCtxt) -> i32 {
+    unsafe {
+        if !ctxt.content_bytes().starts_with(b"<!") {
+            return -1;
+        }
+        ctxt.advance(2);
+
+        // GROW; done in the caller
+
+        if !ctxt.content_bytes().starts_with(b"ELEMENT") {
+            return -1;
+        }
+        let inputid: i32 = ctxt.input().unwrap().id;
+        ctxt.advance(7);
+
+        if ctxt.skip_blanks() == 0 {
+            xml_fatal_err_msg(
+                ctxt,
+                XmlParserErrors::XmlErrSpaceRequired,
+                "Space required after 'ELEMENT'\n",
+            );
+            return -1;
+        }
+        let Some(name) = parse_name(ctxt) else {
+            xml_fatal_err_msg(
+                ctxt,
+                XmlParserErrors::XmlErrNameRequired,
+                "xmlParseElementDecl: no name for Element\n",
+            );
+            return -1;
+        };
+
+        if ctxt.skip_blanks() == 0 {
+            xml_fatal_err_msg(
+                ctxt,
+                XmlParserErrors::XmlErrSpaceRequired,
+                "Space required after the element name\n",
+            );
+        }
+
+        let mut content: XmlElementContentPtr = null_mut();
+        let ret = match ctxt.content_bytes() {
+            [b'E', b'M', b'P', b'T', b'Y', ..] => {
+                ctxt.advance(5);
+                // Element must always be empty.
+                Some(XmlElementTypeVal::XmlElementTypeEmpty)
+            }
+            [b'A', b'N', b'Y', ..] => {
+                ctxt.advance(3);
+                // Element is a generic container.
+                Some(XmlElementTypeVal::XmlElementTypeAny)
+            }
+            [b'(', ..] => parse_element_content_decl(ctxt, &name, &mut content),
+            _ => {
+                // [ WFC: PEs in Internal Subset ] error handling.
+                if ctxt.current_byte() == b'%' && ctxt.external == 0 && ctxt.input_tab.len() == 1 {
+                    xml_fatal_err_msg(
+                        ctxt,
+                        XmlParserErrors::XmlErrPERefInIntSubset,
+                        "PEReference: forbidden within markup decl in internal subset\n",
+                    );
+                } else {
+                    xml_fatal_err_msg(
+                        ctxt,
+                        XmlParserErrors::XmlErrElemcontentNotStarted,
+                        "xmlParseElementDecl: 'EMPTY', 'ANY' or '(' expected\n",
+                    );
+                }
+                return -1;
+            }
+        };
+
+        ctxt.skip_blanks();
+
+        if ctxt.current_byte() != b'>' {
+            xml_fatal_err(ctxt, XmlParserErrors::XmlErrGtRequired, None);
+            if !content.is_null() {
+                xml_free_doc_element_content(ctxt.my_doc, content);
+            }
+        } else {
+            if inputid != ctxt.input().unwrap().id {
+                xml_fatal_err_msg(
+                    ctxt,
+                    XmlParserErrors::XmlErrEntityBoundary,
+                    "Element declaration doesn't start and stop in the same entity\n",
+                );
+            }
+
+            ctxt.skip_char();
+            if let Some(element_decl) = ctxt
+                .sax
+                .as_deref_mut()
+                .filter(|_| ctxt.disable_sax == 0)
+                .and_then(|sax| sax.element_decl)
+            {
+                if !content.is_null() {
+                    (*content).parent = null_mut();
+                }
+                element_decl(ctxt.user_data.clone(), &name, ret, content);
+                if !content.is_null() && (*content).parent.is_null() {
+                    // this is a trick: if xmlAddElementDecl is called,
+                    // instead of copying the full tree it is plugged directly
+                    // if called from the parser. Avoid duplicating the
+                    // interfaces or change the API/ABI
+                    xml_free_doc_element_content(ctxt.my_doc, content);
+                }
+            } else if !content.is_null() {
+                xml_free_doc_element_content(ctxt.my_doc, content);
+            }
+        }
+        ret.map_or(-1, |ret| ret as i32)
+    }
+}
+
+/// Parse the declaration for an Element content either Mixed or Children,
+/// the cases EMPTY and ANY are handled directly in xmlParseElementDecl
+///
+/// ```text
+/// [46] contentspec ::= 'EMPTY' | 'ANY' | Mixed | children
+/// ```
+///
+/// returns: the type of element content XML_ELEMENT_TYPE_xxx
+#[doc(alias = "xmlParseElementContentDecl")]
+unsafe fn parse_element_content_decl(
+    ctxt: &mut XmlParserCtxt,
+    name: &str,
+    result: &mut XmlElementContentPtr,
+) -> Option<XmlElementTypeVal> {
+    unsafe {
+        let tree: XmlElementContentPtr;
+        let inputid: i32 = ctxt.input().unwrap().id;
+
+        *result = null_mut();
+
+        if ctxt.current_byte() != b'(' {
+            xml_fatal_err_msg_str!(
+                ctxt,
+                XmlParserErrors::XmlErrElemcontentNotStarted,
+                "xmlParseElementContentDecl : {} '(' expected\n",
+                name
+            );
+            return None;
+        }
+        ctxt.skip_char();
+        ctxt.grow();
+        if matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
+            return None;
+        }
+        ctxt.skip_blanks();
+        let res = if ctxt.content_bytes().starts_with(b"#PCDATA") {
+            tree = parse_element_mixed_content_decl(ctxt, inputid);
+            XmlElementTypeVal::XmlElementTypeMixed
+        } else {
+            tree = parse_element_children_content_decl_priv(ctxt, inputid, 1);
+            XmlElementTypeVal::XmlElementTypeElement
+        };
+        ctxt.skip_blanks();
+        *result = tree;
+        Some(res)
+    }
+}
+
+/// Parse the declaration for a Mixed Element content
+/// The leading '(' and spaces have been skipped in xmlParseElementContentDecl
+///
+/// ```text
+/// [47] children ::= (choice | seq) ('?' | '*' | '+')?
+/// [48] cp ::= (Name | choice | seq) ('?' | '*' | '+')?
+/// [49] choice ::= '(' S? cp ( S? '|' S? cp )* S? ')'
+/// [50] seq ::= '(' S? cp ( S? ',' S? cp )* S? ')'
+///
+/// [ VC: Proper Group/PE Nesting ] applies to [49] and [50]  
+/// ```
+/// TODO Parameter-entity replacement text must be properly nested
+///    with parenthesized groups. That is to say, if either of the
+///    opening or closing parentheses in a choice, seq, or Mixed
+///    construct is contained in the replacement text for a parameter
+///    entity, both must be contained in the same replacement text. For
+///    interoperability, if a parameter-entity reference appears in a
+///    choice, seq, or Mixed construct, its replacement text should not
+///    be empty, and neither the first nor last non-blank character of
+///    the replacement text should be a connector (| or ,).
+///
+/// Returns the tree of xmlElementContentPtr describing the element hierarchy.
+#[doc(alias = "xmlParseElementChildrenContentDeclPriv")]
+unsafe fn parse_element_children_content_decl_priv(
+    ctxt: &mut XmlParserCtxt,
+    inputchk: i32,
+    depth: i32,
+) -> XmlElementContentPtr {
+    unsafe {
+        let mut ret: XmlElementContentPtr;
+        let mut cur: XmlElementContentPtr;
+        let mut last: XmlElementContentPtr = null_mut();
+        let mut op: XmlElementContentPtr;
+        let mut typ = 0;
+
+        if (depth > 128 && ctxt.options & XmlParserOption::XmlParseHuge as i32 == 0) || depth > 2048
+        {
+            xml_fatal_err_msg_int!(
+                ctxt,
+                XmlParserErrors::XmlErrElemcontentNotFinished,
+                "xmlParseElementChildrenContentDecl : depth %d too deep, use xmlParserOption::XML_PARSE_HUGE\n",
+                depth
+            );
+            return null_mut();
+        }
+        ctxt.skip_blanks();
+        ctxt.grow();
+        if ctxt.current_byte() == b'(' {
+            let inputid: i32 = ctxt.input().unwrap().id;
+
+            // Recurse on first child
+            ctxt.skip_char();
+            ctxt.skip_blanks();
+            cur = parse_element_children_content_decl_priv(ctxt, inputid, depth + 1);
+            ret = cur;
+            if cur.is_null() {
+                return null_mut();
+            }
+            ctxt.skip_blanks();
+            ctxt.grow();
+        } else {
+            let Some(elem) = parse_name(ctxt) else {
+                xml_fatal_err(ctxt, XmlParserErrors::XmlErrElemcontentNotStarted, None);
+                return null_mut();
+            };
+            cur = xml_new_doc_element_content(
+                ctxt.my_doc,
+                Some(&elem),
+                XmlElementContentType::XmlElementContentElement,
+            );
+            ret = cur;
+            if cur.is_null() {
+                xml_err_memory(ctxt, None);
+                return null_mut();
+            }
+            ctxt.grow();
+            match ctxt.current_byte() {
+                b'?' => {
+                    (*cur).ocur = XmlElementContentOccur::XmlElementContentOpt;
+                    ctxt.skip_char();
+                }
+                b'*' => {
+                    (*cur).ocur = XmlElementContentOccur::XmlElementContentMult;
+                    ctxt.skip_char();
+                }
+                b'+' => {
+                    (*cur).ocur = XmlElementContentOccur::XmlElementContentPlus;
+                    ctxt.skip_char();
+                }
+                _ => (*cur).ocur = XmlElementContentOccur::XmlElementContentOnce,
+            }
+            ctxt.grow();
+        }
+        ctxt.skip_blanks();
+        while ctxt.current_byte() != b')'
+            && !matches!(ctxt.instate, XmlParserInputState::XmlParserEOF)
+        {
+            // Each loop we parse one separator and one element.
+            if ctxt.current_byte() == b',' {
+                if typ == 0 {
+                    typ = ctxt.current_byte();
+                } else if typ != ctxt.current_byte() {
+                    // Detect "Name | Name , Name" error
+                    xml_fatal_err_msg_int!(
+                        ctxt,
+                        XmlParserErrors::XmlErrSeparatorRequired,
+                        format!(
+                            "xmlParseElementChildrenContentDecl : '{}' expected\n",
+                            typ as char
+                        )
+                        .as_str(),
+                        typ as i32
+                    );
+                    if !last.is_null() && last != ret {
+                        xml_free_doc_element_content(ctxt.my_doc, last);
+                    }
+                    if !ret.is_null() {
+                        xml_free_doc_element_content(ctxt.my_doc, ret);
+                    }
+                    return null_mut();
+                }
+                ctxt.skip_char();
+
+                op = xml_new_doc_element_content(
+                    ctxt.my_doc,
+                    None,
+                    XmlElementContentType::XmlElementContentSeq,
+                );
+                if op.is_null() {
+                    if !last.is_null() && last != ret {
+                        xml_free_doc_element_content(ctxt.my_doc, last);
+                    }
+                    xml_free_doc_element_content(ctxt.my_doc, ret);
+                    return null_mut();
+                }
+                if last.is_null() {
+                    (*op).c1 = ret;
+                    if !ret.is_null() {
+                        (*ret).parent = op;
+                    }
+                    ret = op;
+                    cur = ret;
+                } else {
+                    (*cur).c2 = op;
+                    if !op.is_null() {
+                        (*op).parent = cur;
+                    }
+                    (*op).c1 = last;
+                    if !last.is_null() {
+                        (*last).parent = op;
+                    }
+                    cur = op;
+                    // last = null_mut();
+                }
+            } else if ctxt.current_byte() == b'|' {
+                if typ == 0 {
+                    typ = ctxt.current_byte();
+                } else if typ != ctxt.current_byte() {
+                    // Detect "Name , Name | Name" error
+                    xml_fatal_err_msg_int!(
+                        ctxt,
+                        XmlParserErrors::XmlErrSeparatorRequired,
+                        format!(
+                            "xmlParseElementChildrenContentDecl : '{}' expected\n",
+                            typ as char
+                        )
+                        .as_str(),
+                        typ as i32
+                    );
+                    if !last.is_null() && last != ret {
+                        xml_free_doc_element_content(ctxt.my_doc, last);
+                    }
+                    if !ret.is_null() {
+                        xml_free_doc_element_content(ctxt.my_doc, ret);
+                    }
+                    return null_mut();
+                }
+                ctxt.skip_char();
+
+                op = xml_new_doc_element_content(
+                    ctxt.my_doc,
+                    None,
+                    XmlElementContentType::XmlElementContentOr,
+                );
+                if op.is_null() {
+                    if !last.is_null() && last != ret {
+                        xml_free_doc_element_content(ctxt.my_doc, last);
+                    }
+                    if !ret.is_null() {
+                        xml_free_doc_element_content(ctxt.my_doc, ret);
+                    }
+                    return null_mut();
+                }
+                if last.is_null() {
+                    (*op).c1 = ret;
+                    if !ret.is_null() {
+                        (*ret).parent = op;
+                    }
+                    ret = op;
+                    cur = ret;
+                } else {
+                    (*cur).c2 = op;
+                    if !op.is_null() {
+                        (*op).parent = cur;
+                    }
+                    (*op).c1 = last;
+                    if !last.is_null() {
+                        (*last).parent = op;
+                    }
+                    cur = op;
+                    // last = null_mut();
+                }
+            } else {
+                xml_fatal_err(ctxt, XmlParserErrors::XmlErrElemcontentNotFinished, None);
+                if !last.is_null() && last != ret {
+                    xml_free_doc_element_content(ctxt.my_doc, last);
+                }
+                if !ret.is_null() {
+                    xml_free_doc_element_content(ctxt.my_doc, ret);
+                }
+                return null_mut();
+            }
+            ctxt.grow();
+            ctxt.skip_blanks();
+            ctxt.grow();
+            if ctxt.current_byte() == b'(' {
+                let inputid: i32 = ctxt.input().unwrap().id;
+                // Recurse on second child
+                ctxt.skip_char();
+                ctxt.skip_blanks();
+                last = parse_element_children_content_decl_priv(ctxt, inputid, depth + 1);
+                if last.is_null() {
+                    if !ret.is_null() {
+                        xml_free_doc_element_content(ctxt.my_doc, ret);
+                    }
+                    return null_mut();
+                }
+                ctxt.skip_blanks();
+            } else {
+                let Some(elem) = parse_name(ctxt) else {
+                    xml_fatal_err(ctxt, XmlParserErrors::XmlErrElemcontentNotStarted, None);
+                    if !ret.is_null() {
+                        xml_free_doc_element_content(ctxt.my_doc, ret);
+                    }
+                    return null_mut();
+                };
+                last = xml_new_doc_element_content(
+                    ctxt.my_doc,
+                    Some(&elem),
+                    XmlElementContentType::XmlElementContentElement,
+                );
+                if last.is_null() {
+                    if !ret.is_null() {
+                        xml_free_doc_element_content(ctxt.my_doc, ret);
+                    }
+                    return null_mut();
+                }
+                match ctxt.current_byte() {
+                    b'?' => {
+                        (*last).ocur = XmlElementContentOccur::XmlElementContentOpt;
+                        ctxt.skip_char();
+                    }
+                    b'*' => {
+                        (*last).ocur = XmlElementContentOccur::XmlElementContentMult;
+                        ctxt.skip_char();
+                    }
+                    b'+' => {
+                        (*last).ocur = XmlElementContentOccur::XmlElementContentPlus;
+                        ctxt.skip_char();
+                    }
+                    _ => (*last).ocur = XmlElementContentOccur::XmlElementContentOnce,
+                }
+            }
+            ctxt.skip_blanks();
+            ctxt.grow();
+        }
+        if !cur.is_null() && !last.is_null() {
+            (*cur).c2 = last;
+            if !last.is_null() {
+                (*last).parent = cur;
+            }
+        }
+        if ctxt.input().unwrap().id != inputchk {
+            xml_fatal_err_msg(
+                ctxt,
+                XmlParserErrors::XmlErrEntityBoundary,
+                "Element content declaration doesn't start and stop in the same entity\n",
+            );
+        }
+        ctxt.skip_char();
+        if ctxt.current_byte() == b'?' {
+            if !ret.is_null() {
+                if matches!((*ret).ocur, XmlElementContentOccur::XmlElementContentPlus)
+                    || matches!((*ret).ocur, XmlElementContentOccur::XmlElementContentMult)
+                {
+                    (*ret).ocur = XmlElementContentOccur::XmlElementContentMult;
+                } else {
+                    (*ret).ocur = XmlElementContentOccur::XmlElementContentOpt;
+                }
+            }
+            ctxt.skip_char();
+        } else if ctxt.current_byte() == b'*' {
+            if !ret.is_null() {
+                (*ret).ocur = XmlElementContentOccur::XmlElementContentMult;
+                cur = ret;
+                // Some normalization:
+                // (a | b* | c?)* == (a | b | c)*
+                while !cur.is_null()
+                    && matches!((*cur).typ, XmlElementContentType::XmlElementContentOr)
+                {
+                    if !(*cur).c1.is_null()
+                        && (matches!(
+                            (*(*cur).c1).ocur,
+                            XmlElementContentOccur::XmlElementContentOpt
+                        ) || matches!(
+                            (*(*cur).c1).ocur,
+                            XmlElementContentOccur::XmlElementContentMult
+                        ))
+                    {
+                        (*(*cur).c1).ocur = XmlElementContentOccur::XmlElementContentOnce;
+                    }
+                    if !(*cur).c2.is_null()
+                        && (matches!(
+                            (*(*cur).c2).ocur,
+                            XmlElementContentOccur::XmlElementContentOpt
+                        ) || matches!(
+                            (*(*cur).c2).ocur,
+                            XmlElementContentOccur::XmlElementContentMult
+                        ))
+                    {
+                        (*(*cur).c2).ocur = XmlElementContentOccur::XmlElementContentOnce;
+                    }
+                    cur = (*cur).c2;
+                }
+            }
+            ctxt.skip_char();
+        } else if ctxt.current_byte() == b'+' {
+            if !ret.is_null() {
+                let mut found: i32 = 0;
+
+                if matches!((*ret).ocur, XmlElementContentOccur::XmlElementContentOpt)
+                    || matches!((*ret).ocur, XmlElementContentOccur::XmlElementContentMult)
+                {
+                    (*ret).ocur = XmlElementContentOccur::XmlElementContentMult;
+                } else {
+                    (*ret).ocur = XmlElementContentOccur::XmlElementContentPlus;
+                }
+                // Some normalization:
+                // (a | b*)+ == (a | b)*
+                // (a | b?)+ == (a | b)*
+                while !cur.is_null()
+                    && matches!((*cur).typ, XmlElementContentType::XmlElementContentOr)
+                {
+                    if !(*cur).c1.is_null()
+                        && (matches!(
+                            (*(*cur).c1).ocur,
+                            XmlElementContentOccur::XmlElementContentOpt
+                        ) || matches!(
+                            (*(*cur).c1).ocur,
+                            XmlElementContentOccur::XmlElementContentMult
+                        ))
+                    {
+                        (*(*cur).c1).ocur = XmlElementContentOccur::XmlElementContentOnce;
+                        found = 1;
+                    }
+                    if !(*cur).c2.is_null()
+                        && (matches!(
+                            (*(*cur).c2).ocur,
+                            XmlElementContentOccur::XmlElementContentOpt
+                        ) || matches!(
+                            (*(*cur).c2).ocur,
+                            XmlElementContentOccur::XmlElementContentMult
+                        ))
+                    {
+                        (*(*cur).c2).ocur = XmlElementContentOccur::XmlElementContentOnce;
+                        found = 1;
+                    }
+                    cur = (*cur).c2;
+                }
+                if found != 0 {
+                    (*ret).ocur = XmlElementContentOccur::XmlElementContentMult;
+                }
+            }
+            ctxt.skip_char();
+        }
+        ret
+    }
+}
+
+/// Parse the declaration for a Mixed Element content
+/// The leading '(' and spaces have been skipped in xmlParseElementContentDecl
+///
+/// ```text
+/// [51] Mixed ::= '(' S? '#PCDATA' (S? '|' S? Name)* S? ')*' | '(' S? '#PCDATA' S? ')'
+///
+/// [ VC: Proper Group/PE Nesting ] applies to [51] too (see [49])
+///
+/// [ VC: No Duplicate Types ]
+/// The same name must not appear more than once in a single
+/// mixed-content declaration.
+/// ```
+///
+/// returns: the list of the xmlElementContentPtr describing the element choices
+#[doc(alias = "xmlParseElementMixedContentDecl")]
+unsafe fn parse_element_mixed_content_decl(
+    ctxt: &mut XmlParserCtxt,
+    inputchk: i32,
+) -> XmlElementContentPtr {
+    unsafe {
+        let mut ret: XmlElementContentPtr = null_mut();
+        let mut cur: XmlElementContentPtr = null_mut();
+        let mut n: XmlElementContentPtr;
+
+        ctxt.grow();
+        if !ctxt.content_bytes().starts_with(b"#PCDATA") {
+            xml_fatal_err(ctxt, XmlParserErrors::XmlErrPCDATARequired, None);
+        }
+        ctxt.advance(7);
+        ctxt.skip_blanks();
+        if ctxt.current_byte() == b')' {
+            if ctxt.input().unwrap().id != inputchk {
+                xml_fatal_err_msg(
+                    ctxt,
+                    XmlParserErrors::XmlErrEntityBoundary,
+                    "Element content declaration doesn't start and stop in the same entity\n",
+                );
+            }
+            ctxt.skip_char();
+            ret = xml_new_doc_element_content(
+                ctxt.my_doc,
+                None,
+                XmlElementContentType::XmlElementContentPCDATA,
+            );
+            if ret.is_null() {
+                return null_mut();
+            }
+            if ctxt.current_byte() == b'*' {
+                (*ret).ocur = XmlElementContentOccur::XmlElementContentMult;
+                ctxt.skip_char();
+            }
+            return ret;
+        }
+        if matches!(ctxt.current_byte(), b'(' | b'|') {
+            ret = xml_new_doc_element_content(
+                ctxt.my_doc,
+                None,
+                XmlElementContentType::XmlElementContentPCDATA,
+            );
+            cur = ret;
+            if ret.is_null() {
+                return null_mut();
+            }
+        }
+        let mut elem: Option<String> = None;
+        while ctxt.current_byte() == b'|'
+            && !matches!(ctxt.instate, XmlParserInputState::XmlParserEOF)
+        {
+            ctxt.skip_char();
+            if let Some(elem) = elem.as_deref() {
+                n = xml_new_doc_element_content(
+                    ctxt.my_doc,
+                    None,
+                    XmlElementContentType::XmlElementContentOr,
+                );
+                if n.is_null() {
+                    xml_free_doc_element_content(ctxt.my_doc, ret);
+                    return null_mut();
+                }
+                (*n).c1 = xml_new_doc_element_content(
+                    ctxt.my_doc,
+                    Some(elem),
+                    XmlElementContentType::XmlElementContentElement,
+                );
+                if !(*n).c1.is_null() {
+                    (*(*n).c1).parent = n;
+                }
+                (*cur).c2 = n;
+                if !n.is_null() {
+                    (*n).parent = cur;
+                }
+                cur = n;
+            } else {
+                ret = xml_new_doc_element_content(
+                    ctxt.my_doc,
+                    None,
+                    XmlElementContentType::XmlElementContentOr,
+                );
+                if ret.is_null() {
+                    xml_free_doc_element_content(ctxt.my_doc, cur);
+                    return null_mut();
+                }
+                (*ret).c1 = cur;
+                if !cur.is_null() {
+                    (*cur).parent = ret;
+                }
+                cur = ret;
+            }
+            ctxt.skip_blanks();
+            elem = parse_name(ctxt);
+            if elem.is_none() {
+                xml_fatal_err_msg(
+                    ctxt,
+                    XmlParserErrors::XmlErrNameRequired,
+                    "xmlParseElementMixedContentDecl : Name expected\n",
+                );
+                xml_free_doc_element_content(ctxt.my_doc, ret);
+                return null_mut();
+            }
+            ctxt.skip_blanks();
+            ctxt.grow();
+        }
+        if ctxt.content_bytes().starts_with(b")*") {
+            if let Some(elem) = elem {
+                (*cur).c2 = xml_new_doc_element_content(
+                    ctxt.my_doc,
+                    Some(&elem),
+                    XmlElementContentType::XmlElementContentElement,
+                );
+                if !(*cur).c2.is_null() {
+                    (*(*cur).c2).parent = cur;
+                }
+            }
+            if !ret.is_null() {
+                (*ret).ocur = XmlElementContentOccur::XmlElementContentMult;
+            }
+            if ctxt.input().unwrap().id != inputchk {
+                xml_fatal_err_msg(
+                    ctxt,
+                    XmlParserErrors::XmlErrEntityBoundary,
+                    "Element content declaration doesn't start and stop in the same entity\n",
+                );
+            }
+            ctxt.advance(2);
+        } else {
+            xml_free_doc_element_content(ctxt.my_doc, ret);
+            xml_fatal_err(ctxt, XmlParserErrors::XmlErrMixedNotStarted, None);
+            return null_mut();
+        }
+        ret
+    }
+}
+
 /// Parse an attribute list declaration for an element. Always consumes '<!'.
 ///
 /// ```text
 /// [52] AttlistDecl ::= '<!ATTLIST' S Name AttDef* S? '>'
-/// [53] AttDef ::= S Name S AttType S DefaultDecl
+/// [53] AttDef      ::= S Name S AttType S DefaultDecl
 /// ```
 #[doc(alias = "xmlParseAttributeListDecl")]
 pub(crate) unsafe fn parse_attribute_list_decl(ctxt: &mut XmlParserCtxt) {
@@ -236,35 +956,35 @@ pub(crate) unsafe fn parse_attribute_list_decl(ctxt: &mut XmlParserCtxt) {
 /// [54] AttType ::= StringType | TokenizedType | EnumeratedType
 /// [55] StringType ::= 'CDATA'
 /// [56] TokenizedType ::= 'ID' | 'IDREF' | 'IDREFS' | 'ENTITY' | 'ENTITIES' | 'NMTOKEN' | 'NMTOKENS'
-/// ```
 ///
-/// Validity constraints for attribute values syntax are checked in xmlValidateAttributeValue()
-///
-/// `[ VC: ID ]`  
+/// [ VC: ID ]
 /// Values of type ID must match the Name production. A name must not
 /// appear more than once in an XML document as a value of this type;
 /// i.e., ID values must uniquely identify the elements which bear them.
 ///
-/// `[ VC: One ID per Element Type ]`  
+/// [ VC: One ID per Element Type ]
 /// No element type may have more than one ID attribute specified.
 ///
-/// `[ VC: ID Attribute Default ]`  
+/// [ VC: ID Attribute Default ]
 /// An ID attribute must have a declared default of #IMPLIED or #REQUIRED.
 ///
-/// `[ VC: IDREF ]`  
+/// [ VC: IDREF ]
 /// Values of type IDREF must match the Name production, and values
 /// of type IDREFS must match Names; each IDREF Name must match the value
 /// of an ID attribute on some element in the XML document; i.e. IDREF
 /// values must match the value of some ID attribute.
 ///
-/// `[ VC: Entity Name ]`  
+/// [ VC: Entity Name ]
 /// Values of type ENTITY must match the Name production, values
 /// of type ENTITIES must match Names; each Entity Name must match the
 /// name of an unparsed entity declared in the DTD.
 ///
-/// `[ VC: Name Token ]`  
+/// [ VC: Name Token ]
 /// Values of type NMTOKEN must match the Nmtoken production; values
 /// of type NMTOKENS must match Nmtokens.
+/// ```
+///
+/// Validity constraints for attribute values syntax are checked in xmlValidateAttributeValue()
 ///
 /// Returns the attribute type
 #[doc(alias = "xmlParseAttributeType")]
@@ -347,11 +1067,11 @@ pub(crate) unsafe fn parse_enumerated_type(
 ///
 /// ```text
 /// [58] NotationType ::= 'NOTATION' S '(' S? Name (S? '|' S? Name)* S? ')'
-/// ```
 ///
-/// `[ VC: Notation Attributes ]`
+/// [ VC: Notation Attributes ]
 /// Values of this type must match one of the notation names included
 /// in the declaration; all notation names in the declaration must be declared.
+/// ```
 ///
 /// Returns: the notation attribute tree built while parsing
 #[doc(alias = "xmlParseNotationType")]
@@ -414,10 +1134,10 @@ pub(crate) unsafe fn parse_notation_type(ctxt: &mut XmlParserCtxt) -> Option<Box
 ///
 /// ```text
 /// [59] Enumeration ::= '(' S? Nmtoken (S? '|' S? Nmtoken)* S? ')'
-/// ```
 ///
-/// `[ VC: Enumeration ]`  
+/// [ VC: Enumeration ]
 /// Values of this type must match one of the Nmtoken tokens in the declaration
+/// ```
 ///
 /// Returns: the enumeration attribute tree built while parsing
 #[doc(alias = "xmlParseEnumerationType")]
@@ -478,30 +1198,29 @@ pub(crate) unsafe fn parse_enumeration_type(
 ///
 /// ```text
 /// [60] DefaultDecl ::= '#REQUIRED' | '#IMPLIED' | (('#FIXED' S)? AttValue)
-/// ```
 ///
-/// `[ VC: Required Attribute ]`  
+/// [ VC: Required Attribute ]
 /// if the default declaration is the keyword #REQUIRED, then the
 /// attribute must be specified for all elements of the type in the
 /// attribute-list declaration.
 ///
-/// `[ VC: Attribute Default Legal ]`  
+/// [ VC: Attribute Default Legal ]
 /// The declared default value must meet the lexical constraints of
 /// the declared attribute type c.f. xmlValidateAttributeDecl()
 ///
-/// `[ VC: Fixed Attribute Default ]`  
+/// [ VC: Fixed Attribute Default ]
 /// if an attribute has a default value declared with the #FIXED
 /// keyword, instances of that attribute must match the default value.
 ///
-/// `[ WFC: No < in Attribute Values ]`  
+/// [ WFC: No < in Attribute Values ]
 /// handled in xmlParseAttValue()
+/// ```
+///
 ///
 /// returns: XML_ATTRIBUTE_NONE, XML_ATTRIBUTE_REQUIRED, XML_ATTRIBUTE_IMPLIED
 ///  or XML_ATTRIBUTE_FIXED.
 #[doc(alias = "xmlParseDefaultDecl")]
-pub(crate) unsafe fn parse_default_decl(
-    ctxt: &mut XmlParserCtxt,
-) -> (XmlAttributeDefault, Option<String>) {
+unsafe fn parse_default_decl(ctxt: &mut XmlParserCtxt) -> (XmlAttributeDefault, Option<String>) {
     unsafe {
         if ctxt.content_bytes().starts_with(b"#REQUIRED") {
             ctxt.advance(9);

@@ -47,10 +47,9 @@ use crate::{
         globals::{xml_free, xml_malloc_atomic, xml_realloc},
         parser::{
             XML_SKIP_IDS, XmlParserInputState, XmlParserMode, XmlParserOption,
-            xml_parse_conditional_sections, xml_parse_element_children_content_decl_priv,
-            xml_parse_end_tag1, xml_parse_end_tag2, xml_parse_external_entity_private,
-            xml_parse_markup_decl, xml_parse_start_tag2, xml_parser_add_node_info,
-            xml_parser_find_node_info,
+            xml_parse_conditional_sections, xml_parse_end_tag1, xml_parse_end_tag2,
+            xml_parse_external_entity_private, xml_parse_markup_decl, xml_parse_start_tag2,
+            xml_parser_add_node_info, xml_parser_find_node_info,
         },
         sax2::xml_sax2_get_entity,
         valid::{
@@ -71,10 +70,10 @@ use crate::{
     tree::{
         NodeCommon, XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
         XML_ENT_PARSED, XML_XML_NAMESPACE, XmlDocProperties, XmlElementContentOccur,
-        XmlElementContentPtr, XmlElementContentType, XmlElementType, XmlElementTypeVal,
-        XmlEntityPtr, XmlEntityType, XmlGenericNodePtr, XmlNodePtr, xml_create_int_subset,
-        xml_doc_copy_node, xml_free_doc, xml_free_node, xml_free_node_list,
-        xml_get_predefined_entity, xml_new_doc, xml_new_doc_node,
+        XmlElementContentPtr, XmlElementContentType, XmlElementType, XmlEntityPtr, XmlEntityType,
+        XmlGenericNodePtr, XmlNodePtr, xml_create_int_subset, xml_doc_copy_node, xml_free_doc,
+        xml_free_node, xml_free_node_list, xml_get_predefined_entity, xml_new_doc,
+        xml_new_doc_node,
     },
 };
 
@@ -655,53 +654,6 @@ pub(crate) unsafe fn xml_parse_element_mixed_content_decl(
 //         xml_parse_element_children_content_decl_priv(ctxt, inputchk, 1)
 //     }
 // }
-
-/// Parse the declaration for an Element content either Mixed or Children,
-/// the cases EMPTY and ANY are handled directly in xmlParseElementDecl
-///
-/// `[46] contentspec ::= 'EMPTY' | 'ANY' | Mixed | children`
-///
-/// returns: the type of element content XML_ELEMENT_TYPE_xxx
-#[doc(alias = "xmlParseElementContentDecl")]
-pub(crate) unsafe fn xml_parse_element_content_decl(
-    ctxt: XmlParserCtxtPtr,
-    name: *const XmlChar,
-    result: *mut XmlElementContentPtr,
-) -> Option<XmlElementTypeVal> {
-    unsafe {
-        let tree: XmlElementContentPtr;
-        let inputid: i32 = (*ctxt).input().unwrap().id;
-
-        *result = null_mut();
-
-        if (*ctxt).current_byte() != b'(' {
-            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
-            xml_fatal_err_msg_str!(
-                ctxt,
-                XmlParserErrors::XmlErrElemcontentNotStarted,
-                "xmlParseElementContentDecl : {} '(' expected\n",
-                name
-            );
-            return None;
-        }
-        (*ctxt).skip_char();
-        (*ctxt).grow();
-        if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-            return None;
-        }
-        (*ctxt).skip_blanks();
-        let res = if (*ctxt).content_bytes().starts_with(b"#PCDATA") {
-            tree = xml_parse_element_mixed_content_decl(ctxt, inputid);
-            XmlElementTypeVal::XmlElementTypeMixed
-        } else {
-            tree = xml_parse_element_children_content_decl_priv(ctxt, inputid, 1);
-            XmlElementTypeVal::XmlElementTypeElement
-        };
-        (*ctxt).skip_blanks();
-        *result = tree;
-        Some(res)
-    }
-}
 
 /// Parse an entitiy reference. Always consumes '&'.
 ///
