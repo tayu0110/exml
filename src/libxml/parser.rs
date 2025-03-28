@@ -84,11 +84,11 @@ use crate::{
         dict::{__xml_initialize_dict, xml_cleanup_dict_internal, xml_dict_free, xml_dict_lookup},
         globals::{
             xml_cleanup_globals_internal, xml_default_sax_locator, xml_free,
-            xml_init_globals_internal, xml_malloc_atomic, xml_realloc,
+            xml_init_globals_internal, xml_realloc,
         },
         htmlparser::{__html_parse_content, HtmlParserOption, html_create_memory_parser_ctxt},
         parser_internals::{
-            XML_MAX_HUGE_LENGTH, XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH, xml_parse_content,
+            XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH, xml_parse_content,
             xml_parse_content_internal, xml_parse_doc_type_decl, xml_parse_element_content_decl,
             xml_parse_element_end, xml_parse_element_start, xml_parse_external_subset,
             xml_parse_misc, xml_parse_name, xml_parse_nmtoken, xml_parse_pe_reference,
@@ -5678,155 +5678,6 @@ pub(crate) unsafe fn xml_parse_markup_decl(ctxt: XmlParserCtxtPtr) {
         }
 
         (*ctxt).instate = XmlParserInputState::XmlParserDTD;
-    }
-}
-
-/// Parse escaped pure raw content. Always consumes '<!['.
-///
-/// `[18] CDSect ::= CDStart CData CDEnd`
-///
-/// `[19] CDStart ::= '<![CDATA['`
-///
-/// `[20] Data ::= (Char* - (Char* ']]>' Char*))`
-///
-/// `[21] CDEnd ::= ']]>'`
-#[doc(alias = "xmlParseCDSect")]
-pub(crate) unsafe fn xml_parse_cdsect(ctxt: XmlParserCtxtPtr) {
-    unsafe {
-        let mut buf: *mut XmlChar = null_mut();
-        let mut len: i32 = 0;
-        let mut size: i32 = XML_PARSER_BUFFER_SIZE as i32;
-        let mut rl: i32 = 0;
-        let mut sl: i32 = 0;
-        let mut l: i32 = 0;
-        let max_length: i32 = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
-            XML_MAX_HUGE_LENGTH as i32
-        } else {
-            XML_MAX_TEXT_LENGTH as i32
-        };
-
-        if (*ctxt).current_byte() != b'<'
-            || (*ctxt).nth_byte(1) != b'!'
-            || (*ctxt).nth_byte(2) != b'['
-        {
-            return;
-        }
-        (*ctxt).advance(3);
-
-        if !(*ctxt).content_bytes().starts_with(b"CDATA[") {
-            return;
-        }
-        (*ctxt).advance(6);
-
-        (*ctxt).instate = XmlParserInputState::XmlParserCDATASection;
-        let mut r = (*ctxt).current_char(&mut rl).unwrap_or('\0');
-        if !xml_is_char(r as u32) {
-            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrCDATANotFinished, None);
-            // goto out;
-            if !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-                (*ctxt).instate = XmlParserInputState::XmlParserContent;
-            }
-            xml_free(buf as _);
-            return;
-        }
-        (*ctxt).advance_with_line_handling(rl as usize);
-        let mut s = (*ctxt).current_char(&mut sl).unwrap_or('\0');
-        if !xml_is_char(s as u32) {
-            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrCDATANotFinished, None);
-            // goto out;
-            if !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-                (*ctxt).instate = XmlParserInputState::XmlParserContent;
-            }
-            xml_free(buf as _);
-            return;
-        }
-        (*ctxt).advance_with_line_handling(sl as usize);
-        let mut cur = (*ctxt).current_char(&mut l).unwrap_or('\0');
-        buf = xml_malloc_atomic(size as usize) as *mut XmlChar;
-        if buf.is_null() {
-            xml_err_memory(ctxt, None);
-            // goto out;
-            if !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-                (*ctxt).instate = XmlParserInputState::XmlParserContent;
-            }
-            xml_free(buf as _);
-            return;
-        }
-        while xml_is_char(cur as u32) && (r != ']' || s != ']' || cur != '>') {
-            if len + 5 >= size {
-                let tmp: *mut XmlChar = xml_realloc(buf as _, size as usize * 2) as *mut XmlChar;
-                if tmp.is_null() {
-                    xml_err_memory(ctxt, None);
-                    // goto out;
-                    if !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-                        (*ctxt).instate = XmlParserInputState::XmlParserContent;
-                    }
-                    xml_free(buf as _);
-                    return;
-                }
-                buf = tmp;
-                size *= 2;
-            }
-            COPY_BUF!(rl, buf, len, r);
-            if len > max_length {
-                xml_fatal_err_msg(
-                    &mut *ctxt,
-                    XmlParserErrors::XmlErrCDATANotFinished,
-                    "CData section too big found\n",
-                );
-                // goto out;
-                if !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-                    (*ctxt).instate = XmlParserInputState::XmlParserContent;
-                }
-                xml_free(buf as _);
-                return;
-            }
-            r = s;
-            rl = sl;
-            s = cur;
-            sl = l;
-            (*ctxt).advance_with_line_handling(l as usize);
-            cur = (*ctxt).current_char(&mut l).unwrap_or('\0');
-        }
-        *buf.add(len as usize) = 0;
-        if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-            xml_free(buf as _);
-            return;
-        }
-        if cur != '>' {
-            let b = CStr::from_ptr(buf as *const i8).to_string_lossy();
-            xml_fatal_err_msg_str!(
-                ctxt,
-                XmlParserErrors::XmlErrCDATANotFinished,
-                "CData section not finished\n{}\n",
-                b
-            );
-            // goto out;
-            if !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-                (*ctxt).instate = XmlParserInputState::XmlParserContent;
-            }
-            xml_free(buf as _);
-            return;
-        }
-        (*ctxt).advance_with_line_handling(l as usize);
-
-        // OK the buffer is to be consumed as cdata.
-        if (*ctxt).disable_sax == 0 {
-            if let Some(sax) = (*ctxt).sax.as_deref_mut() {
-                let s = from_utf8(from_raw_parts(buf, len as usize)).expect("Internal Error");
-                if let Some(cdata) = sax.cdata_block {
-                    cdata((*ctxt).user_data.clone(), s);
-                } else if let Some(characters) = sax.characters {
-                    characters((*ctxt).user_data.clone(), s);
-                }
-            }
-        }
-
-        // out:
-        if !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-            (*ctxt).instate = XmlParserInputState::XmlParserContent;
-        }
-        xml_free(buf as _);
     }
 }
 

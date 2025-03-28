@@ -4,10 +4,14 @@ use crate::{
     error::XmlParserErrors,
     libxml::{
         chvalid::{xml_is_blank_char, xml_is_char},
-        parser::{XML_PARSER_BIG_BUFFER_SIZE, XmlParserInputState},
+        parser::{XML_PARSER_BIG_BUFFER_SIZE, XmlParserInputState, XmlParserOption},
+        parser_internals::{XML_MAX_HUGE_LENGTH, XML_MAX_TEXT_LENGTH},
         valid::xml_is_mixed_element,
     },
-    parser::{XmlParserCtxt, xml_fatal_err, xml_fatal_err_msg_int},
+    parser::{
+        XmlParserCtxt, xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_int,
+        xml_fatal_err_msg_str,
+    },
     tree::{NodeCommon, XmlElementType},
 };
 
@@ -201,19 +205,18 @@ unsafe fn parse_char_data_complex(ctxt: &mut XmlParserCtxt, partial: i32) {
 }
 
 // used for the test in the inner loop of the char data testing
+// &    : start reference
+// <    : start tag
+// ]    : end CDATA section
 const TEST_CHAR_DATA: [u8; 256] = [
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, /* 0x9, CR/LF separated */
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x00, 0x27, /* & */
-    0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37,
-    0x38, 0x39, 0x3A, 0x3B, 0x00, 0x3D, 0x3E, 0x3F, /* < */
+    0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x00, 0x27, 0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F,
+    0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3A, 0x3B, 0x00, 0x3D, 0x3E, 0x3F,
     0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C, 0x4D, 0x4E, 0x4F,
-    0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5A, 0x5B, 0x5C, 0x00, 0x5E,
-    0x5F, /* ] */
+    0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5A, 0x5B, 0x5C, 0x00, 0x5E, 0x5F,
     0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6A, 0x6B, 0x6C, 0x6D, 0x6E, 0x6F,
     0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7A, 0x7B, 0x7C, 0x7D, 0x7E, 0x7F,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* non-ascii */
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -221,7 +224,7 @@ const TEST_CHAR_DATA: [u8; 256] = [
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
 
 /// Parse character data. Always makes progress if the first char isn't '<' or '&'.
@@ -331,7 +334,7 @@ pub(crate) unsafe fn parse_char_data_internal(ctxt: &mut XmlParserCtxt, partial:
                         ctxt.input_mut().unwrap().line = line;
                         ctxt.input_mut().unwrap().col = col;
                         ctxt.input_mut().unwrap().cur = ctxt.input().unwrap().cur.add(diff);
-                        xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrMisplacedCDATAEnd, None);
+                        xml_fatal_err(ctxt, XmlParserErrors::XmlErrMisplacedCDATAEnd, None);
                         if !matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
                             // if the parser input state is not EOF,
                             // consume the head of ']'.
@@ -498,6 +501,106 @@ pub(crate) unsafe fn parse_lookup_char_data(ctxt: &mut XmlParserCtxt) -> i32 {
         } else {
             ctxt.check_index = cur.len() as i64;
             0
+        }
+    }
+}
+
+/// Parse escaped pure raw content. Always consumes '<!['.
+///
+/// ```text
+/// [18] CDSect ::= CDStart CData CDEnd
+/// [19] CDStart ::= '<![CDATA['
+/// [20] Data ::= (Char* - (Char* ']]>' Char*))
+/// [21] CDEnd ::= ']]>'
+/// ```
+#[doc(alias = "xmlParseCDSect")]
+pub(crate) unsafe fn parse_cdsect(ctxt: &mut XmlParserCtxt) {
+    unsafe {
+        let mut rl: i32 = 0;
+        let mut sl: i32 = 0;
+        let mut l: i32 = 0;
+        let max_length = if ctxt.options & XmlParserOption::XmlParseHuge as i32 != 0 {
+            XML_MAX_HUGE_LENGTH
+        } else {
+            XML_MAX_TEXT_LENGTH
+        };
+
+        if !ctxt.content_bytes().starts_with(b"<![CDATA[") {
+            return;
+        }
+        ctxt.advance(9);
+
+        ctxt.instate = XmlParserInputState::XmlParserCDATASection;
+        let mut r = ctxt.current_char(&mut rl).unwrap_or('\0');
+        if !xml_is_char(r as u32) {
+            xml_fatal_err(ctxt, XmlParserErrors::XmlErrCDATANotFinished, None);
+            if !matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
+                ctxt.instate = XmlParserInputState::XmlParserContent;
+            }
+            return;
+        }
+        ctxt.advance_with_line_handling(rl as usize);
+        let mut s = ctxt.current_char(&mut sl).unwrap_or('\0');
+        if !xml_is_char(s as u32) {
+            xml_fatal_err(ctxt, XmlParserErrors::XmlErrCDATANotFinished, None);
+            if !matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
+                ctxt.instate = XmlParserInputState::XmlParserContent;
+            }
+            return;
+        }
+        ctxt.advance_with_line_handling(sl as usize);
+        let mut cur = ctxt.current_char(&mut l).unwrap_or('\0');
+        let mut buf = String::new();
+        while xml_is_char(cur as u32) && (r != ']' || s != ']' || cur != '>') {
+            buf.push(r);
+            if buf.len() > max_length {
+                xml_fatal_err_msg(
+                    ctxt,
+                    XmlParserErrors::XmlErrCDATANotFinished,
+                    "CData section too big found\n",
+                );
+                if !matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
+                    ctxt.instate = XmlParserInputState::XmlParserContent;
+                }
+                return;
+            }
+            r = s;
+            s = cur;
+            ctxt.advance_with_line_handling(l as usize);
+            cur = ctxt.current_char(&mut l).unwrap_or('\0');
+        }
+        if matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
+            return;
+        }
+        if cur != '>' {
+            xml_fatal_err_msg_str!(
+                ctxt,
+                XmlParserErrors::XmlErrCDATANotFinished,
+                "CData section not finished\n{}\n",
+                buf
+            );
+            // goto out;
+            if !matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
+                ctxt.instate = XmlParserInputState::XmlParserContent;
+            }
+            return;
+        }
+        ctxt.advance_with_line_handling(l as usize);
+
+        // OK the buffer is to be consumed as cdata.
+        if ctxt.disable_sax == 0 {
+            if let Some(sax) = ctxt.sax.as_deref_mut() {
+                if let Some(cdata) = sax.cdata_block {
+                    cdata(ctxt.user_data.clone(), &buf);
+                } else if let Some(characters) = sax.characters {
+                    characters(ctxt.user_data.clone(), &buf);
+                }
+            }
+        }
+
+        // out:
+        if !matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
+            ctxt.instate = XmlParserInputState::XmlParserContent;
         }
     }
 }

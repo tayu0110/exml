@@ -46,7 +46,7 @@ use crate::{
         dict::{xml_dict_free, xml_dict_lookup},
         globals::{xml_free, xml_malloc_atomic, xml_realloc},
         parser::{
-            XML_SKIP_IDS, XmlParserInputState, XmlParserMode, XmlParserOption, xml_parse_cdsect,
+            XML_SKIP_IDS, XmlParserInputState, XmlParserMode, XmlParserOption,
             xml_parse_conditional_sections, xml_parse_element_children_content_decl_priv,
             xml_parse_end_tag1, xml_parse_end_tag2, xml_parse_external_entity_private,
             xml_parse_markup_decl, xml_parse_start_tag2, xml_parser_add_node_info,
@@ -61,7 +61,7 @@ use crate::{
     },
     parser::{
         __xml_err_encoding, XmlParserCharValid, XmlParserCtxtPtr, XmlParserInput,
-        XmlParserNodeInfo, parse_att_value, parse_char_data_internal, parse_char_ref,
+        XmlParserNodeInfo, parse_att_value, parse_cdsect, parse_char_data_internal, parse_char_ref,
         parse_comment, parse_external_id, parse_name, parse_pi, parse_text_decl,
         parser_entity_check, xml_create_memory_parser_ctxt, xml_err_encoding_int, xml_err_memory,
         xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_int,
@@ -2322,7 +2322,7 @@ pub(crate) unsafe fn xml_parse_content_internal(ctxt: XmlParserCtxtPtr) {
             // Second case : a CDSection
             // 2.6.0 test was *cur not RAW
             else if (*ctxt).content_bytes().starts_with(b"<![CDATA[") {
-                xml_parse_cdsect(ctxt);
+                parse_cdsect(&mut *ctxt);
             }
             // Third case :  a comment
             else if *cur == b'<'
