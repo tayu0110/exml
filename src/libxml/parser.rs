@@ -100,10 +100,9 @@ use crate::{
     },
     parser::{
         __xml_err_encoding, XmlParserCharValid, XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput,
-        XmlParserNodeInfo, check_cdata_push, parse_attribute_list_decl, parse_attribute2,
-        parse_char_data_internal, parse_comment, parse_element_decl, parse_entity_decl,
-        parse_lookup_char, parse_lookup_char_data, parse_notation_decl, parse_pi, parse_qname,
-        parse_text_decl, parse_xmldecl, xml_create_entity_parser_ctxt_internal,
+        XmlParserNodeInfo, check_cdata_push, parse_attribute2, parse_char_data_internal,
+        parse_comment, parse_lookup_char, parse_lookup_char_data, parse_markup_decl, parse_pi,
+        parse_qname, parse_text_decl, parse_xmldecl, xml_create_entity_parser_ctxt_internal,
         xml_create_memory_parser_ctxt, xml_err_attribute_dup, xml_err_memory, xml_fatal_err,
         xml_fatal_err_msg, xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str,
         xml_free_parser_ctxt, xml_new_sax_parser_ctxt, xml_ns_err, xml_ns_warn, xml_validity_error,
@@ -923,7 +922,7 @@ pub(crate) unsafe fn xml_parse_conditional_sections(ctxt: XmlParserCtxtPtr) {
             } else if (*ctxt).current_byte() == b'<'
                 && ((*ctxt).nth_byte(1) == b'!' || (*ctxt).nth_byte(1) == b'?')
             {
-                xml_parse_markup_decl(ctxt);
+                parse_markup_decl(&mut *ctxt);
             } else {
                 xml_fatal_err(
                     &mut *ctxt,
@@ -983,7 +982,7 @@ unsafe fn xml_parse_internal_subset(ctxt: XmlParserCtxtPtr) {
                 } else if (*ctxt).current_byte() == b'<'
                     && ((*ctxt).nth_byte(1) == b'!' || (*ctxt).nth_byte(1) == b'?')
                 {
-                    xml_parse_markup_decl(ctxt);
+                    parse_markup_decl(&mut *ctxt);
                 } else if (*ctxt).current_byte() == b'%' {
                     xml_parse_pe_reference(ctxt);
                 } else {
@@ -5088,67 +5087,6 @@ pub fn xml_has_feature(feature: Option<XmlFeature>) -> bool {
         //   xmlFeature::XML_WITH_LZMA => {}
         //   xmlFeature::XML_WITH_ICU => {}
         _ => false,
-    }
-}
-
-/// Parse markup declarations. Always consumes '<!' or '<?'.
-///
-/// `[29] markupdecl ::= elementdecl | AttlistDecl | EntityDecl | NotationDecl | PI | Comment`
-///
-/// `[ VC: Proper Declaration/PE Nesting ]`  
-/// Parameter-entity replacement text must be properly nested with
-/// markup declarations. That is to say, if either the first character
-/// or the last character of a markup declaration (markupdecl above) is
-/// contained in the replacement text for a parameter-entity reference,
-/// both must be contained in the same replacement text.
-///
-/// `[ WFC: PEs in Internal Subset ]`  
-/// In the internal DTD subset, parameter-entity references can occur
-/// only where markup declarations can occur, not within markup declarations.
-/// (This does not apply to references that occur in external parameter
-/// entities or to the external subset.)
-#[doc(alias = "xmlParseMarkupDecl")]
-pub(crate) unsafe fn xml_parse_markup_decl(ctxt: XmlParserCtxtPtr) {
-    unsafe {
-        (*ctxt).grow();
-        if (*ctxt).current_byte() == b'<' {
-            if (*ctxt).nth_byte(1) == b'!' {
-                match (*ctxt).nth_byte(2) {
-                    b'E' => {
-                        if (*ctxt).nth_byte(3) == b'L' {
-                            parse_element_decl(&mut *ctxt);
-                        } else if (*ctxt).nth_byte(3) == b'N' {
-                            parse_entity_decl(&mut *ctxt);
-                        } else {
-                            (*ctxt).advance(2);
-                        }
-                    }
-                    b'A' => {
-                        parse_attribute_list_decl(&mut *ctxt);
-                    }
-                    b'N' => {
-                        parse_notation_decl(&mut *ctxt);
-                    }
-                    b'-' => {
-                        parse_comment(&mut *ctxt);
-                    }
-                    _ => {
-                        // there is an error but it will be detected later
-                        (*ctxt).advance(2);
-                    }
-                }
-            } else if (*ctxt).nth_byte(1) == b'?' {
-                parse_pi(&mut *ctxt);
-            }
-        }
-
-        // detect requirement to exit there and act accordingly
-        // and avoid having instate overridden later on
-        if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-            return;
-        }
-
-        (*ctxt).instate = XmlParserInputState::XmlParserDTD;
     }
 }
 

@@ -24,8 +24,8 @@ use crate::{
 };
 
 use super::{
-    attr_normalize_space, parse_att_value, parse_entity_value, parse_external_id, parse_name,
-    parse_nmtoken,
+    attr_normalize_space, parse_att_value, parse_comment, parse_entity_value, parse_external_id,
+    parse_name, parse_nmtoken, parse_pi,
 };
 
 impl XmlParserCtxt {
@@ -104,6 +104,59 @@ impl XmlParserCtxt {
     }
 }
 
+/// Parse markup declarations. Always consumes '<!' or '<?'.
+///
+/// ```text
+/// [29] markupdecl ::= elementdecl | AttlistDecl | EntityDecl | NotationDecl | PI | Comment
+///
+/// [ VC: Proper Declaration/PE Nesting ]
+/// Parameter-entity replacement text must be properly nested with
+/// markup declarations. That is to say, if either the first character
+/// or the last character of a markup declaration (markupdecl above) is
+/// contained in the replacement text for a parameter-entity reference,
+/// both must be contained in the same replacement text.
+///
+/// [ WFC: PEs in Internal Subset ]
+/// In the internal DTD subset, parameter-entity references can occur
+/// only where markup declarations can occur, not within markup declarations.
+/// (This does not apply to references that occur in external parameter
+/// entities or to the external subset.)
+/// ```
+#[doc(alias = "xmlParseMarkupDecl")]
+pub(crate) unsafe fn parse_markup_decl(ctxt: &mut XmlParserCtxt) {
+    unsafe {
+        ctxt.grow();
+        if ctxt.current_byte() == b'<' {
+            if ctxt.nth_byte(1) == b'!' {
+                match ctxt.nth_byte(2) {
+                    b'E' => match ctxt.nth_byte(3) {
+                        b'L' => {
+                            parse_element_decl(ctxt);
+                        }
+                        b'N' => parse_entity_decl(ctxt),
+                        _ => ctxt.advance(2),
+                    },
+                    b'A' => parse_attribute_list_decl(ctxt),
+                    b'N' => parse_notation_decl(ctxt),
+                    b'-' => parse_comment(ctxt),
+                    // there is an error but it will be detected later
+                    _ => ctxt.advance(2),
+                }
+            } else if ctxt.nth_byte(1) == b'?' {
+                parse_pi(ctxt);
+            }
+        }
+
+        // detect requirement to exit there and act accordingly
+        // and avoid having instate overridden later on
+        if matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
+            return;
+        }
+
+        ctxt.instate = XmlParserInputState::XmlParserDTD;
+    }
+}
+
 /// Parse an element declaration. Always consumes '<!'.
 ///
 /// ```text
@@ -115,7 +168,7 @@ impl XmlParserCtxt {
 ///
 /// Returns the type of the element, or -1 in case of error
 #[doc(alias = "xmlParseElementDecl")]
-pub(crate) unsafe fn parse_element_decl(ctxt: &mut XmlParserCtxt) -> i32 {
+unsafe fn parse_element_decl(ctxt: &mut XmlParserCtxt) -> i32 {
     unsafe {
         if !ctxt.content_bytes().starts_with(b"<!") {
             return -1;
@@ -826,7 +879,7 @@ unsafe fn parse_element_mixed_content_decl(
 /// [53] AttDef      ::= S Name S AttType S DefaultDecl
 /// ```
 #[doc(alias = "xmlParseAttributeListDecl")]
-pub(crate) unsafe fn parse_attribute_list_decl(ctxt: &mut XmlParserCtxt) {
+unsafe fn parse_attribute_list_decl(ctxt: &mut XmlParserCtxt) {
     unsafe {
         if !ctxt.content_bytes().starts_with(b"<!") {
             return;
@@ -988,7 +1041,7 @@ pub(crate) unsafe fn parse_attribute_list_decl(ctxt: &mut XmlParserCtxt) {
 ///
 /// Returns the attribute type
 #[doc(alias = "xmlParseAttributeType")]
-pub(crate) unsafe fn parse_attribute_type(
+unsafe fn parse_attribute_type(
     ctxt: &mut XmlParserCtxt,
     tree: &mut Option<Box<XmlEnumeration>>,
 ) -> Option<XmlAttributeType> {
@@ -1031,7 +1084,7 @@ pub(crate) unsafe fn parse_attribute_type(
 ///
 /// Returns: XML_ATTRIBUTE_ENUMERATION or XML_ATTRIBUTE_NOTATION
 #[doc(alias = "xmlParseEnumeratedType")]
-pub(crate) unsafe fn parse_enumerated_type(
+unsafe fn parse_enumerated_type(
     ctxt: &mut XmlParserCtxt,
     tree: &mut Option<Box<XmlEnumeration>>,
 ) -> Option<XmlAttributeType> {
@@ -1075,7 +1128,7 @@ pub(crate) unsafe fn parse_enumerated_type(
 ///
 /// Returns: the notation attribute tree built while parsing
 #[doc(alias = "xmlParseNotationType")]
-pub(crate) unsafe fn parse_notation_type(ctxt: &mut XmlParserCtxt) -> Option<Box<XmlEnumeration>> {
+unsafe fn parse_notation_type(ctxt: &mut XmlParserCtxt) -> Option<Box<XmlEnumeration>> {
     unsafe {
         let mut ret = None::<Box<XmlEnumeration>>;
 
@@ -1141,9 +1194,7 @@ pub(crate) unsafe fn parse_notation_type(ctxt: &mut XmlParserCtxt) -> Option<Box
 ///
 /// Returns: the enumeration attribute tree built while parsing
 #[doc(alias = "xmlParseEnumerationType")]
-pub(crate) unsafe fn parse_enumeration_type(
-    ctxt: &mut XmlParserCtxt,
-) -> Option<Box<XmlEnumeration>> {
+unsafe fn parse_enumeration_type(ctxt: &mut XmlParserCtxt) -> Option<Box<XmlEnumeration>> {
     unsafe {
         let mut ret = None::<Box<XmlEnumeration>>;
 
@@ -1269,7 +1320,7 @@ unsafe fn parse_default_decl(ctxt: &mut XmlParserCtxt) -> (XmlAttributeDefault, 
 /// `[ VC: Notation Declared ]`  
 /// The Name must match the declared name of a notation.
 #[doc(alias = "xmlParseEntityDecl")]
-pub(crate) unsafe fn parse_entity_decl(ctxt: &mut XmlParserCtxt) {
+unsafe fn parse_entity_decl(ctxt: &mut XmlParserCtxt) {
     unsafe {
         let mut is_parameter: i32 = 0;
 
@@ -1611,7 +1662,7 @@ pub(crate) unsafe fn parse_entity_decl(ctxt: &mut XmlParserCtxt) {
 ///
 /// See the NOTE on xmlParseExternalID().
 #[doc(alias = "xmlParseNotationDecl")]
-pub(crate) unsafe fn parse_notation_decl(ctxt: &mut XmlParserCtxt) {
+unsafe fn parse_notation_decl(ctxt: &mut XmlParserCtxt) {
     unsafe {
         if !ctxt.content_bytes().starts_with(b"<!") {
             return;
