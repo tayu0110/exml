@@ -1,13 +1,9 @@
-use std::ptr::null_mut;
-
 use crate::{
-    dict::xml_dict_lookup,
     error::XmlParserErrors,
     globals::GenericErrorContext,
     hash::{XmlHashTable, XmlHashTableRef},
     libxml::{
-        globals::{xml_free, xml_malloc, xml_realloc},
-        parser::{SAX_COMPAT_MODE, XmlDefAttrs, XmlDefAttrsPtr, XmlParserInputState},
+        parser::{SAX_COMPAT_MODE, XmlParserInputState},
         sax2::{xml_sax2_entity_decl, xml_sax2_get_entity},
         xmlstring::xml_strndup,
     },
@@ -30,10 +26,8 @@ use super::{
 impl XmlParserCtxt {
     /// Add a defaulted attribute for an element
     #[doc(alias = "xmlAddDefAttrs")]
-    pub(crate) unsafe fn add_def_attrs(&mut self, fullname: &str, fullattr: &str, value: &str) {
+    unsafe fn add_def_attrs(&mut self, fullname: &str, fullattr: &str, value: &str) {
         unsafe {
-            let mut defaults: XmlDefAttrsPtr;
-
             // Allows to detect attribute redefinitions
             if self
                 .atts_special
@@ -43,110 +37,38 @@ impl XmlParserCtxt {
                 return;
             }
 
-            'mem_error: {
-                let mut atts_default = if let Some(table) = self.atts_default {
-                    table
-                } else {
-                    let table = XmlHashTable::with_capacity(10);
-                    let Some(table) = XmlHashTableRef::from_table(table) else {
-                        break 'mem_error;
-                    };
-                    self.atts_default = Some(table);
-                    table
-                };
+            // split the element name into prefix:localname , the string found
+            // are within the DTD and then not associated to namespace names.
+            let (prefix, name) = split_qname2(fullname)
+                .map(|(pre, loc)| (Some(pre), loc))
+                .unwrap_or((None, fullname));
 
-                // split the element name into prefix:localname , the string found
-                // are within the DTD and then not associated to namespace names.
-                let (prefix, name) = split_qname2(fullname)
-                    .map(|(pre, loc)| (Some(pre), loc))
-                    .unwrap_or((None, fullname));
+            // make sure there is some storage
+            let defaults = self
+                .atts_default
+                .entry((
+                    name.to_owned().into(),
+                    prefix.map(|prefix| prefix.to_owned().into()),
+                ))
+                .or_default();
 
-                // make sure there is some storage
-                defaults = atts_default
-                    .lookup2(name, prefix)
-                    .map_or(null_mut(), |p| *p);
-                if defaults.is_null() {
-                    defaults =
-                        xml_malloc(size_of::<XmlDefAttrs>() + (4 * 5) * size_of::<*const u8>())
-                            as _;
-                    if defaults.is_null() {
-                        break 'mem_error;
-                    }
-                    (*defaults).nb_attrs = 0;
-                    (*defaults).max_attrs = 4;
-                    if atts_default
-                        .update_entry2(name, prefix, defaults, |_, _| {})
-                        .is_err()
-                    {
-                        xml_free(defaults as _);
-                        break 'mem_error;
-                    }
-                } else if (*defaults).nb_attrs >= (*defaults).max_attrs {
-                    let temp: XmlDefAttrsPtr = xml_realloc(
-                        defaults as _,
-                        size_of::<XmlDefAttrs>()
-                            + (2 * (*defaults).max_attrs as usize * 5) * size_of::<*const u8>(),
-                    ) as _;
-                    if temp.is_null() {
-                        break 'mem_error;
-                    }
-                    defaults = temp;
-                    (*defaults).max_attrs *= 2;
-                    if atts_default
-                        .update_entry2(name, prefix, defaults, |_, _| {})
-                        .is_err()
-                    {
-                        xml_free(defaults as _);
-                        break 'mem_error;
-                    }
-                }
+            // Split the element name into prefix:localname , the string found
+            // are within the DTD and hen not associated to namespace names.
+            let (prefix, name) = split_qname2(fullattr)
+                .map(|(pre, loc)| (Some(pre), loc))
+                .unwrap_or((None, fullattr));
 
-                // Split the element name into prefix:localname , the string found
-                // are within the DTD and hen not associated to namespace names.
-                let (prefix, name) = split_qname2(fullattr)
-                    .map(|(pre, loc)| (Some(pre), loc))
-                    .unwrap_or((None, fullattr));
-
-                *(*defaults)
-                    .values
-                    .as_mut_ptr()
-                    .add(5 * (*defaults).nb_attrs as usize) =
-                    xml_dict_lookup(self.dict, name.as_ptr(), name.len() as i32);
-                *(*defaults)
-                    .values
-                    .as_mut_ptr()
-                    .add(5 * (*defaults).nb_attrs as usize + 1) = prefix
-                    .map_or(null_mut(), |pre| {
-                        xml_dict_lookup(self.dict, pre.as_ptr(), pre.len() as i32)
-                    });
-                // intern the string and precompute the end
-                let len = value.len();
-                let value = xml_dict_lookup(self.dict, value.as_ptr(), len as i32);
-                if value.is_null() {
-                    break 'mem_error;
-                }
-                *(*defaults)
-                    .values
-                    .as_mut_ptr()
-                    .add(5 * (*defaults).nb_attrs as usize + 2) = value;
-                *(*defaults)
-                    .values
-                    .as_mut_ptr()
-                    .add(5 * (*defaults).nb_attrs as usize + 3) = value.add(len);
+            defaults.push((
+                name.to_owned(),
+                prefix.map(|prefix| prefix.to_owned()),
+                value.to_owned(),
                 if self.external != 0 {
-                    *(*defaults)
-                        .values
-                        .as_mut_ptr()
-                        .add(5 * (*defaults).nb_attrs as usize + 4) = c"external".as_ptr() as _;
+                    Some("external")
                 } else {
-                    *(*defaults)
-                        .values
-                        .as_mut_ptr()
-                        .add(5 * (*defaults).nb_attrs as usize + 4) = null_mut();
-                }
-                (*defaults).nb_attrs += 1;
-                return;
-            }
+                    None
+                },
+            ));
+            return;
 
             xml_err_memory(self, None);
         }
@@ -154,12 +76,7 @@ impl XmlParserCtxt {
 
     /// Register this attribute type
     #[doc(alias = "xmlAddSpecialAttr")]
-    pub(crate) unsafe fn add_special_attr(
-        &mut self,
-        fullname: &str,
-        fullattr: &str,
-        typ: XmlAttributeType,
-    ) {
+    unsafe fn add_special_attr(&mut self, fullname: &str, fullattr: &str, typ: XmlAttributeType) {
         unsafe {
             let mut atts_special = if let Some(table) = self.atts_special {
                 table

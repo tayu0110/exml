@@ -25,6 +25,7 @@ use std::{
     cell::RefCell,
     ffi::{CStr, CString},
     io::Write,
+    mem::take,
     ptr::{addr_of_mut, null, null_mut},
     rc::Rc,
     str::from_utf8_unchecked,
@@ -1028,7 +1029,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
             (*ctxt).loadsubset |= XML_SKIP_IDS as i32;
         }
         (*ctxt).dict_names = (*oldctxt).dict_names;
-        (*ctxt).atts_default = (*oldctxt).atts_default;
+        (*ctxt).atts_default = take(&mut (*oldctxt).atts_default);
         (*ctxt).atts_special = (*oldctxt).atts_special;
 
         xml_parse_content(ctxt);
@@ -1095,7 +1096,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
         (*oldctxt).sax = (*ctxt).sax.take();
         (*ctxt).sax = oldsax;
         (*ctxt).dict = null_mut();
-        (*ctxt).atts_default = None;
+        (*ctxt).atts_default.clear();
         (*ctxt).atts_special = None;
         xml_free_parser_ctxt(ctxt);
         if let Some(new_doc) = new_doc {

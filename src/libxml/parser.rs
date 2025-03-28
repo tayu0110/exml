@@ -770,14 +770,6 @@ pub unsafe fn xml_recover_file(filename: Option<&str>) -> Option<XmlDocPtr> {
     unsafe { xml_sax_parse_file(None, filename, 1) }
 }
 
-pub type XmlDefAttrsPtr = *mut XmlDefAttrs;
-#[repr(C)]
-pub struct XmlDefAttrs {
-    pub(crate) nb_attrs: i32, /* number of defaulted attributes on that element */
-    pub(crate) max_attrs: i32, /* the size of the array */
-    pub(crate) values: [*const XmlChar; 5], /* array of localname/prefix/values/external */
-}
-
 /// Parse a conditional section. Always consumes '<!['.
 ///
 /// ```text
@@ -2485,7 +2477,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
             (*ctxt).str_xmlns = Some(Cow::Borrowed("xmlns"));
             (*ctxt).str_xml_ns = Some(Cow::Borrowed(XML_XML_NAMESPACE.to_str().unwrap()));
             (*ctxt).dict_names = (*oldctxt).dict_names;
-            (*ctxt).atts_default = (*oldctxt).atts_default;
+            (*ctxt).atts_default = take(&mut (*oldctxt).atts_default);
             (*ctxt).atts_special = (*oldctxt).atts_special;
             (*ctxt).linenumbers = (*oldctxt).linenumbers;
             (*ctxt).record_info = (*oldctxt).record_info;
@@ -2544,7 +2536,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
 
         if !oldctxt.is_null() {
             (*ctxt).dict = null_mut();
-            (*ctxt).atts_default = None;
+            (*ctxt).atts_default.clear();
             (*ctxt).atts_special = None;
             (*oldctxt).nb_errors = (*ctxt).nb_errors;
             (*oldctxt).nb_warnings = (*ctxt).nb_warnings;
@@ -3330,85 +3322,60 @@ pub(crate) unsafe fn xml_parse_start_tag2(
         }
 
         // The attributes defaulting
-        if let Some(atts_default) = (*ctxt).atts_default {
-            let defaults = atts_default.lookup2(&localname, prefix.as_deref());
-            if let Some(defaults) = defaults.copied() {
-                'b: for i in 0..(*defaults).nb_attrs as usize {
-                    let attname = *(*defaults).values.as_ptr().add(5 * i);
-                    let aprefix = *(*defaults).values.as_ptr().add(5 * i + 1);
-                    let attname = CStr::from_ptr(attname as *const i8).to_string_lossy();
-
-                    // special work for namespaces defaulted defs
-                    if Some(attname.as_ref()) == (*ctxt).str_xmlns.as_deref() && aprefix.is_null() {
-                        // check that it's not a defined namespace
-                        if (*ctxt).ns_tab.iter().any(|(pre, _)| pre.is_none()) {
-                            continue;
-                        }
-
-                        let nsname = xml_get_namespace(ctxt, None);
-                        let def = CStr::from_ptr(
-                            *(*defaults).values.as_ptr().add(5 * i + 2) as *const i8
-                        )
-                        .to_string_lossy();
-                        if nsname.as_deref() != Some(&def) && (*ctxt).ns_push(None, &def) > 0 {
-                            nb_ns += 1;
-                        }
-                    } else if (!aprefix.is_null())
-                        .then(|| CStr::from_ptr(aprefix as *const i8).to_string_lossy())
-                        == (*ctxt).str_xmlns
-                    {
-                        // check that it's not a defined namespace
-                        if (*ctxt)
-                            .ns_tab
-                            .iter()
-                            .any(|(pre, _)| pre.as_deref() == Some(&attname))
-                        {
-                            continue 'b;
-                        }
-
-                        let nsname = xml_get_namespace(ctxt, Some(&attname));
-                        let def = CStr::from_ptr(
-                            *(*defaults).values.as_ptr().add(5 * i + 2) as *const i8
-                        )
-                        .to_string_lossy();
-                        if nsname.as_deref() != Some(&def)
-                            && (*ctxt).ns_push(Some(&attname), &def) > 0
-                        {
-                            nb_ns += 1;
-                        }
-                    } else {
-                        let aprefix = (!aprefix.is_null()).then(|| {
-                            CStr::from_ptr(aprefix as *const i8)
-                                .to_string_lossy()
-                                .into_owned()
-                        });
-
-                        // check that it's not a defined attribute
-                        if atts.iter().any(|att| att.0 == attname && att.1 == aprefix) {
-                            continue 'b;
-                        }
-
-                        let uri = aprefix
-                            .as_deref()
-                            .and_then(|p| xml_get_namespace(ctxt, Some(p)));
-                        let value1 = *(*defaults).values.as_ptr().add(5 * i + 2);
-                        let value2 = *(*defaults).values.as_ptr().add(5 * i + 3);
-                        let len = value2.offset_from(value1).unsigned_abs();
-                        let value = from_utf8(from_raw_parts(value1, len)).unwrap().to_owned();
-                        atts.push((attname.as_ref().to_owned(), aprefix, uri, value));
-                        if (*ctxt).standalone == 1
-                            && !(*(*defaults).values.as_ptr().add(5 * i + 4)).is_null()
-                        {
-                            xml_validity_error!(
-                                ctxt,
-                                XmlParserErrors::XmlDTDStandaloneDefaulted,
-                                "standalone: attribute {} on {} defaulted from external subset\n",
-                                attname,
-                                localname
-                            );
-                        }
-                        nbdef += 1;
+        let defaults = (*ctxt).atts_default.get(&(
+            localname.as_str().into(),
+            prefix.as_deref().map(Cow::Borrowed),
+        ));
+        if let Some(defaults) = defaults {
+            'b: for (attname, aprefix, def, external) in defaults {
+                // special work for namespaces defaulted defs
+                if Some(attname.as_str()) == (*ctxt).str_xmlns.as_deref() && aprefix.is_none() {
+                    // check that it's not a defined namespace
+                    if (*ctxt).ns_tab.iter().any(|(pre, _)| pre.is_none()) {
+                        continue;
                     }
+
+                    let nsname = xml_get_namespace(ctxt, None);
+                    if nsname.as_deref() != Some(def) && (*ctxt).ns_push(None, def) > 0 {
+                        nb_ns += 1;
+                    }
+                } else if aprefix.as_deref() == (*ctxt).str_xmlns.as_deref() {
+                    // check that it's not a defined namespace
+                    if (*ctxt)
+                        .ns_tab
+                        .iter()
+                        .any(|(pre, _)| pre.as_deref() == Some(attname))
+                    {
+                        continue 'b;
+                    }
+
+                    let nsname = xml_get_namespace(ctxt, Some(attname));
+                    if nsname.as_deref() != Some(def) && (*ctxt).ns_push(Some(attname), def) > 0 {
+                        nb_ns += 1;
+                    }
+                } else {
+                    // check that it's not a defined attribute
+                    if atts
+                        .iter()
+                        .any(|att| att.0 == *attname && att.1.as_deref() == aprefix.as_deref())
+                    {
+                        continue 'b;
+                    }
+
+                    let uri = aprefix
+                        .as_deref()
+                        .and_then(|p| xml_get_namespace(ctxt, Some(p)));
+                    atts.push((attname.clone(), aprefix.clone(), uri, def.clone()));
+                    if (*ctxt).standalone == 1 && external.is_some() {
+                        xml_validity_error!(
+                            ctxt,
+                            XmlParserErrors::XmlDTDStandaloneDefaulted,
+                            "standalone: attribute {} on {} defaulted from external subset\n",
+                            attname,
+                            localname
+                        );
+                    }
+                    nbdef += 1;
                 }
             }
         }

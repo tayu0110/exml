@@ -10719,9 +10719,7 @@ pub unsafe fn html_ctxt_reset(ctxt: HtmlParserCtxtPtr) {
         }
         (*ctxt).node_seq.clear();
 
-        if let Some(mut table) = (*ctxt).atts_default.take().map(|t| t.into_inner()) {
-            table.clear_with(|data, _| xml_free(data as _));
-        }
+        (*ctxt).atts_default.clear();
 
         let _ = (*ctxt).atts_special.take().map(|t| t.into_inner());
 

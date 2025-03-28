@@ -1,6 +1,7 @@
 use std::{
     borrow::Cow,
     cell::RefCell,
+    collections::HashMap,
     ffi::{CStr, c_void},
     ptr::{drop_in_place, null, null_mut},
     rc::Rc,
@@ -32,9 +33,9 @@ use crate::{
         chvalid::{xml_is_blank_char, xml_is_char},
         globals::{xml_free, xml_malloc},
         parser::{
-            XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SAX2_MAGIC, XmlDefAttrsPtr,
-            XmlParserInputState, XmlParserMode, XmlParserOption, XmlSAXHandler, XmlStartTag,
-            xml_init_parser, xml_load_external_entity, xml_parse_document,
+            XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SAX2_MAGIC, XmlParserInputState, XmlParserMode,
+            XmlParserOption, XmlSAXHandler, XmlStartTag, xml_init_parser, xml_load_external_entity,
+            xml_parse_document,
         },
         parser_internals::{
             INPUT_CHUNK, LINE_LEN, XML_MAX_DICTIONARY_LIMIT, XML_MAX_LOOKUP_LIMIT,
@@ -213,7 +214,13 @@ pub struct XmlParserCtxt {
     // array of data for push
     pub(crate) push_tab: Vec<XmlStartTag>,
     // defaulted attributes if any
-    pub(crate) atts_default: Option<XmlHashTableRef<'static, XmlDefAttrsPtr>>,
+    // Key      : (name, prefix)
+    // Value    : (name, prefix, value, is_external)
+    #[allow(clippy::type_complexity)]
+    pub(crate) atts_default: HashMap<
+        (Cow<'static, str>, Option<Cow<'static, str>>),
+        Vec<(String, Option<String>, String, Option<&'static str>)>,
+    >,
     // non-CDATA attributes if any
     pub(crate) atts_special: Option<XmlHashTableRef<'static, XmlAttributeType>>,
     // is the document XML Namespace okay
@@ -540,9 +547,7 @@ impl XmlParserCtxt {
             self.sizeentcopy = 0;
             self.node_seq.clear();
 
-            if let Some(mut table) = self.atts_default.take().map(|t| t.into_inner()) {
-                table.clear_with(|data, _| xml_free(data as _));
-            }
+            self.atts_default.clear();
             let _ = self.atts_special.take().map(|t| t.into_inner());
 
             #[cfg(feature = "catalog")]
@@ -1690,7 +1695,7 @@ impl Default for XmlParserCtxt {
             ns_tab: vec![],
             attallocs: null_mut(),
             push_tab: vec![],
-            atts_default: None,
+            atts_default: HashMap::new(),
             atts_special: None,
             ns_well_formed: 0,
             options: 0,
@@ -1939,9 +1944,7 @@ pub unsafe fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
         if !(*ctxt).attallocs.is_null() {
             xml_free((*ctxt).attallocs as _);
         }
-        if let Some(mut table) = (*ctxt).atts_default.take().map(|t| t.into_inner()) {
-            table.clear_with(|data, _| xml_free(data as _));
-        }
+        (*ctxt).atts_default.clear();
         let _ = (*ctxt).atts_special.take().map(|t| t.into_inner());
         let mut cur = (*ctxt).free_elems;
         while let Some(now) = cur {
