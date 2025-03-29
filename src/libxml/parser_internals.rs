@@ -50,26 +50,22 @@ use crate::{
             xml_parser_add_node_info, xml_parser_find_node_info,
         },
         sax2::xml_sax2_get_entity,
-        valid::{
-            xml_free_doc_element_content, xml_new_doc_element_content, xml_validate_element,
-            xml_validate_root,
-        },
+        valid::{xml_validate_element, xml_validate_root},
         xmlstring::{XmlChar, xml_strchr, xml_strndup},
     },
     parser::{
-        __xml_err_encoding, XmlParserCharValid, XmlParserCtxtPtr, XmlParserNodeInfo,
-        parse_att_value, parse_cdsect, parse_char_data_internal, parse_char_ref, parse_comment,
-        parse_name, parse_pi, parser_entity_check, xml_create_memory_parser_ctxt,
-        xml_err_encoding_int, xml_err_memory, xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg,
-        xml_fatal_err_msg_int, xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str,
-        xml_free_parser_ctxt, xml_warning_msg,
+        __xml_err_encoding, XmlParserCharValid, XmlParserCtxtPtr, XmlParserNodeInfo, parse_cdsect,
+        parse_char_data_internal, parse_char_ref, parse_comment, parse_name, parse_pi,
+        parser_entity_check, xml_create_memory_parser_ctxt, xml_err_encoding_int, xml_err_memory,
+        xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_int,
+        xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str, xml_free_parser_ctxt,
     },
     tree::{
         NodeCommon, XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
-        XML_ENT_PARSED, XML_XML_NAMESPACE, XmlDocProperties, XmlElementContentOccur,
-        XmlElementContentPtr, XmlElementContentType, XmlElementType, XmlEntityPtr, XmlEntityType,
-        XmlGenericNodePtr, XmlNodePtr, xml_doc_copy_node, xml_free_doc, xml_free_node,
-        xml_free_node_list, xml_get_predefined_entity, xml_new_doc, xml_new_doc_node,
+        XML_ENT_PARSED, XML_XML_NAMESPACE, XmlDocProperties, XmlElementType, XmlEntityPtr,
+        XmlEntityType, XmlGenericNodePtr, XmlNodePtr, xml_doc_copy_node, xml_free_doc,
+        xml_free_node, xml_free_node_list, xml_get_predefined_entity, xml_new_doc,
+        xml_new_doc_node,
     },
 };
 
@@ -461,193 +457,6 @@ pub(crate) unsafe fn xml_parse_nmtoken(ctxt: XmlParserCtxtPtr) -> *mut XmlChar {
 // pub(crate) unsafe fn xml_parse_char_data(ctxt: XmlParserCtxtPtr, _cdata: i32) {
 //     unsafe {
 //         parse_char_data_internal(&mut *ctxt, 0);
-//     }
-// }
-
-/// Parse the declaration for a Mixed Element content
-/// The leading '(' and spaces have been skipped in xmlParseElementContentDecl
-///
-/// `[51] Mixed ::= '(' S? '#PCDATA' (S? '|' S? Name)* S? ')*' | '(' S? '#PCDATA' S? ')'`
-///
-/// `[ VC: Proper Group/PE Nesting ]` applies to [51] too (see [49])
-///
-/// `[ VC: No Duplicate Types ]`  
-/// The same name must not appear more than once in a single
-/// mixed-content declaration.
-///
-/// returns: the list of the xmlElementContentPtr describing the element choices
-#[doc(alias = "xmlParseElementMixedContentDecl")]
-pub(crate) unsafe fn xml_parse_element_mixed_content_decl(
-    ctxt: XmlParserCtxtPtr,
-    inputchk: i32,
-) -> XmlElementContentPtr {
-    unsafe {
-        let mut ret: XmlElementContentPtr = null_mut();
-        let mut cur: XmlElementContentPtr = null_mut();
-        let mut n: XmlElementContentPtr;
-
-        (*ctxt).grow();
-        if (*ctxt).content_bytes().starts_with(b"#PCDATA") {
-            (*ctxt).advance(7);
-            (*ctxt).skip_blanks();
-            if (*ctxt).current_byte() == b')' {
-                if (*ctxt).input().unwrap().id != inputchk {
-                    xml_fatal_err_msg(
-                        &mut *ctxt,
-                        XmlParserErrors::XmlErrEntityBoundary,
-                        "Element content declaration doesn't start and stop in the same entity\n",
-                    );
-                }
-                (*ctxt).skip_char();
-                ret = xml_new_doc_element_content(
-                    (*ctxt).my_doc,
-                    None,
-                    XmlElementContentType::XmlElementContentPCDATA,
-                );
-                if ret.is_null() {
-                    return null_mut();
-                }
-                if (*ctxt).current_byte() == b'*' {
-                    (*ret).ocur = XmlElementContentOccur::XmlElementContentMult;
-                    (*ctxt).skip_char();
-                }
-                return ret;
-            }
-            if (*ctxt).current_byte() == b'(' || (*ctxt).current_byte() == b'|' {
-                ret = xml_new_doc_element_content(
-                    (*ctxt).my_doc,
-                    None,
-                    XmlElementContentType::XmlElementContentPCDATA,
-                );
-                cur = ret;
-                if ret.is_null() {
-                    return null_mut();
-                }
-            }
-            let mut elem: Option<String> = None;
-            while (*ctxt).current_byte() == b'|'
-                && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
-            {
-                (*ctxt).skip_char();
-                if let Some(elem) = elem.as_deref() {
-                    n = xml_new_doc_element_content(
-                        (*ctxt).my_doc,
-                        None,
-                        XmlElementContentType::XmlElementContentOr,
-                    );
-                    if n.is_null() {
-                        xml_free_doc_element_content((*ctxt).my_doc, ret);
-                        return null_mut();
-                    }
-                    (*n).c1 = xml_new_doc_element_content(
-                        (*ctxt).my_doc,
-                        Some(elem),
-                        XmlElementContentType::XmlElementContentElement,
-                    );
-                    if !(*n).c1.is_null() {
-                        (*(*n).c1).parent = n;
-                    }
-                    (*cur).c2 = n;
-                    if !n.is_null() {
-                        (*n).parent = cur;
-                    }
-                    cur = n;
-                } else {
-                    ret = xml_new_doc_element_content(
-                        (*ctxt).my_doc,
-                        None,
-                        XmlElementContentType::XmlElementContentOr,
-                    );
-                    if ret.is_null() {
-                        xml_free_doc_element_content((*ctxt).my_doc, cur);
-                        return null_mut();
-                    }
-                    (*ret).c1 = cur;
-                    if !cur.is_null() {
-                        (*cur).parent = ret;
-                    }
-                    cur = ret;
-                }
-                (*ctxt).skip_blanks();
-                elem = parse_name(&mut *ctxt);
-                if elem.is_none() {
-                    xml_fatal_err_msg(
-                        &mut *ctxt,
-                        XmlParserErrors::XmlErrNameRequired,
-                        "xmlParseElementMixedContentDecl : Name expected\n",
-                    );
-                    xml_free_doc_element_content((*ctxt).my_doc, ret);
-                    return null_mut();
-                }
-                (*ctxt).skip_blanks();
-                (*ctxt).grow();
-            }
-            if (*ctxt).current_byte() == b')' && NXT!(ctxt, 1) == b'*' {
-                if let Some(elem) = elem {
-                    (*cur).c2 = xml_new_doc_element_content(
-                        (*ctxt).my_doc,
-                        Some(&elem),
-                        XmlElementContentType::XmlElementContentElement,
-                    );
-                    if !(*cur).c2.is_null() {
-                        (*(*cur).c2).parent = cur;
-                    }
-                }
-                if !ret.is_null() {
-                    (*ret).ocur = XmlElementContentOccur::XmlElementContentMult;
-                }
-                if (*ctxt).input().unwrap().id != inputchk {
-                    xml_fatal_err_msg(
-                        &mut *ctxt,
-                        XmlParserErrors::XmlErrEntityBoundary,
-                        "Element content declaration doesn't start and stop in the same entity\n",
-                    );
-                }
-                (*ctxt).advance(2);
-            } else {
-                xml_free_doc_element_content((*ctxt).my_doc, ret);
-                xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrMixedNotStarted, None);
-                return null_mut();
-            }
-        } else {
-            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrPCDATARequired, None);
-        }
-        ret
-    }
-}
-
-// /// Parse the declaration for a Mixed Element content
-// /// The leading '(' and spaces have been skipped in xmlParseElementContentDecl
-// ///
-// /// `[47] children ::= (choice | seq) ('?' | '*' | '+')?`
-// ///
-// /// `[48] cp ::= (Name | choice | seq) ('?' | '*' | '+')?`
-// ///
-// /// `[49] choice ::= '(' S? cp ( S? '|' S? cp )* S? ')'`
-// ///
-// /// `[50] seq ::= '(' S? cp ( S? ',' S? cp )* S? ')'`
-// ///
-// /// `[ VC: Proper Group/PE Nesting ]` applies to [49] and [50]
-// ///
-// /// TODO Parameter-entity replacement text must be properly nested
-// ///    with parenthesized groups. That is to say, if either of the
-// ///    opening or closing parentheses in a choice, seq, or Mixed
-// ///    construct is contained in the replacement text for a parameter
-// ///    entity, both must be contained in the same replacement text. For
-// ///    interoperability, if a parameter-entity reference appears in a
-// ///    choice, seq, or Mixed construct, its replacement text should not
-// ///    be empty, and neither the first nor last non-blank character of
-// ///    the replacement text should be a connector (| or ,).
-// ///
-// /// Returns the tree of xmlElementContentPtr describing the element hierarchy.
-// #[doc(alias = "xmlParseElementChildrenContentDecl")]
-// pub(crate) unsafe fn xml_parse_element_children_content_decl(
-//     ctxt: XmlParserCtxtPtr,
-//     inputchk: i32,
-// ) -> XmlElementContentPtr {
-//     unsafe {
-//         // stub left for API/ABI compat
-//         xml_parse_element_children_content_decl_priv(ctxt, inputchk, 1)
 //     }
 // }
 
@@ -1536,100 +1345,6 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
     }
 }
 
-/// Parse an attribute
-///
-/// `[41] Attribute ::= Name Eq AttValue`
-///
-/// `[ WFC: No External Entity References ]`  
-/// Attribute values cannot contain direct or indirect entity references
-/// to external entities.
-///
-/// `[ WFC: No < in Attribute Values ]`  
-/// The replacement text of any entity referred to directly or indirectly in
-/// an attribute value (other than "&lt;") must not contain a <.
-///
-/// `[ VC: Attribute Value Type ]`  
-/// The attribute must have been declared; the value must be of the type declared for it.
-///
-/// `[25] Eq ::= S? '=' S?`
-///
-/// With namespace:
-///
-/// `[NS 11] Attribute ::= QName Eq AttValue`
-///
-/// Also the case QName == xmlns:??? is handled independently as a namespace definition.
-///
-/// Returns the attribute name, and the value in *value.
-#[doc(alias = "xmlParseAttribute")]
-#[cfg(feature = "sax1")]
-pub(crate) unsafe fn xml_parse_attribute(
-    ctxt: XmlParserCtxtPtr,
-    value: *mut *mut XmlChar,
-) -> Option<String> {
-    use crate::parser::check_language_id;
-
-    unsafe {
-        *value = null_mut();
-        (*ctxt).grow();
-        let Some(name) = parse_name(&mut *ctxt) else {
-            xml_fatal_err_msg(
-                &mut *ctxt,
-                XmlParserErrors::XmlErrNameRequired,
-                "error parsing attribute name\n",
-            );
-            return None;
-        };
-
-        // read the value
-        (*ctxt).skip_blanks();
-        if (*ctxt).current_byte() != b'=' {
-            xml_fatal_err_msg_str!(
-                ctxt,
-                XmlParserErrors::XmlErrAttributeWithoutValue,
-                "Specification mandates value for attribute {}\n",
-                name
-            );
-            return Some(name);
-        }
-
-        (*ctxt).skip_char();
-        (*ctxt).skip_blanks();
-        let val = parse_att_value(&mut *ctxt).unwrap();
-        (*ctxt).instate = XmlParserInputState::XmlParserContent;
-
-        // Check that xml:lang conforms to the specification
-        // No more registered as an error, just generate a warning now
-        // since this was deprecated in XML second edition
-        if (*ctxt).pedantic != 0 && name == "xml:lang" && !check_language_id(&val) {
-            xml_warning_msg!(
-                ctxt,
-                XmlParserErrors::XmlWarLangValue,
-                "Malformed value for xml:lang : {}\n",
-                val
-            );
-        }
-
-        // Check that xml:space conforms to the specification
-        if name == "xml:space" {
-            if val == "default" {
-                *(*ctxt).space_mut() = 0;
-            } else if val == "preserve" {
-                *(*ctxt).space_mut() = 1;
-            } else {
-                xml_warning_msg!(
-                    ctxt,
-                    XmlParserErrors::XmlWarSpaceValue,
-                    "Invalid value \"{}\" for xml:space : \"default\" or \"preserve\" expected\n",
-                    val
-                );
-            }
-        }
-
-        *value = xml_strndup(val.as_ptr(), val.len() as i32);
-        Some(name)
-    }
-}
-
 /// Parse a start tag. Always consumes '<'.
 ///
 /// `[40] STag ::= '<' Name (S Attribute)* S? '>'`
@@ -1652,10 +1367,10 @@ pub(crate) unsafe fn xml_parse_attribute(
 #[doc(alias = "xmlParseStartTag")]
 #[cfg(feature = "sax1")]
 pub(crate) unsafe fn xml_parse_start_tag(ctxt: XmlParserCtxtPtr) -> Option<String> {
+    use crate::parser::parse_attribute;
+
     unsafe {
         use crate::parser::xml_err_attribute_dup;
-
-        let mut attvalue: *mut XmlChar = null_mut();
 
         if (*ctxt).current_byte() != b'<' {
             return None;
@@ -1683,7 +1398,7 @@ pub(crate) unsafe fn xml_parse_start_tag(ctxt: XmlParserCtxtPtr) -> Option<Strin
             && xml_is_char((*ctxt).current_byte() as u32)
             && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
         {
-            let Some(attname) = xml_parse_attribute(ctxt, addr_of_mut!(attvalue)) else {
+            let (Some(attname), attvalue) = parse_attribute(&mut *ctxt) else {
                 xml_fatal_err_msg(
                     &mut *ctxt,
                     XmlParserErrors::XmlErrInternalError,
@@ -1693,27 +1408,18 @@ pub(crate) unsafe fn xml_parse_start_tag(ctxt: XmlParserCtxtPtr) -> Option<Strin
             };
 
             'failed: {
-                if !attvalue.is_null() {
+                if let Some(attvalue) = attvalue {
                     // [ WFC: Unique Att Spec ]
                     // No attribute name may appear more than once in the same
                     // start-tag or empty-element tag.
                     for (att, _) in &atts {
                         if att.as_str() == attname {
                             xml_err_attribute_dup(ctxt, None, &attname);
-                            xml_free(attvalue as _);
                             break 'failed;
                         }
                     }
                     // Add the pair to atts
-                    atts.push((
-                        attname,
-                        Some(
-                            CStr::from_ptr(attvalue as *const i8)
-                                .to_string_lossy()
-                                .into_owned(),
-                        ),
-                    ));
-                    xml_free(attvalue as _);
+                    atts.push((attname, Some(attvalue)));
                 }
             }
 

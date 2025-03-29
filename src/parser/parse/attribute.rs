@@ -318,7 +318,7 @@ unsafe fn parse_att_value_complex(ctxt: &mut XmlParserCtxt, normalize: bool) -> 
             if c == '&' {
                 in_space = 0;
                 if ctxt.nth_byte(1) == b'#' {
-                    let val = parse_char_ref(&mut *ctxt);
+                    let val = parse_char_ref(ctxt);
                     if val == Some('&') {
                         if ctxt.replace_entities != 0 {
                             buf.push('&');
@@ -521,6 +521,96 @@ pub(crate) unsafe fn parse_att_value(ctxt: &mut XmlParserCtxt) -> Option<String>
     unsafe {
         ctxt.input()?;
         parse_att_value_internal(ctxt, false)
+    }
+}
+
+/// Parse an attribute
+///
+/// ```text
+/// [41] Attribute ::= Name Eq AttValue
+///
+/// [ WFC: No External Entity References ]
+/// Attribute values cannot contain direct or indirect entity references
+/// to external entities.
+///
+/// [ WFC: No < in Attribute Values ]
+/// The replacement text of any entity referred to directly or indirectly in
+/// an attribute value (other than "&lt;") must not contain a <.
+///
+/// [ VC: Attribute Value Type ]
+/// The attribute must have been declared; the value must be of the type declared for it.
+///
+/// [25] Eq ::= S? '=' S?
+///
+/// With namespace:
+/// [NS 11] Attribute ::= QName Eq AttValue
+/// ```
+///
+/// Also the case QName == xmlns:??? is handled independently as a namespace definition.
+///
+/// Returns (Name, AttValue).
+#[doc(alias = "xmlParseAttribute")]
+#[cfg(feature = "sax1")]
+pub(crate) unsafe fn parse_attribute(ctxt: &mut XmlParserCtxt) -> (Option<String>, Option<String>) {
+    use super::parse_name;
+
+    unsafe {
+        ctxt.grow();
+        let Some(name) = parse_name(ctxt) else {
+            xml_fatal_err_msg(
+                ctxt,
+                XmlParserErrors::XmlErrNameRequired,
+                "error parsing attribute name\n",
+            );
+            return (None, None);
+        };
+
+        // read the value
+        ctxt.skip_blanks();
+        if ctxt.current_byte() != b'=' {
+            xml_fatal_err_msg_str!(
+                ctxt,
+                XmlParserErrors::XmlErrAttributeWithoutValue,
+                "Specification mandates value for attribute {}\n",
+                name
+            );
+            return (Some(name), None);
+        }
+
+        ctxt.skip_char();
+        ctxt.skip_blanks();
+        let val = parse_att_value(ctxt).unwrap();
+        ctxt.instate = XmlParserInputState::XmlParserContent;
+
+        // Check that xml:lang conforms to the specification
+        // No more registered as an error, just generate a warning now
+        // since this was deprecated in XML second edition
+        if ctxt.pedantic != 0 && name == "xml:lang" && !check_language_id(&val) {
+            xml_warning_msg!(
+                ctxt,
+                XmlParserErrors::XmlWarLangValue,
+                "Malformed value for xml:lang : {}\n",
+                val
+            );
+        }
+
+        // Check that xml:space conforms to the specification
+        if name == "xml:space" {
+            if val == "default" {
+                *ctxt.space_mut() = 0;
+            } else if val == "preserve" {
+                *ctxt.space_mut() = 1;
+            } else {
+                xml_warning_msg!(
+                    ctxt,
+                    XmlParserErrors::XmlWarSpaceValue,
+                    "Invalid value \"{}\" for xml:space : \"default\" or \"preserve\" expected\n",
+                    val
+                );
+            }
+        }
+
+        (Some(name), Some(val))
     }
 }
 
