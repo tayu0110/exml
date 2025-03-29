@@ -84,7 +84,7 @@ use crate::{
             xml_cleanup_globals_internal, xml_default_sax_locator, xml_init_globals_internal,
         },
         htmlparser::{__html_parse_content, HtmlParserOption, html_create_memory_parser_ctxt},
-        parser_internals::{xml_parse_misc, xml_parse_reference},
+        parser_internals::xml_parse_misc,
         valid::xml_validate_root,
         xmlmemory::{xml_cleanup_memory_internal, xml_init_memory_internal},
         xmlschemastypes::xml_schema_cleanup_types,
@@ -94,9 +94,10 @@ use crate::{
         __xml_err_encoding, XmlParserCtxtPtr, XmlParserInput, check_cdata_push,
         parse_char_data_internal, parse_comment, parse_content, parse_doctypedecl, parse_element,
         parse_end_tag1, parse_end_tag2, parse_external_entity_private, parse_internal_subset,
-        parse_lookup_char, parse_lookup_char_data, parse_pi, parse_start_tag, parse_start_tag2,
-        parse_xmldecl, xml_create_memory_parser_ctxt, xml_err_memory, xml_fatal_err,
-        xml_fatal_err_msg, xml_fatal_err_msg_str, xml_free_parser_ctxt, xml_new_sax_parser_ctxt,
+        parse_lookup_char, parse_lookup_char_data, parse_pi, parse_reference, parse_start_tag,
+        parse_start_tag2, parse_xmldecl, xml_create_memory_parser_ctxt, xml_err_memory,
+        xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_str, xml_free_parser_ctxt,
+        xml_new_sax_parser_ctxt,
     },
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlAttributeDefault, XmlAttributeType, XmlDocProperties,
@@ -2815,7 +2816,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                                 // goto done;
                                 return ret;
                             }
-                            xml_parse_reference(ctxt);
+                            parse_reference(&mut *ctxt);
                         } else {
                             // TODO Avoid the extra copy, handle directly !!!
 

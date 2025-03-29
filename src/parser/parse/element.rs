@@ -5,7 +5,7 @@ use crate::{
     libxml::{
         chvalid::{xml_is_blank_char, xml_is_char},
         parser::{XmlParserInputState, XmlParserOption},
-        parser_internals::{XML_PARSER_MAX_DEPTH, xml_parse_reference},
+        parser_internals::XML_PARSER_MAX_DEPTH,
         valid::xml_validate_root,
     },
     parser::{
@@ -18,7 +18,7 @@ use crate::{
 
 use super::{
     parse_attribute2, parse_cdsect, parse_char_data_internal, parse_comment, parse_name, parse_pi,
-    parse_qname,
+    parse_qname, parse_reference,
 };
 
 /// parse an XML element
@@ -997,7 +997,7 @@ pub(crate) unsafe fn parse_content_internal(ctxt: &mut XmlParserCtxt) {
                 }
                 // Fifth case : a reference. If if has not been resolved,
                 //    parsing returns it's Name, create the node
-                [b'&', ..] => xml_parse_reference(ctxt),
+                [b'&', ..] => parse_reference(ctxt),
                 // Last case, text. Note that References are handled directly.
                 _ => parse_char_data_internal(ctxt, 0),
             }
