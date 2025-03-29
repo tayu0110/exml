@@ -136,10 +136,12 @@ pub(crate) unsafe fn parse_char_ref(ctxt: &mut XmlParserCtxt) -> Option<char> {
 /// Parse Reference declarations, variant parsing from a string rather
 /// than an an input flow.
 ///
-/// `[66] CharRef ::= '&#' [0-9]+ ';' | '&#x' [0-9a-fA-F]+ ';'`
+/// ```text
+/// [66] CharRef ::= '&#' [0-9]+ ';' | '&#x' [0-9a-fA-F]+ ';'
 ///
-/// `[ WFC: Legal Character ]`  
+/// [ WFC: Legal Character ]
 /// Characters referred to using character references must match the production for Char.
+/// ```
 ///
 /// Returns the value parsed (as an int), 0 in case of error, str will be
 /// updated to the current value of the index
@@ -205,9 +207,10 @@ pub(super) unsafe fn parse_string_char_ref<'a>(
 
 /// Parse an entitiy reference. Always consumes '&'.
 ///
-/// `[68] EntityRef ::= '&' Name ';'`
+/// ```text
+/// [68] EntityRef ::= '&' Name ';'
 ///
-/// `[ WFC: Entity Declared ]`  
+/// [ WFC: Entity Declared ]
 /// In a document without any DTD, a document with only an internal DTD
 /// subset which contains no parameter entity references, or a document
 /// with "standalone='yes'", the Name given in the entity reference
@@ -222,8 +225,9 @@ pub(super) unsafe fn parse_string_char_ref<'a>(
 /// for such documents, the rule that an entity must be declared is a
 /// well-formedness constraint only if standalone='yes'.
 ///
-/// `[ WFC: Parsed Entity ]`  
+/// [ WFC: Parsed Entity ]
 /// An entity reference must not contain the name of an unparsed entity
+/// ```
 ///
 /// Returns the xmlEntityPtr if found, or NULL otherwise.
 #[doc(alias = "xmlParseEntityRef")]
@@ -403,9 +407,10 @@ pub(crate) unsafe fn parse_entity_ref(ctxt: &mut XmlParserCtxt) -> Option<XmlEnt
 /// Parse ENTITY references declarations, but this version parses it from
 /// a string value.
 ///
-/// `[68] EntityRef ::= '&' Name ';'`
+/// ```text
+/// [68] EntityRef ::= '&' Name ';'
 ///
-/// `[ WFC: Entity Declared ]`  
+/// [ WFC: Entity Declared ]
 /// In a document without any DTD, a document with only an internal DTD
 /// subset which contains no parameter entity references, or a document
 /// with "standalone='yes'", the Name given in the entity reference
@@ -420,8 +425,9 @@ pub(crate) unsafe fn parse_entity_ref(ctxt: &mut XmlParserCtxt) -> Option<XmlEnt
 /// for such documents, the rule that an entity must be declared is a
 /// well-formedness constraint only if standalone='yes'.
 ///
-/// `[ WFC: Parsed Entity ]`
+/// [ WFC: Parsed Entity ]
 /// An entity reference must not contain the name of an unparsed entity
+/// ```
 ///
 /// Returns the xmlEntityPtr if found, or NULL otherwise. The str pointer
 /// is updated to the current location in the string.
@@ -590,26 +596,28 @@ pub(super) unsafe fn parse_string_entity_ref<'a>(
 
 /// Parse PEReference declarations
 ///
-/// `[69] PEReference ::= '%' Name ';'`
+/// ```text
+/// [69] PEReference ::= '%' Name ';'
 ///
-/// `[ WFC: No Recursion ]`
+/// [ WFC: No Recursion ]
 /// A parsed entity must not contain a recursive
 /// reference to itself, either directly or indirectly.
 ///
-/// `[ WFC: Entity Declared ]`
+/// [ WFC: Entity Declared ]
 /// In a document without any DTD, a document with only an internal DTD
 /// subset which contains no parameter entity references, or a document
 /// with "standalone='yes'", ...  ... The declaration of a parameter
 /// entity must precede any reference to it...
 ///
-/// `[ VC: Entity Declared ]`
+/// [ VC: Entity Declared ]
 /// In a document with an external subset or external parameter entities
 /// with "standalone='no'", ...  ... The declaration of a parameter entity
 /// must precede any reference to it...
 ///
-/// `[ WFC: In DTD ]`
+/// [ WFC: In DTD ]
 /// Parameter-entity references may only appear in the DTD.
 /// NOTE: misleading but this is handled.
+/// ```
 ///
 /// Returns the string of the entity content.
 /// str is updated to the current value of the index

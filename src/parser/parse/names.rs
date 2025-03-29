@@ -12,9 +12,10 @@ use crate::{
 
 /// Parse an XML Nmtoken.
 ///
-/// `[7] Nmtoken ::= (NameChar)+`
-///
-/// `[8] Nmtokens ::= Nmtoken (#x20 Nmtoken)*`
+/// ```text
+/// [7] Nmtoken ::= (NameChar)+
+/// [8] Nmtokens ::= Nmtoken (#x20 Nmtoken)*
+/// ```
 ///
 /// Returns the Nmtoken parsed or NULL
 #[doc(alias = "xmlParseNmtoken")]
@@ -80,7 +81,6 @@ pub(crate) unsafe fn parse_ncname_complex(ctxt: &mut XmlParserCtxt) -> Option<St
 ///
 /// ```text
 /// [4NS] NCNameChar ::= Letter | Digit | '.' | '-' | '_' | CombiningChar | Extender
-///
 /// [5NS] NCName ::= (Letter | '_') (NCNameChar)*
 /// ```
 ///
@@ -234,9 +234,7 @@ unsafe fn parse_name_complex(ctxt: &mut XmlParserCtxt) -> Option<String> {
 ///
 /// ```text
 /// [4] NameChar ::= Letter | Digit | '.' | '-' | '_' | ':' | CombiningChar | Extender
-///
 /// [5] Name ::= (Letter | '_' | ':') (NameChar)*
-///
 /// [6] Names ::= Name (#x20 Name)*
 /// ```
 ///

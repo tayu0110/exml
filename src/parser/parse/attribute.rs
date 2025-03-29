@@ -492,7 +492,9 @@ unsafe fn parse_att_value_complex(ctxt: &mut XmlParserCtxt, normalize: bool) -> 
 /// Note: the parser won't do substitution of entities here, this
 /// will be handled later in xmlStringGetNodeList
 ///
-/// `[10] AttValue ::= '"' ([^<&"] | Reference)* '"' | "'" ([^<&'] | Reference)* "'"`
+/// ```text
+/// [10] AttValue ::= '"' ([^<&"] | Reference)* '"' | "'" ([^<&'] | Reference)* "'"
+/// ```
 ///
 /// # 3.3.3 Attribute-Value Normalization:
 /// Before the value of an attribute is passed to the application or

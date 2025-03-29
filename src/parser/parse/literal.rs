@@ -8,58 +8,6 @@ use crate::{
     parser::{XmlParserCtxt, xml_fatal_err, xml_fatal_err_msg},
 };
 
-/// Parse an XML public literal
-///
-/// ```text
-/// [12] PubidLiteral ::= '"' PubidChar* '"' | "'" (PubidChar - "'")* "'"
-/// ```
-///
-/// Returns the PubidLiteral parsed or NULL.
-#[doc(alias = "xmlParsePubidLiteral")]
-unsafe fn parse_pubid_literal(ctxt: &mut XmlParserCtxt) -> Option<String> {
-    unsafe {
-        let max_length = if ctxt.options & XmlParserOption::XmlParseHuge as i32 != 0 {
-            XML_MAX_TEXT_LENGTH
-        } else {
-            XML_MAX_NAME_LENGTH
-        };
-
-        let oldstate = ctxt.instate;
-
-        if !matches!(ctxt.current_byte(), b'"' | b'\'') {
-            xml_fatal_err(ctxt, XmlParserErrors::XmlErrLiteralNotStarted, None);
-            return None;
-        }
-        let stop = ctxt.current_byte();
-        ctxt.skip_char();
-
-        let mut buf = String::new();
-        ctxt.instate = XmlParserInputState::XmlParserPublicLiteral;
-        let mut cur = ctxt.current_byte();
-        while xml_is_pubid_char(cur as u32) && cur != stop {
-            // Since PubidChar is a subset of ASCII,
-            // there is no problem with casting to `char`.
-            buf.push(cur as char);
-            if buf.len() > max_length {
-                xml_fatal_err(ctxt, XmlParserErrors::XmlErrNameTooLong, Some("Public ID"));
-                return None;
-            }
-            ctxt.skip_char();
-            cur = ctxt.current_byte();
-        }
-        if matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
-            return None;
-        }
-        if cur != stop {
-            xml_fatal_err(ctxt, XmlParserErrors::XmlErrLiteralNotFinished, None);
-        } else {
-            ctxt.advance(1);
-        }
-        ctxt.instate = oldstate;
-        Some(buf)
-    }
-}
-
 /// Parse an XML Literal
 ///
 /// ```text
@@ -111,6 +59,58 @@ unsafe fn parse_system_literal(ctxt: &mut XmlParserCtxt) -> Option<String> {
         } else {
             ctxt.skip_char();
         }
+        Some(buf)
+    }
+}
+
+/// Parse an XML public literal
+///
+/// ```text
+/// [12] PubidLiteral ::= '"' PubidChar* '"' | "'" (PubidChar - "'")* "'"
+/// ```
+///
+/// Returns the PubidLiteral parsed or NULL.
+#[doc(alias = "xmlParsePubidLiteral")]
+unsafe fn parse_pubid_literal(ctxt: &mut XmlParserCtxt) -> Option<String> {
+    unsafe {
+        let max_length = if ctxt.options & XmlParserOption::XmlParseHuge as i32 != 0 {
+            XML_MAX_TEXT_LENGTH
+        } else {
+            XML_MAX_NAME_LENGTH
+        };
+
+        let oldstate = ctxt.instate;
+
+        if !matches!(ctxt.current_byte(), b'"' | b'\'') {
+            xml_fatal_err(ctxt, XmlParserErrors::XmlErrLiteralNotStarted, None);
+            return None;
+        }
+        let stop = ctxt.current_byte();
+        ctxt.skip_char();
+
+        let mut buf = String::new();
+        ctxt.instate = XmlParserInputState::XmlParserPublicLiteral;
+        let mut cur = ctxt.current_byte();
+        while xml_is_pubid_char(cur as u32) && cur != stop {
+            // Since PubidChar is a subset of ASCII,
+            // there is no problem with casting to `char`.
+            buf.push(cur as char);
+            if buf.len() > max_length {
+                xml_fatal_err(ctxt, XmlParserErrors::XmlErrNameTooLong, Some("Public ID"));
+                return None;
+            }
+            ctxt.skip_char();
+            cur = ctxt.current_byte();
+        }
+        if matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
+            return None;
+        }
+        if cur != stop {
+            xml_fatal_err(ctxt, XmlParserErrors::XmlErrLiteralNotFinished, None);
+        } else {
+            ctxt.advance(1);
+        }
+        ctxt.instate = oldstate;
         Some(buf)
     }
 }
