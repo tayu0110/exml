@@ -39,7 +39,7 @@ use crate::{
         },
         parser_internals::{
             INPUT_CHUNK, LINE_LEN, XML_MAX_DICTIONARY_LIMIT, XML_MAX_LOOKUP_LIMIT,
-            XML_PARSER_MAX_DEPTH, XML_VCTXT_USE_PCTXT, xml_parse_pe_reference,
+            XML_PARSER_MAX_DEPTH, XML_VCTXT_USE_PCTXT,
         },
         sax2::{
             xml_sax_version, xml_sax2_end_element, xml_sax2_ignorable_whitespace,
@@ -56,8 +56,8 @@ use crate::{
 };
 
 use super::{
-    XmlParserInput, XmlParserNodeInfo, XmlParserNodeInfoSeq, parser_entity_check, xml_err_memory,
-    xml_fatal_err,
+    XmlParserInput, XmlParserNodeInfo, XmlParserNodeInfoSeq, parse_pe_reference,
+    parser_entity_check, xml_err_memory, xml_fatal_err,
 };
 
 /// The parser context.
@@ -758,7 +758,7 @@ impl XmlParserCtxt {
                         {
                             break;
                         }
-                        xml_parse_pe_reference(self);
+                        parse_pe_reference(self);
                     } else if self.current_byte() == 0 {
                         let mut consumed: u64;
 

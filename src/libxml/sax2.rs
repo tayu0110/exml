@@ -44,7 +44,10 @@ use crate::{
         },
         xmlstring::XmlChar,
     },
-    parser::{XmlParserCtxtPtr, XmlParserInput, build_qname, split_qname, xml_err_memory},
+    parser::{
+        XmlParserCtxtPtr, XmlParserInput, build_qname, parse_external_subset, split_qname,
+        xml_err_memory,
+    },
     tree::{
         __XML_REGISTER_CALLBACKS, NodeCommon, XmlAttr, XmlAttributeDefault, XmlAttributeType,
         XmlDocProperties, XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr,
@@ -67,7 +70,6 @@ use super::{
     },
     parser_internals::{
         XML_MAX_TEXT_LENGTH, XML_STRING_TEXT, XML_SUBSTITUTE_REF, XML_VCTXT_DTD_VALIDATED,
-        xml_parse_external_subset,
     },
     valid::{
         xml_add_element_decl, xml_add_id, xml_add_notation_decl, xml_add_ref,
@@ -370,7 +372,7 @@ pub unsafe fn xml_sax2_external_subset(
             }
 
             // let's parse that entity knowing it's an external subset.
-            xml_parse_external_subset(ctxt, external_id, system_id);
+            parse_external_subset(&mut *ctxt, external_id, system_id);
 
             // Free up the external entities
             while (*ctxt).input_tab.len() > 1 {

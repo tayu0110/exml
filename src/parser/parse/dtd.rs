@@ -1,31 +1,35 @@
 use std::ptr::null_mut;
 
 use crate::{
+    encoding::{XmlCharEncoding, detect_encoding},
     error::XmlParserErrors,
-    globals::GenericErrorContext,
+    generic_error,
+    globals::{GenericErrorContext, get_parser_debug_entities},
     hash::{XmlHashTable, XmlHashTableRef},
     libxml::{
+        chvalid::xml_is_blank_char,
         parser::{SAX_COMPAT_MODE, XmlParserInputState, XmlParserOption},
         sax2::{xml_sax2_entity_decl, xml_sax2_get_entity},
         valid::{xml_free_doc_element_content, xml_new_doc_element_content},
         xmlstring::xml_strndup,
     },
     parser::{
-        XmlParserCtxt, split_qname2, xml_err_memory, xml_err_msg_str, xml_fatal_err,
-        xml_fatal_err_msg, xml_fatal_err_msg_int, xml_fatal_err_msg_str, xml_ns_err,
-        xml_validity_error,
+        XmlParserCtxt, XmlParserInput, split_qname2, xml_err_memory, xml_err_msg_str,
+        xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_int, xml_fatal_err_msg_str, xml_ns_err,
+        xml_validity_error, xml_warning_msg,
     },
     tree::{
-        XmlAttributeDefault, XmlAttributeType, XmlDocProperties, XmlElementContentOccur,
-        XmlElementContentPtr, XmlElementContentType, XmlElementTypeVal, XmlEntityType,
-        XmlEnumeration, xml_create_enumeration, xml_new_doc, xml_new_dtd,
+        XML_ENT_EXPANDING, XML_ENT_PARSED, XmlAttributeDefault, XmlAttributeType, XmlDocProperties,
+        XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementTypeVal,
+        XmlEntityType, XmlEnumeration, xml_create_enumeration, xml_create_int_subset, xml_new_doc,
+        xml_new_dtd,
     },
     uri::XmlURI,
 };
 
 use super::{
     attr_normalize_space, parse_att_value, parse_comment, parse_entity_value, parse_external_id,
-    parse_name, parse_nmtoken, parse_pi,
+    parse_name, parse_nmtoken, parse_pi, parse_text_decl,
 };
 
 impl XmlParserCtxt {
@@ -104,6 +108,136 @@ impl XmlParserCtxt {
     }
 }
 
+/// Parse a DOCTYPE declaration
+///
+/// ```text
+/// [28] doctypedecl ::= '<!DOCTYPE' S Name (S ExternalID)? S? ('[' (markupdecl | PEReference | S)* ']' S?)? '>'
+///
+/// [ VC: Root Element Type ]
+/// The Name in the document type declaration must match the element type of the root element.
+/// ```
+#[doc(alias = "xmlParseDocTypeDecl")]
+pub(crate) unsafe fn parse_doctypedecl(ctxt: &mut XmlParserCtxt) {
+    unsafe {
+        // We know that '<!DOCTYPE' has been detected.
+        ctxt.advance(9);
+        ctxt.skip_blanks();
+
+        // Parse the DOCTYPE name.
+        let name = parse_name(ctxt);
+        if name.is_none() {
+            xml_fatal_err_msg(
+                ctxt,
+                XmlParserErrors::XmlErrNameRequired,
+                "xmlParseDocTypeDecl : no DOCTYPE name !\n",
+            );
+        }
+        ctxt.int_sub_name = name.as_deref().map(|n| n.to_owned());
+        ctxt.skip_blanks();
+
+        // Check for SystemID and ExternalID
+        let (external_id, uri) = parse_external_id(ctxt, true);
+
+        if uri.is_some() || external_id.is_some() {
+            ctxt.has_external_subset = 1;
+        }
+        ctxt.ext_sub_uri = uri;
+        ctxt.ext_sub_system = external_id;
+
+        ctxt.skip_blanks();
+
+        // Create and update the internal subset.
+        if ctxt.disable_sax == 0 {
+            if let Some(internal_subset) =
+                ctxt.sax.as_deref_mut().and_then(|sax| sax.internal_subset)
+            {
+                internal_subset(
+                    ctxt.user_data.clone(),
+                    name.as_deref(),
+                    ctxt.ext_sub_system.as_deref(),
+                    ctxt.ext_sub_uri.as_deref(),
+                );
+            }
+        }
+        if matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
+            return;
+        }
+
+        // Is there any internal subset declarations ?
+        // they are handled separately in xmlParseInternalSubset()
+        if ctxt.current_byte() == b'[' {
+            return;
+        }
+
+        // We should be at the end of the DOCTYPE declaration.
+        if ctxt.current_byte() != b'>' {
+            xml_fatal_err(ctxt, XmlParserErrors::XmlErrDoctypeNotFinished, None);
+        }
+        ctxt.skip_char();
+    }
+}
+
+/// Parse the internal subset declaration
+///
+/// ```text
+/// [28 end] ('[' (markupdecl | PEReference | S)* ']' S?)? '>'
+/// ```
+#[doc(alias = "xmlParseInternalSubset")]
+pub(crate) unsafe fn parse_internal_subset(ctxt: &mut XmlParserCtxt) {
+    unsafe {
+        // Is there any DTD definition ?
+        if ctxt.current_byte() == b'[' {
+            let base_input_nr = ctxt.input_tab.len();
+            ctxt.instate = XmlParserInputState::XmlParserDTD;
+            ctxt.skip_char();
+            // Parse the succession of Markup declarations and
+            // PEReferences.
+            // Subsequence (markupdecl | PEReference | S)*
+            ctxt.skip_blanks();
+            while (ctxt.current_byte() != b']' || ctxt.input_tab.len() > base_input_nr)
+                && !matches!(ctxt.instate, XmlParserInputState::XmlParserEOF)
+            {
+                // Conditional sections are allowed from external entities included
+                // by PE References in the internal subset.
+                if ctxt.input_tab.len() > 1
+                    && ctxt.input().unwrap().filename.is_some()
+                    && ctxt.content_bytes().starts_with(b"<![")
+                {
+                    parse_conditional_sections(ctxt);
+                } else if ctxt.current_byte() == b'<'
+                    && (ctxt.nth_byte(1) == b'!' || ctxt.nth_byte(1) == b'?')
+                {
+                    parse_markup_decl(ctxt);
+                } else if ctxt.current_byte() == b'%' {
+                    parse_pe_reference(ctxt);
+                } else {
+                    xml_fatal_err(
+                        ctxt,
+                        XmlParserErrors::XmlErrInternalError,
+                        Some("xmlParseInternalSubset: error detected in Markup declaration\n"),
+                    );
+                    ctxt.halt();
+                    return;
+                }
+                ctxt.skip_blanks();
+                ctxt.shrink();
+                ctxt.grow();
+            }
+            if ctxt.current_byte() == b']' {
+                ctxt.skip_char();
+                ctxt.skip_blanks();
+            }
+        }
+
+        // We should be at the end of the DOCTYPE declaration.
+        if ctxt.current_byte() != b'>' {
+            xml_fatal_err(ctxt, XmlParserErrors::XmlErrDoctypeNotFinished, None);
+            return;
+        }
+        ctxt.skip_char();
+    }
+}
+
 /// Parse markup declarations. Always consumes '<!' or '<?'.
 ///
 /// ```text
@@ -123,7 +257,7 @@ impl XmlParserCtxt {
 /// entities or to the external subset.)
 /// ```
 #[doc(alias = "xmlParseMarkupDecl")]
-pub(crate) unsafe fn parse_markup_decl(ctxt: &mut XmlParserCtxt) {
+unsafe fn parse_markup_decl(ctxt: &mut XmlParserCtxt) {
     unsafe {
         ctxt.grow();
         if ctxt.current_byte() == b'<' {
@@ -154,6 +288,79 @@ pub(crate) unsafe fn parse_markup_decl(ctxt: &mut XmlParserCtxt) {
         }
 
         ctxt.instate = XmlParserInputState::XmlParserDTD;
+    }
+}
+
+/// Parse Markup declarations from an external subset
+///
+/// ```text
+/// [30] extSubset ::= textDecl? extSubsetDecl
+/// [31] extSubsetDecl ::= (markupdecl | conditionalSect | PEReference | S) *
+/// ```
+#[doc(alias = "xmlParseExternalSubset")]
+pub unsafe fn parse_external_subset(
+    ctxt: &mut XmlParserCtxt,
+    external_id: Option<&str>,
+    system_id: Option<&str>,
+) {
+    unsafe {
+        ctxt.detect_sax2();
+        ctxt.grow();
+
+        if ctxt.encoding.is_none() && ctxt.input().unwrap().remainder_len() >= 4 {
+            let mut start = [0; 4];
+            start.copy_from_slice(&ctxt.content_bytes()[..4]);
+            let enc = detect_encoding(&start);
+            if !matches!(enc, XmlCharEncoding::None) {
+                ctxt.switch_encoding(enc);
+            }
+        }
+
+        if ctxt.content_bytes().starts_with(b"<?xml") {
+            parse_text_decl(ctxt);
+            if ctxt.err_no == XmlParserErrors::XmlErrUnsupportedEncoding as i32 {
+                // The XML REC instructs us to stop parsing right here
+                ctxt.halt();
+                return;
+            }
+        }
+        let my_doc = if let Some(my_doc) = ctxt.my_doc {
+            my_doc
+        } else {
+            ctxt.my_doc = xml_new_doc(Some("1.0"));
+            let Some(mut my_doc) = ctxt.my_doc else {
+                xml_err_memory(ctxt, Some("New Doc failed"));
+                return;
+            };
+            my_doc.properties = XmlDocProperties::XmlDocInternal as i32;
+            my_doc
+        };
+        if my_doc.int_subset.is_none() {
+            xml_create_int_subset(ctxt.my_doc, None, external_id, system_id);
+        }
+
+        ctxt.instate = XmlParserInputState::XmlParserDTD;
+        ctxt.external = 1;
+        ctxt.skip_blanks();
+        while !matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) && ctxt.current_byte() != 0
+        {
+            ctxt.grow();
+            match ctxt.content_bytes() {
+                [b'<', b'!', b'[', ..] => parse_conditional_sections(ctxt),
+                [b'<', b'!', ..] | [b'<', b'?', ..] => parse_markup_decl(ctxt),
+                _ => {
+                    xml_fatal_err(ctxt, XmlParserErrors::XmlErrExtSubsetNotFinished, None);
+                    ctxt.halt();
+                    return;
+                }
+            }
+            ctxt.skip_blanks();
+            ctxt.shrink();
+        }
+
+        if ctxt.current_byte() != 0 {
+            xml_fatal_err(ctxt, XmlParserErrors::XmlErrExtSubsetNotFinished, None);
+        }
     }
 }
 
@@ -1316,7 +1523,7 @@ unsafe fn parse_default_decl(ctxt: &mut XmlParserCtxt) -> (XmlAttributeDefault, 
 /// [65] Ignore ::= Char* - (Char* ('<![' | ']]>') Char*)
 /// ```
 #[doc(alias = "xmlParseConditionalSections")]
-pub(crate) unsafe fn parse_conditional_sections(ctxt: &mut XmlParserCtxt) {
+unsafe fn parse_conditional_sections(ctxt: &mut XmlParserCtxt) {
     unsafe {
         let mut depth = 0;
         let mut input_ids = vec![];
@@ -1443,6 +1650,190 @@ pub(crate) unsafe fn parse_conditional_sections(ctxt: &mut XmlParserCtxt) {
             ctxt.shrink();
             ctxt.grow();
         }
+    }
+}
+
+/// Parse a parameter entity reference. Always consumes '%'.
+///
+/// The entity content is handled directly by pushing it's content as a new input stream.
+///
+/// ```text
+/// [69] PEReference ::= '%' Name ';'
+///
+/// [ WFC: No Recursion ]
+/// A parsed entity must not contain a recursive
+/// reference to itself, either directly or indirectly.
+///
+/// [ WFC: Entity Declared ]
+/// In a document without any DTD, a document with only an internal DTD
+/// subset which contains no parameter entity references, or a document
+/// with "standalone='yes'", ...  ... The declaration of a parameter
+/// entity must precede any reference to it...
+///
+/// [ VC: Entity Declared ]
+/// In a document with an external subset or external parameter entities
+/// with "standalone='no'", ...  ... The declaration of a parameter entity
+/// must precede any reference to it...
+///
+/// [ WFC: In DTD ]
+/// Parameter-entity references may only appear in the DTD.
+/// NOTE: misleading but this is handled.
+/// ```
+#[doc(alias = "xmlParsePEReference")]
+pub(crate) unsafe fn parse_pe_reference(ctxt: &mut XmlParserCtxt) {
+    unsafe {
+        if ctxt.current_byte() != b'%' {
+            return;
+        }
+        ctxt.skip_char();
+        let Some(name) = parse_name(ctxt) else {
+            xml_fatal_err_msg(
+                ctxt,
+                XmlParserErrors::XmlErrPERefNoName,
+                "PEReference: no name\n",
+            );
+            return;
+        };
+        if get_parser_debug_entities() != 0 {
+            generic_error!("PEReference: {}\n", name);
+        }
+        if ctxt.current_byte() != b';' {
+            xml_fatal_err(ctxt, XmlParserErrors::XmlErrPERefSemicolMissing, None);
+            return;
+        }
+
+        ctxt.skip_char();
+
+        // Request the entity from SAX
+        let entity = ctxt
+            .sax
+            .as_deref_mut()
+            .and_then(|sax| sax.get_parameter_entity)
+            .and_then(|get_parameter_entity| get_parameter_entity(ctxt.user_data.clone(), &name));
+        if matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
+            return;
+        }
+        if let Some(mut entity) = entity {
+            // Internal checking in case the entity quest barfed
+            if !matches!(
+                entity.etype,
+                XmlEntityType::XmlInternalParameterEntity
+                    | XmlEntityType::XmlExternalParameterEntity
+            ) {
+                xml_warning_msg!(
+                    ctxt,
+                    XmlParserErrors::XmlWarUndeclaredEntity,
+                    "Internal: %{}; is not a parameter entity\n",
+                    name
+                );
+            } else {
+                if matches!(entity.etype, XmlEntityType::XmlExternalParameterEntity)
+                    && ctxt.options & XmlParserOption::XmlParseNoEnt as i32 == 0
+                    && ctxt.options & XmlParserOption::XmlParseDTDValid as i32 == 0
+                    && ctxt.options & XmlParserOption::XmlParseDTDLoad as i32 == 0
+                    && ctxt.options & XmlParserOption::XmlParseDTDAttr as i32 == 0
+                    && ctxt.replace_entities == 0
+                    && ctxt.validate == 0
+                {
+                    return;
+                }
+
+                if entity.flags & XML_ENT_EXPANDING as i32 != 0 {
+                    xml_fatal_err(ctxt, XmlParserErrors::XmlErrEntityLoop, None);
+                    ctxt.halt();
+                    return;
+                }
+
+                // Must be computed from old input before pushing new input.
+                let mut parent_consumed = ctxt.input().unwrap().parent_consumed;
+                let old_ent = ctxt.input().unwrap().entity;
+                if old_ent.is_none_or(|old_ent| {
+                    matches!(old_ent.etype, XmlEntityType::XmlExternalParameterEntity)
+                        && old_ent.flags & XML_ENT_PARSED as i32 == 0
+                }) {
+                    parent_consumed =
+                        parent_consumed.saturating_add(ctxt.input().unwrap().consumed);
+                    parent_consumed = parent_consumed
+                        .saturating_add(ctxt.input().unwrap().offset_from_base() as u64);
+                }
+
+                let Some(mut input) = XmlParserInput::from_entity(ctxt, entity) else {
+                    return;
+                };
+                input.parent_consumed = parent_consumed;
+                if ctxt.push_input(input) < 0 {
+                    return;
+                }
+
+                entity.flags |= XML_ENT_EXPANDING as i32;
+
+                if matches!(entity.etype, XmlEntityType::XmlExternalParameterEntity) {
+                    // Get the 4 first bytes and decode the charset
+                    // if enc != XML_CHAR_ENCODING_NONE
+                    // plug some encoding conversion routines.
+                    // Note that, since we may have some non-UTF8
+                    // encoding (like UTF16, bug 135229), the 'length'
+                    // is not known, but we can calculate based upon
+                    // the amount of data in the buffer.
+                    ctxt.grow();
+                    if matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
+                        return;
+                    }
+                    if ctxt.input().unwrap().remainder_len() >= 4 {
+                        let mut start: [u8; 4] = [0; 4];
+                        start.copy_from_slice(&ctxt.content_bytes()[..4]);
+                        let enc = detect_encoding(&start);
+                        if !matches!(enc, XmlCharEncoding::None) {
+                            ctxt.switch_encoding(enc);
+                        }
+                    }
+
+                    if ctxt.content_bytes().starts_with(b"<?xml")
+                        && xml_is_blank_char(ctxt.nth_byte(5) as u32)
+                    {
+                        parse_text_decl(ctxt);
+                    }
+                }
+            }
+        } else {
+            // [ WFC: Entity Declared ]
+            // In a document without any DTD, a document with only an
+            // internal DTD subset which contains no parameter entity
+            // references, or a document with "standalone='yes'", ...
+            // ... The declaration of a parameter entity must precede
+            // any reference to it...
+            if ctxt.standalone == 1 || (ctxt.has_external_subset == 0 && ctxt.has_perefs == 0) {
+                xml_fatal_err_msg_str!(
+                    ctxt,
+                    XmlParserErrors::XmlErrUndeclaredEntity,
+                    "PEReference: %{}; not found\n",
+                    name
+                );
+            } else {
+                // [ VC: Entity Declared ]
+                // In a document with an external subset or external
+                // parameter entities with "standalone='no'", ...
+                // ... The declaration of a parameter entity must
+                // precede any reference to it...
+                if ctxt.validate != 0 && ctxt.vctxt.error.is_some() {
+                    xml_validity_error!(
+                        ctxt,
+                        XmlParserErrors::XmlWarUndeclaredEntity,
+                        "PEReference: %{}; not found\n",
+                        name
+                    );
+                } else {
+                    xml_warning_msg!(
+                        ctxt,
+                        XmlParserErrors::XmlWarUndeclaredEntity,
+                        "PEReference: %{}; not found\n",
+                        name
+                    );
+                }
+                ctxt.valid = 0;
+            }
+        }
+        ctxt.has_perefs = 1;
     }
 }
 

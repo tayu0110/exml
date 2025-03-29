@@ -89,9 +89,9 @@ use crate::{
         htmlparser::{__html_parse_content, HtmlParserOption, html_create_memory_parser_ctxt},
         parser_internals::{
             XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH, xml_parse_content,
-            xml_parse_content_internal, xml_parse_doc_type_decl, xml_parse_element_end,
-            xml_parse_element_start, xml_parse_external_subset, xml_parse_misc, xml_parse_name,
-            xml_parse_nmtoken, xml_parse_pe_reference, xml_parse_reference, xml_parse_start_tag,
+            xml_parse_content_internal, xml_parse_element_end, xml_parse_element_start,
+            xml_parse_misc, xml_parse_name, xml_parse_nmtoken, xml_parse_reference,
+            xml_parse_start_tag,
         },
         valid::xml_validate_root,
         xmlmemory::{xml_cleanup_memory_internal, xml_init_memory_internal},
@@ -101,8 +101,8 @@ use crate::{
     parser::{
         __xml_err_encoding, XmlParserCharValid, XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput,
         XmlParserNodeInfo, check_cdata_push, parse_attribute2, parse_char_data_internal,
-        parse_comment, parse_conditional_sections, parse_lookup_char, parse_lookup_char_data,
-        parse_markup_decl, parse_pi, parse_qname, parse_text_decl, parse_xmldecl,
+        parse_comment, parse_doctypedecl, parse_internal_subset, parse_lookup_char,
+        parse_lookup_char_data, parse_pi, parse_qname, parse_text_decl, parse_xmldecl,
         xml_create_entity_parser_ctxt_internal, xml_create_memory_parser_ctxt,
         xml_err_attribute_dup, xml_err_memory, xml_fatal_err, xml_fatal_err_msg,
         xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str, xml_free_parser_ctxt,
@@ -742,70 +742,6 @@ pub unsafe fn xml_recover_file(filename: Option<&str>) -> Option<XmlDocPtr> {
     unsafe { xml_sax_parse_file(None, filename, 1) }
 }
 
-/// Parse the internal subset declaration
-///
-/// ```test
-/// [28 end] ('[' (markupdecl | PEReference | S)* ']' S?)? '>'
-/// ```
-#[doc(alias = "xmlParseInternalSubset")]
-unsafe fn xml_parse_internal_subset(ctxt: XmlParserCtxtPtr) {
-    unsafe {
-        // Is there any DTD definition ?
-        if (*ctxt).current_byte() == b'[' {
-            let base_input_nr = (*ctxt).input_tab.len();
-            (*ctxt).instate = XmlParserInputState::XmlParserDTD;
-            (*ctxt).skip_char();
-            // Parse the succession of Markup declarations and
-            // PEReferences.
-            // Subsequence (markupdecl | PEReference | S)*
-            (*ctxt).skip_blanks();
-            #[allow(clippy::while_immutable_condition)]
-            while ((*ctxt).current_byte() != b']' || (*ctxt).input_tab.len() > base_input_nr)
-                && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
-            {
-                // Conditional sections are allowed from external entities included
-                // by PE References in the internal subset.
-                if (*ctxt).input_tab.len() > 1
-                    && (*ctxt).input().unwrap().filename.is_some()
-                    && (*ctxt).current_byte() == b'<'
-                    && (*ctxt).nth_byte(1) == b'!'
-                    && (*ctxt).nth_byte(2) == b'['
-                {
-                    parse_conditional_sections(&mut *ctxt);
-                } else if (*ctxt).current_byte() == b'<'
-                    && ((*ctxt).nth_byte(1) == b'!' || (*ctxt).nth_byte(1) == b'?')
-                {
-                    parse_markup_decl(&mut *ctxt);
-                } else if (*ctxt).current_byte() == b'%' {
-                    xml_parse_pe_reference(ctxt);
-                } else {
-                    xml_fatal_err(
-                        &mut *ctxt,
-                        XmlParserErrors::XmlErrInternalError,
-                        Some("xmlParseInternalSubset: error detected in Markup declaration\n"),
-                    );
-                    (*ctxt).halt();
-                    return;
-                }
-                (*ctxt).skip_blanks();
-                (*ctxt).shrink();
-                (*ctxt).grow();
-            }
-            if (*ctxt).current_byte() == b']' {
-                (*ctxt).skip_char();
-                (*ctxt).skip_blanks();
-            }
-        }
-
-        // We should be at the end of the DOCTYPE declaration.
-        if (*ctxt).current_byte() != b'>' {
-            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrDoctypeNotFinished, None);
-            return;
-        }
-        (*ctxt).skip_char();
-    }
-}
-
 /// Trim the list of attributes defined to remove all those of type
 /// CDATA as they are not special. This call should be done when finishing
 /// to parse the DTD and before starting to parse the document root.
@@ -939,10 +875,10 @@ pub unsafe fn xml_parse_document(ctxt: XmlParserCtxtPtr) -> i32 {
         (*ctxt).grow();
         if (*ctxt).content_bytes().starts_with(b"<!DOCTYPE") {
             (*ctxt).in_subset = 1;
-            xml_parse_doc_type_decl(ctxt);
+            parse_doctypedecl(&mut *ctxt);
             if (*ctxt).current_byte() == b'[' {
                 (*ctxt).instate = XmlParserInputState::XmlParserDTD;
-                xml_parse_internal_subset(ctxt);
+                parse_internal_subset(&mut *ctxt);
                 if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
                     return -1;
                 }
@@ -1527,6 +1463,8 @@ pub(crate) unsafe fn xml_sax_parse_dtd(
     external_id: Option<&str>,
     system_id: Option<&str>,
 ) -> Option<XmlDtdPtr> {
+    use crate::parser::parse_external_subset;
+
     unsafe {
         use std::slice::from_raw_parts;
 
@@ -1597,7 +1535,7 @@ pub(crate) unsafe fn xml_sax_parse_dtd(
         };
         my_doc.properties = XmlDocProperties::XmlDocInternal as i32;
         my_doc.ext_subset = xml_new_dtd((*ctxt).my_doc, Some("none"), external_id, system_id);
-        xml_parse_external_subset(ctxt, external_id, system_id);
+        parse_external_subset(&mut *ctxt, external_id, system_id);
 
         let mut ret = None;
         if let Some(mut my_doc) = (*ctxt).my_doc.take() {
@@ -1645,6 +1583,8 @@ pub unsafe fn xml_io_parse_dtd(
     input: XmlParserInputBuffer,
     mut enc: XmlCharEncoding,
 ) -> Option<XmlDtdPtr> {
+    use crate::parser::parse_external_subset;
+
     unsafe {
         use crate::parser::xml_new_sax_parser_ctxt;
 
@@ -1715,7 +1655,7 @@ pub unsafe fn xml_io_parse_dtd(
             }
         }
 
-        xml_parse_external_subset(ctxt, Some("none"), Some("none"));
+        parse_external_subset(&mut *ctxt, Some("none"), Some("none"));
 
         let mut ret = None;
         if let Some(mut my_doc) = (*ctxt).my_doc.take() {
@@ -4200,7 +4140,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                                 return ret;
                             }
                             (*ctxt).in_subset = 1;
-                            xml_parse_doc_type_decl(ctxt);
+                            parse_doctypedecl(&mut *ctxt);
                             if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
                                 // goto done;
                                 return ret;
@@ -4258,7 +4198,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                             // goto done;
                             return ret;
                         }
-                        xml_parse_internal_subset(ctxt);
+                        parse_internal_subset(&mut *ctxt);
                         if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
                             // goto done;
                             return ret;
