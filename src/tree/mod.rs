@@ -2124,11 +2124,7 @@ pub unsafe fn xml_free_node(cur: impl Into<XmlGenericNodePtr>) {
         }
 
         if let Ok(mut ent) = XmlEntityPtr::try_from(cur) {
-            let system_id = ent.system_id;
-            if !system_id.is_null() {
-                xml_free(system_id as _);
-            }
-            ent.system_id = null_mut();
+            ent.system_id = None;
             ent.external_id = None;
         }
         if let Some(children) = cur

@@ -118,7 +118,7 @@ pub struct XmlEntity {
     // External identifier for PUBLIC
     pub(crate) external_id: Option<Box<str>>,
     // URI for a SYSTEM or PUBLIC Entity
-    pub(crate) system_id: *mut u8,
+    pub(crate) system_id: Option<Box<str>>,
 
     // unused
     pub(crate) nexte: Option<XmlEntityPtr>,
@@ -259,7 +259,7 @@ impl Default for XmlEntity {
             length: Default::default(),
             etype: Default::default(),
             external_id: None,
-            system_id: null_mut(),
+            system_id: None,
             nexte: Default::default(),
             uri: None,
             owner: Default::default(),
@@ -362,8 +362,7 @@ unsafe fn xml_create_entity(
             ret.external_id = Some(external_id.to_owned().into_boxed_str());
         }
         if let Some(system_id) = system_id {
-            let system_id = CString::new(system_id).unwrap();
-            ret.system_id = xml_strdup(system_id.as_ptr() as *const u8);
+            ret.system_id = Some(system_id.to_owned().into_boxed_str());
         }
         if let Some(content) = content {
             ret.length = content.len() as i32;
@@ -462,10 +461,6 @@ unsafe fn xml_free_entity(mut entity: XmlEntityPtr) {
         if !entity.name.is_null() {
             xml_free(entity.name as _);
             entity.name = null_mut();
-        }
-        if !entity.system_id.is_null() {
-            xml_free(entity.system_id as _);
-            entity.system_id = null_mut();
         }
         if !entity.content.is_null() {
             xml_free(entity.content as _);
@@ -651,7 +646,7 @@ thread_local! {
         length: 1,
         etype: XmlEntityType::XmlInternalPredefinedEntity,
         external_id: None,
-        system_id: null_mut(),
+        system_id: None,
         nexte: None,
         uri: None,
         owner: 0,
@@ -673,7 +668,7 @@ thread_local! {
         length: 1,
         etype: XmlEntityType::XmlInternalPredefinedEntity,
         external_id: None,
-        system_id: null_mut(),
+        system_id: None,
         nexte: None,
         uri: None,
         owner: 0,
@@ -695,7 +690,7 @@ thread_local! {
         length: 1,
         etype: XmlEntityType::XmlInternalPredefinedEntity,
         external_id: None,
-        system_id: null_mut(),
+        system_id: None,
         nexte: None,
         uri: None,
         owner: 0,
@@ -717,7 +712,7 @@ thread_local! {
         length: 1,
         etype: XmlEntityType::XmlInternalPredefinedEntity,
         external_id: None,
-        system_id: null_mut(),
+        system_id: None,
         nexte: None,
         uri: None,
         owner: 0,
@@ -739,7 +734,7 @@ thread_local! {
         length: 1,
         etype: XmlEntityType::XmlInternalPredefinedEntity,
         external_id: None,
-        system_id: null_mut(),
+        system_id: None,
         nexte: None,
         uri: None,
         owner: 0,
@@ -1318,9 +1313,7 @@ unsafe fn xml_copy_entity(ent: XmlEntityPtr) -> Option<XmlEntityPtr> {
             cur.name = xml_strdup(ent.name);
         }
         cur.external_id = ent.external_id.clone();
-        if !ent.system_id.is_null() {
-            cur.system_id = xml_strdup(ent.system_id);
-        }
+        cur.system_id = ent.system_id.clone();
         if !ent.content.is_null() {
             cur.content = xml_strdup(ent.content);
         }
@@ -1471,22 +1464,10 @@ pub unsafe fn xml_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: XmlEnti
                     write!(buf, " PUBLIC ").ok();
                     write_quoted(buf, external_id).ok();
                     write!(buf, " ").ok();
-                    write_quoted(
-                        buf,
-                        CStr::from_ptr(ent.system_id as _)
-                            .to_string_lossy()
-                            .as_ref(),
-                    )
-                    .ok();
+                    write_quoted(buf, ent.system_id.as_deref().unwrap()).ok();
                 } else {
                     write!(buf, " SYSTEM ").ok();
-                    write_quoted(
-                        buf,
-                        CStr::from_ptr(ent.system_id as _)
-                            .to_string_lossy()
-                            .as_ref(),
-                    )
-                    .ok();
+                    write_quoted(buf, ent.system_id.as_deref().unwrap()).ok();
                 }
                 writeln!(buf, ">").ok();
             }
@@ -1496,22 +1477,10 @@ pub unsafe fn xml_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: XmlEnti
                     write!(buf, " PUBLIC ").ok();
                     write_quoted(buf, external_id).ok();
                     write!(buf, " ").ok();
-                    write_quoted(
-                        buf,
-                        CStr::from_ptr(ent.system_id as _)
-                            .to_string_lossy()
-                            .as_ref(),
-                    )
-                    .ok();
+                    write_quoted(buf, ent.system_id.as_deref().unwrap()).ok();
                 } else {
                     write!(buf, " SYSTEM ").ok();
-                    write_quoted(
-                        buf,
-                        CStr::from_ptr(ent.system_id as _)
-                            .to_string_lossy()
-                            .as_ref(),
-                    )
-                    .ok();
+                    write_quoted(buf, ent.system_id.as_deref().unwrap()).ok();
                 }
                 if !ent.content.is_null() {
                     /* Should be true ! */
@@ -1553,22 +1522,10 @@ pub unsafe fn xml_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: XmlEnti
                     write!(buf, " PUBLIC ").ok();
                     write_quoted(buf, external_id).ok();
                     write!(buf, " ").ok();
-                    write_quoted(
-                        buf,
-                        CStr::from_ptr(ent.system_id as _)
-                            .to_string_lossy()
-                            .as_ref(),
-                    )
-                    .ok();
+                    write_quoted(buf, ent.system_id.as_deref().unwrap()).ok();
                 } else {
                     write!(buf, " SYSTEM ").ok();
-                    write_quoted(
-                        buf,
-                        CStr::from_ptr(ent.system_id as _)
-                            .to_string_lossy()
-                            .as_ref(),
-                    )
-                    .ok();
+                    write_quoted(buf, ent.system_id.as_deref().unwrap()).ok();
                 }
                 writeln!(buf, ">").ok();
             }
