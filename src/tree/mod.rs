@@ -2173,10 +2173,6 @@ pub unsafe fn xml_free_node(cur: impl Into<XmlGenericNodePtr>) {
             // When a node is a text node or a comment, it uses a global static
             // variable for the name of the node.
             // Otherwise the node name might come from the document's dictionary
-            let name = cur.name;
-            if !name.is_null() {
-                xml_free(name as _);
-            }
         } else {
             // Does this pattern occur ???
             todo!()

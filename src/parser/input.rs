@@ -39,7 +39,6 @@
 
 use std::{
     cell::RefCell,
-    ffi::CStr,
     ops::DerefMut,
     ptr::{null, null_mut},
     rc::Rc,
@@ -252,16 +251,12 @@ impl XmlParserInput {
     ) -> Option<XmlParserInput> {
         unsafe {
             if get_parser_debug_entities() != 0 {
-                generic_error!(
-                    "new input from entity: {}\n",
-                    CStr::from_ptr(entity.name as *const i8).to_string_lossy()
-                );
+                generic_error!("new input from entity: {}\n", entity.name);
             }
             if entity.content.is_null() {
                 match entity.etype {
                     XmlEntityType::XmlExternalGeneralUnparsedEntity => {
-                        let name = CStr::from_ptr(entity.name as *const i8).to_string_lossy();
-                        xml_err_internal!(ctxt, "Cannot parse entity {}\n", name);
+                        xml_err_internal!(ctxt, "Cannot parse entity {}\n", entity.name.clone());
                     }
                     XmlEntityType::XmlExternalGeneralParsedEntity
                     | XmlEntityType::XmlExternalParameterEntity => {
@@ -276,20 +271,25 @@ impl XmlParserInput {
                         return input;
                     }
                     XmlEntityType::XmlInternalGeneralEntity => {
-                        let name = CStr::from_ptr(entity.name as *const i8).to_string_lossy();
-                        xml_err_internal!(ctxt, "Internal entity {} without content !\n", name);
+                        xml_err_internal!(
+                            ctxt,
+                            "Internal entity {} without content !\n",
+                            entity.name.clone()
+                        );
                     }
                     XmlEntityType::XmlInternalParameterEntity => {
-                        let name = CStr::from_ptr(entity.name as *const i8).to_string_lossy();
                         xml_err_internal!(
                             ctxt,
                             "Internal parameter entity {} without content !\n",
-                            name
+                            entity.name.clone()
                         );
                     }
                     XmlEntityType::XmlInternalPredefinedEntity => {
-                        let name = CStr::from_ptr(entity.name as *const i8).to_string_lossy();
-                        xml_err_internal!(ctxt, "Predefined entity {} without content !\n", name);
+                        xml_err_internal!(
+                            ctxt,
+                            "Predefined entity {} without content !\n",
+                            entity.name.clone()
+                        );
                     }
                 }
                 return None;

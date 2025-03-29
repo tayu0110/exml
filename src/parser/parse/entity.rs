@@ -256,10 +256,7 @@ unsafe fn load_entity_content(ctxt: &mut XmlParserCtxt, mut entity: XmlEntityPtr
         }
 
         if get_parser_debug_entities() != 0 {
-            generic_error!(
-                "Reading {} entity content input\n",
-                CStr::from_ptr(entity.name as *const i8).to_string_lossy()
-            );
+            generic_error!("Reading {} entity content input\n", entity.name);
         }
 
         let Some(input) = XmlParserInput::from_entity(ctxt, entity) else {

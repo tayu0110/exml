@@ -93,7 +93,7 @@ pub struct XmlEntity {
     // XML_ENTITY_DECL, must be second !
     pub(crate) typ: XmlElementType,
     // Entity name
-    pub(crate) name: *mut u8,
+    pub(crate) name: Cow<'static, str>,
     // First child link
     pub(crate) children: Option<XmlNodePtr>,
     // Last child link
@@ -143,8 +143,7 @@ impl NodeCommon for XmlEntity {
         self.typ
     }
     fn name(&self) -> Option<Cow<'_, str>> {
-        let name = self.name;
-        (!name.is_null()).then(|| unsafe { CStr::from_ptr(name as *const i8).to_string_lossy() })
+        Some(Cow::Borrowed(self.name.as_ref()))
     }
     fn children(&self) -> Option<XmlGenericNodePtr> {
         self.children.map(|node| node.into())
@@ -247,7 +246,7 @@ impl Default for XmlEntity {
         Self {
             _private: null_mut(),
             typ: XmlElementType::XmlEntityDecl,
-            name: null_mut(),
+            name: "".into(),
             children: Default::default(),
             last: Default::default(),
             parent: Default::default(),
@@ -350,7 +349,7 @@ unsafe fn xml_create_entity(
         let Some(mut ret) = XmlEntityPtr::new(XmlEntity {
             typ: XmlElementType::XmlEntityDecl,
             etype: typ,
-            name: xml_strndup(name.as_ptr(), name.len() as i32),
+            name: Cow::Owned(name.to_owned()),
             ..Default::default()
         }) else {
             xml_entities_err_memory("xmlCreateEntity: malloc failed");
@@ -457,10 +456,6 @@ unsafe fn xml_free_entity(mut entity: XmlEntityPtr) {
                 xml_free_node_list(Some(children));
                 entity.children = None;
             }
-        }
-        if !entity.name.is_null() {
-            xml_free(entity.name as _);
-            entity.name = null_mut();
         }
         if !entity.content.is_null() {
             xml_free(entity.content as _);
@@ -634,7 +629,7 @@ thread_local! {
     static XML_ENTITY_LT: XmlEntity = const { XmlEntity {
         _private: null_mut(),
         typ: XmlElementType::XmlEntityDecl,
-        name: c"lt".as_ptr() as _,
+        name: Cow::Borrowed("lt"),
         children: None,
         last: None,
         parent: None,
@@ -656,7 +651,7 @@ thread_local! {
     static XML_ENTITY_GT: XmlEntity = const { XmlEntity {
         _private: null_mut(),
         typ: XmlElementType::XmlEntityDecl,
-        name: c"gt".as_ptr() as _,
+        name: Cow::Borrowed("gt"),
         children: None,
         last: None,
         parent: None,
@@ -678,7 +673,7 @@ thread_local! {
     static XML_ENTITY_AMP: XmlEntity = const { XmlEntity {
         _private: null_mut(),
         typ: XmlElementType::XmlEntityDecl,
-        name: c"amp".as_ptr() as _,
+        name: Cow::Borrowed("amp"),
         children: None,
         last: None,
         parent: None,
@@ -700,7 +695,7 @@ thread_local! {
     static XML_ENTITY_QUOT: XmlEntity = const { XmlEntity {
         _private: null_mut(),
         typ: XmlElementType::XmlEntityDecl,
-        name: c"quot".as_ptr() as _,
+        name: Cow::Borrowed("quot"),
         children: None,
         last: None,
         parent: None,
@@ -722,7 +717,7 @@ thread_local! {
     static XML_ENTITY_APOS: XmlEntity = const { XmlEntity {
         _private: null_mut(),
         typ: XmlElementType::XmlEntityDecl,
-        name: c"apos".as_ptr() as _,
+        name: Cow::Borrowed("apos"),
         children: None,
         last: None,
         parent: None,
@@ -1309,9 +1304,7 @@ unsafe fn xml_copy_entity(ent: XmlEntityPtr) -> Option<XmlEntityPtr> {
             ..Default::default()
         })
         .unwrap();
-        if !ent.name.is_null() {
-            cur.name = xml_strdup(ent.name);
-        }
+        cur.name = ent.name.clone();
         cur.external_id = ent.external_id.clone();
         cur.system_id = ent.system_id.clone();
         if !ent.content.is_null() {
@@ -1443,7 +1436,7 @@ pub unsafe fn xml_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: XmlEnti
     unsafe {
         use crate::io::write_quoted;
 
-        let name = CStr::from_ptr(ent.name as _).to_string_lossy();
+        let name = &ent.name;
         match ent.etype {
             XmlEntityType::XmlInternalGeneralEntity => {
                 write!(buf, "<!ENTITY {name} ").ok();

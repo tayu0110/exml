@@ -792,7 +792,7 @@ pub(crate) unsafe fn parse_reference(ctxt: &mut XmlParserCtxt) {
         was_checked = ent.flags & XML_ENT_PARSED as i32;
 
         // special case of predefined entities
-        if ent.name.is_null() || matches!(ent.etype, XmlEntityType::XmlInternalPredefinedEntity) {
+        if matches!(ent.etype, XmlEntityType::XmlInternalPredefinedEntity) {
             let val = ent.content;
             if val.is_null() {
                 return;
@@ -941,12 +941,11 @@ pub(crate) unsafe fn parse_reference(ctxt: &mut XmlParserCtxt) {
                 ret,
                 XmlParserErrors::XmlErrOK | XmlParserErrors::XmlWarUndeclaredEntity
             ) {
-                let name = CStr::from_ptr(ent.name as *const i8).to_string_lossy();
                 xml_fatal_err_msg_str!(
                     ctxt,
                     XmlParserErrors::XmlErrUndeclaredEntity,
                     "Entity '{}' failed to parse\n",
-                    name
+                    ent.name
                 );
                 if !ent.content.is_null() {
                     *ent.content.add(0) = 0;
