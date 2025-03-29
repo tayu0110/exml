@@ -1,4 +1,4 @@
-use std::ptr::null_mut;
+use std::{borrow::Cow, ptr::null_mut};
 
 use crate::{
     encoding::{XmlCharEncoding, detect_encoding},
@@ -11,7 +11,6 @@ use crate::{
         parser::{SAX_COMPAT_MODE, XmlParserInputState, XmlParserOption},
         sax2::{xml_sax2_entity_decl, xml_sax2_get_entity},
         valid::{xml_free_doc_element_content, xml_new_doc_element_content},
-        xmlstring::xml_strndup,
     },
     parser::{
         XmlParserCtxt, XmlParserInput, split_qname2, xml_err_memory, xml_err_msg_str,
@@ -2172,8 +2171,8 @@ unsafe fn parse_entity_decl(ctxt: &mut XmlParserCtxt) {
                         );
                     }
                 }
-                if let Some(mut cur) = cur.filter(|cur| cur.orig.is_null()) {
-                    cur.orig = xml_strndup(orig.as_ptr(), orig.len() as i32);
+                if let Some(mut cur) = cur.filter(|cur| cur.orig.is_none()) {
+                    cur.orig = Some(Cow::Owned(orig));
                 }
             }
         }

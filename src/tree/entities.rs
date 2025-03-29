@@ -108,7 +108,7 @@ pub struct XmlEntity {
     pub(crate) doc: Option<XmlDocPtr>,
 
     // content without ref substitution
-    pub(crate) orig: *mut u8,
+    pub(crate) orig: Option<Cow<'static, str>>,
     // content or ndata if unparsed
     pub(crate) content: *mut u8,
     // the content length
@@ -253,7 +253,7 @@ impl Default for XmlEntity {
             next: Default::default(),
             prev: Default::default(),
             doc: Default::default(),
-            orig: null_mut(),
+            orig: None,
             content: null_mut(),
             length: Default::default(),
             etype: Default::default(),
@@ -373,7 +373,7 @@ unsafe fn xml_create_entity(
         }
         // to be computed by the layer knowing the defining entity
         ret.uri = None;
-        ret.orig = null_mut();
+        ret.orig = None;
         ret.owner = 0;
 
         Some(ret)
@@ -460,10 +460,6 @@ unsafe fn xml_free_entity(mut entity: XmlEntityPtr) {
         if !entity.content.is_null() {
             xml_free(entity.content as _);
             entity.content = null_mut();
-        }
-        if !entity.orig.is_null() {
-            xml_free(entity.orig as _);
-            entity.orig = null_mut();
         }
         entity.free();
     }
@@ -636,7 +632,7 @@ thread_local! {
         next: None,
         prev: None,
         doc: None,
-        orig: c"<".as_ptr() as _,
+        orig: Some(Cow::Borrowed("<")),
         content: c"<".as_ptr() as _,
         length: 1,
         etype: XmlEntityType::XmlInternalPredefinedEntity,
@@ -658,7 +654,7 @@ thread_local! {
         next: None,
         prev: None,
         doc: None,
-        orig: c">".as_ptr() as _,
+        orig: Some(Cow::Borrowed(">")),
         content: c">".as_ptr() as _,
         length: 1,
         etype: XmlEntityType::XmlInternalPredefinedEntity,
@@ -680,7 +676,7 @@ thread_local! {
         next: None,
         prev: None,
         doc: None,
-        orig: c"&".as_ptr() as _,
+        orig: Some(Cow::Borrowed("&")),
         content: c"&".as_ptr() as _,
         length: 1,
         etype: XmlEntityType::XmlInternalPredefinedEntity,
@@ -702,7 +698,7 @@ thread_local! {
         next: None,
         prev: None,
         doc: None,
-        orig: c"\"".as_ptr() as _,
+        orig: Some(Cow::Borrowed("\"")),
         content: c"\"".as_ptr() as _,
         length: 1,
         etype: XmlEntityType::XmlInternalPredefinedEntity,
@@ -724,7 +720,7 @@ thread_local! {
         next: None,
         prev: None,
         doc: None,
-        orig: c"'".as_ptr() as _,
+        orig: Some(Cow::Borrowed("'")),
         content: c"'".as_ptr() as _,
         length: 1,
         etype: XmlEntityType::XmlInternalPredefinedEntity,
@@ -1310,9 +1306,7 @@ unsafe fn xml_copy_entity(ent: XmlEntityPtr) -> Option<XmlEntityPtr> {
         if !ent.content.is_null() {
             cur.content = xml_strdup(ent.content);
         }
-        if !ent.orig.is_null() {
-            cur.orig = xml_strdup(ent.orig);
-        }
+        cur.orig = ent.orig.clone();
         cur.uri = ent.uri.clone();
         Some(cur)
     }
@@ -1440,12 +1434,8 @@ pub unsafe fn xml_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: XmlEnti
         match ent.etype {
             XmlEntityType::XmlInternalGeneralEntity => {
                 write!(buf, "<!ENTITY {name} ").ok();
-                if !ent.orig.is_null() {
-                    write_quoted(
-                        buf,
-                        CStr::from_ptr(ent.orig as _).to_string_lossy().as_ref(),
-                    )
-                    .ok();
+                if let Some(orig) = ent.orig.as_deref() {
+                    write_quoted(buf, orig).ok();
                 } else {
                     xml_dump_entity_content(buf, ent.content as _);
                 }
@@ -1476,15 +1466,10 @@ pub unsafe fn xml_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: XmlEnti
                     write_quoted(buf, ent.system_id.as_deref().unwrap()).ok();
                 }
                 if !ent.content.is_null() {
-                    /* Should be true ! */
+                    // Should be true !
                     write!(buf, " NDATA ").ok();
-                    if !ent.orig.is_null() {
-                        write!(
-                            buf,
-                            "{}",
-                            CStr::from_ptr(ent.orig as _).to_string_lossy().as_ref()
-                        )
-                        .ok();
+                    if let Some(orig) = ent.orig.as_deref() {
+                        write!(buf, "{}", orig).ok();
                     } else {
                         write!(
                             buf,
@@ -1498,14 +1483,10 @@ pub unsafe fn xml_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: XmlEnti
             }
             XmlEntityType::XmlInternalParameterEntity => {
                 write!(buf, "<!ENTITY % {name} ").ok();
-                if ent.orig.is_null() {
-                    xml_dump_entity_content(buf, ent.content as _);
+                if let Some(orig) = ent.orig.as_deref() {
+                    write_quoted(buf, orig).ok();
                 } else {
-                    write_quoted(
-                        buf,
-                        CStr::from_ptr(ent.orig as _).to_string_lossy().as_ref(),
-                    )
-                    .ok();
+                    xml_dump_entity_content(buf, ent.content as _);
                 }
                 writeln!(buf, ">").ok();
             }

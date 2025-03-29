@@ -1359,8 +1359,7 @@ impl XmlDebugCtxt<'_> {
                 if let Some(system_id) = cur.system_id.as_deref() {
                     write!(self.output, "SYSTEM \"{system_id}\"").ok();
                 }
-                if !cur.orig.is_null() {
-                    let orig = CStr::from_ptr(cur.orig as *const i8).to_string_lossy();
+                if let Some(orig) = cur.orig.as_deref() {
                     write!(self.output, "\n orig \"{orig}\"").ok();
                 }
                 if cur.typ != XmlElementType::XmlElementNode && !cur.content.is_null() {
