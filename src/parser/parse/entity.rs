@@ -1,14 +1,21 @@
-use std::ffi::CStr;
+use std::{
+    borrow::Cow,
+    ffi::CStr,
+    mem::take,
+    ptr::{null, null_mut},
+};
 
 use crate::{
+    dict::xml_dict_free,
+    encoding::{XmlCharEncoding, detect_encoding},
     error::XmlParserErrors,
     generic_error,
-    globals::get_parser_debug_entities,
+    globals::{GenericErrorContext, get_parser_debug_entities},
     libxml::{
-        chvalid::xml_is_char,
+        chvalid::{xml_is_blank_char, xml_is_char},
         parser::{
             XML_ENT_FIXED_COST, XML_PARSER_ALLOWED_EXPANSION, XML_PARSER_NON_LINEAR,
-            XmlParserInputState, XmlParserOption,
+            XmlParserInputState, XmlParserOption, XmlSAXHandler,
         },
         parser_internals::{
             XML_MAX_HUGE_LENGTH, XML_MAX_TEXT_LENGTH, XML_SUBSTITUTE_PEREF, XML_SUBSTITUTE_REF,
@@ -16,13 +23,21 @@ use crate::{
         xmlstring::xml_strndup,
     },
     parser::{
-        XmlParserCtxt, XmlParserInput, parse::parse_string_char_ref, xml_fatal_err,
-        xml_fatal_err_msg, xml_fatal_err_msg_int, xml_warning_msg,
+        XmlParserCtxt, XmlParserInput, parse::parse_string_char_ref,
+        xml_create_entity_parser_ctxt_internal, xml_fatal_err, xml_fatal_err_msg,
+        xml_fatal_err_msg_int, xml_free_parser_ctxt, xml_warning_msg,
     },
-    tree::{NodeCommon, XML_ENT_EXPANDING, XML_ENT_PARSED, XmlEntityPtr, XmlEntityType},
+    tree::{
+        NodeCommon, XML_ENT_EXPANDING, XML_ENT_PARSED, XML_XML_NAMESPACE, XmlDocProperties,
+        XmlDocPtr, XmlEntityPtr, XmlEntityType, XmlGenericNodePtr, XmlNodePtr, xml_free_doc,
+        xml_new_doc, xml_new_doc_node,
+    },
 };
 
-use super::{parse_string_entity_ref, parse_string_name, parse_string_pereference};
+use super::{
+    parse_content, parse_string_entity_ref, parse_string_name, parse_string_pereference,
+    parse_text_decl,
+};
 
 #[doc(alias = "xmlStringDecodeEntitiesInt")]
 pub(super) unsafe fn string_decode_entities_int(
@@ -496,5 +511,197 @@ pub(crate) unsafe fn parse_entity_value(
         ctxt.depth -= 1;
 
         (ret, Some(buf))
+    }
+}
+
+/// Private version of xmlParseExternalEntity()
+///
+/// Returns 0 if the entity is well formed, -1 in case of args problem and
+/// the parser error code otherwise
+#[doc(alias = "xmlParseExternalEntityPrivate")]
+#[allow(clippy::too_many_arguments)]
+pub(crate) unsafe fn parse_external_entity_private(
+    doc: XmlDocPtr,
+    oldctxt: &mut XmlParserCtxt,
+    sax: Option<Box<XmlSAXHandler>>,
+    user_data: Option<GenericErrorContext>,
+    depth: i32,
+    url: Option<&str>,
+    id: Option<&str>,
+    mut list: Option<&mut Option<XmlGenericNodePtr>>,
+) -> (Option<Box<XmlSAXHandler>>, XmlParserErrors) {
+    unsafe {
+        if (depth > 40 && oldctxt.options & XmlParserOption::XmlParseHuge as i32 == 0)
+            || depth > 100
+        {
+            xml_fatal_err_msg(
+                oldctxt,
+                XmlParserErrors::XmlErrEntityLoop,
+                "Maximum entity nesting depth exceeded",
+            );
+            return (sax, XmlParserErrors::XmlErrEntityLoop);
+        }
+
+        if let Some(list) = list.as_mut() {
+            **list = None;
+        }
+        if url.is_none() && id.is_none() {
+            return (sax, XmlParserErrors::XmlErrInternalError);
+        }
+
+        let ctxt =
+            match xml_create_entity_parser_ctxt_internal(sax, user_data, url, id, None, oldctxt) {
+                Ok(ctxt) => ctxt,
+                Err(sax) => return (sax, XmlParserErrors::XmlWarUndeclaredEntity),
+            };
+
+        (*ctxt).nb_errors = oldctxt.nb_errors;
+        (*ctxt).nb_warnings = oldctxt.nb_warnings;
+        (*ctxt).detect_sax2();
+
+        let Some(mut new_doc) = xml_new_doc(Some("1.0")) else {
+            let sax = (*ctxt).sax.take();
+            xml_free_parser_ctxt(ctxt);
+            return (sax, XmlParserErrors::XmlErrInternalError);
+        };
+        new_doc.properties = XmlDocProperties::XmlDocInternal as i32;
+        new_doc.int_subset = doc.int_subset;
+        new_doc.ext_subset = doc.ext_subset;
+        if let Some(url) = doc.url.as_deref() {
+            new_doc.url = Some(url.to_owned());
+        }
+        let Some(mut new_root) = xml_new_doc_node(Some(new_doc), None, "pseudoroot", null()) else {
+            let sax = (*ctxt).sax.take();
+            new_doc.int_subset = None;
+            new_doc.ext_subset = None;
+            xml_free_doc(new_doc);
+            return (sax, XmlParserErrors::XmlErrInternalError);
+        };
+        new_doc.add_child(new_root.into());
+        (*ctxt).node_push(
+            new_doc
+                .children
+                .map(|c| XmlNodePtr::try_from(c).unwrap())
+                .unwrap(),
+        );
+        (*ctxt).my_doc = Some(doc);
+        new_root.doc = Some(doc);
+
+        // Get the 4 first bytes and decode the charset
+        // if enc != xmlCharEncoding::XML_CHAR_ENCODING_NONE
+        // plug some encoding conversion routines.
+        (*ctxt).grow();
+        if (*ctxt).input().unwrap().remainder_len() >= 4 {
+            let mut start = [0; 4];
+            start.copy_from_slice(&(*ctxt).content_bytes()[..4]);
+            let enc = detect_encoding(&start);
+            if !matches!(enc, XmlCharEncoding::None) {
+                (*ctxt).switch_encoding(enc);
+            }
+        }
+
+        // Parse a possible text declaration first
+        if (*ctxt).content_bytes().starts_with(b"<?xml")
+            && xml_is_blank_char((*ctxt).nth_byte(5) as u32)
+        {
+            parse_text_decl(&mut *ctxt);
+            // An XML-1.0 document can't reference an entity not XML-1.0
+            if oldctxt.version.as_deref() == Some("1.0")
+                && (*ctxt).input().unwrap().version.as_deref() != Some("1.0")
+            {
+                xml_fatal_err_msg(
+                    &mut *ctxt,
+                    XmlParserErrors::XmlErrVersionMismatch,
+                    "Version mismatch between document and entity\n",
+                );
+            }
+        }
+
+        (*ctxt).instate = XmlParserInputState::XmlParserContent;
+        (*ctxt).depth = depth;
+        (*ctxt)._private = oldctxt._private;
+        (*ctxt).loadsubset = oldctxt.loadsubset;
+        (*ctxt).validate = oldctxt.validate;
+        (*ctxt).valid = oldctxt.valid;
+        (*ctxt).replace_entities = oldctxt.replace_entities;
+        if oldctxt.validate != 0 {
+            (*ctxt).vctxt.error = oldctxt.vctxt.error;
+            (*ctxt).vctxt.warning = oldctxt.vctxt.warning;
+            (*ctxt).vctxt.user_data = oldctxt.vctxt.user_data.clone();
+            (*ctxt).vctxt.flags = oldctxt.vctxt.flags;
+        }
+        (*ctxt).external = oldctxt.external;
+        if !(*ctxt).dict.is_null() {
+            xml_dict_free((*ctxt).dict);
+        }
+        (*ctxt).dict = oldctxt.dict;
+        (*ctxt).str_xml = Some(Cow::Borrowed("xml"));
+        (*ctxt).str_xmlns = Some(Cow::Borrowed("xmlns"));
+        (*ctxt).str_xml_ns = Some(Cow::Borrowed(XML_XML_NAMESPACE.to_str().unwrap()));
+        (*ctxt).dict_names = oldctxt.dict_names;
+        (*ctxt).atts_default = take(&mut oldctxt.atts_default);
+        (*ctxt).atts_special = oldctxt.atts_special;
+        (*ctxt).linenumbers = oldctxt.linenumbers;
+        (*ctxt).record_info = oldctxt.record_info;
+        (*ctxt).node_seq = take(&mut oldctxt.node_seq);
+
+        parse_content(&mut *ctxt);
+
+        if (*ctxt).current_byte() == b'<' && (*ctxt).nth_byte(1) == b'/' {
+            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrNotWellBalanced, None);
+        } else if (*ctxt).current_byte() != 0 {
+            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrExtraContent, None);
+        }
+        if new_doc.children != (*ctxt).node.map(|node| node.into()) {
+            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrNotWellBalanced, None);
+        }
+
+        let ret = if (*ctxt).well_formed == 0 {
+            oldctxt.err_no = (*ctxt).err_no;
+            oldctxt.well_formed = 0;
+            oldctxt.last_error = (*ctxt).last_error.clone();
+            XmlParserErrors::try_from((*ctxt).err_no).unwrap()
+        } else {
+            if let Some(list) = list {
+                // Return the newly created nodeset after unlinking it from they pseudo parent.
+                let mut cur = new_doc.children().unwrap().children();
+                *list = cur;
+                while let Some(mut now) = cur {
+                    now.set_parent(None);
+                    cur = now.next();
+                }
+                new_doc.children().unwrap().set_children(None);
+            }
+            XmlParserErrors::XmlErrOK
+        };
+
+        // Also record the size of the entity parsed
+        if (*ctxt).input().is_some() {
+            let mut consumed: u64 = (*ctxt).input().unwrap().consumed;
+            consumed = consumed.saturating_add((*ctxt).input().unwrap().offset_from_base() as u64);
+
+            oldctxt.sizeentities = oldctxt.sizeentities.saturating_add(consumed);
+            oldctxt.sizeentities = oldctxt.sizeentities.saturating_add((*ctxt).sizeentities);
+
+            oldctxt.sizeentcopy = oldctxt.sizeentcopy.saturating_add(consumed);
+            oldctxt.sizeentcopy = oldctxt.sizeentcopy.saturating_add((*ctxt).sizeentcopy);
+        }
+
+        (*ctxt).dict = null_mut();
+        (*ctxt).atts_default.clear();
+        (*ctxt).atts_special = None;
+        oldctxt.nb_errors = (*ctxt).nb_errors;
+        oldctxt.nb_warnings = (*ctxt).nb_warnings;
+        oldctxt.validate = (*ctxt).validate;
+        oldctxt.valid = (*ctxt).valid;
+        oldctxt.node_seq = take(&mut (*ctxt).node_seq);
+
+        let sax = (*ctxt).sax.take();
+        xml_free_parser_ctxt(ctxt);
+        new_doc.int_subset = None;
+        new_doc.ext_subset = None;
+        xml_free_doc(new_doc);
+
+        (sax, ret)
     }
 }

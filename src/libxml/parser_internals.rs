@@ -36,25 +36,20 @@ use crate::{
     libxml::{
         chvalid::{xml_is_base_char, xml_is_char, xml_is_ideographic},
         dict::{xml_dict_free, xml_dict_lookup},
-        parser::{
-            XML_SKIP_IDS, XmlParserInputState, XmlParserMode, XmlParserOption,
-            xml_parse_external_entity_private,
-        },
-        sax2::xml_sax2_get_entity,
+        parser::{XML_SKIP_IDS, XmlParserInputState, XmlParserMode, XmlParserOption},
         valid::xml_validate_element,
-        xmlstring::{XmlChar, xml_strchr},
+        xmlstring::XmlChar,
     },
     parser::{
         __xml_err_encoding, XmlParserCtxtPtr, parse_char_ref, parse_comment, parse_content,
-        parse_name, parse_pi, parser_entity_check, xml_create_memory_parser_ctxt,
-        xml_err_encoding_int, xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg,
-        xml_fatal_err_msg_str, xml_free_parser_ctxt,
+        parse_entity_ref, parse_external_entity_private, parse_pi, parser_entity_check,
+        xml_create_memory_parser_ctxt, xml_err_encoding_int, xml_err_msg_str, xml_fatal_err,
+        xml_fatal_err_msg, xml_fatal_err_msg_str, xml_free_parser_ctxt,
     },
     tree::{
-        NodeCommon, XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
-        XML_ENT_PARSED, XML_XML_NAMESPACE, XmlDocProperties, XmlElementType, XmlEntityPtr,
-        XmlEntityType, XmlGenericNodePtr, XmlNodePtr, xml_doc_copy_node, xml_free_doc,
-        xml_free_node, xml_free_node_list, xml_get_predefined_entity, xml_new_doc,
+        NodeCommon, XML_ENT_CHECKED, XML_ENT_EXPANDING, XML_ENT_PARSED, XML_XML_NAMESPACE,
+        XmlDocProperties, XmlElementType, XmlEntityType, XmlGenericNodePtr, XmlNodePtr,
+        xml_doc_copy_node, xml_free_doc, xml_free_node, xml_free_node_list, xml_new_doc,
         xml_new_doc_node,
     },
 };
@@ -132,209 +127,6 @@ const XML_PARSER_BUFFER_SIZE: usize = 100;
 //         parse_char_data_internal(&mut *ctxt, 0);
 //     }
 // }
-
-/// Parse an entitiy reference. Always consumes '&'.
-///
-/// `[68] EntityRef ::= '&' Name ';'`
-///
-/// `[ WFC: Entity Declared ]`  
-/// In a document without any DTD, a document with only an internal DTD
-/// subset which contains no parameter entity references, or a document
-/// with "standalone='yes'", the Name given in the entity reference
-/// must match that in an entity declaration, except that well-formed
-/// documents need not declare any of the following entities: amp, lt,
-/// gt, apos, quot.  The declaration of a parameter entity must precede
-/// any reference to it.  Similarly, the declaration of a general entity
-/// must precede any reference to it which appears in a default value in an
-/// attribute-list declaration. Note that if entities are declared in the
-/// external subset or in external parameter entities, a non-validating
-/// processor is not obligated to read and process their declarations;
-/// for such documents, the rule that an entity must be declared is a
-/// well-formedness constraint only if standalone='yes'.
-///
-/// `[ WFC: Parsed Entity ]`  
-/// An entity reference must not contain the name of an unparsed entity
-///
-/// Returns the xmlEntityPtr if found, or NULL otherwise.
-#[doc(alias = "xmlParseEntityRef")]
-pub(crate) unsafe fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> Option<XmlEntityPtr> {
-    unsafe {
-        (*ctxt).grow();
-        if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-            return None;
-        }
-
-        if (*ctxt).current_byte() != b'&' {
-            return None;
-        }
-        (*ctxt).skip_char();
-        let Some(name) = parse_name(&mut *ctxt) else {
-            xml_fatal_err_msg(
-                &mut *ctxt,
-                XmlParserErrors::XmlErrNameRequired,
-                "xmlParseEntityRef: no name\n",
-            );
-            return None;
-        };
-        if (*ctxt).current_byte() != b';' {
-            xml_fatal_err(
-                &mut *ctxt,
-                XmlParserErrors::XmlErrEntityRefSemicolMissing,
-                None,
-            );
-            return None;
-        }
-        (*ctxt).skip_char();
-
-        // Predefined entities override any extra definition
-        if (*ctxt).options & XmlParserOption::XmlParseOldSAX as i32 == 0 {
-            if let Some(ent) = xml_get_predefined_entity(&name) {
-                return Some(ent);
-            }
-        }
-
-        let mut ent = None;
-        // Ask first SAX for entity resolution, otherwise try the
-        // entities which may have stored in the parser context.
-        if let Some(sax) = (*ctxt).sax.as_deref_mut() {
-            if let Some(f) = sax.get_entity {
-                ent = f((*ctxt).user_data.clone(), &name);
-            }
-            if (*ctxt).well_formed == 1
-                && ent.is_none()
-                && (*ctxt).options & XmlParserOption::XmlParseOldSAX as i32 != 0
-            {
-                ent = xml_get_predefined_entity(&name);
-            }
-            if (*ctxt).well_formed == 1
-                && ent.is_none()
-                && (*ctxt)
-                    .user_data
-                    .as_ref()
-                    .and_then(|d| d.lock().downcast_ref::<XmlParserCtxtPtr>().copied())
-                    == Some(ctxt)
-            {
-                ent = xml_sax2_get_entity(Some(GenericErrorContext::new(ctxt)), &name);
-            }
-        }
-        if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-            return None;
-        }
-        // [ WFC: Entity Declared ]
-        // In a document without any DTD, a document with only an
-        // internal DTD subset which contains no parameter entity
-        // references, or a document with "standalone='yes'", the
-        // Name given in the entity reference must match that in an
-        // entity declaration, except that well-formed documents
-        // need not declare any of the following entities: amp, lt,
-        // gt, apos, quot.
-        // The declaration of a parameter entity must precede any
-        // reference to it.
-        // Similarly, the declaration of a general entity must
-        // precede any reference to it which appears in a default
-        // value in an attribute-list declaration. Note that if
-        // entities are declared in the external subset or in
-        // external parameter entities, a non-validating processor
-        // is not obligated to read and process their declarations;
-        // for such documents, the rule that an entity must be
-        // declared is a well-formedness constraint only if
-        // standalone='yes'.
-        if let Some(mut ent) = ent {
-            if matches!(ent.etype, XmlEntityType::XmlExternalGeneralUnparsedEntity) {
-                // [ WFC: Parsed Entity ]
-                // An entity reference must not contain the name of an unparsed entity
-                xml_fatal_err_msg_str!(
-                    ctxt,
-                    XmlParserErrors::XmlErrUnparsedEntity,
-                    "Entity reference to unparsed entity {}\n",
-                    name
-                );
-            } else if matches!(
-                (*ctxt).instate,
-                XmlParserInputState::XmlParserAttributeValue
-            ) && matches!(ent.etype, XmlEntityType::XmlExternalGeneralParsedEntity)
-            {
-                // [ WFC: No External Entity References ]
-                // Attribute values cannot contain direct or indirect
-                // entity references to external entities.
-                xml_fatal_err_msg_str!(
-                    ctxt,
-                    XmlParserErrors::XmlErrEntityIsExternal,
-                    "Attribute references external entity '{}'\n",
-                    name
-                );
-            } else if matches!(
-                (*ctxt).instate,
-                XmlParserInputState::XmlParserAttributeValue
-            ) && !matches!(ent.etype, XmlEntityType::XmlInternalPredefinedEntity)
-            {
-                // [ WFC: No < in Attribute Values ]
-                // The replacement text of any entity referred to directly or
-                // indirectly in an attribute value (other than "&lt;") must not contain a <.
-                if ent.flags & XML_ENT_CHECKED_LT as i32 == 0 {
-                    if !ent.content.is_null() && !xml_strchr(ent.content as _, b'<').is_null() {
-                        ent.flags |= XML_ENT_CONTAINS_LT as i32;
-                    }
-                    ent.flags |= XML_ENT_CHECKED_LT as i32;
-                }
-                if ent.flags & XML_ENT_CONTAINS_LT as i32 != 0 {
-                    xml_fatal_err_msg_str!(
-                        ctxt,
-                        XmlParserErrors::XmlErrLtInAttribute,
-                        "'<' in entity '{}' is not allowed in attributes values\n",
-                        name
-                    );
-                }
-            } else {
-                // Internal check, no parameter entities here ...
-                match ent.etype {
-                    XmlEntityType::XmlInternalParameterEntity
-                    | XmlEntityType::XmlExternalParameterEntity => {
-                        xml_fatal_err_msg_str!(
-                            ctxt,
-                            XmlParserErrors::XmlErrEntityIsParameter,
-                            "Attempt to reference the parameter entity '{}'\n",
-                            name
-                        );
-                    }
-                    _ => {}
-                }
-            }
-        } else {
-            if (*ctxt).standalone == 1
-                || ((*ctxt).has_external_subset == 0 && (*ctxt).has_perefs == 0)
-            {
-                xml_fatal_err_msg_str!(
-                    ctxt,
-                    XmlParserErrors::XmlErrUndeclaredEntity,
-                    "Entity '{}' not defined\n",
-                    name
-                );
-            } else {
-                xml_err_msg_str!(
-                    ctxt,
-                    XmlParserErrors::XmlWarUndeclaredEntity,
-                    "Entity '{}' not defined\n",
-                    name
-                );
-                if (*ctxt).in_subset == 0 {
-                    if let Some(reference) =
-                        (*ctxt).sax.as_deref_mut().and_then(|sax| sax.reference)
-                    {
-                        reference((*ctxt).user_data.clone(), &name);
-                    }
-                }
-            }
-            (*ctxt).valid = 0;
-        }
-
-        // [ WFC: No Recursion ]
-        // A parsed entity must not contain a recursive reference
-        // to itself, either directly or indirectly.
-        // Done somewhere else
-        ent
-    }
-}
 
 /// Parse a well-balanced chunk of an XML document called by the parser
 /// The allowed sequence for the Well Balanced Chunk is the one defined by
@@ -614,7 +406,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
         }
 
         // We are seeing an entity reference
-        let Some(mut ent) = xml_parse_entity_ref(ctxt) else {
+        let Some(mut ent) = parse_entity_ref(&mut *ctxt) else {
             return;
         };
         if (*ctxt).well_formed == 0 {
@@ -699,9 +491,9 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 let uri = ent.uri;
                 let external_id = ent.external_id;
                 let has_sax = (*ctxt).sax.is_some();
-                let (sax, error) = xml_parse_external_entity_private(
+                let (sax, error) = parse_external_entity_private(
                     (*ctxt).my_doc.unwrap(),
-                    ctxt,
+                    &mut *ctxt,
                     (*ctxt).sax.take(),
                     user_data,
                     (*ctxt).depth,
@@ -833,9 +625,9 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                     let uri = ent.uri;
                     let external_id = ent.external_id;
                     let has_sax = (*ctxt).sax.is_some();
-                    let (sax, error) = xml_parse_external_entity_private(
+                    let (sax, error) = parse_external_entity_private(
                         (*ctxt).my_doc.unwrap(),
-                        ctxt,
+                        &mut *ctxt,
                         (*ctxt).sax.take(),
                         user_data,
                         (*ctxt).depth,
