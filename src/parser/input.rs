@@ -265,12 +265,9 @@ impl XmlParserInput {
                     }
                     XmlEntityType::XmlExternalGeneralParsedEntity
                     | XmlEntityType::XmlExternalParameterEntity => {
-                        let uri = entity.uri;
                         let external_id = entity.external_id;
                         let mut input = xml_load_external_entity(
-                            (!uri.is_null())
-                                .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
-                                .as_deref(),
+                            entity.uri.as_deref(),
                             (!external_id.is_null())
                                 .then(|| CStr::from_ptr(external_id as *const i8).to_string_lossy())
                                 .as_deref(),
@@ -302,12 +299,8 @@ impl XmlParserInput {
             }
             let mut input = XmlParserInput::new((!ctxt.is_null()).then(|| &mut *ctxt))?;
 
-            if !entity.uri.is_null() {
-                input.filename = Some(
-                    CStr::from_ptr(entity.uri as *const i8)
-                        .to_string_lossy()
-                        .into_owned(),
-                );
+            if let Some(uri) = entity.uri.as_deref() {
+                input.filename = Some(uri.to_owned());
             }
             input.base = entity.content as _;
             if entity.length == 0 {

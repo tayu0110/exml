@@ -88,12 +88,7 @@ pub trait NodeCommon {
             let mut bases: Vec<String> = vec![];
             while let Some(now) = cur {
                 if let Ok(ent) = XmlEntityPtr::try_from(now) {
-                    let ret = ent.uri;
-                    return (!ret.is_null()).then(|| {
-                        CStr::from_ptr(ret as *const i8)
-                            .to_string_lossy()
-                            .into_owned()
-                    });
+                    return ent.uri.as_deref().map(|uri| uri.to_owned());
                 }
                 if matches!(now.element_type(), XmlElementType::XmlElementNode) {
                     let base = now.get_ns_prop("base", XML_XML_NAMESPACE.to_str().ok());

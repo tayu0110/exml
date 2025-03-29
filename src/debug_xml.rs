@@ -721,9 +721,8 @@ impl XmlDebugCtxt<'_> {
                     let system_id = CStr::from_ptr(ent.system_id as *const i8).to_string_lossy();
                     writeln!(self.output, " SystemID={system_id}").ok();
                 }
-                if !ent.uri.is_null() {
+                if let Some(uri) = ent.uri.as_deref() {
                     self.dump_spaces();
-                    let uri = CStr::from_ptr(ent.uri as *const i8).to_string_lossy();
                     writeln!(self.output, " URI={uri}").ok();
                 }
                 let content = ent.content;
@@ -849,9 +848,8 @@ impl XmlDebugCtxt<'_> {
                     let system_id = CStr::from_ptr(ent.system_id as *const i8).to_string_lossy();
                     writeln!(self.output, "SystemID={system_id}").ok();
                 }
-                if !ent.uri.is_null() {
+                if let Some(uri) = ent.uri.as_deref() {
                     self.dump_spaces();
-                    let uri = CStr::from_ptr(ent.uri as *const i8).to_string_lossy();
                     writeln!(self.output, "URI={uri}").ok();
                 }
                 let content = ent.content;

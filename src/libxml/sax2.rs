@@ -638,7 +638,7 @@ pub unsafe fn xml_sax2_entity_decl(
                     name
                 );
             }
-            if let Some(mut ent) = ent.filter(|ent| ent.uri.is_null()) {
+            if let Some(mut ent) = ent.filter(|ent| ent.uri.is_none()) {
                 if let Some(system_id) = system_id {
                     let base = if let Some(input) = (*ctxt).input() {
                         input
@@ -650,12 +650,9 @@ pub unsafe fn xml_sax2_entity_decl(
                         (*ctxt).directory.clone()
                     };
 
-                    if let Some(uri) = base.and_then(|b| build_uri(system_id, &b)) {
-                        let uri = CString::new(uri).unwrap();
-                        ent.uri = xml_strdup(uri.as_ptr() as *const u8);
-                    } else {
-                        ent.uri = null_mut();
-                    }
+                    ent.uri = base
+                        .and_then(|base| build_uri(system_id, &base))
+                        .map(|base| base.into_boxed_str());
                 }
             }
         } else if (*ctxt).in_subset == 2 {
@@ -676,7 +673,7 @@ pub unsafe fn xml_sax2_entity_decl(
                     );
                 }
             }
-            if let Some(mut ent) = ent.filter(|ent| ent.uri.is_null()) {
+            if let Some(mut ent) = ent.filter(|ent| ent.uri.is_none()) {
                 if let Some(system_id) = system_id {
                     let base = if let Some(input) = (*ctxt).input() {
                         input
@@ -688,12 +685,9 @@ pub unsafe fn xml_sax2_entity_decl(
                         (*ctxt).directory.clone()
                     };
 
-                    if let Some(uri) = base.and_then(|b| build_uri(system_id, &b)) {
-                        let uri = CString::new(uri).unwrap();
-                        ent.uri = xml_strdup(uri.as_ptr() as *const u8);
-                    } else {
-                        ent.uri = null_mut();
-                    }
+                    ent.uri = base
+                        .and_then(|base| build_uri(system_id, &base))
+                        .map(|base| base.into_boxed_str());
                 }
             }
         } else {
@@ -1027,7 +1021,7 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
                     )
                 }
             }
-            if let Some(mut ent) = ent.filter(|ent| ent.uri.is_null()) {
+            if let Some(mut ent) = ent.filter(|ent| ent.uri.is_none()) {
                 if let Some(system_id) = system_id {
                     let base = if let Some(input) = (*ctxt).input() {
                         input
@@ -1039,12 +1033,9 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
                         (*ctxt).directory.clone()
                     };
 
-                    if let Some(uri) = base.and_then(|b| build_uri(system_id, &b)) {
-                        let uri = CString::new(uri).unwrap();
-                        ent.uri = xml_strdup(uri.as_ptr() as *const u8);
-                    } else {
-                        ent.uri = null_mut();
-                    }
+                    ent.uri = base
+                        .and_then(|base| build_uri(system_id, &base))
+                        .map(|base| base.into_boxed_str());
                 }
             }
         } else if (*ctxt).in_subset == 2 {
@@ -1065,7 +1056,7 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
                 }
             }
 
-            if let Some(mut ent) = ent.filter(|ent| ent.uri.is_null()) {
+            if let Some(mut ent) = ent.filter(|ent| ent.uri.is_none()) {
                 if let Some(system_id) = system_id {
                     let base = if let Some(input) = (*ctxt).input() {
                         input
@@ -1077,12 +1068,9 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
                         (*ctxt).directory.clone()
                     };
 
-                    if let Some(uri) = base.and_then(|b| build_uri(system_id, &b)) {
-                        let uri = CString::new(uri).unwrap();
-                        ent.uri = xml_strdup(uri.as_ptr() as *const u8);
-                    } else {
-                        ent.uri = null_mut();
-                    }
+                    ent.uri = base
+                        .and_then(|base| build_uri(system_id, &base))
+                        .map(|base| base.into_boxed_str());
                 }
             }
         } else {

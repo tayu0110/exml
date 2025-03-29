@@ -1,6 +1,6 @@
-//! Provide methods and data structures for handling XML entities.  
-//! This module is based on `libxml/entities.h`, `entities.c`, and so on in `libxml2-v2.11.8`.
+//! Provide methods and data structures for handling XML entities.
 //!
+//! This module is based on `libxml/entities.h`, `entities.c`, and so on in `libxml2-v2.11.8`.  
 //! Please refer to original libxml2 documents also.
 
 // Copyright of the original code is the following.
@@ -123,7 +123,7 @@ pub struct XmlEntity {
     // unused
     pub(crate) nexte: Option<XmlEntityPtr>,
     // the full URI as computed
-    pub(crate) uri: *mut u8,
+    pub(crate) uri: Option<Box<str>>,
     // does the entity own the childrens
     pub(crate) owner: i32,
     // various flags
@@ -261,7 +261,7 @@ impl Default for XmlEntity {
             external_id: null_mut(),
             system_id: null_mut(),
             nexte: Default::default(),
-            uri: null_mut(),
+            uri: None,
             owner: Default::default(),
             flags: Default::default(),
             expanded_size: Default::default(),
@@ -375,7 +375,7 @@ unsafe fn xml_create_entity(
             ret.content = null_mut();
         }
         // to be computed by the layer knowing the defining entity
-        ret.uri = null_mut();
+        ret.uri = None;
         ret.orig = null_mut();
         ret.owner = 0;
 
@@ -471,10 +471,6 @@ unsafe fn xml_free_entity(mut entity: XmlEntityPtr) {
         if !entity.system_id.is_null() {
             xml_free(entity.system_id as _);
             entity.system_id = null_mut();
-        }
-        if !entity.uri.is_null() {
-            xml_free(entity.uri as _);
-            entity.uri = null_mut();
         }
         if !entity.content.is_null() {
             xml_free(entity.content as _);
@@ -662,7 +658,7 @@ thread_local! {
         external_id: null_mut(),
         system_id: null_mut(),
         nexte: None,
-        uri: null_mut(),
+        uri: None,
         owner: 0,
         flags: 0,
         expanded_size: 0,
@@ -684,7 +680,7 @@ thread_local! {
         external_id: null_mut(),
         system_id: null_mut(),
         nexte: None,
-        uri: null_mut(),
+        uri: None,
         owner: 0,
         flags: 0,
         expanded_size: 0,
@@ -706,7 +702,7 @@ thread_local! {
         external_id: null_mut(),
         system_id: null_mut(),
         nexte: None,
-        uri: null_mut(),
+        uri: None,
         owner: 0,
         flags: 0,
         expanded_size: 0,
@@ -728,7 +724,7 @@ thread_local! {
         external_id: null_mut(),
         system_id: null_mut(),
         nexte: None,
-        uri: null_mut(),
+        uri: None,
         owner: 0,
         flags: 0,
         expanded_size: 0,
@@ -750,7 +746,7 @@ thread_local! {
         external_id: null_mut(),
         system_id: null_mut(),
         nexte: None,
-        uri: null_mut(),
+        uri: None,
         owner: 0,
         flags: 0,
         expanded_size: 0,
@@ -1338,9 +1334,7 @@ unsafe fn xml_copy_entity(ent: XmlEntityPtr) -> Option<XmlEntityPtr> {
         if !ent.orig.is_null() {
             cur.orig = xml_strdup(ent.orig);
         }
-        if !ent.uri.is_null() {
-            cur.uri = xml_strdup(ent.uri);
-        }
+        cur.uri = ent.uri.clone();
         Some(cur)
     }
 }

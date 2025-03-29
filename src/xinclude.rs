@@ -45,7 +45,7 @@ use crate::{
             xml_load_external_entity, xml_parse_document,
         },
         parser_internals::xml_string_current_char,
-        xmlstring::{XmlChar, xml_str_equal, xml_strdup},
+        xmlstring::{XmlChar, xml_str_equal},
         xpointer::{xml_xptr_eval, xml_xptr_new_context},
     },
     parser::{xml_free_parser_ctxt, xml_new_parser_ctxt},
@@ -793,9 +793,7 @@ impl XmlXIncludeCtxt {
                     .as_deref(),
             );
             if let Some(mut ret) = ret {
-                if !ent.uri.is_null() {
-                    ret.uri = xml_strdup(ent.uri);
-                }
+                ret.uri = ent.uri.clone();
                 return;
             }
 
