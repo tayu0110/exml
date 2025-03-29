@@ -46,7 +46,7 @@ use std::{
     any::type_name,
     borrow::Cow,
     cell::RefCell,
-    ffi::{CStr, CString, c_char, c_void},
+    ffi::{CStr, c_char, c_void},
     io::Read,
     mem::take,
     ptr::{addr_of_mut, null, null_mut},
@@ -81,16 +81,13 @@ use crate::{
         xml_default_external_entity_loader, xml_no_net_exists, xml_parser_get_directory,
     },
     libxml::{
-        dict::{__xml_initialize_dict, xml_cleanup_dict_internal, xml_dict_free, xml_dict_lookup},
+        dict::{__xml_initialize_dict, xml_cleanup_dict_internal, xml_dict_free},
         globals::{
-            xml_cleanup_globals_internal, xml_default_sax_locator, xml_free,
-            xml_init_globals_internal,
+            xml_cleanup_globals_internal, xml_default_sax_locator, xml_init_globals_internal,
         },
         htmlparser::{__html_parse_content, HtmlParserOption, html_create_memory_parser_ctxt},
         parser_internals::{
-            XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH, xml_parse_content,
-            xml_parse_content_internal, xml_parse_element_end, xml_parse_misc, xml_parse_name,
-            xml_parse_nmtoken, xml_parse_reference,
+            xml_parse_content, xml_parse_content_internal, xml_parse_misc, xml_parse_reference,
         },
         valid::xml_validate_root,
         xmlmemory::{xml_cleanup_memory_internal, xml_init_memory_internal},
@@ -98,27 +95,27 @@ use crate::{
         xmlstring::XmlChar,
     },
     parser::{
-        __xml_err_encoding, XmlParserCharValid, XmlParserCtxtPtr, XmlParserInput, check_cdata_push,
-        parse_char_data_internal, parse_comment, parse_doctypedecl, parse_element_start,
-        parse_internal_subset, parse_lookup_char, parse_lookup_char_data, parse_pi,
-        parse_start_tag, parse_start_tag2, parse_text_decl, parse_xmldecl,
-        xml_create_entity_parser_ctxt_internal, xml_create_memory_parser_ctxt, xml_err_memory,
-        xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str,
-        xml_free_parser_ctxt, xml_new_sax_parser_ctxt, xml_ns_err,
+        __xml_err_encoding, XmlParserCtxtPtr, XmlParserInput, check_cdata_push,
+        parse_char_data_internal, parse_comment, parse_doctypedecl, parse_element_end,
+        parse_element_start, parse_end_tag1, parse_end_tag2, parse_internal_subset,
+        parse_lookup_char, parse_lookup_char_data, parse_pi, parse_start_tag, parse_start_tag2,
+        parse_text_decl, parse_xmldecl, xml_create_entity_parser_ctxt_internal,
+        xml_create_memory_parser_ctxt, xml_err_memory, xml_fatal_err, xml_fatal_err_msg,
+        xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str, xml_free_parser_ctxt,
+        xml_new_sax_parser_ctxt,
     },
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlAttributeDefault, XmlAttributeType, XmlDocProperties,
         XmlDocPtr, XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr,
-        XmlEntityType, XmlEnumeration, XmlGenericNodePtr, XmlNodePtr, xml_build_qname,
-        xml_free_doc, xml_free_node, xml_free_node_list, xml_new_doc, xml_new_doc_comment,
-        xml_new_doc_node, xml_new_dtd,
+        XmlEntityType, XmlEnumeration, XmlGenericNodePtr, XmlNodePtr, xml_free_doc, xml_free_node,
+        xml_free_node_list, xml_new_doc, xml_new_doc_comment, xml_new_doc_node, xml_new_dtd,
     },
     uri::canonic_path,
     xpath::xml_init_xpath_internal,
 };
 
 use super::{
-    chvalid::{xml_is_blank_char, xml_is_char},
+    chvalid::xml_is_blank_char,
     threads::{
         __xml_global_init_mutex_lock, __xml_global_init_mutex_unlock, xml_cleanup_threads_internal,
         xml_init_threads_internal,
@@ -2517,228 +2514,6 @@ unsafe fn xml_parse_lookup_gt(ctxt: XmlParserCtxtPtr) -> i32 {
     }
 }
 
-unsafe fn xml_parse_ncname_complex(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
-    unsafe {
-        let mut len: i32 = 0;
-        let mut l: i32 = 0;
-        let max_length: i32 = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
-            XML_MAX_TEXT_LENGTH as i32
-        } else {
-            XML_MAX_NAME_LENGTH as i32
-        };
-
-        // Handler for more complex cases
-        let start_position: size_t = (*ctxt).current_ptr().offset_from((*ctxt).base_ptr()) as _;
-        let Some(mut c) = (*ctxt).current_char(&mut l) else {
-            return null_mut();
-        };
-        if c == ' '
-        || c == '>'
-        || c == '/' /* accelerators */
-        || (!c.is_name_start_char(&*ctxt) || c == ':')
-        {
-            return null_mut();
-        }
-
-        while c != ' '
-        && c != '>'
-        && c != '/' /* test bigname.xml */
-        && (c.is_name_char(&*ctxt) && c != ':')
-        {
-            if len <= i32::MAX - l {
-                len += l;
-            }
-            (*ctxt).advance_with_line_handling(l as usize);
-            c = (*ctxt).current_char(&mut l).unwrap_or('\0');
-        }
-        if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-            return null_mut();
-        }
-        if len > max_length {
-            xml_fatal_err(
-                &mut *ctxt,
-                XmlParserErrors::XmlErrNameTooLong,
-                Some("NCName"),
-            );
-            return null_mut();
-        }
-        xml_dict_lookup((*ctxt).dict, (*ctxt).base_ptr().add(start_position), len)
-    }
-}
-
-/// Parse an XML name.
-///
-/// `[4NS] NCNameChar ::= Letter | Digit | '.' | '-' | '_' | CombiningChar | Extender`
-///
-/// `[5NS] NCName ::= (Letter | '_') (NCNameChar)*`
-///
-/// Returns the Name parsed or NULL
-#[doc(alias = "xmlParseNCName")]
-unsafe fn xml_parse_ncname(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
-    unsafe {
-        let mut input: *const XmlChar;
-
-        let ret: *const XmlChar;
-        let count: size_t;
-        let max_length: size_t = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
-            XML_MAX_TEXT_LENGTH
-        } else {
-            XML_MAX_NAME_LENGTH
-        };
-
-        // Accelerator for simple ASCII names
-        input = (*ctxt).input().unwrap().cur;
-        let e: *const XmlChar = (*ctxt).input().unwrap().end;
-        if ((*input >= 0x61 && *input <= 0x7A)
-            || (*input >= 0x41 && *input <= 0x5A)
-            || *input == b'_')
-            && input < e
-        {
-            input = input.add(1);
-            while ((*input >= 0x61 && *input <= 0x7A)
-                || (*input >= 0x41 && *input <= 0x5A)
-                || (*input >= 0x30 && *input <= 0x39)
-                || *input == b'_'
-                || *input == b'-'
-                || *input == b'.')
-                && input < e
-            {
-                input = input.add(1);
-            }
-            if input >= e {
-                return xml_parse_ncname_complex(ctxt);
-            }
-            if *input > 0 && *input < 0x80 {
-                count = input.offset_from((*ctxt).input().unwrap().cur) as _;
-                if count > max_length {
-                    xml_fatal_err(
-                        &mut *ctxt,
-                        XmlParserErrors::XmlErrNameTooLong,
-                        Some("NCName"),
-                    );
-                    return null_mut();
-                }
-                ret = xml_dict_lookup((*ctxt).dict, (*ctxt).input().unwrap().cur, count as _);
-                (*ctxt).input_mut().unwrap().cur = input;
-                (*ctxt).input_mut().unwrap().col += count as i32;
-                if ret.is_null() {
-                    xml_err_memory(ctxt, None);
-                }
-                return ret;
-            }
-        }
-        xml_parse_ncname_complex(ctxt)
-    }
-}
-
-/// Parse an XML Namespace QName
-///
-/// `[6]  QName  ::= (Prefix ':')? LocalPart`
-/// `[7]  Prefix  ::= NCName`
-/// `[8]  LocalPart  ::= NCName`
-///
-/// Returns the Name parsed or NULL
-#[doc(alias = "xmlParseQName")]
-unsafe fn xml_parse_qname(ctxt: XmlParserCtxtPtr, prefix: *mut *const XmlChar) -> *const XmlChar {
-    unsafe {
-        let mut l: *const XmlChar;
-        let mut p: *const XmlChar;
-
-        (*ctxt).grow();
-        if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-            return null_mut();
-        }
-
-        l = xml_parse_ncname(ctxt);
-        if l.is_null() {
-            if (*ctxt).current_byte() == b':' {
-                l = xml_parse_name(ctxt);
-                if !l.is_null() {
-                    xml_ns_err!(
-                        ctxt,
-                        XmlParserErrors::XmlNsErrQname,
-                        "Failed to parse QName '{}'\n",
-                        CStr::from_ptr(l as *const i8).to_string_lossy()
-                    );
-                    *prefix = null_mut();
-                    return l;
-                }
-            }
-            return null_mut();
-        }
-        if (*ctxt).current_byte() == b':' {
-            (*ctxt).skip_char();
-            p = l;
-            l = xml_parse_ncname(ctxt);
-            if l.is_null() {
-                let tmp: *mut XmlChar;
-
-                if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-                    return null_mut();
-                }
-                xml_ns_err!(
-                    ctxt,
-                    XmlParserErrors::XmlNsErrQname,
-                    "Failed to parse QName '{}:'\n",
-                    CStr::from_ptr(p as *const i8).to_string_lossy()
-                );
-                l = xml_parse_nmtoken(ctxt);
-                if l.is_null() {
-                    if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-                        return null_mut();
-                    }
-                    tmp = xml_build_qname(c"".as_ptr() as _, p, null_mut(), 0);
-                } else {
-                    tmp = xml_build_qname(l, p, null_mut(), 0);
-                    xml_free(l as _);
-                }
-                p = xml_dict_lookup((*ctxt).dict, tmp, -1);
-                if !tmp.is_null() {
-                    xml_free(tmp as _);
-                }
-                *prefix = null_mut();
-                return p;
-            }
-            if (*ctxt).current_byte() == b':' {
-                let mut tmp: *mut XmlChar;
-
-                xml_ns_err!(
-                    ctxt,
-                    XmlParserErrors::XmlNsErrQname,
-                    "Failed to parse QName '{}:{}:'\n",
-                    CStr::from_ptr(p as *const i8).to_string_lossy(),
-                    CStr::from_ptr(l as *const i8).to_string_lossy()
-                );
-                (*ctxt).skip_char();
-                tmp = xml_parse_name(ctxt) as _;
-                if !tmp.is_null() {
-                    tmp = xml_build_qname(tmp, l, null_mut(), 0);
-                    l = xml_dict_lookup((*ctxt).dict, tmp, -1);
-                    if !tmp.is_null() {
-                        xml_free(tmp as _);
-                    }
-                    *prefix = p;
-                    return l;
-                }
-                if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-                    return null_mut();
-                }
-                tmp = xml_build_qname(c"".as_ptr() as _, l, null_mut(), 0);
-                l = xml_dict_lookup((*ctxt).dict, tmp, -1);
-                if !tmp.is_null() {
-                    xml_free(tmp as _);
-                }
-                *prefix = p;
-                return l;
-            }
-            *prefix = p;
-        } else {
-            *prefix = null_mut();
-        }
-        l
-    }
-}
-
 // const XML_PARSER_BIG_ENTITY: usize = 1000;
 // const XML_PARSER_LOT_ENTITY: usize = 5000;
 
@@ -2753,246 +2528,6 @@ pub(crate) const XML_PARSER_ALLOWED_EXPANSION: usize = 1000000;
 // as well to protect, for example, against exponential expansion of empty
 // or very short entities.
 pub(crate) const XML_ENT_FIXED_COST: usize = 20;
-
-/// Parse an XML name and compares for match (specialized for endtag parsing)
-///
-/// Returns NULL for an illegal name, (XmlChar*) 1 for success
-/// and the name for mismatch
-#[doc(alias = "xmlParseNameAndCompare")]
-unsafe fn xml_parse_name_and_compare(
-    ctxt: XmlParserCtxtPtr,
-    other: *mut XmlChar,
-) -> *const XmlChar {
-    unsafe {
-        let mut cmp: *const XmlChar = other;
-        let mut input: *const XmlChar;
-
-        (*ctxt).grow();
-        if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-            return null_mut();
-        }
-
-        input = (*ctxt).input().unwrap().cur;
-        while *input != 0 && *input == *cmp {
-            input = input.add(1);
-            cmp = cmp.add(1);
-        }
-        if *cmp == 0 && (*input == b'>' || xml_is_blank_char(*input as u32)) {
-            // success
-            (*ctxt).input_mut().unwrap().col +=
-                input.offset_from((*ctxt).input().unwrap().cur) as i32;
-            (*ctxt).input_mut().unwrap().cur = input;
-            return 1 as *const XmlChar;
-        }
-        // failure (or end of input buffer), check with full function
-        let ret: *const XmlChar = xml_parse_name(ctxt);
-        // strings coming from the dictionary direct compare possible
-        if ret == other {
-            return 1 as *const XmlChar;
-        }
-        ret
-    }
-}
-
-/// Parse an XML name and compares for match
-/// (specialized for endtag parsing)
-///
-/// Returns NULL for an illegal name, (XmlChar*) 1 for success
-/// and the name for mismatch
-#[doc(alias = "xmlParseQNameAndCompare")]
-unsafe fn xml_parse_qname_and_compare(
-    ctxt: XmlParserCtxtPtr,
-    name: *mut XmlChar,
-    prefix: *mut XmlChar,
-) -> *const XmlChar {
-    unsafe {
-        let mut cmp: *const XmlChar;
-        let mut input: *const XmlChar;
-        let mut prefix2: *const XmlChar = null();
-
-        if prefix.is_null() {
-            return xml_parse_name_and_compare(ctxt, name);
-        }
-
-        (*ctxt).grow();
-        input = (*ctxt).input().unwrap().cur;
-
-        cmp = prefix;
-        while *input != 0 && *input == *cmp {
-            input = input.add(1);
-            cmp = cmp.add(1);
-        }
-        if *cmp == 0 && *input == b':' {
-            input = input.add(1);
-            cmp = name;
-            while *input != 0 && *input == *cmp {
-                input = input.add(1);
-                cmp = cmp.add(1);
-            }
-            if *cmp == 0 && (*input == b'>' || xml_is_blank_char(*input as u32)) {
-                // success
-                (*ctxt).input_mut().unwrap().col +=
-                    input.offset_from((*ctxt).input().unwrap().cur) as i32;
-                (*ctxt).input_mut().unwrap().cur = input;
-                return 1 as *const XmlChar;
-            }
-        }
-        // all strings coms from the dictionary, equality can be done directly
-        let ret: *const XmlChar = xml_parse_qname(ctxt, addr_of_mut!(prefix2));
-        if ret == name && prefix == prefix2 as _ {
-            return 1 as *const XmlChar;
-        }
-        ret
-    }
-}
-
-/// Parse an end tag. Always consumes '</'.
-///
-/// `[42] ETag ::= '</' Name S? '>'`
-///
-/// With namespace
-///
-/// `[NS 9] ETag ::= '</' QName S? '>'`
-#[doc(alias = "xmlParseEndTag2")]
-pub(crate) unsafe fn xml_parse_end_tag2(ctxt: XmlParserCtxtPtr, tag: &XmlStartTag) {
-    unsafe {
-        let mut name: *const XmlChar;
-
-        (*ctxt).grow();
-        if (*ctxt).current_byte() != b'<' || (*ctxt).nth_byte(1) != b'/' {
-            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrLtSlashRequired, None);
-            return;
-        }
-        (*ctxt).advance(2);
-
-        let context_name = (*ctxt).name.as_deref().unwrap();
-        let context_name = CString::new(context_name).unwrap();
-        if let Some(prefix) = tag.prefix.as_deref() {
-            let prefix = CString::new(prefix).unwrap();
-            name = xml_parse_qname_and_compare(
-                ctxt,
-                context_name.as_ptr() as *mut u8,
-                prefix.as_ptr() as _,
-            );
-        } else {
-            name = xml_parse_name_and_compare(ctxt, context_name.as_ptr() as *mut u8);
-        }
-
-        // We should definitely be at the ending "S? '>'" part
-        (*ctxt).grow();
-        if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-            return;
-        }
-        (*ctxt).skip_blanks();
-        if !xml_is_char((*ctxt).current_byte() as u32) || (*ctxt).current_byte() != b'>' {
-            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrGtRequired, None);
-        } else {
-            (*ctxt).advance(1);
-        }
-
-        // [ WFC: Element Type Match ]
-        // The Name in an element's end-tag must match the element type in the start-tag.
-        if name != 1 as *mut XmlChar {
-            if name.is_null() {
-                name = c"unparsable".as_ptr() as _;
-            }
-            xml_fatal_err_msg_str_int_str!(
-                ctxt,
-                XmlParserErrors::XmlErrTagNameMismatch,
-                "Opening and ending tag mismatch: {} line {} and {}\n",
-                (*ctxt).name.as_deref().unwrap(),
-                tag.line,
-                CStr::from_ptr(name as *const i8).to_string_lossy()
-            );
-        }
-
-        // SAX: End of Tag
-        if (*ctxt).disable_sax == 0 {
-            if let Some(end_element_ns) = (*ctxt)
-                .sax
-                .as_deref_mut()
-                .and_then(|sax| sax.end_element_ns)
-            {
-                end_element_ns(
-                    (*ctxt).user_data.clone(),
-                    (*ctxt).name.as_deref().unwrap(),
-                    tag.prefix.as_deref(),
-                    tag.uri.as_deref(),
-                );
-            }
-        }
-
-        (*ctxt).space_pop();
-        if tag.ns_nr != 0 {
-            (*ctxt).ns_pop(tag.ns_nr as usize);
-        }
-    }
-}
-
-/// Parse an end tag. Always consumes '</'.
-///
-/// `[42] ETag ::= '</' Name S? '>'`
-///
-/// With namespace
-///
-/// `[NS 9] ETag ::= '</' QName S? '>'`
-#[doc(alias = "xmlParseEndTag1")]
-#[cfg(feature = "sax1")]
-pub(crate) unsafe fn xml_parse_end_tag1(ctxt: XmlParserCtxtPtr, line: i32) {
-    unsafe {
-        let mut name: *const XmlChar;
-
-        (*ctxt).grow();
-        if (*ctxt).current_byte() != b'<' || (*ctxt).nth_byte(1) != b'/' {
-            xml_fatal_err_msg(
-                &mut *ctxt,
-                XmlParserErrors::XmlErrLtSlashRequired,
-                "xmlParseEndTag: '</' not found\n",
-            );
-            return;
-        }
-        (*ctxt).advance(2);
-
-        let context_name = (*ctxt).name.as_deref().unwrap();
-        let context_name = CString::new(context_name).unwrap();
-        name = xml_parse_name_and_compare(ctxt, context_name.as_ptr() as *mut u8);
-
-        // We should definitely be at the ending "S? '>'" part
-        (*ctxt).grow();
-        (*ctxt).skip_blanks();
-        if !xml_is_char((*ctxt).current_byte() as u32) || (*ctxt).current_byte() != b'>' {
-            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrGtRequired, None);
-        } else {
-            (*ctxt).advance(1);
-        }
-
-        // [ WFC: Element Type Match ]
-        // The Name in an element's end-tag must match the element type in the start-tag.
-        if name != 1 as *mut XmlChar {
-            if name.is_null() {
-                name = c"unparsable".as_ptr() as _;
-            }
-            xml_fatal_err_msg_str_int_str!(
-                ctxt,
-                XmlParserErrors::XmlErrTagNameMismatch,
-                "Opening and ending tag mismatch: {} line {} and {}\n",
-                (*ctxt).name.as_deref().unwrap(),
-                line,
-                CStr::from_ptr(name as *const i8).to_string_lossy()
-            );
-        }
-
-        // SAX: End of Tag
-        if (*ctxt).disable_sax == 0 {
-            if let Some(end_element) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.end_element) {
-                end_element((*ctxt).user_data.clone(), (*ctxt).name.as_deref().unwrap());
-            }
-        }
-
-        (*ctxt).name_pop();
-        (*ctxt).space_pop();
-    }
-}
 
 /// Check whether there's enough data in the input buffer to finish parsing the internal subset.
 #[doc(alias = "xmlParseLookupInternalSubset")]
@@ -3531,12 +3066,12 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                             return ret;
                         }
                         if (*ctxt).sax2 != 0 {
-                            xml_parse_end_tag2(ctxt, &(*ctxt).push_tab[(*ctxt).name_tab.len() - 1]);
+                            parse_end_tag2(&mut *ctxt);
                             (*ctxt).name_ns_pop();
                         } else {
                             #[cfg(feature = "sax1")]
                             {
-                                xml_parse_end_tag1(ctxt, 0);
+                                parse_end_tag1(&mut *ctxt, 0);
                             }
                         }
                         if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
@@ -4334,7 +3869,7 @@ pub(crate) unsafe fn xml_parse_element(ctxt: XmlParserCtxtPtr) {
             return;
         }
 
-        xml_parse_element_end(ctxt);
+        parse_element_end(&mut *ctxt);
     }
 }
 

@@ -29,32 +29,26 @@ use std::{
     str::from_utf8_unchecked,
 };
 
-use libc::{INT_MAX, memcpy};
-
 use crate::{
     encoding::XmlCharEncoding,
     error::XmlParserErrors,
     globals::GenericErrorContext,
     libxml::{
-        chvalid::{
-            xml_is_base_char, xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender,
-            xml_is_ideographic,
-        },
+        chvalid::{xml_is_base_char, xml_is_char, xml_is_ideographic},
         dict::{xml_dict_free, xml_dict_lookup},
-        globals::{xml_free, xml_malloc_atomic, xml_realloc},
         parser::{
-            XML_SKIP_IDS, XmlParserInputState, XmlParserMode, XmlParserOption, xml_parse_end_tag1,
-            xml_parse_end_tag2, xml_parse_external_entity_private,
+            XML_SKIP_IDS, XmlParserInputState, XmlParserMode, XmlParserOption,
+            xml_parse_external_entity_private,
         },
         sax2::xml_sax2_get_entity,
         valid::xml_validate_element,
-        xmlstring::{XmlChar, xml_strchr, xml_strndup},
+        xmlstring::{XmlChar, xml_strchr},
     },
     parser::{
-        __xml_err_encoding, XmlParserCharValid, XmlParserCtxtPtr, parse_cdsect,
-        parse_char_data_internal, parse_char_ref, parse_comment, parse_element_start, parse_name,
+        __xml_err_encoding, XmlParserCtxtPtr, parse_cdsect, parse_char_data_internal,
+        parse_char_ref, parse_comment, parse_element_end, parse_element_start, parse_name,
         parse_pi, parser_entity_check, xml_create_memory_parser_ctxt, xml_err_encoding_int,
-        xml_err_memory, xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_str,
+        xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_str,
         xml_fatal_err_msg_str_int_str, xml_free_parser_ctxt,
     },
     tree::{
@@ -114,30 +108,6 @@ pub const XML_MAX_NAMELEN: usize = 100;
 /// One of the point is providing context when reporting errors.
 pub const INPUT_CHUNK: usize = 250;
 
-macro_rules! COPY_BUF {
-    ($l:expr, $b:expr, $i:expr, $v:expr) => {
-        if $l == 1 {
-            *$b.add($i as usize) = $v as _;
-            $i += 1;
-        } else {
-            $i =
-                ($i as usize + xml_copy_char_multi_byte($b.add($i as usize), $v as _) as usize) as _
-        }
-    };
-}
-
-macro_rules! NEXTL {
-    ($ctxt:expr, $l:expr) => {
-        if *(*(*$ctxt).input().unwrap()).cur == b'\n' {
-            (*(*$ctxt).input_mut().unwrap()).line += 1;
-            (*(*$ctxt).input_mut().unwrap()).col = 1;
-        } else {
-            (*(*$ctxt).input_mut().unwrap()).col += 1;
-        }
-        (*(*$ctxt).input_mut().unwrap()).cur = (*(*$ctxt).input().unwrap()).cur.add($l as usize);
-    };
-}
-
 /// Global variables used for predefined strings.
 pub static XML_STRING_TEXT: &CStr = c"text";
 pub static XML_STRING_TEXT_NOENC: &CStr = c"textnoenc";
@@ -155,300 +125,7 @@ pub(crate) const XML_VCTXT_DTD_VALIDATED: usize = 1usize << 0;
 /// Set if the validation context is part of a parser context.
 pub(crate) const XML_VCTXT_USE_PCTXT: usize = 1usize << 1;
 
-macro_rules! CUR_SCHAR {
-    ($ctxt:expr, $s:expr, $l:expr) => {
-        xml_string_current_char($ctxt, $s, addr_of_mut!($l))
-    };
-}
-
-unsafe fn xml_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
-    unsafe {
-        let mut len: i32 = 0;
-        let mut l: i32 = 0;
-        let max_length: i32 = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
-            XML_MAX_TEXT_LENGTH as i32
-        } else {
-            XML_MAX_NAME_LENGTH as i32
-        };
-
-        // Handler for more complex cases
-        let c = (*ctxt).current_char(&mut l).unwrap_or('\0');
-        if (*ctxt).options & XmlParserOption::XmlParseOld10 as i32 == 0 {
-            // Use the new checks of production [4] [4a] amd [5] of the
-            // Update 5 of XML-1.0
-            if c == ' '
-            || c == '>'
-            || c == '/' /* accelerators */
-            || (!(c.is_ascii_lowercase()
-                || c.is_ascii_uppercase()
-                || c == '_'
-                || c == ':'
-                || ('\u{C0}'..='\u{D6}').contains(&c)
-                || ('\u{D8}'..='\u{F6}').contains(&c)
-                || ('\u{F8}'..='\u{2FF}').contains(&c)
-                || ('\u{370}'..='\u{37D}').contains(&c)
-                || ('\u{37F}'..='\u{1FFF}').contains(&c)
-                || ('\u{200C}'..='\u{200D}').contains(&c)
-                || ('\u{2070}'..='\u{218F}').contains(&c)
-                || ('\u{2C00}'..='\u{2FEF}').contains(&c)
-                || ('\u{3001}'..='\u{D7FF}').contains(&c)
-                || ('\u{F900}'..='\u{FDCF}').contains(&c)
-                || ('\u{FDF0}'..='\u{FFFD}').contains(&c)
-                || ('\u{10000}'..='\u{EFFFF}').contains(&c)))
-            {
-                return null_mut();
-            }
-            len += l;
-            NEXTL!(ctxt, l);
-            let mut c = (*ctxt).current_char(&mut l).unwrap_or('\0');
-            while c != ' '
-                && c != '>'
-                && c != '/'
-                && (c.is_ascii_lowercase()
-                    || c.is_ascii_uppercase()
-                    || c.is_ascii_digit()
-                    || c == '_'
-                    || c == ':'
-                    || c == '-'
-                    || c == '.'
-                    || c == '\u{B7}'
-                    || ('\u{C0}'..='\u{D6}').contains(&c)
-                    || ('\u{D8}'..='\u{F6}').contains(&c)
-                    || ('\u{F8}'..='\u{2FF}').contains(&c)
-                    || ('\u{300}'..='\u{36F}').contains(&c)
-                    || ('\u{370}'..='\u{37D}').contains(&c)
-                    || ('\u{37F}'..='\u{1FFF}').contains(&c)
-                    || ('\u{200C}'..='\u{200D}').contains(&c)
-                    || ('\u{203F}'..='\u{2040}').contains(&c)
-                    || ('\u{2070}'..='\u{218F}').contains(&c)
-                    || ('\u{2C00}'..='\u{2FEF}').contains(&c)
-                    || ('\u{3001}'..='\u{D7FF}').contains(&c)
-                    || ('\u{F900}'..='\u{FDCF}').contains(&c)
-                    || ('\u{FDF0}'..='\u{FFFD}').contains(&c)
-                    || ('\u{10000}'..='\u{EFFFF}').contains(&c))
-            {
-                if len <= INT_MAX - l {
-                    len += l;
-                }
-                NEXTL!(ctxt, l);
-                c = (*ctxt).current_char(&mut l).unwrap_or('\0');
-            }
-        } else {
-            if c == ' '
-            || c == '>'
-            || c == '/' /* accelerators */
-            || (!xml_is_letter(c as u32) && c != '_' && c != ':')
-            {
-                return null_mut();
-            }
-            len += l;
-            NEXTL!(ctxt, l);
-
-            let mut c = (*ctxt).current_char(&mut l).unwrap_or('\0');
-            while c != ' '
-            && c != '>'
-            && c != '/' /* test bigname.xml */
-            && (xml_is_letter(c as u32)
-                || xml_is_digit(c as u32)
-                || c == '.'
-                || c == '-'
-                || c == '_'
-                || c == ':'
-                || xml_is_combining(c as u32)
-                || xml_is_extender(c as u32))
-            {
-                if len <= INT_MAX - l {
-                    len += l;
-                }
-                NEXTL!(ctxt, l);
-                c = (*ctxt).current_char(&mut l).unwrap_or('\0');
-            }
-        }
-        if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-            return null_mut();
-        }
-        if len > max_length {
-            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrNameTooLong, Some("Name"));
-            return null_mut();
-        }
-        if (*ctxt).input().unwrap().offset_from_base() < len as usize {
-            // There were a couple of bugs where PERefs lead to to a change
-            // of the buffer. Check the buffer size to avoid passing an invalid
-            // pointer to xmlDictLookup.
-            xml_fatal_err(
-                &mut *ctxt,
-                XmlParserErrors::XmlErrInternalError,
-                Some("unexpected change of input buffer"),
-            );
-            return null_mut();
-        }
-        if *(*ctxt).input().unwrap().cur == b'\n' && *(*ctxt).input().unwrap().cur.sub(1) == b'\r' {
-            return xml_dict_lookup(
-                (*ctxt).dict,
-                (*ctxt).input().unwrap().cur.sub(len as usize + 1),
-                len,
-            );
-        }
-        xml_dict_lookup(
-            (*ctxt).dict,
-            (*ctxt).input().unwrap().cur.sub(len as usize),
-            len,
-        )
-    }
-}
-
-/// Parse an XML name.
-///
-/// `[4] NameChar ::= Letter | Digit | '.' | '-' | '_' | ':' | CombiningChar | Extender`
-///
-/// `[5] Name ::= (Letter | '_' | ':') (NameChar)*`
-///
-/// `[6] Names ::= Name (#x20 Name)*`
-///
-/// Returns the Name parsed or NULL
-#[doc(alias = "xmlParseName")]
-pub(crate) unsafe fn xml_parse_name(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
-    unsafe {
-        let mut input: *const XmlChar;
-        let ret: *const XmlChar;
-        let count: usize;
-        let max_length: usize = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
-            XML_MAX_TEXT_LENGTH
-        } else {
-            XML_MAX_NAME_LENGTH
-        };
-
-        (*ctxt).grow();
-        if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-            return null_mut();
-        }
-
-        // Accelerator for simple ASCII names
-        input = (*ctxt).input().unwrap().cur;
-        if (*input >= 0x61 && *input <= 0x7A)
-            || (*input >= 0x41 && *input <= 0x5A)
-            || *input == b'_'
-            || *input == b':'
-        {
-            input = input.add(1);
-            while (*input >= 0x61 && *input <= 0x7A)
-                || (*input >= 0x41 && *input <= 0x5A)
-                || (*input >= 0x30 && *input <= 0x39)
-                || *input == b'_'
-                || *input == b'-'
-                || *input == b':'
-                || *input == b'.'
-            {
-                input = input.add(1);
-            }
-            if *input > 0 && *input < 0x80 {
-                count = input.offset_from((*ctxt).input().unwrap().cur) as _;
-                if count > max_length {
-                    xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrNameTooLong, Some("Name"));
-                    return null_mut();
-                }
-                ret = xml_dict_lookup((*ctxt).dict, (*ctxt).input().unwrap().cur, count as i32);
-                (*ctxt).input_mut().unwrap().cur = input;
-                (*ctxt).input_mut().unwrap().col += count as i32;
-                if ret.is_null() {
-                    xml_err_memory(ctxt, None);
-                }
-                return ret;
-            }
-        }
-        /* accelerator for special cases */
-        xml_parse_name_complex(ctxt)
-    }
-}
-
 const XML_PARSER_BUFFER_SIZE: usize = 100;
-
-/// Parse an XML Nmtoken.
-///
-/// `[7] Nmtoken ::= (NameChar)+`
-///
-/// `[8] Nmtokens ::= Nmtoken (#x20 Nmtoken)*`
-///
-/// Returns the Nmtoken parsed or NULL
-#[doc(alias = "xmlParseNmtoken")]
-pub(crate) unsafe fn xml_parse_nmtoken(ctxt: XmlParserCtxtPtr) -> *mut XmlChar {
-    unsafe {
-        let mut buf: [XmlChar; XML_MAX_NAMELEN + 5] = [0; XML_MAX_NAMELEN + 5];
-        let mut len: i32 = 0;
-        let mut l: i32 = 0;
-        let max_length: i32 = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
-            XML_MAX_TEXT_LENGTH as i32
-        } else {
-            XML_MAX_NAME_LENGTH as i32
-        };
-
-        let mut c = (*ctxt).current_char(&mut l).unwrap_or('\0');
-        while c.is_name_char(&*ctxt) {
-            COPY_BUF!(l, buf.as_mut_ptr(), len, c);
-            NEXTL!(ctxt, l);
-            c = (*ctxt).current_char(&mut l).unwrap_or('\0');
-            if len >= XML_MAX_NAMELEN as i32 {
-                // Okay someone managed to make a huge token, so he's ready to pay
-                // for the processing speed.
-                let mut buffer: *mut XmlChar;
-                let mut max: i32 = len * 2;
-
-                buffer = xml_malloc_atomic(max as usize) as *mut XmlChar;
-                if buffer.is_null() {
-                    xml_err_memory(ctxt, None);
-                    return null_mut();
-                }
-                memcpy(buffer as _, buf.as_ptr() as _, len as usize);
-                while c.is_name_char(&*ctxt) {
-                    if len + 10 > max {
-                        max *= 2;
-                        let tmp: *mut XmlChar =
-                            xml_realloc(buffer as _, max as usize) as *mut XmlChar;
-                        if tmp.is_null() {
-                            xml_err_memory(ctxt, None);
-                            xml_free(buffer as _);
-                            return null_mut();
-                        }
-                        buffer = tmp;
-                    }
-                    COPY_BUF!(l, buffer, len, c);
-                    if len > max_length {
-                        xml_fatal_err(
-                            &mut *ctxt,
-                            XmlParserErrors::XmlErrNameTooLong,
-                            Some("NmToken"),
-                        );
-                        xml_free(buffer as _);
-                        return null_mut();
-                    }
-                    NEXTL!(ctxt, l);
-                    c = (*ctxt).current_char(&mut l).unwrap_or('\0');
-                }
-                *buffer.add(len as usize) = 0;
-                if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-                    xml_free(buffer as _);
-                    return null_mut();
-                }
-                return buffer;
-            }
-        }
-        if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-            return null_mut();
-        }
-        if len == 0 {
-            return null_mut();
-        }
-        if len > max_length {
-            xml_fatal_err(
-                &mut *ctxt,
-                XmlParserErrors::XmlErrNameTooLong,
-                Some("NmToken"),
-            );
-            return null_mut();
-        }
-        xml_strndup(buf.as_ptr() as _, len)
-    }
-}
 
 // #[doc(alias = "xmlParseCharData")]
 // pub(crate) unsafe fn xml_parse_char_data(ctxt: XmlParserCtxtPtr, _cdata: i32) {
@@ -1342,43 +1019,6 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
     }
 }
 
-/// Parse the end of an XML element. Always consumes '</'.
-#[doc(alias = "xmlParseElementEnd")]
-pub(crate) unsafe fn xml_parse_element_end(ctxt: XmlParserCtxtPtr) {
-    unsafe {
-        let cur = (*ctxt).node;
-
-        if (*ctxt).name_tab.is_empty() {
-            if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1) == b'/' {
-                (*ctxt).advance(2);
-            }
-            return;
-        }
-
-        // parse the end of tag: '</' should be here.
-        if (*ctxt).sax2 != 0 {
-            xml_parse_end_tag2(ctxt, &(*ctxt).push_tab[(*ctxt).name_tab.len() - 1]);
-            (*ctxt).name_pop();
-        } else {
-            #[cfg(feature = "sax1")]
-            {
-                xml_parse_end_tag1(ctxt, 0);
-            }
-        }
-
-        // Capture end position
-        if let Some(cur) = cur {
-            if (*ctxt).record_info != 0 {
-                if let Some(node_info) = (*ctxt).find_node_info(cur) {
-                    node_info.borrow_mut().end_pos = (*ctxt).input().unwrap().consumed
-                        + (*ctxt).input().unwrap().offset_from_base() as u64;
-                    node_info.borrow_mut().end_line = (*ctxt).input().unwrap().line as _;
-                }
-            }
-        }
-    }
-}
-
 /// Parse a content sequence. Stops at EOF or '</'. Leaves checking of unexpected EOF to the caller.
 #[doc(alias = "xmlParseContentInternal")]
 pub(crate) unsafe fn xml_parse_content_internal(ctxt: XmlParserCtxtPtr) {
@@ -1415,7 +1055,7 @@ pub(crate) unsafe fn xml_parse_content_internal(ctxt: XmlParserCtxtPtr) {
                     if (*ctxt).name_tab.len() <= name_nr {
                         break;
                     }
-                    xml_parse_element_end(ctxt);
+                    parse_element_end(&mut *ctxt);
                 } else {
                     parse_element_start(&mut *ctxt);
                 }
