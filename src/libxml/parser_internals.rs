@@ -45,11 +45,10 @@ use crate::{
         xmlstring::{XmlChar, xml_strchr},
     },
     parser::{
-        __xml_err_encoding, XmlParserCtxtPtr, parse_cdsect, parse_char_data_internal,
-        parse_char_ref, parse_comment, parse_element_end, parse_element_start, parse_name,
-        parse_pi, parser_entity_check, xml_create_memory_parser_ctxt, xml_err_encoding_int,
-        xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_str,
-        xml_fatal_err_msg_str_int_str, xml_free_parser_ctxt,
+        __xml_err_encoding, XmlParserCtxtPtr, parse_char_ref, parse_comment, parse_content,
+        parse_name, parse_pi, parser_entity_check, xml_create_memory_parser_ctxt,
+        xml_err_encoding_int, xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg,
+        xml_fatal_err_msg_str, xml_free_parser_ctxt,
     },
     tree::{
         NodeCommon, XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
@@ -463,7 +462,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
         (*ctxt).atts_default = take(&mut (*oldctxt).atts_default);
         (*ctxt).atts_special = (*oldctxt).atts_special;
 
-        xml_parse_content(ctxt);
+        parse_content(&mut *ctxt);
         if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1) == b'/' {
             xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrNotWellBalanced, None);
         } else if (*ctxt).current_byte() != 0 {
@@ -1015,89 +1014,6 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 (*ctxt).nodemem = 0;
                 (*ctxt).nodelen = 0;
             }
-        }
-    }
-}
-
-/// Parse a content sequence. Stops at EOF or '</'. Leaves checking of unexpected EOF to the caller.
-#[doc(alias = "xmlParseContentInternal")]
-pub(crate) unsafe fn xml_parse_content_internal(ctxt: XmlParserCtxtPtr) {
-    unsafe {
-        let name_nr = (*ctxt).name_tab.len();
-
-        (*ctxt).grow();
-        while (*ctxt).current_byte() != 0
-            && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
-        {
-            let cur: *const XmlChar = (*ctxt).input().unwrap().cur;
-
-            // First case : a Processing Instruction.
-            if *cur == b'<' && *cur.add(1) == b'?' {
-                parse_pi(&mut *ctxt);
-            }
-            // Second case : a CDSection
-            // 2.6.0 test was *cur not RAW
-            else if (*ctxt).content_bytes().starts_with(b"<![CDATA[") {
-                parse_cdsect(&mut *ctxt);
-            }
-            // Third case :  a comment
-            else if *cur == b'<'
-                && NXT!(ctxt, 1) == b'!'
-                && NXT!(ctxt, 2) == b'-'
-                && NXT!(ctxt, 3) == b'-'
-            {
-                parse_comment(&mut *ctxt);
-                (*ctxt).instate = XmlParserInputState::XmlParserContent;
-            }
-            // Fourth case :  a sub-element.
-            else if *cur == b'<' {
-                if NXT!(ctxt, 1) == b'/' {
-                    if (*ctxt).name_tab.len() <= name_nr {
-                        break;
-                    }
-                    parse_element_end(&mut *ctxt);
-                } else {
-                    parse_element_start(&mut *ctxt);
-                }
-            }
-            // Fifth case : a reference. If if has not been resolved,
-            //    parsing returns it's Name, create the node
-            else if *cur == b'&' {
-                xml_parse_reference(ctxt);
-            }
-            // Last case, text. Note that References are handled directly.
-            else {
-                parse_char_data_internal(&mut *ctxt, 0);
-            }
-
-            (*ctxt).shrink();
-            (*ctxt).grow();
-        }
-    }
-}
-
-/// Parse a content sequence. Stops at EOF or '</'.
-///
-/// `[43] content ::= (element | CharData | Reference | CDSect | PI | Comment)*`
-#[doc(alias = "xmlParseContent")]
-pub unsafe fn xml_parse_content(ctxt: XmlParserCtxtPtr) {
-    unsafe {
-        let name_nr = (*ctxt).name_tab.len();
-
-        xml_parse_content_internal(ctxt);
-
-        if !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
-            && (*ctxt).name_tab.len() > name_nr
-        {
-            let name = &(*ctxt).name_tab[(*ctxt).name_tab.len() - 1];
-            let line: i32 = (*ctxt).push_tab[(*ctxt).name_tab.len() - 1].line;
-            xml_fatal_err_msg_str_int_str!(
-                ctxt,
-                XmlParserErrors::XmlErrTagNotFinished,
-                "Premature end of data in tag {} line {}\n",
-                name,
-                line
-            );
         }
     }
 }

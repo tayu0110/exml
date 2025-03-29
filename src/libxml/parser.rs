@@ -86,9 +86,7 @@ use crate::{
             xml_cleanup_globals_internal, xml_default_sax_locator, xml_init_globals_internal,
         },
         htmlparser::{__html_parse_content, HtmlParserOption, html_create_memory_parser_ctxt},
-        parser_internals::{
-            xml_parse_content, xml_parse_content_internal, xml_parse_misc, xml_parse_reference,
-        },
+        parser_internals::{xml_parse_misc, xml_parse_reference},
         valid::xml_validate_root,
         xmlmemory::{xml_cleanup_memory_internal, xml_init_memory_internal},
         xmlschemastypes::xml_schema_cleanup_types,
@@ -96,13 +94,12 @@ use crate::{
     },
     parser::{
         __xml_err_encoding, XmlParserCtxtPtr, XmlParserInput, check_cdata_push,
-        parse_char_data_internal, parse_comment, parse_doctypedecl, parse_element_end,
-        parse_element_start, parse_end_tag1, parse_end_tag2, parse_internal_subset,
-        parse_lookup_char, parse_lookup_char_data, parse_pi, parse_start_tag, parse_start_tag2,
-        parse_text_decl, parse_xmldecl, xml_create_entity_parser_ctxt_internal,
-        xml_create_memory_parser_ctxt, xml_err_memory, xml_fatal_err, xml_fatal_err_msg,
-        xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str, xml_free_parser_ctxt,
-        xml_new_sax_parser_ctxt,
+        parse_char_data_internal, parse_comment, parse_content, parse_doctypedecl, parse_element,
+        parse_end_tag1, parse_end_tag2, parse_internal_subset, parse_lookup_char,
+        parse_lookup_char_data, parse_pi, parse_start_tag, parse_start_tag2, parse_text_decl,
+        parse_xmldecl, xml_create_entity_parser_ctxt_internal, xml_create_memory_parser_ctxt,
+        xml_err_memory, xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_str,
+        xml_free_parser_ctxt, xml_new_sax_parser_ctxt,
     },
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlAttributeDefault, XmlAttributeType, XmlDocProperties,
@@ -916,7 +913,7 @@ pub unsafe fn xml_parse_document(ctxt: XmlParserCtxtPtr) -> i32 {
             );
         } else {
             (*ctxt).instate = XmlParserInputState::XmlParserContent;
-            xml_parse_element(ctxt);
+            parse_element(&mut *ctxt);
             (*ctxt).instate = XmlParserInputState::XmlParserEpilog;
 
             // The Misc part at the end
@@ -1044,7 +1041,7 @@ pub unsafe fn xml_parse_ext_parsed_ent(ctxt: XmlParserCtxtPtr) -> i32 {
         (*ctxt).loadsubset = 0;
         (*ctxt).depth = 0;
 
-        xml_parse_content(ctxt);
+        parse_content(&mut *ctxt);
         if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
             return -1;
         }
@@ -1854,12 +1851,12 @@ pub unsafe fn xml_parse_in_node_context(
             if doc.typ == XmlElementType::XmlHTMLDocumentNode {
                 __html_parse_content(ctxt as _);
             } else {
-                xml_parse_content(ctxt);
+                parse_content(&mut *ctxt);
             }
         }
         #[cfg(not(feature = "html"))]
         {
-            xml_parse_content(ctxt);
+            parse_content(&mut *ctxt);
         }
 
         (*ctxt).ns_pop(nsnr);
@@ -2014,10 +2011,10 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
 
         if let Some(mut doc) = doc {
             let content = doc.children.take();
-            xml_parse_content(ctxt);
+            parse_content(&mut *ctxt);
             doc.children = content;
         } else {
-            xml_parse_content(ctxt);
+            parse_content(&mut *ctxt);
         }
         if (*ctxt).current_byte() == b'<' && (*ctxt).nth_byte(1) == b'/' {
             xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrNotWellBalanced, None);
@@ -2215,7 +2212,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
             (*ctxt).loadsubset = 0;
         }
 
-        xml_parse_content(ctxt);
+        parse_content(&mut *ctxt);
 
         if (*ctxt).current_byte() == b'<' && (*ctxt).nth_byte(1) == b'/' {
             xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrNotWellBalanced, None);
@@ -3835,41 +3832,6 @@ pub fn xml_has_feature(feature: Option<XmlFeature>) -> bool {
         //   xmlFeature::XML_WITH_LZMA => {}
         //   xmlFeature::XML_WITH_ICU => {}
         _ => false,
-    }
-}
-
-/// parse an XML element
-///
-/// `[39] element ::= EmptyElemTag | STag content ETag`
-///
-/// `[ WFC: Element Type Match ]`
-/// The Name in an element's end-tag must match the element type in the start-tag.
-#[doc(alias = "xmlParseElement")]
-pub(crate) unsafe fn xml_parse_element(ctxt: XmlParserCtxtPtr) {
-    unsafe {
-        if parse_element_start(&mut *ctxt) != 0 {
-            return;
-        }
-
-        xml_parse_content_internal(ctxt);
-        if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-            return;
-        }
-
-        if (*ctxt).current_byte() == 0 {
-            let name = &(*ctxt).name_tab[(*ctxt).name_tab.len() - 1];
-            let line: i32 = (*ctxt).push_tab[(*ctxt).name_tab.len() - 1].line;
-            xml_fatal_err_msg_str_int_str!(
-                ctxt,
-                XmlParserErrors::XmlErrTagNotFinished,
-                "Premature end of data in tag {} line {}\n",
-                name,
-                line
-            );
-            return;
-        }
-
-        parse_element_end(&mut *ctxt);
     }
 }
 
