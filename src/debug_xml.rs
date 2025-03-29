@@ -710,10 +710,8 @@ impl XmlDebugCtxt<'_> {
                         writeln!(self.output, ", predefined").ok();
                     }
                 }
-                if !ent.external_id.is_null() {
+                if let Some(external_id) = ent.external_id.as_deref() {
                     self.dump_spaces();
-                    let external_id =
-                        CStr::from_ptr(ent.external_id as *const i8).to_string_lossy();
                     writeln!(self.output, " ExternalID={external_id}").ok();
                 }
                 if !ent.system_id.is_null() {
@@ -837,10 +835,8 @@ impl XmlDebugCtxt<'_> {
                     }
                 }
                 writeln!(self.output, "{}", ent.name().unwrap()).ok();
-                if !ent.external_id.is_null() {
+                if let Some(external_id) = ent.external_id.as_deref() {
                     self.dump_spaces();
-                    let external_id =
-                        CStr::from_ptr(ent.external_id as *const i8).to_string_lossy();
                     writeln!(self.output, "ExternalID={external_id}").ok();
                 }
                 if !ent.system_id.is_null() {
@@ -1359,9 +1355,7 @@ impl XmlDebugCtxt<'_> {
                         );
                     }
                 }
-                if !cur.external_id.is_null() {
-                    let external_id =
-                        CStr::from_ptr(cur.external_id as *const i8).to_string_lossy();
+                if let Some(external_id) = cur.external_id.as_deref() {
                     write!(self.output, "ID \"{external_id}\"").ok();
                 }
                 if !cur.system_id.is_null() {

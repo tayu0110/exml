@@ -116,7 +116,7 @@ pub struct XmlEntity {
     // The entity type
     pub(crate) etype: XmlEntityType,
     // External identifier for PUBLIC
-    pub(crate) external_id: *mut u8,
+    pub(crate) external_id: Option<Box<str>>,
     // URI for a SYSTEM or PUBLIC Entity
     pub(crate) system_id: *mut u8,
 
@@ -258,7 +258,7 @@ impl Default for XmlEntity {
             content: null_mut(),
             length: Default::default(),
             etype: Default::default(),
-            external_id: null_mut(),
+            external_id: None,
             system_id: null_mut(),
             nexte: Default::default(),
             uri: None,
@@ -359,8 +359,7 @@ unsafe fn xml_create_entity(
 
         // fill the structure.
         if let Some(external_id) = external_id {
-            let external_id = CString::new(external_id).unwrap();
-            ret.external_id = xml_strdup(external_id.as_ptr() as *const u8);
+            ret.external_id = Some(external_id.to_owned().into_boxed_str());
         }
         if let Some(system_id) = system_id {
             let system_id = CString::new(system_id).unwrap();
@@ -463,10 +462,6 @@ unsafe fn xml_free_entity(mut entity: XmlEntityPtr) {
         if !entity.name.is_null() {
             xml_free(entity.name as _);
             entity.name = null_mut();
-        }
-        if !entity.external_id.is_null() {
-            xml_free(entity.external_id as _);
-            entity.external_id = null_mut();
         }
         if !entity.system_id.is_null() {
             xml_free(entity.system_id as _);
@@ -655,7 +650,7 @@ thread_local! {
         content: c"<".as_ptr() as _,
         length: 1,
         etype: XmlEntityType::XmlInternalPredefinedEntity,
-        external_id: null_mut(),
+        external_id: None,
         system_id: null_mut(),
         nexte: None,
         uri: None,
@@ -677,7 +672,7 @@ thread_local! {
         content: c">".as_ptr() as _,
         length: 1,
         etype: XmlEntityType::XmlInternalPredefinedEntity,
-        external_id: null_mut(),
+        external_id: None,
         system_id: null_mut(),
         nexte: None,
         uri: None,
@@ -699,7 +694,7 @@ thread_local! {
         content: c"&".as_ptr() as _,
         length: 1,
         etype: XmlEntityType::XmlInternalPredefinedEntity,
-        external_id: null_mut(),
+        external_id: None,
         system_id: null_mut(),
         nexte: None,
         uri: None,
@@ -721,7 +716,7 @@ thread_local! {
         content: c"\"".as_ptr() as _,
         length: 1,
         etype: XmlEntityType::XmlInternalPredefinedEntity,
-        external_id: null_mut(),
+        external_id: None,
         system_id: null_mut(),
         nexte: None,
         uri: None,
@@ -743,7 +738,7 @@ thread_local! {
         content: c"'".as_ptr() as _,
         length: 1,
         etype: XmlEntityType::XmlInternalPredefinedEntity,
-        external_id: null_mut(),
+        external_id: None,
         system_id: null_mut(),
         nexte: None,
         uri: None,
@@ -1322,9 +1317,7 @@ unsafe fn xml_copy_entity(ent: XmlEntityPtr) -> Option<XmlEntityPtr> {
         if !ent.name.is_null() {
             cur.name = xml_strdup(ent.name);
         }
-        if !ent.external_id.is_null() {
-            cur.external_id = xml_strdup(ent.external_id);
-        }
+        cur.external_id = ent.external_id.clone();
         if !ent.system_id.is_null() {
             cur.system_id = xml_strdup(ent.system_id);
         }
@@ -1474,15 +1467,9 @@ pub unsafe fn xml_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: XmlEnti
             }
             XmlEntityType::XmlExternalGeneralParsedEntity => {
                 write!(buf, "<!ENTITY {name}").ok();
-                if !ent.external_id.is_null() {
+                if let Some(external_id) = ent.external_id.as_deref() {
                     write!(buf, " PUBLIC ").ok();
-                    write_quoted(
-                        buf,
-                        CStr::from_ptr(ent.external_id as _)
-                            .to_string_lossy()
-                            .as_ref(),
-                    )
-                    .ok();
+                    write_quoted(buf, external_id).ok();
                     write!(buf, " ").ok();
                     write_quoted(
                         buf,
@@ -1505,15 +1492,9 @@ pub unsafe fn xml_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: XmlEnti
             }
             XmlEntityType::XmlExternalGeneralUnparsedEntity => {
                 write!(buf, "<!ENTITY {name}").ok();
-                if !ent.external_id.is_null() {
+                if let Some(external_id) = ent.external_id.as_deref() {
                     write!(buf, " PUBLIC ").ok();
-                    write_quoted(
-                        buf,
-                        CStr::from_ptr(ent.external_id as _)
-                            .to_string_lossy()
-                            .as_ref(),
-                    )
-                    .ok();
+                    write_quoted(buf, external_id).ok();
                     write!(buf, " ").ok();
                     write_quoted(
                         buf,
@@ -1568,15 +1549,9 @@ pub unsafe fn xml_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: XmlEnti
             }
             XmlEntityType::XmlExternalParameterEntity => {
                 write!(buf, "<!ENTITY % {name}").ok();
-                if !ent.external_id.is_null() {
+                if let Some(external_id) = ent.external_id.as_deref() {
                     write!(buf, " PUBLIC ").ok();
-                    write_quoted(
-                        buf,
-                        CStr::from_ptr(ent.external_id as _)
-                            .to_string_lossy()
-                            .as_ref(),
-                    )
-                    .ok();
+                    write_quoted(buf, external_id).ok();
                     write!(buf, " ").ok();
                     write_quoted(
                         buf,

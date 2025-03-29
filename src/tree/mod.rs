@@ -2129,11 +2129,7 @@ pub unsafe fn xml_free_node(cur: impl Into<XmlGenericNodePtr>) {
                 xml_free(system_id as _);
             }
             ent.system_id = null_mut();
-            let external_id = ent.external_id;
-            if !external_id.is_null() {
-                xml_free(external_id as _);
-            }
-            ent.external_id = null_mut();
+            ent.external_id = None;
         }
         if let Some(children) = cur
             .children()

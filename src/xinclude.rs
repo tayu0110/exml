@@ -775,16 +775,14 @@ impl XmlXIncludeCtxt {
                 | XmlEntityType::XmlExternalGeneralParsedEntity
                 | XmlEntityType::XmlExternalGeneralUnparsedEntity => {}
             }
-            let external_id = ent.external_id;
+
             let system_id = ent.system_id;
             let content = ent.content;
             let ret = xml_add_doc_entity(
                 doc,
                 &ent.name().unwrap(),
                 ent.etype,
-                (!external_id.is_null())
-                    .then(|| CStr::from_ptr(external_id as *const i8).to_string_lossy())
-                    .as_deref(),
+                ent.external_id.as_deref(),
                 (!system_id.is_null())
                     .then(|| CStr::from_ptr(system_id as *const i8).to_string_lossy())
                     .as_deref(),
@@ -808,8 +806,8 @@ impl XmlXIncludeCtxt {
                         if !xml_str_equal(ent.system_id, prev.system_id) {
                             break 'error;
                         }
-                    } else if !ent.external_id.is_null() && !prev.external_id.is_null() {
-                        if !xml_str_equal(ent.external_id, prev.external_id) {
+                    } else if ent.external_id.is_some() && prev.external_id.is_some() {
+                        if ent.external_id != prev.external_id {
                             break 'error;
                         }
                     } else if !ent.content.is_null() && !prev.content.is_null() {

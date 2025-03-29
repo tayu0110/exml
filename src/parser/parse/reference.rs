@@ -864,7 +864,7 @@ pub(crate) unsafe fn parse_reference(ctxt: &mut XmlParserCtxt) {
                 ctxt.depth -= 1;
             } else if matches!(ent.etype, XmlEntityType::XmlExternalGeneralParsedEntity) {
                 ctxt.depth += 1;
-                let external_id = ent.external_id;
+
                 let has_sax = ctxt.sax.is_some();
                 let sax = ctxt.sax.take();
                 let (sax, error) = parse_external_entity_private(
@@ -874,9 +874,7 @@ pub(crate) unsafe fn parse_reference(ctxt: &mut XmlParserCtxt) {
                     user_data,
                     ctxt.depth,
                     ent.uri.as_deref(),
-                    (!external_id.is_null())
-                        .then(|| CStr::from_ptr(external_id as *const i8).to_string_lossy())
-                        .as_deref(),
+                    ent.external_id.as_deref(),
                     Some(&mut list),
                 );
                 assert_eq!(has_sax, sax.is_some());
@@ -996,7 +994,7 @@ pub(crate) unsafe fn parse_reference(ctxt: &mut XmlParserCtxt) {
                     let oldsizeentities: u64 = ctxt.sizeentities;
 
                     ctxt.depth += 1;
-                    let external_id = ent.external_id;
+
                     let has_sax = ctxt.sax.is_some();
                     let sax = ctxt.sax.take();
                     let (sax, error) = parse_external_entity_private(
@@ -1006,9 +1004,7 @@ pub(crate) unsafe fn parse_reference(ctxt: &mut XmlParserCtxt) {
                         user_data,
                         ctxt.depth,
                         ent.uri.as_deref(),
-                        (!external_id.is_null())
-                            .then(|| CStr::from_ptr(external_id as *const i8).to_string_lossy())
-                            .as_deref(),
+                        ent.external_id.as_deref(),
                         None,
                     );
                     assert_eq!(has_sax, sax.is_some());

@@ -265,12 +265,9 @@ impl XmlParserInput {
                     }
                     XmlEntityType::XmlExternalGeneralParsedEntity
                     | XmlEntityType::XmlExternalParameterEntity => {
-                        let external_id = entity.external_id;
                         let mut input = xml_load_external_entity(
                             entity.uri.as_deref(),
-                            (!external_id.is_null())
-                                .then(|| CStr::from_ptr(external_id as *const i8).to_string_lossy())
-                                .as_deref(),
+                            entity.external_id.as_deref(),
                             ctxt,
                         );
                         if let Some(input) = input.as_mut() {
