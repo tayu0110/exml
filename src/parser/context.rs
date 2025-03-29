@@ -1712,6 +1712,37 @@ impl Default for XmlParserCtxt {
     }
 }
 
+impl Drop for XmlParserCtxt {
+    /// Free all the memory used by a parser context. However the parsed
+    /// document in self.myDoc is not freed.
+    #[doc(alias = "xmlFreeParserCtxt")]
+    fn drop(&mut self) {
+        unsafe {
+            if !self.dict.is_null() {
+                xml_dict_free(self.dict);
+            }
+            if !self.attallocs.is_null() {
+                xml_free(self.attallocs as _);
+            }
+            let _ = self.atts_special.take().map(|t| t.into_inner());
+            let mut cur = self.free_elems;
+            while let Some(now) = cur {
+                let next = now.next.map(|node| XmlNodePtr::try_from(node).unwrap());
+                now.free();
+                cur = next;
+            }
+            if let Some(attrs) = self.free_attrs.take() {
+                let mut cur = Some(attrs);
+                while let Some(now) = cur {
+                    let next = now.next;
+                    now.free();
+                    cur = next;
+                }
+            }
+        }
+    }
+}
+
 /// Allocate and initialize a new parser context.
 ///
 /// Returns the xmlParserCtxtPtr or NULL
@@ -1914,50 +1945,6 @@ pub unsafe fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
     unsafe {
         if ctxt.is_null() {
             return;
-        }
-
-        while (*ctxt).input_pop().is_some() {
-            // drop input
-        }
-        (*ctxt).space_tab.clear();
-        (*ctxt).name_tab.clear();
-        (*ctxt).node_tab.clear();
-        (*ctxt).node_info_tab.clear();
-        (*ctxt).input_tab.clear();
-        (*ctxt).version = None;
-        (*ctxt).encoding = None;
-        (*ctxt).ext_sub_uri = None;
-        (*ctxt).ext_sub_system = None;
-        (*ctxt).sax = None;
-        (*ctxt).directory = None;
-        if !(*ctxt).dict.is_null() {
-            xml_dict_free((*ctxt).dict);
-        }
-        (*ctxt).ns_tab.clear();
-        (*ctxt).push_tab.clear();
-        if !(*ctxt).attallocs.is_null() {
-            xml_free((*ctxt).attallocs as _);
-        }
-        (*ctxt).atts_default.clear();
-        let _ = (*ctxt).atts_special.take().map(|t| t.into_inner());
-        let mut cur = (*ctxt).free_elems;
-        while let Some(now) = cur {
-            let next = now.next.map(|node| XmlNodePtr::try_from(node).unwrap());
-            now.free();
-            cur = next;
-        }
-        if let Some(attrs) = (*ctxt).free_attrs.take() {
-            let mut cur = Some(attrs);
-            while let Some(now) = cur {
-                let next = now.next;
-                now.free();
-                cur = next;
-            }
-        }
-
-        #[cfg(feature = "catalog")]
-        {
-            (*ctxt).catalogs = None;
         }
         drop_in_place(ctxt);
         xml_free(ctxt as _);
