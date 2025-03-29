@@ -22,12 +22,10 @@
 
 use std::{
     borrow::Cow,
-    cell::RefCell,
-    ffi::{CStr, CString},
+    ffi::CStr,
     io::Write,
     mem::take,
-    ptr::{addr_of_mut, null, null_mut},
-    rc::Rc,
+    ptr::{addr_of_mut, null_mut},
     str::from_utf8_unchecked,
 };
 
@@ -46,19 +44,18 @@ use crate::{
         globals::{xml_free, xml_malloc_atomic, xml_realloc},
         parser::{
             XML_SKIP_IDS, XmlParserInputState, XmlParserMode, XmlParserOption, xml_parse_end_tag1,
-            xml_parse_end_tag2, xml_parse_external_entity_private, xml_parse_start_tag2,
-            xml_parser_add_node_info, xml_parser_find_node_info,
+            xml_parse_end_tag2, xml_parse_external_entity_private, xml_parser_find_node_info,
         },
         sax2::xml_sax2_get_entity,
-        valid::{xml_validate_element, xml_validate_root},
+        valid::xml_validate_element,
         xmlstring::{XmlChar, xml_strchr, xml_strndup},
     },
     parser::{
-        __xml_err_encoding, XmlParserCharValid, XmlParserCtxtPtr, XmlParserNodeInfo, parse_cdsect,
-        parse_char_data_internal, parse_char_ref, parse_comment, parse_name, parse_pi,
-        parser_entity_check, xml_create_memory_parser_ctxt, xml_err_encoding_int, xml_err_memory,
-        xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_int,
-        xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str, xml_free_parser_ctxt,
+        __xml_err_encoding, XmlParserCharValid, XmlParserCtxtPtr, parse_cdsect,
+        parse_char_data_internal, parse_char_ref, parse_comment, parse_element_start, parse_name,
+        parse_pi, parser_entity_check, xml_create_memory_parser_ctxt, xml_err_encoding_int,
+        xml_err_memory, xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_str,
+        xml_fatal_err_msg_str_int_str, xml_free_parser_ctxt,
     },
     tree::{
         NodeCommon, XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
@@ -79,7 +76,7 @@ macro_rules! NXT {
 /// process. This is not a limitation of the parser but a safety
 /// boundary feature, use XML_PARSE_HUGE option to override it.
 #[doc(alias = "xmlParserMaxDepth")]
-pub static mut XML_PARSER_MAX_DEPTH: u32 = 256;
+pub const XML_PARSER_MAX_DEPTH: u32 = 256;
 
 /// Maximum size allowed for a single text node when building a tree.
 /// This is not a limitation of the parser but a safety boundary feature,
@@ -1345,320 +1342,6 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
     }
 }
 
-/// Parse a start tag. Always consumes '<'.
-///
-/// `[40] STag ::= '<' Name (S Attribute)* S? '>'`
-///
-/// `[ WFC: Unique Att Spec ]`  
-/// No attribute name may appear more than once in the same start-tag or empty-element tag.
-///
-/// `[44] EmptyElemTag ::= '<' Name (S Attribute)* S? '/>'`
-///
-/// `[ WFC: Unique Att Spec ]`  
-/// No attribute name may appear more than once in the same start-tag or empty-element tag.
-///
-/// With namespace:
-///
-/// `[NS 8] STag ::= '<' QName (S Attribute)* S? '>'`
-///
-/// `[NS 10] EmptyElement ::= '<' QName (S Attribute)* S? '/>'`
-///
-/// Returns the element name parsed
-#[doc(alias = "xmlParseStartTag")]
-#[cfg(feature = "sax1")]
-pub(crate) unsafe fn xml_parse_start_tag(ctxt: XmlParserCtxtPtr) -> Option<String> {
-    use crate::parser::parse_attribute;
-
-    unsafe {
-        use crate::parser::xml_err_attribute_dup;
-
-        if (*ctxt).current_byte() != b'<' {
-            return None;
-        }
-        (*ctxt).advance(1);
-
-        let Some(name) = parse_name(&mut *ctxt) else {
-            xml_fatal_err_msg(
-                &mut *ctxt,
-                XmlParserErrors::XmlErrNameRequired,
-                "xmlParseStartTag: invalid element name\n",
-            );
-            return None;
-        };
-
-        // Now parse the attributes, it ends up with the ending
-        //
-        // (S Attribute)* S?
-        (*ctxt).skip_blanks();
-        (*ctxt).grow();
-
-        let mut atts: Vec<(String, Option<String>)> = vec![];
-        while (*ctxt).current_byte() != b'>'
-            && ((*ctxt).current_byte() != b'/' || NXT!(ctxt, 1) != b'>')
-            && xml_is_char((*ctxt).current_byte() as u32)
-            && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
-        {
-            let (Some(attname), attvalue) = parse_attribute(&mut *ctxt) else {
-                xml_fatal_err_msg(
-                    &mut *ctxt,
-                    XmlParserErrors::XmlErrInternalError,
-                    "xmlParseStartTag: problem parsing attributes\n",
-                );
-                break;
-            };
-
-            'failed: {
-                if let Some(attvalue) = attvalue {
-                    // [ WFC: Unique Att Spec ]
-                    // No attribute name may appear more than once in the same
-                    // start-tag or empty-element tag.
-                    for (att, _) in &atts {
-                        if att.as_str() == attname {
-                            xml_err_attribute_dup(ctxt, None, &attname);
-                            break 'failed;
-                        }
-                    }
-                    // Add the pair to atts
-                    atts.push((attname, Some(attvalue)));
-                }
-            }
-
-            // failed:
-
-            (*ctxt).grow();
-            if (*ctxt).current_byte() == b'>'
-                || ((*ctxt).current_byte() == b'/' && NXT!(ctxt, 1) == b'>')
-            {
-                break;
-            }
-            if (*ctxt).skip_blanks() == 0 {
-                xml_fatal_err_msg(
-                    &mut *ctxt,
-                    XmlParserErrors::XmlErrSpaceRequired,
-                    "attributes construct error\n",
-                );
-            }
-            (*ctxt).shrink();
-            (*ctxt).grow();
-        }
-
-        // SAX: Start of Element !
-        if (*ctxt).disable_sax == 0 {
-            if let Some(start_element) =
-                (*ctxt).sax.as_deref_mut().and_then(|sax| sax.start_element)
-            {
-                if !atts.is_empty() {
-                    start_element((*ctxt).user_data.clone(), &name, atts.as_slice());
-                } else {
-                    start_element((*ctxt).user_data.clone(), &name, &[]);
-                }
-            }
-        }
-
-        Some(name)
-    }
-}
-
-// /// Parse an end of tag
-// ///
-// /// `[42] ETag ::= '</' Name S? '>'`
-// ///
-// /// With namespace
-// ///
-// /// `[NS 9] ETag ::= '</' QName S? '>'`
-// #[doc(alias = "xmlParseEndTag")]
-// #[cfg(feature = "sax1")]
-// pub(crate) unsafe fn xml_parse_end_tag(ctxt: XmlParserCtxtPtr) {
-//     unsafe {
-//         xml_parse_end_tag1(ctxt, 0);
-//     }
-// }
-
-/// Parse the start of an XML element. Returns -1 in case of error, 0 if an
-/// opening tag was parsed, 1 if an empty element was parsed.
-///
-/// Always consumes '<'.
-#[doc(alias = "xmlParseElementStart")]
-pub(crate) unsafe fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) -> i32 {
-    unsafe {
-        let name: *const XmlChar;
-        let mut prefix: *const XmlChar = null_mut();
-        let mut tlen: i32 = 0;
-        let ns_nr = (*ctxt).ns_tab.len();
-
-        if (*ctxt).name_tab.len() as u32 > XML_PARSER_MAX_DEPTH
-            && (*ctxt).options & XmlParserOption::XmlParseHuge as i32 == 0
-        {
-            let max_depth = XML_PARSER_MAX_DEPTH as i32;
-            xml_fatal_err_msg_int!(
-            ctxt,
-            XmlParserErrors::XmlErrInternalError,
-            format!("Excessive depth in document: {max_depth} use xmlParserOption::XML_PARSE_HUGE option\n").as_str(),
-            max_depth
-        );
-            (*ctxt).halt();
-            return -1;
-        }
-
-        // Capture start position
-        let (begin_pos, begin_line) = if (*ctxt).record_info != 0 {
-            (
-                (*ctxt).input().unwrap().consumed
-                    + (*ctxt).input().unwrap().offset_from_base() as u64,
-                (*ctxt).input().unwrap().line as u64,
-            )
-        } else {
-            (0, 0)
-        };
-
-        if (*ctxt).space_tab.is_empty() || (*ctxt).space() == -2 {
-            (*ctxt).space_push(-1);
-        } else {
-            (*ctxt).space_push((*ctxt).space());
-        }
-
-        let line: i32 = (*ctxt).input().unwrap().line;
-        let mut uri = None;
-        #[cfg(feature = "sax1")]
-        {
-            if (*ctxt).sax2 != 0 {
-                name =
-                    xml_parse_start_tag2(ctxt, addr_of_mut!(prefix), &mut uri, addr_of_mut!(tlen));
-            } else if let Some(n) = xml_parse_start_tag(ctxt) {
-                name = xml_dict_lookup((*ctxt).dict, n.as_ptr(), n.len() as i32);
-            } else {
-                name = null_mut();
-            }
-        }
-        #[cfg(not(feature = "sax1"))]
-        {
-            name = xml_parse_start_tag2(
-                ctxt,
-                addr_of_mut!(prefix),
-                addr_of_mut!(uri),
-                addr_of_mut!(tlen),
-            );
-        }
-        if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-            return -1;
-        }
-        if name.is_null() {
-            (*ctxt).space_pop();
-            return -1;
-        }
-        let curi = uri.as_deref().map(|uri| CString::new(uri).unwrap());
-        (*ctxt).name_ns_push(
-            name,
-            prefix,
-            curi.as_deref()
-                .map_or(null(), |uri| uri.as_ptr() as *const u8),
-            line,
-            (*ctxt).ns_tab.len() as i32 - ns_nr as i32,
-        );
-        let cur = (*ctxt).node;
-
-        // [ VC: Root Element Type ]
-        // The Name in the document type declaration must match the element type of the root element.
-        #[cfg(feature = "libxml_valid")]
-        if (*ctxt).validate != 0 && (*ctxt).well_formed != 0 {
-            if let Some(context_node) = (*ctxt).node {
-                if let Some(my_doc) = (*ctxt)
-                    .my_doc
-                    .filter(|doc| doc.children == Some(context_node.into()))
-                {
-                    (*ctxt).valid &= xml_validate_root(addr_of_mut!((*ctxt).vctxt), my_doc);
-                }
-            }
-        }
-
-        // Check for an Empty Element.
-        if (*ctxt).current_byte() == b'/' && NXT!(ctxt, 1) == b'>' {
-            (*ctxt).advance(2);
-            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
-            if (*ctxt).sax2 != 0 {
-                if (*ctxt).disable_sax == 0 {
-                    if let Some(end_element_ns) = (*ctxt)
-                        .sax
-                        .as_deref_mut()
-                        .and_then(|sax| sax.end_element_ns)
-                    {
-                        end_element_ns(
-                            (*ctxt).user_data.clone(),
-                            &name,
-                            (!prefix.is_null())
-                                .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
-                                .as_deref(),
-                            uri.as_deref(),
-                        );
-                    }
-                }
-            } else {
-                #[cfg(feature = "sax1")]
-                if (*ctxt).disable_sax == 0 {
-                    if let Some(end_element) =
-                        (*ctxt).sax.as_deref_mut().and_then(|sax| sax.end_element)
-                    {
-                        end_element((*ctxt).user_data.clone(), &name);
-                    }
-                }
-            }
-            (*ctxt).name_pop();
-            (*ctxt).space_pop();
-            if ns_nr != (*ctxt).ns_tab.len() {
-                (*ctxt).ns_pop((*ctxt).ns_tab.len() - ns_nr);
-            }
-            if let Some(cur) = cur {
-                if (*ctxt).record_info != 0 {
-                    let node_info = XmlParserNodeInfo {
-                        node: Some(cur),
-                        begin_pos,
-                        begin_line,
-                        end_pos: (*ctxt).input().unwrap().consumed
-                            + (*ctxt).input().unwrap().offset_from_base() as u64,
-                        end_line: (*ctxt).input().unwrap().line as u64,
-                    };
-                    xml_parser_add_node_info(ctxt, Rc::new(RefCell::new(node_info)));
-                }
-            }
-            return 1;
-        }
-        if (*ctxt).current_byte() == b'>' {
-            (*ctxt).advance(1);
-            if let Some(cur) = cur {
-                if (*ctxt).record_info != 0 {
-                    let node_info = XmlParserNodeInfo {
-                        node: Some(cur),
-                        begin_pos,
-                        begin_line,
-                        end_pos: 0,
-                        end_line: 0,
-                    };
-                    xml_parser_add_node_info(ctxt, Rc::new(RefCell::new(node_info)));
-                }
-            }
-        } else {
-            xml_fatal_err_msg_str_int_str!(
-                ctxt,
-                XmlParserErrors::XmlErrGtRequired,
-                "Couldn't find end of Start Tag {} line {}\n",
-                CStr::from_ptr(name as *const i8).to_string_lossy(),
-                line
-            );
-
-            // end of parsing of this node.
-            (*ctxt).node_pop();
-            (*ctxt).name_pop();
-            (*ctxt).space_pop();
-            if ns_nr != (*ctxt).ns_tab.len() {
-                (*ctxt).ns_pop((*ctxt).ns_tab.len() - ns_nr);
-            }
-            return -1;
-        }
-
-        0
-    }
-}
-
 /// Parse the end of an XML element. Always consumes '</'.
 #[doc(alias = "xmlParseElementEnd")]
 pub(crate) unsafe fn xml_parse_element_end(ctxt: XmlParserCtxtPtr) {
@@ -1734,7 +1417,7 @@ pub(crate) unsafe fn xml_parse_content_internal(ctxt: XmlParserCtxtPtr) {
                     }
                     xml_parse_element_end(ctxt);
                 } else {
-                    xml_parse_element_start(ctxt);
+                    parse_element_start(&mut *ctxt);
                 }
             }
             // Fifth case : a reference. If if has not been resolved,
@@ -1766,13 +1449,13 @@ pub unsafe fn xml_parse_content(ctxt: XmlParserCtxtPtr) {
         if !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
             && (*ctxt).name_tab.len() > name_nr
         {
-            let name: *const XmlChar = (*ctxt).name_tab[(*ctxt).name_tab.len() - 1];
+            let name = &(*ctxt).name_tab[(*ctxt).name_tab.len() - 1];
             let line: i32 = (*ctxt).push_tab[(*ctxt).name_tab.len() - 1].line;
             xml_fatal_err_msg_str_int_str!(
                 ctxt,
                 XmlParserErrors::XmlErrTagNotFinished,
                 "Premature end of data in tag {} line {}\n",
-                CStr::from_ptr(name as *const i8).to_string_lossy(),
+                name,
                 line
             );
         }

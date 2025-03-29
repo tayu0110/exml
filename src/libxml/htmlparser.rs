@@ -6053,15 +6053,11 @@ unsafe fn html_parse_html_name(ctxt: HtmlParserCtxtPtr) -> *const XmlChar {
 ///
 /// Returns the name just removed
 #[doc(alias = "htmlnamePop")]
-unsafe fn html_name_pop(ctxt: HtmlParserCtxtPtr) -> *const XmlChar {
+unsafe fn html_name_pop(ctxt: HtmlParserCtxtPtr) -> Option<String> {
     unsafe {
-        let res = (*ctxt).name_tab.pop().unwrap_or(null());
-        let name = *(*ctxt).name_tab.last().unwrap_or(&null());
-        (*ctxt).name = (!name.is_null()).then(|| {
-            CStr::from_ptr(name as *const i8)
-                .to_string_lossy()
-                .into_owned()
-        });
+        let res = (*ctxt).name_tab.pop();
+        let name = (*ctxt).name_tab.last().cloned();
+        (*ctxt).name = name;
         res
     }
 }
@@ -6134,20 +6130,17 @@ static HTML_OMITTED_DEFAULT_VALUE: AtomicI32 = AtomicI32::new(1);
 ///
 /// Returns -1 in case of error, the index in the stack otherwise
 #[doc(alias = "htmlnamePush")]
-unsafe fn html_name_push(ctxt: HtmlParserCtxtPtr, value: *const XmlChar) -> i32 {
+unsafe fn html_name_push(ctxt: HtmlParserCtxtPtr, value: &str) -> i32 {
     unsafe {
-        if (*ctxt).html < 3 && xml_str_equal(value, c"head".as_ptr() as _) {
+        if (*ctxt).html < 3 && value == "head" {
             (*ctxt).html = 3;
         }
-        if (*ctxt).html < 10 && xml_str_equal(value, c"body".as_ptr() as _) {
+        if (*ctxt).html < 10 && value == "body" {
             (*ctxt).html = 10;
         }
-        (*ctxt).name = (!value.is_null()).then(|| {
-            CStr::from_ptr(value as *const i8)
-                .to_string_lossy()
-                .into_owned()
-        });
-        (*ctxt).name_tab.push(value);
+
+        (*ctxt).name = Some(value.to_owned());
+        (*ctxt).name_tab.push(value.to_owned());
         (*ctxt).name_tab.len() as i32 - 1
     }
 }
@@ -6168,7 +6161,7 @@ unsafe fn html_check_implied(ctxt: HtmlParserCtxtPtr, newtag: &str) {
             return;
         }
         if (*ctxt).name_tab.is_empty() {
-            html_name_push(ctxt, c"html".as_ptr() as _);
+            html_name_push(ctxt, "html");
             if let Some(start_element) =
                 (*ctxt).sax.as_deref_mut().and_then(|sax| sax.start_element)
             {
@@ -6191,7 +6184,7 @@ unsafe fn html_check_implied(ctxt: HtmlParserCtxtPtr, newtag: &str) {
                 return;
             }
             // dropped OBJECT ... i you put it first BODY will be assumed !
-            html_name_push(ctxt, c"head".as_ptr() as _);
+            html_name_push(ctxt, "head");
             if let Some(start_element) =
                 (*ctxt).sax.as_deref_mut().and_then(|sax| sax.start_element)
             {
@@ -6203,15 +6196,15 @@ unsafe fn html_check_implied(ctxt: HtmlParserCtxtPtr, newtag: &str) {
                 return;
             }
             for i in 0..(*ctxt).name_tab.len() {
-                if xml_str_equal((*ctxt).name_tab[i], c"body".as_ptr() as _) {
+                if (*ctxt).name_tab[i] == "body" {
                     return;
                 }
-                if xml_str_equal((*ctxt).name_tab[i], c"head".as_ptr() as _) {
+                if (*ctxt).name_tab[i] == "head" {
                     return;
                 }
             }
 
-            html_name_push(ctxt, c"body".as_ptr() as _);
+            html_name_push(ctxt, "body");
             if let Some(start_element) =
                 (*ctxt).sax.as_deref_mut().and_then(|sax| sax.start_element)
             {
@@ -6815,7 +6808,7 @@ unsafe fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
         }
         if xml_str_equal(name, c"body".as_ptr() as _) {
             for indx in 0..(*ctxt).name_tab.len() {
-                if xml_str_equal((*ctxt).name_tab[indx], c"body".as_ptr() as _) {
+                if (*ctxt).name_tab[indx] == "body" {
                     html_parse_err(
                         ctxt,
                         XmlParserErrors::XmlHTMLStrucureError,
@@ -6897,7 +6890,7 @@ unsafe fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
 
         // SAX: Start of Element !
         if discardtag == 0 {
-            html_name_push(ctxt, name);
+            html_name_push(ctxt, &CStr::from_ptr(name as *const i8).to_string_lossy());
             if let Some(start_element) =
                 (*ctxt).sax.as_deref_mut().and_then(|sax| sax.start_element)
             {
@@ -6988,11 +6981,7 @@ unsafe fn html_auto_close_on_close(ctxt: HtmlParserCtxtPtr, newtag: &str) {
         let priority = html_get_end_priority(newtag);
 
         for i in (0..(*ctxt).name_tab.len()).rev() {
-            if newtag
-                == CStr::from_ptr((*ctxt).name_tab[i] as *const i8)
-                    .to_string_lossy()
-                    .as_ref()
-            {
+            if newtag == (*ctxt).name_tab[i] {
                 while Some(newtag) != (*ctxt).name.as_deref() {
                     let info = (*ctxt)
                         .name
@@ -7024,12 +7013,7 @@ unsafe fn html_auto_close_on_close(ctxt: HtmlParserCtxtPtr, newtag: &str) {
             // or equal priority, so if we find an element with higher
             // priority before we find an element with
             // matching name, we just ignore this endtag
-            if html_get_end_priority(
-                CStr::from_ptr((*ctxt).name_tab[i] as *const i8)
-                    .to_string_lossy()
-                    .as_ref(),
-            ) > priority
-            {
+            if html_get_end_priority(&(*ctxt).name_tab[i]) > priority {
                 return;
             }
         }
@@ -7107,7 +7091,7 @@ unsafe fn html_parse_end_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
         // If the name read is not one of the element in the parsing stack
         // then return, it's just an error.
         for i in (0..(*ctxt).name_tab.len()).rev() {
-            if xml_str_equal(name, (*ctxt).name_tab[i]) {
+            if CStr::from_ptr(name as *const i8).to_string_lossy() == (*ctxt).name_tab[i] {
                 // Check for auto-closure of HTML elements.
 
                 html_auto_close_on_close(
@@ -7973,7 +7957,7 @@ unsafe fn html_check_paragraph(ctxt: HtmlParserCtxtPtr) -> i32 {
         let Some(tag) = tag else {
             html_auto_close(ctxt, Some("p"));
             html_check_implied(ctxt, "p");
-            html_name_push(ctxt, c"p".as_ptr() as _);
+            html_name_push(ctxt, "p");
             if let Some(start_element) =
                 (*ctxt).sax.as_deref_mut().and_then(|sax| sax.start_element)
             {
@@ -7988,7 +7972,7 @@ unsafe fn html_check_paragraph(ctxt: HtmlParserCtxtPtr) -> i32 {
             if tag == elem {
                 html_auto_close(ctxt, Some("p"));
                 html_check_implied(ctxt, "p");
-                html_name_push(ctxt, c"p".as_ptr() as _);
+                html_name_push(ctxt, "p");
                 if let Some(start_element) =
                     (*ctxt).sax.as_deref_mut().and_then(|sax| sax.start_element)
                 {

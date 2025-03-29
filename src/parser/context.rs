@@ -3,7 +3,7 @@ use std::{
     cell::RefCell,
     collections::HashMap,
     ffi::{CStr, c_void},
-    ptr::{drop_in_place, null, null_mut},
+    ptr::{drop_in_place, null_mut},
     rc::Rc,
     slice::from_raw_parts,
     str::{from_utf8, from_utf8_unchecked},
@@ -139,7 +139,7 @@ pub struct XmlParserCtxt {
     // Current parsed Node
     pub(crate) name: Option<String>,
     // array of nodes
-    pub(crate) name_tab: Vec<*const u8>,
+    pub(crate) name_tab: Vec<String>,
 
     // unused
     nb_chars: i64,
@@ -943,6 +943,25 @@ impl XmlParserCtxt {
         }
     }
 
+    // Lookup the namespace name for the @prefix (which ca be NULL)
+    //
+    // Returns the namespace name or NULL if not bound
+    #[doc(alias = "xmlGetNamespace")]
+    pub(super) unsafe fn get_namespace(&self, prefix: Option<&str>) -> Option<&str> {
+        if prefix == self.str_xml.as_deref() {
+            return self.str_xml_ns.as_deref();
+        }
+        for (pre, href) in self.ns_tab.iter().rev() {
+            if pre.as_deref() == prefix {
+                if prefix.is_none() && href.is_empty() {
+                    return None;
+                }
+                return Some(href.as_str());
+            }
+        }
+        None
+    }
+
     /// Pushes a new parser input on top of the input stack
     ///
     /// Returns -1 in case of error, the index in the stack otherwise
@@ -1000,13 +1019,9 @@ impl XmlParserCtxt {
     ///
     /// Returns -1 in case of error, the index in the stack otherwise
     #[doc(alias = "namePush")]
-    pub(crate) fn name_push(&mut self, value: *const u8) -> i32 {
-        self.name = (!value.is_null()).then(|| unsafe {
-            CStr::from_ptr(value as *const i8)
-                .to_string_lossy()
-                .into_owned()
-        });
-        self.name_tab.push(value);
+    pub(crate) fn name_push(&mut self, value: &str) -> i32 {
+        self.name = Some(value.to_owned());
+        self.name_tab.push(value.to_owned());
         self.name_tab.len() as i32 - 1
     }
 
@@ -1014,14 +1029,10 @@ impl XmlParserCtxt {
     ///
     /// Returns the name just removed
     #[doc(alias = "namePop")]
-    pub(crate) fn name_pop(&mut self) -> *const u8 {
-        let res = self.name_tab.pop().unwrap_or(null_mut());
-        let name = *self.name_tab.last().unwrap_or(&null());
-        self.name = (!name.is_null()).then(|| unsafe {
-            CStr::from_ptr(name as *const i8)
-                .to_string_lossy()
-                .into_owned()
-        });
+    pub(crate) fn name_pop(&mut self) -> Option<String> {
+        let res = self.name_tab.pop();
+        let name = self.name_tab.last().cloned();
+        self.name = name;
         res
     }
 
@@ -1050,31 +1061,19 @@ impl XmlParserCtxt {
     #[doc(alias = "nameNsPush")]
     pub(crate) fn name_ns_push(
         &mut self,
-        value: *const u8,
-        prefix: *const u8,
-        uri: *const u8,
+        value: &str,
+        prefix: Option<&str>,
+        uri: Option<&str>,
         line: i32,
         ns_nr: i32,
     ) -> i32 {
-        self.name = (!value.is_null()).then(|| unsafe {
-            CStr::from_ptr(value as *const i8)
-                .to_string_lossy()
-                .into_owned()
-        });
-        self.name_tab.push(value);
+        self.name_tab.push(value.to_owned());
+        self.name = Some(value.to_owned());
         self.push_tab
             .resize(self.name_tab.len(), XmlStartTag::default());
         let res = self.name_tab.len() - 1;
-        self.push_tab[res].prefix = (!prefix.is_null()).then(|| unsafe {
-            CStr::from_ptr(prefix as *const i8)
-                .to_string_lossy()
-                .into_owned()
-        });
-        self.push_tab[res].uri = (!uri.is_null()).then(|| unsafe {
-            CStr::from_ptr(uri as *const i8)
-                .to_string_lossy()
-                .into_owned()
-        });
+        self.push_tab[res].prefix = prefix.map(|pre| pre.to_owned());
+        self.push_tab[res].uri = uri.map(|uri| uri.to_owned());
         self.push_tab[res].line = line;
         self.push_tab[res].ns_nr = ns_nr;
         res as i32
@@ -1085,14 +1084,9 @@ impl XmlParserCtxt {
     /// Returns the name just removed
     #[doc(alias = "nameNsPop")]
     #[cfg(feature = "libxml_push")]
-    pub(crate) fn name_ns_pop(&mut self) -> *const u8 {
-        let res = self.name_tab.pop().unwrap_or(null_mut());
-        let name = *self.name_tab.last().unwrap_or(&null());
-        self.name = (!name.is_null()).then(|| unsafe {
-            CStr::from_ptr(name as *const i8)
-                .to_string_lossy()
-                .into_owned()
-        });
+    pub(crate) fn name_ns_pop(&mut self) -> Option<String> {
+        let res = self.name_tab.pop();
+        self.name = self.name_tab.last().cloned();
         res
     }
 
