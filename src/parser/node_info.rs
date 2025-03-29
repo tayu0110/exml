@@ -45,7 +45,9 @@ use std::{
 
 use crate::tree::XmlNodePtr;
 
-pub type XmlParserNodeInfoSeqPtr = *mut XmlParserNodeInfoSeq;
+use super::XmlParserCtxt;
+
+#[doc(alias = "xmlParserNodeInfoSeq")]
 #[repr(C)]
 #[derive(Clone, Default)]
 pub struct XmlParserNodeInfoSeq {
@@ -98,8 +100,6 @@ impl IndexMut<usize> for XmlParserNodeInfoSeq {
 /// place in the file they were detected.
 /// NOTE: This is off by default and not very well tested.
 #[doc(alias = "xmlParserNodeInfo")]
-pub type XmlParserNodeInfoPtr = *mut XmlParserNodeInfo;
-
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
 pub struct XmlParserNodeInfo {
@@ -109,4 +109,35 @@ pub struct XmlParserNodeInfo {
     pub(crate) begin_line: u64,
     pub(crate) end_pos: u64,
     pub(crate) end_line: u64,
+}
+
+impl XmlParserCtxt {
+    /// Insert node info record into the sorted sequence
+    #[doc(alias = "xmlParserAddNodeInfo")]
+    pub(crate) fn add_node_info(&mut self, info: Rc<RefCell<XmlParserNodeInfo>>) {
+        // Find pos and check to see if node is already in the sequence
+        let pos = self.node_seq.binary_search(info.borrow().node);
+        match pos {
+            Ok(pos) => {
+                self.node_seq[pos] = info;
+            }
+            Err(pos) => {
+                // Otherwise, we need to add new node to buffer
+                self.node_seq.insert(pos, info);
+            }
+        }
+    }
+
+    /// Find the parser node info struct for a given node
+    ///
+    /// Returns an xmlParserNodeInfo block pointer or NULL
+    #[doc(alias = "xmlParserFindNodeInfo")]
+    pub(crate) fn find_node_info(
+        &self,
+        node: XmlNodePtr,
+    ) -> Option<Rc<RefCell<XmlParserNodeInfo>>> {
+        // Find position where node should be at
+        let pos = self.node_seq.binary_search(Some(node)).ok()?;
+        Some(self.node_seq[pos].clone())
+    }
 }

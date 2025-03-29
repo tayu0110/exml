@@ -44,7 +44,7 @@ use crate::{
         globals::{xml_free, xml_malloc_atomic, xml_realloc},
         parser::{
             XML_SKIP_IDS, XmlParserInputState, XmlParserMode, XmlParserOption, xml_parse_end_tag1,
-            xml_parse_end_tag2, xml_parse_external_entity_private, xml_parser_find_node_info,
+            xml_parse_end_tag2, xml_parse_external_entity_private,
         },
         sax2::xml_sax2_get_entity,
         valid::xml_validate_element,
@@ -1369,7 +1369,7 @@ pub(crate) unsafe fn xml_parse_element_end(ctxt: XmlParserCtxtPtr) {
         // Capture end position
         if let Some(cur) = cur {
             if (*ctxt).record_info != 0 {
-                if let Some(node_info) = xml_parser_find_node_info(ctxt, cur) {
+                if let Some(node_info) = (*ctxt).find_node_info(cur) {
                     node_info.borrow_mut().end_pos = (*ctxt).input().unwrap().consumed
                         + (*ctxt).input().unwrap().offset_from_base() as u64;
                     node_info.borrow_mut().end_line = (*ctxt).input().unwrap().line as _;

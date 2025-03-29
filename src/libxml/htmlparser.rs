@@ -49,7 +49,7 @@ use crate::{
         globals::{xml_default_sax_locator, xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         parser::{
             XmlParserInputState, XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr, xml_init_parser,
-            xml_load_external_entity, xml_parser_add_node_info,
+            xml_load_external_entity,
         },
         parser_internals::{
             INPUT_CHUNK, XML_MAX_HUGE_LENGTH, XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH,
@@ -8750,7 +8750,7 @@ unsafe fn html_parser_finish_element_parsing(ctxt: HtmlParserCtxtPtr) {
                     + (*ctxt).input().unwrap().offset_from_base() as u64;
                 node_info.borrow_mut().end_line = (*ctxt).input().unwrap().line as _;
                 node_info.borrow_mut().node = Some(node);
-                xml_parser_add_node_info(ctxt, node_info.clone());
+                (*ctxt).add_node_info(node_info.clone());
                 html_node_info_pop(ctxt);
             }
         }

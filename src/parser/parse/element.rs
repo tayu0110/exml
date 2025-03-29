@@ -4,7 +4,7 @@ use crate::{
     error::XmlParserErrors,
     libxml::{
         chvalid::xml_is_char,
-        parser::{XmlParserInputState, XmlParserOption, xml_parser_add_node_info},
+        parser::{XmlParserInputState, XmlParserOption},
         parser_internals::XML_PARSER_MAX_DEPTH,
         valid::xml_validate_root,
     },
@@ -142,7 +142,7 @@ pub(crate) unsafe fn parse_element_start(ctxt: &mut XmlParserCtxt) -> i32 {
                             + ctxt.input().unwrap().offset_from_base() as u64,
                         end_line: ctxt.input().unwrap().line as u64,
                     };
-                    xml_parser_add_node_info(ctxt, Rc::new(RefCell::new(node_info)));
+                    ctxt.add_node_info(Rc::new(RefCell::new(node_info)));
                 }
             }
             return 1;
@@ -158,7 +158,7 @@ pub(crate) unsafe fn parse_element_start(ctxt: &mut XmlParserCtxt) -> i32 {
                         end_pos: 0,
                         end_line: 0,
                     };
-                    xml_parser_add_node_info(ctxt, Rc::new(RefCell::new(node_info)));
+                    ctxt.add_node_info(Rc::new(RefCell::new(node_info)));
                 }
             }
         } else {

@@ -98,13 +98,13 @@ use crate::{
         xmlstring::XmlChar,
     },
     parser::{
-        __xml_err_encoding, XmlParserCharValid, XmlParserCtxtPtr, XmlParserInput,
-        XmlParserNodeInfo, check_cdata_push, parse_char_data_internal, parse_comment,
-        parse_doctypedecl, parse_element_start, parse_internal_subset, parse_lookup_char,
-        parse_lookup_char_data, parse_pi, parse_start_tag, parse_start_tag2, parse_text_decl,
-        parse_xmldecl, xml_create_entity_parser_ctxt_internal, xml_create_memory_parser_ctxt,
-        xml_err_memory, xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_str,
-        xml_fatal_err_msg_str_int_str, xml_free_parser_ctxt, xml_new_sax_parser_ctxt, xml_ns_err,
+        __xml_err_encoding, XmlParserCharValid, XmlParserCtxtPtr, XmlParserInput, check_cdata_push,
+        parse_char_data_internal, parse_comment, parse_doctypedecl, parse_element_start,
+        parse_internal_subset, parse_lookup_char, parse_lookup_char_data, parse_pi,
+        parse_start_tag, parse_start_tag2, parse_text_decl, parse_xmldecl,
+        xml_create_entity_parser_ctxt_internal, xml_create_memory_parser_ctxt, xml_err_memory,
+        xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str,
+        xml_free_parser_ctxt, xml_new_sax_parser_ctxt, xml_ns_err,
     },
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlAttributeDefault, XmlAttributeType, XmlDocProperties,
@@ -4041,49 +4041,6 @@ pub unsafe fn xml_create_io_parser_ctxt(
         (*ctxt).input_push(input_stream);
 
         ctxt
-    }
-}
-
-/// Find the parser node info struct for a given node
-///
-/// Returns an xmlParserNodeInfo block pointer or NULL
-#[doc(alias = "xmlParserFindNodeInfo")]
-pub(crate) unsafe fn xml_parser_find_node_info(
-    ctxt: XmlParserCtxtPtr,
-    node: XmlNodePtr,
-) -> Option<Rc<RefCell<XmlParserNodeInfo>>> {
-    unsafe {
-        if ctxt.is_null() {
-            return None;
-        }
-        // Find position where node should be at
-        let pos = (*ctxt).node_seq.binary_search(Some(node)).ok()?;
-        Some((*ctxt).node_seq[pos].clone())
-    }
-}
-
-/// Insert node info record into the sorted sequence
-#[doc(alias = "xmlParserAddNodeInfo")]
-pub(crate) unsafe fn xml_parser_add_node_info(
-    ctxt: XmlParserCtxtPtr,
-    info: Rc<RefCell<XmlParserNodeInfo>>,
-) {
-    unsafe {
-        if ctxt.is_null() {
-            return;
-        }
-
-        // Find pos and check to see if node is already in the sequence
-        let pos = (*ctxt).node_seq.binary_search(info.borrow().node);
-        match pos {
-            Ok(pos) => {
-                (*ctxt).node_seq[pos] = info;
-            }
-            Err(pos) => {
-                // Otherwise, we need to add new node to buffer
-                (*ctxt).node_seq.insert(pos, info);
-            }
-        }
     }
 }
 
