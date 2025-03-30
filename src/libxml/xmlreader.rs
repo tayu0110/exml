@@ -483,9 +483,7 @@ impl XmlTextReader {
 
                     (*self.ctxt).reset();
                     let buf = XmlParserInputBuffer::new(enc);
-                    let Some(mut input_stream) =
-                        XmlParserInput::new(Some(&mut *self.ctxt))
-                    else {
+                    let Some(mut input_stream) = XmlParserInput::new(Some(&mut *self.ctxt)) else {
                         return -1;
                     };
 
@@ -1225,6 +1223,10 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderReadAttributeValue")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn read_attribute_value(&mut self) -> i32 {
+        use std::ffi::CString;
+
+        use crate::libxml::xmlstring::xml_strndup;
+
         unsafe {
             use crate::tree::XmlNsPtr;
 
@@ -1244,9 +1246,18 @@ impl XmlTextReader {
                     if !faketext.content.is_null() {
                         xml_free(faketext.content as _);
                     }
-                    faketext.content = xml_strdup(ns.href);
+                    if let Some(href) = ns.href.as_deref() {
+                        faketext.content = xml_strndup(href.as_ptr(), href.len() as i32);
+                    } else {
+                        faketext.content = null_mut();
+                    }
                 } else {
-                    self.faketext = xml_new_doc_text(self.node.unwrap().document(), ns.href);
+                    let href = ns.href().map(|href| CString::new(href.as_ref()).unwrap());
+                    self.faketext = xml_new_doc_text(
+                        self.node.unwrap().document(),
+                        href.as_deref()
+                            .map_or(null_mut(), |href| href.as_ptr() as *const u8),
+                    );
                 }
                 self.curnode = self.faketext.map(|node| node.into());
             } else {
@@ -3541,26 +3552,24 @@ impl XmlTextReader {
     /// Returns the namespace URI or `None` if not available.
     #[doc(alias = "xmlTextReaderNamespaceUri")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn namespace_uri(&self) -> Option<String> {
-        unsafe {
-            let current_node = self.node?;
-            let node = self.curnode.unwrap_or(current_node);
-            if node.element_type() == XmlElementType::XmlNamespaceDecl {
-                return Some("http://www.w3.org/2000/xmlns/".to_owned());
+    pub fn namespace_uri(&self) -> Option<String> {
+        let current_node = self.node?;
+        let node = self.curnode.unwrap_or(current_node);
+        if node.element_type() == XmlElementType::XmlNamespaceDecl {
+            return Some("http://www.w3.org/2000/xmlns/".to_owned());
+        }
+        match node.element_type() {
+            XmlElementType::XmlElementNode => {
+                let node = XmlNodePtr::try_from(node).unwrap();
+                let ns = node.ns?;
+                ns.href().map(|href| href.into_owned())
             }
-            match node.element_type() {
-                XmlElementType::XmlElementNode => {
-                    let node = XmlNodePtr::try_from(node).unwrap();
-                    let ns = node.ns?;
-                    ns.href().map(|href| href.into_owned())
-                }
-                XmlElementType::XmlAttributeNode => {
-                    let node = XmlAttrPtr::try_from(node).unwrap();
-                    let ns = node.ns?;
-                    ns.href().map(|href| href.into_owned())
-                }
-                _ => None,
+            XmlElementType::XmlAttributeNode => {
+                let node = XmlAttrPtr::try_from(node).unwrap();
+                let ns = node.ns?;
+                ns.href().map(|href| href.into_owned())
             }
+            _ => None,
         }
     }
 

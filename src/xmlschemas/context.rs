@@ -20,12 +20,10 @@ use std::{
     rc::Rc,
 };
 
-use libc::memset;
-
 #[cfg(feature = "libxml_automata")]
 use crate::libxml::xmlautomata::XmlAutomata;
 use crate::{
-    dict::{XmlDictPtr, xml_dict_create, xml_dict_free, xml_dict_lookup, xml_dict_reference},
+    dict::{XmlDictPtr, xml_dict_create, xml_dict_free, xml_dict_reference},
     encoding::XmlCharEncoding,
     globals::{GenericError, GenericErrorContext, StructuredError},
     io::XmlParserInputBuffer,
@@ -426,7 +424,7 @@ pub struct XmlSchemaValidCtxt {
 
 impl XmlSchemaValidCtxt {
     #[doc(alias = "xmlSchemaLookupNamespace")]
-    pub(crate) unsafe fn lookup_namespace(&self, prefix: Option<&str>) -> *const u8 {
+    pub(crate) unsafe fn lookup_namespace(&self, prefix: Option<&str>) -> Option<String> {
         unsafe {
             match () {
                 _ if !self.parser_ctxt.is_null() && (*self.parser_ctxt).sax.is_some() => {
@@ -449,21 +447,21 @@ impl XmlSchemaValidCtxt {
                                 {
                                     // Note that the namespace bindings are already
                                     // in a string dict.
-                                    return *(*inode).ns_bindings.add(j as usize + 1);
+                                    return Some(
+                                        CStr::from_ptr(
+                                            *(*inode).ns_bindings.add(j as usize + 1) as *const i8
+                                        )
+                                        .to_string_lossy()
+                                        .into_owned(),
+                                    );
                                 }
                             }
                         }
                     }
-                    null_mut()
+                    None
                 }
                 #[cfg(feature = "libxml_reader")]
-                _ if !self.reader.is_null() => {
-                    if let Some(ns_name) = (*self.reader).lookup_namespace(prefix) {
-                        xml_dict_lookup(self.dict, ns_name.as_ptr(), ns_name.len() as i32)
-                    } else {
-                        null_mut()
-                    }
-                }
+                _ if !self.reader.is_null() => (*self.reader).lookup_namespace(prefix),
                 _ => {
                     let Some(mut node) = (*self.inode).node.filter(|node| node.doc.is_some())
                     else {
@@ -472,14 +470,14 @@ impl XmlSchemaValidCtxt {
                             "xmlSchemaLookupNamespace",
                             "no node or node's doc available",
                         );
-                        return null_mut();
+                        return None;
                     };
                     let doc = node.doc;
                     let ns = node.search_ns(doc, prefix);
                     if let Some(ns) = ns {
-                        return ns.href;
+                        return ns.href.as_deref().map(|href| href.to_owned());
                     }
-                    null_mut()
+                    None
                 }
             }
         }
@@ -712,13 +710,10 @@ impl XmlSchemaValidCtxt {
                     xml_free(((*ielem).local_name) as _);
                     ((*ielem).local_name) = null_mut();
                 };
-                if !((*ielem).ns_name).is_null() {
-                    xml_free(((*ielem).ns_name) as _);
-                    ((*ielem).ns_name) = null_mut();
-                };
+                (*ielem).ns_name = None;
             } else {
                 (*ielem).local_name = null_mut();
-                (*ielem).ns_name = null_mut();
+                (*ielem).ns_name = None;
             }
             if (*ielem).flags & XML_SCHEMA_NODE_INFO_FLAG_OWNED_VALUES != 0 {
                 if !((*ielem).value).is_null() {
@@ -768,13 +763,10 @@ impl XmlSchemaValidCtxt {
             }
             for i in 0..self.nb_attr_infos {
                 attr = *self.attr_infos.add(i as usize);
-                if (*attr).flags & XML_SCHEMA_NODE_INFO_FLAG_OWNED_NAMES != 0 {
-                    if !(*attr).local_name.is_null() {
-                        xml_free((*attr).local_name as _);
-                    }
-                    if !(*attr).ns_name.is_null() {
-                        xml_free((*attr).ns_name as _);
-                    }
+                if (*attr).flags & XML_SCHEMA_NODE_INFO_FLAG_OWNED_NAMES != 0
+                    && !(*attr).local_name.is_null()
+                {
+                    xml_free((*attr).local_name as _);
                 }
                 if (*attr).flags & XML_SCHEMA_NODE_INFO_FLAG_OWNED_VALUES != 0
                     && !(*attr).value.is_null()
@@ -785,7 +777,7 @@ impl XmlSchemaValidCtxt {
                     xml_schema_free_value((*attr).val);
                     (*attr).val = null_mut();
                 }
-                memset(attr as _, 0, size_of::<XmlSchemaAttrInfo>());
+                std::ptr::write(&mut *attr, XmlSchemaAttrInfo::default());
             }
             self.nb_attr_infos = 0;
         }

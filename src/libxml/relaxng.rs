@@ -615,7 +615,7 @@ unsafe fn xml_relaxng_element_match(
         }
         if !(*define).ns.is_null() && *(*define).ns.add(0) != 0 {
             if let Some(ns) = elem.ns {
-                if !xml_str_equal(ns.href, (*define).ns) {
+                if ns.href() != Some(CStr::from_ptr((*define).ns as *const i8).to_string_lossy()) {
                     VALID_ERR3!(
                         ctxt,
                         XmlRelaxNGValidErr::XmlRelaxngErrElemwrongns,
@@ -759,7 +759,12 @@ unsafe fn xml_relaxng_compare_name_classes(
                     node.ns = None;
                 } else {
                     node.ns = XmlNsPtr::from_raw(addr_of_mut!(ns)).unwrap();
-                    ns.href = (*def1).ns;
+                    ns.href = Some(
+                        CStr::from_ptr((*def1).ns as *const i8)
+                            .to_string_lossy()
+                            .into_owned()
+                            .into(),
+                    );
                 }
             } else {
                 node.ns = None;
@@ -811,10 +816,15 @@ unsafe fn xml_relaxng_compare_name_classes(
                 if *(*def2).ns.add(0) == 0 {
                     node.ns = None;
                 } else {
-                    ns.href = (*def2).ns;
+                    ns.href = Some(
+                        CStr::from_ptr((*def2).ns as *const i8)
+                            .to_string_lossy()
+                            .into_owned()
+                            .into(),
+                    );
                 }
             } else {
-                ns.href = INVALID_NAME.as_ptr() as *const u8;
+                ns.href = Some(INVALID_NAME.to_str().unwrap().into());
             }
             if xml_relaxng_element_match(
                 addr_of_mut!(ctxt),
@@ -7068,7 +7078,11 @@ unsafe fn xml_relaxng_attribute_match(
                 }
             } else if prop
                 .ns
-                .is_none_or(|ns| !xml_str_equal((*define).ns, ns.href))
+                .as_deref()
+                .and_then(|ns| ns.href())
+                .is_none_or(|href| {
+                    CStr::from_ptr((*define).ns as *const i8).to_string_lossy() != href
+                })
             {
                 return 0;
             }
@@ -7140,7 +7154,12 @@ unsafe fn xml_relaxng_validate_attribute(
                             && tmp.ns.is_none())
                             || tmp
                                 .ns
-                                .is_some_and(|ns| xml_str_equal((*define).ns, ns.href)))
+                                .as_deref()
+                                .and_then(|ns| ns.href())
+                                .is_some_and(|href| {
+                                    CStr::from_ptr((*define).ns as *const i8).to_string_lossy()
+                                        == href
+                                }))
                 })
             {
                 let value = prop
@@ -8493,10 +8512,21 @@ unsafe fn xml_relaxng_validate_state(
                                 xml_hash_lookup2(triage, c"#text".as_ptr() as _, null_mut()) as _;
                         } else if node.element_type() == XmlElementType::XmlElementNode {
                             if let Some(ns) = node.ns {
-                                list = xml_hash_lookup2(triage, node.name, ns.href) as _;
+                                let href =
+                                    ns.href.as_deref().map(|href| CString::new(href).unwrap());
+                                list = xml_hash_lookup2(
+                                    triage,
+                                    node.name,
+                                    href.as_deref()
+                                        .map_or(null_mut(), |href| href.as_ptr() as *const u8),
+                                ) as _;
                                 if list.is_null() {
-                                    list = xml_hash_lookup2(triage, c"#any".as_ptr() as _, ns.href)
-                                        as _;
+                                    list = xml_hash_lookup2(
+                                        triage,
+                                        c"#any".as_ptr() as _,
+                                        href.as_deref()
+                                            .map_or(null_mut(), |href| href.as_ptr() as *const u8),
+                                    ) as _;
                                 }
                             } else {
                                 list = xml_hash_lookup2(triage, node.name, null_mut()) as _;

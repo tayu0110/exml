@@ -40,7 +40,6 @@ use std::{
 use crate::{
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     io::{XmlOutputBuffer, write_quoted},
-    libxml::xmlstring::xml_strlen,
     list::XmlList,
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlAttr, XmlAttrPtr, XmlDoc, XmlDocPtr, XmlElementType,
@@ -91,24 +90,24 @@ impl XmlC14NVisibleNsStack {
     /// Please refer to the document of `xmlC14NVisibleNsStackFind` for original libxml2.
     #[doc(alias = "xmlC14NVisibleNsStackFind")]
     unsafe fn find(&self, ns: &XmlNs) -> bool {
-        // if the default namespace xmlns="" is not defined yet then we do not want to print it out
-        let prefix = unsafe { ns.prefix() };
-        let prefix = prefix.as_deref().unwrap_or("");
-        let href = unsafe { ns.href() };
-        let href = href.as_deref().unwrap_or("");
+        unsafe {
+            // if the default namespace xmlns="" is not defined yet then we do not want to print it out
+            let prefix = ns.prefix();
+            let prefix = prefix.as_deref().unwrap_or("");
+            let href = ns.href();
+            let href = href.as_deref().unwrap_or("");
 
-        let has_empty_ns =
-            xml_c14n_str_equal(Some(prefix), None) && xml_c14n_str_equal(Some(href), None);
+            let has_empty_ns =
+                xml_c14n_str_equal(Some(prefix), None) && xml_c14n_str_equal(Some(href), None);
 
-        let start = if has_empty_ns { 0 } else { self.ns_prev_start };
-        for &ns1 in self.ns_tab[start..self.ns_cur_end].iter().rev() {
-            unsafe {
+            let start = if has_empty_ns { 0 } else { self.ns_prev_start };
+            for &ns1 in self.ns_tab[start..self.ns_cur_end].iter().rev() {
                 if xml_c14n_str_equal(Some(prefix), ns1.prefix().as_deref()) {
                     return xml_c14n_str_equal(Some(href), ns1.href().as_deref());
                 }
             }
+            has_empty_ns
         }
-        has_empty_ns
     }
 
     #[doc(alias = "xmlC14NVisibleNsStackAdd")]
@@ -194,31 +193,29 @@ impl<T> XmlC14NCtx<'_, T> {
     ///
     /// Returns 0 if the node has no relative namespaces or -1 otherwise.
     #[doc(alias = "xmlC14NCheckForRelativeNamespaces")]
-    unsafe fn check_for_relative_namespaces(&self, cur: &XmlNode) -> i32 {
-        unsafe {
-            if !matches!(cur.element_type(), XmlElementType::XmlElementNode) {
-                xml_c14n_err_param("checking for relative namespaces");
-                return -1;
-            }
-
-            let mut ns = cur.ns_def;
-            while let Some(now) = ns {
-                let href = now.href().unwrap();
-                if !href.is_empty() {
-                    let Some(uri) = XmlURI::parse(&href) else {
-                        xml_c14n_err_internal("parsing namespace uri");
-                        return -1;
-                    };
-                    let scheme = uri.scheme.as_deref().unwrap();
-                    if scheme.is_empty() {
-                        xml_c14n_err_relative_namespace(scheme);
-                        return -1;
-                    }
-                }
-                ns = now.next;
-            }
-            0
+    fn check_for_relative_namespaces(&self, cur: &XmlNode) -> i32 {
+        if !matches!(cur.element_type(), XmlElementType::XmlElementNode) {
+            xml_c14n_err_param("checking for relative namespaces");
+            return -1;
         }
+
+        let mut ns = cur.ns_def;
+        while let Some(now) = ns {
+            let href = now.href().unwrap();
+            if !href.is_empty() {
+                let Some(uri) = XmlURI::parse(&href) else {
+                    xml_c14n_err_internal("parsing namespace uri");
+                    return -1;
+                };
+                let scheme = uri.scheme.as_deref().unwrap();
+                if scheme.is_empty() {
+                    xml_c14n_err_relative_namespace(scheme);
+                    return -1;
+                }
+            }
+            ns = now.next;
+        }
+        0
     }
 
     /// Prints the given namespace to the output buffer from C14N context.
@@ -234,8 +231,8 @@ impl<T> XmlC14NCtx<'_, T> {
             } else {
                 self.buf.write_str(" xmlns=").ok();
             }
-            if !ns.href.is_null() {
-                write_quoted(&mut self.buf, &ns.href().unwrap()).ok();
+            if let Some(href) = ns.href.as_deref() {
+                write_quoted(&mut self.buf, href).ok();
             } else {
                 self.buf.write_str("\"\"").ok();
             }
@@ -988,7 +985,8 @@ impl<T> XmlC14NCtx<'_, T> {
                         has_empty_ns = true;
                     }
                 } else if cur_attr.ns.is_some_and(|ns| {
-                    ns.prefix().map_or(0, |pre| pre.len()) == 0 && xml_strlen(ns.href) == 0
+                    ns.prefix().map_or(0, |pre| pre.len()) == 0
+                        && ns.href.as_deref().unwrap().is_empty()
                 }) {
                     has_visibly_utilized_empty_ns = true;
                 }
@@ -1214,7 +1212,10 @@ unsafe fn xml_c14n_is_node_in_nodeset(
     unsafe {
         if let (Some(nodes), Some(node)) = (nodes, node) {
             if let Ok(node) = XmlNsPtr::try_from(node) {
-                let mut ns = XmlNs { ..*node };
+                let mut ns = XmlNs {
+                    href: node.href.clone(),
+                    ..*node
+                };
                 ns.node = ns.next.map(|ns| ns.into());
 
                 // this is a libxml hack! check xpath.c for details

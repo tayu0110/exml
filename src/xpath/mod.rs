@@ -206,7 +206,7 @@ pub type XmlXPathFunction = unsafe fn(ctxt: &mut XmlXPathParserContext, nargs: u
 #[doc(alias = "xmlXPathVariableLookupFunc")]
 #[cfg(feature = "xpath")]
 pub type XmlXPathVariableLookupFunc =
-    unsafe fn(ctxt: *mut c_void, name: *const XmlChar, ns_uri: *const XmlChar) -> XmlXPathObjectPtr;
+    unsafe fn(ctxt: *mut c_void, name: *const XmlChar, ns_uri: Option<&str>) -> XmlXPathObjectPtr;
 
 /// Prototype for callbacks used to plug function lookup in the XPath engine.
 ///
@@ -264,7 +264,7 @@ pub struct XmlXPathStepOp {
     pub(crate) value4: *mut c_void,
     pub(crate) value5: *mut c_void,
     pub(crate) cache: Option<XmlXPathFunction>,
-    pub(crate) cache_uri: *mut c_void,
+    pub(crate) cache_uri: Option<String>,
 }
 
 // The structure of a compiled expression form is not public.
@@ -2661,38 +2661,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_xpath_ns_lookup() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_XPATH_CONTEXT_PTR {
-                for n_prefix in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let ctxt = gen_xml_xpath_context_ptr(n_ctxt, 0);
-                    let prefix = gen_const_xml_char_ptr(n_prefix, 1);
-
-                    let ret_val = xml_xpath_ns_lookup(ctxt, prefix);
-                    desret_const_xml_char_ptr(ret_val);
-                    des_xml_xpath_context_ptr(n_ctxt, ctxt, 0);
-                    des_const_xml_char_ptr(n_prefix, prefix, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlXPathNsLookup",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlXPathNsLookup()");
-                        eprint!(" {}", n_ctxt);
-                        eprintln!(" {}", n_prefix);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_xpath_registered_funcs_cleanup() {
         #[cfg(feature = "xpath")]
         unsafe {
@@ -2925,46 +2893,6 @@ mod tests {
                         );
                         eprint!(" {}", n_ctxt);
                         eprintln!(" {}", n_name);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_variable_lookup_ns() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_XPATH_CONTEXT_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_ns_uri in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let ctxt = gen_xml_xpath_context_ptr(n_ctxt, 0);
-                        let name = gen_const_xml_char_ptr(n_name, 1);
-                        let ns_uri = gen_const_xml_char_ptr(n_ns_uri, 2);
-
-                        let ret_val = xml_xpath_variable_lookup_ns(ctxt, name, ns_uri);
-                        desret_xml_xpath_object_ptr(ret_val);
-                        des_xml_xpath_context_ptr(n_ctxt, ctxt, 0);
-                        des_const_xml_char_ptr(n_name, name, 1);
-                        des_const_xml_char_ptr(n_ns_uri, ns_uri, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlXPathVariableLookupNS",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlXPathVariableLookupNS()"
-                            );
-                            eprint!(" {}", n_ctxt);
-                            eprint!(" {}", n_name);
-                            eprintln!(" {}", n_ns_uri);
-                        }
                     }
                 }
             }

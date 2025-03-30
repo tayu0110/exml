@@ -1988,7 +1988,8 @@ impl XmlCatalogEntry {
 
             doc.add_child(dtd.unwrap().into());
 
-            let Some(ns) = xml_new_ns(None, XML_CATALOGS_NAMESPACE.as_ptr() as _, None) else {
+            let Some(ns) = xml_new_ns(None, Some(XML_CATALOGS_NAMESPACE.to_str().unwrap()), None)
+            else {
                 xml_free_doc(doc);
                 return -1;
             };
@@ -2601,8 +2602,8 @@ unsafe fn xml_parse_xml_catalog_node_list(
     unsafe {
         while let Some(cur_node) = cur {
             if cur_node.ns.is_some_and(|ns| {
-                !ns.href.is_null()
-                    && ns.href().as_deref() == Some(XML_CATALOGS_NAMESPACE.to_str().unwrap())
+                ns.href()
+                    .is_some_and(|href| href == XML_CATALOGS_NAMESPACE.to_str().unwrap())
             }) {
                 xml_parse_xml_catalog_node(cur_node, prefer, parent.clone(), cgroup.clone());
             }
@@ -2637,10 +2638,11 @@ unsafe fn xml_parse_xml_catalog_file(
 
         if let Some(cur) = doc.get_root_element().filter(|cur| {
             xml_str_equal(cur.name, c"catalog".as_ptr() as _)
-                && cur.ns.is_some_and(|ns| {
-                    !ns.href.is_null()
-                        && ns.href().as_deref() == Some(XML_CATALOGS_NAMESPACE.to_str().unwrap())
-                })
+                && cur
+                    .ns
+                    .as_deref()
+                    .and_then(|ns| ns.href())
+                    .is_some_and(|href| href == XML_CATALOGS_NAMESPACE.to_str().unwrap())
         }) {
             let parent = xml_new_catalog_entry(
                 XmlCatalogEntryType::XmlCataCatalog,

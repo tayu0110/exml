@@ -141,32 +141,28 @@ fn xml_schematron_perr_memory(extra: &str, node: Option<XmlGenericNodePtr>) {
     __xml_simple_oom_error(XmlErrorDomain::XmlFromSchemasp, node, Some(extra));
 }
 
-unsafe fn is_schematron(node: XmlNodePtr, elem: &str) -> bool {
-    unsafe {
-        node.element_type() == XmlElementType::XmlElementNode
-            && node.name().as_deref() == Some(elem)
-            && node.ns.is_some_and(|ns| {
+fn is_schematron(node: XmlNodePtr, elem: &str) -> bool {
+    node.element_type() == XmlElementType::XmlElementNode
+        && node.name().as_deref() == Some(elem)
+        && node.ns.is_some_and(|ns| {
+            ns.href().as_deref() == Some(XML_SCHEMATRON_NS)
+                || ns.href().as_deref() == Some(XML_OLD_SCHEMATRON_NS)
+        })
+}
+
+fn next_schematron(mut node: Option<XmlNodePtr>) -> Option<XmlNodePtr> {
+    while let Some(cur) = node {
+        if cur.element_type() == XmlElementType::XmlElementNode
+            && cur.ns.is_some_and(|ns| {
                 ns.href().as_deref() == Some(XML_SCHEMATRON_NS)
                     || ns.href().as_deref() == Some(XML_OLD_SCHEMATRON_NS)
             })
-    }
-}
-
-unsafe fn next_schematron(mut node: Option<XmlNodePtr>) -> Option<XmlNodePtr> {
-    unsafe {
-        while let Some(cur) = node {
-            if cur.element_type() == XmlElementType::XmlElementNode
-                && cur.ns.is_some_and(|ns| {
-                    ns.href().as_deref() == Some(XML_SCHEMATRON_NS)
-                        || ns.href().as_deref() == Some(XML_OLD_SCHEMATRON_NS)
-                })
-            {
-                break;
-            }
-            node = cur.next.map(|node| XmlNodePtr::try_from(node).unwrap());
+        {
+            break;
         }
-        node
+        node = cur.next.map(|node| XmlNodePtr::try_from(node).unwrap());
     }
+    node
 }
 
 /// Registers a list of let variables to the current context of @cur
@@ -220,7 +216,7 @@ unsafe fn xml_schematron_unregister_variables(
     }
 }
 
-unsafe fn xml_schematron_next_node(cur: XmlNodePtr) -> Option<XmlNodePtr> {
+fn xml_schematron_next_node(cur: XmlNodePtr) -> Option<XmlNodePtr> {
     let mut cur = if let Some(children) = cur.children() {
         // Do not descend on entities declarations
         if children.element_type() != XmlElementType::XmlEntityDecl {

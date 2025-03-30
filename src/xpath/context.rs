@@ -445,7 +445,7 @@ pub struct XmlXPathContext {
 
     // The function name and URI when calling a function
     pub(crate) function: *const u8,
-    pub(crate) function_uri: *const u8,
+    pub(crate) function_uri: Option<String>,
 
     // function lookup function and data
     // function lookup func
@@ -626,7 +626,7 @@ impl Default for XmlXPathContext {
             var_lookup_data: null_mut(),
             extra: null_mut(),
             function: null_mut(),
-            function_uri: null_mut(),
+            function_uri: None,
             func_lookup: None,
             tmp_ns_list: None,
             tmp_ns_nr: 0,

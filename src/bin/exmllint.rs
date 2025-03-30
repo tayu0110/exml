@@ -2260,7 +2260,8 @@ unsafe fn walk_doc(doc: XmlDocPtr) {
 
         #[cfg(feature = "libxml_pattern")]
         {
-            let mut namespaces: [(*const u8, *const u8); 22] = [(null(), null()); 22];
+            let mut namespaces: [(Option<Box<str>>, *const u8); 22] =
+                [const { (None, null()) }; 22];
 
             let Some(root) = doc.get_root_element() else {
                 generic_error!("Document does not have a root element");
@@ -2270,7 +2271,7 @@ unsafe fn walk_doc(doc: XmlDocPtr) {
             let mut i = 0;
             let mut ns = root.ns_def;
             while let Some(now) = ns.filter(|_| i < 10) {
-                namespaces[i] = (now.href, now.prefix);
+                namespaces[i] = (now.href.clone(), now.prefix);
                 i += 1;
                 ns = now.next;
             }
@@ -2282,13 +2283,11 @@ unsafe fn walk_doc(doc: XmlDocPtr) {
                     Some(
                         namespaces[..i]
                             .iter()
-                            .map(|&(href, pref)| {
+                            .map(|(href, pref)| {
                                 (
-                                    CStr::from_ptr(href as *const i8)
-                                        .to_string_lossy()
-                                        .into_owned(),
+                                    href.clone().map(|href| href.to_string()).unwrap(),
                                     (!pref.is_null()).then(|| {
-                                        CStr::from_ptr(pref as *const i8)
+                                        CStr::from_ptr(*pref as *const i8)
                                             .to_string_lossy()
                                             .into_owned()
                                     }),

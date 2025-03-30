@@ -662,12 +662,9 @@ pub unsafe fn xml_xpath_namespace_uri_function(ctxt: &mut XmlXPathParserContext,
                             .map(|node| node.ns)
                             .or_else(|_| XmlAttrPtr::try_from(table[i]).map(|attr| attr.ns))
                         {
-                            let href = ns.href;
                             ctxt.value_push(xml_xpath_cache_new_string(
                                 ctxt.context,
-                                (!href.is_null())
-                                    .then(|| CStr::from_ptr(href as *const i8).to_string_lossy())
-                                    .as_deref(),
+                                ns.href.as_deref(),
                             ));
                         } else {
                             ctxt.value_push(xml_xpath_cache_new_string(ctxt.context, Some("")));

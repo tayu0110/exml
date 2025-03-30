@@ -1465,8 +1465,7 @@ unsafe fn xml_sax2_attribute_internal(
             }
 
             // a default namespace definition
-            let cval = CString::new(val.as_str()).unwrap();
-            let nsret = xml_new_ns((*ctxt).node, cval.as_ptr() as *const u8, None);
+            let nsret = xml_new_ns((*ctxt).node, Some(val.as_str()), None);
 
             // Validate also for namespace decls, they are attributes from an XML-1.0 perspective
             #[cfg(feature = "libxml_valid")]
@@ -1546,8 +1545,7 @@ unsafe fn xml_sax2_attribute_internal(
             }
 
             // a standard namespace definition
-            let cval = CString::new(val.as_str()).unwrap();
-            let nsret = xml_new_ns((*ctxt).node, cval.as_ptr() as *const u8, Some(name));
+            let nsret = xml_new_ns((*ctxt).node, Some(val.as_str()), Some(name));
             #[cfg(feature = "libxml_valid")]
             // Validate also for namespace decls, they are attributes from an XML-1.0 perspective
             if nsret.is_some() && (*ctxt).validate != 0 && (*ctxt).well_formed != 0 {
@@ -1995,12 +1993,12 @@ pub unsafe fn xml_sax2_start_element(
 
             // Search the namespace, note that since the attributes have been
             // processed, the local namespaces are available.
-            let mut ns = (*ret)
+            let mut ns = ret
                 .search_ns((*ctxt).my_doc, prefix)
                 .or_else(|| parent.and_then(|parent| parent.search_ns((*ctxt).my_doc, prefix)));
             if ns.is_none() {
                 if let Some(prefix) = prefix {
-                    ns = xml_new_ns(Some(ret), null_mut(), Some(prefix));
+                    ns = xml_new_ns(Some(ret), None, Some(prefix));
                     xml_ns_warn_msg!(
                         ctxt,
                         XmlParserErrors::XmlNsErrUndefinedNamespace,
@@ -2012,10 +2010,11 @@ pub unsafe fn xml_sax2_start_element(
 
             // set the namespace node, making sure that if the default namespace
             // is unbound on a parent we simply keep it NULL
-            if let Some(ns) = ns
-                .filter(|ns| !ns.href.is_null() && (*ns.href.add(0) != 0 || ns.prefix().is_some()))
-            {
-                (*ret).set_ns(Some(ns));
+            if let Some(ns) = ns.filter(|ns| {
+                ns.href()
+                    .is_some_and(|href| !href.is_empty() || ns.prefix().is_some())
+            }) {
+                ret.set_ns(Some(ns));
             }
         }
 
@@ -2185,8 +2184,7 @@ pub unsafe fn xml_sax2_start_element_ns(
         // Build the namespace list
         let mut last = None::<XmlNsPtr>;
         for (pref, uri) in namespaces {
-            let curi = CString::new(uri.as_str()).unwrap();
-            let Some(ns) = xml_new_ns(None, curi.as_ptr() as *const u8, pref.as_deref()) else {
+            let Some(ns) = xml_new_ns(None, Some(uri.as_str()), pref.as_deref()) else {
                 // any out of memory error would already have been raised
                 // but we can't be guaranteed it's the actual error due to the
                 // API, best is to skip in this case
@@ -2252,7 +2250,7 @@ pub unsafe fn xml_sax2_start_element_ns(
                 ret.ns = ret.search_ns((*ctxt).my_doc, prefix);
             }
             if ret.ns.is_none() {
-                if xml_new_ns(Some(ret), null_mut(), prefix).is_none() {
+                if xml_new_ns(Some(ret), None, prefix).is_none() {
                     xml_sax2_err_memory(ctxt, "xmlSAX2StartElementNs");
                     return;
                 }

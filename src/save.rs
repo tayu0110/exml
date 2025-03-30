@@ -646,7 +646,7 @@ unsafe fn xml_ns_dump_output(
         if buf.is_none() && ctxt.is_none() {
             return;
         };
-        if matches!(cur.element_type(), XML_LOCAL_NAMESPACE) && !cur.href.is_null() {
+        if matches!(cur.element_type(), XML_LOCAL_NAMESPACE) && cur.href.is_some() {
             if (*cur).prefix().as_deref() == Some("xml") {
                 return;
             }
@@ -670,7 +670,7 @@ unsafe fn xml_ns_dump_output(
                 }
                 buf.write_bytes(b"=").ok();
                 if let Some(mut buf) = buf.buffer {
-                    buf.push_quoted_cstr(CStr::from_ptr(cur.href as *const i8))
+                    buf.push_quoted_cstr(&CString::new(cur.href.as_deref().unwrap()).unwrap())
                         .ok();
                 }
             };

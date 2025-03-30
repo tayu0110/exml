@@ -116,13 +116,11 @@ unsafe fn xml_schema_eval_error_node_type(
     }
 }
 
-unsafe fn xml_schema_format_qname_ns(ns: Option<XmlNsPtr>, local_name: Option<&str>) -> String {
-    unsafe {
-        if let Some(ns) = ns {
-            xml_schema_format_qname(ns.href().as_deref(), local_name)
-        } else {
-            xml_schema_format_qname(None, local_name)
-        }
+fn xml_schema_format_qname_ns(ns: Option<XmlNsPtr>, local_name: Option<&str>) -> String {
+    if let Some(ns) = ns {
+        xml_schema_format_qname(ns.href().as_deref(), local_name)
+    } else {
+        xml_schema_format_qname(None, local_name)
     }
 }
 
@@ -150,11 +148,8 @@ unsafe fn xml_schema_format_error_node_qname(
                 ));
             }
         } else if !ni.is_null() {
-            let namespace_name = (*ni).ns_name as *const i8;
             return Some(xml_schema_format_qname(
-                (!namespace_name.is_null())
-                    .then(|| CStr::from_ptr(namespace_name).to_string_lossy())
-                    .as_deref(),
+                (*ni).ns_name.as_deref(),
                 Some(
                     CStr::from_ptr((*ni).local_name as *const i8)
                         .to_string_lossy()
@@ -583,12 +578,9 @@ unsafe fn xml_schema_format_node_for_error(
                 let ielem: XmlSchemaNodeInfoPtr = *(*vctxt).elem_infos.add((*vctxt).depth as usize);
 
                 res.push_str("Element '");
-                let namespace_name = (*ielem).ns_name as *const i8;
                 res.push_str(
                     xml_schema_format_qname(
-                        (!namespace_name.is_null())
-                            .then(|| CStr::from_ptr(namespace_name).to_string_lossy())
-                            .as_deref(),
+                        (*ielem).ns_name.as_deref(),
                         Some(
                             CStr::from_ptr((*ielem).local_name as *const i8)
                                 .to_string_lossy()
@@ -602,12 +594,10 @@ unsafe fn xml_schema_format_node_for_error(
             } else {
                 res.push_str("Element '");
             }
-            let namespace_name = (*(*vctxt).inode).ns_name as *const i8;
+
             res.push_str(
                 xml_schema_format_qname(
-                    (!namespace_name.is_null())
-                        .then(|| CStr::from_ptr(namespace_name).to_string_lossy())
-                        .as_deref(),
+                    (*(*vctxt).inode).ns_name.as_deref(),
                     Some(
                         CStr::from_ptr((*(*vctxt).inode).local_name as *const i8)
                             .to_string_lossy()

@@ -757,35 +757,30 @@ impl XmlDebugCtxt<'_> {
                 );
                 return;
             }
-            if ns.href.is_null() {
-                if let Some(prefix) = ns.prefix() {
-                    xml_debug_err!(
-                        self,
-                        XmlParserErrors::XmlCheckNoHref,
-                        "Incomplete namespace {} href=NULL\n",
-                        prefix
-                    );
-                } else {
-                    xml_debug_err!(
-                        self,
-                        XmlParserErrors::XmlCheckNoHref,
-                        "Incomplete default namespace href=NULL\n",
-                    );
-                }
-            } else if self.check == 0 {
-                if let Some(prefix) = ns.prefix() {
-                    write!(self.output, "namespace {prefix} href=").ok();
-                } else {
-                    write!(self.output, "default namespace href=").ok();
-                }
+            if let Some(href) = ns.href.as_deref() {
+                if self.check == 0 {
+                    if let Some(prefix) = ns.prefix() {
+                        write!(self.output, "namespace {prefix} href=").ok();
+                    } else {
+                        write!(self.output, "default namespace href=").ok();
+                    }
 
-                let href = ns.href;
-                self.dump_string(
-                    (!href.is_null())
-                        .then(|| CStr::from_ptr(href as *const i8).to_string_lossy())
-                        .as_deref(),
+                    self.dump_string(Some(href));
+                    writeln!(self.output).ok();
+                }
+            } else if let Some(prefix) = ns.prefix() {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckNoHref,
+                    "Incomplete namespace {} href=NULL\n",
+                    prefix
                 );
-                writeln!(self.output).ok();
+            } else {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckNoHref,
+                    "Incomplete default namespace href=NULL\n",
+                );
             }
         }
     }
@@ -1765,11 +1760,10 @@ pub unsafe fn xml_ls_one_node<'a>(output: &mut (impl Write + 'a), node: Option<X
             XmlElementType::XmlNotationNode => {}
             XmlElementType::XmlNamespaceDecl => {
                 let ns = XmlNsPtr::try_from(node).unwrap();
-                let href = CStr::from_ptr(ns.href as *const i8).to_string_lossy();
                 if let Some(prefix) = ns.prefix() {
-                    write!(output, "{prefix} -> {href}").ok();
+                    write!(output, "{prefix} -> {}", ns.href.as_deref().unwrap()).ok();
                 } else {
-                    write!(output, "default -> {href}").ok();
+                    write!(output, "default -> {}", ns.href.as_deref().unwrap()).ok();
                 }
             }
             _ => {

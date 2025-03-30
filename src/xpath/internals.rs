@@ -616,32 +616,37 @@ pub unsafe fn xml_xpath_register_ns(
 pub unsafe fn xml_xpath_ns_lookup(
     ctxt: XmlXPathContextPtr,
     prefix: *const XmlChar,
-) -> *const XmlChar {
+) -> Option<String> {
     unsafe {
         if ctxt.is_null() {
-            return null();
+            return None;
         }
         if prefix.is_null() {
-            return null();
+            return None;
         }
 
         let prefix = CStr::from_ptr(prefix as *const i8).to_string_lossy();
         if prefix == "xml" {
-            return XML_XML_NAMESPACE.as_ptr() as _;
+            return Some(XML_XML_NAMESPACE.to_str().unwrap().into());
         }
 
         if let Some(namespaces) = (*ctxt).namespaces.as_deref() {
             for &ns in namespaces {
                 if ns.prefix().as_deref() == Some(prefix.as_ref()) {
-                    return ns.href;
+                    return ns.href.as_deref().map(|href| href.to_owned());
                 }
             }
         }
 
-        (*ctxt)
+        let res = (*ctxt)
             .ns_hash
             .and_then(|table| table.lookup(&prefix).copied())
-            .unwrap_or(null_mut())
+            .unwrap_or(null_mut());
+        (!res.is_null()).then(|| {
+            CStr::from_ptr(res as *const i8)
+                .to_string_lossy()
+                .into_owned()
+        })
     }
 }
 
@@ -760,9 +765,9 @@ pub unsafe fn xml_xpath_variable_lookup(
         }
 
         if let Some(var_lookup_func) = (*ctxt).var_lookup_func {
-            return var_lookup_func((*ctxt).var_lookup_data, name, null());
+            return var_lookup_func((*ctxt).var_lookup_data, name, None);
         }
-        xml_xpath_variable_lookup_ns(ctxt, name, null())
+        xml_xpath_variable_lookup_ns(ctxt, name, None)
     }
 }
 
@@ -1024,7 +1029,7 @@ pub(super) unsafe fn xml_xpath_cache_object_copy(
 pub unsafe fn xml_xpath_variable_lookup_ns(
     ctxt: XmlXPathContextPtr,
     name: *const XmlChar,
-    ns_uri: *const XmlChar,
+    ns_uri: Option<&str>,
 ) -> XmlXPathObjectPtr {
     unsafe {
         if ctxt.is_null() {
@@ -1048,9 +1053,7 @@ pub unsafe fn xml_xpath_variable_lookup_ns(
         let obj = var_hash
             .lookup2(
                 CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
-                (!ns_uri.is_null())
-                    .then(|| CStr::from_ptr(ns_uri as *const i8).to_string_lossy())
-                    .as_deref(),
+                ns_uri,
             )
             .copied()
             .unwrap_or(null_mut());
@@ -1137,9 +1140,7 @@ pub unsafe fn xml_xpath_node_set_dup_ns(
             xml_xpath_err_memory(null_mut(), Some("duplicating namespace\n"));
             return None;
         };
-        if !ns.href.is_null() {
-            cur.href = xml_strdup(ns.href);
-        }
+        cur.href = ns.href.clone();
         if ns.prefix().is_some() {
             cur.prefix = xml_strdup(ns.prefix);
         }
@@ -2243,7 +2244,7 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
         let typ: XmlXPathTypeVal = (*op).value3.try_into().unwrap();
         let prefix: *const XmlChar = (*op).value4 as _;
         let name: *const XmlChar = (*op).value5 as _;
-        let mut uri: *const XmlChar = null();
+        let mut uri = None;
         let mut total: i32 = 0;
         let mut has_ns_nodes: bool;
 
@@ -2263,7 +2264,7 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
         // Setup namespaces.
         if !prefix.is_null() {
             uri = xml_xpath_ns_lookup(xpctxt, prefix);
-            if uri.is_null() {
+            if uri.is_none() {
                 xml_xpath_release_object(xpctxt, obj);
                 XP_ERROR0!(ctxt, XmlXPathError::XPathUndefPrefixError as i32);
             }
@@ -2476,7 +2477,7 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
                     }
                     XmlXPathTestVal::NodeTestType => {
                         if matches!(typ, XmlXPathTypeVal::NodeTypeNode) {
-                            match (*cur).element_type() {
+                            match cur.element_type() {
                                 XmlElementType::XmlDocumentNode
                                 | XmlElementType::XmlHTMLDocumentNode
                                 | XmlElementType::XmlElementNode
@@ -2497,20 +2498,20 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
                                 }
                                 _ => {}
                             }
-                        } else if (*cur).element_type() as isize == typ as isize {
-                            if matches!((*cur).element_type(), XmlElementType::XmlNamespaceDecl) {
+                        } else if cur.element_type() as isize == typ as isize {
+                            if matches!(cur.element_type(), XmlElementType::XmlNamespaceDecl) {
                                 xp_test_hit_ns!(has_axis_range, pos, max_pos, has_ns_nodes, seq, xpctxt, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                             } else {
                                 xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                             }
                         } else if matches!(typ, XmlXPathTypeVal::NodeTypeText)
-                            && matches!((*cur).element_type(), XmlElementType::XmlCDATASectionNode)
+                            && matches!(cur.element_type(), XmlElementType::XmlCDATASectionNode)
                         {
                             xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                         }
                     }
                     XmlXPathTestVal::NodeTestPI => {
-                        if matches!((*cur).element_type(), XmlElementType::XmlPINode)
+                        if matches!(cur.element_type(), XmlElementType::XmlPINode)
                             && (name.is_null()
                                 || xml_str_equal(name, XmlNodePtr::try_from(cur).unwrap().name))
                         {
@@ -2524,7 +2525,9 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
                                     || XmlAttrPtr::try_from(cur)
                                         .unwrap()
                                         .ns
-                                        .is_some_and(|ns| xml_str_equal(uri, ns.href)))
+                                        .as_deref()
+                                        .and_then(|ns| ns.href.as_deref())
+                                        .is_some_and(|href| uri.as_deref() == Some(href)))
                             {
                                 xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                             }
@@ -2537,7 +2540,9 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
                                 || XmlNodePtr::try_from(cur)
                                     .unwrap()
                                     .ns
-                                    .is_some_and(|ns| xml_str_equal(uri, ns.href)))
+                                    .as_deref()
+                                    .and_then(|ns| ns.href.as_deref())
+                                    .is_some_and(|href| uri.as_deref() == Some(href)))
                         {
                             xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                         }
@@ -2565,7 +2570,11 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
                                         if node.ns.is_none() {
                                             xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                                         }
-                                    } else if node.ns.is_some_and(|ns| xml_str_equal(uri, ns.href))
+                                    } else if node
+                                        .ns
+                                        .as_deref()
+                                        .and_then(|ns| ns.href.as_deref())
+                                        .is_some_and(|href| uri.as_deref() == Some(href))
                                     {
                                         xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                                     }
@@ -2579,7 +2588,11 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
                                         if attr.ns.is_none_or(|ns| ns.prefix().is_none()) {
                                             xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                                         }
-                                    } else if attr.ns.is_some_and(|ns| xml_str_equal(uri, ns.href))
+                                    } else if attr
+                                        .ns
+                                        .as_deref()
+                                        .and_then(|ns| ns.href.as_deref())
+                                        .is_some_and(|href| uri.as_deref() == Some(href))
                                     {
                                         xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                                     }
@@ -3075,14 +3088,15 @@ unsafe fn xml_xpath_node_val_hash(node: Option<XmlGenericNodePtr>) -> u32 {
             }
             XmlElementType::XmlNamespaceDecl => {
                 let ns = XmlNsPtr::try_from(node).unwrap();
-                let string = ns.href;
-                if string.is_null() {
+                let Some(string) = ns.href.as_deref() else {
+                    return 0;
+                };
+                if string.is_empty() {
                     return 0;
                 }
-                if *string.add(0) == 0 {
-                    return 0;
-                }
-                return *string.add(0) as u32 + ((*string.add(1) as u32) << 8);
+                let s0 = string.as_bytes()[0];
+                let s1 = *string.as_bytes().get(1).unwrap_or(&0);
+                return s0 as u32 + ((s1 as u32) << 8);
             }
             XmlElementType::XmlAttributeNode => {
                 let attr = XmlAttrPtr::try_from(node).unwrap();
@@ -4600,7 +4614,7 @@ pub unsafe fn xml_xpath_next_following(
                 None
             }
         })?;
-        if let Some(next) = (*cur).next() {
+        if let Some(next) = cur.next() {
             return Some(next);
         }
         loop {
@@ -4608,7 +4622,7 @@ pub unsafe fn xml_xpath_next_following(
             if Some(cur) == (*(*ctxt).context).doc.map(|doc| doc.into()) {
                 break None;
             }
-            if let Some(next) = (*cur).next() {
+            if let Some(next) = cur.next() {
                 break Some(next);
             }
         }
@@ -4616,15 +4630,15 @@ pub unsafe fn xml_xpath_next_following(
 }
 
 thread_local! {
-    static XML_XPATH_XMLNAMESPACE_STRUCT: XmlNs = const { XmlNs {
+    static XML_XPATH_XMLNAMESPACE_STRUCT: XmlNs = XmlNs {
         next: None,
         typ: XmlElementType::XmlNamespaceDecl,
-        href: XML_XML_NAMESPACE.as_ptr() as *const u8,
+        href: Some(XML_XML_NAMESPACE.to_str().unwrap().into()),
         prefix: c"xml".as_ptr() as *const u8,
         _private: null_mut(),
         context: None,
         node: None,
-    } };
+    };
 }
 
 /// Traversal function for the "namespace" direction
@@ -4873,7 +4887,7 @@ pub unsafe fn xml_xpath_next_ancestor(
         if Some(cur) == (*(*ctxt).context).doc.map(|doc| doc.into()) {
             return None;
         }
-        match (*cur).element_type() {
+        match cur.element_type() {
             XmlElementType::XmlElementNode
             | XmlElementType::XmlTextNode
             | XmlElementType::XmlCDATASectionNode
@@ -5138,9 +5152,6 @@ pub(crate) unsafe fn xml_xpath_node_set_free_ns(ns: XmlNsPtr) {
             .node
             .is_some_and(|node| !matches!(node.element_type(), XmlElementType::XmlNamespaceDecl))
         {
-            if !ns.href.is_null() {
-                xml_free(ns.href as _);
-            }
             if !ns.prefix.is_null() {
                 xml_free(ns.prefix as _);
             }

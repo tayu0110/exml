@@ -24,7 +24,7 @@ use std::{
     ffi::{CStr, CString, c_char},
     mem::size_of,
     os::raw::c_void,
-    ptr::{addr_of_mut, drop_in_place, null, null_mut},
+    ptr::{addr_of_mut, drop_in_place, null_mut},
     rc::Rc,
 };
 
@@ -2792,7 +2792,7 @@ unsafe fn xml_schema_val_atomic_type(
                                     break 'done;
                                 }
                                 XmlSchemaValType::XmlSchemasQName => {
-                                    let mut uri: *const XmlChar = null();
+                                    let mut uri = None;
                                     let mut local: *mut XmlChar = null_mut();
 
                                     ret = validate_qname::<true>(
@@ -2825,7 +2825,7 @@ unsafe fn xml_schema_val_atomic_type(
                                             break 'return1;
                                         }
                                         if let Some(ns) = ns {
-                                            uri = ns.href;
+                                            uri = ns.href.clone();
                                         }
                                         if !prefix.is_null() {
                                             xml_free(prefix as _);
@@ -2844,8 +2844,9 @@ unsafe fn xml_schema_val_atomic_type(
                                         } else {
                                             (*v).value.qname.name = xml_strdup(value);
                                         }
-                                        if !uri.is_null() {
-                                            (*v).value.qname.uri = xml_strdup(uri);
+                                        if let Some(uri) = uri {
+                                            (*v).value.qname.uri =
+                                                xml_strndup(uri.as_ptr(), uri.len() as i32);
                                         }
                                         *val = v;
                                     } else if !local.is_null() {
@@ -3075,7 +3076,7 @@ unsafe fn xml_schema_val_atomic_type(
                                     break 'done;
                                 }
                                 XmlSchemaValType::XmlSchemasNotation => {
-                                    let mut uri: *mut XmlChar = null_mut();
+                                    let mut uri = None;
                                     let mut local: *mut XmlChar = null_mut();
 
                                     ret = validate_qname::<true>(
@@ -3098,7 +3099,7 @@ unsafe fn xml_schema_val_atomic_type(
                                                 ),
                                             ) {
                                                 if !val.is_null() {
-                                                    uri = xml_strdup(ns.href);
+                                                    uri = ns.href.clone();
                                                 }
                                             } else {
                                                 ret = 1;
@@ -3136,17 +3137,15 @@ unsafe fn xml_schema_val_atomic_type(
                                                 } else {
                                                     (*v).value.qname.name = xml_strdup(value);
                                                 }
-                                                if !uri.is_null() {
-                                                    (*v).value.qname.uri = uri;
+                                                if let Some(uri) = uri {
+                                                    (*v).value.qname.uri =
+                                                        xml_strndup(uri.as_ptr(), uri.len() as i32);
                                                 }
 
                                                 *val = v;
                                             } else {
                                                 if !local.is_null() {
                                                     xml_free(local as _);
-                                                }
-                                                if !uri.is_null() {
-                                                    xml_free(uri as _);
                                                 }
                                                 break 'error;
                                             }

@@ -29,7 +29,7 @@ use std::{
 
 use crate::libxml::{
     globals::xml_free,
-    xmlstring::{XmlChar, xml_str_equal, xml_strdup, xml_strndup},
+    xmlstring::{XmlChar, xml_str_equal, xml_strndup},
 };
 
 use super::{
@@ -41,7 +41,7 @@ use super::{
 pub struct XmlNs {
     pub next: Option<XmlNsPtr>,            /* next Ns link for this node  */
     pub(crate) typ: XmlNsType,             /* global or local */
-    pub href: *const XmlChar,              /* URL for the namespace */
+    pub href: Option<Box<str>>,            /* URL for the namespace */
     pub prefix: *const XmlChar,            /* prefix for the namespace */
     pub _private: *mut c_void,             /* application data */
     pub(crate) context: Option<XmlDocPtr>, /* normally an xmlDoc */
@@ -60,11 +60,8 @@ impl XmlNs {
         }
     }
 
-    pub unsafe fn href(&self) -> Option<Cow<'_, str>> {
-        unsafe {
-            let href = self.href;
-            (!href.is_null()).then(|| CStr::from_ptr(href as *const i8).to_string_lossy())
-        }
+    pub fn href(&self) -> Option<Cow<'_, str>> {
+        self.href.as_deref().map(Cow::Borrowed)
     }
 
     /// Read the value of a node, this can be either the text carried
@@ -76,14 +73,12 @@ impl XmlNs {
     /// Returns a new #XmlChar * or null_mut() if no content is available.  
     /// It's up to the caller to free the memory with xml_free().
     #[doc(alias = "xmlNodeGetContent")]
-    pub unsafe fn get_content(&self) -> Option<String> {
-        unsafe {
-            assert!(matches!(
-                self.element_type(),
-                XmlElementType::XmlNamespaceDecl
-            ));
-            self.href().map(|href| href.into_owned())
-        }
+    pub fn get_content(&self) -> Option<String> {
+        assert!(matches!(
+            self.element_type(),
+            XmlElementType::XmlNamespaceDecl
+        ));
+        self.href().map(|href| href.into_owned())
     }
 
     /// Read the value of a node `cur`, this can be either the text carried
@@ -94,16 +89,14 @@ impl XmlNs {
     ///
     /// Returns 0 in case of success and -1 in case of error.
     #[doc(alias = "xmlBufGetNodeContent")]
-    pub unsafe fn get_content_to(&self, buf: &mut String) -> i32 {
-        unsafe {
-            assert!(matches!(
-                self.element_type(),
-                XmlElementType::XmlNamespaceDecl
-            ));
-            buf.push_str(self.href().unwrap().as_ref());
+    pub fn get_content_to(&self, buf: &mut String) -> i32 {
+        assert!(matches!(
+            self.element_type(),
+            XmlElementType::XmlNamespaceDecl
+        ));
+        buf.push_str(self.href().unwrap().as_ref());
 
-            0
-        }
+        0
     }
 }
 
@@ -112,7 +105,7 @@ impl Default for XmlNs {
         Self {
             next: None,
             typ: XmlNsType::XmlNamespaceDecl,
-            href: null_mut(),
+            href: None,
             prefix: null_mut(),
             _private: null_mut(),
             context: None,
@@ -132,8 +125,7 @@ impl NodeCommon for XmlNs {
         self.typ
     }
     fn name(&self) -> Option<Cow<'_, str>> {
-        (!self.href.is_null())
-            .then(|| unsafe { CStr::from_ptr(self.href as *const i8).to_string_lossy() })
+        self.href()
     }
     fn children(&self) -> Option<XmlGenericNodePtr> {
         None
@@ -291,7 +283,7 @@ impl From<XmlNsPtr> for *mut XmlNs {
 #[doc(alias = "xmlNewNs")]
 pub unsafe fn xml_new_ns(
     node: Option<XmlNodePtr>,
-    href: *const XmlChar,
+    href: Option<&str>,
     prefix: Option<&str>,
 ) -> Option<XmlNsPtr> {
     unsafe {
@@ -301,7 +293,7 @@ pub unsafe fn xml_new_ns(
 
         if prefix == Some("xml") {
             // xml namespace is predefined, no need to add it
-            if xml_str_equal(href, XML_XML_NAMESPACE.as_ptr() as _) {
+            if href == Some(XML_XML_NAMESPACE.to_str().unwrap()) {
                 return None;
             }
 
@@ -321,9 +313,7 @@ pub unsafe fn xml_new_ns(
             return None;
         };
 
-        if !href.is_null() {
-            cur.href = xml_strdup(href);
-        }
+        cur.href = href.map(|href| href.into());
         if let Some(prefix) = prefix {
             cur.prefix = xml_strndup(prefix.as_ptr(), prefix.len() as i32);
         }
@@ -361,9 +351,6 @@ pub unsafe fn xml_new_ns(
 #[doc(alias = "xmlFreeNs")]
 pub unsafe fn xml_free_ns(cur: XmlNsPtr) {
     unsafe {
-        if !cur.href.is_null() {
-            xml_free(cur.href as _);
-        }
         if !cur.prefix.is_null() {
             xml_free(cur.prefix as _);
         }

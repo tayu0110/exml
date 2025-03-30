@@ -60,7 +60,7 @@ impl XmlXPathParserContext {
                 value4,
                 value5,
                 cache: None,
-                cache_uri: null_mut(),
+                cache_uri: None,
             });
             (*comp).steps.len() as i32 - 1
         }
@@ -893,7 +893,7 @@ impl XmlXPathParserContext {
                         if !self.context.is_null()
                             && (*self.context).flags & XML_XPATH_CHECKNS as i32 != 0
                             && xml_xpath_ns_lookup(self.context, prefix.as_ptr() as *const u8)
-                                .is_null()
+                                .is_none()
                         {
                             xml_xpath_err(self, XmlXPathError::XPathUndefPrefixError as i32);
                         }

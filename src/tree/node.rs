@@ -32,7 +32,7 @@ use crate::{
     libxml::{
         globals::xml_free,
         valid::xml_remove_id,
-        xmlstring::{XmlChar, xml_str_equal, xml_strcat, xml_strdup, xml_strncat},
+        xmlstring::{XmlChar, xml_strcat, xml_strdup, xml_strncat},
     },
     tree::xml_free_node_list,
 };
@@ -639,13 +639,9 @@ impl XmlNode {
                 let mut prop = self.properties;
                 if let Some(ns_name) = ns_name {
                     // We want the attr to be in the specified namespace.
-                    let ns_name = CString::new(ns_name).unwrap();
                     while let Some(now) = prop {
                         if now.name().as_deref() == Some(name)
-                            && now.ns.is_some_and(|ns| {
-                                ns.href == ns_name.as_ptr() as _
-                                    || xml_str_equal(ns.href, ns_name.as_ptr() as *const u8)
-                            })
+                            && now.ns.is_some_and(|ns| ns.href.as_deref() == Some(ns_name))
                         {
                             return Some(Ok(now));
                         }
@@ -717,9 +713,8 @@ impl XmlNode {
                                     }
                                     return None;
                                 };
-                                let ns_name = CString::new(ns_name).unwrap();
                                 for cur in ns_list {
-                                    if xml_str_equal(cur.href, ns_name.as_ptr() as *const u8) {
+                                    if cur.href.as_deref() == Some(ns_name) {
                                         let prefix = (*cur).prefix();
                                         attr_decl = int_subset.get_qattr_desc(
                                             CStr::from_ptr(elem_qname as *const i8)
@@ -1204,7 +1199,7 @@ impl XmlNode {
                 },
             };
 
-            if ns.is_some_and(|ns| ns.href.is_null()) {
+            if ns.is_some_and(|ns| ns.href.is_none()) {
                 return None;
             }
             let prop = self.get_prop_node_internal(
@@ -2034,7 +2029,7 @@ impl XmlNode {
                     // In this case exceptionally create it on the node element.
                     let Some(cur) = XmlNsPtr::new(XmlNs {
                         typ: XML_LOCAL_NAMESPACE,
-                        href: xml_strdup(XML_XML_NAMESPACE.as_ptr() as _),
+                        href: Some(XML_XML_NAMESPACE.to_str().unwrap().into()),
                         prefix: xml_strdup(c"xml".as_ptr() as _),
                         next: self.ns_def,
                         ..Default::default()
@@ -2068,7 +2063,7 @@ impl XmlNode {
                     let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
                     let mut cur = cur_node.ns_def;
                     while let Some(now) = cur {
-                        if now.prefix().is_none() && namespace.is_none() && !now.href.is_null() {
+                        if now.prefix().is_none() && namespace.is_none() && now.href.is_some() {
                             return Some(now);
                         }
                         if now.href().is_some()
@@ -2082,8 +2077,7 @@ impl XmlNode {
                     if orig != node {
                         let cur = cur_node.ns;
                         if let Some(cur) = cur {
-                            if cur.prefix().is_none() && namespace.is_none() && !cur.href.is_null()
-                            {
+                            if cur.prefix().is_none() && namespace.is_none() && cur.href.is_some() {
                                 return Some(cur);
                             }
                             if cur.prefix().is_some()
@@ -2124,7 +2118,7 @@ impl XmlNode {
                     // In this case exceptionally create it on the node element.
                     let Some(cur) = XmlNsPtr::new(XmlNs {
                         typ: XML_LOCAL_NAMESPACE,
-                        href: xml_strdup(XML_XML_NAMESPACE.as_ptr() as _),
+                        href: Some(XML_XML_NAMESPACE.to_str().unwrap().into()),
                         prefix: xml_strdup(c"xml".as_ptr() as _),
                         next: self.ns_def,
                         ..Default::default()
@@ -2156,11 +2150,9 @@ impl XmlNode {
                 }
                 if matches!(cur_node.element_type(), XmlElementType::XmlElementNode) {
                     let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                    let href = CString::new(href).unwrap();
                     let mut cur = cur_node.ns_def;
                     while let Some(now) = cur {
-                        if !now.href.is_null()
-                            && xml_str_equal(now.href, href.as_ptr() as *const u8)
+                        if now.href.as_deref().is_some_and(|h| h == href)
                             && (!is_attr || now.prefix().is_some())
                             && xml_ns_in_scope(doc, Some(orig), node, now.prefix) == 1
                         {
@@ -2171,8 +2163,7 @@ impl XmlNode {
                     if orig != cur_node.into() {
                         let cur = cur_node.ns;
                         if let Some(cur) = cur.filter(|cur| {
-                            !cur.href.is_null()
-                                && xml_str_equal(cur.href, href.as_ptr() as *const u8)
+                            cur.href.as_deref().is_some_and(|h| h == href)
                                 && (!is_attr || (*cur).prefix().is_some())
                                 && xml_ns_in_scope(doc, Some(orig), node, cur.prefix) == 1
                         }) {

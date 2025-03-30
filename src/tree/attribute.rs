@@ -31,7 +31,7 @@ use std::{
 use crate::libxml::{
     globals::{xml_deregister_node_default_value, xml_free, xml_register_node_default_value},
     valid::{xml_add_id, xml_is_id, xml_remove_id},
-    xmlstring::{XmlChar, xml_str_equal, xml_strdup, xml_strndup},
+    xmlstring::{XmlChar, xml_strdup, xml_strndup},
 };
 
 use super::{
@@ -95,7 +95,7 @@ impl XmlAttr {
                     // let href = CString::new(href).unwrap();
                     let mut cur = now.ns_def;
                     while let Some(cur_ns) = cur {
-                        if !cur_ns.href.is_null()
+                        if cur_ns.href.is_some()
                             && cur_ns.href().as_deref() == Some(href)
                             && cur_ns.prefix().is_some()
                             && xml_ns_in_scope(
@@ -111,8 +111,7 @@ impl XmlAttr {
                     }
                     let cur = now.ns;
                     if let Some(cur) = cur.filter(|cur| {
-                        !cur.href.is_null()
-                            && cur.href().as_deref() == Some(href)
+                        cur.href.as_deref().is_some_and(|h| h == href)
                             && cur.prefix().is_some()
                             && xml_ns_in_scope(
                                 doc,
@@ -640,7 +639,7 @@ pub(super) unsafe fn xml_copy_prop_internal(
                 // we have to find something appropriate here since
                 // we can't be sure, that the namespace we found is identified
                 // by the prefix
-                if xml_str_equal(ns.href, cur_ns.href) {
+                if ns.href == cur_ns.href {
                     // this is the nice case
                     ret.ns = Some(ns);
                 } else {
@@ -664,13 +663,13 @@ pub(super) unsafe fn xml_copy_prop_internal(
                         // correct possibly cycling above the document elt
                         xml_new_ns(
                             pred.map(|p| XmlNodePtr::try_from(p).unwrap()),
-                            ns.href,
+                            ns.href.as_deref(),
                             ns.prefix().as_deref(),
                         )
                     } else {
                         xml_new_ns(
                             Some(XmlNodePtr::try_from(root).unwrap()),
-                            ns.href,
+                            ns.href.as_deref(),
                             ns.prefix().as_deref(),
                         )
                     };

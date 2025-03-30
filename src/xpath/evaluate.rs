@@ -1,7 +1,4 @@
-use std::{
-    ffi::{CStr, c_void},
-    ptr::{null, null_mut},
-};
+use std::{ffi::CStr, mem::replace, ptr::null_mut};
 
 use crate::{
     CHECK_ERROR, XP_ERROR, generic_error,
@@ -437,8 +434,8 @@ impl XmlXPathParserContext {
                         }
                         self.value_push(val);
                     } else {
-                        let uri: *const u8 = xml_xpath_ns_lookup(self.context, (*op).value5 as _);
-                        if uri.is_null() {
+                        let uri = xml_xpath_ns_lookup(self.context, (*op).value5 as _);
+                        let Some(uri) = uri else {
                             generic_error!(
                                 "xmlXPathCompOpEval: variable {} bound to undefined prefix {}\n",
                                 CStr::from_ptr((*op).value4 as *const i8).to_string_lossy(),
@@ -446,8 +443,12 @@ impl XmlXPathParserContext {
                             );
                             self.error = XmlXPathError::XPathUndefPrefixError as _;
                             break 'to_break;
-                        }
-                        val = xml_xpath_variable_lookup_ns(self.context, (*op).value4 as _, uri);
+                        };
+                        val = xml_xpath_variable_lookup_ns(
+                            self.context,
+                            (*op).value4 as _,
+                            Some(&uri),
+                        );
                         if val.is_null() {
                             xml_xpath_err(self, XmlXPathError::XPathUndefVariableError as i32);
                             return 0;
@@ -481,7 +482,7 @@ impl XmlXPathParserContext {
                     if let Some(cache) = (*op).cache {
                         func = cache;
                     } else {
-                        let mut uri: *const u8 = null();
+                        let mut uri = None;
 
                         let f = if (*op).value5.is_null() {
                             (*self.context).lookup_function(
@@ -489,7 +490,7 @@ impl XmlXPathParserContext {
                             )
                         } else {
                             uri = xml_xpath_ns_lookup(self.context, (*op).value5 as _);
-                            if uri.is_null() {
+                            let Some(uri) = uri.as_deref() else {
                                 generic_error!(
                                     "xmlXPathCompOpEval: function {} bound to undefined prefix {}\n",
                                     CStr::from_ptr((*op).value4 as *const i8).to_string_lossy(),
@@ -497,12 +498,10 @@ impl XmlXPathParserContext {
                                 );
                                 self.error = XmlXPathError::XPathUndefPrefixError as i32;
                                 break 'to_break;
-                            }
+                            };
                             (*self.context).lookup_function_ns(
                                 CStr::from_ptr((*op).value4 as _).to_string_lossy().as_ref(),
-                                (!uri.is_null())
-                                    .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
-                                    .as_deref(),
+                                Some(uri),
                             )
                         };
                         if let Some(f) = f {
@@ -517,13 +516,13 @@ impl XmlXPathParserContext {
                         }
 
                         (*op).cache = Some(func);
-                        (*op).cache_uri = uri as *mut c_void;
+                        (*op).cache_uri = uri;
                     }
 
                     let old_func: *const u8 = (*self.context).function;
-                    let old_func_uri: *const u8 = (*self.context).function_uri;
+                    let old_func_uri =
+                        replace(&mut (*self.context).function_uri, (*op).cache_uri.clone());
                     (*self.context).function = (*op).value4 as _;
-                    (*self.context).function_uri = (*op).cache_uri as _;
                     func(self, (*op).value as usize);
                     (*self.context).function = old_func;
                     (*self.context).function_uri = old_func_uri;

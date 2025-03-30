@@ -781,7 +781,8 @@ impl XmlSchemaParserCtxt {
                         if let Some(ns) = cur_attr.ns {
                             if ns.href().as_deref() == Some(XML_SCHEMA_NS.to_str().unwrap())
                                 || (xml_str_equal(cur_attr.name, c"lang".as_ptr() as _)
-                                    && !xml_str_equal(ns.href, XML_XML_NAMESPACE.as_ptr() as _))
+                                    && ns.href.as_deref()
+                                        != Some(XML_XML_NAMESPACE.to_str().unwrap()))
                             {
                                 xml_schema_pillegal_attr_err(
                                     self,
@@ -803,7 +804,7 @@ impl XmlSchemaParserCtxt {
                     // Attribute "xml:lang".
                     if let Some(attr) = xml_schema_get_prop_node_ns(
                         cur_node,
-                        XML_XML_NAMESPACE.as_ptr() as _,
+                        XML_XML_NAMESPACE.to_str().unwrap(),
                         "lang",
                     ) {
                         xml_schema_pval_attr_node(

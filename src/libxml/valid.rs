@@ -5162,7 +5162,12 @@ pub unsafe fn xml_validate_one_element(
                         let mut ns = elem.ns_def;
                         while let Some(now) = ns {
                             if now.prefix().is_none() {
-                                if !xml_str_equal(cur_attr.default_value, now.href) {
+                                if Some(
+                                    CStr::from_ptr(cur_attr.default_value as *const i8)
+                                        .to_string_lossy()
+                                        .as_ref(),
+                                ) != now.href().as_deref()
+                                {
                                     let elem_name = elem.name().unwrap();
                                     xml_err_valid_node(
                                     Some(&mut *ctxt),
@@ -5183,7 +5188,12 @@ pub unsafe fn xml_validate_one_element(
                         let mut ns = elem.ns_def;
                         while let Some(now) = ns {
                             if cur_attr.name() == now.prefix() {
-                                if !xml_str_equal(cur_attr.default_value, now.href) {
+                                if Some(
+                                    CStr::from_ptr(cur_attr.default_value as *const i8)
+                                        .to_string_lossy()
+                                        .as_ref(),
+                                ) != now.href().as_deref()
+                                {
                                     let elem_name = elem.name().unwrap();
                                     let prefix = now.prefix().unwrap();
                                     xml_err_valid_node(
@@ -5550,7 +5560,7 @@ pub unsafe fn xml_validate_one_namespace(
         if elem.name.is_null() {
             return 0;
         }
-        if ns.href.is_null() {
+        if ns.href.is_none() {
             return 0;
         }
 

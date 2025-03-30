@@ -810,7 +810,7 @@ unsafe fn xml_new_reconciled_ns(
         }
 
         // OK, now we are ready to create a new one.
-        xml_new_ns(Some(tree), ns.href, Some(&prefix))
+        xml_new_ns(Some(tree), ns.href.as_deref(), Some(&prefix))
     }
 }
 
@@ -976,7 +976,7 @@ pub(crate) unsafe fn xml_static_copy_node(
                     }
                     ret.ns = xml_new_ns(
                         Some(XmlNodePtr::try_from(root).unwrap()),
-                        ns.href,
+                        ns.href.as_deref(),
                         ns.prefix().as_deref(),
                     );
                 } else {
@@ -2235,7 +2235,7 @@ pub unsafe fn xml_copy_namespace(cur: Option<XmlNsPtr>) -> Option<XmlNsPtr> {
     unsafe {
         let cur = cur?;
         match cur.element_type() {
-            XML_LOCAL_NAMESPACE => xml_new_ns(None, cur.href, cur.prefix().as_deref()),
+            XML_LOCAL_NAMESPACE => xml_new_ns(None, cur.href.as_deref(), cur.prefix().as_deref()),
             _ => None,
         }
     }
@@ -2398,7 +2398,7 @@ unsafe fn xml_search_ns_by_prefix_strict(
                 while let Some(now) = ns {
                     if prefix == now.prefix || xml_str_equal(prefix, now.prefix) {
                         // Disabled namespaces, e.g. xmlns:abc="".
-                        if now.href.is_null() {
+                        if now.href.is_none() {
                             return 0;
                         }
                         if let Some(ret_ns) = ret_ns {
@@ -2427,23 +2427,17 @@ unsafe fn xml_search_ns_by_prefix_strict(
 unsafe fn xml_search_ns_by_namespace_strict(
     mut doc: XmlDocPtr,
     node: XmlGenericNodePtr,
-    ns_name: *const XmlChar,
+    ns_name: &str,
     ret_ns: &mut Option<XmlNsPtr>,
     prefixed: i32,
 ) -> i32 {
     unsafe {
-        if ns_name.is_null() {
-            return -1;
-        }
-        // if node.is_null() {
-        //     return -1;
-        // }
         if matches!(node.element_type(), XmlElementType::XmlNamespaceDecl) {
             return -1;
         }
 
         *ret_ns = None;
-        if xml_str_equal(ns_name, XML_XML_NAMESPACE.as_ptr() as _) {
+        if ns_name == XML_XML_NAMESPACE.to_str().unwrap() {
             *ret_ns = doc.ensure_xmldecl();
             if ret_ns.is_none() {
                 return -1;
@@ -2486,7 +2480,7 @@ unsafe fn xml_search_ns_by_namespace_strict(
                             }
                         }
                         // Ns-name comparison.
-                        if ns_name == now.href || xml_str_equal(ns_name, now.href) {
+                        if Some(ns_name) == now.href.as_deref() {
                             // At this point the prefix can only be shadowed,
                             // if we are the the (at least) 3rd level of ns-decls.
                             if out.is_some() {

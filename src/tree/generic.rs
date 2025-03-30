@@ -332,14 +332,11 @@ pub trait NodeCommon {
                     // check if an attribute with the same name exists
 
                     let lastattr = if let Some(ns) = cur.ns {
-                        let href = ns.href;
                         cur_node.has_ns_prop(
                             CStr::from_ptr(cur.name as *const i8)
                                 .to_string_lossy()
                                 .as_ref(),
-                            (!href.is_null())
-                                .then(|| CStr::from_ptr(href as *const i8).to_string_lossy())
-                                .as_deref(),
+                            ns.href.as_deref(),
                         )
                     } else {
                         cur_node.has_ns_prop(
@@ -728,7 +725,7 @@ impl XmlGenericNodePtr {
                     // In this case exceptionally create it on the node element.
                     let Some(cur) = XmlNsPtr::new(XmlNs {
                         typ: XML_LOCAL_NAMESPACE,
-                        href: xml_strdup(XML_XML_NAMESPACE.as_ptr() as _),
+                        href: Some(XML_XML_NAMESPACE.to_str().unwrap().into()),
                         prefix: xml_strdup(c"xml".as_ptr() as _),
                         next: node.ns_def,
                         ..Default::default()
@@ -762,7 +759,7 @@ impl XmlGenericNodePtr {
                 }) {
                     let mut cur = cur_node.ns_def;
                     while let Some(now) = cur {
-                        if now.prefix().is_none() && namespace.is_none() && !now.href.is_null() {
+                        if now.prefix().is_none() && namespace.is_none() && now.href.is_some() {
                             return Some(now);
                         }
                         if now.href().is_some()
@@ -776,8 +773,7 @@ impl XmlGenericNodePtr {
                     if orig != cur_node.into() {
                         let cur = cur_node.ns;
                         if let Some(cur) = cur {
-                            if cur.prefix().is_none() && namespace.is_none() && !cur.href.is_null()
-                            {
+                            if cur.prefix().is_none() && namespace.is_none() && cur.href.is_some() {
                                 return Some(cur);
                             }
                             if cur.prefix().is_some()

@@ -4387,7 +4387,7 @@ unsafe fn load_xpath_expr(parent_doc: XmlDocPtr, filename: &str) -> XmlXPathObje
                 eprintln!(
                     "Error: unable to register NS with prefix=\"{}\" and href=\"{}\"",
                     CStr::from_ptr(now.prefix as _).to_string_lossy(),
-                    CStr::from_ptr(now.href as _).to_string_lossy(),
+                    now.href.as_deref().unwrap()
                 );
                 xml_xpath_free_context(ctx);
                 xml_free_doc(doc);
