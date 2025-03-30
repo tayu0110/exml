@@ -26,7 +26,6 @@ use std::{
     ops::{Deref, DerefMut},
     os::raw::c_void,
     ptr::{NonNull, null_mut},
-    slice::from_raw_parts,
     sync::atomic::Ordering,
 };
 
@@ -34,10 +33,8 @@ use crate::{
     encoding::XmlCharEncoding,
     error::XmlParserErrors,
     hash::XmlHashTable,
-    libxml::{
-        globals::{xml_deregister_node_default_value, xml_free, xml_register_node_default_value},
-        parser_internals::xml_copy_char_multi_byte,
-        xmlstring::{XmlChar, xml_strndup},
+    libxml::globals::{
+        xml_deregister_node_default_value, xml_free, xml_register_node_default_value,
     },
     list::XmlList,
 };
@@ -371,11 +368,7 @@ impl XmlDoc {
                                     ent.flags |= XML_ENT_EXPANDING as i32;
                                     let content = node.content.as_deref().unwrap();
                                     ent.set_children(
-                                        self.get_node_list_with_strlen(
-                                            content.as_ptr(),
-                                            content.len() as i32,
-                                        )
-                                        .map(|node| node.into()),
+                                        self.get_node_list(content).map(|node| node.into()),
                                     );
                                     ent.owner = 1;
                                     ent.flags &= !XML_ENT_EXPANDING as i32;
@@ -436,269 +429,6 @@ impl XmlDoc {
             }
 
             head
-        }
-    }
-
-    /// Parse the value string and build the node list associated.  
-    /// Should produce a flat tree with only TEXTs and ENTITY_REFs.
-    ///
-    /// Returns a pointer to the first child.
-    #[doc(alias = "xmlStringLenGetNodeList")]
-    pub unsafe fn get_node_list_with_strlen(
-        &self,
-        value: *const XmlChar,
-        len: i32,
-    ) -> Option<XmlNodePtr> {
-        unsafe {
-            let mut ret = None;
-            let mut last: Option<XmlNodePtr> = None;
-            let mut val: *mut XmlChar;
-            let mut cur: *const XmlChar;
-            let mut q: *const XmlChar;
-
-            if value.is_null() {
-                return None;
-            }
-            cur = value;
-            let end: *const XmlChar = cur.add(len as usize);
-
-            let mut buf = vec![];
-            q = cur;
-            while cur < end && *cur != 0 {
-                if *cur.add(0) == b'&' {
-                    let mut charval: i32 = 0;
-                    let mut tmp: XmlChar;
-
-                    // Save the current text.
-                    if cur != q {
-                        buf.extend(from_raw_parts(q, cur.offset_from(q) as usize));
-                    }
-                    // q = cur;
-                    if cur.add(2) < end && *cur.add(1) == b'#' && *cur.add(2) == b'x' {
-                        cur = cur.add(3);
-                        if cur < end {
-                            tmp = *cur;
-                        } else {
-                            tmp = 0;
-                        }
-                        while tmp != b';' {
-                            // Non input consuming loop
-
-                            // If you find an integer overflow here when fuzzing,
-                            // the bug is probably elsewhere. This function should
-                            // only receive entities that were already validated by
-                            // the parser, typically by xmlParseAttValueComplex
-                            // calling xmlStringDecodeEntities.
-                            //
-                            // So it's better *not* to check for overflow to
-                            // potentially discover new bugs.
-                            if tmp.is_ascii_digit() {
-                                charval = charval * 16 + (tmp - b'0') as i32;
-                            } else if (b'a'..=b'f').contains(&tmp) {
-                                charval = charval * 16 + (tmp - b'a') as i32 + 10;
-                            } else if (b'A'..=b'F').contains(&tmp) {
-                                charval = charval * 16 + (tmp - b'A') as i32 + 10;
-                            } else {
-                                xml_tree_err(
-                                    XmlParserErrors::XmlTreeInvalidHex,
-                                    XmlGenericNodePtr::from_raw(
-                                        self as *const XmlDoc as *mut XmlDoc,
-                                    ),
-                                    None,
-                                );
-                                charval = 0;
-                                break;
-                            }
-                            cur = cur.add(1);
-                            if cur < end {
-                                tmp = *cur;
-                            } else {
-                                tmp = 0;
-                            }
-                        }
-                        if tmp == b';' {
-                            cur = cur.add(1);
-                        }
-                        q = cur;
-                    } else if cur.add(1) < end && *cur.add(1) == b'#' {
-                        cur = cur.add(2);
-                        if cur < end {
-                            tmp = *cur;
-                        } else {
-                            tmp = 0;
-                        }
-                        while tmp != b';' {
-                            // Non input consuming loops
-                            // Don't check for integer overflow, see above.
-                            if tmp.is_ascii_digit() {
-                                charval = charval * 10 + (tmp - b'0') as i32;
-                            } else {
-                                xml_tree_err(
-                                    XmlParserErrors::XmlTreeInvalidDec,
-                                    XmlGenericNodePtr::from_raw(
-                                        self as *const XmlDoc as *mut XmlDoc,
-                                    ),
-                                    None,
-                                );
-                                charval = 0;
-                                break;
-                            }
-                            cur = cur.add(1);
-                            if cur < end {
-                                tmp = *cur;
-                            } else {
-                                tmp = 0;
-                            }
-                        }
-                        if tmp == b';' {
-                            cur = cur.add(1);
-                        }
-                        q = cur;
-                    } else {
-                        // Read the entity string
-                        cur = cur.add(1);
-                        q = cur;
-                        while cur < end && *cur != 0 && *cur != b';' {
-                            cur = cur.add(1);
-                        }
-                        if cur >= end || *cur == 0 {
-                            let q = (!q.is_null())
-                                .then(|| CStr::from_ptr(q as *const i8).to_string_lossy());
-                            xml_tree_err(
-                                XmlParserErrors::XmlTreeUnterminatedEntity,
-                                XmlGenericNodePtr::from_raw(self as *const XmlDoc as *mut XmlDoc),
-                                q.as_deref(),
-                            );
-                            // goto out;
-                            return ret;
-                        }
-                        if cur != q {
-                            // Predefined entities don't generate nodes
-                            val = xml_strndup(q, cur.offset_from(q) as _);
-                            let ent = xml_get_doc_entity(
-                                XmlDocPtr::from_raw(self as *const XmlDoc as _).unwrap(),
-                                CStr::from_ptr(val as *const i8).to_string_lossy().as_ref(),
-                            );
-                            if let Some(ent) = ent.filter(|ent| {
-                                matches!(ent.etype, XmlEntityType::XmlInternalPredefinedEntity)
-                            }) {
-                                buf.extend(CStr::from_ptr(ent.content as *const i8).to_bytes());
-                            } else {
-                                // Flush buffer so far
-                                if !buf.is_empty() {
-                                    let Some(mut node) = xml_new_doc_text(
-                                        XmlDocPtr::from_raw(self as *const XmlDoc as *mut XmlDoc)
-                                            .unwrap(),
-                                        None,
-                                    ) else {
-                                        if !val.is_null() {
-                                            xml_free(val as _);
-                                        }
-                                        // goto out;
-                                        return ret;
-                                    };
-                                    node.content = Some(String::from_utf8(buf).unwrap());
-                                    buf = vec![];
-
-                                    if let Some(mut l) = last {
-                                        last = l
-                                            .add_next_sibling(node.into())
-                                            .map(|node| XmlNodePtr::try_from(node).unwrap());
-                                    } else {
-                                        last = Some(node);
-                                        ret = Some(node);
-                                    }
-                                }
-
-                                // Create a new REFERENCE_REF node
-                                let Some(node) = xml_new_reference(
-                                    XmlDocPtr::from_raw(self as *const XmlDoc as _).unwrap(),
-                                    &CStr::from_ptr(val as *const i8).to_string_lossy(),
-                                ) else {
-                                    if !val.is_null() {
-                                        xml_free(val as _);
-                                    }
-                                    // goto out;
-                                    return ret;
-                                };
-                                if let Some(mut ent) = ent.filter(|ent| {
-                                    ent.flags & XML_ENT_PARSED as i32 == 0
-                                        && ent.flags & XML_ENT_EXPANDING as i32 == 0
-                                }) {
-                                    // The entity should have been checked already,
-                                    // but set the flag anyway to avoid recursion.
-                                    ent.flags |= XML_ENT_EXPANDING as i32;
-                                    let content = node.content.as_deref().unwrap();
-                                    ent.children = self.get_node_list_with_strlen(
-                                        content.as_ptr(),
-                                        content.len() as i32,
-                                    );
-                                    ent.owner = 1;
-                                    ent.flags &= !XML_ENT_EXPANDING as i32;
-                                    ent.flags |= XML_ENT_PARSED as i32;
-                                    let mut temp = ent.children();
-                                    while let Some(mut now) = temp {
-                                        now.set_parent(Some(ent.into()));
-                                        ent.set_last(Some(now));
-                                        temp = now.next();
-                                    }
-                                }
-                                if let Some(mut l) = last {
-                                    last = l
-                                        .add_next_sibling(node.into())
-                                        .map(|node| XmlNodePtr::try_from(node).unwrap());
-                                } else {
-                                    last = Some(node);
-                                    ret = Some(node);
-                                }
-                            }
-                            xml_free(val as _);
-                        }
-                        cur = cur.add(1);
-                        q = cur;
-                    }
-                    if charval != 0 {
-                        let mut buffer: [XmlChar; 10] = [0; 10];
-
-                        let l: i32 = xml_copy_char_multi_byte(buffer.as_mut_ptr() as _, charval);
-                        buffer[l as usize] = 0;
-                        buf.extend_from_slice(&buffer[..l as usize]);
-                        // charval = 0;
-                    }
-                } else {
-                    cur = cur.add(1);
-                }
-            }
-
-            if cur != q {
-                // Handle the last piece of text.
-                buf.extend(from_raw_parts(q, cur.offset_from(q) as usize));
-            }
-
-            if !buf.is_empty() {
-                let Some(mut node) = xml_new_doc_text(
-                    XmlDocPtr::from_raw(self as *const XmlDoc as *mut XmlDoc).unwrap(),
-                    None,
-                ) else {
-                    // goto out;
-                    return ret;
-                };
-                node.content = Some(String::from_utf8(buf).unwrap());
-
-                if let Some(mut last) = last {
-                    last.add_next_sibling(node.into());
-                } else {
-                    ret = Some(node);
-                }
-            } else if ret.is_none() {
-                ret = xml_new_doc_text(
-                    XmlDocPtr::from_raw(self as *const XmlDoc as *mut XmlDoc).unwrap(),
-                    Some(""),
-                );
-            }
-
-            // out:
-            ret
         }
     }
 

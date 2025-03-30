@@ -2453,8 +2453,8 @@ unsafe fn xml_sax2_attribute_ns(
             // the string has been dup'ed and terminates with 0
             // otherwise with ' or "
             ret.children = (*ctxt).my_doc.and_then(|doc| {
-                let len = CStr::from_ptr(value as *const i8).to_bytes().len();
-                doc.get_node_list_with_strlen(value, len as i32)
+                let value = CStr::from_ptr(value as *const i8).to_string_lossy();
+                doc.get_node_list(&value)
             });
             let mut tmp = ret.children();
             while let Some(mut now) = tmp {
