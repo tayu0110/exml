@@ -1676,7 +1676,7 @@ impl XmlGenericNodePtr {
                     let mut node = XmlNodePtr::try_from(self).unwrap();
                     let tmp = elem.content.get_or_insert_default();
                     tmp.push_str(node.content.as_deref().unwrap());
-                    node.set_content_len(tmp.as_ptr(), tmp.len() as i32);
+                    node.set_content(tmp);
                     xml_free_node(elem);
                     return Some(self);
                 }
@@ -1764,7 +1764,7 @@ impl XmlGenericNodePtr {
                 {
                     let tmp = elem.content.get_or_insert_default();
                     tmp.push_str(next.content.as_deref().unwrap());
-                    next.set_content_len(tmp.as_ptr(), tmp.len() as i32);
+                    next.set_content(tmp);
                     xml_free_node(elem);
                     return Some(next.into());
                 }

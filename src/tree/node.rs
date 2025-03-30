@@ -1440,78 +1440,6 @@ impl XmlNode {
         }
     }
 
-    /// Replace the content of a node.
-    ///
-    /// # Note
-    /// `content` is supposed to be a piece of XML CDATA, so it allows entity
-    /// references, but XML special chars need to be escaped first by using
-    /// xmlEncodeEntitiesReentrant() resp. xmlEncodeSpecialChars().
-    #[doc(alias = "xmlNodeSetContentLen")]
-    #[cfg(feature = "libxml_tree")]
-    pub unsafe fn set_content_len(&mut self, content: *const XmlChar, len: i32) {
-        unsafe {
-            use super::xml_free_node_list;
-
-            match self.element_type() {
-                XmlElementType::XmlDocumentFragNode
-                | XmlElementType::XmlElementNode
-                | XmlElementType::XmlAttributeNode => {
-                    if let Some(children) = self.children() {
-                        xml_free_node_list(Some(children));
-                    }
-                    self.children = self
-                        .document()
-                        .and_then(|doc| doc.get_node_list_with_strlen(content, len))
-                        .map(|node| node.into());
-                    if let Some(mut ulccur) = self.children() {
-                        while let Some(next) = ulccur.next() {
-                            ulccur.set_parent(XmlGenericNodePtr::from_raw(self));
-                            ulccur = next;
-                        }
-                        ulccur.set_parent(XmlGenericNodePtr::from_raw(self));
-                        self.set_last(Some(ulccur));
-                    } else {
-                        self.set_last(None);
-                    }
-                }
-                XmlElementType::XmlTextNode
-                | XmlElementType::XmlCDATASectionNode
-                | XmlElementType::XmlEntityRefNode
-                | XmlElementType::XmlEntityNode
-                | XmlElementType::XmlPINode
-                | XmlElementType::XmlCommentNode
-                | XmlElementType::XmlNotationNode => {
-                    if let Some(children) = self.children() {
-                        xml_free_node_list(Some(children));
-                    }
-                    self.set_children(None);
-                    self.set_last(None);
-                    if !content.is_null() {
-                        self.content = Some(
-                            CStr::from_ptr(content as *const i8)
-                                .to_string_lossy()
-                                .into_owned(),
-                        );
-                    } else {
-                        self.content = None;
-                    }
-                    self.properties = None;
-                }
-                XmlElementType::XmlDocumentNode
-                | XmlElementType::XmlDTDNode
-                | XmlElementType::XmlHTMLDocumentNode
-                | XmlElementType::XmlDocumentTypeNode
-                | XmlElementType::XmlNamespaceDecl
-                | XmlElementType::XmlXIncludeStart
-                | XmlElementType::XmlXIncludeEnd => {}
-                XmlElementType::XmlElementDecl => { /* TODO !!! */ }
-                XmlElementType::XmlAttributeDecl => { /* TODO !!! */ }
-                XmlElementType::XmlEntityDecl => { /* TODO !!! */ }
-                _ => unreachable!(),
-            }
-        }
-    }
-
     /// update all nodes under the tree to point to the right document
     #[doc(alias = "xmlSetTreeDoc")]
     pub unsafe fn set_doc(&mut self, doc: Option<XmlDocPtr>) {
@@ -1761,7 +1689,7 @@ impl XmlNode {
                 if matches!(self.element_type(), XmlElementType::XmlTextNode) {
                     let mut tmp = elem.content.as_deref().unwrap().to_owned();
                     tmp.push_str(self.content.as_deref().unwrap());
-                    self.set_content_len(tmp.as_ptr(), tmp.len() as i32);
+                    self.set_content(&tmp);
                     xml_free_node(elem);
                     return XmlGenericNodePtr::from_raw(self);
                 }
@@ -1849,7 +1777,7 @@ impl XmlNode {
                 {
                     let mut tmp = elem.content.as_deref().unwrap().to_owned();
                     tmp.push_str(next.content.as_deref().unwrap());
-                    next.set_content_len(tmp.as_ptr(), tmp.len() as i32);
+                    next.set_content(&tmp);
                     xml_free_node(elem);
                     return Some(next.into());
                 }
