@@ -37,7 +37,7 @@ use crate::{
     libxml::{
         globals::{xml_deregister_node_default_value, xml_free, xml_register_node_default_value},
         parser_internals::xml_copy_char_multi_byte,
-        xmlstring::{XmlChar, xml_strdup, xml_strndup},
+        xmlstring::{XmlChar, xml_strndup},
     },
     list::XmlList,
 };
@@ -106,60 +106,54 @@ impl XmlDoc {
     ///
     /// Returns the namespace pointer or NULL.
     #[doc(alias = "xmlSearchNsByHref")]
-    pub unsafe fn search_ns_by_href(
-        &mut self,
-        doc: Option<XmlDocPtr>,
-        href: &str,
-    ) -> Option<XmlNsPtr> {
-        unsafe {
-            let orig = XmlGenericNodePtr::from_raw(self).unwrap();
+    pub fn search_ns_by_href(&mut self, doc: Option<XmlDocPtr>, href: &str) -> Option<XmlNsPtr> {
+        let orig = XmlGenericNodePtr::from_raw(self).unwrap();
 
-            if href == XML_XML_NAMESPACE.to_str().unwrap() {
-                let mut doc = doc.or(self.document())?;
-                // Return the XML namespace declaration held by the doc.
-                if doc.old_ns.is_none() {
-                    return doc.ensure_xmldecl();
-                } else {
-                    return doc.old_ns;
-                }
+        if href == XML_XML_NAMESPACE.to_str().unwrap() {
+            let mut doc = doc.or(self.document())?;
+            // Return the XML namespace declaration held by the doc.
+            if doc.old_ns.is_none() {
+                return doc.ensure_xmldecl();
+            } else {
+                return doc.old_ns;
             }
-            let mut node = Some(orig);
-            while let Some(cur_node) = node {
-                if matches!(
-                    cur_node.element_type(),
-                    XmlElementType::XmlEntityRefNode
-                        | XmlElementType::XmlEntityNode
-                        | XmlElementType::XmlEntityDecl
-                ) {
-                    return None;
-                }
-                if matches!(cur_node.element_type(), XmlElementType::XmlElementNode) {
-                    let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                    let mut cur = cur_node.ns_def;
-                    while let Some(now) = cur {
-                        if now.href.as_deref().is_some_and(|h| h == href)
-                            && now.prefix().is_some()
-                            && xml_ns_in_scope(doc, Some(orig), node, now.prefix) == 1
-                        {
-                            return Some(now);
-                        }
-                        cur = now.next;
-                    }
-                    if orig != cur_node.into() {
-                        let cur = cur_node.ns;
-                        if let Some(cur) = cur.filter(|cur| {
-                            cur.href.as_deref().is_some_and(|h| h == href)
-                                && (*cur).prefix().is_some()
-                                && xml_ns_in_scope(doc, Some(orig), node, cur.prefix) == 1
-                        }) {
-                            return Some(cur);
-                        }
-                    }
-                }
-                node = cur_node.parent();
-            }
-            None
         }
+        let mut node = Some(orig);
+        while let Some(cur_node) = node {
+            if matches!(
+                cur_node.element_type(),
+                XmlElementType::XmlEntityRefNode
+                    | XmlElementType::XmlEntityNode
+                    | XmlElementType::XmlEntityDecl
+            ) {
+                return None;
+            }
+            if matches!(cur_node.element_type(), XmlElementType::XmlElementNode) {
+                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                let mut cur = cur_node.ns_def;
+                while let Some(now) = cur {
+                    if now.href.as_deref().is_some_and(|h| h == href)
+                        && now.prefix().is_some()
+                        && xml_ns_in_scope(doc, Some(orig), node, now.prefix.as_deref()) == 1
+                    {
+                        return Some(now);
+                    }
+                    cur = now.next;
+                }
+                if orig != cur_node.into() {
+                    let cur = cur_node.ns;
+                    if let Some(cur) = cur.filter(|cur| {
+                        cur.href.as_deref().is_some_and(|h| h == href)
+                            && (*cur).prefix().is_some()
+                            && xml_ns_in_scope(doc, Some(orig), node, cur.prefix.as_deref()) == 1
+                    }) {
+                        return Some(cur);
+                    }
+                }
+            }
+            node = cur_node.parent();
+        }
+        None
     }
 
     /// Get the internal subset of a document
@@ -823,23 +817,21 @@ impl XmlDoc {
     ///
     /// Returns the XML ns-struct or null_mut() on API and internal errors.
     #[doc(alias = "xmlTreeEnsureXMLDecl")]
-    pub(super) unsafe fn ensure_xmldecl(&mut self) -> Option<XmlNsPtr> {
-        unsafe {
-            if let Some(old_ns) = self.old_ns {
-                return Some(old_ns);
-            }
-            let Some(ns) = XmlNsPtr::new(XmlNs {
-                typ: XML_LOCAL_NAMESPACE,
-                href: Some(XML_XML_NAMESPACE.to_str().unwrap().into()),
-                prefix: xml_strdup(c"xml".as_ptr() as _),
-                ..Default::default()
-            }) else {
-                xml_tree_err_memory("allocating the XML namespace");
-                return None;
-            };
-            self.old_ns = Some(ns);
-            Some(ns)
+    pub(super) fn ensure_xmldecl(&mut self) -> Option<XmlNsPtr> {
+        if let Some(old_ns) = self.old_ns {
+            return Some(old_ns);
         }
+        let Some(ns) = XmlNsPtr::new(XmlNs {
+            typ: XML_LOCAL_NAMESPACE,
+            href: Some(XML_XML_NAMESPACE.to_str().unwrap().into()),
+            prefix: Some("xml".into()),
+            ..Default::default()
+        }) else {
+            xml_tree_err_memory("allocating the XML namespace");
+            return None;
+        };
+        self.old_ns = Some(ns);
+        Some(ns)
     }
 }
 

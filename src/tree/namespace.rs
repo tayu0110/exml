@@ -21,15 +21,9 @@
 use std::{
     any::type_name,
     borrow::Cow,
-    ffi::CStr,
     ops::{Deref, DerefMut},
     os::raw::c_void,
     ptr::{NonNull, null_mut},
-};
-
-use crate::libxml::{
-    globals::xml_free,
-    xmlstring::{XmlChar, xml_str_equal, xml_strndup},
 };
 
 use super::{
@@ -42,7 +36,7 @@ pub struct XmlNs {
     pub next: Option<XmlNsPtr>,            /* next Ns link for this node  */
     pub(crate) typ: XmlNsType,             /* global or local */
     pub href: Option<Box<str>>,            /* URL for the namespace */
-    pub prefix: *const XmlChar,            /* prefix for the namespace */
+    pub prefix: Option<Box<str>>,          /* prefix for the namespace */
     pub _private: *mut c_void,             /* application data */
     pub(crate) context: Option<XmlDocPtr>, /* normally an xmlDoc */
     /// For XPath. Not used except for XPath.
@@ -53,11 +47,8 @@ pub struct XmlNs {
 }
 
 impl XmlNs {
-    pub unsafe fn prefix(&self) -> Option<Cow<'_, str>> {
-        unsafe {
-            let prefix = self.prefix;
-            (!prefix.is_null()).then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
-        }
+    pub fn prefix(&self) -> Option<Cow<'_, str>> {
+        self.prefix.as_deref().map(Cow::Borrowed)
     }
 
     pub fn href(&self) -> Option<Cow<'_, str>> {
@@ -106,7 +97,7 @@ impl Default for XmlNs {
             next: None,
             typ: XmlNsType::XmlNamespaceDecl,
             href: None,
-            prefix: null_mut(),
+            prefix: None,
             _private: null_mut(),
             context: None,
             node: None,
@@ -281,79 +272,76 @@ impl From<XmlNsPtr> for *mut XmlNs {
 ///
 /// Returns a new namespace pointer or NULL
 #[doc(alias = "xmlNewNs")]
-pub unsafe fn xml_new_ns(
+pub fn xml_new_ns(
     node: Option<XmlNodePtr>,
     href: Option<&str>,
     prefix: Option<&str>,
 ) -> Option<XmlNsPtr> {
-    unsafe {
-        if node.is_some_and(|node| node.element_type() != XmlElementType::XmlElementNode) {
+    if node.is_some_and(|node| node.element_type() != XmlElementType::XmlElementNode) {
+        return None;
+    }
+
+    if prefix == Some("xml") {
+        // xml namespace is predefined, no need to add it
+        if href == Some(XML_XML_NAMESPACE.to_str().unwrap()) {
             return None;
         }
 
-        if prefix == Some("xml") {
-            // xml namespace is predefined, no need to add it
-            if href == Some(XML_XML_NAMESPACE.to_str().unwrap()) {
+        // Problem, this is an attempt to bind xml prefix to a wrong
+        // namespace, which breaks
+        // Namespace constraint: Reserved Prefixes and Namespace Names
+        // from XML namespace. But documents authors may not care in
+        // their context so let's proceed.
+    }
+
+    // Allocate a new Namespace and fill the fields.
+    let Some(mut cur) = XmlNsPtr::new(XmlNs {
+        typ: XML_LOCAL_NAMESPACE,
+        ..Default::default()
+    }) else {
+        xml_tree_err_memory("building namespace");
+        return None;
+    };
+
+    cur.href = href.map(|href| href.into());
+    cur.prefix = prefix.map(|prefix| prefix.into());
+
+    // Add it at the end to preserve parsing order ...
+    // and checks for existing use of the prefix
+    if let Some(mut node) = node {
+        if let Some(ns_def) = node.ns_def {
+            let mut prev = ns_def;
+            if prev.prefix == cur.prefix {
+                unsafe {
+                    // # Safety
+                    // `cur` is created this function and it is not leaked from here.
+                    xml_free_ns(cur);
+                }
                 return None;
             }
-
-            // Problem, this is an attempt to bind xml prefix to a wrong
-            // namespace, which breaks
-            // Namespace constraint: Reserved Prefixes and Namespace Names
-            // from XML namespace. But documents authors may not care in
-            // their context so let's proceed.
-        }
-
-        // Allocate a new Namespace and fill the fields.
-        let Some(mut cur) = XmlNsPtr::new(XmlNs {
-            typ: XML_LOCAL_NAMESPACE,
-            ..Default::default()
-        }) else {
-            xml_tree_err_memory("building namespace");
-            return None;
-        };
-
-        cur.href = href.map(|href| href.into());
-        if let Some(prefix) = prefix {
-            cur.prefix = xml_strndup(prefix.as_ptr(), prefix.len() as i32);
-        }
-
-        // Add it at the end to preserve parsing order ...
-        // and checks for existing use of the prefix
-        if let Some(mut node) = node {
-            if let Some(ns_def) = node.ns_def {
-                let mut prev = ns_def;
-                if (prev.prefix.is_null() && cur.prefix.is_null())
-                    || xml_str_equal(prev.prefix, cur.prefix)
-                {
-                    xml_free_ns(cur);
+            while let Some(next) = prev.next {
+                prev = next;
+                if prev.prefix == cur.prefix {
+                    unsafe {
+                        // # Safety
+                        // `cur` is created this function and it is not leaked from here.
+                        xml_free_ns(cur);
+                    }
                     return None;
                 }
-                while let Some(next) = prev.next {
-                    prev = next;
-                    if (prev.prefix.is_null() && cur.prefix.is_null())
-                        || xml_str_equal(prev.prefix, cur.prefix)
-                    {
-                        xml_free_ns(cur);
-                        return None;
-                    }
-                }
-                prev.next = Some(cur);
-            } else {
-                node.ns_def = Some(cur);
             }
+            prev.next = Some(cur);
+        } else {
+            node.ns_def = Some(cur);
         }
-        Some(cur)
     }
+    Some(cur)
 }
 
 /// Free up the structures associated to a namespace
 #[doc(alias = "xmlFreeNs")]
 pub unsafe fn xml_free_ns(cur: XmlNsPtr) {
     unsafe {
-        if !cur.prefix.is_null() {
-            xml_free(cur.prefix as _);
-        }
         cur.free();
     }
 }

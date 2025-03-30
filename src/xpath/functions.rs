@@ -1,12 +1,9 @@
-use std::{
-    ffi::{CStr, CString},
-    iter::repeat,
-    ptr::null_mut,
-};
+use std::{ffi::CString, iter::repeat, ptr::null_mut};
 
 use crate::{
-    libxml::{chvalid::xml_is_blank_char, globals::xml_free, xmlstring::xml_strdup},
-    tree::{NodeCommon, XmlAttrPtr, XmlElementType, XmlNodePtr, XmlNsPtr, xml_build_qname},
+    libxml::chvalid::xml_is_blank_char,
+    parser::build_qname,
+    tree::{NodeCommon, XmlAttrPtr, XmlElementType, XmlNodePtr, XmlNsPtr},
     xpath::{
         XmlXPathObjectPtr, XmlXPathObjectType, xml_xpath_cache_convert_boolean,
         xml_xpath_cache_new_boolean,
@@ -19,8 +16,7 @@ use super::{
     xml_xpath_cache_new_string, xml_xpath_cache_wrap_node_set, xml_xpath_cache_wrap_string,
     xml_xpath_cast_node_to_number, xml_xpath_cast_node_to_string, xml_xpath_err,
     xml_xpath_free_node_set, xml_xpath_get_elements_by_ids, xml_xpath_node_set_create,
-    xml_xpath_node_set_merge, xml_xpath_perr_memory, xml_xpath_release_object,
-    xml_xpath_string_eval_number,
+    xml_xpath_node_set_merge, xml_xpath_release_object, xml_xpath_string_eval_number,
 };
 
 /// Macro to check that the number of args passed to an XPath function matches.
@@ -550,24 +546,14 @@ pub(super) unsafe fn xml_xpath_name_function(ctxt: &mut XmlXPathParserContext, m
                         if *node.name.add(0) == b' ' {
                             ctxt.value_push(xml_xpath_cache_new_string(ctxt.context, Some("")));
                         } else if let Some(prefix) =
-                            node.ns.map(|ns| ns.prefix).filter(|p| !p.is_null())
+                            node.ns.as_deref().and_then(|ns| ns.prefix.as_deref())
                         {
-                            let mut fullname = xml_build_qname(node.name, prefix, null_mut(), 0);
-                            if fullname == node.name as _ {
-                                fullname = xml_strdup(node.name);
-                            }
-                            if fullname.is_null() {
-                                xml_xpath_perr_memory(ctxt, None);
-                            }
+                            let nodename = node.name().unwrap();
+                            let fullname = build_qname(&nodename, Some(prefix));
                             ctxt.value_push(xml_xpath_cache_wrap_string(
                                 ctxt.context,
-                                (!fullname.is_null())
-                                    .then(|| {
-                                        CStr::from_ptr(fullname as *const i8).to_string_lossy()
-                                    })
-                                    .as_deref(),
+                                Some(&fullname),
                             ));
-                            xml_free(fullname as _);
                         } else {
                             ctxt.value_push(xml_xpath_cache_new_string(
                                 ctxt.context,
@@ -580,24 +566,14 @@ pub(super) unsafe fn xml_xpath_name_function(ctxt: &mut XmlXPathParserContext, m
                         if *attr.name.add(0) == b' ' {
                             ctxt.value_push(xml_xpath_cache_new_string(ctxt.context, Some("")));
                         } else if let Some(prefix) =
-                            attr.ns.map(|ns| ns.prefix).filter(|p| !p.is_null())
+                            attr.ns.as_deref().and_then(|ns| ns.prefix.as_deref())
                         {
-                            let mut fullname = xml_build_qname(attr.name, prefix, null_mut(), 0);
-                            if fullname == attr.name as _ {
-                                fullname = xml_strdup(attr.name);
-                            }
-                            if fullname.is_null() {
-                                xml_xpath_perr_memory(ctxt, None);
-                            }
+                            let attrname = attr.name().unwrap();
+                            let fullname = build_qname(&attrname, Some(prefix));
                             ctxt.value_push(xml_xpath_cache_wrap_string(
                                 ctxt.context,
-                                (!fullname.is_null())
-                                    .then(|| {
-                                        CStr::from_ptr(fullname as *const i8).to_string_lossy()
-                                    })
-                                    .as_deref(),
+                                Some(&fullname),
                             ));
-                            xml_free(fullname as _);
                         } else {
                             ctxt.value_push(xml_xpath_cache_new_string(
                                 ctxt.context,

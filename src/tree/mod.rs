@@ -55,7 +55,7 @@ use crate::{
             xml_register_node_default_value,
         },
         parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
-        xmlstring::{XmlChar, xml_str_equal, xml_strdup, xml_strncat, xml_strndup},
+        xmlstring::{XmlChar, xml_strdup, xml_strncat, xml_strndup},
     },
 };
 
@@ -776,42 +776,40 @@ pub unsafe fn xml_split_qname2(name: *const XmlChar, prefix: *mut *mut XmlChar) 
 /// @tree or on one of its ancestors then a new prefix is generated.
 /// Returns the (new) namespace definition or null_mut() in case of error
 #[doc(alias = "xmlNewReconciledNs")]
-unsafe fn xml_new_reconciled_ns(
+fn xml_new_reconciled_ns(
     doc: Option<XmlDocPtr>,
     mut tree: XmlNodePtr,
     ns: XmlNsPtr,
 ) -> Option<XmlNsPtr> {
-    unsafe {
-        let mut counter: i32 = 1;
+    let mut counter: i32 = 1;
 
-        // let tree = tree?;
-        if !matches!(tree.element_type(), XmlElementType::XmlElementNode) {
-            return None;
-        }
-        if !matches!(ns.typ, XmlElementType::XmlNamespaceDecl) {
-            return None;
-        }
-        // Search an existing namespace definition inherited.
-        if let Some(def) = tree.search_ns_by_href(doc, ns.href().as_deref().unwrap()) {
-            return Some(def);
-        }
-
-        // Find a close prefix which is not already in use.
-        // Let's strip namespace prefixes longer than 20 chars !
-        let prefix = ns.prefix().unwrap_or(Cow::Borrowed("default"));
-        let mut def = tree.search_ns(doc, Some(&prefix));
-        while def.is_some() {
-            if counter > 1000 {
-                return None;
-            }
-            let prefix = format!("{prefix}{counter}");
-            counter += 1;
-            def = tree.search_ns(doc, Some(&prefix));
-        }
-
-        // OK, now we are ready to create a new one.
-        xml_new_ns(Some(tree), ns.href.as_deref(), Some(&prefix))
+    // let tree = tree?;
+    if !matches!(tree.element_type(), XmlElementType::XmlElementNode) {
+        return None;
     }
+    if !matches!(ns.typ, XmlElementType::XmlNamespaceDecl) {
+        return None;
+    }
+    // Search an existing namespace definition inherited.
+    if let Some(def) = tree.search_ns_by_href(doc, ns.href().as_deref().unwrap()) {
+        return Some(def);
+    }
+
+    // Find a close prefix which is not already in use.
+    // Let's strip namespace prefixes longer than 20 chars !
+    let prefix = ns.prefix().unwrap_or(Cow::Borrowed("default"));
+    let mut def = tree.search_ns(doc, Some(&prefix));
+    while def.is_some() {
+        if counter > 1000 {
+            return None;
+        }
+        let prefix = format!("{prefix}{counter}");
+        counter += 1;
+        def = tree.search_ns(doc, Some(&prefix));
+    }
+
+    // OK, now we are ready to create a new one.
+    xml_new_ns(Some(tree), ns.href.as_deref(), Some(&prefix))
 }
 
 // NOTE about the CopyNode operations !
@@ -2184,60 +2182,53 @@ pub unsafe fn xml_free_node(cur: impl Into<XmlGenericNodePtr>) {
 ///
 /// Returns 1 if true, 0 if false and -1 in case of error.
 #[doc(alias = "xmlNsInScope")]
-unsafe fn xml_ns_in_scope(
+fn xml_ns_in_scope(
     _doc: Option<XmlDocPtr>,
     mut node: Option<XmlGenericNodePtr>,
     ancestor: Option<XmlGenericNodePtr>,
-    prefix: *const XmlChar,
+    prefix: Option<&str>,
 ) -> i32 {
-    unsafe {
-        while let Some(cur_node) = node.filter(|&node| Some(node) != ancestor) {
-            if matches!(
-                cur_node.element_type(),
-                XmlElementType::XmlEntityRefNode
-                    | XmlElementType::XmlEntityNode
-                    | XmlElementType::XmlEntityDecl
-            ) {
-                return -1;
-            }
-            if let Some(cur_node) = XmlNodePtr::try_from(cur_node).ok().filter(|cur_node| {
-                matches!(cur_node.element_type(), XmlElementType::XmlElementNode)
-            }) {
-                let mut tst = cur_node.ns_def;
-                while let Some(now) = tst {
-                    if now.prefix().is_none() && prefix.is_null() {
-                        return 0;
-                    }
-                    if now.prefix().is_some()
-                        && now.prefix()
-                            == (!prefix.is_null())
-                                .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
-                    {
-                        return 0;
-                    }
-                    tst = now.next;
-                }
-            }
-            node = cur_node.parent();
-        }
-        if node != ancestor {
+    while let Some(cur_node) = node.filter(|&node| Some(node) != ancestor) {
+        if matches!(
+            cur_node.element_type(),
+            XmlElementType::XmlEntityRefNode
+                | XmlElementType::XmlEntityNode
+                | XmlElementType::XmlEntityDecl
+        ) {
             return -1;
         }
-        1
+        if let Some(cur_node) = XmlNodePtr::try_from(cur_node)
+            .ok()
+            .filter(|cur_node| matches!(cur_node.element_type(), XmlElementType::XmlElementNode))
+        {
+            let mut tst = cur_node.ns_def;
+            while let Some(now) = tst {
+                if now.prefix().is_none() && prefix.is_none() {
+                    return 0;
+                }
+                if now.prefix().is_some() && now.prefix.as_deref() == prefix {
+                    return 0;
+                }
+                tst = now.next;
+            }
+        }
+        node = cur_node.parent();
     }
+    if node != ancestor {
+        return -1;
+    }
+    1
 }
 
 /// Do a copy of the namespace.
 ///
 /// Returns: a new #xmlNsPtr, or null_mut() in case of error.
 #[doc(alias = "xmlCopyNamespace")]
-pub unsafe fn xml_copy_namespace(cur: Option<XmlNsPtr>) -> Option<XmlNsPtr> {
-    unsafe {
-        let cur = cur?;
-        match cur.element_type() {
-            XML_LOCAL_NAMESPACE => xml_new_ns(None, cur.href.as_deref(), cur.prefix().as_deref()),
-            _ => None,
-        }
+pub fn xml_copy_namespace(cur: Option<XmlNsPtr>) -> Option<XmlNsPtr> {
+    let cur = cur?;
+    match cur.element_type() {
+        XML_LOCAL_NAMESPACE => xml_new_ns(None, cur.href.as_deref(), cur.prefix().as_deref()),
+        _ => None,
     }
 }
 
@@ -2330,34 +2321,22 @@ pub fn set_compress_mode(mode: i32) {
     }
 }
 
-macro_rules! IS_STR_XML {
-    ($str:expr) => {
-        !$str.is_null()
-            && *$str.add(0) == b'x'
-            && *$str.add(1) == b'm'
-            && *$str.add(2) == b'l'
-            && *$str.add(3) == 0
-    };
-}
-
 /// Searches for a ns-decl with the given prefix in @nsList.
 ///
 /// Returns the ns-decl if found, null_mut() if not found and on API errors.
 #[doc(alias = "xmlTreeLookupNsListByPrefix")]
-unsafe fn xml_tree_nslist_lookup_by_prefix(
+fn xml_tree_nslist_lookup_by_prefix(
     ns_list: Option<XmlNsPtr>,
-    prefix: *const XmlChar,
+    prefix: Option<&str>,
 ) -> Option<XmlNsPtr> {
-    unsafe {
-        let mut ns = ns_list;
-        while let Some(now) = ns {
-            if prefix == now.prefix || xml_str_equal(prefix, now.prefix) {
-                return ns;
-            }
-            ns = now.next;
+    let mut ns = ns_list;
+    while let Some(now) = ns {
+        if prefix == now.prefix.as_deref() {
+            return ns;
         }
-        None
+        ns = now.next;
     }
+    None
 }
 
 /// Dynamically searches for a ns-declaration which matches
@@ -2365,58 +2344,55 @@ unsafe fn xml_tree_nslist_lookup_by_prefix(
 ///
 /// Returns 1 if a ns-decl was found, 0 if not and -1 on API and internal errors.
 #[doc(alias = "xmlSearchNsByPrefixStrict")]
-unsafe fn xml_search_ns_by_prefix_strict(
+fn xml_search_ns_by_prefix_strict(
     mut doc: XmlDocPtr,
     node: XmlGenericNodePtr,
-    prefix: *const XmlChar,
+    prefix: Option<&str>,
     mut ret_ns: Option<&mut Option<XmlNsPtr>>,
 ) -> i32 {
-    unsafe {
-        if matches!(node.element_type(), XmlElementType::XmlNamespaceDecl) {
-            return -1;
-        }
-
-        if let Some(ret_ns) = ret_ns.as_deref_mut() {
-            *ret_ns = None;
-        }
-        if IS_STR_XML!(prefix) {
-            if let Some(ret_ns) = ret_ns {
-                *ret_ns = doc.ensure_xmldecl();
-                if ret_ns.is_none() {
-                    return -1;
-                }
-            }
-            return 1;
-        }
-        let mut cur = Some(node);
-        while let Some(cur_node) =
-            cur.filter(|&cur| cur.document().map(|doc| doc.into()) != Some(cur))
-        {
-            if matches!(cur_node.element_type(), XmlElementType::XmlElementNode) {
-                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                let mut ns = cur_node.ns_def;
-                while let Some(now) = ns {
-                    if prefix == now.prefix || xml_str_equal(prefix, now.prefix) {
-                        // Disabled namespaces, e.g. xmlns:abc="".
-                        if now.href.is_none() {
-                            return 0;
-                        }
-                        if let Some(ret_ns) = ret_ns {
-                            *ret_ns = ns;
-                        }
-                        return 1;
-                    }
-                    ns = now.next;
-                }
-            } else if (matches!(cur_node.element_type(), XmlElementType::XmlEntityNode)
-                || matches!(cur_node.element_type(), XmlElementType::XmlEntityDecl))
-            {
-                return 0;
-            }
-            cur = cur_node.parent();
-        }
-        0
+    if matches!(node.element_type(), XmlElementType::XmlNamespaceDecl) {
+        return -1;
     }
+
+    if let Some(ret_ns) = ret_ns.as_deref_mut() {
+        *ret_ns = None;
+    }
+    if prefix == Some("xml") {
+        if let Some(ret_ns) = ret_ns {
+            *ret_ns = doc.ensure_xmldecl();
+            if ret_ns.is_none() {
+                return -1;
+            }
+        }
+        return 1;
+    }
+    let mut cur = Some(node);
+    while let Some(cur_node) = cur.filter(|&cur| cur.document().map(|doc| doc.into()) != Some(cur))
+    {
+        if matches!(cur_node.element_type(), XmlElementType::XmlElementNode) {
+            let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+            let mut ns = cur_node.ns_def;
+            while let Some(now) = ns {
+                if prefix == now.prefix.as_deref() {
+                    // Disabled namespaces, e.g. xmlns:abc="".
+                    if now.href.is_none() {
+                        return 0;
+                    }
+                    if let Some(ret_ns) = ret_ns {
+                        *ret_ns = ns;
+                    }
+                    return 1;
+                }
+                ns = now.next;
+            }
+        } else if (matches!(cur_node.element_type(), XmlElementType::XmlEntityNode)
+            || matches!(cur_node.element_type(), XmlElementType::XmlEntityDecl))
+        {
+            return 0;
+        }
+        cur = cur_node.parent();
+    }
+    0
 }
 
 /// Dynamically searches for a ns-declaration which matches
@@ -2424,101 +2400,98 @@ unsafe fn xml_search_ns_by_prefix_strict(
 ///
 /// Returns 1 if a ns-decl was found, 0 if not and -1 on API and internal errors.
 #[doc(alias = "xmlSearchNsByNamespaceStrict")]
-unsafe fn xml_search_ns_by_namespace_strict(
+fn xml_search_ns_by_namespace_strict(
     mut doc: XmlDocPtr,
     node: XmlGenericNodePtr,
     ns_name: &str,
     ret_ns: &mut Option<XmlNsPtr>,
     prefixed: i32,
 ) -> i32 {
-    unsafe {
-        if matches!(node.element_type(), XmlElementType::XmlNamespaceDecl) {
+    if matches!(node.element_type(), XmlElementType::XmlNamespaceDecl) {
+        return -1;
+    }
+
+    *ret_ns = None;
+    if ns_name == XML_XML_NAMESPACE.to_str().unwrap() {
+        *ret_ns = doc.ensure_xmldecl();
+        if ret_ns.is_none() {
             return -1;
         }
-
-        *ret_ns = None;
-        if ns_name == XML_XML_NAMESPACE.to_str().unwrap() {
-            *ret_ns = doc.ensure_xmldecl();
-            if ret_ns.is_none() {
-                return -1;
-            }
-            return 1;
-        }
-        let mut cur = Some(node);
-        let mut prev: Option<XmlNodePtr> = None;
-        let mut out = None;
-        while let Some(cur_node) =
-            cur.filter(|&cur| Some(cur) != cur.document().map(|doc| doc.into()))
-        {
-            if matches!(cur_node.element_type(), XmlElementType::XmlElementNode) {
-                let cur = XmlNodePtr::try_from(cur_node).unwrap();
-                if cur.ns_def.is_some() {
-                    let mut ns = cur.ns_def;
-                    while let Some(now) = ns {
-                        if prefixed != 0 && now.prefix().is_none() {
+        return 1;
+    }
+    let mut cur = Some(node);
+    let mut prev: Option<XmlNodePtr> = None;
+    let mut out = None;
+    while let Some(cur_node) = cur.filter(|&cur| Some(cur) != cur.document().map(|doc| doc.into()))
+    {
+        if matches!(cur_node.element_type(), XmlElementType::XmlElementNode) {
+            let cur = XmlNodePtr::try_from(cur_node).unwrap();
+            if cur.ns_def.is_some() {
+                let mut ns = cur.ns_def;
+                while let Some(now) = ns {
+                    if prefixed != 0 && now.prefix().is_none() {
+                        ns = now.next;
+                        continue;
+                    }
+                    if let Some(prev) = prev {
+                        // Check the last level of ns-decls for a
+                        // shadowing prefix.
+                        let mut prevns = prev.ns_def;
+                        while let Some(pns) = prevns {
+                            if pns.prefix() == now.prefix()
+                                || (pns.prefix().is_some()
+                                    && now.prefix().is_some()
+                                    && pns.prefix() == now.prefix())
+                            {
+                                // Shadowed.
+                                break;
+                            }
+                            prevns = pns.next;
+                        }
+                        if prevns.is_some() {
                             ns = now.next;
                             continue;
                         }
-                        if let Some(prev) = prev {
-                            // Check the last level of ns-decls for a
-                            // shadowing prefix.
-                            let mut prevns = prev.ns_def;
-                            while let Some(pns) = prevns {
-                                if pns.prefix() == now.prefix()
-                                    || (pns.prefix().is_some()
-                                        && now.prefix().is_some()
-                                        && pns.prefix() == now.prefix())
-                                {
-                                    // Shadowed.
-                                    break;
-                                }
-                                prevns = pns.next;
+                    }
+                    // Ns-name comparison.
+                    if Some(ns_name) == now.href.as_deref() {
+                        // At this point the prefix can only be shadowed,
+                        // if we are the the (at least) 3rd level of ns-decls.
+                        if out.is_some() {
+                            let ret: i32 = xml_ns_in_scope(
+                                Some(doc),
+                                Some(node),
+                                prev.map(|prev| prev.into()),
+                                now.prefix.as_deref(),
+                            );
+                            if ret < 0 {
+                                return -1;
                             }
-                            if prevns.is_some() {
+                            // TODO: Should we try to find a matching ns-name
+                            // only once? This here keeps on searching.
+                            // I think we should try further since, there might
+                            // be an other matching ns-decl with an unshadowed
+                            // prefix.
+                            if ret == 0 {
                                 ns = now.next;
                                 continue;
                             }
                         }
-                        // Ns-name comparison.
-                        if Some(ns_name) == now.href.as_deref() {
-                            // At this point the prefix can only be shadowed,
-                            // if we are the the (at least) 3rd level of ns-decls.
-                            if out.is_some() {
-                                let ret: i32 = xml_ns_in_scope(
-                                    Some(doc),
-                                    Some(node),
-                                    prev.map(|prev| prev.into()),
-                                    now.prefix,
-                                );
-                                if ret < 0 {
-                                    return -1;
-                                }
-                                // TODO: Should we try to find a matching ns-name
-                                // only once? This here keeps on searching.
-                                // I think we should try further since, there might
-                                // be an other matching ns-decl with an unshadowed
-                                // prefix.
-                                if ret == 0 {
-                                    ns = now.next;
-                                    continue;
-                                }
-                            }
-                            *ret_ns = ns;
-                            return 1;
-                        }
+                        *ret_ns = ns;
+                        return 1;
                     }
-                    out = prev;
-                    prev = Some(cur);
                 }
-            } else if (matches!(cur_node.element_type(), XmlElementType::XmlEntityNode)
-                || matches!(cur_node.element_type(), XmlElementType::XmlEntityDecl))
-            {
-                return 0;
+                out = prev;
+                prev = Some(cur);
             }
-            cur = cur_node.parent();
+        } else if (matches!(cur_node.element_type(), XmlElementType::XmlEntityNode)
+            || matches!(cur_node.element_type(), XmlElementType::XmlEntityDecl))
+        {
+            return 0;
         }
-        0
+        cur = cur_node.parent();
     }
+    0
 }
 
 #[cfg(test)]

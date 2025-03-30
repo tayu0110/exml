@@ -89,25 +89,23 @@ impl XmlC14NVisibleNsStack {
     ///
     /// Please refer to the document of `xmlC14NVisibleNsStackFind` for original libxml2.
     #[doc(alias = "xmlC14NVisibleNsStackFind")]
-    unsafe fn find(&self, ns: &XmlNs) -> bool {
-        unsafe {
-            // if the default namespace xmlns="" is not defined yet then we do not want to print it out
-            let prefix = ns.prefix();
-            let prefix = prefix.as_deref().unwrap_or("");
-            let href = ns.href();
-            let href = href.as_deref().unwrap_or("");
+    fn find(&self, ns: &XmlNs) -> bool {
+        // if the default namespace xmlns="" is not defined yet then we do not want to print it out
+        let prefix = ns.prefix();
+        let prefix = prefix.as_deref().unwrap_or("");
+        let href = ns.href();
+        let href = href.as_deref().unwrap_or("");
 
-            let has_empty_ns =
-                xml_c14n_str_equal(Some(prefix), None) && xml_c14n_str_equal(Some(href), None);
+        let has_empty_ns =
+            xml_c14n_str_equal(Some(prefix), None) && xml_c14n_str_equal(Some(href), None);
 
-            let start = if has_empty_ns { 0 } else { self.ns_prev_start };
-            for &ns1 in self.ns_tab[start..self.ns_cur_end].iter().rev() {
-                if xml_c14n_str_equal(Some(prefix), ns1.prefix().as_deref()) {
-                    return xml_c14n_str_equal(Some(href), ns1.href().as_deref());
-                }
+        let start = if has_empty_ns { 0 } else { self.ns_prev_start };
+        for &ns1 in self.ns_tab[start..self.ns_cur_end].iter().rev() {
+            if xml_c14n_str_equal(Some(prefix), ns1.prefix().as_deref()) {
+                return xml_c14n_str_equal(Some(href), ns1.href().as_deref());
             }
-            has_empty_ns
         }
+        has_empty_ns
     }
 
     #[doc(alias = "xmlC14NVisibleNsStackAdd")]
@@ -222,22 +220,20 @@ impl<T> XmlC14NCtx<'_, T> {
     ///
     /// Returns 1 on success or 0 on fail.
     #[doc(alias = "xmlC14NPrintNamespaces")]
-    unsafe fn print_namespaces(&mut self, ns: &XmlNs) -> i32 {
-        unsafe {
-            if let Some(prefix) = ns.prefix() {
-                self.buf.write_str(" xmlns:").ok();
-                self.buf.write_str(&prefix).ok();
-                self.buf.write_str("=").ok();
-            } else {
-                self.buf.write_str(" xmlns=").ok();
-            }
-            if let Some(href) = ns.href.as_deref() {
-                write_quoted(&mut self.buf, href).ok();
-            } else {
-                self.buf.write_str("\"\"").ok();
-            }
-            1
+    fn print_namespaces(&mut self, ns: &XmlNs) -> i32 {
+        if let Some(prefix) = ns.prefix() {
+            self.buf.write_str(" xmlns:").ok();
+            self.buf.write_str(&prefix).ok();
+            self.buf.write_str("=").ok();
+        } else {
+            self.buf.write_str(" xmlns=").ok();
         }
+        if let Some(href) = ns.href.as_deref() {
+            write_quoted(&mut self.buf, href).ok();
+        } else {
+            self.buf.write_str("\"\"").ok();
+        }
+        1
     }
 
     /// Prints out canonical namespace axis of the current node to the
@@ -1214,6 +1210,7 @@ unsafe fn xml_c14n_is_node_in_nodeset(
             if let Ok(node) = XmlNsPtr::try_from(node) {
                 let mut ns = XmlNs {
                     href: node.href.clone(),
+                    prefix: node.prefix.clone(),
                     ..*node
                 };
                 ns.node = ns.next.map(|ns| ns.into());
@@ -1554,17 +1551,15 @@ fn xml_c14n_err_relative_namespace(ns_uri: &str) {
 ///
 /// Returns -1 if ns1 < ns2, 0 if ns1 == ns2 or 1 if ns1 > ns2.
 #[doc(alias = "xmlC14NNsCompare")]
-unsafe fn xml_c14n_ns_compare(ns1: XmlNsPtr, ns2: XmlNsPtr) -> Ordering {
+fn xml_c14n_ns_compare(ns1: XmlNsPtr, ns2: XmlNsPtr) -> Ordering {
     if ns1 == ns2 {
         return Ordering::Equal;
     }
-    unsafe {
-        match (ns1.prefix(), ns2.prefix()) {
-            (Some(p1), Some(p2)) => p1.cmp(&p2),
-            (Some(_), None) => Ordering::Greater,
-            (None, Some(_)) => Ordering::Less,
-            (None, None) => Ordering::Equal,
-        }
+    match (ns1.prefix(), ns2.prefix()) {
+        (Some(p1), Some(p2)) => p1.cmp(&p2),
+        (Some(_), None) => Ordering::Greater,
+        (None, Some(_)) => Ordering::Less,
+        (None, None) => Ordering::Equal,
     }
 }
 
@@ -1574,11 +1569,9 @@ unsafe fn xml_c14n_ns_compare(ns1: XmlNsPtr, ns2: XmlNsPtr) -> Ordering {
 /// Please refer to the document of `xmlC14NIsXmlNs` for original libxml2.
 /* todo: make it a define? */
 #[doc(alias = "xmlC14NIsXmlNs")]
-unsafe fn xml_c14n_is_xml_ns(ns: XmlNsPtr) -> bool {
-    unsafe {
-        ns.prefix().as_deref() == Some("xml")
-            && ns.href().as_deref() == Some(XML_XML_NAMESPACE.to_str().unwrap())
-    }
+fn xml_c14n_is_xml_ns(ns: XmlNsPtr) -> bool {
+    ns.prefix().as_deref() == Some("xml")
+        && ns.href().as_deref() == Some(XML_XML_NAMESPACE.to_str().unwrap())
 }
 
 #[doc(alias = "xmlC14NStrEqual")]
@@ -1596,7 +1589,7 @@ fn xml_c14n_str_equal(str1: Option<&str>, str2: Option<&str>) -> bool {
 ///
 /// Returns -1 if attr1 < attr2, 0 if attr1 == attr2 or 1 if attr1 > attr2.
 #[doc(alias = "xmlC14NAttrsCompare")]
-unsafe fn xml_c14n_attrs_compare(attr1: XmlAttrPtr, attr2: XmlAttrPtr) -> Ordering {
+fn xml_c14n_attrs_compare(attr1: XmlAttrPtr, attr2: XmlAttrPtr) -> Ordering {
     // Simple cases
     if attr1 == attr2 {
         return Ordering::Equal;
@@ -1613,17 +1606,15 @@ unsafe fn xml_c14n_attrs_compare(attr1: XmlAttrPtr, attr2: XmlAttrPtr) -> Orderi
     let Some(attr2_ns) = attr2.ns else {
         return Ordering::Greater;
     };
-    unsafe {
-        if attr1_ns.prefix().is_none() {
-            return Ordering::Less;
-        }
-        if attr2_ns.prefix().is_none() {
-            return Ordering::Greater;
-        }
-        match attr1_ns.href().cmp(&attr2_ns.href()) {
-            Ordering::Equal => attr1.name().cmp(&attr2.name()),
-            diff => diff,
-        }
+    if attr1_ns.prefix().is_none() {
+        return Ordering::Less;
+    }
+    if attr2_ns.prefix().is_none() {
+        return Ordering::Greater;
+    }
+    match attr1_ns.href().cmp(&attr2_ns.href()) {
+        Ordering::Equal => attr1.name().cmp(&attr2.name()),
+        diff => diff,
     }
 }
 
@@ -1631,11 +1622,9 @@ unsafe fn xml_c14n_attrs_compare(attr1: XmlAttrPtr, attr2: XmlAttrPtr) -> Orderi
 /// Return `true` if so, otherwise return false.
 /* todo: make it a define? */
 #[doc(alias = "xmlC14NIsXmlAttr")]
-unsafe fn xml_c14n_is_xml_attr(attr: XmlAttrPtr) -> bool {
-    unsafe {
-        let ns = attr.ns;
-        ns.is_some_and(|ns| xml_c14n_is_xml_ns(ns))
-    }
+fn xml_c14n_is_xml_attr(attr: XmlAttrPtr) -> bool {
+    let ns = attr.ns;
+    ns.is_some_and(xml_c14n_is_xml_ns)
 }
 
 /// Converts a string to a canonical (normalized) format.  

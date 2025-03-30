@@ -18,15 +18,13 @@
 //
 // daniel@veillard.com
 
-use std::{ffi::CStr, os::raw::c_void, ptr::null_mut};
-
-use libc::snprintf;
+use std::{os::raw::c_void, ptr::null_mut};
 
 use crate::libxml::{
     globals::{xml_free, xml_malloc},
     parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
     valid::{xml_add_id, xml_is_id, xml_remove_id},
-    xmlstring::{XmlChar, xml_strdup},
+    xmlstring::xml_strdup,
 };
 
 use super::{
@@ -44,7 +42,7 @@ pub type XmlDOMWrapAcquireNsFunction = unsafe fn(
     ctxt: XmlDOMWrapCtxtPtr,
     node: Option<XmlGenericNodePtr>,
     ns_name: Option<&str>,
-    ns_prefix: *const XmlChar,
+    ns_prefix: Option<&str>,
 ) -> Option<XmlNsPtr>;
 
 /// Context for DOM wrapper-operations.
@@ -384,29 +382,27 @@ unsafe fn xml_dom_wrap_ns_norm_add_ns_map_item2(
 ///
 /// Returns the acquired ns struct or null_mut() in case of an API or internal error.
 #[doc(alias = "xmlDOMWrapStoreNs")]
-unsafe fn xml_dom_wrap_store_ns(
+fn xml_dom_wrap_store_ns(
     mut doc: XmlDocPtr,
     ns_name: Option<&str>,
     prefix: Option<&str>,
 ) -> Option<XmlNsPtr> {
-    unsafe {
-        let mut ns = doc.ensure_xmldecl()?;
-        if let Some(next) = ns.next {
+    let mut ns = doc.ensure_xmldecl()?;
+    if let Some(next) = ns.next {
+        if next.prefix().as_deref() == prefix && next.href.as_deref() == ns_name {
+            return Some(next);
+        }
+        ns = next;
+        while let Some(next) = ns.next {
             if next.prefix().as_deref() == prefix && next.href.as_deref() == ns_name {
                 return Some(next);
             }
             ns = next;
-            while let Some(next) = ns.next {
-                if next.prefix().as_deref() == prefix && next.href.as_deref() == ns_name {
-                    return Some(next);
-                }
-                ns = next;
-            }
         }
-        // Create.
-        ns.next = xml_new_ns(None, ns_name, prefix);
-        ns.next
     }
+    // Create.
+    ns.next = xml_new_ns(None, ns_name, prefix);
+    ns.next
 }
 
 /// Declares a new namespace on @elem. It tries to use the
@@ -415,86 +411,65 @@ unsafe fn xml_dom_wrap_store_ns(
 ///
 /// Returns 1 if a ns-decl was found, 0 if not and -1 on API and internal errors.
 #[doc(alias = "xmlDOMWrapNSNormDeclareNsForced")]
-unsafe fn xml_dom_wrap_nsnorm_declare_ns_forced(
+fn xml_dom_wrap_nsnorm_declare_ns_forced(
     doc: XmlDocPtr,
     mut elem: XmlNodePtr,
     ns_name: Option<&str>,
-    prefix: *const XmlChar,
+    prefix: Option<&str>,
     check_shadow: i32,
 ) -> Option<XmlNsPtr> {
-    unsafe {
-        let mut buf: [i8; 50] = [0; 50];
-        let mut pref: *const XmlChar;
-        let mut counter: i32 = 0;
+    let mut counter: i32 = 0;
 
-        // let doc = doc?;
-        // let elem = elem?;
-        if !matches!(elem.element_type(), XmlElementType::XmlElementNode) {
-            return None;
-        }
-        // Create a ns-decl on @anchor.
-        pref = prefix;
-        loop {
-            // Lookup whether the prefix is unused in elem's ns-decls.
-            if elem.ns_def.is_some()
-                && xml_tree_nslist_lookup_by_prefix(elem.ns_def, pref).is_some()
+    // let doc = doc?;
+    // let elem = elem?;
+    if !matches!(elem.element_type(), XmlElementType::XmlElementNode) {
+        return None;
+    }
+    // Create a ns-decl on @anchor.
+    let mut pref = prefix.map(|prefix| prefix.to_owned());
+    loop {
+        // Lookup whether the prefix is unused in elem's ns-decls.
+        if elem.ns_def.is_some()
+            && xml_tree_nslist_lookup_by_prefix(elem.ns_def, pref.as_deref()).is_some()
+        {
+            // goto ns_next_prefix;
+        } else {
+            // Does it shadow ancestor ns-decls?
+            if check_shadow != 0
+                && elem
+                    .parent()
+                    .filter(|&p| {
+                        Some(p) != p.document().map(|doc| doc.into())
+                            && xml_search_ns_by_prefix_strict(doc, p, pref.as_deref(), None) == 1
+                    })
+                    .is_some()
             {
                 // goto ns_next_prefix;
             } else {
-                // Does it shadow ancestor ns-decls?
-                if check_shadow != 0
-                    && elem
-                        .parent()
-                        .filter(|&p| {
-                            Some(p) != p.document().map(|doc| doc.into())
-                                && xml_search_ns_by_prefix_strict(doc, p, pref, None) == 1
-                        })
-                        .is_some()
-                {
-                    // goto ns_next_prefix;
-                } else {
-                    let ret = xml_new_ns(
-                        None,
-                        ns_name,
-                        (!pref.is_null())
-                            .then(|| CStr::from_ptr(pref as *const i8).to_string_lossy())
-                            .as_deref(),
-                    )?;
-                    if let Some(ns_def) = elem.ns_def {
-                        let mut ns2 = ns_def;
-                        while let Some(next) = ns2.next {
-                            ns2 = next;
-                        }
-                        ns2.next = Some(ret);
-                    } else {
-                        elem.ns_def = Some(ret);
+                let ret = xml_new_ns(None, ns_name, pref.as_deref())?;
+                if let Some(ns_def) = elem.ns_def {
+                    let mut ns2 = ns_def;
+                    while let Some(next) = ns2.next {
+                        ns2 = next;
                     }
-                    return Some(ret);
+                    ns2.next = Some(ret);
+                } else {
+                    elem.ns_def = Some(ret);
                 }
+                return Some(ret);
             }
-            // ns_next_prefix:
-            counter += 1;
-            if counter > 1000 {
-                return None;
-            }
-            if prefix.is_null() {
-                snprintf(
-                    buf.as_mut_ptr() as _,
-                    buf.len(),
-                    c"ns_%d".as_ptr() as _,
-                    counter,
-                );
-            } else {
-                snprintf(
-                    buf.as_mut_ptr() as _,
-                    buf.len(),
-                    c"%.30s_%d".as_ptr() as _,
-                    prefix,
-                    counter,
-                );
-            }
-            pref = buf.as_ptr() as _;
         }
+        // ns_next_prefix:
+        counter += 1;
+        if counter > 1000 {
+            return None;
+        }
+        let buf = if let Some(prefix) = prefix {
+            format!("{prefix}_{counter}")
+        } else {
+            format!("ns_{counter}")
+        };
+        pref = Some(buf);
     }
 }
 
@@ -568,9 +543,13 @@ unsafe fn xml_dom_wrap_ns_norm_acquire_normalized_ns(
         }
         // No luck, the namespace is out of scope or shadowed.
         if let Some(elem) = elem {
-            let Some(tmpns) =
-                xml_dom_wrap_nsnorm_declare_ns_forced(doc, elem, ns.href.as_deref(), ns.prefix, 0)
-            else {
+            let Some(tmpns) = xml_dom_wrap_nsnorm_declare_ns_forced(
+                doc,
+                elem,
+                ns.href.as_deref(),
+                ns.prefix.as_deref(),
+                0,
+            ) else {
                 return -1;
             };
 
@@ -1189,7 +1168,7 @@ unsafe fn xml_dom_wrap_adopt_branch(
                                                 ctxt,
                                                 Some(node.into()),
                                                 node.ns.unwrap().href.as_deref(),
-                                                node.ns.unwrap().prefix,
+                                                node.ns.unwrap().prefix.as_deref(),
                                             );
                                             // Insert mapping if ns is available; it's the users fault
                                             // if not.
@@ -1281,7 +1260,7 @@ unsafe fn xml_dom_wrap_adopt_branch(
                                                 ctxt,
                                                 Some(attr.into()),
                                                 attr.ns.unwrap().href.as_deref(),
-                                                attr.ns.unwrap().prefix,
+                                                attr.ns.unwrap().prefix.as_deref(),
                                             );
                                             // Insert mapping if ns is available; it's the users fault
                                             // if not.
@@ -1486,7 +1465,7 @@ unsafe fn xml_dom_wrap_adopt_attr(
                         dest_doc,
                         dest_parent,
                         attr_ns.href.as_deref(),
-                        attr_ns.prefix,
+                        attr_ns.prefix.as_deref(),
                         1,
                     );
                 }
@@ -2137,9 +2116,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                                     };
 
                                     new.href = now.href.clone();
-                                    if now.prefix().is_some() {
-                                        new.prefix = xml_strdup(now.prefix);
-                                    }
+                                    new.prefix = now.prefix.clone();
 
                                     if let Some(mut last) = clone_ns_def_slot {
                                         last.next = Some(new);
@@ -2290,7 +2267,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                                         ctxt,
                                         Some(cur_node),
                                         cur_ns.href.as_deref(),
-                                        cur_ns.prefix,
+                                        cur_ns.prefix.as_deref(),
                                     );
                                     // Add user's mapping.
                                     if xml_dom_wrap_ns_map_add_item(

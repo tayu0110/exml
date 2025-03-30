@@ -78,35 +78,30 @@ impl XmlNodeSet {
     ///
     /// Returns true (1) if @cur contains @val, false (0) otherwise
     #[doc(alias = "xmlXPathNodeSetContains")]
-    pub unsafe fn contains(&self, val: Option<XmlGenericNodePtr>) -> bool {
-        unsafe {
-            let Some(val) = val else {
-                return false;
-            };
-            let table = &self.node_tab;
-            if let Ok(ns1) = XmlNsPtr::try_from(val) {
-                for &node in table {
-                    if let Ok(ns2) = XmlNsPtr::try_from(node) {
-                        if ns1 == ns2 {
-                            return true;
-                        }
-                        if ns1.node.is_some()
-                            && ns2.node == ns1.node
-                            && ns1.prefix() == ns2.prefix()
-                        {
-                            return true;
-                        }
+    pub fn contains(&self, val: Option<XmlGenericNodePtr>) -> bool {
+        let Some(val) = val else {
+            return false;
+        };
+        let table = &self.node_tab;
+        if let Ok(ns1) = XmlNsPtr::try_from(val) {
+            for &node in table {
+                if let Ok(ns2) = XmlNsPtr::try_from(node) {
+                    if ns1 == ns2 {
+                        return true;
                     }
-                }
-            } else {
-                for &node in table {
-                    if val == node {
+                    if ns1.node.is_some() && ns2.node == ns1.node && ns1.prefix() == ns2.prefix() {
                         return true;
                     }
                 }
             }
-            false
+        } else {
+            for &node in table {
+                if val == node {
+                    return true;
+                }
+            }
         }
+        false
     }
 
     /// Implements the EXSLT - Sets has-same-nodes function:

@@ -63,70 +63,64 @@ impl XmlAttr {
     ///
     /// Returns the namespace pointer or NULL.
     #[doc(alias = "xmlSearchNsByHref")]
-    pub unsafe fn search_ns_by_href(
-        &mut self,
-        doc: Option<XmlDocPtr>,
-        href: &str,
-    ) -> Option<XmlNsPtr> {
-        unsafe {
-            if href == XML_XML_NAMESPACE.to_str().unwrap() {
-                let mut doc = doc.or(self.document())?;
-                // Return the XML namespace declaration held by the doc.
-                if doc.old_ns.is_none() {
-                    return doc.ensure_xmldecl();
-                } else {
-                    return doc.old_ns;
-                }
+    pub fn search_ns_by_href(&mut self, doc: Option<XmlDocPtr>, href: &str) -> Option<XmlNsPtr> {
+        if href == XML_XML_NAMESPACE.to_str().unwrap() {
+            let mut doc = doc.or(self.document())?;
+            // Return the XML namespace declaration held by the doc.
+            if doc.old_ns.is_none() {
+                return doc.ensure_xmldecl();
+            } else {
+                return doc.old_ns;
             }
-            let mut node = self.parent.map(XmlGenericNodePtr::from);
-            while let Some(now) = node {
-                if matches!(
-                    now.element_type(),
-                    XmlElementType::XmlEntityRefNode
-                        | XmlElementType::XmlEntityNode
-                        | XmlElementType::XmlEntityDecl
-                ) {
-                    return None;
-                }
-                if let Some(now) = XmlNodePtr::try_from(now)
-                    .ok()
-                    .filter(|now| now.element_type() == XmlElementType::XmlElementNode)
-                {
-                    // let href = CString::new(href).unwrap();
-                    let mut cur = now.ns_def;
-                    while let Some(cur_ns) = cur {
-                        if cur_ns.href.is_some()
-                            && cur_ns.href().as_deref() == Some(href)
-                            && cur_ns.prefix().is_some()
-                            && xml_ns_in_scope(
-                                doc,
-                                XmlGenericNodePtr::from_raw(self as *mut Self),
-                                Some(now.into()),
-                                cur_ns.prefix,
-                            ) == 1
-                        {
-                            return Some(cur_ns);
-                        }
-                        cur = cur_ns.next;
-                    }
-                    let cur = now.ns;
-                    if let Some(cur) = cur.filter(|cur| {
-                        cur.href.as_deref().is_some_and(|h| h == href)
-                            && cur.prefix().is_some()
-                            && xml_ns_in_scope(
-                                doc,
-                                XmlGenericNodePtr::from_raw(self as *mut Self),
-                                Some(now.into()),
-                                cur.prefix,
-                            ) == 1
-                    }) {
-                        return Some(cur);
-                    }
-                }
-                node = now.parent();
-            }
-            None
         }
+        let mut node = self.parent.map(XmlGenericNodePtr::from);
+        while let Some(now) = node {
+            if matches!(
+                now.element_type(),
+                XmlElementType::XmlEntityRefNode
+                    | XmlElementType::XmlEntityNode
+                    | XmlElementType::XmlEntityDecl
+            ) {
+                return None;
+            }
+            if let Some(now) = XmlNodePtr::try_from(now)
+                .ok()
+                .filter(|now| now.element_type() == XmlElementType::XmlElementNode)
+            {
+                // let href = CString::new(href).unwrap();
+                let mut cur = now.ns_def;
+                while let Some(cur_ns) = cur {
+                    if cur_ns.href.is_some()
+                        && cur_ns.href().as_deref() == Some(href)
+                        && cur_ns.prefix().is_some()
+                        && xml_ns_in_scope(
+                            doc,
+                            XmlGenericNodePtr::from_raw(self as *mut Self),
+                            Some(now.into()),
+                            cur_ns.prefix.as_deref(),
+                        ) == 1
+                    {
+                        return Some(cur_ns);
+                    }
+                    cur = cur_ns.next;
+                }
+                let cur = now.ns;
+                if let Some(cur) = cur.filter(|cur| {
+                    cur.href.as_deref().is_some_and(|h| h == href)
+                        && cur.prefix().is_some()
+                        && xml_ns_in_scope(
+                            doc,
+                            XmlGenericNodePtr::from_raw(self as *mut Self),
+                            Some(now.into()),
+                            cur.prefix.as_deref(),
+                        ) == 1
+                }) {
+                    return Some(cur);
+                }
+            }
+            node = now.parent();
+        }
+        None
     }
 
     /// Read the value of a node, this can be either the text carried
@@ -178,12 +172,10 @@ impl XmlAttr {
     /// Set (or reset) the base URI of a node, i.e. the value of the xml:base attribute.
     #[doc(alias = "xmlNodeSetBase")]
     #[cfg(any(feature = "libxml_tree", feature = "xinclude"))]
-    pub unsafe fn set_base(&mut self, _uri: Option<&str>) {
-        unsafe {
-            use crate::tree::XML_XML_NAMESPACE;
+    pub fn set_base(&mut self, _uri: Option<&str>) {
+        use crate::tree::XML_XML_NAMESPACE;
 
-            self.search_ns_by_href(self.document(), XML_XML_NAMESPACE.to_str().unwrap());
-        }
+        self.search_ns_by_href(self.document(), XML_XML_NAMESPACE.to_str().unwrap());
     }
 
     /// update all nodes under the tree to point to the right document

@@ -130,40 +130,38 @@ impl XmlDebugCtxt<'_> {
 
     /// Report if a given namespace is is not in scope.
     #[doc(alias = "xmlCtxtNsCheckScope")]
-    unsafe fn ns_check_scope(&mut self, node: XmlGenericNodePtr, ns: XmlNsPtr) {
-        unsafe {
-            let ret: i32 = xml_ns_check_scope(node, ns);
-            if ret == -2 {
-                if let Some(prefix) = ns.prefix() {
-                    xml_debug_err!(
-                        self,
-                        XmlParserErrors::XmlCheckNsScope,
-                        "Reference to namespace '{}' not in scope\n",
-                        prefix
-                    );
-                } else {
-                    xml_debug_err!(
-                        self,
-                        XmlParserErrors::XmlCheckNsScope,
-                        "Reference to default namespace not in scope\n",
-                    );
-                }
+    fn ns_check_scope(&mut self, node: XmlGenericNodePtr, ns: XmlNsPtr) {
+        let ret: i32 = xml_ns_check_scope(node, ns);
+        if ret == -2 {
+            if let Some(prefix) = ns.prefix() {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckNsScope,
+                    "Reference to namespace '{}' not in scope\n",
+                    prefix
+                );
+            } else {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckNsScope,
+                    "Reference to default namespace not in scope\n",
+                );
             }
-            if ret == -3 {
-                if let Some(prefix) = ns.prefix() {
-                    xml_debug_err!(
-                        self,
-                        XmlParserErrors::XmlCheckNsAncestor,
-                        "Reference to namespace '{}' not on ancestor\n",
-                        prefix
-                    );
-                } else {
-                    xml_debug_err!(
-                        self,
-                        XmlParserErrors::XmlCheckNsAncestor,
-                        "Reference to default namespace not on ancestor\n",
-                    );
-                }
+        }
+        if ret == -3 {
+            if let Some(prefix) = ns.prefix() {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckNsAncestor,
+                    "Reference to namespace '{}' not on ancestor\n",
+                    prefix
+                );
+            } else {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckNsAncestor,
+                    "Reference to default namespace not on ancestor\n",
+                );
             }
         }
     }
@@ -739,60 +737,56 @@ impl XmlDebugCtxt<'_> {
     }
 
     #[doc(alias = "xmlCtxtDumpNamespace")]
-    unsafe fn dump_namespace(&mut self, ns: Option<&XmlNs>) {
-        unsafe {
-            self.dump_spaces();
+    fn dump_namespace(&mut self, ns: Option<&XmlNs>) {
+        self.dump_spaces();
 
-            let Some(ns) = ns else {
-                if self.check == 0 {
-                    writeln!(self.output, "namespace node is NULL").ok();
-                }
-                return;
-            };
-            if ns.element_type() != XmlElementType::XmlNamespaceDecl {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckNotNsDecl,
-                    "Node is not a namespace declaration",
-                );
-                return;
+        let Some(ns) = ns else {
+            if self.check == 0 {
+                writeln!(self.output, "namespace node is NULL").ok();
             }
-            if let Some(href) = ns.href.as_deref() {
-                if self.check == 0 {
-                    if let Some(prefix) = ns.prefix() {
-                        write!(self.output, "namespace {prefix} href=").ok();
-                    } else {
-                        write!(self.output, "default namespace href=").ok();
-                    }
+            return;
+        };
+        if ns.element_type() != XmlElementType::XmlNamespaceDecl {
+            xml_debug_err!(
+                self,
+                XmlParserErrors::XmlCheckNotNsDecl,
+                "Node is not a namespace declaration",
+            );
+            return;
+        }
+        if let Some(href) = ns.href.as_deref() {
+            if self.check == 0 {
+                if let Some(prefix) = ns.prefix() {
+                    write!(self.output, "namespace {prefix} href=").ok();
+                } else {
+                    write!(self.output, "default namespace href=").ok();
+                }
 
-                    self.dump_string(Some(href));
-                    writeln!(self.output).ok();
-                }
-            } else if let Some(prefix) = ns.prefix() {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckNoHref,
-                    "Incomplete namespace {} href=NULL\n",
-                    prefix
-                );
-            } else {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckNoHref,
-                    "Incomplete default namespace href=NULL\n",
-                );
+                self.dump_string(Some(href));
+                writeln!(self.output).ok();
             }
+        } else if let Some(prefix) = ns.prefix() {
+            xml_debug_err!(
+                self,
+                XmlParserErrors::XmlCheckNoHref,
+                "Incomplete namespace {} href=NULL\n",
+                prefix
+            );
+        } else {
+            xml_debug_err!(
+                self,
+                XmlParserErrors::XmlCheckNoHref,
+                "Incomplete default namespace href=NULL\n",
+            );
         }
     }
 
     #[doc(alias = "xmlCtxtDumpNamespaceList")]
-    unsafe fn dump_namespace_list(&mut self, mut ns: Option<XmlNsPtr>) {
-        unsafe {
-            while let Some(now) = ns {
-                self.dump_namespace(Some(&*now));
-                let next = now.next;
-                ns = next;
-            }
+    fn dump_namespace_list(&mut self, mut ns: Option<XmlNsPtr>) {
+        while let Some(now) = ns {
+            self.dump_namespace(Some(&*now));
+            let next = now.next;
+            ns = next;
         }
     }
 
@@ -1252,38 +1246,36 @@ impl XmlDebugCtxt<'_> {
 
     /// Dumps debug information concerning the document, not recursive
     #[doc(alias = "xmlCtxtDumpDocumentHead")]
-    unsafe fn dump_document_head(&mut self, doc: Option<XmlDocPtr>) {
-        unsafe {
-            if let Some(doc) = doc {
-                self.dump_doc_head(doc);
-                if self.check == 0 {
-                    if let Some(name) = doc.name() {
-                        write!(self.output, "name=").ok();
-                        self.dump_string(Some(&name));
-                        writeln!(self.output).ok();
-                    }
-                    if let Some(version) = doc.version.as_deref() {
-                        write!(self.output, "version=").ok();
-                        self.dump_string(Some(version));
-                        writeln!(self.output).ok();
-                    }
-                    if let Some(encoding) = doc.encoding.as_deref() {
-                        write!(self.output, "encoding=").ok();
-                        self.dump_string(Some(encoding));
-                        writeln!(self.output).ok();
-                    }
-                    if let Some(url) = doc.url.as_deref() {
-                        write!(self.output, "URL=").ok();
-                        self.dump_string(Some(url));
-                        writeln!(self.output).ok();
-                    }
-                    if doc.standalone != 0 {
-                        writeln!(self.output, "standalone=true").ok();
-                    }
+    fn dump_document_head(&mut self, doc: Option<XmlDocPtr>) {
+        if let Some(doc) = doc {
+            self.dump_doc_head(doc);
+            if self.check == 0 {
+                if let Some(name) = doc.name() {
+                    write!(self.output, "name=").ok();
+                    self.dump_string(Some(&name));
+                    writeln!(self.output).ok();
                 }
-                if let Some(old_ns) = doc.old_ns {
-                    self.dump_namespace_list(Some(old_ns));
+                if let Some(version) = doc.version.as_deref() {
+                    write!(self.output, "version=").ok();
+                    self.dump_string(Some(version));
+                    writeln!(self.output).ok();
                 }
+                if let Some(encoding) = doc.encoding.as_deref() {
+                    write!(self.output, "encoding=").ok();
+                    self.dump_string(Some(encoding));
+                    writeln!(self.output).ok();
+                }
+                if let Some(url) = doc.url.as_deref() {
+                    write!(self.output, "URL=").ok();
+                    self.dump_string(Some(url));
+                    writeln!(self.output).ok();
+                }
+                if doc.standalone != 0 {
+                    writeln!(self.output, "standalone=true").ok();
+                }
+            }
+            if let Some(old_ns) = doc.old_ns {
+                self.dump_namespace_list(Some(old_ns));
             }
         }
     }
@@ -1454,56 +1446,54 @@ const DUMP_TEXT_TYPE: i32 = 1;
 /// -2 if the namespace is not in scope,
 /// and -3 if not on an ancestor node.
 #[doc(alias = "xmlNsCheckScope")]
-unsafe fn xml_ns_check_scope(node: XmlGenericNodePtr, ns: XmlNsPtr) -> i32 {
-    unsafe {
-        if !matches!(
-            node.element_type(),
+fn xml_ns_check_scope(node: XmlGenericNodePtr, ns: XmlNsPtr) -> i32 {
+    if !matches!(
+        node.element_type(),
+        XmlElementType::XmlElementNode
+            | XmlElementType::XmlAttributeNode
+            | XmlElementType::XmlDocumentNode
+            | XmlElementType::XmlTextNode
+            | XmlElementType::XmlHTMLDocumentNode
+            | XmlElementType::XmlXIncludeStart
+    ) {
+        return -2;
+    }
+
+    let mut node = Some(node);
+    while let Some(now) = node.filter(|n| {
+        matches!(
+            n.element_type(),
             XmlElementType::XmlElementNode
                 | XmlElementType::XmlAttributeNode
-                | XmlElementType::XmlDocumentNode
                 | XmlElementType::XmlTextNode
-                | XmlElementType::XmlHTMLDocumentNode
                 | XmlElementType::XmlXIncludeStart
+        )
+    }) {
+        if matches!(
+            now.element_type(),
+            XmlElementType::XmlElementNode | XmlElementType::XmlXIncludeStart
         ) {
-            return -2;
-        }
-
-        let mut node = Some(node);
-        while let Some(now) = node.filter(|n| {
-            matches!(
-                n.element_type(),
-                XmlElementType::XmlElementNode
-                    | XmlElementType::XmlAttributeNode
-                    | XmlElementType::XmlTextNode
-                    | XmlElementType::XmlXIncludeStart
-            )
-        }) {
-            if matches!(
-                now.element_type(),
-                XmlElementType::XmlElementNode | XmlElementType::XmlXIncludeStart
-            ) {
-                let mut cur = XmlNodePtr::try_from(now).unwrap().ns_def;
-                while let Some(now) = cur {
-                    if now == ns {
-                        return 1;
-                    }
-                    if now.prefix() == ns.prefix() {
-                        return -2;
-                    }
-                    cur = now.next;
+            let mut cur = XmlNodePtr::try_from(now).unwrap().ns_def;
+            while let Some(now) = cur {
+                if now == ns {
+                    return 1;
                 }
-            }
-            node = now.parent();
-        }
-        // the xml namespace may be declared on the document node
-        if let Some(node) = node.and_then(|node| XmlDocPtr::try_from(node).ok()) {
-            let old_ns = node.old_ns;
-            if old_ns == Some(ns) {
-                return 1;
+                if now.prefix() == ns.prefix() {
+                    return -2;
+                }
+                cur = now.next;
             }
         }
-        -3
+        node = now.parent();
     }
+    // the xml namespace may be declared on the document node
+    if let Some(node) = node.and_then(|node| XmlDocPtr::try_from(node).ok()) {
+        let old_ns = node.old_ns;
+        if old_ns == Some(ns) {
+            return 1;
+        }
+    }
+    -3
 }
 
 /// Dumps debug information for the attribute
@@ -1593,17 +1583,12 @@ pub unsafe fn xml_debug_dump_node_list<'a>(
 
 /// Dumps debug information concerning the document, not recursive
 #[doc(alias = "xmlDebugDumpDocumentHead")]
-pub unsafe fn xml_debug_dump_document_head<'a>(
-    output: Option<impl Write + 'a>,
-    doc: Option<XmlDocPtr>,
-) {
-    unsafe {
-        let mut ctxt = XmlDebugCtxt::default();
+pub fn xml_debug_dump_document_head<'a>(output: Option<impl Write + 'a>, doc: Option<XmlDocPtr>) {
+    let mut ctxt = XmlDebugCtxt::default();
 
-        ctxt.options |= DUMP_TEXT_TYPE;
-        ctxt.output = output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o));
-        ctxt.dump_document_head(doc);
-    }
+    ctxt.options |= DUMP_TEXT_TYPE;
+    ctxt.output = output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o));
+    ctxt.dump_document_head(doc);
 }
 
 /// Dumps debug information for the document, it's recursive
@@ -2321,7 +2306,7 @@ impl XmlShellCtxt<'_> {
     /// Returns 0 or -1 in case of error
     #[doc(alias = "xmlShellPwd")]
     #[cfg(feature = "xpath")]
-    pub unsafe fn xml_shell_pwd(
+    pub fn xml_shell_pwd(
         &mut self,
         buffer: &mut String,
         node: Option<XmlGenericNodePtr>,
@@ -2330,13 +2315,11 @@ impl XmlShellCtxt<'_> {
         let Some(node) = node else {
             return -1;
         };
-        unsafe {
-            let Some(path) = node.get_node_path() else {
-                return -1;
-            };
+        let Some(path) = node.get_node_path() else {
+            return -1;
+        };
 
-            *buffer = path;
-        }
+        *buffer = path;
         0
     }
 

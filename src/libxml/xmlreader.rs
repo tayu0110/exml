@@ -2816,86 +2816,84 @@ impl XmlTextReader {
     /// Returns 1 in case of success, -1 in case of error, 0 if not found
     #[doc(alias = "xmlTextReaderMoveToAttribute")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn move_to_attribute(&mut self, name: &str) -> i32 {
-        unsafe {
-            use crate::{parser::split_qname2, tree::NodeCommon};
+    pub fn move_to_attribute(&mut self, name: &str) -> i32 {
+        use crate::{parser::split_qname2, tree::NodeCommon};
 
-            if self.node.is_none() {
-                return -1;
-            }
+        if self.node.is_none() {
+            return -1;
+        }
 
-            // TODO: handle the xmlDecl
-            if self.node.unwrap().element_type() != XmlElementType::XmlElementNode {
-                return 0;
-            }
-            let Some(current_node) = self
-                .node
-                .and_then(|node| XmlNodePtr::try_from(node).ok())
-                .filter(|node| node.element_type() == XmlElementType::XmlElementNode)
-            else {
-                return 0;
-            };
+        // TODO: handle the xmlDecl
+        if self.node.unwrap().element_type() != XmlElementType::XmlElementNode {
+            return 0;
+        }
+        let Some(current_node) = self
+            .node
+            .and_then(|node| XmlNodePtr::try_from(node).ok())
+            .filter(|node| node.element_type() == XmlElementType::XmlElementNode)
+        else {
+            return 0;
+        };
 
-            let Some((prefix, localname)) = split_qname2(name) else {
-                // Namespace default decl
-                if name == "xmlns" {
-                    let mut ns = current_node.ns_def;
-                    while let Some(now) = ns {
-                        if now.prefix().is_none() {
-                            self.curnode = Some(now.into());
-                            return 1;
-                        }
-                        ns = now.next;
-                    }
-                    return 0;
-                }
-
-                let mut prop = current_node.properties;
-                while let Some(now) = prop {
-                    // One need to have
-                    //   - same attribute names
-                    //   - and the attribute carrying that namespace
-                    if now.name().as_deref() == Some(name)
-                        && now.ns.is_none_or(|ns| ns.prefix().is_none())
-                    {
-                        self.curnode = Some(now.into());
-                        return 1;
-                    }
-                    prop = now.next;
-                }
-                return 0;
-            };
-
+        let Some((prefix, localname)) = split_qname2(name) else {
             // Namespace default decl
-            if prefix == "xmlns" {
+            if name == "xmlns" {
                 let mut ns = current_node.ns_def;
                 while let Some(now) = ns {
-                    if now.prefix().as_deref() == Some(localname) {
+                    if now.prefix().is_none() {
                         self.curnode = Some(now.into());
                         return 1;
                     }
                     ns = now.next;
                 }
-            // goto not_found;
-            } else {
-                let mut prop = current_node.properties;
-                while let Some(now) = prop {
-                    // One need to have
-                    //   - same attribute names
-                    //   - and the attribute carrying that namespace
-                    if now.name().as_deref() == Some(localname)
-                        && now
-                            .ns
-                            .is_some_and(|ns| ns.prefix().as_deref() == Some(prefix))
-                    {
-                        self.curnode = Some(now.into());
-                        return 1;
-                    }
-                    prop = now.next;
-                }
+                return 0;
             }
-            0
+
+            let mut prop = current_node.properties;
+            while let Some(now) = prop {
+                // One need to have
+                //   - same attribute names
+                //   - and the attribute carrying that namespace
+                if now.name().as_deref() == Some(name)
+                    && now.ns.is_none_or(|ns| ns.prefix().is_none())
+                {
+                    self.curnode = Some(now.into());
+                    return 1;
+                }
+                prop = now.next;
+            }
+            return 0;
+        };
+
+        // Namespace default decl
+        if prefix == "xmlns" {
+            let mut ns = current_node.ns_def;
+            while let Some(now) = ns {
+                if now.prefix().as_deref() == Some(localname) {
+                    self.curnode = Some(now.into());
+                    return 1;
+                }
+                ns = now.next;
+            }
+        // goto not_found;
+        } else {
+            let mut prop = current_node.properties;
+            while let Some(now) = prop {
+                // One need to have
+                //   - same attribute names
+                //   - and the attribute carrying that namespace
+                if now.name().as_deref() == Some(localname)
+                    && now
+                        .ns
+                        .is_some_and(|ns| ns.prefix().as_deref() == Some(prefix))
+                {
+                    self.curnode = Some(now.into());
+                    return 1;
+                }
+                prop = now.next;
+            }
         }
+        0
     }
 
     /// Moves the position of the current instance to the attribute with the
@@ -2904,53 +2902,51 @@ impl XmlTextReader {
     /// Returns 1 in case of success, -1 in case of error, 0 if not found
     #[doc(alias = "xmlTextReaderMoveToAttributeNs")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn move_to_attribute_ns(&mut self, local_name: &str, namespace_uri: &str) -> i32 {
-        unsafe {
-            use crate::tree::NodeCommon;
+    pub fn move_to_attribute_ns(&mut self, local_name: &str, namespace_uri: &str) -> i32 {
+        use crate::tree::NodeCommon;
 
-            if self.node.is_none() {
-                return -1;
-            }
-            let Some(node) = self
-                .node
-                .and_then(|node| XmlNodePtr::try_from(node).ok())
-                .filter(|node| node.element_type() == XmlElementType::XmlElementNode)
-            else {
-                return 0;
-            };
+        if self.node.is_none() {
+            return -1;
+        }
+        let Some(node) = self
+            .node
+            .and_then(|node| XmlNodePtr::try_from(node).ok())
+            .filter(|node| node.element_type() == XmlElementType::XmlElementNode)
+        else {
+            return 0;
+        };
 
-            if namespace_uri == "http://www.w3.org/2000/xmlns/" {
-                let prefix = (local_name != "xmlns").then_some(local_name);
-                let mut ns = node.ns_def;
-                while let Some(now) = ns {
-                    if (prefix.is_none() && now.prefix().is_none())
-                        || now.prefix().as_deref() == Some(local_name)
-                    {
-                        self.curnode = Some(now.into());
-                        return 1;
-                    }
-                    ns = now.next;
-                }
-                return 0;
-            }
-
-            let mut prop = node.properties;
-            while let Some(now) = prop {
-                // One need to have
-                //   - same attribute names
-                //   - and the attribute carrying that namespace
-                if now.name().as_deref() == Some(local_name)
-                    && now
-                        .ns
-                        .is_some_and(|ns| ns.href().as_deref() == Some(namespace_uri))
+        if namespace_uri == "http://www.w3.org/2000/xmlns/" {
+            let prefix = (local_name != "xmlns").then_some(local_name);
+            let mut ns = node.ns_def;
+            while let Some(now) = ns {
+                if (prefix.is_none() && now.prefix().is_none())
+                    || now.prefix().as_deref() == Some(local_name)
                 {
                     self.curnode = Some(now.into());
                     return 1;
                 }
-                prop = now.next;
+                ns = now.next;
             }
-            0
+            return 0;
         }
+
+        let mut prop = node.properties;
+        while let Some(now) = prop {
+            // One need to have
+            //   - same attribute names
+            //   - and the attribute carrying that namespace
+            if now.name().as_deref() == Some(local_name)
+                && now
+                    .ns
+                    .is_some_and(|ns| ns.href().as_deref() == Some(namespace_uri))
+            {
+                self.curnode = Some(now.into());
+                return 1;
+            }
+            prop = now.next;
+        }
+        0
     }
 
     /// Moves the position of the current instance to the attribute with
@@ -3081,16 +3077,14 @@ impl XmlTextReader {
     /// The string must be deallocated by the caller.
     #[doc(alias = "xmlTextReaderLookupNamespace")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn lookup_namespace(&mut self, prefix: Option<&str>) -> Option<String> {
-        unsafe {
-            let current_node = self.node.as_ref()?;
+    pub fn lookup_namespace(&mut self, prefix: Option<&str>) -> Option<String> {
+        let current_node = self.node.as_ref()?;
 
-            current_node
-                .search_ns(current_node.document(), prefix)
-                .as_deref()?
-                .href()
-                .map(|href| href.into_owned())
-        }
+        current_node
+            .search_ns(current_node.document(), prefix)
+            .as_deref()?
+            .href()
+            .map(|href| href.into_owned())
     }
 
     /// The quotation mark character used to enclose the value of an attribute.
@@ -3455,27 +3449,25 @@ impl XmlTextReader {
     /// Returns the local name or `None` if not available.
     #[doc(alias = "xmlTextReaderLocalName")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn local_name(&self) -> Option<String> {
-        unsafe {
-            use crate::tree::XmlNsPtr;
+    pub fn local_name(&self) -> Option<String> {
+        use crate::tree::XmlNsPtr;
 
-            let current_node = self.node?;
-            let node = self.curnode.unwrap_or(current_node);
-            if let Ok(ns) = XmlNsPtr::try_from(node) {
-                if let Some(prefix) = ns.prefix() {
-                    return Some(prefix.into_owned());
-                } else {
-                    return Some("xmlns".to_owned());
-                }
+        let current_node = self.node?;
+        let node = self.curnode.unwrap_or(current_node);
+        if let Ok(ns) = XmlNsPtr::try_from(node) {
+            if let Some(prefix) = ns.prefix() {
+                return Some(prefix.into_owned());
+            } else {
+                return Some("xmlns".to_owned());
             }
-            if !matches!(
-                node.element_type(),
-                XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode
-            ) {
-                return self.name();
-            }
-            node.name().map(|name| name.into_owned())
         }
+        if !matches!(
+            node.element_type(),
+            XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode
+        ) {
+            return self.name();
+        }
+        node.name().map(|name| name.into_owned())
     }
 
     /// The qualified name of the node, equal to Prefix :LocalName.
@@ -3483,67 +3475,65 @@ impl XmlTextReader {
     /// Returns the local name or `None` if not available.
     #[doc(alias = "xmlTextReaderName")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn name(&self) -> Option<String> {
-        unsafe {
-            use crate::tree::{NodeCommon, XmlNsPtr};
+    pub fn name(&self) -> Option<String> {
+        use crate::tree::{NodeCommon, XmlNsPtr};
 
-            let current_node = self.node?;
-            let node = self.curnode.unwrap_or(current_node);
-            match node.element_type() {
-                XmlElementType::XmlElementNode => {
-                    let node = XmlNodePtr::try_from(node).unwrap();
-                    let Some(prefix) = node.ns.as_deref().and_then(|ns| ns.prefix()) else {
-                        return node.name().map(|name| name.into_owned());
-                    };
+        let current_node = self.node?;
+        let node = self.curnode.unwrap_or(current_node);
+        match node.element_type() {
+            XmlElementType::XmlElementNode => {
+                let node = XmlNodePtr::try_from(node).unwrap();
+                let Some(prefix) = node.ns.as_deref().and_then(|ns| ns.prefix()) else {
+                    return node.name().map(|name| name.into_owned());
+                };
 
-                    let mut ret = prefix.into_owned();
-                    ret.push(':');
-                    ret.push_str(node.name().unwrap().as_ref());
-                    Some(ret)
-                }
-                XmlElementType::XmlAttributeNode => {
-                    let attr = XmlAttrPtr::try_from(node).unwrap();
-                    let Some(prefix) = attr.ns.as_deref().and_then(|ns| ns.prefix()) else {
-                        return attr.name().map(|name| name.into_owned());
-                    };
-
-                    let mut ret = prefix.into_owned();
-                    ret.push(':');
-                    ret.push_str(node.name().unwrap().as_ref());
-                    Some(ret)
-                }
-                XmlElementType::XmlTextNode => Some("#text".to_owned()),
-                XmlElementType::XmlCDATASectionNode => Some("#cdata-section".to_owned()),
-                XmlElementType::XmlEntityNode | XmlElementType::XmlEntityRefNode => {
-                    node.name().map(|name| name.into_owned())
-                }
-                XmlElementType::XmlPINode => node.name().map(|name| name.into_owned()),
-                XmlElementType::XmlCommentNode => Some("#comment".to_owned()),
-                XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
-                    Some("#document".to_owned())
-                }
-                XmlElementType::XmlDocumentFragNode => Some("#document-fragment".to_owned()),
-                XmlElementType::XmlNotationNode => node.name().map(|name| name.into_owned()),
-                XmlElementType::XmlDocumentTypeNode | XmlElementType::XmlDTDNode => {
-                    node.name().map(|name| name.into_owned())
-                }
-                XmlElementType::XmlNamespaceDecl => {
-                    let ns = XmlNsPtr::try_from(node).unwrap();
-                    let mut ret = "xmlns".to_owned();
-                    let Some(prefix) = ns.prefix() else {
-                        return Some(ret);
-                    };
-                    ret.push(':');
-                    ret.push_str(&prefix);
-                    Some(ret)
-                }
-                XmlElementType::XmlElementDecl
-                | XmlElementType::XmlAttributeDecl
-                | XmlElementType::XmlEntityDecl
-                | XmlElementType::XmlXIncludeStart
-                | XmlElementType::XmlXIncludeEnd => None,
-                _ => unreachable!(),
+                let mut ret = prefix.into_owned();
+                ret.push(':');
+                ret.push_str(node.name().unwrap().as_ref());
+                Some(ret)
             }
+            XmlElementType::XmlAttributeNode => {
+                let attr = XmlAttrPtr::try_from(node).unwrap();
+                let Some(prefix) = attr.ns.as_deref().and_then(|ns| ns.prefix()) else {
+                    return attr.name().map(|name| name.into_owned());
+                };
+
+                let mut ret = prefix.into_owned();
+                ret.push(':');
+                ret.push_str(node.name().unwrap().as_ref());
+                Some(ret)
+            }
+            XmlElementType::XmlTextNode => Some("#text".to_owned()),
+            XmlElementType::XmlCDATASectionNode => Some("#cdata-section".to_owned()),
+            XmlElementType::XmlEntityNode | XmlElementType::XmlEntityRefNode => {
+                node.name().map(|name| name.into_owned())
+            }
+            XmlElementType::XmlPINode => node.name().map(|name| name.into_owned()),
+            XmlElementType::XmlCommentNode => Some("#comment".to_owned()),
+            XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
+                Some("#document".to_owned())
+            }
+            XmlElementType::XmlDocumentFragNode => Some("#document-fragment".to_owned()),
+            XmlElementType::XmlNotationNode => node.name().map(|name| name.into_owned()),
+            XmlElementType::XmlDocumentTypeNode | XmlElementType::XmlDTDNode => {
+                node.name().map(|name| name.into_owned())
+            }
+            XmlElementType::XmlNamespaceDecl => {
+                let ns = XmlNsPtr::try_from(node).unwrap();
+                let mut ret = "xmlns".to_owned();
+                let Some(prefix) = ns.prefix() else {
+                    return Some(ret);
+                };
+                ret.push(':');
+                ret.push_str(&prefix);
+                Some(ret)
+            }
+            XmlElementType::XmlElementDecl
+            | XmlElementType::XmlAttributeDecl
+            | XmlElementType::XmlEntityDecl
+            | XmlElementType::XmlXIncludeStart
+            | XmlElementType::XmlXIncludeEnd => None,
+            _ => unreachable!(),
         }
     }
 
@@ -3578,29 +3568,27 @@ impl XmlTextReader {
     /// Returns the prefix or `None` if not available.
     #[doc(alias = "xmlTextReaderPrefix")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn prefix(&self) -> Option<String> {
-        unsafe {
-            use crate::tree::XmlNsPtr;
+    pub fn prefix(&self) -> Option<String> {
+        use crate::tree::XmlNsPtr;
 
-            let current_node = self.node?;
-            let node = self.curnode.unwrap_or(current_node);
-            if let Ok(ns) = XmlNsPtr::try_from(node) {
-                ns.prefix()?;
-                return Some("xmlns".to_owned());
+        let current_node = self.node?;
+        let node = self.curnode.unwrap_or(current_node);
+        if let Ok(ns) = XmlNsPtr::try_from(node) {
+            ns.prefix()?;
+            return Some("xmlns".to_owned());
+        }
+        match node.element_type() {
+            XmlElementType::XmlElementNode => {
+                let node = XmlNodePtr::try_from(node).unwrap();
+                let ns = node.ns?;
+                ns.prefix().map(|prefix| prefix.into_owned())
             }
-            match node.element_type() {
-                XmlElementType::XmlElementNode => {
-                    let node = XmlNodePtr::try_from(node).unwrap();
-                    let ns = node.ns?;
-                    ns.prefix().map(|prefix| prefix.into_owned())
-                }
-                XmlElementType::XmlAttributeNode => {
-                    let node = XmlAttrPtr::try_from(node).unwrap();
-                    let ns = node.ns?;
-                    ns.prefix().map(|prefix| prefix.into_owned())
-                }
-                _ => None,
+            XmlElementType::XmlAttributeNode => {
+                let node = XmlAttrPtr::try_from(node).unwrap();
+                let ns = node.ns?;
+                ns.prefix().map(|prefix| prefix.into_owned())
             }
+            _ => None,
         }
     }
 

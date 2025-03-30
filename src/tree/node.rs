@@ -32,7 +32,7 @@ use crate::{
     libxml::{
         globals::xml_free,
         valid::xml_remove_id,
-        xmlstring::{XmlChar, xml_strcat, xml_strdup, xml_strncat},
+        xmlstring::{XmlChar, xml_strcat, xml_strdup, xml_strncat, xml_strndup},
     },
     tree::xml_free_node_list,
 };
@@ -185,52 +185,72 @@ impl XmlNode {
     /// Returns the new path or `None` in case of error.  
     #[doc(alias = "xmlGetNodePath")]
     #[cfg(feature = "libxml_tree")]
-    pub unsafe fn get_node_path(&self) -> Option<String> {
-        unsafe {
-            let mut occur: i32;
-            let mut generic: i32;
+    pub fn get_node_path(&self) -> Option<String> {
+        let mut occur: i32;
+        let mut generic: i32;
 
-            if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
-                return None;
-            }
+        if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
+            return None;
+        }
 
-            let mut buffer = String::with_capacity(500);
-            let mut buf = String::with_capacity(500);
-            let mut cur = XmlGenericNodePtr::from_raw(self as *const Self as *mut Self);
-            let mut sep: &str;
-            while let Some(current) = cur {
-                let mut name: Cow<'_, str> = "".into();
-                occur = 0;
-                let next = if matches!(
-                    current.element_type(),
-                    XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
-                ) {
-                    if buffer.starts_with('/') {
-                        break;
-                    }
-                    sep = "/";
-                    None
-                } else if matches!(current.element_type(), XmlElementType::XmlElementNode) {
-                    let current = XmlNodePtr::try_from(current).unwrap();
-                    generic = 0;
-                    sep = "/";
-                    if let Some(ns) = current.ns {
-                        name = if let Some(prefix) = ns.prefix() {
-                            Cow::Owned(format!("{prefix}:{}", current.name().unwrap(),))
-                        } else {
-                            // We cannot express named elements in the default
-                            // namespace, so use "*".
-                            generic = 1;
-                            "*".into()
-                        };
+        let mut buffer = String::with_capacity(500);
+        let mut buf = String::with_capacity(500);
+        let mut cur = XmlGenericNodePtr::from_raw(self as *const Self as *mut Self);
+        let mut sep: &str;
+        while let Some(current) = cur {
+            let mut name: Cow<'_, str> = "".into();
+            occur = 0;
+            let next = if matches!(
+                current.element_type(),
+                XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
+            ) {
+                if buffer.starts_with('/') {
+                    break;
+                }
+                sep = "/";
+                None
+            } else if matches!(current.element_type(), XmlElementType::XmlElementNode) {
+                let current = XmlNodePtr::try_from(current).unwrap();
+                generic = 0;
+                sep = "/";
+                if let Some(ns) = current.ns {
+                    name = if let Some(prefix) = ns.prefix() {
+                        Cow::Owned(format!("{prefix}:{}", current.name().unwrap(),))
                     } else {
-                        name = current.name().unwrap().into_owned().into();
-                    }
+                        // We cannot express named elements in the default
+                        // namespace, so use "*".
+                        generic = 1;
+                        "*".into()
+                    };
+                } else {
+                    name = current.name().unwrap().into_owned().into();
+                }
 
-                    // Thumbler index computation
-                    // TODO: the occurrence test seems bogus for namespaced names
-                    let mut tmp = current.prev();
-                    while let Some(now) = tmp {
+                // Thumbler index computation
+                // TODO: the occurrence test seems bogus for namespaced names
+                let mut tmp = current.prev();
+                while let Some(now) = tmp {
+                    if XmlNodePtr::try_from(now)
+                        .ok()
+                        .filter(|now| now.element_type() == XmlElementType::XmlElementNode)
+                        .filter(|now| {
+                            generic != 0
+                                || (current.name() == now.name()
+                                    && (now.ns == current.ns
+                                        || current
+                                            .ns
+                                            .zip(now.ns)
+                                            .is_some_and(|(c, n)| c.prefix() == n.prefix())))
+                        })
+                        .is_some()
+                    {
+                        occur += 1;
+                    }
+                    tmp = now.prev();
+                }
+                if occur == 0 {
+                    let mut tmp = current.next();
+                    while let Some(now) = tmp.filter(|_| occur == 0) {
                         if XmlNodePtr::try_from(now)
                             .ok()
                             .filter(|now| now.element_type() == XmlElementType::XmlElementNode)
@@ -247,163 +267,142 @@ impl XmlNode {
                         {
                             occur += 1;
                         }
-                        tmp = now.prev();
+                        tmp = now.next();
                     }
-                    if occur == 0 {
-                        let mut tmp = current.next();
-                        while let Some(now) = tmp.filter(|_| occur == 0) {
-                            if XmlNodePtr::try_from(now)
-                                .ok()
-                                .filter(|now| now.element_type() == XmlElementType::XmlElementNode)
-                                .filter(|now| {
-                                    generic != 0
-                                        || (current.name() == now.name()
-                                            && (now.ns == current.ns
-                                                || current.ns.zip(now.ns).is_some_and(|(c, n)| {
-                                                    c.prefix() == n.prefix()
-                                                })))
-                                })
-                                .is_some()
-                            {
-                                occur += 1;
-                            }
-                            tmp = now.next();
-                        }
-                        if occur != 0 {
-                            occur = 1;
-                        }
-                    } else {
+                    if occur != 0 {
+                        occur = 1;
+                    }
+                } else {
+                    occur += 1;
+                }
+                current.parent()
+            } else if matches!(current.element_type(), XmlElementType::XmlCommentNode) {
+                sep = "/";
+                name = "comment()".into();
+
+                // Thumbler index computation
+                let mut tmp = current.prev();
+                while let Some(now) = tmp {
+                    if matches!(now.element_type(), XmlElementType::XmlCommentNode) {
                         occur += 1;
                     }
-                    current.parent()
-                } else if matches!(current.element_type(), XmlElementType::XmlCommentNode) {
-                    sep = "/";
-                    name = "comment()".into();
-
-                    // Thumbler index computation
-                    let mut tmp = current.prev();
-                    while let Some(now) = tmp {
+                    tmp = now.prev();
+                }
+                if occur == 0 {
+                    let mut tmp = current.next();
+                    while let Some(now) = tmp.filter(|_| occur == 0) {
                         if matches!(now.element_type(), XmlElementType::XmlCommentNode) {
                             occur += 1;
                         }
-                        tmp = now.prev();
+                        tmp = now.next();
                     }
-                    if occur == 0 {
-                        let mut tmp = current.next();
-                        while let Some(now) = tmp.filter(|_| occur == 0) {
-                            if matches!(now.element_type(), XmlElementType::XmlCommentNode) {
-                                occur += 1;
-                            }
-                            tmp = now.next();
-                        }
-                        if occur != 0 {
-                            occur = 1;
-                        }
-                    } else {
+                    if occur != 0 {
+                        occur = 1;
+                    }
+                } else {
+                    occur += 1;
+                }
+                current.parent()
+            } else if matches!(
+                current.element_type(),
+                XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
+            ) {
+                sep = "/";
+                name = "text()".into();
+
+                // Thumbler index computation
+                let mut tmp = current.prev();
+                while let Some(now) = tmp {
+                    if matches!(
+                        now.element_type(),
+                        XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
+                    ) {
                         occur += 1;
                     }
-                    current.parent()
-                } else if matches!(
-                    current.element_type(),
-                    XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
-                ) {
-                    sep = "/";
-                    name = "text()".into();
-
-                    // Thumbler index computation
-                    let mut tmp = current.prev();
+                    tmp = now.prev();
+                }
+                // Evaluate if this is the only text- or CDATA-section-node;
+                // if yes, then we'll get "text()".as_ptr() as _, otherwise "text()[1]".
+                if occur == 0 {
+                    let mut tmp = current.next();
                     while let Some(now) = tmp {
                         if matches!(
                             now.element_type(),
                             XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
                         ) {
-                            occur += 1;
+                            occur = 1;
+                            break;
                         }
-                        tmp = now.prev();
+                        tmp = now.next();
                     }
-                    // Evaluate if this is the only text- or CDATA-section-node;
-                    // if yes, then we'll get "text()".as_ptr() as _, otherwise "text()[1]".
-                    if occur == 0 {
-                        let mut tmp = current.next();
-                        while let Some(now) = tmp {
-                            if matches!(
-                                now.element_type(),
-                                XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
-                            ) {
-                                occur = 1;
-                                break;
-                            }
-                            tmp = now.next();
-                        }
-                    } else {
+                } else {
+                    occur += 1;
+                }
+                current.parent()
+            } else if matches!(current.element_type(), XmlElementType::XmlPINode) {
+                sep = "/";
+                name = Cow::Owned(format!(
+                    "processing-instruction('{}')",
+                    current.name().unwrap()
+                ));
+
+                // Thumbler index computation
+                let mut tmp = current.prev();
+                while let Some(now) = tmp {
+                    if matches!(now.element_type(), XmlElementType::XmlPINode)
+                        && current.name() == now.name()
+                    {
                         occur += 1;
                     }
-                    current.parent()
-                } else if matches!(current.element_type(), XmlElementType::XmlPINode) {
-                    sep = "/";
-                    name = Cow::Owned(format!(
-                        "processing-instruction('{}')",
-                        current.name().unwrap()
-                    ));
-
-                    // Thumbler index computation
-                    let mut tmp = current.prev();
-                    while let Some(now) = tmp {
+                    tmp = now.prev();
+                }
+                if occur == 0 {
+                    let mut tmp = current.next();
+                    while let Some(now) = tmp.filter(|_| occur == 0) {
                         if matches!(now.element_type(), XmlElementType::XmlPINode)
                             && current.name() == now.name()
                         {
                             occur += 1;
                         }
-                        tmp = now.prev();
+                        tmp = now.next();
                     }
-                    if occur == 0 {
-                        let mut tmp = current.next();
-                        while let Some(now) = tmp.filter(|_| occur == 0) {
-                            if matches!(now.element_type(), XmlElementType::XmlPINode)
-                                && current.name() == now.name()
-                            {
-                                occur += 1;
-                            }
-                            tmp = now.next();
-                        }
-                        if occur != 0 {
-                            occur = 1;
-                        }
-                    } else {
-                        occur += 1;
+                    if occur != 0 {
+                        occur = 1;
                     }
-                    current.parent()
-                } else if matches!(current.element_type(), XmlElementType::XmlAttributeNode) {
-                    let attr = XmlAttrPtr::try_from(current).unwrap();
-                    sep = "/@";
-                    if let Some(ns) = attr.ns {
-                        name = if let Some(prefix) = ns.prefix() {
-                            format!("{prefix}:{}", attr.name().unwrap()).into()
-                        } else {
-                            format!("{}", attr.name().unwrap()).into()
-                        };
-                    } else {
-                        name = attr.name().unwrap().into_owned().into();
-                    }
-                    attr.parent()
                 } else {
-                    return None;
-                };
-
-                {
-                    use std::fmt::Write as _;
-                    if occur == 0 {
-                        write!(buf, "{sep}{name}{buffer}").ok();
-                    } else {
-                        write!(buf, "{sep}{name}[{occur}]{buffer}").ok();
-                    }
+                    occur += 1;
                 }
-                (buffer, buf) = (buf, buffer);
-                buf.clear();
-                cur = next;
+                current.parent()
+            } else if matches!(current.element_type(), XmlElementType::XmlAttributeNode) {
+                let attr = XmlAttrPtr::try_from(current).unwrap();
+                sep = "/@";
+                if let Some(ns) = attr.ns {
+                    name = if let Some(prefix) = ns.prefix() {
+                        format!("{prefix}:{}", attr.name().unwrap()).into()
+                    } else {
+                        format!("{}", attr.name().unwrap()).into()
+                    };
+                } else {
+                    name = attr.name().unwrap().into_owned().into();
+                }
+                attr.parent()
+            } else {
+                return None;
+            };
+
+            {
+                use std::fmt::Write as _;
+                if occur == 0 {
+                    write!(buf, "{sep}{name}{buffer}").ok();
+                } else {
+                    write!(buf, "{sep}{name}[{occur}]{buffer}").ok();
+                }
             }
-            Some(buffer)
+            (buffer, buf) = (buf, buffer);
+            buf.clear();
+            cur = next;
         }
+        Some(buffer)
     }
 
     /// Read the value of a node, this can be either the text carried
@@ -671,8 +670,9 @@ impl XmlNode {
                         let mut tmpstr: *mut XmlChar = null_mut();
 
                         // We need the QName of the element for the DTD-lookup.
-                        if let Some(prefix) = self.ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) {
-                            tmpstr = xml_strdup(prefix);
+                        if let Some(prefix) = self.ns.as_deref().and_then(|ns| ns.prefix.as_deref())
+                        {
+                            tmpstr = xml_strndup(prefix.as_ptr(), prefix.len() as i32);
                             tmpstr = xml_strcat(tmpstr, c":".as_ptr() as _);
                             tmpstr = xml_strcat(tmpstr, self.name);
                             if tmpstr.is_null() {
@@ -852,29 +852,27 @@ impl XmlNode {
     /// Returns an `Vec` of all the `xmlNsPtr` found.
     #[doc(alias = "xmlGetNsList")]
     #[cfg(any(feature = "libxml_tree", feature = "xpath", feature = "schema"))]
-    pub unsafe fn get_ns_list(&self, _doc: Option<XmlDocPtr>) -> Option<Vec<XmlNsPtr>> {
-        unsafe {
-            if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
-                return None;
-            }
-
-            let mut ret: Vec<XmlNsPtr> = vec![];
-            let mut node = XmlGenericNodePtr::from_raw(self as *const Self as *mut Self);
-            while let Some(cur_node) = node {
-                if matches!(cur_node.element_type(), XmlElementType::XmlElementNode) {
-                    let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                    let mut cur = cur_node.ns_def;
-                    while let Some(now) = cur {
-                        if ret.iter().all(|&ret| now.prefix() != ret.prefix()) {
-                            ret.push(now);
-                        }
-                        cur = now.next
-                    }
-                }
-                node = cur_node.parent();
-            }
-            Some(ret)
+    pub fn get_ns_list(&self, _doc: Option<XmlDocPtr>) -> Option<Vec<XmlNsPtr>> {
+        if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
+            return None;
         }
+
+        let mut ret: Vec<XmlNsPtr> = vec![];
+        let mut node = XmlGenericNodePtr::from_raw(self as *const Self as *mut Self);
+        while let Some(cur_node) = node {
+            if matches!(cur_node.element_type(), XmlElementType::XmlElementNode) {
+                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                let mut cur = cur_node.ns_def;
+                while let Some(now) = cur {
+                    if ret.iter().all(|&ret| now.prefix() != ret.prefix()) {
+                        ret.push(now);
+                    }
+                    cur = now.next
+                }
+            }
+            node = cur_node.parent();
+        }
+        Some(ret)
     }
 
     /// Searches the language of a node, i.e. the values of the xml:lang
@@ -2014,85 +2012,83 @@ impl XmlNode {
     ///
     /// Returns the namespace pointer or NULL.
     #[doc(alias = "xmlSearchNs")]
-    pub unsafe fn search_ns(
+    pub fn search_ns(
         &mut self,
         doc: Option<XmlDocPtr>,
         namespace: Option<&str>,
     ) -> Option<XmlNsPtr> {
-        unsafe {
-            if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
+        if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
+            return None;
+        }
+        if namespace == Some("xml") {
+            if doc.is_none() && matches!(self.element_type(), XmlElementType::XmlElementNode) {
+                // The XML-1.0 namespace is normally held on the root element.
+                // In this case exceptionally create it on the node element.
+                let Some(cur) = XmlNsPtr::new(XmlNs {
+                    typ: XML_LOCAL_NAMESPACE,
+                    href: Some(XML_XML_NAMESPACE.to_str().unwrap().into()),
+                    prefix: Some("xml".into()),
+                    next: self.ns_def,
+                    ..Default::default()
+                }) else {
+                    xml_tree_err_memory("searching namespace");
+                    return None;
+                };
+                self.ns_def = Some(cur);
+                return Some(cur);
+            }
+            let mut doc = doc.or(self.document())?;
+            // Return the XML namespace declaration held by the doc.
+            if doc.old_ns.is_none() {
+                return doc.ensure_xmldecl();
+            } else {
+                return doc.old_ns;
+            }
+        }
+        let mut node = XmlGenericNodePtr::from_raw(self);
+        let orig = node;
+        while let Some(cur_node) = node {
+            if matches!(
+                cur_node.element_type(),
+                XmlElementType::XmlEntityRefNode
+                    | XmlElementType::XmlEntityNode
+                    | XmlElementType::XmlEntityDecl
+            ) {
                 return None;
             }
-            if namespace == Some("xml") {
-                if doc.is_none() && matches!(self.element_type(), XmlElementType::XmlElementNode) {
-                    // The XML-1.0 namespace is normally held on the root element.
-                    // In this case exceptionally create it on the node element.
-                    let Some(cur) = XmlNsPtr::new(XmlNs {
-                        typ: XML_LOCAL_NAMESPACE,
-                        href: Some(XML_XML_NAMESPACE.to_str().unwrap().into()),
-                        prefix: xml_strdup(c"xml".as_ptr() as _),
-                        next: self.ns_def,
-                        ..Default::default()
-                    }) else {
-                        xml_tree_err_memory("searching namespace");
-                        return None;
-                    };
-                    self.ns_def = Some(cur);
-                    return Some(cur);
+            if matches!(cur_node.element_type(), XmlElementType::XmlElementNode) {
+                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                let mut cur = cur_node.ns_def;
+                while let Some(now) = cur {
+                    if now.prefix().is_none() && namespace.is_none() && now.href.is_some() {
+                        return Some(now);
+                    }
+                    if now.href().is_some()
+                        && now.prefix().is_some()
+                        && namespace == now.prefix().as_deref()
+                    {
+                        return Some(now);
+                    }
+                    cur = now.next;
                 }
-                let mut doc = doc.or(self.document())?;
-                // Return the XML namespace declaration held by the doc.
-                if doc.old_ns.is_none() {
-                    return doc.ensure_xmldecl();
-                } else {
-                    return doc.old_ns;
-                }
-            }
-            let mut node = XmlGenericNodePtr::from_raw(self);
-            let orig = node;
-            while let Some(cur_node) = node {
-                if matches!(
-                    cur_node.element_type(),
-                    XmlElementType::XmlEntityRefNode
-                        | XmlElementType::XmlEntityNode
-                        | XmlElementType::XmlEntityDecl
-                ) {
-                    return None;
-                }
-                if matches!(cur_node.element_type(), XmlElementType::XmlElementNode) {
-                    let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                    let mut cur = cur_node.ns_def;
-                    while let Some(now) = cur {
-                        if now.prefix().is_none() && namespace.is_none() && now.href.is_some() {
-                            return Some(now);
+                if orig != node {
+                    let cur = cur_node.ns;
+                    if let Some(cur) = cur {
+                        if cur.prefix().is_none() && namespace.is_none() && cur.href.is_some() {
+                            return Some(cur);
                         }
-                        if now.href().is_some()
-                            && now.prefix().is_some()
-                            && namespace == now.prefix().as_deref()
+                        if cur.prefix().is_some()
+                            && cur.href().is_some()
+                            && namespace == cur.prefix().as_deref()
                         {
-                            return Some(now);
-                        }
-                        cur = now.next;
-                    }
-                    if orig != node {
-                        let cur = cur_node.ns;
-                        if let Some(cur) = cur {
-                            if cur.prefix().is_none() && namespace.is_none() && cur.href.is_some() {
-                                return Some(cur);
-                            }
-                            if cur.prefix().is_some()
-                                && cur.href().is_some()
-                                && namespace == cur.prefix().as_deref()
-                            {
-                                return Some(cur);
-                            }
+                            return Some(cur);
                         }
                     }
                 }
-                node = cur_node.parent();
             }
-            None
+            node = cur_node.parent();
         }
+        None
     }
 
     /// Search a Ns aliasing a given URI.
@@ -2100,81 +2096,75 @@ impl XmlNode {
     ///
     /// Returns the namespace pointer or NULL.
     #[doc(alias = "xmlSearchNsByHref")]
-    pub unsafe fn search_ns_by_href(
-        &mut self,
-        doc: Option<XmlDocPtr>,
-        href: &str,
-    ) -> Option<XmlNsPtr> {
-        unsafe {
-            let orig = XmlGenericNodePtr::from_raw(self).unwrap();
+    pub fn search_ns_by_href(&mut self, doc: Option<XmlDocPtr>, href: &str) -> Option<XmlNsPtr> {
+        let orig = XmlGenericNodePtr::from_raw(self).unwrap();
 
-            if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
+        if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
+            return None;
+        }
+        if href == XML_XML_NAMESPACE.to_str().unwrap() {
+            // Only the document can hold the XML spec namespace.
+            if doc.is_none() && matches!(self.element_type(), XmlElementType::XmlElementNode) {
+                // The XML-1.0 namespace is normally held on the root element.
+                // In this case exceptionally create it on the node element.
+                let Some(cur) = XmlNsPtr::new(XmlNs {
+                    typ: XML_LOCAL_NAMESPACE,
+                    href: Some(XML_XML_NAMESPACE.to_str().unwrap().into()),
+                    prefix: Some("xml".into()),
+                    next: self.ns_def,
+                    ..Default::default()
+                }) else {
+                    xml_tree_err_memory("searching namespace");
+                    return None;
+                };
+                self.ns_def = Some(cur);
+                return Some(cur);
+            }
+            let mut doc = doc.or(self.document())?;
+            // Return the XML namespace declaration held by the doc.
+            if doc.old_ns.is_none() {
+                return doc.ensure_xmldecl();
+            } else {
+                return doc.old_ns;
+            }
+        }
+        let is_attr = matches!(self.element_type(), XmlElementType::XmlAttributeNode);
+        let mut node = Some(orig);
+        while let Some(cur_node) = node {
+            if matches!(
+                cur_node.element_type(),
+                XmlElementType::XmlEntityRefNode
+                    | XmlElementType::XmlEntityNode
+                    | XmlElementType::XmlEntityDecl
+            ) {
                 return None;
             }
-            if href == XML_XML_NAMESPACE.to_str().unwrap() {
-                // Only the document can hold the XML spec namespace.
-                if doc.is_none() && matches!(self.element_type(), XmlElementType::XmlElementNode) {
-                    // The XML-1.0 namespace is normally held on the root element.
-                    // In this case exceptionally create it on the node element.
-                    let Some(cur) = XmlNsPtr::new(XmlNs {
-                        typ: XML_LOCAL_NAMESPACE,
-                        href: Some(XML_XML_NAMESPACE.to_str().unwrap().into()),
-                        prefix: xml_strdup(c"xml".as_ptr() as _),
-                        next: self.ns_def,
-                        ..Default::default()
-                    }) else {
-                        xml_tree_err_memory("searching namespace");
-                        return None;
-                    };
-                    self.ns_def = Some(cur);
-                    return Some(cur);
-                }
-                let mut doc = doc.or(self.document())?;
-                // Return the XML namespace declaration held by the doc.
-                if doc.old_ns.is_none() {
-                    return doc.ensure_xmldecl();
-                } else {
-                    return doc.old_ns;
-                }
-            }
-            let is_attr = matches!(self.element_type(), XmlElementType::XmlAttributeNode);
-            let mut node = Some(orig);
-            while let Some(cur_node) = node {
-                if matches!(
-                    cur_node.element_type(),
-                    XmlElementType::XmlEntityRefNode
-                        | XmlElementType::XmlEntityNode
-                        | XmlElementType::XmlEntityDecl
-                ) {
-                    return None;
-                }
-                if matches!(cur_node.element_type(), XmlElementType::XmlElementNode) {
-                    let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                    let mut cur = cur_node.ns_def;
-                    while let Some(now) = cur {
-                        if now.href.as_deref().is_some_and(|h| h == href)
-                            && (!is_attr || now.prefix().is_some())
-                            && xml_ns_in_scope(doc, Some(orig), node, now.prefix) == 1
-                        {
-                            return Some(now);
-                        }
-                        cur = now.next;
+            if matches!(cur_node.element_type(), XmlElementType::XmlElementNode) {
+                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                let mut cur = cur_node.ns_def;
+                while let Some(now) = cur {
+                    if now.href.as_deref().is_some_and(|h| h == href)
+                        && (!is_attr || now.prefix().is_some())
+                        && xml_ns_in_scope(doc, Some(orig), node, now.prefix.as_deref()) == 1
+                    {
+                        return Some(now);
                     }
-                    if orig != cur_node.into() {
-                        let cur = cur_node.ns;
-                        if let Some(cur) = cur.filter(|cur| {
-                            cur.href.as_deref().is_some_and(|h| h == href)
-                                && (!is_attr || (*cur).prefix().is_some())
-                                && xml_ns_in_scope(doc, Some(orig), node, cur.prefix) == 1
-                        }) {
-                            return Some(cur);
-                        }
+                    cur = now.next;
+                }
+                if orig != cur_node.into() {
+                    let cur = cur_node.ns;
+                    if let Some(cur) = cur.filter(|cur| {
+                        cur.href.as_deref().is_some_and(|h| h == href)
+                            && (!is_attr || (*cur).prefix().is_some())
+                            && xml_ns_in_scope(doc, Some(orig), node, cur.prefix.as_deref()) == 1
+                    }) {
+                        return Some(cur);
                     }
                 }
-                node = cur_node.parent();
             }
-            None
+            node = cur_node.parent();
         }
+        None
     }
 
     /// This function checks that all the namespaces declared within the given tree are properly declared.
