@@ -1642,6 +1642,8 @@ unsafe fn push_parse_test(
     err: Option<String>,
     options: i32,
 ) -> i32 {
+    use exml::tree::NodeCommon;
+
     unsafe {
         use exml::{
             encoding::XmlCharEncoding,
@@ -1738,6 +1740,10 @@ unsafe fn push_parse_test(
         }
         #[cfg(feature = "html")]
         if options & XML_PARSE_HTML != 0 {
+            assert_eq!(
+                doc.unwrap().element_type(),
+                XmlElementType::XmlHTMLDocumentNode
+            );
             html_doc_dump_memory(
                 doc.unwrap(),
                 addr_of_mut!(base) as *mut *mut XmlChar,
@@ -1761,10 +1767,21 @@ unsafe fn push_parse_test(
             from_raw_parts(base as _, size as usize),
         );
         if base.is_null() || res != 0 {
-            if !base.is_null() {
-                xml_free(base as _);
-            }
             eprintln!("Result for {filename} failed in {}", result.unwrap());
+            if options & XML_PARSE_HTML != 0 {
+                if TEST_ERRORS_SIZE.get() > 0 {
+                    TEST_ERRORS.with_borrow(|errors| {
+                        eprintln!(
+                            "errors: {}",
+                            std::str::from_utf8(&errors[..TEST_ERRORS_SIZE.get()]).unwrap()
+                        )
+                    });
+                }
+                if !base.is_null() {
+                    eprintln!("{}", CStr::from_ptr(base).to_string_lossy().as_ref());
+                    xml_free(base as _);
+                }
+            }
             return -1;
         }
         xml_free(base as _);

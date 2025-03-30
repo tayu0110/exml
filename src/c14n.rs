@@ -712,12 +712,8 @@ impl<T> XmlC14NCtx<'_, T> {
                     let cur = XmlNodePtr::try_from(cur).unwrap();
                     // cdata sections are processed as text nodes
                     // todo: verify that cdata sections are included in XPath nodes set
-                    if visible && !cur.content.is_null() {
-                        let buffer = normalize_text(
-                            CStr::from_ptr(cur.content as *const i8)
-                                .to_string_lossy()
-                                .as_ref(),
-                        );
+                    if let Some(content) = cur.content.as_deref().filter(|_| visible) {
+                        let buffer = normalize_text(content);
                         self.buf.write_str(&buffer).ok();
                     }
                 }
@@ -741,15 +737,12 @@ impl<T> XmlC14NCtx<'_, T> {
 
                         self.buf.write_str(&cur.name().unwrap()).ok();
                         let cur = XmlNodePtr::try_from(cur).unwrap();
-                        if !cur.content.is_null() && *cur.content != b'\0' {
+                        if let Some(content) =
+                            cur.content.as_deref().filter(|cont| !cont.is_empty())
+                        {
                             self.buf.write_str(" ").ok();
-
-                            /* todo: do we need to normalize pi? */
-                            let buffer = normalize_pi(
-                                CStr::from_ptr(cur.content as *const i8)
-                                    .to_string_lossy()
-                                    .as_ref(),
-                            );
+                            // todo: do we need to normalize pi?
+                            let buffer = normalize_pi(content);
                             self.buf.write_str(&buffer).ok();
                         }
 
@@ -782,13 +775,9 @@ impl<T> XmlC14NCtx<'_, T> {
                         }
 
                         let cur = XmlNodePtr::try_from(cur).unwrap();
-                        if !cur.content.is_null() {
-                            /* todo: do we need to normalize comment? */
-                            let buffer = normalize_comment(
-                                CStr::from_ptr(cur.content as *const i8)
-                                    .to_string_lossy()
-                                    .as_ref(),
-                            );
+                        if let Some(content) = cur.content.as_deref() {
+                            // todo: do we need to normalize comment?
+                            let buffer = normalize_comment(content);
                             self.buf.write_str(&buffer).ok();
                         }
 

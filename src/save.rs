@@ -26,7 +26,6 @@ use std::{
     os::raw::c_void,
     ptr::{fn_addr_eq, null_mut},
     rc::Rc,
-    slice::from_raw_parts,
     str::from_utf8_unchecked,
 };
 
@@ -743,9 +742,7 @@ unsafe fn xml_attr_serialize_content(buf: &mut XmlOutputBuffer, attr: XmlAttrPtr
                         &mut out,
                         attr.doc,
                         Some(attr),
-                        CStr::from_ptr(now.content as *const i8)
-                            .to_string_lossy()
-                            .as_ref(),
+                        now.content.as_deref().unwrap(),
                     );
                     buf.write_bytes(&out).ok();
                 }
@@ -795,8 +792,6 @@ pub(crate) unsafe fn xml_node_dump_output_internal(
     unsafe {
         let format: i32 = ctxt.format;
         let mut unformatted_node = None;
-        let mut start: *mut u8;
-        let mut end: *mut u8;
 
         let root = cur;
         let mut parent = cur.parent();
@@ -926,26 +921,15 @@ pub(crate) unsafe fn xml_node_dump_output_internal(
                 }
                 XmlElementType::XmlTextNode => {
                     let node = XmlNodePtr::try_from(cur).unwrap();
-                    if !node.content.is_null() {
+                    if let Some(content) = node.content.as_deref() {
                         if node.name != XML_STRING_TEXT_NOENC.as_ptr() as _ {
                             ctxt.buf
                                 .borrow_mut()
-                                .write_str_with_escape(
-                                    CStr::from_ptr(node.content as *const i8)
-                                        .to_string_lossy()
-                                        .as_ref(),
-                                    ctxt.escape,
-                                )
+                                .write_str_with_escape(content, ctxt.escape)
                                 .ok();
                         } else {
                             // Disable escaping, needed for XSLT
-
-                            ctxt.buf
-                                .borrow_mut()
-                                .write_str(
-                                    CStr::from_ptr(node.content as _).to_string_lossy().as_ref(),
-                                )
-                                .ok();
+                            ctxt.buf.borrow_mut().write_str(content).ok();
                         }
                     }
                 }
@@ -961,27 +945,19 @@ pub(crate) unsafe fn xml_node_dump_output_internal(
                         ctxt.buf.borrow_mut().write_bytes(&ctxt.indent[..len]).ok();
                     }
 
-                    if !node.content.is_null() {
+                    if let Some(content) = node.content.as_deref() {
                         ctxt.buf.borrow_mut().write_bytes(b"<?").ok();
-
                         ctxt.buf
                             .borrow_mut()
                             .write_str(CStr::from_ptr(node.name as _).to_string_lossy().as_ref())
                             .ok();
-                        if !node.content.is_null() {
-                            if ctxt.format == 2 {
-                                ctxt.write_ws_non_sig(0);
-                            } else {
-                                ctxt.buf.borrow_mut().write_bytes(b" ").ok();
-                            }
-
-                            ctxt.buf
-                                .borrow_mut()
-                                .write_str(
-                                    CStr::from_ptr(node.content as _).to_string_lossy().as_ref(),
-                                )
-                                .ok();
+                        if ctxt.format == 2 {
+                            ctxt.write_ws_non_sig(0);
+                        } else {
+                            ctxt.buf.borrow_mut().write_bytes(b" ").ok();
                         }
+
+                        ctxt.buf.borrow_mut().write_str(content).ok();
                         ctxt.buf.borrow_mut().write_bytes(b"?>").ok();
                     } else {
                         ctxt.buf.borrow_mut().write_bytes(b"<?").ok();
@@ -1008,12 +984,9 @@ pub(crate) unsafe fn xml_node_dump_output_internal(
                         ctxt.buf.borrow_mut().write_bytes(&ctxt.indent[..len]).ok();
                     }
 
-                    if !node.content.is_null() {
+                    if let Some(content) = node.content.as_deref() {
                         ctxt.buf.borrow_mut().write_bytes(b"<!--").ok();
-                        ctxt.buf
-                            .borrow_mut()
-                            .write_str(CStr::from_ptr(node.content as _).to_string_lossy().as_ref())
-                            .ok();
+                        ctxt.buf.borrow_mut().write_str(content).ok();
                         ctxt.buf.borrow_mut().write_bytes(b"-->").ok();
                     }
                 }
@@ -1028,35 +1001,29 @@ pub(crate) unsafe fn xml_node_dump_output_internal(
                 }
                 XmlElementType::XmlCDATASectionNode => {
                     let node = XmlNodePtr::try_from(cur).unwrap();
-                    if node.content.is_null() || *node.content == b'\0' {
-                        ctxt.buf.borrow_mut().write_bytes(b"<![CDATA[]]>").ok();
-                    } else {
-                        start = node.content;
-                        end = node.content;
-                        while *end != b'\0' {
-                            if *end == b']' && *end.add(1) == b']' && *end.add(2) == b'>' {
-                                end = end.add(2);
+                    if let Some(content) = node.content.as_deref().filter(|cont| !cont.is_empty()) {
+                        let mut start = content;
+                        let mut end = content;
+                        while !end.is_empty() {
+                            if let Some(rem) = end.strip_prefix("]]>") {
+                                let len = start.len() - rem.len();
                                 ctxt.buf.borrow_mut().write_bytes(b"<![CDATA[").ok();
-                                ctxt.buf
-                                    .borrow_mut()
-                                    .write_bytes(from_raw_parts(
-                                        start as _,
-                                        end.offset_from(start) as _,
-                                    ))
-                                    .ok();
+                                ctxt.buf.borrow_mut().write_str(&start[..len]).ok();
                                 ctxt.buf.borrow_mut().write_bytes(b"]]>").ok();
-                                start = end;
+                                end = rem;
+                                start = rem;
                             }
-                            end = end.add(1);
+                            let mut next = end.chars();
+                            next.next();
+                            end = next.as_str();
                         }
-                        if start != end {
+                        if !start.is_empty() {
                             ctxt.buf.borrow_mut().write_bytes(b"<![CDATA[").ok();
-                            ctxt.buf
-                                .borrow_mut()
-                                .write_str(CStr::from_ptr(start as _).to_string_lossy().as_ref())
-                                .ok();
+                            ctxt.buf.borrow_mut().write_str(start).ok();
                             ctxt.buf.borrow_mut().write_bytes(b"]]>").ok();
                         }
+                    } else {
+                        ctxt.buf.borrow_mut().write_bytes(b"<![CDATA[]]>").ok();
                     }
                 }
                 XmlElementType::XmlAttributeNode => {
@@ -1235,15 +1202,16 @@ unsafe fn xhtml_attr_list_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Option<Xm
                 && now
                     .children()
                     .map(|children| XmlNodePtr::try_from(children).unwrap())
-                    .is_none_or(|c| c.content.is_null() || *c.content.add(0) == 0)
+                    .is_none_or(|c| c.content.as_deref().is_none_or(|cont| cont.is_empty()))
                 && html_is_boolean_attr(now.name().as_deref().unwrap())
             {
                 if let Some(children) = now.children() {
                     xml_free_node(children);
                 }
                 let doc = now.doc;
-                let name = now.name;
-                now.set_children(xml_new_doc_text(doc, name).map(|node| node.into()));
+                let name = now.name();
+                let new_text = xml_new_doc_text(doc, name.as_deref()).map(|node| node.into());
+                now.set_children(new_text);
                 if let Some(mut children) = now.children() {
                     children.set_parent(Some(now.into()));
                 }
@@ -1348,8 +1316,6 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Xml
 
         let format: i32 = ctxt.format;
         let mut unformatted_node = None;
-        let mut start: *mut u8;
-        let mut end: *mut u8;
 
         let root = cur;
         let mut parent = cur.parent();
@@ -1563,53 +1529,35 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Xml
                 }
                 XmlElementType::XmlTextNode => {
                     let node = XmlNodePtr::try_from(cur).unwrap();
-                    if node.content.is_null() {
+                    let Some(content) = node.content.as_deref() else {
                         break;
-                    }
+                    };
                     if node.name == XML_STRING_TEXT.as_ptr() as _
                         || node.name != XML_STRING_TEXT_NOENC.as_ptr() as _
                     {
                         ctxt.buf
                             .borrow_mut()
-                            .write_str_with_escape(
-                                CStr::from_ptr(node.content as *const i8)
-                                    .to_string_lossy()
-                                    .as_ref(),
-                                ctxt.escape,
-                            )
+                            .write_str_with_escape(content, ctxt.escape)
                             .ok();
                     } else {
                         // Disable escaping, needed for XSLT
 
-                        ctxt.buf
-                            .borrow_mut()
-                            .write_str(CStr::from_ptr(node.content as _).to_string_lossy().as_ref())
-                            .ok();
+                        ctxt.buf.borrow_mut().write_str(content).ok();
                     }
                 }
                 XmlElementType::XmlPINode => {
                     let node = XmlNodePtr::try_from(cur).unwrap();
-                    if !node.content.is_null() {
+                    if let Some(content) = node.content.as_deref() {
                         ctxt.buf.borrow_mut().write_bytes(b"<?").ok();
-
                         ctxt.buf
                             .borrow_mut()
                             .write_str(CStr::from_ptr(node.name as _).to_string_lossy().as_ref())
                             .ok();
-                        if !node.content.is_null() {
-                            ctxt.buf.borrow_mut().write_bytes(b" ").ok();
-
-                            ctxt.buf
-                                .borrow_mut()
-                                .write_str(
-                                    CStr::from_ptr(node.content as _).to_string_lossy().as_ref(),
-                                )
-                                .ok();
-                        }
+                        ctxt.buf.borrow_mut().write_bytes(b" ").ok();
+                        ctxt.buf.borrow_mut().write_str(content).ok();
                         ctxt.buf.borrow_mut().write_bytes(b"?>").ok();
                     } else {
                         ctxt.buf.borrow_mut().write_bytes(b"<?").ok();
-
                         ctxt.buf
                             .borrow_mut()
                             .write_str(CStr::from_ptr(node.name as _).to_string_lossy().as_ref())
@@ -1619,13 +1567,9 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Xml
                 }
                 XmlElementType::XmlCommentNode => {
                     let node = XmlNodePtr::try_from(cur).unwrap();
-                    if !node.content.is_null() {
+                    if let Some(content) = node.content.as_deref() {
                         ctxt.buf.borrow_mut().write_bytes(b"<!--").ok();
-
-                        ctxt.buf
-                            .borrow_mut()
-                            .write_str(CStr::from_ptr(node.content as _).to_string_lossy().as_ref())
-                            .ok();
+                        ctxt.buf.borrow_mut().write_str(content).ok();
                         ctxt.buf.borrow_mut().write_bytes(b"-->").ok();
                     }
                 }
@@ -1640,37 +1584,27 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Xml
                 }
                 XmlElementType::XmlCDATASectionNode => {
                     let node = XmlNodePtr::try_from(cur).unwrap();
-                    if node.content.is_null() || *node.content == b'\0' {
-                        ctxt.buf.borrow_mut().write_bytes(b"<![CDATA[]]>").ok();
-                    } else {
-                        start = node.content;
-                        end = node.content;
-                        while *end != b'\0' {
-                            if *end == b']' && *end.add(1) == b']' && *end.add(2) == b'>' {
-                                end = end.add(2);
+                    if let Some(content) = node.content.as_deref().filter(|cont| !cont.is_empty()) {
+                        let mut start = content;
+                        let mut end = content;
+                        while !end.is_empty() {
+                            if let Some(rem) = end.strip_prefix("]]>") {
+                                let len = start.len() - rem.len();
                                 ctxt.buf.borrow_mut().write_bytes(b"<![CDATA[").ok();
-
-                                ctxt.buf
-                                    .borrow_mut()
-                                    .write_bytes(from_raw_parts(
-                                        start as _,
-                                        end.offset_from(start) as _,
-                                    ))
-                                    .ok();
+                                ctxt.buf.borrow_mut().write_str(&start[..len]).ok();
                                 ctxt.buf.borrow_mut().write_bytes(b"]]>").ok();
-                                start = end;
+                                start = rem;
+                                end = rem;
                             }
-                            end = end.add(1);
+                            end = &end[1..];
                         }
-                        if start != end {
+                        if !start.is_empty() {
                             ctxt.buf.borrow_mut().write_bytes(b"<![CDATA[").ok();
-
-                            ctxt.buf
-                                .borrow_mut()
-                                .write_str(CStr::from_ptr(start as _).to_string_lossy().as_ref())
-                                .ok();
+                            ctxt.buf.borrow_mut().write_str(start).ok();
                             ctxt.buf.borrow_mut().write_bytes(b"]]>").ok();
                         }
+                    } else {
+                        ctxt.buf.borrow_mut().write_bytes(b"<![CDATA[]]>").ok();
                     }
                 }
                 XmlElementType::XmlAttributeNode => {

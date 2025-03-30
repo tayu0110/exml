@@ -28,7 +28,7 @@ use std::{
     borrow::Cow,
     cell::{Cell, RefCell},
     collections::VecDeque,
-    ffi::{CStr, c_char},
+    ffi::c_char,
     io::{self, Write},
     os::raw::c_void,
     ptr::null_mut,
@@ -42,14 +42,12 @@ use crate::{
     globals::GenericErrorContext,
     io::XmlOutputBuffer,
     libxml::{
-        globals::xml_free,
         htmltree::html_new_doc_no_dtd,
         parser::{
             XML_DEFAULT_VERSION, XmlParserInputState, XmlSAXHandler, xml_create_push_parser_ctxt,
             xml_parse_chunk,
         },
         sax2::{xml_sax2_end_element, xml_sax2_init_default_sax_handler, xml_sax2_start_element},
-        xmlstring::xml_strndup,
     },
     list::XmlList,
     parser::{XmlParserCtxtPtr, xml_free_parser_ctxt},
@@ -451,16 +449,8 @@ impl<'a> XmlTextWriter<'a> {
                 match lk.state.get() {
                     XmlTextWriterState::XmlTextwriterName
                     | XmlTextWriterState::XmlTextwriterText => {
-                        let content = xml_strndup(content.as_ptr(), content.len() as i32);
                         let buf = xml_encode_special_chars(None, content);
-                        if !buf.is_null() {
-                            sum += self.write_bytes(CStr::from_ptr(buf as *const i8).to_bytes())?;
-                            if buf != content {
-                                // buf was allocated by us, so free it
-                                xml_free(buf as _);
-                            }
-                        }
-                        xml_free(content as _);
+                        sum += self.write_bytes(buf.as_bytes())?;
                     }
                     XmlTextWriterState::XmlTextwriterAttribute => {
                         attr_serialize_text_content(&mut self.out, self.doc, None, content);

@@ -24,13 +24,11 @@ use std::io::Write;
 use std::{
     any::type_name,
     borrow::Cow,
-    ffi::{CStr, CString, c_char},
+    ffi::{CStr, CString},
     ops::{Deref, DerefMut},
     os::raw::c_void,
     ptr::{NonNull, null_mut},
 };
-
-use libc::{size_t, snprintf, strchr};
 
 use crate::{
     error::{
@@ -40,9 +38,9 @@ use crate::{
     hash::{CVoidWrapper, XmlHashTableRef},
     libxml::{
         chvalid::xml_is_char,
-        globals::{xml_free, xml_malloc},
+        globals::xml_free,
         hash::{XmlHashTable, xml_hash_create},
-        xmlstring::{XmlChar, xml_strchr, xml_strdup, xml_strndup, xml_strstr},
+        xmlstring::{XmlChar, xml_strchr, xml_strdup, xml_strndup},
     },
     tree::{NodeCommon, XmlElementType, xml_free_node_list},
 };
@@ -876,284 +874,84 @@ macro_rules! grow_buffer_reentrant {
 ///
 /// Returns A newly allocated string with the substitution done.
 #[doc(alias = "xmlEncodeEntitiesInternal")]
-pub(crate) unsafe fn xml_encode_entities_internal(
-    doc: Option<XmlDocPtr>,
-    input: *const XmlChar,
-    attr: i32,
-) -> *mut XmlChar {
-    unsafe {
-        let mut cur: *const XmlChar = input;
-        let mut buffer: *mut XmlChar;
-        let mut out: *mut XmlChar;
-        let mut buffer_size: size_t;
-        let mut html: i32 = 0;
+fn xml_encode_entities_internal(doc: Option<XmlDocPtr>, input: &str, attr: i32) -> String {
+    let mut html = false;
 
-        if input.is_null() {
-            return null_mut();
-        }
-        if let Some(doc) = doc {
-            html = matches!(doc.typ, XmlElementType::XmlHTMLDocumentNode) as i32;
-        }
-
-        // allocate an translation buffer.
-        buffer_size = 1000;
-        buffer = xml_malloc(buffer_size) as *mut XmlChar;
-        if buffer.is_null() {
-            xml_entities_err_memory("xmlEncodeEntities: malloc failed");
-            return null_mut();
-        }
-        out = buffer;
-
-        'mem_error: {
-            while *cur != b'\0' {
-                let mut indx: size_t = out.offset_from(buffer) as _;
-                if indx + 100 > buffer_size {
-                    grow_buffer_reentrant!(buffer, buffer_size, 'mem_error);
-                    out = buffer.add(indx);
-                }
-
-                // By default one have to encode at least '<', '>', '"' and '&' !
-                if *cur == b'<' {
-                    let end: *const XmlChar;
-
-                    // Special handling of server side include in HTML attributes
-                    if html != 0
-                        && attr != 0
-                        && *cur.add(1) == b'!'
-                        && *cur.add(2) == b'-'
-                        && *cur.add(3) == b'-'
-                        && {
-                            end = xml_strstr(cur, c"-->".as_ptr() as _);
-                            !end.is_null()
-                        }
-                    {
-                        while cur != end {
-                            *out = *cur;
-                            cur = cur.add(1);
-                            out = out.add(1);
-                            indx = out.offset_from(buffer) as _;
-                            if indx + 100 > buffer_size {
-                                grow_buffer_reentrant!(buffer, buffer_size, 'mem_error);
-                                out = buffer.add(indx);
-                            }
-                        }
-                        *out = *cur;
-                        cur = cur.add(1);
-                        out = out.add(1);
-                        *out = *cur;
-                        cur = cur.add(1);
-                        out = out.add(1);
-                        *out = *cur;
-                        cur = cur.add(1);
-                        out = out.add(1);
-                        continue;
-                    }
-                    *out = b'&';
-                    out = out.add(1);
-                    *out = b'l';
-                    out = out.add(1);
-                    *out = b't';
-                    out = out.add(1);
-                    *out = b';';
-                    out = out.add(1);
-                } else if *cur == b'>' {
-                    *out = b'&';
-                    out = out.add(1);
-                    *out = b'g';
-                    out = out.add(1);
-                    *out = b't';
-                    out = out.add(1);
-                    *out = b';';
-                    out = out.add(1);
-                } else if *cur == b'&' {
-                    // Special handling of &{...} construct from HTML 4, see
-                    // http://www.w3.org/TR/html401/appendix/notes.html#h-B.7.1
-                    if html != 0
-                        && attr != 0
-                        && *cur.add(1) == b'{'
-                        && !strchr(cur as _, b'}' as _).is_null()
-                    {
-                        while *cur != b'}' {
-                            *out = *cur;
-                            cur = cur.add(1);
-                            out = out.add(1);
-                            indx = out.offset_from(buffer) as _;
-                            if indx + 100 > buffer_size {
-                                grow_buffer_reentrant!(buffer, buffer_size, 'mem_error);
-                                out = buffer.add(indx as usize);
-                            }
-                        }
-                        *out = *cur;
-                        cur = cur.add(1);
-                        out = out.add(1);
-                        continue;
-                    }
-                    *out = b'&';
-                    out = out.add(1);
-                    *out = b'a';
-                    out = out.add(1);
-                    *out = b'm';
-                    out = out.add(1);
-                    *out = b'p';
-                    out = out.add(1);
-                    *out = b';';
-                    out = out.add(1);
-                } else if (*cur >= 0x20 && *cur < 0x80)
-                    || *cur == b'\n'
-                    || *cur == b'\t'
-                    || (html != 0 && *cur == b'\r')
-                {
-                    // default case, just copy !
-                    *out = *cur;
-                    out = out.add(1);
-                } else if *cur >= 0x80 {
-                    if doc.is_some_and(|doc| doc.encoding.is_some()) || html != 0 {
-                        // Bjørn Reese <br@sseusa.com> provided the patch
-                        // XmlChar xc;
-                        // xc = (*cur & 0x3F) << 6;
-                        // if (*cur.add(1) != 0) {
-                        //     xc += *(++cur) & 0x3F;
-                        //     *out++ = xc;
-                        // } else
-                        *out = *cur;
-                        out = out.add(1);
-                    } else {
-                        // We assume we have UTF-8 input.
-                        // It must match either:
-                        //   110xxxxx 10xxxxxx
-                        //   1110xxxx 10xxxxxx 10xxxxxx
-                        //   11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
-                        // That is:
-                        //   *cur.add(0) is 11xxxxxx
-                        //   *cur.add(1) is 10xxxxxx
-                        //   *cur.add(2) is 10xxxxxx if *cur.add(0) is 111xxxxx
-                        //   *cur.add(3) is 10xxxxxx if *cur.add(0) is 1111xxxx
-                        //   *cur.add(0) is not 11111xxx
-                        let mut buf: [c_char; 11] = [0; 11];
-                        let mut ptr: *mut c_char;
-                        let mut val: i32 = 0;
-                        let mut l: i32 = 1;
-
-                        if *cur.add(0) & 0xC0 != 0xC0
-                            || *cur.add(1) & 0xC0 != 0x80
-                            || (*cur.add(0) & 0xE0 == 0xE0 && *cur.add(2) & 0xC0 != 0x80)
-                            || (*cur.add(0) & 0xF0 == 0xF0 && *cur.add(3) & 0xC0 != 0x80)
-                            || *cur.add(0) & 0xF8 == 0xF8
-                        {
-                            xml_entities_err(
-                                XmlParserErrors::XmlCheckNotUTF8,
-                                "xmlEncodeEntities: input not UTF-8",
-                            );
-                            if let Some(mut doc) = doc {
-                                doc.encoding = Some("ISO-8859-1".to_owned());
-                            }
-                            snprintf(
-                                buf.as_mut_ptr() as _,
-                                buf.len(),
-                                c"&#%d;".as_ptr() as _,
-                                *cur as u32,
-                            );
-                            *buf.last_mut().unwrap() = 0;
-                            ptr = buf.as_ptr() as _;
-                            while *ptr != 0 {
-                                *out = *ptr as _;
-                                out = out.add(1);
-                                ptr = ptr.add(1);
-                            }
-                            cur = cur.add(1);
-                            continue;
-                        } else if *cur < 0xE0 {
-                            val = *cur.add(0) as i32 & 0x1F;
-                            val <<= 6;
-                            val |= *cur.add(1) as i32 & 0x3F;
-                            l = 2;
-                        } else if *cur < 0xF0 {
-                            val = *cur.add(0) as i32 & 0x0F;
-                            val <<= 6;
-                            val |= *cur.add(1) as i32 & 0x3F;
-                            val <<= 6;
-                            val |= *cur.add(2) as i32 & 0x3F;
-                            l = 3;
-                        } else if *cur < 0xF8 {
-                            val = *cur.add(0) as i32 & 0x07;
-                            val <<= 6;
-                            val |= *cur.add(1) as i32 & 0x3F;
-                            val <<= 6;
-                            val |= *cur.add(2) as i32 & 0x3F;
-                            val <<= 6;
-                            val |= *cur.add(3) as i32 & 0x3F;
-                            l = 4;
-                        }
-                        if l == 1 || !xml_is_char(val as u32) {
-                            xml_entities_err(
-                                XmlParserErrors::XmlErrInvalidChar,
-                                "xmlEncodeEntities: char out of range\n",
-                            );
-                            if let Some(mut doc) = doc {
-                                doc.encoding = Some("ISO-8859-1".to_owned());
-                            }
-                            snprintf(
-                                buf.as_mut_ptr() as _,
-                                buf.len(),
-                                c"&#%d;".as_ptr() as _,
-                                *cur as u32,
-                            );
-                            buf[buf.len() - 1] = 0;
-                            ptr = buf.as_ptr() as _;
-                            while *ptr != 0 {
-                                *out = *ptr as _;
-                                out = out.add(1);
-                                ptr = ptr.add(1);
-                            }
-                            cur = cur.add(1);
-                            continue;
-                        }
-                        // We could do multiple things here. Just save as a c_char ref
-                        snprintf(
-                            buf.as_mut_ptr() as _,
-                            buf.len(),
-                            c"&#x%X;".as_ptr() as _,
-                            val,
-                        );
-                        buf[buf.len() - 1] = 0;
-                        ptr = buf.as_ptr() as _;
-                        while *ptr != 0 {
-                            *out = *ptr as _;
-                            out = out.add(1);
-                            ptr = ptr.add(1);
-                        }
-                        cur = cur.add(l as usize);
-                        continue;
-                    }
-                } else if xml_is_char(*cur as u32) {
-                    let mut buf: [c_char; 11] = [0; 11];
-                    let mut ptr: *mut c_char;
-
-                    snprintf(
-                        buf.as_mut_ptr() as _,
-                        buf.len(),
-                        c"&#%d;".as_ptr() as _,
-                        *cur as u32,
-                    );
-                    buf[buf.len() - 1] = 0;
-                    ptr = buf.as_ptr() as _;
-                    while *ptr != 0 {
-                        *out = *ptr as _;
-                        out = out.add(1);
-                        ptr = ptr.add(1);
-                    }
-                }
-                cur = cur.add(1);
-            }
-            *out = 0;
-            return buffer;
-        }
-
-        // mem_error:
-        xml_entities_err_memory("xmlEncodeEntities: realloc failed");
-        xml_free(buffer as _);
-        null_mut()
+    if let Some(doc) = doc {
+        html = matches!(doc.typ, XmlElementType::XmlHTMLDocumentNode);
     }
+
+    // allocate an translation buffer.
+    let mut cur = input;
+    let mut out = String::with_capacity(1000);
+    while !cur.is_empty() {
+        // By default one have to encode at least '<', '>', '"' and '&' !
+        if cur.starts_with('<') {
+            // Special handling of server side include in HTML attributes
+            if html && attr != 0 && cur.starts_with("<!--") {
+                if let Some(pos) = cur.find("-->") {
+                    out.push_str(&cur[..pos + 3]);
+                    cur = &cur[pos + 3..];
+                    continue;
+                }
+            }
+            out.push_str("&lt;");
+        } else if cur.starts_with('>') {
+            out.push_str("&gt;");
+        } else if cur.starts_with('&') {
+            // Special handling of &{...} construct from HTML 4, see
+            // http://www.w3.org/TR/html401/appendix/notes.html#h-B.7.1
+            if html && attr != 0 && cur[1..].starts_with('{') {
+                if let Some(pos) = cur.find('}') {
+                    out.push_str(&cur[..pos + 1]);
+                    cur = &cur[pos + 1..];
+                    continue;
+                }
+            }
+            out.push_str("&amp;");
+        } else if matches!(cur.as_bytes()[0], 0x20..0x80 | b'\n' | b'\t')
+            || (html && cur.starts_with('\r'))
+        {
+            // default case, just copy !
+            out.push(cur.as_bytes()[0] as char);
+        } else if matches!(cur.as_bytes()[0], 0x80..) {
+            if doc.is_some_and(|doc| doc.encoding.is_some()) || html {
+                // Bjørn Reese <br@sseusa.com> provided the patch
+                // XmlChar xc;
+                // xc = (*cur & 0x3F) << 6;
+                // if (*cur.add(1) != 0) {
+                //     xc += *(++cur) & 0x3F;
+                //     *out++ = xc;
+                // } else
+                let c = cur.chars().next().unwrap();
+                out.push(c);
+                cur = &cur[c.len_utf8()..];
+                continue;
+            } else {
+                let val = cur.chars().next().unwrap();
+                if !xml_is_char(val as u32) {
+                    xml_entities_err(
+                        XmlParserErrors::XmlErrInvalidChar,
+                        "xmlEncodeEntities: char out of range\n",
+                    );
+                    if let Some(mut doc) = doc {
+                        doc.encoding = Some("ISO-8859-1".to_owned());
+                    }
+                    out.push_str(format!("&#{}", cur.as_bytes()[0]).as_str());
+                    cur = &cur[1..];
+                    continue;
+                }
+                // We could do multiple things here. Just save as a c_char ref
+                out.push_str(format!("&#x{:X}", val as u32).as_str());
+                cur = &cur[val.len_utf8()..];
+                continue;
+            }
+        } else if xml_is_char(cur.as_bytes()[0] as u32) {
+            out.push_str(format!("&#{};", cur.as_bytes()[0]).as_str());
+        }
+        cur = &cur[1..];
+    }
+    out
 }
 
 /// Do a global encoding of a string, replacing the predefined entities
@@ -1163,11 +961,8 @@ pub(crate) unsafe fn xml_encode_entities_internal(
 ///
 /// Returns A newly allocated string with the substitution done.
 #[doc(alias = "xmlEncodeEntitiesReentrant")]
-pub unsafe fn xml_encode_entities_reentrant(
-    doc: Option<XmlDocPtr>,
-    input: *const XmlChar,
-) -> *mut XmlChar {
-    unsafe { xml_encode_entities_internal(doc, input, 0) }
+pub fn xml_encode_entities_reentrant(doc: Option<XmlDocPtr>, input: &str) -> String {
+    xml_encode_entities_internal(doc, input, 0)
 }
 
 /// Do a global encoding of a string, replacing the predefined entities
@@ -1175,107 +970,26 @@ pub unsafe fn xml_encode_entities_reentrant(
 ///
 /// Returns A newly allocated string with the substitution done.
 #[doc(alias = "xmlEncodeSpecialChars")]
-pub unsafe fn xml_encode_special_chars(
-    _doc: Option<XmlDocPtr>,
-    input: *const XmlChar,
-) -> *mut XmlChar {
-    unsafe {
-        let mut cur: *const XmlChar = input;
-        let mut buffer: *mut XmlChar;
-        let mut out: *mut XmlChar;
-        let mut buffer_size: size_t;
-        if input.is_null() {
-            return null_mut();
+pub fn xml_encode_special_chars(_doc: Option<XmlDocPtr>, input: &str) -> String {
+    // allocate an translation buffer.
+    let mut out = String::with_capacity(1000);
+    for cur in input.chars() {
+        // By default one have to encode at least '<', '>', '"' and '&' !
+        if cur == '<' {
+            out.push_str("&lt;");
+        } else if cur == '>' {
+            out.push_str("&gt;");
+        } else if cur == '&' {
+            out.push_str("&amp;");
+        } else if cur == '"' {
+            out.push_str("&quot;");
+        } else if cur == '\r' {
+            out.push_str("&#13;");
+        } else {
+            out.push(cur);
         }
-
-        // allocate an translation buffer.
-        buffer_size = 1000;
-        buffer = xml_malloc(buffer_size) as *mut XmlChar;
-        if buffer.is_null() {
-            xml_entities_err_memory("xmlEncodeSpecialChars: malloc failed");
-            return null_mut();
-        }
-        out = buffer;
-
-        'mem_error: {
-            while *cur != b'\0' {
-                let indx: size_t = out.offset_from(buffer) as _;
-                if indx + 10 > buffer_size {
-                    grow_buffer_reentrant!(buffer, buffer_size, 'mem_error);
-                    out = buffer.add(indx as usize);
-                }
-
-                // By default one have to encode at least '<', '>', '"' and '&' !
-                if *cur == b'<' {
-                    *out = b'&';
-                    out = out.add(1);
-                    *out = b'l';
-                    out = out.add(1);
-                    *out = b't';
-                    out = out.add(1);
-                    *out = b';';
-                    out = out.add(1);
-                } else if *cur == b'>' {
-                    *out = b'&';
-                    out = out.add(1);
-                    *out = b'g';
-                    out = out.add(1);
-                    *out = b't';
-                    out = out.add(1);
-                    *out = b';';
-                    out = out.add(1);
-                } else if *cur == b'&' {
-                    *out = b'&';
-                    out = out.add(1);
-                    *out = b'a';
-                    out = out.add(1);
-                    *out = b'm';
-                    out = out.add(1);
-                    *out = b'p';
-                    out = out.add(1);
-                    *out = b';';
-                    out = out.add(1);
-                } else if *cur == b'"' {
-                    *out = b'&';
-                    out = out.add(1);
-                    *out = b'q';
-                    out = out.add(1);
-                    *out = b'u';
-                    out = out.add(1);
-                    *out = b'o';
-                    out = out.add(1);
-                    *out = b't';
-                    out = out.add(1);
-                    *out = b';';
-                    out = out.add(1);
-                } else if *cur == b'\r' {
-                    *out = b'&';
-                    out = out.add(1);
-                    *out = b'#';
-                    out = out.add(1);
-                    *out = b'1';
-                    out = out.add(1);
-                    *out = b'3';
-                    out = out.add(1);
-                    *out = b';';
-                    out = out.add(1);
-                } else {
-                    // Works because on UTF-8, all extended sequences cannot
-                    // result in bytes in the ASCII range.
-                    *out = *cur;
-                    out = out.add(1);
-                }
-                cur = cur.add(1);
-            }
-            *out = 0;
-            return buffer;
-        }
-
-        // mem_error:
-        xml_entities_err_memory("xmlEncodeSpecialChars: realloc failed");
-        xml_free(buffer as _);
-        null_mut()
     }
+    out
 }
 
 /// create and initialize an empty entities hash table.
@@ -1528,9 +1242,6 @@ pub(crate) const XML_ENT_CONTAINS_LT: usize = 1 << 4;
 ///
 /// Returns A newly allocated string with the substitution done.
 #[doc(alias = "xmlEncodeAttributeEntities")]
-pub(crate) unsafe fn xml_encode_attribute_entities(
-    doc: Option<XmlDocPtr>,
-    input: *const XmlChar,
-) -> *mut XmlChar {
-    unsafe { xml_encode_entities_internal(doc, input, 1) }
+pub(crate) fn xml_encode_attribute_entities(doc: Option<XmlDocPtr>, input: &str) -> String {
+    xml_encode_entities_internal(doc, input, 1)
 }

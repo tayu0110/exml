@@ -44,6 +44,12 @@ use libc::c_void;
 
 #[cfg(feature = "libxml_xptr_locs")]
 use crate::xpath::{XmlNodeSet, XmlXPathParserContext, functions::check_arity};
+#[cfg(feature = "libxml_xptr_locs")]
+use crate::xpath::{
+    XmlXPathObject,
+    internals::{xml_xpath_err, xml_xpath_evaluate_predicate_result},
+    xml_xpath_cmp_nodes, xml_xpath_object_copy,
+};
 use crate::xpath::{
     functions::xml_xpath_id_function, xml_xpath_free_parser_context, xml_xpath_new_parser_context,
 };
@@ -53,7 +59,7 @@ use crate::{
     libxml::{
         globals::{xml_free, xml_malloc},
         parser::xml_init_parser,
-        xmlstring::{XmlChar, xml_str_equal, xml_strlen},
+        xmlstring::{XmlChar, xml_str_equal},
     },
     tree::{NodeCommon, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNode},
     xpath::{
@@ -61,15 +67,6 @@ use crate::{
         XmlXPathParserContextPtr,
         internals::{xml_xpath_register_ns, xml_xpath_root},
         xml_xpath_free_object, xml_xpath_new_context, xml_xpath_new_node_set, xml_xpath_new_string,
-    },
-};
-#[cfg(feature = "libxml_xptr_locs")]
-use crate::{
-    libxml::xmlstring::xml_strchr,
-    xpath::{
-        XmlXPathObject,
-        internals::{xml_xpath_err, xml_xpath_evaluate_predicate_result},
-        xml_xpath_cmp_nodes, xml_xpath_object_copy,
     },
 };
 
@@ -869,15 +866,15 @@ unsafe fn xml_xptr_inside_range(
                     | XmlElementType::XmlTextNode
                     | XmlElementType::XmlCDATASectionNode => {
                         let node = XmlNodePtr::try_from(node).unwrap();
-                        if node.content.is_null() {
-                            return xml_xptr_new_range(node.into(), 0, node.into(), 0);
-                        } else {
+                        if let Some(content) = node.content.as_deref() {
                             return xml_xptr_new_range(
                                 node.into(),
                                 0,
                                 node.into(),
-                                xml_strlen(node.content),
+                                content.len() as i32,
                             );
+                        } else {
+                            return xml_xptr_new_range(node.into(), 0, node.into(), 0);
                         }
                     }
                     XmlElementType::XmlAttributeNode
@@ -908,15 +905,15 @@ unsafe fn xml_xptr_inside_range(
                         | XmlElementType::XmlTextNode
                         | XmlElementType::XmlCDATASectionNode => {
                             let node = XmlNodePtr::try_from(node).unwrap();
-                            if node.content.is_null() {
-                                return xml_xptr_new_range(node.into(), 0, node.into(), 0);
-                            } else {
+                            if let Some(content) = node.content.as_deref() {
                                 return xml_xptr_new_range(
                                     node.into(),
                                     0,
                                     node.into(),
-                                    xml_strlen(node.content),
+                                    content.len() as i32,
                                 );
+                            } else {
+                                return xml_xptr_new_range(node.into(), 0, node.into(), 0);
                             }
                         }
                         XmlElementType::XmlAttributeNode
@@ -1254,8 +1251,8 @@ unsafe fn xml_xptr_advance_char(
             let mut len = 0;
             if now.element_type() != XmlElementType::XmlElementNode {
                 let cur = XmlNodePtr::try_from(now).unwrap();
-                if !cur.content.is_null() {
-                    len = xml_strlen(cur.content);
+                if let Some(content) = cur.content.as_deref() {
+                    len = content.len() as i32;
                 }
             }
             if pos > len {
@@ -1309,10 +1306,13 @@ unsafe fn xml_xptr_get_last_char(node: &mut Option<XmlGenericNodePtr>, indx: &mu
         while let Some(now) = cur {
             if let Some(last) = now.last() {
                 cur = Some(last);
-            } else if let Some(now) = XmlNodePtr::try_from(now).ok().filter(|now| {
-                now.element_type() != XmlElementType::XmlElementNode && !now.content.is_null()
-            }) {
-                len = xml_strlen(now.content) as usize;
+            } else if let Some(content) = XmlNodePtr::try_from(now)
+                .ok()
+                .as_deref()
+                .filter(|now| now.element_type() != XmlElementType::XmlElementNode)
+                .and_then(|now| now.content.as_deref())
+            {
+                len = content.len();
                 break;
             } else {
                 return -1;
@@ -1365,8 +1365,7 @@ unsafe fn xml_xptr_match_string(
 
             if cur.element_type() != XmlElementType::XmlElementNode {
                 let cur = XmlNodePtr::try_from(cur).unwrap();
-                if !cur.content.is_null() {
-                    let content = CStr::from_ptr(cur.content as *const i8).to_string_lossy();
+                if let Some(content) = cur.content.as_deref() {
                     let len = content.len();
                     if len >= pos + stringlen {
                         let is_match =
@@ -1420,8 +1419,6 @@ unsafe fn xml_xptr_search_string(
     unsafe {
         use crate::tree::XmlNodePtr;
 
-        let mut str: *const XmlChar;
-
         if start.map_or(true, |start| {
             start.element_type() == XmlElementType::XmlNamespaceDecl
         }) {
@@ -1434,15 +1431,12 @@ unsafe fn xml_xptr_search_string(
         while let Some(cur_node) = cur {
             if cur_node.element_type() != XmlElementType::XmlElementNode {
                 let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                if !cur_node.content.is_null() {
-                    let len = CStr::from_ptr(cur_node.content as *const i8)
-                        .to_bytes()
-                        .len();
+                if let Some(content) = cur_node.content.as_deref() {
+                    let len = content.len();
                     while pos <= len {
                         if first != 0 {
-                            str = xml_strchr(cur_node.content.add(pos), first);
-                            if !str.is_null() {
-                                pos = str.offset_from(cur_node.content as *mut XmlChar) as _;
+                            if let Some(p) = content[pos..].find(first as char) {
+                                pos += p;
                                 if xml_xptr_match_string(
                                     string,
                                     cur_node.into(),

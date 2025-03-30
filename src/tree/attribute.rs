@@ -155,11 +155,7 @@ impl XmlAttr {
             while let Some(now) = tmp {
                 if matches!(now.element_type(), XmlElementType::XmlTextNode) {
                     let now = XmlNodePtr::try_from(now).unwrap();
-                    buf.push_str(
-                        CStr::from_ptr(now.content as *const i8)
-                            .to_string_lossy()
-                            .as_ref(),
-                    );
+                    buf.push_str(now.content.as_deref().unwrap());
                 } else {
                     now.get_content_to(buf);
                 }
@@ -499,7 +495,17 @@ pub(super) unsafe fn xml_new_prop_internal(
         }
 
         if !value.is_null() {
-            cur.set_children(xml_new_doc_text(doc, value).map(|node| node.into()));
+            cur.set_children(
+                xml_new_doc_text(
+                    doc,
+                    Some(
+                        CStr::from_ptr(value as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    ),
+                )
+                .map(|node| node.into()),
+            );
             cur.set_last(None);
             let mut tmp = cur.children();
             while let Some(mut now) = tmp {

@@ -3073,14 +3073,15 @@ unsafe fn xml_xpath_node_val_hash(node: Option<XmlGenericNodePtr>) -> u32 {
             | XmlElementType::XmlCDATASectionNode
             | XmlElementType::XmlTextNode => {
                 let node = XmlNodePtr::try_from(node).unwrap();
-                let string = node.content;
-                if string.is_null() {
+                let Some(string) = node.content.as_deref() else {
+                    return 0;
+                };
+                if string.is_empty() {
                     return 0;
                 }
-                if *string.add(0) == 0 {
-                    return 0;
-                }
-                return *string.add(0) as u32 + ((*string.add(1) as u32) << 8);
+                let s0 = string.as_bytes()[0];
+                let s1 = *string.as_bytes().get(1).unwrap_or(&0);
+                return s0 as u32 + ((s1 as u32) << 8);
             }
             XmlElementType::XmlNamespaceDecl => {
                 let ns = XmlNsPtr::try_from(node).unwrap();
@@ -3107,19 +3108,20 @@ unsafe fn xml_xpath_node_val_hash(node: Option<XmlGenericNodePtr>) -> u32 {
             let string = match now.element_type() {
                 XmlElementType::XmlCDATASectionNode | XmlElementType::XmlTextNode => {
                     let node = XmlNodePtr::try_from(now).unwrap();
-                    node.content
+                    node.content.clone()
                 }
-                _ => null_mut(),
+                _ => None,
             };
-            if !string.is_null() && *string.add(0) != 0 {
+            if let Some(string) = string.filter(|s| !s.is_empty()) {
+                let bytes = string.as_bytes();
                 if len == 1 {
-                    return ret + ((*string.add(0) as u32) << 8);
+                    return ret + ((bytes[0] as u32) << 8);
                 }
-                if *string.add(1) == 0 {
+                if bytes.len() == 1 {
                     len = 1;
-                    ret = *string.add(0) as _;
+                    ret = bytes[0] as u32;
                 } else {
-                    return *string.add(0) as u32 + ((*string.add(1) as u32) << 8);
+                    return bytes[0] as u32 + ((bytes[1] as u32) << 8);
                 }
             }
             // Skip to next node

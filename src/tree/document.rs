@@ -373,7 +373,7 @@ impl XmlDoc {
                                     let Some(mut node) = xml_new_doc_text(
                                         XmlDocPtr::from_raw(self as *const XmlDoc as *mut XmlDoc)
                                             .unwrap(),
-                                        null_mut(),
+                                        None,
                                     ) else {
                                         // goto out;
                                         if !val.is_null() {
@@ -384,8 +384,8 @@ impl XmlDoc {
                                         }
                                         return ret;
                                     };
-                                    node.content = xml_strndup(buf.as_ptr(), buf.len() as i32);
-                                    buf.clear();
+                                    node.content = Some(String::from_utf8(buf).unwrap());
+                                    buf = vec![];
 
                                     if let Some(mut l) = last {
                                         last = l
@@ -418,8 +418,13 @@ impl XmlDoc {
                                     // The entity should have been checked already,
                                     // but set the flag anyway to avoid recursion.
                                     ent.flags |= XML_ENT_EXPANDING as i32;
+                                    let content = node.content.as_deref().unwrap();
                                     ent.set_children(
-                                        self.get_node_list(node.content).map(|node| node.into()),
+                                        self.get_node_list_with_strlen(
+                                            content.as_ptr(),
+                                            content.len() as i32,
+                                        )
+                                        .map(|node| node.into()),
                                     );
                                     ent.owner = 1;
                                     ent.flags &= !XML_ENT_EXPANDING as i32;
@@ -466,7 +471,7 @@ impl XmlDoc {
             if !buf.is_empty() {
                 let Some(mut node) = xml_new_doc_text(
                     XmlDocPtr::from_raw(self as *const XmlDoc as *mut XmlDoc).unwrap(),
-                    null_mut(),
+                    None,
                 ) else {
                     // goto out;
                     if !val.is_null() {
@@ -477,11 +482,10 @@ impl XmlDoc {
                     }
                     return ret;
                 };
-                node.content = xml_strndup(buf.as_ptr(), buf.len() as i32);
-                buf.clear();
+                node.content = Some(String::from_utf8(buf).unwrap());
 
                 if let Some(mut last) = last {
-                    (*last).add_next_sibling(node.into());
+                    last.add_next_sibling(node.into());
                 } else {
                     head = Some(node);
                 }
@@ -647,7 +651,7 @@ impl XmlDoc {
                                     let Some(mut node) = xml_new_doc_text(
                                         XmlDocPtr::from_raw(self as *const XmlDoc as *mut XmlDoc)
                                             .unwrap(),
-                                        null_mut(),
+                                        None,
                                     ) else {
                                         if !val.is_null() {
                                             xml_free(val as _);
@@ -655,8 +659,8 @@ impl XmlDoc {
                                         // goto out;
                                         return ret;
                                     };
-                                    node.content = xml_strndup(buf.as_ptr(), buf.len() as i32);
-                                    buf.clear();
+                                    node.content = Some(String::from_utf8(buf).unwrap());
+                                    buf = vec![];
 
                                     if let Some(mut l) = last {
                                         last = l
@@ -686,7 +690,11 @@ impl XmlDoc {
                                     // The entity should have been checked already,
                                     // but set the flag anyway to avoid recursion.
                                     ent.flags |= XML_ENT_EXPANDING as i32;
-                                    ent.children = self.get_node_list(node.content as _);
+                                    let content = node.content.as_deref().unwrap();
+                                    ent.children = self.get_node_list_with_strlen(
+                                        content.as_ptr(),
+                                        content.len() as i32,
+                                    );
                                     ent.owner = 1;
                                     ent.flags &= !XML_ENT_EXPANDING as i32;
                                     ent.flags |= XML_ENT_PARSED as i32;
@@ -732,13 +740,12 @@ impl XmlDoc {
             if !buf.is_empty() {
                 let Some(mut node) = xml_new_doc_text(
                     XmlDocPtr::from_raw(self as *const XmlDoc as *mut XmlDoc).unwrap(),
-                    null_mut(),
+                    None,
                 ) else {
                     // goto out;
                     return ret;
                 };
-                node.content = xml_strndup(buf.as_ptr(), buf.len() as i32);
-                buf.clear();
+                node.content = Some(String::from_utf8(buf).unwrap());
 
                 if let Some(mut last) = last {
                     last.add_next_sibling(node.into());
@@ -748,7 +755,7 @@ impl XmlDoc {
             } else if ret.is_none() {
                 ret = xml_new_doc_text(
                     XmlDocPtr::from_raw(self as *const XmlDoc as *mut XmlDoc).unwrap(),
-                    c"".as_ptr() as _,
+                    Some(""),
                 );
             }
 

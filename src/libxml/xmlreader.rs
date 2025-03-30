@@ -574,8 +574,6 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderRead")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn read(&mut self) -> i32 {
-        use std::ffi::CStr;
-
         unsafe {
             use crate::{
                 tree::{NodeCommon, XmlEntityPtr},
@@ -987,9 +985,7 @@ impl XmlTextReader {
                         node.element_type(),
                         XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
                     ) {
-                        self.validate_cdata(
-                            &CStr::from_ptr(node.content as *const i8).to_string_lossy(),
-                        );
+                        self.validate_cdata(node.content.as_deref().unwrap());
                     }
                 }
             }
@@ -1185,20 +1181,14 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderReadString")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn read_string(&mut self) -> Option<String> {
-        use std::ffi::CStr;
-
         unsafe {
             let current_node = self.node?;
             let node = self.curnode.unwrap_or(current_node);
             match node.element_type() {
                 XmlElementType::XmlTextNode => {
                     let node = XmlNodePtr::try_from(node).unwrap();
-                    if !node.content.is_null() {
-                        return Some(
-                            CStr::from_ptr(node.content as *const i8)
-                                .to_string_lossy()
-                                .into_owned(),
-                        );
+                    if let Some(content) = node.content.as_deref() {
+                        return Some(content.to_owned());
                     }
                 }
                 XmlElementType::XmlElementNode => {
@@ -1223,10 +1213,6 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderReadAttributeValue")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn read_attribute_value(&mut self) -> i32 {
-        use std::ffi::CString;
-
-        use crate::libxml::xmlstring::xml_strndup;
-
         unsafe {
             use crate::tree::XmlNsPtr;
 
@@ -1243,21 +1229,10 @@ impl XmlTextReader {
                 self.curnode = Some(children);
             } else if let Ok(ns) = XmlNsPtr::try_from(curnode) {
                 if let Some(mut faketext) = self.faketext {
-                    if !faketext.content.is_null() {
-                        xml_free(faketext.content as _);
-                    }
-                    if let Some(href) = ns.href.as_deref() {
-                        faketext.content = xml_strndup(href.as_ptr(), href.len() as i32);
-                    } else {
-                        faketext.content = null_mut();
-                    }
+                    faketext.content = ns.href.as_deref().map(|href| href.to_owned());
                 } else {
-                    let href = ns.href().map(|href| CString::new(href.as_ref()).unwrap());
-                    self.faketext = xml_new_doc_text(
-                        self.node.unwrap().document(),
-                        href.as_deref()
-                            .map_or(null_mut(), |href| href.as_ptr() as *const u8),
-                    );
+                    self.faketext =
+                        xml_new_doc_text(self.node.unwrap().document(), ns.href.as_deref());
                 }
                 self.curnode = self.faketext.map(|node| node.into());
             } else {
@@ -1593,8 +1568,6 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderValidateEntity")]
     #[cfg(all(feature = "libxml_reader", feature = "libxml_regexp"))]
     unsafe fn validate_entity(&mut self) {
-        use std::ffi::CStr;
-
         unsafe {
             use crate::tree::{NodeCommon, XmlEntityPtr};
 
@@ -1637,9 +1610,7 @@ impl XmlTextReader {
                                 XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
                             ) {
                                 let node = XmlNodePtr::try_from(node).unwrap();
-                                self.validate_cdata(
-                                    &CStr::from_ptr(node.content as *const i8).to_string_lossy(),
-                                );
+                                self.validate_cdata(node.content.as_deref().unwrap());
                             }
                         }
                         // go to next node
@@ -3684,8 +3655,6 @@ impl XmlTextReader {
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn text_value(&self) -> Option<String> {
         unsafe {
-            use std::ffi::CStr;
-
             use crate::tree::{NodeCommon, XmlAttrPtr, XmlNsPtr};
 
             let current_node = self.node?;
@@ -3710,12 +3679,8 @@ impl XmlTextReader {
                 | XmlElementType::XmlPINode
                 | XmlElementType::XmlCommentNode => {
                     let node = XmlNodePtr::try_from(node).unwrap();
-                    if !node.content.is_null() {
-                        return Some(
-                            CStr::from_ptr(node.content as *const i8)
-                                .to_string_lossy()
-                                .into_owned(),
-                        );
+                    if let Some(content) = node.content.as_deref() {
+                        return Some(content.to_owned());
                     }
                 }
                 _ => {}
@@ -4308,7 +4273,7 @@ unsafe fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mut cur: XmlG
                         | XmlElementType::XmlXIncludeEnd
                         | XmlElementType::XmlEntityRefNode
                 ) {
-                    DICT_FREE!(dict, cur.content);
+                    // DICT_FREE!(dict, cur.content);
                 }
                 if matches!(
                     cur.element_type(),
@@ -4456,7 +4421,7 @@ unsafe fn xml_text_reader_free_node(reader: XmlTextReaderPtr, mut cur: XmlGeneri
                 | XmlElementType::XmlXIncludeEnd
                 | XmlElementType::XmlEntityRefNode
         ) {
-            DICT_FREE!(dict, cur.content);
+            // DICT_FREE!(dict, cur.content);
         }
         if matches!(
             cur.element_type(),
@@ -4519,36 +4484,31 @@ fn xml_text_reader_get_successor(cur: XmlGenericNodePtr) -> Option<XmlGenericNod
 ///  Returns a string containing the content, or NULL in case of error.
 #[doc(alias = "xmlTextReaderCollectSiblings")]
 #[cfg(feature = "libxml_reader")]
-unsafe fn xml_text_reader_collect_siblings(node: XmlGenericNodePtr) -> Option<String> {
-    unsafe {
-        use std::ffi::CStr;
-
-        if node.element_type() == XmlElementType::XmlNamespaceDecl {
-            return None;
-        }
-
-        let mut buffer = vec![];
-        let mut cur = Some(node);
-        while let Some(cur_node) = cur {
-            match cur_node.element_type() {
-                XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode => {
-                    let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                    buffer.extend(CStr::from_ptr(cur_node.content as *const i8).to_bytes());
-                }
-                XmlElementType::XmlElementNode => {
-                    let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                    if let Some(tmp) = xml_text_reader_collect_siblings(cur_node.children.unwrap())
-                    {
-                        buffer.extend_from_slice(tmp.as_bytes());
-                    }
-                }
-                _ => {}
-            }
-
-            cur = cur_node.next();
-        }
-        Some(String::from_utf8(buffer).unwrap())
+fn xml_text_reader_collect_siblings(node: XmlGenericNodePtr) -> Option<String> {
+    if node.element_type() == XmlElementType::XmlNamespaceDecl {
+        return None;
     }
+
+    let mut buffer = vec![];
+    let mut cur = Some(node);
+    while let Some(cur_node) = cur {
+        match cur_node.element_type() {
+            XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode => {
+                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                buffer.extend(cur_node.content.as_deref().unwrap().bytes());
+            }
+            XmlElementType::XmlElementNode => {
+                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                if let Some(tmp) = xml_text_reader_collect_siblings(cur_node.children.unwrap()) {
+                    buffer.extend_from_slice(tmp.as_bytes());
+                }
+            }
+            _ => {}
+        }
+
+        cur = cur_node.next();
+    }
+    Some(String::from_utf8(buffer).unwrap())
 }
 
 /// Free up all the structures used by a document, tree included.

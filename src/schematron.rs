@@ -18,14 +18,7 @@
 //
 // Daniel Veillard <daniel@veillard.com>
 
-use std::{
-    cell::RefCell,
-    ffi::{CStr, c_char},
-    mem::take,
-    os::raw::c_void,
-    ptr::null_mut,
-    rc::Rc,
-};
+use std::{cell::RefCell, ffi::c_char, mem::take, os::raw::c_void, ptr::null_mut, rc::Rc};
 
 use libc::FILE;
 
@@ -529,11 +522,7 @@ impl<'a> XmlSchematronValidCtxt<'a> {
                     || cur_node.element_type() == XmlElementType::XmlCDATASectionNode
                 {
                     let ret = ret.get_or_insert_default();
-                    ret.push_str(
-                        CStr::from_ptr(cur_node.content as *const i8)
-                            .to_string_lossy()
-                            .as_ref(),
-                    );
+                    ret.push_str(cur_node.content.as_deref().unwrap());
                 } else if is_schematron(cur_node, "name") {
                     let path = cur_node.get_no_ns_prop("path");
 

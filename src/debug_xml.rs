@@ -36,7 +36,6 @@ use crate::{
         parser::{XmlParserOption, xml_parse_in_node_context},
         parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
         valid::xml_snprintf_element_content,
-        xmlstring::xml_strstr,
     },
     tree::{
         NodeCommon, XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDocPtr,
@@ -336,14 +335,18 @@ impl XmlDebugCtxt<'_> {
                     | XmlElementType::XmlDocumentNode
             ) {
                 let content = if let Ok(node) = XmlNodePtr::try_from(node) {
-                    node.content
+                    node.content.clone()
                 } else if let Ok(ent) = XmlEntityPtr::try_from(node) {
-                    ent.content
+                    (!ent.content.is_null()).then(|| {
+                        CStr::from_ptr(ent.content as *const i8)
+                            .to_string_lossy()
+                            .into_owned()
+                    })
                 } else {
                     todo!("What is this type ????: {:?}", node.element_type());
                 };
-                if !content.is_null() {
-                    self.check_string(&CStr::from_ptr(content as *const i8).to_string_lossy());
+                if let Some(content) = content {
+                    self.check_string(&content);
                 }
             }
             match node.element_type() {
@@ -940,15 +943,7 @@ impl XmlDebugCtxt<'_> {
                         } else {
                             write!(self.output, "TEXT").ok();
                         }
-                        if self.options & DUMP_TEXT_TYPE != 0 {
-                            if xml_dict_owns(self.dict, node.content) == 1 {
-                                writeln!(self.output, " interned").ok();
-                            } else {
-                                writeln!(self.output).ok();
-                            }
-                        } else {
-                            writeln!(self.output).ok();
-                        }
+                        writeln!(self.output).ok();
                     }
                 }
                 XmlElementType::XmlCDATASectionNode => {
@@ -1078,16 +1073,14 @@ impl XmlDebugCtxt<'_> {
             if node.element_type() != XmlElementType::XmlEntityRefNode {
                 if node.element_type() != XmlElementType::XmlElementNode && self.check == 0 {
                     let content = if let Ok(node) = XmlNodePtr::try_from(node) {
-                        node.content
+                        node.content.clone()
                     } else {
-                        null()
+                        None
                     };
-                    if !content.is_null() {
+                    if let Some(content) = content {
                         self.dump_spaces();
                         write!(self.output, "content=").ok();
-                        self.dump_string(Some(
-                            &CStr::from_ptr(content as *const i8).to_string_lossy(),
-                        ));
+                        self.dump_string(Some(&content));
                         writeln!(self.output).ok();
                     }
                 }
@@ -1710,9 +1703,8 @@ pub unsafe fn xml_ls_one_node<'a>(output: &mut (impl Write + 'a), node: Option<X
             }
             XmlElementType::XmlTextNode => {
                 let node = XmlNodePtr::try_from(node).unwrap();
-                if !node.content.is_null() {
-                    let content = CStr::from_ptr(node.content as *const i8).to_string_lossy();
-                    xml_debug_dump_string(Some(output), Some(&content));
+                if let Some(content) = node.content.as_deref() {
+                    xml_debug_dump_string(Some(output), Some(content));
                 }
             }
             XmlElementType::XmlCDATASectionNode => {}
@@ -1765,52 +1757,49 @@ pub unsafe fn xml_ls_one_node<'a>(output: &mut (impl Write + 'a), node: Option<X
 ///
 /// Returns the number of children of @node.
 #[doc(alias = "xmlLsCountNode")]
-pub unsafe fn xml_ls_count_node(node: Option<XmlGenericNodePtr>) -> usize {
+pub fn xml_ls_count_node(node: Option<XmlGenericNodePtr>) -> usize {
     let Some(node) = node else {
         return 0;
     };
-    unsafe {
-        let mut list = match node.element_type() {
-            XmlElementType::XmlElementNode => node.children(),
-            XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
-                XmlDocPtr::try_from(node).unwrap().children()
-            }
-            XmlElementType::XmlAttributeNode => XmlAttrPtr::try_from(node).unwrap().children(),
-            XmlElementType::XmlTextNode
-            | XmlElementType::XmlCDATASectionNode
-            | XmlElementType::XmlPINode
-            | XmlElementType::XmlCommentNode => {
-                let node = XmlNodePtr::try_from(node).unwrap();
-                let content = node.content;
-                return if !content.is_null() {
-                    CStr::from_ptr(content as *const i8).to_bytes().len()
-                } else {
-                    0
-                };
-            }
-            XmlElementType::XmlEntityRefNode
-            | XmlElementType::XmlDocumentTypeNode
-            | XmlElementType::XmlEntityNode
-            | XmlElementType::XmlDocumentFragNode
-            | XmlElementType::XmlNotationNode
-            | XmlElementType::XmlDTDNode
-            | XmlElementType::XmlElementDecl
-            | XmlElementType::XmlAttributeDecl
-            | XmlElementType::XmlEntityDecl
-            | XmlElementType::XmlNamespaceDecl
-            | XmlElementType::XmlXIncludeStart
-            | XmlElementType::XmlXIncludeEnd => {
-                return 1;
-            }
-            _ => unreachable!(),
-        };
-        let mut ret = 0;
-        while let Some(now) = list {
-            list = now.next();
-            ret += 1;
+    let mut list = match node.element_type() {
+        XmlElementType::XmlElementNode => node.children(),
+        XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
+            XmlDocPtr::try_from(node).unwrap().children()
         }
-        ret
+        XmlElementType::XmlAttributeNode => XmlAttrPtr::try_from(node).unwrap().children(),
+        XmlElementType::XmlTextNode
+        | XmlElementType::XmlCDATASectionNode
+        | XmlElementType::XmlPINode
+        | XmlElementType::XmlCommentNode => {
+            let node = XmlNodePtr::try_from(node).unwrap();
+            return if let Some(content) = node.content.as_deref() {
+                content.len()
+            } else {
+                0
+            };
+        }
+        XmlElementType::XmlEntityRefNode
+        | XmlElementType::XmlDocumentTypeNode
+        | XmlElementType::XmlEntityNode
+        | XmlElementType::XmlDocumentFragNode
+        | XmlElementType::XmlNotationNode
+        | XmlElementType::XmlDTDNode
+        | XmlElementType::XmlElementDecl
+        | XmlElementType::XmlAttributeDecl
+        | XmlElementType::XmlEntityDecl
+        | XmlElementType::XmlNamespaceDecl
+        | XmlElementType::XmlXIncludeStart
+        | XmlElementType::XmlXIncludeEnd => {
+            return 1;
+        }
+        _ => unreachable!(),
+    };
+    let mut ret = 0;
+    while let Some(now) = list {
+        list = now.next();
+        ret += 1;
     }
+    ret
 }
 
 /// Convenient way to turn bool into text
@@ -2413,19 +2402,20 @@ impl XmlShellCtxt<'_> {
             // {}
             while let Some(now) = node {
                 if let Ok(now) = XmlNodePtr::try_from(now) {
-                    let arg = CString::new(arg).unwrap();
                     if now.element_type() == XmlElementType::XmlCommentNode {
-                        if !xml_strstr(now.content, arg.as_ptr() as *mut u8).is_null() {
+                        let content = now.content.as_deref().unwrap();
+                        if content.contains(arg) {
                             let path = now.get_node_path().unwrap();
                             write!(self.output, "{path} : ").ok();
                             self.xml_shell_list(None, Some(now.into()), None);
                         }
-                    } else if now.element_type() == XmlElementType::XmlTextNode
-                        && !xml_strstr(now.content, arg.as_ptr() as *mut u8).is_null()
-                    {
-                        let path = now.parent().unwrap().get_node_path().unwrap();
-                        write!(self.output, "{path} : ").ok();
-                        self.xml_shell_list(None, now.parent, None);
+                    } else if now.element_type() == XmlElementType::XmlTextNode {
+                        let content = now.content.as_deref().unwrap();
+                        if content.contains(arg) {
+                            let path = now.parent().unwrap().get_node_path().unwrap();
+                            write!(self.output, "{path} : ").ok();
+                            self.xml_shell_list(None, now.parent, None);
+                        }
                     }
                 }
 

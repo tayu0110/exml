@@ -43,7 +43,7 @@ use crate::{
         },
         valid::{XmlValidCtxt, xml_validate_document_final},
         xmlregexp::XmlRegExecCtxtPtr,
-        xmlstring::{XmlChar, xml_str_equal, xml_strcat, xml_strdup, xml_strlen},
+        xmlstring::{XmlChar, xml_str_equal, xml_strdup, xml_strlen},
     },
     parser::{split_qname2, xml_read_file, xml_read_memory},
     relaxng::{
@@ -69,7 +69,7 @@ use super::{
     chvalid::xml_is_blank_char,
     xmlautomata::XmlAutomata,
     xmlregexp::{XmlRegExecCtxt, XmlRegexp},
-    xmlstring::xml_strndup,
+    xmlstring::{xml_strncat, xml_strndup},
 };
 
 /// Signature of an error callback from a Relax-NG validation
@@ -1106,29 +1106,12 @@ extern "C" fn xml_relaxng_compute_interleaves(
     }
 }
 
-macro_rules! IS_BLANK_NODE {
-    ($n:expr) => {
-        xml_relaxng_is_blank((*$n).content) != 0
-    };
-}
-
 /// Check if a string is ignorable c.f. 4.2. Whitespace
 ///
 /// Returns 1 if the string is NULL or made of blanks chars, 0 otherwise
 #[doc(alias = "xmlRelaxNGIsBlank")]
-unsafe fn xml_relaxng_is_blank(mut str: *mut XmlChar) -> i32 {
-    unsafe {
-        if str.is_null() {
-            return 1;
-        }
-        while *str != 0 {
-            if !xml_is_blank_char(*str as u32) {
-                return 0;
-            }
-            str = str.add(1);
-        }
-        1
-    }
+fn xml_relaxng_is_blank(s: Option<&str>) -> bool {
+    s.is_none_or(|s| s.chars().all(|c| xml_is_blank_char(c as u32)))
 }
 
 /// Check all the attributes on the given node
@@ -1766,10 +1749,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                                         xml_new_doc_node(now.doc, now.ns, "name", null_mut()).map(
                                             |mut node| {
                                                 children.add_prev_sibling(node.into());
-                                                let text = xml_new_doc_text(
-                                                    node.doc,
-                                                    cname.as_ptr() as *const u8,
-                                                );
+                                                let text = xml_new_doc_text(node.doc, Some(&name));
                                                 node.add_child(text.unwrap().into());
                                                 node
                                             },
@@ -1962,7 +1942,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                         ) =>
                     {
                         // Simplification 4.2 whitespaces
-                        if IS_BLANK_NODE!(now) {
+                        if xml_relaxng_is_blank(now.content.as_deref()) {
                             if let Some(parent) = now
                                 .parent()
                                 .filter(|p| p.element_type() == XmlElementType::XmlElementNode)
@@ -6600,7 +6580,8 @@ unsafe fn xml_relaxng_skip_ignored(
             ) || (matches!(
                 node.element_type(),
                 XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
-            ) && ((*ctxt).flags & FLAGS_MIXED_CONTENT != 0 || IS_BLANK_NODE!(node)))
+            ) && ((*ctxt).flags & FLAGS_MIXED_CONTENT != 0
+                || xml_relaxng_is_blank(node.content.as_deref())))
         }) {
             node = now.next.map(|node| XmlNodePtr::try_from(node).unwrap());
         }
@@ -8626,7 +8607,8 @@ unsafe fn xml_relaxng_validate_state(
                         cur_node.element_type(),
                         XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
                     ) {
-                        content = xml_strcat(content, cur_node.content);
+                        let cont = cur_node.content.as_deref().unwrap();
+                        content = xml_strncat(content, cont.as_ptr(), cont.len() as i32);
                     }
                     // TODO: handle entities ...
                     child = cur_node
@@ -8677,7 +8659,8 @@ unsafe fn xml_relaxng_validate_state(
                         cur_node.element_type(),
                         XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
                     ) {
-                        content = xml_strcat(content, cur_node.content);
+                        let cont = cur_node.content.as_deref().unwrap();
+                        content = xml_strncat(content, cont.as_ptr(), cont.len() as i32);
                     }
                     // TODO: handle entities ...
                     child = cur_node
@@ -8728,7 +8711,8 @@ unsafe fn xml_relaxng_validate_state(
                         cur_node.element_type(),
                         XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
                     ) {
-                        content = xml_strcat(content, cur_node.content);
+                        let cont = cur_node.content.as_deref().unwrap();
+                        content = xml_strncat(content, cont.as_ptr(), cont.len() as i32);
                     }
                     // TODO: handle entities ...
                     child = cur_node

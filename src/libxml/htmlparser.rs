@@ -8226,7 +8226,7 @@ unsafe fn are_blanks(ctxt: HtmlParserCtxtPtr, str: *const XmlChar, len: i32) -> 
             }
         } else {
             if context_node.element_type() != XmlElementType::XmlElementNode
-                && !context_node.content.is_null()
+                && context_node.content.is_some()
             {
                 return 0;
             }

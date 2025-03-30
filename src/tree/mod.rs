@@ -55,7 +55,7 @@ use crate::{
             xml_register_node_default_value,
         },
         parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
-        xmlstring::{XmlChar, xml_strdup, xml_strncat, xml_strndup},
+        xmlstring::{XmlChar, xml_strdup, xml_strndup},
     },
 };
 
@@ -905,12 +905,12 @@ pub(crate) unsafe fn xml_static_copy_node(
             ret.name = xml_strdup(node.name);
         }
         if !matches!(node.element_type(), XmlElementType::XmlElementNode)
-            && !node.content.is_null()
+            && node.content.is_some()
             && !matches!(node.element_type(), XmlElementType::XmlEntityRefNode)
             && !matches!(node.element_type(), XmlElementType::XmlXIncludeEnd)
             && !matches!(node.element_type(), XmlElementType::XmlXIncludeStart)
         {
-            ret.content = xml_strdup(node.content);
+            ret.content = node.content.clone();
         } else if matches!(node.element_type(), XmlElementType::XmlElementNode) {
             ret.line = node.line;
         }
@@ -1436,7 +1436,7 @@ pub unsafe fn xml_new_child(
 #[doc(alias = "xmlNewDocText")]
 pub unsafe fn xml_new_doc_text(
     doc: Option<XmlDocPtr>,
-    content: *const XmlChar,
+    content: Option<&str>,
 ) -> Option<XmlNodePtr> {
     unsafe {
         let cur = xml_new_text(content);
@@ -1453,7 +1453,7 @@ pub unsafe fn xml_new_doc_text(
 ///
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewText")]
-pub unsafe fn xml_new_text(content: *const XmlChar) -> Option<XmlNodePtr> {
+pub unsafe fn xml_new_text(content: Option<&str>) -> Option<XmlNodePtr> {
     unsafe {
         // Allocate a new node and fill the fields.
         let Some(mut cur) = XmlNodePtr::new(XmlNode {
@@ -1464,9 +1464,7 @@ pub unsafe fn xml_new_text(content: *const XmlChar) -> Option<XmlNodePtr> {
             xml_tree_err_memory("building text");
             return None;
         };
-        if !content.is_null() {
-            cur.content = xml_strdup(content);
-        }
+        cur.content = content.map(|content| content.to_owned());
 
         if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
         //  && xmlRegisterNodeDefaultValue.is_some()
@@ -1495,10 +1493,7 @@ pub unsafe fn xml_new_doc_pi(
             xml_tree_err_memory("building PI");
             return None;
         };
-        if let Some(content) = content {
-            let content = CString::new(content).unwrap();
-            cur.content = xml_strdup(content.as_ptr() as *const u8);
-        }
+        cur.content = content.map(|content| content.to_owned());
         cur.doc = doc;
 
         if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
@@ -1520,52 +1515,52 @@ pub unsafe fn xml_new_pi(name: &str, content: Option<&str>) -> Option<XmlNodePtr
     unsafe { xml_new_doc_pi(None, name, content) }
 }
 
-/// Creation of a new text node with an extra content length parameter. The
-/// text node pertain to a given document.
-/// Returns a pointer to the new node object.
-#[doc(alias = "xmlNewDocTextLen")]
-pub unsafe fn xml_new_doc_text_len(
-    doc: Option<XmlDocPtr>,
-    content: *const XmlChar,
-    len: i32,
-) -> Option<XmlNodePtr> {
-    unsafe {
-        let cur = xml_new_text_len(content, len);
-        if let Some(mut cur) = cur {
-            cur.doc = doc;
-        }
-        cur
-    }
-}
+// /// Creation of a new text node with an extra content length parameter. The
+// /// text node pertain to a given document.
+// /// Returns a pointer to the new node object.
+// #[doc(alias = "xmlNewDocTextLen")]
+// pub unsafe fn xml_new_doc_text_len(
+//     doc: Option<XmlDocPtr>,
+//     content: *const XmlChar,
+//     len: i32,
+// ) -> Option<XmlNodePtr> {
+//     unsafe {
+//         let cur = xml_new_text_len(content, len);
+//         if let Some(mut cur) = cur {
+//             cur.doc = doc;
+//         }
+//         cur
+//     }
+// }
 
-/// Use of this function is DISCOURAGED in favor of xmlNewDocTextLen.
-///
-/// Creation of a new text node with an extra parameter for the content's length
-/// Returns a pointer to the new node object.
-#[doc(alias = "xmlNewTextLen")]
-pub unsafe fn xml_new_text_len(content: *const XmlChar, len: i32) -> Option<XmlNodePtr> {
-    unsafe {
-        // Allocate a new node and fill the fields.
-        let Some(mut cur) = XmlNodePtr::new(XmlNode {
-            typ: XmlElementType::XmlTextNode,
-            name: XML_STRING_TEXT.as_ptr() as _,
-            ..Default::default()
-        }) else {
-            xml_tree_err_memory("building text");
-            return None;
-        };
-        if !content.is_null() {
-            cur.content = xml_strndup(content, len);
-        }
+// /// Use of this function is DISCOURAGED in favor of xmlNewDocTextLen.
+// ///
+// /// Creation of a new text node with an extra parameter for the content's length
+// /// Returns a pointer to the new node object.
+// #[doc(alias = "xmlNewTextLen")]
+// pub unsafe fn xml_new_text_len(content: *const XmlChar, len: i32) -> Option<XmlNodePtr> {
+//     unsafe {
+//         // Allocate a new node and fill the fields.
+//         let Some(mut cur) = XmlNodePtr::new(XmlNode {
+//             typ: XmlElementType::XmlTextNode,
+//             name: XML_STRING_TEXT.as_ptr() as _,
+//             ..Default::default()
+//         }) else {
+//             xml_tree_err_memory("building text");
+//             return None;
+//         };
+//         if !content.is_null() {
+//             cur.content = xml_strndup(content, len);
+//         }
 
-        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-        //  && xmlRegisterNodeDefaultValue.is_some()
-        {
-            xml_register_node_default_value(cur.into());
-        }
-        Some(cur)
-    }
-}
+//         if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
+//         //  && xmlRegisterNodeDefaultValue.is_some()
+//         {
+//             xml_register_node_default_value(cur.into());
+//         }
+//         Some(cur)
+//     }
+// }
 
 /// Creation of a new node containing a comment within a document.
 /// Returns a pointer to the new node object.
@@ -1591,7 +1586,7 @@ pub unsafe fn xml_new_comment(content: &str) -> Option<XmlNodePtr> {
         let Some(cur) = XmlNodePtr::new(XmlNode {
             typ: XmlElementType::XmlCommentNode,
             name: XML_STRING_COMMENT.as_ptr() as _,
-            content: xml_strndup(content.as_ptr(), content.len() as i32),
+            content: Some(content.to_owned()),
             ..Default::default()
         }) else {
             xml_tree_err_memory("building comment");
@@ -1616,7 +1611,7 @@ pub unsafe fn xml_new_cdata_block(doc: Option<XmlDocPtr>, content: &str) -> Opti
         let Some(cur) = XmlNodePtr::new(XmlNode {
             typ: XmlElementType::XmlCDATASectionNode,
             doc,
-            content: xml_strndup(content.as_ptr(), content.len() as i32),
+            content: Some(content.to_owned()),
             ..Default::default()
         }) else {
             xml_tree_err_memory("building CDATA");
@@ -1695,7 +1690,11 @@ pub unsafe fn xml_new_reference(doc: Option<XmlDocPtr>, name: &str) -> Option<Xm
 
         let ent = xml_get_doc_entity(doc, &cur.name().unwrap());
         if let Some(ent) = ent {
-            cur.content = ent.content;
+            cur.content = (!ent.content.is_null()).then(|| {
+                CStr::from_ptr(ent.content as *const i8)
+                    .to_string_lossy()
+                    .into_owned()
+            });
             // The parent pointer in entity is a DTD pointer and thus is NOT
             // updated.  Not sure if this is 100% correct.
             //  -George
@@ -1769,7 +1768,7 @@ pub unsafe fn xml_new_text_child(
     mut parent: XmlGenericNodePtr,
     ns: Option<XmlNsPtr>,
     name: &str,
-    content: *const XmlChar,
+    content: Option<&str>,
 ) -> Option<XmlNodePtr> {
     unsafe {
         // Allocate a new node
@@ -1822,14 +1821,14 @@ pub unsafe fn xml_new_doc_raw_node(
     doc: Option<XmlDocPtr>,
     ns: Option<XmlNsPtr>,
     name: &str,
-    content: *const XmlChar,
+    content: Option<&str>,
 ) -> Option<XmlNodePtr> {
     unsafe {
         let cur = xml_new_doc_node(doc, ns, name, null_mut());
         if let Some(mut cur) = cur {
             cur.doc = doc;
-            if !content.is_null() {
-                cur.set_children(xml_new_doc_text(doc, content).map(|node| node.into()));
+            if let Some(content) = content {
+                cur.set_children(xml_new_doc_text(doc, Some(content)).map(|node| node.into()));
                 if let Some(mut ulccur) = cur.children() {
                     while let Some(next) = ulccur.next() {
                         ulccur.set_parent(Some(cur.into()));
@@ -1960,7 +1959,8 @@ pub unsafe fn xml_text_merge(
                 if first.name != second.name {
                     return Some(first);
                 }
-                first.add_content(second.content);
+                let content = second.content.as_deref().unwrap();
+                first.add_content_len(content.as_ptr(), content.len() as i32);
                 second.unlink();
                 xml_free_node(second);
                 Some(first)
@@ -1976,27 +1976,19 @@ pub unsafe fn xml_text_merge(
 ///
 /// Returns -1 in case of error, 0 otherwise
 #[doc(alias = "xmlTextConcat")]
-pub unsafe fn xml_text_concat(mut node: XmlNodePtr, content: &str) -> i32 {
-    unsafe {
-        // if node.is_null() {
-        //     return -1;
-        // }
-
-        if !matches!(node.element_type(), XmlElementType::XmlTextNode)
-            && !matches!(node.element_type(), XmlElementType::XmlCDATASectionNode)
-            && !matches!(node.element_type(), XmlElementType::XmlCommentNode)
-            && !matches!(node.element_type(), XmlElementType::XmlPINode)
-        {
-            return -1;
-        }
-        // need to check if content is currently in the dictionary
-        node.content = xml_strncat(node.content, content.as_ptr(), content.len() as i32);
-        node.properties = None;
-        if node.content.is_null() {
-            return -1;
-        }
-        0
+pub fn xml_text_concat(mut node: XmlNodePtr, content: &str) -> i32 {
+    if !matches!(node.element_type(), XmlElementType::XmlTextNode)
+        && !matches!(node.element_type(), XmlElementType::XmlCDATASectionNode)
+        && !matches!(node.element_type(), XmlElementType::XmlCommentNode)
+        && !matches!(node.element_type(), XmlElementType::XmlPINode)
+    {
+        return -1;
     }
+    // need to check if content is currently in the dictionary
+    let cont = node.content.get_or_insert_default();
+    cont.push_str(content);
+    node.properties = None;
+    0
 }
 
 /// Free a node and all its siblings, this is a recursive behaviour, all
@@ -2048,14 +2040,14 @@ pub unsafe fn xml_free_node_list(cur: Option<impl Into<XmlGenericNodePtr>>) {
                 {
                     xml_free_prop_list(cur.properties);
                 }
-                if !matches!(cur.element_type(), XmlElementType::XmlElementNode)
-                    && !matches!(cur.element_type(), XmlElementType::XmlXIncludeStart)
-                    && !matches!(cur.element_type(), XmlElementType::XmlXIncludeEnd)
-                    && !matches!(cur.element_type(), XmlElementType::XmlEntityRefNode)
-                    && !cur.content.is_null()
-                {
-                    xml_free(cur.content as _);
-                }
+                // if !matches!(cur.element_type(), XmlElementType::XmlElementNode)
+                //     && !matches!(cur.element_type(), XmlElementType::XmlXIncludeStart)
+                //     && !matches!(cur.element_type(), XmlElementType::XmlXIncludeEnd)
+                //     && !matches!(cur.element_type(), XmlElementType::XmlEntityRefNode)
+                //     && !cur.content.is_null()
+                // {
+                //     xml_free(cur.content as _);
+                // }
                 if matches!(cur.element_type(), XmlElementType::XmlElementNode)
                     || matches!(cur.element_type(), XmlElementType::XmlXIncludeStart)
                     || matches!(cur.element_type(), XmlElementType::XmlXIncludeEnd)
@@ -2145,12 +2137,13 @@ pub unsafe fn xml_free_node(cur: impl Into<XmlGenericNodePtr>) {
                 if let Some(ns_def) = cur.ns_def.take() {
                     xml_free_ns_list(ns_def);
                 }
-            } else if !cur.content.is_null()
-                && !matches!(cur.element_type(), XmlElementType::XmlEntityRefNode)
-                && !cur.content.is_null()
-            {
-                xml_free(cur.content as _);
             }
+            // else if !cur.content.is_null()
+            //     && !matches!(cur.element_type(), XmlElementType::XmlEntityRefNode)
+            //     && !cur.content.is_null()
+            // {
+            //     xml_free(cur.content as _);
+            // }
 
             // When a node is a text node or a comment, it uses a global static
             // variable for the name of the node.

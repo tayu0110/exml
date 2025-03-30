@@ -78,7 +78,7 @@ unsafe fn are_blanks(ctxt: &mut XmlParserCtxt, s: &str, blank_chars: bool) -> bo
                 return false;
             }
         } else if context_node.element_type() != XmlElementType::XmlElementNode
-            && !context_node.content.is_null()
+            && context_node.content.is_some()
         {
             return false;
         }

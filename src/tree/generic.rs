@@ -9,7 +9,7 @@ use crate::{
     libxml::{
         globals::xml_free,
         valid::xml_remove_id,
-        xmlstring::{XmlChar, xml_strcat, xml_strdup, xml_strlen, xml_strncat},
+        xmlstring::{XmlChar, xml_strcat, xml_strlen, xml_strncat},
     },
     uri::build_uri,
 };
@@ -19,7 +19,7 @@ use super::{
     XmlAttributeType, XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElement, XmlElementPtr,
     XmlElementType, XmlEntity, XmlEntityPtr, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
     add_prop_sibling, xml_encode_attribute_entities, xml_encode_entities_reentrant, xml_free_node,
-    xml_free_prop, xml_get_doc_entity, xml_new_doc_text_len, xml_text_merge, xml_tree_err_memory,
+    xml_free_prop, xml_get_doc_entity, xml_new_doc_text, xml_text_merge, xml_tree_err_memory,
 };
 
 pub trait NodeCommon {
@@ -140,11 +140,7 @@ pub trait NodeCommon {
                     {
                         let children = XmlNodePtr::try_from(children).unwrap();
                         // Optimization for the common case: only 1 text node.
-                        return (!children.content.is_null()).then(|| {
-                            CStr::from_ptr(children.content as *const i8)
-                                .to_string_lossy()
-                                .into_owned()
-                        });
+                        return children.content.clone();
                     } else if let Some(ret) = children.get_string(self.document(), 1) {
                         return Some(ret);
                     }
@@ -203,10 +199,12 @@ pub trait NodeCommon {
             if len <= 0 {
                 return;
             }
+            let content =
+                std::str::from_utf8(std::slice::from_raw_parts(content, len as usize)).unwrap();
             match self.element_type() {
                 XmlElementType::XmlDocumentFragNode | XmlElementType::XmlElementNode => {
                     let last = self.last();
-                    if let Some(new_node) = xml_new_doc_text_len(self.document(), content, len) {
+                    if let Some(new_node) = xml_new_doc_text(self.document(), Some(content)) {
                         let tmp = self.add_child(new_node.into());
                         if tmp != Some(new_node.into()) {
                             return;
@@ -231,9 +229,8 @@ pub trait NodeCommon {
                         XmlGenericNodePtr::from_raw(self as *mut Self as *mut XmlNode).unwrap(),
                     )
                     .unwrap();
-                    if !content.is_null() {
-                        node.content = xml_strncat(node.content, content, len);
-                    }
+                    let buf = node.content.get_or_insert_default();
+                    buf.push_str(content);
                 }
                 XmlElementType::XmlDocumentNode
                 | XmlElementType::XmlDTDNode
@@ -283,10 +280,11 @@ pub trait NodeCommon {
                 let cur = XmlNodePtr::try_from(cur).unwrap();
                 if let Some(mut cur_node) = XmlNodePtr::try_from(cur_node).ok().filter(|cur_node| {
                     matches!(cur_node.element_type(), XmlElementType::XmlTextNode)
-                        && !cur_node.content.is_null()
+                        && cur_node.content.is_some()
                         && self.name() == cur.name()
                 }) {
-                    cur_node.add_content(cur.content);
+                    let content = cur.content.as_deref().unwrap();
+                    cur_node.add_content_len(content.as_ptr(), content.len() as i32);
                     xml_free_node(cur);
                     return Some(cur_node.into());
                 }
@@ -295,7 +293,8 @@ pub trait NodeCommon {
                         && l.name() == cur.name()
                         && self.last() != Some(cur.into())
                 }) {
-                    last.add_content(cur.content);
+                    let content = cur.content.as_deref().unwrap();
+                    last.add_content_len(content.as_ptr(), content.len() as i32);
                     xml_free_node(cur);
                     return self.last();
                 }
@@ -316,10 +315,12 @@ pub trait NodeCommon {
             // Coalescing
             if let Some(mut cur_node) = XmlNodePtr::try_from(cur_node).ok().filter(|&cur_node| {
                 matches!(cur_node.element_type(), XmlElementType::XmlTextNode)
-                    && !cur_node.content.is_null()
+                    && cur_node.content.is_some()
                     && cur != cur_node.into()
             }) {
-                cur_node.add_content(XmlNodePtr::try_from(cur).unwrap().content);
+                let node = XmlNodePtr::try_from(cur).unwrap();
+                let content = node.content.as_deref().unwrap();
+                cur_node.add_content_len(content.as_ptr(), content.len() as i32);
                 xml_free_node(cur);
                 return Some(cur_node.into());
             }
@@ -1244,18 +1245,16 @@ impl XmlGenericNodePtr {
                     XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
                 ) {
                     let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                    let content = cur_node.content.as_deref().unwrap();
                     if in_line != 0 {
-                        ret = xml_strcat(ret, cur_node.content);
+                        ret = xml_strncat(ret, content.as_ptr(), content.len() as i32);
                     } else {
                         let buffer = if attr {
-                            xml_encode_attribute_entities(doc, cur_node.content)
+                            xml_encode_attribute_entities(doc, cur_node.content.as_deref().unwrap())
                         } else {
-                            xml_encode_entities_reentrant(doc, cur_node.content)
+                            xml_encode_entities_reentrant(doc, cur_node.content.as_deref().unwrap())
                         };
-                        if !buffer.is_null() {
-                            ret = xml_strcat(ret, buffer);
-                            xml_free(buffer as _);
-                        }
+                        ret = xml_strncat(ret, buffer.as_ptr(), buffer.len() as i32);
                     }
                 } else if matches!(cur_node.element_type(), XmlElementType::XmlEntityRefNode) {
                     let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
@@ -1275,7 +1274,8 @@ impl XmlGenericNodePtr {
                                 ret = xml_strcat(ret, buffer.as_ptr() as *const u8);
                             }
                         } else {
-                            ret = xml_strcat(ret, cur_node.content);
+                            let content = cur_node.content.as_deref().unwrap();
+                            ret = xml_strncat(ret, content.as_ptr(), content.len() as i32);
                         }
                     } else {
                         let mut buf: [XmlChar; 2] = [0; 2];
@@ -1322,13 +1322,12 @@ impl XmlGenericNodePtr {
                 ) {
                     let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
                     if in_line != 0 {
-                        ret = xml_strcat(ret, cur_node.content);
+                        let content = cur_node.content.as_deref().unwrap();
+                        ret = xml_strncat(ret, content.as_ptr(), content.len() as i32);
                     } else {
-                        let buffer: *mut XmlChar = xml_encode_special_chars(doc, cur_node.content);
-                        if !buffer.is_null() {
-                            ret = xml_strcat(ret, buffer);
-                            xml_free(buffer as _);
-                        }
+                        let buffer =
+                            xml_encode_special_chars(doc, cur_node.content.as_deref().unwrap());
+                        ret = xml_strncat(ret, buffer.as_ptr(), buffer.len() as i32);
                     }
                 } else if matches!(cur_node.element_type(), XmlElementType::XmlEntityRefNode) {
                     let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
@@ -1348,7 +1347,8 @@ impl XmlGenericNodePtr {
                                 ret = xml_strcat(ret, buffer.as_ptr() as *const u8);
                             }
                         } else {
-                            ret = xml_strcat(ret, cur_node.content);
+                            let content = cur_node.content.as_deref().unwrap();
+                            ret = xml_strncat(ret, content.as_ptr(), content.len() as i32);
                         }
                     } else {
                         let mut buf: [u8; 2] = [0; 2];
@@ -1516,7 +1516,10 @@ impl XmlGenericNodePtr {
                         )
                         && cur.name() == self.last().unwrap().name()
                 }) {
-                    self.last().unwrap().add_content(node.content);
+                    let content = node.content.as_deref().unwrap();
+                    self.last()
+                        .unwrap()
+                        .add_content_len(content.as_ptr(), content.len() as i32);
                     // if it's the only child, nothing more to be done.
                     let Some(next) = node.next() else {
                         xml_free_node(node);
@@ -1600,7 +1603,8 @@ impl XmlGenericNodePtr {
                 )
                 .filter(|(cur, elem)| cur.name() == elem.name())
             {
-                cur.add_content(elem.content);
+                let content = elem.content.as_deref().unwrap();
+                cur.add_content_len(content.as_ptr(), content.len() as i32);
                 xml_free_node(elem);
                 return Some(cur.into());
             }
@@ -1653,11 +1657,6 @@ impl XmlGenericNodePtr {
         mut elem: XmlGenericNodePtr,
     ) -> Option<XmlGenericNodePtr> {
         unsafe {
-            use crate::libxml::{
-                globals::xml_free,
-                xmlstring::{xml_strcat, xml_strdup},
-            };
-
             if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
                 return None;
             }
@@ -1672,13 +1671,12 @@ impl XmlGenericNodePtr {
             elem.unlink();
 
             if matches!(elem.element_type(), XmlElementType::XmlTextNode) {
-                let elem = XmlNodePtr::try_from(elem).unwrap();
+                let mut elem = XmlNodePtr::try_from(elem).unwrap();
                 if matches!(self.element_type(), XmlElementType::XmlTextNode) {
                     let mut node = XmlNodePtr::try_from(self).unwrap();
-                    let mut tmp = xml_strdup(elem.content);
-                    tmp = xml_strcat(tmp, node.content);
-                    node.set_content(tmp);
-                    xml_free(tmp as _);
+                    let tmp = elem.content.get_or_insert_default();
+                    tmp.push_str(node.content.as_deref().unwrap());
+                    node.set_content_len(tmp.as_ptr(), tmp.len() as i32);
                     xml_free_node(elem);
                     return Some(self);
                 }
@@ -1686,7 +1684,8 @@ impl XmlGenericNodePtr {
                     matches!(p.element_type(), XmlElementType::XmlTextNode)
                         && self.name() == p.name()
                 }) {
-                    prev.add_content(elem.content);
+                    let content = elem.content.as_deref().unwrap();
+                    prev.add_content_len(content.as_ptr(), content.len() as i32);
                     xml_free_node(elem);
                     return Some(prev);
                 }
@@ -1748,9 +1747,10 @@ impl XmlGenericNodePtr {
             elem.unlink();
 
             if matches!(elem.element_type(), XmlElementType::XmlTextNode) {
-                let elem = XmlNodePtr::try_from(elem).unwrap();
+                let mut elem = XmlNodePtr::try_from(elem).unwrap();
                 if matches!(self.element_type(), XmlElementType::XmlTextNode) {
-                    self.add_content(elem.content);
+                    let content = elem.content.as_deref().unwrap();
+                    self.add_content_len(content.as_ptr(), content.len() as i32);
                     xml_free_node(elem);
                     return Some(self);
                 }
@@ -1762,10 +1762,9 @@ impl XmlGenericNodePtr {
                     })
                     .map(|next| XmlNodePtr::try_from(next).unwrap())
                 {
-                    let mut tmp = xml_strdup(elem.content);
-                    tmp = xml_strcat(tmp, next.content);
-                    next.set_content(tmp);
-                    xml_free(tmp as _);
+                    let tmp = elem.content.get_or_insert_default();
+                    tmp.push_str(next.content.as_deref().unwrap());
+                    next.set_content_len(tmp.as_ptr(), tmp.len() as i32);
                     xml_free_node(elem);
                     return Some(next.into());
                 }

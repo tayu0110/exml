@@ -18,7 +18,7 @@
 //
 // daniel@veillard.com
 
-use std::{os::raw::c_void, ptr::null_mut};
+use std::{ffi::CStr, os::raw::c_void, ptr::null_mut};
 
 use crate::libxml::{
     globals::{xml_free, xml_malloc},
@@ -1320,7 +1320,7 @@ unsafe fn xml_dom_wrap_adopt_branch(
                             XmlElementType::XmlEntityRefNode => {
                                 let mut cur = XmlNodePtr::try_from(cur_node).unwrap();
                                 // Remove reference to the entity-node.
-                                cur.content = null_mut();
+                                cur.content = None;
                                 cur.set_children(None);
                                 cur.set_last(None);
                                 if dest_doc.int_subset.is_some() || dest_doc.ext_subset.is_some() {
@@ -1328,7 +1328,11 @@ unsafe fn xml_dom_wrap_adopt_branch(
                                     let ent =
                                         xml_get_doc_entity(Some(dest_doc), &cur.name().unwrap());
                                     if let Some(ent) = ent {
-                                        cur.content = ent.content;
+                                        cur.content = (!ent.content.is_null()).then(|| {
+                                            CStr::from_ptr(ent.content as *const i8)
+                                                .to_string_lossy()
+                                                .into_owned()
+                                        });
                                         cur.set_children(Some(ent.into()));
                                         cur.set_last(Some(ent.into()));
                                     }
@@ -1502,14 +1506,18 @@ unsafe fn xml_dom_wrap_adopt_attr(
                 XmlElementType::XmlEntityRefNode => {
                     let mut cur = XmlNodePtr::try_from(cur_node).unwrap();
                     // Remove reference to the entity-node.
-                    cur.content = null_mut();
+                    cur.content = None;
                     cur.set_children(None);
                     cur.set_last(None);
                     if dest_doc.int_subset.is_some() || dest_doc.ext_subset.is_some() {
                         // Assign new entity-node if available.
                         let ent = xml_get_doc_entity(Some(dest_doc), &cur.name().unwrap());
                         if let Some(ent) = ent {
-                            cur.content = ent.content;
+                            cur.content = (!ent.content.is_null()).then(|| {
+                                CStr::from_ptr(ent.content as *const i8)
+                                    .to_string_lossy()
+                                    .into_owned()
+                            });
                             cur.set_children(Some(ent.into()));
                             cur.set_last(Some(ent.into()));
                         }
@@ -1631,14 +1639,18 @@ pub unsafe fn xml_dom_wrap_adopt_node(
                 XmlElementType::XmlEntityRefNode => {
                     let mut node = XmlNodePtr::try_from(node).unwrap();
                     // Remove reference to the entity-node.
-                    node.content = null_mut();
+                    node.content = None;
                     node.set_children(None);
                     node.set_last(None);
                     if dest_doc.int_subset.is_some() || dest_doc.ext_subset.is_some() {
                         // Assign new entity-node if available.
                         let ent = xml_get_doc_entity(Some(dest_doc), &node.name().unwrap());
                         if let Some(ent) = ent {
-                            node.content = ent.content;
+                            node.content = (!ent.content.is_null()).then(|| {
+                                CStr::from_ptr(ent.content as *const i8)
+                                    .to_string_lossy()
+                                    .into_owned()
+                            });
                             node.set_children(Some(ent.into()));
                             node.set_last(Some(ent.into()));
                         }
@@ -2168,8 +2180,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                         XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode => {
                             let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
                             // Note that this will also cover the values of attributes.
-                            XmlNodePtr::try_from(clone).unwrap().content =
-                                xml_strdup(cur_node.content);
+                            XmlNodePtr::try_from(clone).unwrap().content = cur_node.content.clone();
                             // goto leave_node;
                             leave_node = true;
                         }
@@ -2188,14 +2199,20 @@ pub unsafe fn xml_dom_wrap_clone_node(
                                         &cur_node.name().unwrap(),
                                     );
                                     if let Some(ent) = ent {
-                                        XmlNodePtr::try_from(clone).unwrap().content = ent.content;
+                                        XmlNodePtr::try_from(clone).unwrap().content =
+                                            (!ent.content.is_null()).then(|| {
+                                                CStr::from_ptr(ent.content as *const i8)
+                                                    .to_string_lossy()
+                                                    .into_owned()
+                                            });
                                         clone.set_children(Some(ent.into()));
                                         clone.set_last(Some(ent.into()));
                                     }
                                 }
                             } else {
                                 // Same doc: Use the current node's entity declaration and value.
-                                XmlNodePtr::try_from(clone).unwrap().content = cur_node.content;
+                                XmlNodePtr::try_from(clone).unwrap().content =
+                                    cur_node.content.clone();
                                 clone.set_children(cur_node.children());
                                 clone.set_last(cur_node.last());
                             }
@@ -2204,15 +2221,13 @@ pub unsafe fn xml_dom_wrap_clone_node(
                         }
                         XmlElementType::XmlPINode => {
                             let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                            XmlNodePtr::try_from(clone).unwrap().content =
-                                xml_strdup(cur_node.content);
+                            XmlNodePtr::try_from(clone).unwrap().content = cur_node.content.clone();
                             // goto leave_node;
                             leave_node = true;
                         }
                         XmlElementType::XmlCommentNode => {
                             let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                            XmlNodePtr::try_from(clone).unwrap().content =
-                                xml_strdup(cur_node.content);
+                            XmlNodePtr::try_from(clone).unwrap().content = cur_node.content.clone();
                             // goto leave_node;
                             leave_node = true;
                         }

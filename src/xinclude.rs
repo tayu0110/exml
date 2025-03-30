@@ -26,7 +26,7 @@
 
 use std::{
     borrow::Cow,
-    ffi::{CStr, CString},
+    ffi::CStr,
     mem::take,
     os::raw::c_void,
     ptr::{addr_of_mut, null_mut},
@@ -951,10 +951,7 @@ impl XmlXIncludeCtxt {
     #[cfg(feature = "libxml_xptr_locs")]
     unsafe fn copy_range(&self, range: XmlXPathObjectPtr) -> Option<XmlGenericNodePtr> {
         unsafe {
-            use crate::{
-                libxml::xpointer::xml_xptr_advance_node,
-                tree::{xml_new_doc_text, xml_new_doc_text_len},
-            };
+            use crate::{libxml::xpointer::xml_xptr_advance_node, tree::xml_new_doc_text};
 
             // pointers to generated nodes
             let mut list = None;
@@ -1014,20 +1011,16 @@ impl XmlXIncludeCtxt {
                     // Are we at the end of the range?
                     if cur_node.element_type() == XmlElementType::XmlTextNode {
                         let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                        let mut content: *const XmlChar = cur_node.content;
-                        let mut len: i32;
 
-                        let tmp = if content.is_null() {
-                            xml_new_doc_text_len(Some(self.doc), null_mut(), 0)
-                        } else {
-                            len = index2;
+                        let tmp = if let Some(mut content) = cur_node.content.as_deref() {
+                            let mut len = index2 as usize;
                             if start == cur_node.into() && index1 > 1 {
-                                content = content.add(index1 as usize - 1);
-                                len -= index1 - 1;
-                            } else {
-                                len = index2;
+                                content = &content[index1 as usize - 1..];
+                                len -= index1 as usize - 1;
                             }
-                            xml_new_doc_text_len(Some(self.doc), content, len)
+                            xml_new_doc_text(Some(self.doc), Some(&content[..len]))
+                        } else {
+                            xml_new_doc_text(Some(self.doc), None)
                         };
                         // single sub text node selection
                         if list.is_none() {
@@ -1079,16 +1072,15 @@ impl XmlXIncludeCtxt {
                         XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
                     ) {
                         let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                        let mut content: *const XmlChar = cur_node.content;
 
-                        let tmp = if content.is_null() {
-                            xml_new_doc_text_len(Some(self.doc), null_mut(), 0)
-                        } else {
+                        let tmp = if let Some(mut content) = cur_node.content.as_deref() {
                             if index1 > 1 {
-                                content = content.add(index1 as usize - 1);
+                                content = &content[index1 as usize - 1..];
                                 index1 = 0;
                             }
-                            xml_new_doc_text(Some(self.doc), content)
+                            xml_new_doc_text(Some(self.doc), Some(content))
+                        } else {
+                            xml_new_doc_text(Some(self.doc), None)
                         };
                         last = tmp.map(|node| node.into());
                         list = tmp.map(|node| node.into());
@@ -1567,8 +1559,7 @@ impl XmlXIncludeCtxt {
             // Prevent reloading the document twice.
             for txt in &self.txt_tab {
                 if *url == *txt.url {
-                    let text = CString::new(&*txt.text).unwrap();
-                    let node = xml_new_doc_text(Some(self.doc), text.as_ptr() as *const u8);
+                    let node = xml_new_doc_text(Some(self.doc), Some(&txt.text));
                     self.inc_tab[ref_index].inc = node;
                     return 0;
                 }
@@ -1610,7 +1601,7 @@ impl XmlXIncludeCtxt {
                 return ret;
             };
             buf.borrow_mut().encoder = get_encoding_handler(enc);
-            let Some(mut node) = xml_new_doc_text(Some(self.doc), null_mut()) else {
+            let Some(mut node) = xml_new_doc_text(Some(self.doc), None) else {
                 let node = self.inc_tab[ref_index].elem.map(|node| node.into());
                 xml_xinclude_err_memory(Some(self), node, None);
                 xml_free_parser_ctxt(pctxt);
@@ -1654,10 +1645,7 @@ impl XmlXIncludeCtxt {
             node.add_content_len(content, len);
 
             self.txt_tab.push(XmlXIncludeTxt {
-                text: CStr::from_ptr(node.content as *const i8)
-                    .to_string_lossy()
-                    .into_owned()
-                    .into_boxed_str(),
+                text: node.content.as_deref().unwrap().into(),
                 url: url.into_boxed_str(),
             });
 

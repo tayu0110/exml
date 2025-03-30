@@ -730,27 +730,18 @@ unsafe fn test_user_encoding() -> c_int {
 
         let buffer = from_raw_parts(buf, 2 * total_size as usize).to_vec();
         let Some(doc) = xml_read_memory(buffer, None, Some("UTF-16LE"), 0) else {
-            // let error = get_last_error();
-            // eprintln!("error: {error:?}");
-            // goto error;
             xml_free(buf as _);
             panic!("failed to parse document");
         };
 
-        let text: *mut XmlChar = XmlNodePtr::try_from(doc.children().unwrap().children().unwrap())
-            .unwrap()
-            .content;
-        eprintln!(
-            "text: {}",
-            std::str::from_utf8_unchecked(std::slice::from_raw_parts(text, text_size as usize))
-        );
-        for i in 0..text_size {
-            if *text.add(i as usize) != b'x' {
-                // goto error;
-                xml_free_doc(doc);
-                xml_free(buf as _);
-                panic!("text node has wrong content at offset {i}");
-            }
+        let node = XmlNodePtr::try_from(doc.children().unwrap().children().unwrap()).unwrap();
+        let text = node.content.as_deref().unwrap();
+        eprintln!("text: {text}");
+        if let Some(pos) = text[..text_size as usize].find(|c| c != 'x') {
+            // goto error;
+            xml_free_doc(doc);
+            xml_free(buf as _);
+            panic!("text node has wrong content at offset {pos}");
         }
 
         // error:

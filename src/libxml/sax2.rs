@@ -27,8 +27,6 @@ use std::{
     sync::atomic::Ordering,
 };
 
-use libc::memcpy;
-
 use crate::{
     encoding::{XmlCharEncoding, detect_encoding},
     error::{
@@ -62,8 +60,7 @@ use crate::{
 };
 
 use super::{
-    dict::xml_dict_owns,
-    globals::{xml_free, xml_realloc, xml_register_node_default_value},
+    globals::{xml_free, xml_register_node_default_value},
     parser::{
         XML_COMPLETE_ATTRS, XML_SAX2_MAGIC, XML_SKIP_IDS, XmlParserOption, XmlSAXHandler,
         xml_load_external_entity,
@@ -78,7 +75,7 @@ use super::{
         xml_validate_notation_decl, xml_validate_one_attribute, xml_validate_one_namespace,
         xml_validate_root,
     },
-    xmlstring::{xml_strdup, xml_strlen, xml_strndup},
+    xmlstring::{xml_strdup, xml_strndup},
 };
 
 /// Provides the public ID e.g. "-//SGMLSOURCE//DTD DEMO//EN"
@@ -1629,7 +1626,10 @@ unsafe fn xml_sax2_attribute_internal(
                 tmp = now.next();
             }
         } else if !value.is_null() {
-            ret.children = xml_new_doc_text((*ctxt).my_doc, value);
+            ret.children = xml_new_doc_text(
+                (*ctxt).my_doc,
+                Some(&CStr::from_ptr(value as *const i8).to_string_lossy()),
+            );
             ret.last = ret.children;
             if let Some(mut children) = ret.children() {
                 children.set_parent(Some(ret.into()));
@@ -1710,23 +1710,15 @@ unsafe fn xml_sax2_attribute_internal(
                         })
                         .is_some()
                 {
-                    let content: *mut XmlChar = XmlNodePtr::try_from(ret.children().unwrap())
-                        .unwrap()
-                        .content;
+                    let node = XmlNodePtr::try_from(ret.children().unwrap()).unwrap();
+                    let content = node.content.as_deref().unwrap();
                     // when validating, the ID registration is done at the attribute
                     // validation level. Otherwise we have to do specific handling here.
                     if fullname == "xml:id" {
                         // Add the xml:id value
                         //
                         // Open issue: normalization of the value.
-                        if validate_ncname::<true>(
-                            CStr::from_ptr(content as *const i8)
-                                .to_string_lossy()
-                                .as_ref(),
-                        )
-                        .is_err()
-                        {
-                            let content = CStr::from_ptr(content as *const i8).to_string_lossy();
+                        if validate_ncname::<true>(content).is_err() {
                             xml_err_valid!(
                                 ctxt,
                                 XmlParserErrors::XmlDTDXmlidValue,
@@ -1737,27 +1729,21 @@ unsafe fn xml_sax2_attribute_internal(
                         xml_add_id(
                             &raw mut (*ctxt).vctxt,
                             (*ctxt).my_doc.unwrap(),
-                            CStr::from_ptr(content as *const i8)
-                                .to_string_lossy()
-                                .as_ref(),
+                            content,
                             ret,
                         );
                     } else if xml_is_id((*ctxt).my_doc, (*ctxt).node, Some(ret)) != 0 {
                         xml_add_id(
                             &raw mut (*ctxt).vctxt,
                             (*ctxt).my_doc.unwrap(),
-                            CStr::from_ptr(content as *const i8)
-                                .to_string_lossy()
-                                .as_ref(),
+                            content,
                             ret,
                         );
                     } else if xml_is_ref((*ctxt).my_doc, (*ctxt).node, Some(ret)) != 0 {
                         xml_add_ref(
                             &raw mut (*ctxt).vctxt,
                             (*ctxt).my_doc.unwrap(),
-                            CStr::from_ptr(content as *const i8)
-                                .to_string_lossy()
-                                .as_ref(),
+                            content,
                             ret,
                         );
                     }
@@ -2353,12 +2339,7 @@ unsafe fn xml_sax2_text_node(ctxt: XmlParserCtxtPtr, s: &str) -> Option<XmlNodeP
         };
         ret.typ = XmlElementType::XmlTextNode;
         ret.name = XML_STRING_TEXT.as_ptr() as _;
-        ret.content = xml_strndup(s.as_ptr(), s.len() as i32);
-        if ret.content.is_null() {
-            xml_sax2_err_memory(ctxt, "xmlSAX2TextNode");
-            ret.free();
-            return None;
-        }
+        ret.content = Some(s.to_owned());
 
         if (*ctxt).linenumbers != 0 && (*ctxt).input().is_some() {
             if ((*ctxt).input().unwrap().line as u32) < u32::MAX {
@@ -2580,9 +2561,8 @@ unsafe fn xml_sax2_attribute_ns(
                 .filter(|c| matches!(c.element_type(), XmlElementType::XmlTextNode) && c.next().is_none())
                 .is_some()
                 {
-                    let content: *mut XmlChar = XmlNodePtr::try_from(ret.children().unwrap())
-                        .unwrap()
-                        .content;
+                    let node = XmlNodePtr::try_from(ret.children().unwrap()).unwrap();
+                    let content = node.content.as_deref().unwrap();
                     // when validating, the ID registration is done at the attribute
                     // validation level. Otherwise we have to do specific handling here.
                     if (!prefix.is_null())
@@ -2598,15 +2578,7 @@ unsafe fn xml_sax2_attribute_ns(
                         #[cfg(any(feature = "sax1", feature = "html", feature = "libxml_writer",))]
                         {
                             #[cfg(feature = "libxml_valid")]
-                            if validate_ncname::<true>(
-                                CStr::from_ptr(content as *const i8)
-                                    .to_string_lossy()
-                                    .as_ref(),
-                            )
-                            .is_err()
-                            {
-                                let content =
-                                    CStr::from_ptr(content as *const i8).to_string_lossy();
+                            if validate_ncname::<true>(content).is_err() {
                                 xml_err_valid!(
                                     ctxt,
                                     XmlParserErrors::XmlDTDXmlidValue,
@@ -2618,27 +2590,21 @@ unsafe fn xml_sax2_attribute_ns(
                         xml_add_id(
                             &raw mut (*ctxt).vctxt,
                             (*ctxt).my_doc.unwrap(),
-                            CStr::from_ptr(content as *const i8)
-                                .to_string_lossy()
-                                .as_ref(),
+                            content,
                             ret,
                         );
                     } else if xml_is_id((*ctxt).my_doc, (*ctxt).node, Some(ret)) != 0 {
                         xml_add_id(
                             &raw mut (*ctxt).vctxt,
                             (*ctxt).my_doc.unwrap(),
-                            CStr::from_ptr(content as *const i8)
-                                .to_string_lossy()
-                                .as_ref(),
+                            content,
                             ret,
                         );
                     } else if xml_is_ref((*ctxt).my_doc, (*ctxt).node, Some(ret)) != 0 {
                         xml_add_ref(
                             &raw mut (*ctxt).vctxt,
                             (*ctxt).my_doc.unwrap(),
-                            CStr::from_ptr(content as *const i8)
-                                .to_string_lossy()
-                                .as_ref(),
+                            content,
                             ret,
                         );
                     }
@@ -2745,15 +2711,6 @@ unsafe fn xml_sax2_text(ctxt: XmlParserCtxtPtr, ch: &str, typ: XmlElementType) {
                 // reallocate a new buffer, move data, append ch. Here
                 // We try to minimize realloc() uses and avoid copying
                 // and recomputing length over and over.
-                if (*ctxt).nodemem == (*ctxt).nodelen + 1
-                    && xml_dict_owns((*ctxt).dict, last_child.content) != 0
-                {
-                    last_child.content = xml_strdup(last_child.content);
-                }
-                if last_child.content.is_null() {
-                    xml_sax2_err_memory(ctxt, "xmlSAX2Characters: xmlStrdup returned NULL");
-                    return;
-                }
                 let (nodelen, overflowed) = (*ctxt).nodelen.overflowing_add(ch.len() as i32);
                 if overflowed {
                     xml_sax2_err_memory(ctxt, "xmlSAX2Characters overflow prevented");
@@ -2765,32 +2722,15 @@ unsafe fn xml_sax2_text(ctxt: XmlParserCtxtPtr, ch: &str, typ: XmlElementType) {
                     xml_sax2_err_memory(ctxt, "xmlSAX2Characters: huge text node");
                     return;
                 }
-                if nodelen >= (*ctxt).nodemem {
-                    let size = (*ctxt)
-                        .nodemem
-                        .saturating_add(ch.len() as i32)
-                        .saturating_mul(2);
-                    let newbuf: *mut XmlChar = xml_realloc(last_child.content as _, size as _) as _;
-                    if newbuf.is_null() {
-                        xml_sax2_err_memory(ctxt, "xmlSAX2Characters");
-                        return;
-                    }
-                    (*ctxt).nodemem = size;
-                    last_child.content = newbuf;
-                }
-                memcpy(
-                    last_child.content.add((*ctxt).nodelen as usize) as _,
-                    ch.as_ptr() as _,
-                    ch.len(),
-                );
+                let buffer = last_child.content.get_or_insert_default();
+                buffer.push_str(ch);
                 (*ctxt).nodelen = nodelen;
-                *last_child.content.add((*ctxt).nodelen as usize) = 0;
             } else if coalesce_text != 0 {
                 if xml_text_concat(last_child, ch) != 0 {
                     xml_sax2_err_memory(ctxt, "xmlSAX2Characters");
                 }
                 if (*ctxt).node.unwrap().children().is_some() {
-                    (*ctxt).nodelen = xml_strlen(last_child.content);
+                    (*ctxt).nodelen = last_child.content.as_deref().unwrap().len() as i32;
                     (*ctxt).nodemem = (*ctxt).nodelen + 1;
                 }
             } else {

@@ -2627,40 +2627,19 @@ unsafe fn xml_schema_get_chameleon_schema_bucket(
     }
 }
 
-unsafe fn is_blank_node(node: XmlNodePtr) -> bool {
-    unsafe {
-        node.element_type() == XmlElementType::XmlTextNode
-            && xml_schema_is_blank(node.content, -1) != 0
-    }
+fn is_blank_node(node: XmlNodePtr) -> bool {
+    node.element_type() == XmlElementType::XmlTextNode
+        && node
+            .content
+            .as_deref()
+            .is_some_and(|content| content.chars().all(|c| xml_is_blank_char(c as u32)))
 }
 
 /// Check if a string is ignorable
 ///
 /// Returns 1 if the string is NULL or made of blanks chars, 0 otherwise
-unsafe fn xml_schema_is_blank(mut str: *mut XmlChar, mut len: i32) -> i32 {
-    unsafe {
-        if str.is_null() {
-            return 1;
-        }
-        if len < 0 {
-            while *str != 0 {
-                if !xml_is_blank_char(*str as u32) {
-                    return 0;
-                }
-                str = str.add(1);
-            }
-        } else {
-            while *str != 0 && len != 0 {
-                if !xml_is_blank_char(*str as u32) {
-                    return 0;
-                }
-                str = str.add(1);
-                len -= 1;
-            }
-        }
-
-        1
-    }
+fn xml_schema_is_blank(s: Option<&str>) -> bool {
+    s.is_none_or(|s| s.chars().all(|c| xml_is_blank_char(c as u32)))
 }
 
 /// Removes unwanted nodes in a schemas document tree
@@ -17087,8 +17066,7 @@ const XML_SCHEMA_PUSH_TEXT_VOLATILE: i32 = 3;
 unsafe fn xml_schema_vpush_text(
     vctxt: XmlSchemaValidCtxtPtr,
     node_type: i32,
-    value: *const XmlChar,
-    mut len: i32,
+    value: Option<&str>,
     mode: i32,
     consumed: *mut i32,
 ) -> i32 {
@@ -17132,9 +17110,7 @@ unsafe fn xml_schema_vpush_text(
         if (*(*(*vctxt).inode).type_def).content_type
             == XmlSchemaContentType::XmlSchemaContentElements
         {
-            if node_type != XmlElementType::XmlTextNode as i32
-                || xml_schema_is_blank(value as _, len) == 0
-            {
+            if node_type != XmlElementType::XmlTextNode as i32 || !xml_schema_is_blank(value) {
                 // SPEC cvc-complex-type (2.3)
                 // "If the {content type} is element-only, then the
                 // element information item has no character information
@@ -17151,9 +17127,9 @@ unsafe fn xml_schema_vpush_text(
             return 0;
         }
 
-        if value.is_null() || *value.add(0) == 0 {
+        let Some(value) = value.filter(|value| !value.is_empty()) else {
             return 0;
-        }
+        };
         // Save the value.
         // NOTE that even if the content type is *mixed*, we need the
         // *initial value* for default/fixed value constraints.
@@ -17168,12 +17144,13 @@ unsafe fn xml_schema_vpush_text(
             match mode {
                 _ if mode == XML_SCHEMA_PUSH_TEXT_PERSIST => {
                     // When working on a tree.
-                    (*(*vctxt).inode).value = value;
+                    (*(*vctxt).inode).value = xml_strndup(value.as_ptr(), value.len() as i32);
+                    (*(*vctxt).inode).flags |= XML_SCHEMA_NODE_INFO_FLAG_OWNED_VALUES;
                 }
                 _ if mode == XML_SCHEMA_PUSH_TEXT_CREATED => {
                     // When working with the reader.
                     // The value will be freed by the element info.
-                    (*(*vctxt).inode).value = value;
+                    (*(*vctxt).inode).value = xml_strndup(value.as_ptr(), value.len() as i32);
                     if !consumed.is_null() {
                         *consumed = 1;
                     }
@@ -17182,24 +17159,22 @@ unsafe fn xml_schema_vpush_text(
                 _ if mode == XML_SCHEMA_PUSH_TEXT_VOLATILE => {
                     // When working with SAX.
                     // The value will be freed by the element info.
-                    if len != -1 {
-                        (*(*vctxt).inode).value = xml_strndup(value, len);
-                    } else {
-                        (*(*vctxt).inode).value = xml_strdup(value);
-                    }
+                    (*(*vctxt).inode).value = xml_strndup(value.as_ptr(), value.len() as i32);
                     (*(*vctxt).inode).flags |= XML_SCHEMA_NODE_INFO_FLAG_OWNED_VALUES;
                 }
                 _ => {}
             }
         } else {
-            if len < 0 {
-                len = xml_strlen(value);
-            }
             // Concat the value.
             if (*(*vctxt).inode).flags & XML_SCHEMA_NODE_INFO_FLAG_OWNED_VALUES != 0 {
-                (*(*vctxt).inode).value = xml_strncat((*(*vctxt).inode).value as _, value, len);
+                (*(*vctxt).inode).value = xml_strncat(
+                    (*(*vctxt).inode).value as _,
+                    value.as_ptr(),
+                    value.len() as i32,
+                );
             } else {
-                (*(*vctxt).inode).value = xml_strncat_new((*(*vctxt).inode).value, value, len);
+                (*(*vctxt).inode).value =
+                    xml_strncat_new((*(*vctxt).inode).value, value.as_ptr(), value.len() as i32);
                 (*(*vctxt).inode).flags |= XML_SCHEMA_NODE_INFO_FLAG_OWNED_VALUES;
             }
         }
@@ -18207,11 +18182,23 @@ unsafe fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                                     xml_strndup(res.as_ptr(), res.len() as i32)
                                 });
                             let text_child = if !norm_value.is_null() {
-                                let text_child = xml_new_doc_text(node.doc, norm_value);
+                                let text_child = xml_new_doc_text(
+                                    node.doc,
+                                    Some(
+                                        &CStr::from_ptr(norm_value as *const i8).to_string_lossy(),
+                                    ),
+                                );
                                 xml_free(norm_value as _);
                                 text_child
                             } else {
-                                xml_new_doc_text(node.doc, (*(*inode).decl).value)
+                                xml_new_doc_text(
+                                    node.doc,
+                                    Some(
+                                        CStr::from_ptr((*(*inode).decl).value as *const i8)
+                                            .to_string_lossy()
+                                            .as_ref(),
+                                    ),
+                                )
                             };
                             if let Some(text_child) = text_child {
                                 node.add_child(text_child.into());
@@ -18561,8 +18548,7 @@ unsafe fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                     ret = xml_schema_vpush_text(
                         vctxt,
                         cur_node.element_type() as _,
-                        cur_node.content,
-                        -1,
+                        cur_node.content.as_deref(),
                         XML_SCHEMA_PUSH_TEXT_PERSIST,
                         null_mut(),
                     );
@@ -19155,13 +19141,10 @@ unsafe fn xml_schema_sax_handle_text(ctx: Option<GenericErrorContext>, ch: &str)
         if (*(*vctxt).inode).flags & XML_SCHEMA_ELEM_INFO_EMPTY != 0 {
             (*(*vctxt).inode).flags ^= XML_SCHEMA_ELEM_INFO_EMPTY;
         }
-        let len = ch.len();
-        let ch = CString::new(ch).unwrap();
         if xml_schema_vpush_text(
             vctxt,
             XmlElementType::XmlTextNode as i32,
-            ch.as_ptr() as *const u8,
-            len as i32,
+            Some(ch),
             XML_SCHEMA_PUSH_TEXT_VOLATILE,
             null_mut(),
         ) == -1
@@ -19193,13 +19176,10 @@ unsafe fn xml_schema_sax_handle_cdata_section(ctx: Option<GenericErrorContext>, 
         if (*(*vctxt).inode).flags & XML_SCHEMA_ELEM_INFO_EMPTY != 0 {
             (*(*vctxt).inode).flags ^= XML_SCHEMA_ELEM_INFO_EMPTY;
         }
-        let len = ch.len();
-        let ch = CString::new(ch).unwrap();
         if xml_schema_vpush_text(
             vctxt,
             XmlElementType::XmlCDATASectionNode as i32,
-            ch.as_ptr() as *const u8,
-            len as i32,
+            Some(ch),
             XML_SCHEMA_PUSH_TEXT_VOLATILE,
             null_mut(),
         ) == -1

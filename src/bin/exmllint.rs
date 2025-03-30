@@ -968,13 +968,11 @@ unsafe fn xml_htmlencode_send() {
         // an out-of-bounds read.
         BUFFER.with_borrow_mut(|buffer| {
             memset(addr_of_mut!(buffer[buffer.len() - 4]) as _, 0, 4);
-            let result: *mut c_char =
-                xml_encode_entities_reentrant(None, buffer.as_ptr() as _) as *mut c_char;
-            if !result.is_null() {
-                let s = CStr::from_ptr(result).to_string_lossy().into_owned();
-                generic_error!("{s}");
-                xml_free(result as _);
-            }
+            let result = xml_encode_entities_reentrant(
+                None,
+                &CStr::from_ptr(buffer.as_ptr()).to_string_lossy(),
+            );
+            generic_error!("{result}");
             buffer[0] = 0;
         })
     }

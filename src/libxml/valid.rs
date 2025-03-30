@@ -4729,7 +4729,7 @@ pub unsafe fn xml_validate_one_element(
                     );
                     return 0;
                 }
-                if elem.content.is_null() {
+                if elem.content.is_none() {
                     xml_err_valid_node(
                         Some(&mut *ctxt),
                         Some(elem.into()),
@@ -5014,22 +5014,23 @@ pub unsafe fn xml_validate_one_element(
                         while let Some(cur_node) = child {
                             if matches!(cur_node.element_type(), XmlElementType::XmlTextNode) {
                                 let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                                let mut content: *const XmlChar = cur_node.content;
-
-                                while xml_is_blank_char(*content as u32) {
-                                    content = content.add(1);
-                                }
-                                if *content == 0 {
+                                let mut content = cur_node.content.as_deref().unwrap();
+                                content = content
+                                    .trim_start_matches(|c: char| xml_is_blank_char(c as u32));
+                                if content.is_empty() {
                                     let name = elem.name().unwrap();
                                     xml_err_valid_node(
-                                    Some(&mut *ctxt),
-                                    Some(elem.into()),
-                                    XmlParserErrors::XmlDTDStandaloneWhiteSpace,
-                                    format!("standalone: {name} declared in the external subset contains white spaces nodes\n").as_str(),
-                                    Some(&name),
-                                    None,
-                                    None
-                                );
+                                        Some(&mut *ctxt),
+                                        Some(elem.into()),
+                                        XmlParserErrors::XmlDTDStandaloneWhiteSpace,
+                                        format!(
+                                            "standalone: {} declared in the external subset contains white spaces nodes\n",
+                                            name
+                                        ).as_str(),
+                                        Some(&name),
+                                        None,
+                                        None
+                                    );
                                     ret = 0;
                                     break;
                                 }

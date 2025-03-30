@@ -1,6 +1,6 @@
-//! Provide methods and data structures for handling HTML tree.  
-//! This module is based on `libxml/HTMLtree.h`, `HTMLtree.c`, and so on in `libxml2-v2.11.8`.
+//! Provide methods and data structures for handling HTML tree.
 //!
+//! This module is based on `libxml/HTMLtree.h`, `HTMLtree.c`, and so on in `libxml2-v2.11.8`.  
 //! Please refer to original libxml2 documents also.
 
 // Copyright of the original code is the following.
@@ -22,7 +22,7 @@
 #[cfg(feature = "libxml_output")]
 use std::io::Write;
 use std::{
-    ffi::{CStr, CString, c_char},
+    ffi::{CString, c_char},
     ptr::{null, null_mut},
     sync::atomic::Ordering,
 };
@@ -41,7 +41,7 @@ use crate::{error::XmlParserErrors, io::XmlOutputBuffer, tree::XmlGenericNodePtr
 use super::{
     globals::xml_register_node_default_value,
     htmlparser::{HtmlDocPtr, HtmlNodePtr, html_err_memory},
-    xmlstring::{XmlChar, xml_str_equal, xml_strcasecmp, xml_strstr},
+    xmlstring::{XmlChar, xml_str_equal, xml_strcasecmp},
 };
 
 /// Macro. A text node in a HTML document is really implemented
@@ -128,9 +128,6 @@ pub unsafe fn html_new_doc_no_dtd(
 #[doc(alias = "htmlGetMetaEncoding")]
 pub unsafe fn html_get_meta_encoding(doc: XmlDocPtr) -> Option<String> {
     unsafe {
-        let mut content: *const XmlChar;
-        let mut encoding: *const XmlChar;
-
         let mut cur = doc.children;
 
         // Search the html
@@ -183,9 +180,8 @@ pub unsafe fn html_get_meta_encoding(doc: XmlDocPtr) -> Option<String> {
                 if !cur_node.name.is_null() && cur_node.name().as_deref() == Some("meta") {
                     let mut attr = cur_node.properties;
                     let mut http = 0;
-                    let mut value: *const XmlChar;
 
-                    content = null_mut();
+                    let mut content = None;
                     while let Some(now) = attr {
                         if let Some(children) = now
                             .children()
@@ -195,49 +191,30 @@ pub unsafe fn html_get_meta_encoding(doc: XmlDocPtr) -> Option<String> {
                             })
                             .map(|children| XmlNodePtr::try_from(children).unwrap())
                         {
-                            value = children.content;
+                            let value = children.content.as_deref();
                             if xml_strcasecmp(now.name, c"http-equiv".as_ptr() as _) == 0
-                                && xml_strcasecmp(value, c"Content-Type".as_ptr() as _) == 0
+                                && value
+                                    .is_some_and(|value| value.eq_ignore_ascii_case("Content-Type"))
                             {
                                 http = 1;
-                            } else if !value.is_null()
+                            } else if value.is_some()
                                 && xml_strcasecmp(now.name, c"content".as_ptr() as _) == 0
                             {
-                                content = value;
+                                content = value.map(|value| value.to_owned());
                             }
-                            if http != 0 && !content.is_null() {
-                                // goto found_content;
-                                encoding = xml_strstr(content, c"charset=".as_ptr() as _);
-                                if encoding.is_null() {
-                                    encoding = xml_strstr(content, c"Charset=".as_ptr() as _);
+                            if http != 0 {
+                                if let Some(content) = content {
+                                    return content
+                                        .split_once("charset=")
+                                        .or_else(|| content.split_once("Charset="))
+                                        .or_else(|| content.split_once("CHARSET="))
+                                        .or_else(|| content.split_once("charset ="))
+                                        .or_else(|| content.split_once("Charset ="))
+                                        .or_else(|| content.split_once("CHARSET ="))
+                                        .map(|encoding| {
+                                            encoding.1.trim_start_matches([' ', '\t']).to_owned()
+                                        });
                                 }
-                                if encoding.is_null() {
-                                    encoding = xml_strstr(content, c"CHARSET=".as_ptr() as _);
-                                }
-                                if !encoding.is_null() {
-                                    encoding = encoding.add(8);
-                                } else {
-                                    encoding = xml_strstr(content, c"charset =".as_ptr() as _);
-                                    if encoding.is_null() {
-                                        encoding = xml_strstr(content, c"Charset =".as_ptr() as _);
-                                    }
-                                    if encoding.is_null() {
-                                        encoding = xml_strstr(content, c"CHARSET =".as_ptr() as _);
-                                    }
-                                    if !encoding.is_null() {
-                                        encoding = encoding.add(9);
-                                    }
-                                }
-                                if !encoding.is_null() {
-                                    while *encoding == b' ' || *encoding == b'\t' {
-                                        encoding = encoding.add(1);
-                                    }
-                                }
-                                return Some(
-                                    CStr::from_ptr(encoding as *const i8)
-                                        .to_string_lossy()
-                                        .into_owned(),
-                                );
                             }
                         }
                         attr = now.next;
@@ -372,7 +349,6 @@ pub unsafe fn html_set_meta_encoding(doc: XmlDocPtr, encoding: Option<&str>) -> 
                 {
                     let mut attr = cur_node.properties;
                     let mut http = 0;
-                    let mut value: *const XmlChar;
 
                     content = None;
                     while let Some(now) = attr {
@@ -384,19 +360,16 @@ pub unsafe fn html_set_meta_encoding(doc: XmlDocPtr, encoding: Option<&str>) -> 
                             })
                             .map(|children| XmlNodePtr::try_from(children).unwrap())
                         {
-                            value = children.content;
+                            let value = children.content.as_deref();
                             if xml_strcasecmp(now.name, c"http-equiv".as_ptr() as _) == 0
-                                && xml_strcasecmp(value, c"Content-Type".as_ptr() as _) == 0
+                                && value
+                                    .is_some_and(|value| value.eq_ignore_ascii_case("Content-Type"))
                             {
                                 http = 1;
-                            } else if !value.is_null()
+                            } else if value.is_some()
                                 && xml_strcasecmp(now.name, c"content".as_ptr() as _) == 0
                             {
-                                content = Some(
-                                    CStr::from_ptr(value as *const i8)
-                                        .to_string_lossy()
-                                        .into_owned(),
-                                );
+                                content = value.map(|value| value.to_owned());
                             }
                             if http != 0 && content.is_some() {
                                 break;
@@ -962,7 +935,6 @@ pub unsafe fn html_node_dump_format_output(
 
         use crate::{
             libxml::{
-                globals::xml_free,
                 htmlparser::html_tag_lookup,
                 parser::xml_init_parser,
                 parser_internals::{XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
@@ -1089,9 +1061,9 @@ pub unsafe fn html_node_dump_format_output(
 
                 HTML_TEXT_NODE => 'to_break: {
                     let node = XmlNodePtr::try_from(cur).unwrap();
-                    if node.content.is_null() {
+                    let Some(content) = node.content.as_deref() else {
                         break 'to_break;
-                    }
+                    };
                     if (node.name == XML_STRING_TEXT.as_ptr() as _
                         || node.name != XML_STRING_TEXT_NOENC.as_ptr() as _)
                         && parent.is_none_or(|parent| {
@@ -1099,25 +1071,18 @@ pub unsafe fn html_node_dump_format_output(
                                 && !parent.name().unwrap().eq_ignore_ascii_case("style")
                         })
                     {
-                        let buffer: *mut XmlChar = xml_encode_entities_reentrant(doc, node.content);
-                        if !buffer.is_null() {
-                            buf.write_str(CStr::from_ptr(buffer as _).to_string_lossy().as_ref())
-                                .ok();
-                            xml_free(buffer as _);
-                        }
+                        let buffer = xml_encode_entities_reentrant(doc, content);
+                        buf.write_str(&buffer).ok();
                     } else {
-                        buf.write_str(CStr::from_ptr(node.content as _).to_string_lossy().as_ref())
-                            .ok();
+                        buf.write_str(content).ok();
                     }
                 }
 
                 HTML_COMMENT_NODE => {
                     let node = XmlNodePtr::try_from(cur).unwrap();
-                    if !node.content.is_null() {
+                    if let Some(content) = node.content.as_deref() {
                         buf.write_str("<!--").ok();
-
-                        buf.write_str(CStr::from_ptr(node.content as _).to_string_lossy().as_ref())
-                            .ok();
+                        buf.write_str(content).ok();
                         buf.write_str("-->").ok();
                     }
                 }
@@ -1126,16 +1091,11 @@ pub unsafe fn html_node_dump_format_output(
                     let node = XmlNodePtr::try_from(cur).unwrap();
                     if !node.name.is_null() {
                         buf.write_str("<?").ok();
-
                         buf.write_str(CStr::from_ptr(node.name as _).to_string_lossy().as_ref())
                             .ok();
-                        if !node.content.is_null() {
+                        if let Some(content) = node.content.as_deref() {
                             buf.write_str(" ").ok();
-
-                            buf.write_str(
-                                CStr::from_ptr(node.content as _).to_string_lossy().as_ref(),
-                            )
-                            .ok();
+                            buf.write_str(content).ok();
                         }
                         buf.write_str(">").ok();
                     }
@@ -1150,9 +1110,8 @@ pub unsafe fn html_node_dump_format_output(
                 }
                 HTML_PRESERVE_NODE => {
                     let node = XmlNodePtr::try_from(cur).unwrap();
-                    if !node.content.is_null() {
-                        buf.write_str(CStr::from_ptr(node.content as _).to_string_lossy().as_ref())
-                            .ok();
+                    if let Some(content) = node.content.as_deref() {
+                        buf.write_str(content).ok();
                     }
                 }
                 _ => {}
