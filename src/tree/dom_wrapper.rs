@@ -2065,18 +2065,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                                 result_clone = Some(new.into());
                             }
                             // Clone the name of the node if any.
-                            if cur_node.name == XML_STRING_TEXT.as_ptr() as _ {
-                                new.name = XML_STRING_TEXT.as_ptr() as _;
-                            } else if cur_node.name == XML_STRING_TEXT_NOENC.as_ptr() as _ {
-                                // NOTE: Although xmlStringTextNoenc is never assigned to a node
-                                //   in tree.c, it might be set in Libxslt via
-                                //   "xsl:disable-output-escaping".
-                                new.name = XML_STRING_TEXT_NOENC.as_ptr() as _;
-                            } else if cur_node.name == XML_STRING_COMMENT.as_ptr() as _ {
-                                new.name = XML_STRING_COMMENT.as_ptr() as _;
-                            } else if !cur_node.name.is_null() {
-                                new.name = xml_strdup(cur_node.name);
-                            }
+                            new.name = cur_node.name.clone();
 
                             XmlGenericNodePtr::from(new)
                         }

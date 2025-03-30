@@ -1696,10 +1696,7 @@ pub unsafe fn xml_ls_one_node<'a>(output: &mut (impl Write + 'a), node: Option<X
             }
             XmlElementType::XmlAttributeNode => {
                 let node = XmlAttrPtr::try_from(node).unwrap();
-                if !node.name.is_null() {
-                    let name = CStr::from_ptr(node.name as *const i8).to_string_lossy();
-                    write!(output, "{name}").ok();
-                }
+                write!(output, "{}", node.name).ok();
             }
             XmlElementType::XmlTextNode => {
                 let node = XmlNodePtr::try_from(node).unwrap();

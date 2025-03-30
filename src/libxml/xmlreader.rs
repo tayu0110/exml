@@ -4266,15 +4266,6 @@ unsafe fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mut cur: XmlG
                 {
                     xml_text_reader_free_prop_list(&mut *reader, cur.properties);
                 }
-                if !matches!(
-                    cur.element_type(),
-                    XmlElementType::XmlElementNode
-                        | XmlElementType::XmlXIncludeStart
-                        | XmlElementType::XmlXIncludeEnd
-                        | XmlElementType::XmlEntityRefNode
-                ) {
-                    // DICT_FREE!(dict, cur.content);
-                }
                 if matches!(
                     cur.element_type(),
                     XmlElementType::XmlElementNode
@@ -4330,12 +4321,6 @@ unsafe fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mut cur: XmlG
 #[cfg(feature = "libxml_reader")]
 unsafe fn xml_text_reader_free_prop(reader: XmlTextReaderPtr, mut cur: XmlAttrPtr) {
     unsafe {
-        let dict = if !reader.is_null() && !(*reader).ctxt.is_null() {
-            (*(*reader).ctxt).dict
-        } else {
-            null_mut()
-        };
-
         if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0 {
             // if let Some(f) = xmlDeregisterNodeDefaultValue {
             //     f(cur as _);
@@ -4347,7 +4332,6 @@ unsafe fn xml_text_reader_free_prop(reader: XmlTextReaderPtr, mut cur: XmlAttrPt
             xml_text_reader_free_node_list(reader, children);
         }
 
-        DICT_FREE!(dict, cur.name);
         if !reader.is_null()
             && !(*reader).ctxt.is_null()
             && (*(*reader).ctxt).free_attrs_nr < MAX_FREE_NODES
@@ -4414,15 +4398,7 @@ unsafe fn xml_text_reader_free_node(reader: XmlTextReaderPtr, mut cur: XmlGeneri
         {
             xml_text_reader_free_prop_list(&mut *reader, cur.properties);
         }
-        if !matches!(
-            cur.element_type(),
-            XmlElementType::XmlElementNode
-                | XmlElementType::XmlXIncludeStart
-                | XmlElementType::XmlXIncludeEnd
-                | XmlElementType::XmlEntityRefNode
-        ) {
-            // DICT_FREE!(dict, cur.content);
-        }
+
         if matches!(
             cur.element_type(),
             XmlElementType::XmlElementNode

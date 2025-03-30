@@ -75,7 +75,7 @@ use super::{
         xml_validate_notation_decl, xml_validate_one_attribute, xml_validate_one_namespace,
         xml_validate_root,
     },
-    xmlstring::{xml_strdup, xml_strndup},
+    xmlstring::xml_strndup,
 };
 
 /// Provides the public ID e.g. "-//SGMLSOURCE//DTD DEMO//EN"
@@ -2416,7 +2416,10 @@ unsafe fn xml_sax2_attribute_ns(
             ret.parent = (*ctxt).node;
             ret.doc = (*ctxt).my_doc;
             ret.ns = namespace;
-            ret.name = xml_strdup(localname);
+            ret.name = CStr::from_ptr(localname as *const i8)
+                .to_string_lossy()
+                .into_owned()
+                .into_boxed_str();
 
             // link at the end to preserve order, TODO speed up with a last
             if let Some(mut prev) = (*ctxt).node.unwrap().properties {

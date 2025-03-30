@@ -2161,7 +2161,7 @@ pub unsafe fn xml_is_id(
     attr: Option<XmlAttrPtr>,
 ) -> i32 {
     unsafe {
-        let Some(attr) = attr.filter(|a| !a.name.is_null()) else {
+        let Some(attr) = attr else {
             return 0;
         };
         if attr.name().as_deref() == Some("id")
@@ -2180,8 +2180,8 @@ pub unsafe fn xml_is_id(
         {
             return 0;
         } else if matches!(doc.typ, XmlElementType::XmlHTMLDocumentNode) {
-            if xml_str_equal(c"id".as_ptr() as _, attr.name)
-                || (xml_str_equal(c"name".as_ptr() as _, attr.name)
+            if "id" == attr.name.as_ref()
+                || ("name" == attr.name.as_ref()
                     && elem.is_none_or(|elem| xml_str_equal(elem.name, c"a".as_ptr() as _)))
             {
                 return 1;
@@ -5258,7 +5258,7 @@ pub unsafe fn xml_validate_one_attribute(
         if elem.name.is_null() {
             return 0;
         }
-        let Some(mut attr) = attr.filter(|a| !a.name.is_null()) else {
+        let Some(mut attr) = attr else {
             return 0;
         };
 

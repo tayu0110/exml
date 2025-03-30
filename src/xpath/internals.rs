@@ -2578,7 +2578,9 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
                             XmlElementType::XmlAttributeNode => {
                                 let attr = XmlAttrPtr::try_from(cur).unwrap();
 
-                                if xml_str_equal(name, attr.name) {
+                                if CStr::from_ptr(name as *const i8).to_string_lossy().as_ref()
+                                    == attr.name.as_ref()
+                                {
                                     if prefix.is_null() {
                                         if attr.ns.is_none_or(|ns| ns.prefix().is_none()) {
                                             xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);

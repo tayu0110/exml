@@ -719,7 +719,7 @@ impl XmlSchemaParserCtxt {
             };
             let mut attr = node.properties;
             while let Some(now) = attr {
-                if (now.ns.is_none() && !xml_str_equal(now.name, c"id".as_ptr() as _))
+                if (now.ns.is_none() && now.name.as_ref() != "id")
                     || now.ns.is_some_and(|ns| {
                         ns.href().as_deref() == Some(XML_SCHEMA_NS.to_str().unwrap())
                     })
@@ -745,7 +745,7 @@ impl XmlSchemaParserCtxt {
                     // Content: ({any})*
                     let mut attr = cur_node.properties;
                     while let Some(now) = attr {
-                        if (now.ns.is_none() && !xml_str_equal(now.name, c"source".as_ptr() as _))
+                        if (now.ns.is_none() && now.name.as_ref() != "source")
                             || now.ns.is_some_and(|ns| {
                                 ns.href().as_deref() == Some(XML_SCHEMA_NS.to_str().unwrap())
                             })
@@ -780,7 +780,7 @@ impl XmlSchemaParserCtxt {
                     while let Some(cur_attr) = attr {
                         if let Some(ns) = cur_attr.ns {
                             if ns.href().as_deref() == Some(XML_SCHEMA_NS.to_str().unwrap())
-                                || (xml_str_equal(cur_attr.name, c"lang".as_ptr() as _)
+                                || (cur_attr.name.as_ref() == "lang"
                                     && ns.href.as_deref()
                                         != Some(XML_XML_NAMESPACE.to_str().unwrap()))
                             {
@@ -791,7 +791,7 @@ impl XmlSchemaParserCtxt {
                                     cur_attr,
                                 );
                             }
-                        } else if !xml_str_equal(cur_attr.name, c"source".as_ptr() as _) {
+                        } else if cur_attr.name.as_ref() != "source" {
                             xml_schema_pillegal_attr_err(
                                 self,
                                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -870,9 +870,9 @@ impl XmlSchemaParserCtxt {
                             cur_attr,
                         );
                     }
-                } else if !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
-                    && !xml_str_equal(cur_attr.name, c"namespace".as_ptr() as _)
-                    && !xml_str_equal(cur_attr.name, c"schemaLocation".as_ptr() as _)
+                } else if cur_attr.name.as_ref() != "id"
+                    && cur_attr.name.as_ref() != "namespace"
+                    && cur_attr.name.as_ref() != "schemaLocation"
                 {
                     xml_schema_pillegal_attr_err(
                         self,
@@ -1308,8 +1308,8 @@ impl XmlSchemaParserCtxt {
                             cur_attr,
                         );
                     }
-                } else if !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
-                    && !xml_str_equal(cur_attr.name, c"schemaLocation".as_ptr() as _)
+                } else if cur_attr.name.as_ref() != "id"
+                    && cur_attr.name.as_ref() != "schemaLocation"
                 {
                     xml_schema_pillegal_attr_err(
                         self,
@@ -1531,24 +1531,24 @@ impl XmlSchemaParserCtxt {
                             cur_attr,
                         );
                     }
-                } else if xml_str_equal(cur_attr.name, c"id".as_ptr() as _) {
+                } else if cur_attr.name.as_ref() == "id" {
                     // Attribute "id".
                     xml_schema_pval_attr_id(self, node, "id");
-                } else if xml_str_equal(cur_attr.name, c"mixed".as_ptr() as _) {
+                } else if cur_attr.name.as_ref() == "mixed" {
                     // Attribute "mixed".
                     if xml_schema_pget_bool_node_value(self, null_mut(), cur_attr.into()) != 0 {
                         (*typ).flags |= XML_SCHEMAS_TYPE_MIXED;
                     }
                 } else if top_level != 0 {
                     // Attributes of global complex type definitions.
-                    if xml_str_equal(cur_attr.name, c"name".as_ptr() as _) {
+                    if cur_attr.name.as_ref() == "name" {
                         // Pass.
-                    } else if xml_str_equal(cur_attr.name, c"abstract".as_ptr() as _) {
+                    } else if cur_attr.name.as_ref() == "abstract" {
                         // Attribute "abstract".
                         if xml_schema_pget_bool_node_value(self, null_mut(), cur_attr.into()) != 0 {
                             (*typ).flags |= XML_SCHEMAS_TYPE_ABSTRACT;
                         }
-                    } else if xml_str_equal(cur_attr.name, c"final".as_ptr() as _) {
+                    } else if cur_attr.name.as_ref() == "final" {
                         // Attribute "final".
                         let attr_value = self.get_node_content(Some(cur_attr.into()));
                         let cattr_value = xml_dict_lookup(
@@ -1582,7 +1582,7 @@ impl XmlSchemaParserCtxt {
                         } else {
                             is_final = 1;
                         }
-                    } else if xml_str_equal(cur_attr.name, c"block".as_ptr() as _) {
+                    } else if cur_attr.name.as_ref() == "block" {
                         // Attribute "block".
                         let attr_value = self.get_node_content(Some(cur_attr.into()));
                         let cattr_value = xml_dict_lookup(
@@ -1906,7 +1906,7 @@ impl XmlSchemaParserCtxt {
                                 cur_attr,
                             );
                         }
-                    } else if !xml_str_equal(cur_attr.name, c"id".as_ptr() as _) {
+                    } else if cur_attr.name.as_ref() != "id" {
                         xml_schema_pillegal_attr_err(
                             self,
                             XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -1947,9 +1947,9 @@ impl XmlSchemaParserCtxt {
                                 cur_attr,
                             );
                         }
-                    } else if !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
-                        && !xml_str_equal(cur_attr.name, c"name".as_ptr() as _)
-                        && !xml_str_equal(cur_attr.name, c"final".as_ptr() as _)
+                    } else if cur_attr.name.as_ref() != "id"
+                        && cur_attr.name.as_ref() != "name"
+                        && cur_attr.name.as_ref() != "final"
                     {
                         xml_schema_pillegal_attr_err(
                             self,
@@ -2210,11 +2210,11 @@ impl XmlSchemaParserCtxt {
                                         cur_attr,
                                     );
                                 }
-                            } else if xml_str_equal(cur_attr.name, c"ref".as_ptr() as _)
-                                || xml_str_equal(cur_attr.name, c"name".as_ptr() as _)
-                                || xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
-                                || xml_str_equal(cur_attr.name, c"maxOccurs".as_ptr() as _)
-                                || xml_str_equal(cur_attr.name, c"minOccurs".as_ptr() as _)
+                            } else if cur_attr.name.as_ref() == "ref"
+                                || cur_attr.name.as_ref() == "name"
+                                || cur_attr.name.as_ref() == "id"
+                                || cur_attr.name.as_ref() == "maxOccurs"
+                                || cur_attr.name.as_ref() == "minOccurs"
                             {
                                 attr = cur_attr.next;
                                 continue;
@@ -2328,18 +2328,18 @@ impl XmlSchemaParserCtxt {
                                 cur_attr,
                             );
                         }
-                    } else if !xml_str_equal(cur_attr.name, c"name".as_ptr() as _)
-                        && !xml_str_equal(cur_attr.name, c"type".as_ptr() as _)
-                        && !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
-                        && !xml_str_equal(cur_attr.name, c"default".as_ptr() as _)
-                        && !xml_str_equal(cur_attr.name, c"fixed".as_ptr() as _)
-                        && !xml_str_equal(cur_attr.name, c"block".as_ptr() as _)
-                        && !xml_str_equal(cur_attr.name, c"nillable".as_ptr() as _)
+                    } else if cur_attr.name.as_ref() != "name"
+                        && cur_attr.name.as_ref() != "type"
+                        && cur_attr.name.as_ref() != "id"
+                        && cur_attr.name.as_ref() != "default"
+                        && cur_attr.name.as_ref() != "fixed"
+                        && cur_attr.name.as_ref() != "block"
+                        && cur_attr.name.as_ref() != "nillable"
                     {
                         if top_level == 0 {
-                            if !xml_str_equal(cur_attr.name, c"maxOccurs".as_ptr() as _)
-                                && !xml_str_equal(cur_attr.name, c"minOccurs".as_ptr() as _)
-                                && !xml_str_equal(cur_attr.name, c"form".as_ptr() as _)
+                            if cur_attr.name.as_ref() != "maxOccurs"
+                                && cur_attr.name.as_ref() != "minOccurs"
+                                && cur_attr.name.as_ref() != "form"
                             {
                                 xml_schema_pillegal_attr_err(
                                     self,
@@ -2348,9 +2348,9 @@ impl XmlSchemaParserCtxt {
                                     cur_attr,
                                 );
                             }
-                        } else if !xml_str_equal(cur_attr.name, c"final".as_ptr() as _)
-                            && !xml_str_equal(cur_attr.name, c"abstract".as_ptr() as _)
-                            && !xml_str_equal(cur_attr.name, c"substitutionGroup".as_ptr() as _)
+                        } else if cur_attr.name.as_ref() != "final"
+                            && cur_attr.name.as_ref() != "abstract"
+                            && cur_attr.name.as_ref() != "substitutionGroup"
                         {
                             xml_schema_pillegal_attr_err(
                                 self,
@@ -2879,18 +2879,18 @@ impl XmlSchemaParserCtxt {
                         }
                     } else {
                         if is_ref != 0 {
-                            if xml_str_equal(cur_attr.name, c"id".as_ptr() as _) {
+                            if cur_attr.name.as_ref() == "id" {
                                 xml_schema_pval_attr_node_id(self, Some(cur_attr));
                                 break 'attr_next;
-                            } else if xml_str_equal(cur_attr.name, c"ref".as_ptr() as _) {
+                            } else if cur_attr.name.as_ref() == "ref" {
                                 break 'attr_next;
                             }
-                        } else if xml_str_equal(cur_attr.name, c"name".as_ptr() as _) {
+                        } else if cur_attr.name.as_ref() == "name" {
                             break 'attr_next;
-                        } else if xml_str_equal(cur_attr.name, c"id".as_ptr() as _) {
+                        } else if cur_attr.name.as_ref() == "id" {
                             xml_schema_pval_attr_node_id(self, Some(cur_attr));
                             break 'attr_next;
-                        } else if xml_str_equal(cur_attr.name, c"type".as_ptr() as _) {
+                        } else if cur_attr.name.as_ref() == "type" {
                             xml_schema_pval_attr_node_qname(
                                 self,
                                 schema,
@@ -2900,7 +2900,7 @@ impl XmlSchemaParserCtxt {
                                 &raw mut tmp_name,
                             );
                             break 'attr_next;
-                        } else if xml_str_equal(cur_attr.name, c"form".as_ptr() as _) {
+                        } else if cur_attr.name.as_ref() == "form" {
                             // Evaluate the target namespace
                             has_form = 1;
                             let attr_value = self.get_node_content(Some(cur_attr.into()));
@@ -2922,7 +2922,7 @@ impl XmlSchemaParserCtxt {
                             }
                             break 'attr_next;
                         }
-                        if xml_str_equal(cur_attr.name, c"use".as_ptr() as _) {
+                        if cur_attr.name.as_ref() == "use" {
                             let attr_value = self.get_node_content(Some(cur_attr.into()));
                             // TODO: Maybe we need to normalize the value beforehand.
                             if attr_value == "optional" {
@@ -2946,7 +2946,7 @@ impl XmlSchemaParserCtxt {
                                 );
                             }
                             break 'attr_next;
-                        } else if xml_str_equal(cur_attr.name, c"default".as_ptr() as _) {
+                        } else if cur_attr.name.as_ref() == "default" {
                             // 3.2.3 : 1
                             // default and fixed must not both be present.
                             if def_value.is_some() {
@@ -2963,7 +2963,7 @@ impl XmlSchemaParserCtxt {
                                 def_value_type = WXS_ATTR_DEF_VAL_DEFAULT;
                             }
                             break 'attr_next;
-                        } else if xml_str_equal(cur_attr.name, c"fixed".as_ptr() as _) {
+                        } else if cur_attr.name.as_ref() == "fixed" {
                             // 3.2.3 : 1
                             // default and fixed must not both be present.
                             if def_value.is_some() {
@@ -3403,9 +3403,9 @@ impl XmlSchemaParserCtxt {
                             cur_attr,
                         );
                     }
-                } else if !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
-                    && !xml_str_equal(cur_attr.name, c"namespace".as_ptr() as _)
-                    && !xml_str_equal(cur_attr.name, c"processContents".as_ptr() as _)
+                } else if cur_attr.name.as_ref() != "id"
+                    && cur_attr.name.as_ref() != "namespace"
+                    && cur_attr.name.as_ref() != "processContents"
                 {
                     xml_schema_pillegal_attr_err(
                         self,
@@ -3508,9 +3508,7 @@ impl XmlSchemaParserCtxt {
                             cur_attr,
                         );
                     }
-                } else if !xml_str_equal(cur_attr.name, c"name".as_ptr() as _)
-                    && !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
-                {
+                } else if cur_attr.name.as_ref() != "name" && cur_attr.name.as_ref() != "id" {
                     xml_schema_pillegal_attr_err(
                         self,
                         XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -3624,9 +3622,7 @@ impl XmlSchemaParserCtxt {
                             cur_attr,
                         );
                     }
-                } else if !xml_str_equal(cur_attr.name, c"ref".as_ptr() as _)
-                    && !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
-                {
+                } else if cur_attr.name.as_ref() != "ref" && cur_attr.name.as_ref() != "id" {
                     xml_schema_pillegal_attr_err(
                         self,
                         XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -3821,9 +3817,7 @@ impl XmlSchemaParserCtxt {
                             cur_attr,
                         );
                     }
-                } else if !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
-                    && !xml_str_equal(cur_attr.name, c"mixed".as_ptr() as _)
-                {
+                } else if cur_attr.name.as_ref() != "id" && cur_attr.name.as_ref() != "mixed" {
                     xml_schema_pillegal_attr_err(
                         self,
                         XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -3945,7 +3939,7 @@ impl XmlSchemaParserCtxt {
                             cur_attr,
                         );
                     }
-                } else if !xml_str_equal(cur_attr.name, c"id".as_ptr() as _) {
+                } else if cur_attr.name.as_ref() != "id" {
                     xml_schema_pillegal_attr_err(
                         self,
                         XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -4106,9 +4100,9 @@ impl XmlSchemaParserCtxt {
                                 cur_attr,
                             );
                         }
-                    } else if !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
-                        && !xml_str_equal(cur_attr.name, c"maxOccurs".as_ptr() as _)
-                        && !xml_str_equal(cur_attr.name, c"minOccurs".as_ptr() as _)
+                    } else if cur_attr.name.as_ref() != "id"
+                        && cur_attr.name.as_ref() != "maxOccurs"
+                        && cur_attr.name.as_ref() != "minOccurs"
                     {
                         xml_schema_pillegal_attr_err(
                             self,
@@ -4132,7 +4126,7 @@ impl XmlSchemaParserCtxt {
                                 cur_attr,
                             );
                         }
-                    } else if !xml_str_equal(cur_attr.name, c"id".as_ptr() as _) {
+                    } else if cur_attr.name.as_ref() != "id" {
                         xml_schema_pillegal_attr_err(
                             self,
                             XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -4436,9 +4430,7 @@ impl XmlSchemaParserCtxt {
                             cur_attr,
                         );
                     }
-                } else if !xml_str_equal(cur_attr.name, c"name".as_ptr() as _)
-                    && !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
-                {
+                } else if cur_attr.name.as_ref() != "name" && cur_attr.name.as_ref() != "id" {
                     xml_schema_pillegal_attr_err(
                         self,
                         XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -4569,10 +4561,10 @@ impl XmlSchemaParserCtxt {
                             cur_attr,
                         );
                     }
-                } else if !xml_str_equal(cur_attr.name, c"ref".as_ptr() as _)
-                    && !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
-                    && !xml_str_equal(cur_attr.name, c"minOccurs".as_ptr() as _)
-                    && !xml_str_equal(cur_attr.name, c"maxOccurs".as_ptr() as _)
+                } else if cur_attr.name.as_ref() != "ref"
+                    && cur_attr.name.as_ref() != "id"
+                    && cur_attr.name.as_ref() != "minOccurs"
+                    && cur_attr.name.as_ref() != "maxOccurs"
                 {
                     xml_schema_pillegal_attr_err(
                         self,
@@ -4656,9 +4648,7 @@ impl XmlSchemaParserCtxt {
                             cur_attr,
                         );
                     }
-                } else if !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
-                    && !xml_str_equal(cur_attr.name, c"base".as_ptr() as _)
-                {
+                } else if cur_attr.name.as_ref() != "id" && cur_attr.name.as_ref() != "base" {
                     xml_schema_pillegal_attr_err(
                         self,
                         XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -5043,9 +5033,7 @@ impl XmlSchemaParserCtxt {
                             cur_attr,
                         );
                     }
-                } else if !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
-                    && !xml_str_equal(cur_attr.name, c"base".as_ptr() as _)
-                {
+                } else if cur_attr.name.as_ref() != "id" && cur_attr.name.as_ref() != "base" {
                     xml_schema_pillegal_attr_err(
                         self,
                         XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -5223,9 +5211,7 @@ impl XmlSchemaParserCtxt {
                             cur_attr,
                         );
                     }
-                } else if !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
-                    && !xml_str_equal(cur_attr.name, c"itemType".as_ptr() as _)
-                {
+                } else if cur_attr.name.as_ref() != "id" && cur_attr.name.as_ref() != "itemType" {
                     xml_schema_pillegal_attr_err(
                         self,
                         XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -5353,8 +5339,7 @@ impl XmlSchemaParserCtxt {
                             cur_attr,
                         );
                     }
-                } else if !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
-                    && !xml_str_equal(cur_attr.name, c"memberTypes".as_ptr() as _)
+                } else if cur_attr.name.as_ref() != "id" && cur_attr.name.as_ref() != "memberTypes"
                 {
                     xml_schema_pillegal_attr_err(
                         self,
@@ -5523,10 +5508,10 @@ impl XmlSchemaParserCtxt {
                             cur_attr,
                         );
                     }
-                } else if !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
-                    && !xml_str_equal(cur_attr.name, c"name".as_ptr() as _)
+                } else if cur_attr.name.as_ref() != "id"
+                    && cur_attr.name.as_ref() != "name"
                     && (idc_category != XmlSchemaTypeType::XmlSchemaTypeIDCKeyref
-                        || !xml_str_equal(cur_attr.name, c"refer".as_ptr() as _))
+                        || cur_attr.name.as_ref() != "refer")
                 {
                     xml_schema_pillegal_attr_err(
                         self,
@@ -5706,9 +5691,7 @@ impl XmlSchemaParserCtxt {
                             cur_attr,
                         );
                     }
-                } else if !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
-                    && !xml_str_equal(cur_attr.name, c"xpath".as_ptr() as _)
-                {
+                } else if cur_attr.name.as_ref() != "id" && cur_attr.name.as_ref() != "xpath" {
                     xml_schema_pillegal_attr_err(
                         self,
                         XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -6050,11 +6033,11 @@ impl XmlSchemaParserCtxt {
                             cur_attr,
                         );
                     }
-                } else if !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
-                    && !xml_str_equal(cur_attr.name, c"minOccurs".as_ptr() as _)
-                    && !xml_str_equal(cur_attr.name, c"maxOccurs".as_ptr() as _)
-                    && !xml_str_equal(cur_attr.name, c"namespace".as_ptr() as _)
-                    && !xml_str_equal(cur_attr.name, c"processContents".as_ptr() as _)
+                } else if cur_attr.name.as_ref() != "id"
+                    && cur_attr.name.as_ref() != "minOccurs"
+                    && cur_attr.name.as_ref() != "maxOccurs"
+                    && cur_attr.name.as_ref() != "namespace"
+                    && cur_attr.name.as_ref() != "processContents"
                 {
                     xml_schema_pillegal_attr_err(
                         self,

@@ -31,7 +31,7 @@ use std::{
 use crate::libxml::{
     globals::{xml_deregister_node_default_value, xml_free, xml_register_node_default_value},
     valid::{xml_add_id, xml_is_id, xml_remove_id},
-    xmlstring::{XmlChar, xml_strdup, xml_strndup},
+    xmlstring::XmlChar,
 };
 
 use super::{
@@ -45,7 +45,7 @@ use super::{
 pub struct XmlAttr {
     pub _private: *mut c_void,                  /* application data */
     pub(crate) typ: XmlElementType,             /* XML_ATTRIBUTE_NODE, must be second ! */
-    pub(crate) name: *const XmlChar,            /* the name of the property */
+    pub(crate) name: Box<str>,                  /* the name of the property */
     pub(crate) children: Option<XmlNodePtr>,    /* the value of the property */
     pub(crate) last: Option<XmlNodePtr>,        /* NULL */
     pub(crate) parent: Option<XmlNodePtr>,      /* child->parent link */
@@ -195,7 +195,7 @@ impl Default for XmlAttr {
         Self {
             _private: null_mut(),
             typ: XmlElementType::XmlAttributeNode,
-            name: null_mut(),
+            name: "".into(),
             children: None,
             last: None,
             parent: None,
@@ -220,8 +220,7 @@ impl NodeCommon for XmlAttr {
         self.typ
     }
     fn name(&self) -> Option<Cow<'_, str>> {
-        (!self.name.is_null())
-            .then(|| unsafe { CStr::from_ptr(self.name as *const i8).to_string_lossy() })
+        Some(Cow::Borrowed(&self.name))
     }
     fn children(&self) -> Option<XmlGenericNodePtr> {
         self.children.map(|children| children.into())
@@ -424,18 +423,14 @@ impl From<XmlAttrPtr> for *mut XmlAttr {
 #[doc(alias = "xmlNewDocProp")]
 pub unsafe fn xml_new_doc_prop(
     doc: Option<XmlDocPtr>,
-    name: *const XmlChar,
+    name: &str,
     value: Option<&str>,
 ) -> Option<XmlAttrPtr> {
     unsafe {
-        if name.is_null() {
-            return None;
-        }
-
         // Allocate a new property and fill the fields.
         let Some(mut cur) = XmlAttrPtr::new(XmlAttr {
             typ: XmlElementType::XmlAttributeNode,
-            name: xml_strdup(name),
+            name: name.into(),
             doc,
             ..Default::default()
         }) else {
@@ -481,7 +476,7 @@ pub(super) unsafe fn xml_new_prop_internal(
             typ: XmlElementType::XmlAttributeNode,
             parent: node,
             ns,
-            name: xml_strndup(name.as_ptr(), name.len() as i32),
+            name: name.into(),
             ..Default::default()
         }) else {
             xml_tree_err_memory("building attribute");
@@ -543,17 +538,10 @@ pub(super) unsafe fn xml_new_prop_internal(
 #[cfg(any(feature = "libxml_tree", feature = "html", feature = "schema"))]
 pub unsafe fn xml_new_prop(
     node: Option<XmlNodePtr>,
-    name: *const XmlChar,
+    name: &str,
     value: Option<&str>,
 ) -> Option<XmlAttrPtr> {
-    unsafe {
-        if name.is_null() {
-            return None;
-        }
-
-        let n = CStr::from_ptr(name as *const i8).to_string_lossy();
-        xml_new_prop_internal(node, None, &n, value)
-    }
+    unsafe { xml_new_prop_internal(node, None, name, value) }
 }
 
 /// Create a new property tagged with a namespace and carried by a node.  
@@ -601,15 +589,15 @@ pub(super) unsafe fn xml_copy_prop_internal(
             return None;
         }
         let mut ret = if let Some(target) = target {
-            xml_new_doc_prop(target.doc, cur.name, None)
+            xml_new_doc_prop(target.doc, &cur.name, None)
         } else if let Some(doc) = doc {
-            xml_new_doc_prop(Some(doc), cur.name, None)
+            xml_new_doc_prop(Some(doc), &cur.name, None)
         } else if let Some(parent) = cur.parent() {
-            xml_new_doc_prop(parent.document(), cur.name, None)
+            xml_new_doc_prop(parent.document(), &cur.name, None)
         } else if let Some(children) = cur.children() {
-            xml_new_doc_prop(children.document(), cur.name, None)
+            xml_new_doc_prop(children.document(), &cur.name, None)
         } else {
-            xml_new_doc_prop(None, cur.name, None)
+            xml_new_doc_prop(None, &cur.name, None)
         }?;
         ret.parent = target;
 
@@ -753,9 +741,6 @@ pub unsafe fn xml_free_prop(cur: XmlAttrPtr) {
         }
         if let Some(children) = cur.children() {
             xml_free_node_list(Some(children));
-        }
-        if !cur.name.is_null() {
-            xml_free(cur.name as _);
         }
         cur.free();
     }

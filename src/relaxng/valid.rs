@@ -176,7 +176,11 @@ impl XmlRelaxNGValidCtxt {
                     .push_string(elem.name().as_deref(), data);
             }
             if ret < 0 {
-                VALID_ERR2!(self, XmlRelaxNGValidErr::XmlRelaxngErrElemwrong, elem.name);
+                VALID_ERR2!(
+                    self,
+                    XmlRelaxNGValidErr::XmlRelaxngErrElemwrong,
+                    elem.name().as_deref()
+                );
             } else if self.pstate == 0 {
                 ret = 0;
             } else if self.pstate < 0 {
@@ -204,11 +208,7 @@ impl XmlRelaxNGValidCtxt {
             match ret.cmp(&0) {
                 std::cmp::Ordering::Equal => {
                     // TODO: get some of the names needed to exit the current state of exec
-                    VALID_ERR2!(
-                        self,
-                        XmlRelaxNGValidErr::XmlRelaxngErrNoelem,
-                        c"".as_ptr() as _
-                    );
+                    VALID_ERR2!(self, XmlRelaxNGValidErr::XmlRelaxngErrNoelem, Some(""));
                     ret = -1;
                 }
                 std::cmp::Ordering::Less => {

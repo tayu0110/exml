@@ -33,15 +33,14 @@ use crate::{
         xmlregexp::XmlRegExecCtxtPtr,
         xmlschemas::{
             XML_SCHEMA_CTXT_PARSER, XML_SCHEMA_CTXT_VALIDATOR,
-            XML_SCHEMA_NODE_INFO_FLAG_OWNED_NAMES, XML_SCHEMA_NODE_INFO_FLAG_OWNED_VALUES,
-            XmlSchemaAttrInfo, XmlSchemaAttrInfoPtr, XmlSchemaBucketPtr,
-            XmlSchemaConstructionCtxtPtr, XmlSchemaIDCAugPtr, XmlSchemaIDCMatcherPtr,
-            XmlSchemaIDCStateObjPtr, XmlSchemaNodeInfoPtr, XmlSchemaPSVIIDCKeyPtr,
-            XmlSchemaPSVIIDCNodePtr, XmlSchemaRedefPtr, XmlSchemaValidityLocatorFunc,
-            xml_schema_construction_ctxt_free, xml_schema_free_idc_state_obj_list,
-            xml_schema_idc_free_key, xml_schema_idc_free_matcher_list,
-            xml_schema_idc_release_matcher_list, xml_schema_idcfree_idc_table,
-            xml_schema_validate_stream,
+            XML_SCHEMA_NODE_INFO_FLAG_OWNED_VALUES, XmlSchemaAttrInfo, XmlSchemaAttrInfoPtr,
+            XmlSchemaBucketPtr, XmlSchemaConstructionCtxtPtr, XmlSchemaIDCAugPtr,
+            XmlSchemaIDCMatcherPtr, XmlSchemaIDCStateObjPtr, XmlSchemaNodeInfoPtr,
+            XmlSchemaPSVIIDCKeyPtr, XmlSchemaPSVIIDCNodePtr, XmlSchemaRedefPtr,
+            XmlSchemaValidityLocatorFunc, xml_schema_construction_ctxt_free,
+            xml_schema_free_idc_state_obj_list, xml_schema_idc_free_key,
+            xml_schema_idc_free_matcher_list, xml_schema_idc_release_matcher_list,
+            xml_schema_idcfree_idc_table, xml_schema_validate_stream,
         },
         xmlschemastypes::{XmlSchemaValPtr, xml_schema_free_value},
     },
@@ -705,16 +704,8 @@ impl XmlSchemaValidCtxt {
         unsafe {
             (*ielem).has_keyrefs = 0;
             (*ielem).applied_xpath = 0;
-            if (*ielem).flags & XML_SCHEMA_NODE_INFO_FLAG_OWNED_NAMES != 0 {
-                if !((*ielem).local_name).is_null() {
-                    xml_free(((*ielem).local_name) as _);
-                    ((*ielem).local_name) = null_mut();
-                };
-                (*ielem).ns_name = None;
-            } else {
-                (*ielem).local_name = null_mut();
-                (*ielem).ns_name = None;
-            }
+            (*ielem).local_name = None;
+            (*ielem).ns_name = None;
             if (*ielem).flags & XML_SCHEMA_NODE_INFO_FLAG_OWNED_VALUES != 0 {
                 if !((*ielem).value).is_null() {
                     xml_free(((*ielem).value) as _);
@@ -763,11 +754,6 @@ impl XmlSchemaValidCtxt {
             }
             for i in 0..self.nb_attr_infos {
                 attr = *self.attr_infos.add(i as usize);
-                if (*attr).flags & XML_SCHEMA_NODE_INFO_FLAG_OWNED_NAMES != 0
-                    && !(*attr).local_name.is_null()
-                {
-                    xml_free((*attr).local_name as _);
-                }
                 if (*attr).flags & XML_SCHEMA_NODE_INFO_FLAG_OWNED_VALUES != 0
                     && !(*attr).value.is_null()
                 {

@@ -333,19 +333,9 @@ pub trait NodeCommon {
                     // check if an attribute with the same name exists
 
                     let lastattr = if let Some(ns) = cur.ns {
-                        cur_node.has_ns_prop(
-                            CStr::from_ptr(cur.name as *const i8)
-                                .to_string_lossy()
-                                .as_ref(),
-                            ns.href.as_deref(),
-                        )
+                        cur_node.has_ns_prop(&cur.name, ns.href.as_deref())
                     } else {
-                        cur_node.has_ns_prop(
-                            CStr::from_ptr(cur.name as *const i8)
-                                .to_string_lossy()
-                                .as_ref(),
-                            None,
-                        )
+                        cur_node.has_ns_prop(&cur.name, None)
                     };
                     if let Some(mut lastattr) = lastattr
                         .and_then(|attr| attr.ok())

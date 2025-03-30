@@ -563,7 +563,7 @@ pub(super) unsafe fn xml_xpath_name_function(ctxt: &mut XmlXPathParserContext, m
                     }
                     XmlElementType::XmlAttributeNode => {
                         let attr = XmlAttrPtr::try_from(table[i]).unwrap();
-                        if *attr.name.add(0) == b' ' {
+                        if attr.name.starts_with(' ') {
                             ctxt.value_push(xml_xpath_cache_new_string(ctxt.context, Some("")));
                         } else if let Some(prefix) =
                             attr.ns.as_deref().and_then(|ns| ns.prefix.as_deref())

@@ -192,14 +192,12 @@ pub unsafe fn html_get_meta_encoding(doc: XmlDocPtr) -> Option<String> {
                             .map(|children| XmlNodePtr::try_from(children).unwrap())
                         {
                             let value = children.content.as_deref();
-                            if xml_strcasecmp(now.name, c"http-equiv".as_ptr() as _) == 0
+                            if now.name.eq_ignore_ascii_case("http-equiv")
                                 && value
                                     .is_some_and(|value| value.eq_ignore_ascii_case("Content-Type"))
                             {
                                 http = 1;
-                            } else if value.is_some()
-                                && xml_strcasecmp(now.name, c"content".as_ptr() as _) == 0
-                            {
+                            } else if value.is_some() && now.name.eq_ignore_ascii_case("content") {
                                 content = value.map(|value| value.to_owned());
                             }
                             if http != 0 {
@@ -320,8 +318,8 @@ pub unsafe fn html_set_meta_encoding(doc: XmlDocPtr, encoding: Option<&str>) -> 
                         } else {
                             head.add_child(meta.unwrap().into());
                         }
-                        xml_new_prop(meta, c"http-equiv".as_ptr() as _, Some("Content-Type"));
-                        xml_new_prop(meta, c"content".as_ptr() as _, Some(&newcontent));
+                        xml_new_prop(meta, "http-equiv", Some("Content-Type"));
+                        xml_new_prop(meta, "content", Some(&newcontent));
                     }
                 }
                 return 0;
@@ -356,14 +354,12 @@ pub unsafe fn html_set_meta_encoding(doc: XmlDocPtr, encoding: Option<&str>) -> 
                             .map(|children| XmlNodePtr::try_from(children).unwrap())
                         {
                             let value = children.content.as_deref();
-                            if xml_strcasecmp(now.name, c"http-equiv".as_ptr() as _) == 0
+                            if now.name.eq_ignore_ascii_case("http-equiv")
                                 && value
                                     .is_some_and(|value| value.eq_ignore_ascii_case("Content-Type"))
                             {
                                 http = 1;
-                            } else if value.is_some()
-                                && xml_strcasecmp(now.name, c"content".as_ptr() as _) == 0
-                            {
+                            } else if value.is_some() && now.name.eq_ignore_ascii_case("content") {
                                 content = value.map(|value| value.to_owned());
                             }
                             if http != 0 && content.is_some() {
@@ -402,8 +398,8 @@ pub unsafe fn html_set_meta_encoding(doc: XmlDocPtr, encoding: Option<&str>) -> 
             } else {
                 head.add_child(meta.unwrap().into());
             }
-            xml_new_prop(meta, c"http-equiv".as_ptr() as _, Some("Content-Type"));
-            xml_new_prop(meta, c"content".as_ptr() as _, Some(&newcontent));
+            xml_new_prop(meta, "http-equiv", Some("Content-Type"));
+            xml_new_prop(meta, "content", Some(&newcontent));
         }
 
         0
@@ -849,8 +845,6 @@ fn html_dtd_dump_output(buf: &mut XmlOutputBuffer, doc: XmlDocPtr, _encoding: Op
 #[cfg(feature = "libxml_output")]
 unsafe fn html_attr_dump_output(buf: &mut XmlOutputBuffer, doc: Option<XmlDocPtr>, cur: &XmlAttr) {
     unsafe {
-        use std::ffi::CStr;
-
         use crate::{libxml::chvalid::xml_is_blank_char, uri::escape_url_except};
 
         // The html output method should not escape a & character
@@ -864,8 +858,7 @@ unsafe fn html_attr_dump_output(buf: &mut XmlOutputBuffer, doc: Option<XmlDocPtr
             buf.write_str(":").ok();
         }
 
-        buf.write_str(CStr::from_ptr(cur.name as _).to_string_lossy().as_ref())
-            .ok();
+        buf.write_str(&cur.name).ok();
         if let Some(children) = cur
             .children()
             .filter(|_| !html_is_boolean_attr(cur.name().as_deref().unwrap()))
@@ -878,10 +871,10 @@ unsafe fn html_attr_dump_output(buf: &mut XmlOutputBuffer, doc: Option<XmlDocPtr
                         .map(|parent| XmlNodePtr::try_from(parent).unwrap())
                         .filter(|p| {
                             p.ns.is_none()
-                                && (xml_strcasecmp(cur.name, c"href".as_ptr() as _) == 0
-                                    || xml_strcasecmp(cur.name, c"action".as_ptr() as _) == 0
-                                    || xml_strcasecmp(cur.name, c"src".as_ptr() as _) == 0
-                                    || (xml_strcasecmp(cur.name, c"name".as_ptr() as _) == 0
+                                && (cur.name.eq_ignore_ascii_case("href")
+                                    || cur.name.eq_ignore_ascii_case("action")
+                                    || cur.name.eq_ignore_ascii_case("src")
+                                    || (cur.name.eq_ignore_ascii_case("name")
                                         && xml_strcasecmp(p.name, c"a".as_ptr() as _) == 0))
                         })
                         .is_some()

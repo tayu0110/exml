@@ -25,7 +25,7 @@ use std::{
     ffi::{CStr, CString, c_char},
     mem::{size_of, take},
     os::raw::c_void,
-    ptr::{addr_of_mut, drop_in_place, null, null_mut},
+    ptr::{addr_of_mut, drop_in_place, null_mut},
     rc::Rc,
     slice::from_raw_parts,
 };
@@ -308,26 +308,14 @@ pub type XmlRelaxNGValidErrorPtr = *mut XmlRelaxNGValidError;
 // TODO: all fieleds are used in only relaxng module.
 #[doc(alias = "xmlRelaxNGValidError")]
 #[repr(C)]
+#[derive(Default)]
 pub struct XmlRelaxNGValidError {
     pub(crate) err: XmlRelaxNGValidErr,         // the error number
     pub(crate) flags: i32,                      // flags
     pub(crate) node: Option<XmlGenericNodePtr>, // the current node
     pub(crate) seq: Option<XmlGenericNodePtr>,  // the current child
-    pub(crate) arg1: *const XmlChar,            // first arg
-    pub(crate) arg2: *const XmlChar,            // second arg
-}
-
-impl Default for XmlRelaxNGValidError {
-    fn default() -> Self {
-        Self {
-            err: XmlRelaxNGValidErr::default(),
-            flags: 0,
-            node: None,
-            seq: None,
-            arg1: null(),
-            arg2: null(),
-        }
-    }
+    pub(crate) arg1: Option<String>,            // first arg
+    pub(crate) arg2: Option<String>,            // second arg
 }
 
 pub type XmlRelaxNGIncludePtr = *mut XmlRelaxNGInclude;
@@ -608,8 +596,12 @@ unsafe fn xml_relaxng_element_match(
             VALID_ERR3!(
                 ctxt,
                 XmlRelaxNGValidErr::XmlRelaxngErrElemname,
-                (*define).name,
-                elem.name
+                Some(
+                    CStr::from_ptr((*define).name as *const i8)
+                        .to_string_lossy()
+                        .as_ref()
+                ),
+                elem.name().as_deref()
             );
             return 0;
         }
@@ -619,27 +611,39 @@ unsafe fn xml_relaxng_element_match(
                     VALID_ERR3!(
                         ctxt,
                         XmlRelaxNGValidErr::XmlRelaxngErrElemwrongns,
-                        elem.name,
-                        (*define).ns
+                        elem.name().as_deref(),
+                        Some(
+                            CStr::from_ptr((*define).ns as *const i8)
+                                .to_string_lossy()
+                                .as_ref()
+                        )
                     );
                     return 0;
                 }
             } else {
-                VALID_ERR2!(ctxt, XmlRelaxNGValidErr::XmlRelaxngErrElemnons, elem.name);
+                VALID_ERR2!(
+                    ctxt,
+                    XmlRelaxNGValidErr::XmlRelaxngErrElemnons,
+                    elem.name().as_deref()
+                );
                 return 0;
             }
         } else if elem.ns.is_some() && !(*define).ns.is_null() && (*define).name.is_null() {
             VALID_ERR2!(
                 ctxt,
                 XmlRelaxNGValidErr::XmlRelaxngErrElemextrans,
-                elem.name
+                elem.name().as_deref()
             );
             return 0;
         } else if elem.ns.is_some() && !(*define).name.is_null() {
             VALID_ERR2!(
                 ctxt,
                 XmlRelaxNGValidErr::XmlRelaxngErrElemextrans,
-                (*define).name
+                Some(
+                    CStr::from_ptr((*define).name as *const i8)
+                        .to_string_lossy()
+                        .as_ref()
+                )
             );
             return 0;
         }
@@ -6679,7 +6683,15 @@ unsafe fn xml_relaxng_validate_datatype(
             ret = -1;
         }
         if ret < 0 {
-            VALID_ERR2!(ctxt, XmlRelaxNGValidErr::XmlRelaxngErrType, (*define).name);
+            VALID_ERR2!(
+                ctxt,
+                XmlRelaxNGValidErr::XmlRelaxngErrType,
+                Some(
+                    CStr::from_ptr((*define).name as *const i8)
+                        .to_string_lossy()
+                        .as_ref()
+                )
+            );
             if !result.is_null() && !lib.is_null() && (*lib).freef.is_some() {
                 (*lib).freef.unwrap()((*lib).data, result);
             }
@@ -6687,13 +6699,29 @@ unsafe fn xml_relaxng_validate_datatype(
         } else if ret == 1 {
             ret = 0;
         } else if ret == 2 {
-            VALID_ERR2P!(ctxt, XmlRelaxNGValidErr::XmlRelaxngErrDupid, value);
+            VALID_ERR2P!(
+                ctxt,
+                XmlRelaxNGValidErr::XmlRelaxngErrDupid,
+                Some(
+                    CStr::from_ptr(value as *const i8)
+                        .to_string_lossy()
+                        .as_ref()
+                )
+            );
         } else {
             VALID_ERR3P!(
                 ctxt,
                 XmlRelaxNGValidErr::XmlRelaxngErrTypeval,
-                (*define).name,
-                value
+                Some(
+                    CStr::from_ptr((*define).name as *const i8)
+                        .to_string_lossy()
+                        .as_ref()
+                ),
+                Some(
+                    CStr::from_ptr(value as *const i8)
+                        .to_string_lossy()
+                        .as_ref()
+                )
             );
             ret = -1;
         }
@@ -6784,7 +6812,11 @@ unsafe fn xml_relaxng_validate_value(
                             VALID_ERR2!(
                                 ctxt,
                                 XmlRelaxNGValidErr::XmlRelaxngErrTypecmp,
-                                (*define).name
+                                Some(
+                                    CStr::from_ptr((*define).name as *const i8)
+                                        .to_string_lossy()
+                                        .as_ref()
+                                )
                             );
                             return -1;
                         } else if ret == 1 {
@@ -6897,7 +6929,11 @@ unsafe fn xml_relaxng_validate_value(
                     VALID_ERR2!(
                         ctxt,
                         XmlRelaxNGValidErr::XmlRelaxngErrListextra,
-                        (*(*ctxt).state).value
+                        Some(
+                            CStr::from_ptr((*(*ctxt).state).value as *const i8)
+                                .to_string_lossy()
+                                .as_ref()
+                        )
                     );
                     ret = -1;
                 }
@@ -7042,7 +7078,12 @@ unsafe fn xml_relaxng_attribute_match(
     unsafe {
         let mut ret: i32;
 
-        if !(*define).name.is_null() && !xml_str_equal((*define).name, prop.name) {
+        if !(*define).name.is_null()
+            && *CStr::from_ptr((*define).name as *const i8)
+                .to_string_lossy()
+                .as_ref()
+                != *prop.name
+        {
             return 0;
         }
         if !(*define).ns.is_null() {
@@ -7123,7 +7164,10 @@ unsafe fn xml_relaxng_validate_attribute(
                 .enumerate()
                 .filter_map(|(i, a)| a.map(|a| (i, a)))
                 .find(|&(_, tmp)| {
-                    xml_str_equal((*define).name, tmp.name)
+                    *CStr::from_ptr((*define).name as *const i8)
+                        .to_string_lossy()
+                        .as_ref()
+                        == *tmp.name
                         && ((((*define).ns.is_null() || *(*define).ns.add(0) == 0)
                             && tmp.ns.is_none())
                             || tmp
@@ -7331,7 +7375,7 @@ unsafe fn xml_relaxng_validate_compiled_content(
                             VALID_ERR2!(
                                 ctxt,
                                 XmlRelaxNGValidErr::XmlRelaxngErrTextwrong,
-                                now.parent().unwrap().name().as_deref().unwrap().as_ptr()
+                                now.parent().unwrap().name().as_deref()
                             );
                         }
                     }
@@ -7347,7 +7391,11 @@ unsafe fn xml_relaxng_validate_compiled_content(
                         ret = exec.push_string(now.name().as_deref(), ctxt as _);
                     }
                     if ret < 0 {
-                        VALID_ERR2!(ctxt, XmlRelaxNGValidErr::XmlRelaxngErrElemwrong, now.name);
+                        VALID_ERR2!(
+                            ctxt,
+                            XmlRelaxNGValidErr::XmlRelaxngErrElemwrong,
+                            now.name().as_deref()
+                        );
                     }
                 }
                 _ => {}
@@ -7364,11 +7412,7 @@ unsafe fn xml_relaxng_validate_compiled_content(
             (*(*ctxt).state).seq = None;
         } else if ret == 0 {
             // TODO: get some of the names needed to exit the current state of exec
-            VALID_ERR2!(
-                ctxt,
-                XmlRelaxNGValidErr::XmlRelaxngErrNoelem,
-                c"".as_ptr() as _
-            );
+            VALID_ERR2!(ctxt, XmlRelaxNGValidErr::XmlRelaxngErrNoelem, Some(""));
             ret = -1;
             if (*ctxt).flags & FLAGS_IGNORABLE == 0 {
                 xml_relaxng_dump_valid_error(ctxt);
@@ -7403,12 +7447,8 @@ unsafe fn xml_relaxng_validate_element_end(ctxt: XmlRelaxNGValidCtxtPtr, dolog: 
                     VALID_ERR3!(
                         ctxt,
                         XmlRelaxNGValidErr::XmlRelaxngErrExtracontent,
-                        (*state)
-                            .node
-                            .unwrap()
-                            .name()
-                            .map_or(null_mut(), |name| name.as_ptr()),
-                        seq.name
+                        (*state).node.unwrap().name().as_deref(),
+                        seq.name().as_deref()
                     );
                 }
                 return -1;
@@ -7420,12 +7460,8 @@ unsafe fn xml_relaxng_validate_element_end(ctxt: XmlRelaxNGValidCtxtPtr, dolog: 
                     VALID_ERR3!(
                         ctxt,
                         XmlRelaxNGValidErr::XmlRelaxngErrInvalidattr,
-                        attr.name,
-                        (*state)
-                            .node
-                            .unwrap()
-                            .name()
-                            .map_or(null_mut(), |name| name.as_ptr())
+                        Some(&attr.name),
+                        (*state).node.unwrap().name().as_deref()
                     );
                 }
                 return -1 - i as i32;
@@ -7506,7 +7542,7 @@ unsafe fn xml_relaxng_validate_definition_list(
             VALID_ERR2!(
                 ctxt,
                 XmlRelaxNGValidErr::XmlRelaxngErrInternal,
-                c"NULL definition list".as_ptr() as _
+                Some("NULL definition list")
             );
             return -1;
         }
@@ -7875,7 +7911,11 @@ unsafe fn xml_relaxng_validate_interleave(
                                 c"open-name-class".as_ptr() as _,
                             )
                     }) {
-                        VALID_ERR2!(ctxt, XmlRelaxNGValidErr::XmlRelaxngErrInterextra, cur.name);
+                        VALID_ERR2!(
+                            ctxt,
+                            XmlRelaxNGValidErr::XmlRelaxngErrInterextra,
+                            cur.name().as_deref()
+                        );
                         ret = -1;
                         (*ctxt).state = oldstate;
                         break 'done;
@@ -7936,13 +7976,13 @@ unsafe fn xml_relaxng_validate_interleave(
                             VALID_ERR2!(
                                 ctxt,
                                 XmlRelaxNGValidErr::XmlRelaxngErrInterextra,
-                                cur.name
+                                cur.name().as_deref()
                             );
                         } else {
                             VALID_ERR2!(
                                 ctxt,
                                 XmlRelaxNGValidErr::XmlRelaxngErrInterextra,
-                                c"noname".as_ptr() as _
+                                Some("noname")
                             );
                         }
                         ret = -1;
@@ -8050,7 +8090,9 @@ unsafe fn xml_relaxng_validate_state(
                     VALID_ERR2!(
                         ctxt,
                         XmlRelaxNGValidErr::XmlRelaxngErrNoelem,
-                        (*define).name
+                        (!(*define).name.is_null())
+                            .then(|| CStr::from_ptr((*define).name as *const i8).to_string_lossy())
+                            .as_deref()
                     );
                     ret = -1;
                     if (*ctxt).flags & FLAGS_IGNORABLE == 0 {
@@ -8079,9 +8121,9 @@ unsafe fn xml_relaxng_validate_state(
                     if !(*ctxt).err_tab.is_empty() {
                         while (*ctxt).err_tab.last().is_some_and(|err| {
                             (err.err == XmlRelaxNGValidErr::XmlRelaxngErrElemname
-                                && xml_str_equal(err.arg2, node.name))
+                                && err.arg2.as_deref() == node.name().as_deref())
                                 || (err.err == XmlRelaxNGValidErr::XmlRelaxngErrElemextrans
-                                    && xml_str_equal(err.arg1, node.name))
+                                    && err.arg1.as_deref() == node.name().as_deref())
                                 || err.err == XmlRelaxNGValidErr::XmlRelaxngErrNoelem
                                 || err.err == XmlRelaxNGValidErr::XmlRelaxngErrNotelem
                         }) {
@@ -8105,9 +8147,9 @@ unsafe fn xml_relaxng_validate_state(
                     }
                     while (*ctxt).err_tab.last().is_some_and(|err| {
                         (err.err == XmlRelaxNGValidErr::XmlRelaxngErrElemname
-                            && xml_str_equal(err.arg2, node.name))
+                            && err.arg2.as_deref() == node.name().as_deref())
                             || (err.err == XmlRelaxNGValidErr::XmlRelaxngErrElemextrans
-                                && xml_str_equal(err.arg1, node.name))
+                                && err.arg1.as_deref() == node.name().as_deref())
                             || err.err == XmlRelaxNGValidErr::XmlRelaxngErrNoelem
                             || err.err == XmlRelaxNGValidErr::XmlRelaxngErrNotelem
                     }) {
@@ -8134,7 +8176,11 @@ unsafe fn xml_relaxng_validate_state(
                     tmp = xml_relaxng_validate_attribute_list(ctxt, (*define).attrs);
                     if tmp != 0 {
                         ret = -1;
-                        VALID_ERR2!(ctxt, XmlRelaxNGValidErr::XmlRelaxngErrAttrvalid, node.name);
+                        VALID_ERR2!(
+                            ctxt,
+                            XmlRelaxNGValidErr::XmlRelaxngErrAttrvalid,
+                            node.name().as_deref()
+                        );
                     }
                 }
                 if let Some(cont_model) = (*define).cont_model.clone() {
@@ -8208,14 +8254,14 @@ unsafe fn xml_relaxng_validate_state(
                                 VALID_ERR2!(
                                     ctxt,
                                     XmlRelaxNGValidErr::XmlRelaxngErrContentvalid,
-                                    node.name
+                                    node.name().as_deref()
                                 );
                                 (*ctxt).state = null_mut();
                             } else {
                                 VALID_ERR2!(
                                     ctxt,
                                     XmlRelaxNGValidErr::XmlRelaxngErrContentvalid,
-                                    node.name
+                                    node.name().as_deref()
                                 );
                             }
                         }
@@ -8515,7 +8561,7 @@ unsafe fn xml_relaxng_validate_state(
                             VALID_ERR2!(
                                 ctxt,
                                 XmlRelaxNGValidErr::XmlRelaxngErrElemwrong,
-                                node.name
+                                node.name().as_deref()
                             );
                             break 'to_break;
                         }
@@ -8592,7 +8638,7 @@ unsafe fn xml_relaxng_validate_state(
                         VALID_ERR2!(
                             ctxt,
                             XmlRelaxNGValidErr::XmlRelaxngErrDataelem,
-                            node.unwrap().parent().unwrap().name().unwrap().as_ptr()
+                            node.unwrap().parent().unwrap().name().as_deref()
                         );
                         ret = -1;
                         break;
@@ -8627,7 +8673,11 @@ unsafe fn xml_relaxng_validate_state(
                     VALID_ERR2!(
                         ctxt,
                         XmlRelaxNGValidErr::XmlRelaxngErrDatatype,
-                        (*define).name
+                        Some(
+                            CStr::from_ptr((*define).name as *const i8)
+                                .to_string_lossy()
+                                .as_ref()
+                        )
                     );
                 } else if ret == 0 {
                     (*(*ctxt).state).seq = None;
@@ -8644,7 +8694,7 @@ unsafe fn xml_relaxng_validate_state(
                         VALID_ERR2!(
                             ctxt,
                             XmlRelaxNGValidErr::XmlRelaxngErrValelem,
-                            node.unwrap().parent().unwrap().name().unwrap().as_ptr()
+                            node.unwrap().parent().unwrap().name().as_deref()
                         );
                         ret = -1;
                         break;
@@ -8679,7 +8729,13 @@ unsafe fn xml_relaxng_validate_state(
                 ret = xml_relaxng_validate_value(ctxt, define);
                 (*(*ctxt).state).value = oldvalue;
                 if ret == -1 {
-                    VALID_ERR2!(ctxt, XmlRelaxNGValidErr::XmlRelaxngErrValue, (*define).name);
+                    VALID_ERR2!(
+                        ctxt,
+                        XmlRelaxNGValidErr::XmlRelaxngErrValue,
+                        (!(*define).name.is_null())
+                            .then(|| CStr::from_ptr((*define).name as *const i8).to_string_lossy())
+                            .as_deref()
+                    );
                 } else if ret == 0 {
                     (*(*ctxt).state).seq = None;
                 }
@@ -8696,7 +8752,7 @@ unsafe fn xml_relaxng_validate_state(
                         VALID_ERR2!(
                             ctxt,
                             XmlRelaxNGValidErr::XmlRelaxngErrListelem,
-                            node.unwrap().parent().unwrap().name().unwrap().as_ptr()
+                            node.unwrap().parent().unwrap().name().as_deref()
                         );
                         ret = -1;
                         break;
@@ -9117,7 +9173,11 @@ pub(crate) unsafe fn xml_relaxng_validate_progressive_callback(
             ret = xml_relaxng_validate_attribute_list(ctxt, (*define).attrs);
             if ret != 0 {
                 (*ctxt).pstate = -1;
-                VALID_ERR2!(ctxt, XmlRelaxNGValidErr::XmlRelaxngErrAttrvalid, node.name);
+                VALID_ERR2!(
+                    ctxt,
+                    XmlRelaxNGValidErr::XmlRelaxngErrAttrvalid,
+                    node.name().as_deref()
+                );
             }
         }
         if !(*ctxt).state.is_null() {
@@ -9186,7 +9246,7 @@ pub unsafe fn xml_relaxng_validate_push_cdata(ctxt: XmlRelaxNGValidCtxtPtr, mut 
             VALID_ERR2!(
                 ctxt,
                 XmlRelaxNGValidErr::XmlRelaxngErrTextwrong,
-                c" TODO ".as_ptr() as _
+                Some(" TODO ")
             );
 
             return -1;

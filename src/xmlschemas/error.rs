@@ -131,30 +131,20 @@ unsafe fn xml_schema_format_error_node_qname(
     unsafe {
         if let Some(node) = node {
             let (name, ns) = if let Ok(node) = XmlNodePtr::try_from(node) {
-                (node.name, node.ns)
+                (node.name().unwrap().into_owned(), node.ns)
             } else {
                 let attr = XmlAttrPtr::try_from(node).unwrap();
-                (attr.name, attr.ns)
+                (attr.name.to_string(), attr.ns)
             };
             if let Some(ns) = ns {
-                return Some(xml_schema_format_qname(
-                    ns.href().as_deref(),
-                    Some(CStr::from_ptr(name as *const i8).to_string_lossy().as_ref()),
-                ));
+                return Some(xml_schema_format_qname(ns.href().as_deref(), Some(&name)));
             } else {
-                return Some(xml_schema_format_qname(
-                    None,
-                    Some(CStr::from_ptr(name as *const i8).to_string_lossy().as_ref()),
-                ));
+                return Some(xml_schema_format_qname(None, Some(&name)));
             }
         } else if !ni.is_null() {
             return Some(xml_schema_format_qname(
                 (*ni).ns_name.as_deref(),
-                Some(
-                    CStr::from_ptr((*ni).local_name as *const i8)
-                        .to_string_lossy()
-                        .as_ref(),
-                ),
+                (*ni).local_name.as_deref(),
             ));
         }
         None
@@ -493,11 +483,7 @@ unsafe fn xml_schema_format_item_for_report(
                     xml_schema_format_qname(ns.href().as_deref(), attr.name().as_deref()).as_str(),
                 );
             } else {
-                res.push_str(
-                    CStr::from_ptr(attr.name as *const i8)
-                        .to_string_lossy()
-                        .as_ref(),
-                );
+                res.push_str(&attr.name);
             }
             res.push('\'');
         }
@@ -547,28 +533,16 @@ unsafe fn xml_schema_format_node_for_error(
                 }
                 res.push_str("', ");
                 res.push_str("attribute '");
-                (node.name, node.ns)
+                (node.name.to_string(), node.ns)
             } else {
                 res.push_str("Element '");
                 let node = XmlNodePtr::try_from(node).unwrap();
-                (node.name, node.ns)
+                (node.name().unwrap().into_owned(), node.ns)
             };
             if let Some(ns) = ns {
-                res.push_str(
-                    xml_schema_format_qname(
-                        ns.href().as_deref(),
-                        Some(CStr::from_ptr(name as *const i8).to_string_lossy().as_ref()),
-                    )
-                    .as_str(),
-                );
+                res.push_str(xml_schema_format_qname(ns.href().as_deref(), Some(&name)).as_str());
             } else {
-                res.push_str(
-                    xml_schema_format_qname(
-                        None,
-                        Some(CStr::from_ptr(name as *const i8).to_string_lossy().as_ref()),
-                    )
-                    .as_str(),
-                );
+                res.push_str(xml_schema_format_qname(None, Some(&name)).as_str());
             }
             res.push_str("': ");
         } else if (*actxt).typ == XML_SCHEMA_CTXT_VALIDATOR {
@@ -581,11 +555,7 @@ unsafe fn xml_schema_format_node_for_error(
                 res.push_str(
                     xml_schema_format_qname(
                         (*ielem).ns_name.as_deref(),
-                        Some(
-                            CStr::from_ptr((*ielem).local_name as *const i8)
-                                .to_string_lossy()
-                                .as_ref(),
-                        ),
+                        (*ielem).local_name.as_deref(),
                     )
                     .as_str(),
                 );
@@ -598,11 +568,7 @@ unsafe fn xml_schema_format_node_for_error(
             res.push_str(
                 xml_schema_format_qname(
                     (*(*vctxt).inode).ns_name.as_deref(),
-                    Some(
-                        CStr::from_ptr((*(*vctxt).inode).local_name as *const i8)
-                            .to_string_lossy()
-                            .as_ref(),
-                    ),
+                    (*(*vctxt).inode).local_name.as_deref(),
                 )
                 .as_str(),
             );

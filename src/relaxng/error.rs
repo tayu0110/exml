@@ -1,17 +1,10 @@
-use std::{borrow::Cow, ffi::CStr, ptr::null_mut};
-
-use libc::snprintf;
+use std::{borrow::Cow, ptr::null_mut};
 
 use crate::{
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     globals::{GenericError, StructuredError},
-    libxml::{
-        globals::xml_free,
-        relaxng::{
-            FLAGS_IGNORABLE, FLAGS_NEGATIVE, FLAGS_NOERROR, XmlRelaxNGValidErr,
-            XmlRelaxNGValidError,
-        },
-        xmlstring::{xml_char_strdup, xml_escape_format_string, xml_str_equal, xml_strdup},
+    libxml::relaxng::{
+        FLAGS_IGNORABLE, FLAGS_NEGATIVE, FLAGS_NOERROR, XmlRelaxNGValidErr, XmlRelaxNGValidError,
     },
     tree::XmlGenericNodePtr,
 };
@@ -22,270 +15,101 @@ const ERROR_IS_DUP: i32 = 1;
 ///
 /// Returns the error string, it must be deallocated by the caller
 #[doc(alias = "xmlRelaxNGGetErrorString")]
-unsafe fn xml_relaxng_get_error_string(
+fn xml_relaxng_get_error_string(
     err: XmlRelaxNGValidErr,
-    mut arg1: *const u8,
-    mut arg2: *const u8,
-) -> *mut u8 {
-    unsafe {
-        let mut msg: [i8; 1000] = [0; 1000];
-        let mut result: *mut u8;
+    arg1: Option<&str>,
+    arg2: Option<&str>,
+) -> Option<String> {
+    let arg1 = arg1.unwrap_or("");
+    let arg2 = arg2.unwrap_or("");
 
-        if arg1.is_null() {
-            arg1 = c"".as_ptr() as _;
+    match err {
+        XmlRelaxNGValidErr::XmlRelaxngOk => None,
+        XmlRelaxNGValidErr::XmlRelaxngErrMemory => Some("out of memory\n".to_string()),
+        XmlRelaxNGValidErr::XmlRelaxngErrType => Some(format!("failed to validate type {arg1}\n")),
+        XmlRelaxNGValidErr::XmlRelaxngErrTypeval => {
+            Some(format!("Type {arg1} doesn't allow value '{arg2}'\n"))
         }
-        if arg2.is_null() {
-            arg2 = c"".as_ptr() as _;
+        XmlRelaxNGValidErr::XmlRelaxngErrDupid => Some(format!("ID {arg1} redefined\n",)),
+        XmlRelaxNGValidErr::XmlRelaxngErrTypecmp => {
+            Some(format!("failed to compare type {arg1}\n"))
         }
-
-        msg[0] = 0;
-        match err {
-            XmlRelaxNGValidErr::XmlRelaxngOk => return null_mut(),
-            XmlRelaxNGValidErr::XmlRelaxngErrMemory => {
-                return xml_char_strdup(c"out of memory\n".as_ptr() as _);
-            }
-            XmlRelaxNGValidErr::XmlRelaxngErrType => {
-                snprintf(
-                    msg.as_mut_ptr() as _,
-                    1000,
-                    c"failed to validate type %s\n".as_ptr() as _,
-                    arg1,
-                );
-            }
-            XmlRelaxNGValidErr::XmlRelaxngErrTypeval => {
-                snprintf(
-                    msg.as_mut_ptr() as _,
-                    1000,
-                    c"Type %s doesn't allow value '%s'\n".as_ptr() as _,
-                    arg1,
-                    arg2,
-                );
-            }
-            XmlRelaxNGValidErr::XmlRelaxngErrDupid => {
-                snprintf(
-                    msg.as_mut_ptr() as _,
-                    1000,
-                    c"ID %s redefined\n".as_ptr() as _,
-                    arg1,
-                );
-            }
-            XmlRelaxNGValidErr::XmlRelaxngErrTypecmp => {
-                snprintf(
-                    msg.as_mut_ptr() as _,
-                    1000,
-                    c"failed to compare type %s\n".as_ptr() as _,
-                    arg1,
-                );
-            }
-            XmlRelaxNGValidErr::XmlRelaxngErrNostate => {
-                return xml_char_strdup(c"Internal error: no state\n".as_ptr() as _);
-            }
-            XmlRelaxNGValidErr::XmlRelaxngErrNodefine => {
-                return xml_char_strdup(c"Internal error: no define\n".as_ptr() as _);
-            }
-            XmlRelaxNGValidErr::XmlRelaxngErrInternal => {
-                snprintf(
-                    msg.as_mut_ptr() as _,
-                    1000,
-                    c"Internal error: %s\n".as_ptr() as _,
-                    arg1,
-                );
-            }
-            XmlRelaxNGValidErr::XmlRelaxngErrListextra => {
-                snprintf(
-                    msg.as_mut_ptr() as _,
-                    1000,
-                    c"Extra data in list: %s\n".as_ptr() as _,
-                    arg1,
-                );
-            }
-            XmlRelaxNGValidErr::XmlRelaxngErrInternodata => {
-                return xml_char_strdup(c"Internal: interleave block has no data\n".as_ptr() as _);
-            }
-            XmlRelaxNGValidErr::XmlRelaxngErrInterseq => {
-                return xml_char_strdup(c"Invalid sequence in interleave\n".as_ptr() as _);
-            }
-            XmlRelaxNGValidErr::XmlRelaxngErrInterextra => {
-                snprintf(
-                    msg.as_mut_ptr() as _,
-                    1000,
-                    c"Extra element %s in interleave\n".as_ptr() as _,
-                    arg1,
-                );
-            }
-            XmlRelaxNGValidErr::XmlRelaxngErrElemname => {
-                snprintf(
-                    msg.as_mut_ptr() as _,
-                    1000,
-                    c"Expecting element %s, got %s\n".as_ptr() as _,
-                    arg1,
-                    arg2,
-                );
-            }
-            XmlRelaxNGValidErr::XmlRelaxngErrElemnons => {
-                snprintf(
-                    msg.as_mut_ptr() as _,
-                    1000,
-                    c"Expecting a namespace for element %s\n".as_ptr() as _,
-                    arg1,
-                );
-            }
-            XmlRelaxNGValidErr::XmlRelaxngErrElemwrongns => {
-                snprintf(
-                    msg.as_mut_ptr() as _,
-                    1000,
-                    c"Element %s has wrong namespace: expecting %s\n".as_ptr() as _,
-                    arg1,
-                    arg2,
-                );
-            }
-            XmlRelaxNGValidErr::XmlRelaxngErrElemwrong => {
-                snprintf(
-                    msg.as_mut_ptr() as _,
-                    1000,
-                    c"Did not expect element %s there\n".as_ptr() as _,
-                    arg1,
-                );
-            }
-            XmlRelaxNGValidErr::XmlRelaxngErrTextwrong => {
-                snprintf(
-                    msg.as_mut_ptr() as _,
-                    1000,
-                    c"Did not expect text in element %s content\n".as_ptr() as _,
-                    arg1,
-                );
-            }
-            XmlRelaxNGValidErr::XmlRelaxngErrElemextrans => {
-                snprintf(
-                    msg.as_mut_ptr() as _,
-                    1000,
-                    c"Expecting no namespace for element %s\n".as_ptr() as _,
-                    arg1,
-                );
-            }
-            XmlRelaxNGValidErr::XmlRelaxngErrElemnotempty => {
-                snprintf(
-                    msg.as_mut_ptr() as _,
-                    1000,
-                    c"Expecting element %s to be empty\n".as_ptr() as _,
-                    arg1,
-                );
-            }
-            XmlRelaxNGValidErr::XmlRelaxngErrNoelem => {
-                snprintf(
-                    msg.as_mut_ptr() as _,
-                    1000,
-                    c"Expecting an element %s, got nothing\n".as_ptr() as _,
-                    arg1,
-                );
-            }
-            XmlRelaxNGValidErr::XmlRelaxngErrNotelem => {
-                return xml_char_strdup(c"Expecting an element got text\n".as_ptr() as _);
-            }
-            XmlRelaxNGValidErr::XmlRelaxngErrAttrvalid => {
-                snprintf(
-                    msg.as_mut_ptr() as _,
-                    1000,
-                    c"Element %s failed to validate attributes\n".as_ptr() as _,
-                    arg1,
-                );
-            }
-            XmlRelaxNGValidErr::XmlRelaxngErrContentvalid => {
-                snprintf(
-                    msg.as_mut_ptr() as _,
-                    1000,
-                    c"Element %s failed to validate content\n".as_ptr() as _,
-                    arg1,
-                );
-            }
-            XmlRelaxNGValidErr::XmlRelaxngErrExtracontent => {
-                snprintf(
-                    msg.as_mut_ptr() as _,
-                    1000,
-                    c"Element %s has extra content: %s\n".as_ptr() as _,
-                    arg1,
-                    arg2,
-                );
-            }
-            XmlRelaxNGValidErr::XmlRelaxngErrInvalidattr => {
-                snprintf(
-                    msg.as_mut_ptr() as _,
-                    1000,
-                    c"Invalid attribute %s for element %s\n".as_ptr() as _,
-                    arg1,
-                    arg2,
-                );
-            }
-            XmlRelaxNGValidErr::XmlRelaxngErrLackdata => {
-                snprintf(
-                    msg.as_mut_ptr() as _,
-                    1000,
-                    c"Datatype element %s contains no data\n".as_ptr() as _,
-                    arg1,
-                );
-            }
-            XmlRelaxNGValidErr::XmlRelaxngErrDataelem => {
-                snprintf(
-                    msg.as_mut_ptr() as _,
-                    1000,
-                    c"Datatype element %s has child elements\n".as_ptr() as _,
-                    arg1,
-                );
-            }
-            XmlRelaxNGValidErr::XmlRelaxngErrValelem => {
-                snprintf(
-                    msg.as_mut_ptr() as _,
-                    1000,
-                    c"Value element %s has child elements\n".as_ptr() as _,
-                    arg1,
-                );
-            }
-            XmlRelaxNGValidErr::XmlRelaxngErrListelem => {
-                snprintf(
-                    msg.as_mut_ptr() as _,
-                    1000,
-                    c"List element %s has child elements\n".as_ptr() as _,
-                    arg1,
-                );
-            }
-            XmlRelaxNGValidErr::XmlRelaxngErrDatatype => {
-                snprintf(
-                    msg.as_mut_ptr() as _,
-                    1000,
-                    c"Error validating datatype %s\n".as_ptr() as _,
-                    arg1,
-                );
-            }
-            XmlRelaxNGValidErr::XmlRelaxngErrValue => {
-                snprintf(
-                    msg.as_mut_ptr() as _,
-                    1000,
-                    c"Error validating value %s\n".as_ptr() as _,
-                    arg1,
-                );
-            }
-            XmlRelaxNGValidErr::XmlRelaxngErrList => {
-                return xml_char_strdup(c"Error validating list\n".as_ptr() as _);
-            }
-            XmlRelaxNGValidErr::XmlRelaxngErrNogrammar => {
-                return xml_char_strdup(c"No top grammar defined\n".as_ptr() as _);
-            }
-            XmlRelaxNGValidErr::XmlRelaxngErrExtradata => {
-                return xml_char_strdup(c"Extra data in the document\n".as_ptr() as _);
-            }
-            _ => return xml_char_strdup(c"Unknown error !\n".as_ptr() as _),
+        XmlRelaxNGValidErr::XmlRelaxngErrNostate => Some("Internal error: no state\n".to_string()),
+        XmlRelaxNGValidErr::XmlRelaxngErrNodefine => {
+            Some("Internal error: no define\n".to_string())
         }
-        if msg[0] == 0 {
-            snprintf(
-                msg.as_mut_ptr() as _,
-                1000,
-                c"Unknown error code %d\n".as_ptr() as _,
-                err,
-            );
+        XmlRelaxNGValidErr::XmlRelaxngErrInternal => Some(format!("Internal error: {arg1}\n")),
+        XmlRelaxNGValidErr::XmlRelaxngErrListextra => Some(format!("Extra data in list: {arg1}\n")),
+        XmlRelaxNGValidErr::XmlRelaxngErrInternodata => {
+            Some("Internal: interleave block has no data\n".to_string())
         }
-        msg[1000 - 1] = 0;
-        result = xml_char_strdup(msg.as_ptr() as _);
-        xml_escape_format_string(&raw mut result)
+        XmlRelaxNGValidErr::XmlRelaxngErrInterseq => {
+            Some("Invalid sequence in interleave\n".to_string())
+        }
+        XmlRelaxNGValidErr::XmlRelaxngErrInterextra => {
+            Some(format!("Extra element {arg1} in interleave\n",))
+        }
+        XmlRelaxNGValidErr::XmlRelaxngErrElemname => {
+            Some(format!("Expecting element {arg1}, got {arg2}\n"))
+        }
+        XmlRelaxNGValidErr::XmlRelaxngErrElemnons => {
+            Some(format!("Expecting a namespace for element {arg1}\n"))
+        }
+        XmlRelaxNGValidErr::XmlRelaxngErrElemwrongns => Some(format!(
+            "Element {arg1} has wrong namespace: expecting {arg2}\n"
+        )),
+        XmlRelaxNGValidErr::XmlRelaxngErrElemwrong => {
+            Some(format!("Did not expect element {arg1} there\n"))
+        }
+        XmlRelaxNGValidErr::XmlRelaxngErrTextwrong => {
+            Some(format!("Did not expect text in element {arg1} content\n"))
+        }
+        XmlRelaxNGValidErr::XmlRelaxngErrElemextrans => {
+            Some(format!("Expecting no namespace for element {arg1}\n"))
+        }
+        XmlRelaxNGValidErr::XmlRelaxngErrElemnotempty => {
+            Some(format!("Expecting element {arg1} to be empty\n"))
+        }
+        XmlRelaxNGValidErr::XmlRelaxngErrNoelem => {
+            Some(format!("Expecting an element {arg1}, got nothing\n"))
+        }
+        XmlRelaxNGValidErr::XmlRelaxngErrNotelem => {
+            Some("Expecting an element got text\n".to_string())
+        }
+        XmlRelaxNGValidErr::XmlRelaxngErrAttrvalid => {
+            Some(format!("Element {arg1} failed to validate attributes\n"))
+        }
+        XmlRelaxNGValidErr::XmlRelaxngErrContentvalid => {
+            Some(format!("Element {arg1} failed to validate content\n"))
+        }
+        XmlRelaxNGValidErr::XmlRelaxngErrExtracontent => {
+            Some(format!("Element {arg1} has extra content: {arg2}\n"))
+        }
+        XmlRelaxNGValidErr::XmlRelaxngErrInvalidattr => {
+            Some(format!("Invalid attribute {arg1} for element {arg2}\n"))
+        }
+        XmlRelaxNGValidErr::XmlRelaxngErrLackdata => {
+            Some(format!("Datatype element {arg1} contains no data\n"))
+        }
+        XmlRelaxNGValidErr::XmlRelaxngErrDataelem => {
+            Some(format!("Datatype element {arg1} has child elements\n"))
+        }
+        XmlRelaxNGValidErr::XmlRelaxngErrValelem => {
+            Some(format!("Value element {arg1} has child elements\n"))
+        }
+        XmlRelaxNGValidErr::XmlRelaxngErrListelem => {
+            Some(format!("List element {arg1} has child elements\n"))
+        }
+        XmlRelaxNGValidErr::XmlRelaxngErrDatatype => {
+            Some(format!("Error validating datatype {arg1}\n"))
+        }
+        XmlRelaxNGValidErr::XmlRelaxngErrValue => Some(format!("Error validating value {arg1}\n")),
+        XmlRelaxNGValidErr::XmlRelaxngErrList => Some("Error validating list\n".to_string()),
+        XmlRelaxNGValidErr::XmlRelaxngErrNogrammar => Some("No top grammar defined\n".to_string()),
+        XmlRelaxNGValidErr::XmlRelaxngErrExtradata => {
+            Some("Extra data in the document\n".to_string())
+        }
+        _ => Some("Unknown error !\n".to_string()),
     }
 }
 
@@ -345,38 +169,22 @@ unsafe fn xml_relaxng_show_valid_error(
     err: XmlRelaxNGValidErr,
     node: Option<XmlGenericNodePtr>,
     child: Option<XmlGenericNodePtr>,
-    arg1: *const u8,
-    arg2: *const u8,
+    arg1: Option<&str>,
+    arg2: Option<&str>,
 ) {
     unsafe {
         if (*ctxt).flags & FLAGS_NOERROR != 0 {
             return;
         }
 
-        let msg: *mut u8 = xml_relaxng_get_error_string(err, arg1, arg2);
-        if msg.is_null() {
+        let Some(message) = xml_relaxng_get_error_string(err, arg1, arg2) else {
             return;
-        }
-        let message = CStr::from_ptr(msg as *const i8)
-            .to_string_lossy()
-            .into_owned();
-        xml_free(msg as _);
+        };
 
         if (*ctxt).err_no == XmlRelaxNGValidErr::XmlRelaxngOk as i32 {
             (*ctxt).err_no = err as i32;
         }
-        xml_rng_verr(
-            ctxt,
-            child.or(node),
-            err as _,
-            message.as_str(),
-            (!arg1.is_null())
-                .then(|| CStr::from_ptr(arg1 as *const i8).to_string_lossy())
-                .as_deref(),
-            (!arg2.is_null())
-                .then(|| CStr::from_ptr(arg2 as *const i8).to_string_lossy())
-                .as_deref(),
-        );
+        xml_rng_verr(ctxt, child.or(node), err as _, message.as_str(), arg1, arg2);
     }
 }
 
@@ -392,23 +200,24 @@ pub(crate) unsafe fn xml_relaxng_dump_valid_error(ctxt: XmlRelaxNGValidCtxtPtr) 
                 if (*ctxt).err_tab[..i].iter().any(|dup| {
                     err.err == dup.err
                         && err.node == dup.node
-                        && xml_str_equal(err.arg1, dup.arg1)
-                        && xml_str_equal(err.arg2, dup.arg2)
+                        && err.arg1 == dup.arg1
+                        && err.arg2 == dup.arg2
                 }) {
                     if err.flags & ERROR_IS_DUP != 0 {
-                        if !err.arg1.is_null() {
-                            xml_free(err.arg1 as _);
-                        }
-                        err.arg1 = null_mut();
-                        if !err.arg2.is_null() {
-                            xml_free(err.arg2 as _);
-                        }
-                        err.arg2 = null_mut();
+                        err.arg1 = None;
+                        err.arg2 = None;
                         err.flags = 0;
                     }
                     continue;
                 }
-                xml_relaxng_show_valid_error(ctxt, err.err, err.node, err.seq, err.arg1, err.arg2);
+                xml_relaxng_show_valid_error(
+                    ctxt,
+                    err.err,
+                    err.node,
+                    err.seq,
+                    err.arg1.as_deref(),
+                    err.arg2.as_deref(),
+                );
                 k += 1;
             }
         }
@@ -424,9 +233,9 @@ pub(crate) unsafe fn xml_relaxng_dump_valid_error(ctxt: XmlRelaxNGValidCtxtPtr) 
 unsafe fn xml_relaxng_valid_error_push(
     ctxt: XmlRelaxNGValidCtxtPtr,
     err: XmlRelaxNGValidErr,
-    arg1: *const u8,
-    arg2: *const u8,
-    dup: i32,
+    arg1: Option<&str>,
+    arg2: Option<&str>,
+    _dup: i32,
 ) -> i32 {
     unsafe {
         if let Some(last_error) = (*ctxt).err_tab.last() {
@@ -441,15 +250,9 @@ unsafe fn xml_relaxng_valid_error_push(
             err,
             ..Default::default()
         };
-        if dup != 0 {
-            cur.arg1 = xml_strdup(arg1);
-            cur.arg2 = xml_strdup(arg2);
-            cur.flags = ERROR_IS_DUP;
-        } else {
-            cur.arg1 = arg1;
-            cur.arg2 = arg2;
-            cur.flags = 0;
-        }
+        cur.arg1 = arg1.map(|arg| arg.to_owned());
+        cur.arg2 = arg2.map(|arg| arg.to_owned());
+        cur.flags = 0;
         if !(*ctxt).state.is_null() {
             cur.node = (*(*ctxt).state).node;
             cur.seq = (*(*ctxt).state).seq;
@@ -466,18 +269,7 @@ unsafe fn xml_relaxng_valid_error_push(
 #[doc(alias = "xmlRelaxNGValidErrorPop")]
 pub(crate) unsafe fn xml_relaxng_valid_error_pop(ctxt: XmlRelaxNGValidCtxtPtr) {
     unsafe {
-        let Some(cur) = (*ctxt).err_tab.pop() else {
-            return;
-        };
-
-        if cur.flags & ERROR_IS_DUP != 0 {
-            if !cur.arg1.is_null() {
-                xml_free(cur.arg1 as _);
-            }
-            if !cur.arg2.is_null() {
-                xml_free(cur.arg2 as _);
-            }
-        }
+        (*ctxt).err_tab.pop();
     }
 }
 
@@ -487,14 +279,8 @@ pub(crate) unsafe fn xml_relaxng_pop_errors(ctxt: XmlRelaxNGValidCtxtPtr, level:
     unsafe {
         for err in (*ctxt).err_tab[level as usize..].iter_mut() {
             if err.flags & ERROR_IS_DUP != 0 {
-                if !err.arg1.is_null() {
-                    xml_free(err.arg1 as _);
-                }
-                err.arg1 = null_mut();
-                if !err.arg2.is_null() {
-                    xml_free(err.arg2 as _);
-                }
-                err.arg2 = null_mut();
+                err.arg1 = None;
+                err.arg2 = None;
                 err.flags = 0;
             }
         }
@@ -508,8 +294,8 @@ pub(crate) unsafe fn xml_relaxng_pop_errors(ctxt: XmlRelaxNGValidCtxtPtr, level:
 pub(crate) unsafe fn xml_relaxng_add_valid_error(
     ctxt: XmlRelaxNGValidCtxtPtr,
     err: XmlRelaxNGValidErr,
-    arg1: *const u8,
-    arg2: *const u8,
+    arg1: Option<&str>,
+    arg2: Option<&str>,
     dup: i32,
 ) {
     unsafe {
@@ -724,12 +510,12 @@ pub(crate) use xml_rng_perr;
 
 macro_rules! VALID_ERR {
     ($ctxt:expr, $a:expr) => {
-        $crate::relaxng::xml_relaxng_add_valid_error($ctxt, $a, null_mut(), null_mut(), 0);
+        $crate::relaxng::xml_relaxng_add_valid_error($ctxt, $a, None, None, 0);
     };
 }
 macro_rules! VALID_ERR2 {
     ($ctxt:expr, $a:expr, $b:expr) => {
-        $crate::relaxng::xml_relaxng_add_valid_error($ctxt, $a, $b, null_mut(), 0);
+        $crate::relaxng::xml_relaxng_add_valid_error($ctxt, $a, $b, None, 0);
     };
 }
 macro_rules! VALID_ERR3 {
@@ -739,7 +525,7 @@ macro_rules! VALID_ERR3 {
 }
 macro_rules! VALID_ERR2P {
     ($ctxt:expr, $a:expr, $b:expr) => {
-        $crate::relaxng::xml_relaxng_add_valid_error($ctxt, $a, $b, null_mut(), 1);
+        $crate::relaxng::xml_relaxng_add_valid_error($ctxt, $a, $b, None, 1);
     };
 }
 macro_rules! VALID_ERR3P {
