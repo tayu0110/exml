@@ -692,8 +692,7 @@ impl XmlXIncludeCtxt {
                     xml_free_node(now);
                     child = next;
                 }
-                let Some(mut end) =
-                    xml_new_doc_node(cur.doc, cur.ns, &cur.name().unwrap(), null_mut())
+                let Some(mut end) = xml_new_doc_node(cur.doc, cur.ns, &cur.name().unwrap(), None)
                 else {
                     xml_xinclude_err!(
                         self,

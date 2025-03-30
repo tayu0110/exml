@@ -1231,14 +1231,14 @@ pub unsafe fn xml_new_doc_node(
     doc: Option<XmlDocPtr>,
     ns: Option<XmlNsPtr>,
     name: &str,
-    content: *const XmlChar,
+    content: Option<&str>,
 ) -> Option<XmlNodePtr> {
     unsafe {
         let name = CString::new(name).unwrap();
         let cur = xml_new_node(ns, name.as_ptr() as *const u8);
         if let Some(mut cur) = cur {
             cur.doc = doc;
-            if !content.is_null() {
+            if let Some(content) = content {
                 cur.set_children(
                     doc.and_then(|doc| doc.get_node_list(content).map(|node| node.into())),
                 );
@@ -1272,13 +1272,13 @@ pub unsafe fn xml_new_doc_node_eat_name(
     doc: Option<XmlDocPtr>,
     ns: Option<XmlNsPtr>,
     name: *mut XmlChar,
-    content: *const XmlChar,
+    content: Option<&str>,
 ) -> Option<XmlNodePtr> {
     unsafe {
         let cur = xml_new_node_eat_name(ns, name);
         if let Some(mut cur) = cur {
             cur.doc = doc;
-            if !content.is_null() {
+            if let Some(content) = content {
                 cur.set_children(
                     doc.and_then(|doc| doc.get_node_list(content).map(|node| node.into())),
                 );
@@ -1388,7 +1388,7 @@ pub unsafe fn xml_new_child(
     mut parent: XmlGenericNodePtr,
     ns: Option<XmlNsPtr>,
     name: &str,
-    content: *const XmlChar,
+    content: Option<&str>,
 ) -> Option<XmlNodePtr> {
     unsafe {
         // Allocate a new node
@@ -1824,7 +1824,7 @@ pub unsafe fn xml_new_doc_raw_node(
     content: Option<&str>,
 ) -> Option<XmlNodePtr> {
     unsafe {
-        let cur = xml_new_doc_node(doc, ns, name, null_mut());
+        let cur = xml_new_doc_node(doc, ns, name, None);
         if let Some(mut cur) = cur {
             cur.doc = doc;
             if let Some(content) = content {

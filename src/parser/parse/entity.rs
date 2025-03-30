@@ -1,9 +1,4 @@
-use std::{
-    borrow::Cow,
-    ffi::CStr,
-    mem::take,
-    ptr::{null, null_mut},
-};
+use std::{borrow::Cow, ffi::CStr, mem::take, ptr::null_mut};
 
 use crate::{
     dict::xml_dict_free,
@@ -567,7 +562,7 @@ pub(crate) unsafe fn parse_external_entity_private(
         if let Some(url) = doc.url.as_deref() {
             new_doc.url = Some(url.to_owned());
         }
-        let Some(mut new_root) = xml_new_doc_node(Some(new_doc), None, "pseudoroot", null()) else {
+        let Some(mut new_root) = xml_new_doc_node(Some(new_doc), None, "pseudoroot", None) else {
             let sax = (*ctxt).sax.take();
             new_doc.int_subset = None;
             new_doc.ext_subset = None;

@@ -1616,7 +1616,9 @@ unsafe fn xml_sax2_attribute_internal(
         };
 
         if (*ctxt).replace_entities == 0 && (*ctxt).html == 0 {
-            ret.children = (*ctxt).my_doc.and_then(|doc| doc.get_node_list(value));
+            ret.children = (*ctxt).my_doc.and_then(|doc| {
+                doc.get_node_list(&CStr::from_ptr(value as *const i8).to_string_lossy())
+            });
             let mut tmp = ret.children();
             while let Some(mut now) = tmp {
                 now.set_parent(Some(ret.into()));
@@ -1928,7 +1930,7 @@ pub unsafe fn xml_sax2_start_element(
         // Note : the namespace resolution is deferred until the end of the
         //        attributes parsing, since local namespace can be defined as
         //        an attribute at this level.
-        let Some(mut ret) = xml_new_doc_node((*ctxt).my_doc, None, name, null_mut()) else {
+        let Some(mut ret) = xml_new_doc_node((*ctxt).my_doc, None, name, None) else {
             xml_sax2_err_memory(ctxt, "xmlSAX2StartElement");
             return;
         };
@@ -2146,9 +2148,9 @@ pub unsafe fn xml_sax2_start_element_ns(
             ret
         } else {
             let ret = if let Some(lname) = lname {
-                xml_new_doc_node((*ctxt).my_doc, None, &lname, null_mut())
+                xml_new_doc_node((*ctxt).my_doc, None, &lname, None)
             } else {
-                xml_new_doc_node((*ctxt).my_doc, None, localname, null_mut())
+                xml_new_doc_node((*ctxt).my_doc, None, localname, None)
             };
             let Some(ret) = ret else {
                 xml_sax2_err_memory(ctxt, "xmlSAX2StartElementNs");

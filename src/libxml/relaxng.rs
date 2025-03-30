@@ -1744,9 +1744,8 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                                 // Simplification 4.8. name attribute of element
                                 // and attribute elements
                                 if let Some(name) = now.get_prop("name") {
-                                    let cname = CString::new(name.as_str()).unwrap();
                                     let text = if let Some(children) = now.children() {
-                                        xml_new_doc_node(now.doc, now.ns, "name", null_mut()).map(
+                                        xml_new_doc_node(now.doc, now.ns, "name", None).map(
                                             |mut node| {
                                                 children.add_prev_sibling(node.into());
                                                 let text = xml_new_doc_text(node.doc, Some(&name));
@@ -1755,12 +1754,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                                             },
                                         )
                                     } else {
-                                        xml_new_child(
-                                            now.into(),
-                                            now.ns,
-                                            "name",
-                                            cname.as_ptr() as *const u8,
-                                        )
+                                        xml_new_child(now.into(), now.ns, "name", Some(&name))
                                     };
                                     if text.is_none() {
                                         xml_rng_perr!(
@@ -1818,8 +1812,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                                             let doc = now.doc;
                                             if let Some(ns) = now.search_ns(doc, Some(prefix)) {
                                                 now.set_prop("ns", ns.href().as_deref());
-                                                let local = CString::new(local).unwrap();
-                                                now.set_content(local.as_ptr() as *const u8);
+                                                now.set_content(local);
                                             } else {
                                                 xml_rng_perr!(
                                                     ctxt,

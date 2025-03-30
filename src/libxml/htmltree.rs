@@ -314,7 +314,7 @@ pub unsafe fn html_set_meta_encoding(doc: XmlDocPtr, encoding: Option<&str>) -> 
                 if encoding.is_some() {
                     if let Some(mut head) = head {
                         // Create a new Meta element with the right attributes
-                        let meta = xml_new_doc_node(Some(doc), None, "meta", null_mut());
+                        let meta = xml_new_doc_node(Some(doc), None, "meta", None);
                         if let Some(children) = head.children() {
                             children.add_prev_sibling(meta.unwrap().into());
                         } else {
@@ -401,7 +401,7 @@ pub unsafe fn html_set_meta_encoding(doc: XmlDocPtr, encoding: Option<&str>) -> 
             }
         } else if let Some(mut head) = head.filter(|_| encoding.is_some()) {
             // Create a new Meta element with the right attributes
-            let meta = xml_new_doc_node(Some(doc), None, "meta", null_mut());
+            let meta = xml_new_doc_node(Some(doc), None, "meta", None);
             if let Some(children) = head.children() {
                 children.add_prev_sibling(meta.unwrap().into());
             } else {

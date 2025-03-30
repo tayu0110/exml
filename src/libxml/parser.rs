@@ -47,7 +47,7 @@ use std::{
     cell::RefCell,
     ffi::{CStr, c_char, c_void},
     io::Read,
-    ptr::{addr_of_mut, null, null_mut},
+    ptr::{addr_of_mut, null_mut},
     rc::Rc,
     slice::from_raw_parts,
     str::from_utf8,
@@ -1975,7 +1975,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
             new_doc.int_subset = doc.int_subset;
             new_doc.ext_subset = doc.ext_subset;
         }
-        let Some(new_root) = xml_new_doc_node(Some(new_doc), None, "pseudoroot", null()) else {
+        let Some(new_root) = xml_new_doc_node(Some(new_doc), None, "pseudoroot", None) else {
             if replaced {
                 (*ctxt).sax = oldsax;
             }

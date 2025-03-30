@@ -216,8 +216,7 @@ pub(crate) unsafe fn xml_parse_balanced_chunk_memory_internal(
             (*ctxt).my_doc = Some(new);
             new
         };
-        let Some(new_root) = xml_new_doc_node((*ctxt).my_doc, None, "pseudoroot", null_mut())
-        else {
+        let Some(new_root) = xml_new_doc_node((*ctxt).my_doc, None, "pseudoroot", None) else {
             (*oldctxt).sax = (*ctxt).sax.take();
             (*ctxt).sax = oldsax;
             (*ctxt).dict = null_mut();

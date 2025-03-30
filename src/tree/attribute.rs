@@ -425,7 +425,7 @@ impl From<XmlAttrPtr> for *mut XmlAttr {
 pub unsafe fn xml_new_doc_prop(
     doc: Option<XmlDocPtr>,
     name: *const XmlChar,
-    value: *const XmlChar,
+    value: Option<&str>,
 ) -> Option<XmlAttrPtr> {
     unsafe {
         if name.is_null() {
@@ -442,7 +442,7 @@ pub unsafe fn xml_new_doc_prop(
             xml_tree_err_memory("building attribute");
             return None;
         };
-        if !value.is_null() {
+        if let Some(value) = value {
             cur.children = doc.and_then(|doc| doc.get_node_list(value));
             cur.last = None;
 
@@ -618,15 +618,15 @@ pub(super) unsafe fn xml_copy_prop_internal(
             return None;
         }
         let mut ret = if let Some(target) = target {
-            xml_new_doc_prop(target.doc, cur.name, null_mut())
+            xml_new_doc_prop(target.doc, cur.name, None)
         } else if let Some(doc) = doc {
-            xml_new_doc_prop(Some(doc), cur.name, null_mut())
+            xml_new_doc_prop(Some(doc), cur.name, None)
         } else if let Some(parent) = cur.parent() {
-            xml_new_doc_prop(parent.document(), cur.name, null_mut())
+            xml_new_doc_prop(parent.document(), cur.name, None)
         } else if let Some(children) = cur.children() {
-            xml_new_doc_prop(children.document(), cur.name, null_mut())
+            xml_new_doc_prop(children.document(), cur.name, None)
         } else {
-            xml_new_doc_prop(None, cur.name, null_mut())
+            xml_new_doc_prop(None, cur.name, None)
         }?;
         ret.parent = target;
 

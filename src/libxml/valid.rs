@@ -6262,8 +6262,7 @@ pub unsafe fn xml_valid_get_valid_elements(
         let parent_last = parent.last();
 
         // Creates a dummy node and insert it into the tree
-        let Some(mut test_node) =
-            xml_new_doc_node(ref_node.document(), None, "<!dummy?>", null_mut())
+        let Some(mut test_node) = xml_new_doc_node(ref_node.document(), None, "<!dummy?>", None)
         else {
             return -1;
         };
