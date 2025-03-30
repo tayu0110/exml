@@ -16562,12 +16562,12 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                                     ns,
                                     &CStr::from_ptr((*iattr).local_name as *const i8)
                                         .to_string_lossy(),
-                                    value,
+                                    Some(&CStr::from_ptr(value as *const i8).to_string_lossy()),
                                 );
                             } else if xml_new_prop(
                                 Some(def_attr_owner_elem),
                                 (*iattr).local_name,
-                                value,
+                                Some(&CStr::from_ptr(value as *const i8).to_string_lossy()),
                             )
                             .is_none()
                             {

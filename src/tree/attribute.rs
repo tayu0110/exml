@@ -469,7 +469,7 @@ pub(super) unsafe fn xml_new_prop_internal(
     node: Option<XmlNodePtr>,
     ns: Option<XmlNsPtr>,
     name: &str,
-    value: *const XmlChar,
+    value: Option<&str>,
 ) -> Option<XmlAttrPtr> {
     unsafe {
         if node.is_some_and(|node| !matches!(node.element_type(), XmlElementType::XmlElementNode)) {
@@ -494,18 +494,8 @@ pub(super) unsafe fn xml_new_prop_internal(
             cur.doc = doc;
         }
 
-        if !value.is_null() {
-            cur.set_children(
-                xml_new_doc_text(
-                    doc,
-                    Some(
-                        CStr::from_ptr(value as *const i8)
-                            .to_string_lossy()
-                            .as_ref(),
-                    ),
-                )
-                .map(|node| node.into()),
-            );
+        if let Some(value) = value {
+            cur.set_children(xml_new_doc_text(doc, Some(value)).map(|node| node.into()));
             cur.set_last(None);
             let mut tmp = cur.children();
             while let Some(mut now) = tmp {
@@ -530,17 +520,10 @@ pub(super) unsafe fn xml_new_prop_internal(
             }
         }
 
-        if !value.is_null() {
+        if let Some(value) = value {
             if let Some(node) = node {
                 if xml_is_id(node.doc, Some(node), Some(cur)) == 1 {
-                    xml_add_id(
-                        null_mut(),
-                        node.doc.unwrap(),
-                        CStr::from_ptr(value as *const i8)
-                            .to_string_lossy()
-                            .as_ref(),
-                        cur,
-                    );
+                    xml_add_id(null_mut(), node.doc.unwrap(), value, cur);
                 }
             }
         }
@@ -561,7 +544,7 @@ pub(super) unsafe fn xml_new_prop_internal(
 pub unsafe fn xml_new_prop(
     node: Option<XmlNodePtr>,
     name: *const XmlChar,
-    value: *const XmlChar,
+    value: Option<&str>,
 ) -> Option<XmlAttrPtr> {
     unsafe {
         if name.is_null() {
@@ -580,7 +563,7 @@ pub unsafe fn xml_new_ns_prop(
     node: Option<XmlNodePtr>,
     ns: Option<XmlNsPtr>,
     name: &str,
-    value: *const XmlChar,
+    value: Option<&str>,
 ) -> Option<XmlAttrPtr> {
     unsafe { xml_new_prop_internal(node, ns, name, value) }
 }
@@ -592,7 +575,7 @@ pub unsafe fn xml_new_ns_prop_eat_name(
     node: Option<XmlNodePtr>,
     ns: Option<XmlNsPtr>,
     name: *mut XmlChar,
-    value: *const XmlChar,
+    value: Option<&str>,
 ) -> Option<XmlAttrPtr> {
     unsafe {
         if name.is_null() {

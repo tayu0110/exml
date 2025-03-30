@@ -320,13 +320,8 @@ pub unsafe fn html_set_meta_encoding(doc: XmlDocPtr, encoding: Option<&str>) -> 
                         } else {
                             head.add_child(meta.unwrap().into());
                         }
-                        xml_new_prop(
-                            meta,
-                            c"http-equiv".as_ptr() as _,
-                            c"Content-Type".as_ptr() as _,
-                        );
-                        let newcontent = CString::new(newcontent).unwrap();
-                        xml_new_prop(meta, c"content".as_ptr() as _, newcontent.as_ptr() as _);
+                        xml_new_prop(meta, c"http-equiv".as_ptr() as _, Some("Content-Type"));
+                        xml_new_prop(meta, c"content".as_ptr() as _, Some(&newcontent));
                     }
                 }
                 return 0;
@@ -407,13 +402,8 @@ pub unsafe fn html_set_meta_encoding(doc: XmlDocPtr, encoding: Option<&str>) -> 
             } else {
                 head.add_child(meta.unwrap().into());
             }
-            xml_new_prop(
-                meta,
-                c"http-equiv".as_ptr() as _,
-                c"Content-Type".as_ptr() as _,
-            );
-            let newcontent = CString::new(newcontent).unwrap();
-            xml_new_prop(meta, c"content".as_ptr() as _, newcontent.as_ptr() as _);
+            xml_new_prop(meta, c"http-equiv".as_ptr() as _, Some("Content-Type"));
+            xml_new_prop(meta, c"content".as_ptr() as _, Some(&newcontent));
         }
 
         0

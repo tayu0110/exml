@@ -1607,7 +1607,7 @@ unsafe fn xml_sax2_attribute_internal(
         };
 
         // !!!!!! <a toto:arg="" xmlns:toto="http://toto.com">
-        let Some(mut ret) = xml_new_ns_prop((*ctxt).node, namespace, name, null()) else {
+        let Some(mut ret) = xml_new_ns_prop((*ctxt).node, namespace, name, None) else {
             // goto error;
             if !nval.is_null() {
                 xml_free(nval as _);
@@ -2440,7 +2440,7 @@ unsafe fn xml_sax2_attribute_ns(
                 (*ctxt).node,
                 namespace,
                 &CStr::from_ptr(localname as *const i8).to_string_lossy(),
-                null_mut(),
+                None,
             ) else {
                 xml_err_memory(ctxt, Some("xmlSAX2AttributeNs"));
                 return;

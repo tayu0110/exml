@@ -1136,8 +1136,6 @@ impl XmlNode {
         value: Option<&str>,
     ) -> Option<XmlAttrPtr> {
         unsafe {
-            use std::ptr::null;
-
             use crate::{
                 libxml::valid::{xml_add_id, xml_remove_id},
                 tree::{
@@ -1185,13 +1183,7 @@ impl XmlNode {
                 return Some(prop);
             }
             // No equal attr found; create a new one.
-            let value = value.map(|v| CString::new(v).unwrap());
-            xml_new_prop_internal(
-                XmlNodePtr::from_raw(self).unwrap(),
-                ns,
-                name,
-                value.as_deref().map_or(null(), |v| v.as_ptr() as *const u8),
-            )
+            xml_new_prop_internal(XmlNodePtr::from_raw(self).unwrap(), ns, name, value)
         }
     }
 

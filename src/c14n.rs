@@ -30,12 +30,7 @@
 //
 // Author: Aleksey Sanin <aleksey@aleksey.com>
 
-use std::{
-    cmp::Ordering,
-    ffi::{CStr, CString},
-    ptr::null_mut,
-    rc::Rc,
-};
+use std::{cmp::Ordering, ffi::CStr, ptr::null_mut, rc::Rc};
 
 use crate::{
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
@@ -1130,10 +1125,7 @@ impl<T> XmlC14NCtx<'_, T> {
             }
 
             // create and return the new attribute node
-            let res = CString::new(res).unwrap();
-            let Some(attr) =
-                xml_new_ns_prop(None, xml_base_attr.ns, "base", res.as_ptr() as *const u8)
-            else {
+            let Some(attr) = xml_new_ns_prop(None, xml_base_attr.ns, "base", Some(&res)) else {
                 xml_c14n_err_internal("processing xml:base attribute - can't construct attribute");
                 return None;
             };
