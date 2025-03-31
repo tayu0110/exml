@@ -23,7 +23,6 @@ use crate::{
             XmlValidCtxtPtr, xml_free_element_content, xml_free_valid_ctxt, xml_new_valid_ctxt,
         },
         xmlautomata::XmlAutomataPtr,
-        xmlmodule::XmlModulePtr,
         xmlreader::{XmlTextReaderLocatorPtr, XmlTextReaderPtr},
         xmlregexp::{XmlExpCtxtPtr, XmlExpNodePtr, XmlRegExecCtxtPtr},
         xmlschemastypes::{XmlSchemaValPtr, XmlSchemaWhitespaceValueType},
@@ -97,11 +96,7 @@ pub(crate) const GEN_NB_XML_PATTERN_PTR: i32 = 1;
 pub(crate) const GEN_NB_XML_RELAXNG_PTR: i32 = 1;
 #[cfg(feature = "schema")]
 pub(crate) const GEN_NB_XML_RELAXNG_VALID_CTXT_PTR: i32 = 1;
-#[cfg(any(
-    feature = "libxml_modules",
-    feature = "libxml_reader",
-    feature = "schema"
-))]
+#[cfg(any(feature = "libxml_reader", feature = "schema"))]
 pub(crate) const GEN_NB_VOID_PTR_PTR: i32 = 1;
 pub(crate) const GEN_NB_XML_URIPTR: i32 = 1;
 pub(crate) const GEN_NB_CHAR_PTR: i32 = 1;
@@ -114,8 +109,6 @@ pub(crate) const GEN_NB_XML_XINCLUDE_CTXT_PTR: i32 = 1;
 pub(crate) const GEN_NB_XML_AUTOMATA_STATE_PTR: i32 = 1;
 #[cfg(feature = "libxml_automata")]
 pub(crate) const GEN_NB_XML_AUTOMATA_PTR: i32 = 1;
-#[cfg(feature = "libxml_modules")]
-pub(crate) const GEN_NB_XML_MODULE_PTR: i32 = 1;
 #[cfg(feature = "libxml_reader")]
 pub(crate) const GEN_NB_XML_TEXT_READER_LOCATOR_PTR: i32 = 1;
 #[cfg(feature = "libxml_reader")]
@@ -458,14 +451,6 @@ pub(crate) fn gen_xml_text_reader_locator_ptr(_no: i32, _nr: i32) -> XmlTextRead
 #[cfg(feature = "libxml_reader")]
 pub(crate) fn des_xml_text_reader_locator_ptr(_no: i32, _val: XmlTextReaderLocatorPtr, _nr: i32) {}
 
-#[cfg(feature = "libxml_modules")]
-pub(crate) fn gen_xml_module_ptr(_no: i32, _nr: i32) -> XmlModulePtr {
-    null_mut()
-}
-
-#[cfg(feature = "libxml_modules")]
-pub(crate) fn des_xml_module_ptr(_no: i32, _val: XmlModulePtr, _nr: i32) {}
-
 #[cfg(feature = "libxml_automata")]
 pub(crate) fn gen_xml_automata_ptr(_no: i32, _nr: i32) -> XmlAutomataPtr {
     null_mut()
@@ -534,20 +519,12 @@ pub(crate) unsafe fn desret_xml_schema_parser_ctxt_ptr(val: XmlSchemaParserCtxtP
 #[cfg(feature = "schema")]
 pub(crate) fn desret_xml_schema_type_ptr(_val: XmlSchemaTypePtr) {}
 
-#[cfg(any(
-    feature = "libxml_modules",
-    feature = "libxml_reader",
-    feature = "schema"
-))]
+#[cfg(any(feature = "libxml_reader", feature = "schema"))]
 pub(crate) fn gen_void_ptr_ptr(_no: i32, _nr: i32) -> *mut *mut c_void {
     null_mut()
 }
 
-#[cfg(any(
-    feature = "libxml_modules",
-    feature = "libxml_reader",
-    feature = "schema"
-))]
+#[cfg(any(feature = "libxml_reader", feature = "schema"))]
 pub(crate) fn des_void_ptr_ptr(_no: i32, _val: *mut *mut c_void, _nr: i32) {}
 
 #[cfg(feature = "schema")]

@@ -25,8 +25,6 @@ pub mod xlink;
 #[cfg(any(feature = "libxml_regexp", feature = "libxml_automata"))]
 pub mod xmlautomata;
 pub mod xmlmemory;
-#[cfg(feature = "libxml_modules")]
-pub mod xmlmodule;
 pub mod xmlreader;
 #[cfg(feature = "libxml_regexp")]
 pub mod xmlregexp;

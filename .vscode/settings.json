@@ -15,7 +15,6 @@
         "libxml_debug",
         "libxml_expr",
         "libxml_iso8859x",
-        "libxml_modules",
         "libxml_output",
         "libxml_pattern",
         "libxml_push",
