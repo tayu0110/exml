@@ -1,6 +1,6 @@
-//! Provide methods and data structures for handling I/O actions.  
-//! This module is based on `libxml/xmlIO.h`, `xmlIO.c`, and so on in `libxml2-v2.11.8`.
+//! Provide methods and data structures for handling I/O actions.
 //!
+//! This module is based on `libxml/xmlIO.h`, `xmlIO.c`, and so on in `libxml2-v2.11.8`.  
 //! Please refer to original libxml2 documents also.
 
 // Copyright of the original code is the following.

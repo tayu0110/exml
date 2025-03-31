@@ -375,15 +375,15 @@ impl XmlDtdPtr {
         }
     }
 
-    /// Acquire the ownership of the inner value.  
-    /// As a result, `self` will be invalid. `self` must not be used after performs this method.
-    ///
-    /// # Safety
-    /// This method should be called only once.  
-    /// If called more than twice, the behavior is undefined.
-    pub(crate) unsafe fn into_inner(self) -> Box<XmlDtd> {
-        unsafe { Box::from_raw(self.0.as_ptr()) }
-    }
+    // /// Acquire the ownership of the inner value.
+    // /// As a result, `self` will be invalid. `self` must not be used after performs this method.
+    // ///
+    // /// # Safety
+    // /// This method should be called only once.
+    // /// If called more than twice, the behavior is undefined.
+    // pub(crate) unsafe fn into_inner(self) -> Box<XmlDtd> {
+    //     unsafe { Box::from_raw(self.0.as_ptr()) }
+    // }
 }
 
 impl Clone for XmlDtdPtr {

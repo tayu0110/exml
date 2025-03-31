@@ -140,30 +140,30 @@ impl XmlElementPtr {
         NonNull::new(Box::leak(boxed)).map(Self)
     }
 
-    /// Create `XmlElementPtr` from a raw pointer.  
-    ///
-    /// If `ptr` is a NULL pointer, return `Ok(None)`.  
-    /// If `ptr` is a valid pointer of `XmlElement`, return `Ok(Some(Self))`.  
-    /// Otherwise, return `Err`.
-    ///
-    /// # Safety
-    /// - `ptr` must be a pointer of types that is implemented `NodeCommon` at least.
-    pub(crate) unsafe fn from_raw(
-        ptr: *mut XmlElement,
-    ) -> Result<Option<Self>, InvalidNodePointerCastError> {
-        unsafe {
-            if ptr.is_null() {
-                return Ok(None);
-            }
-            match (*ptr).element_type() {
-                XmlElementType::XmlElementDecl => Ok(Some(Self(NonNull::new_unchecked(ptr)))),
-                _ => Err(InvalidNodePointerCastError {
-                    from: (*ptr).element_type(),
-                    to: type_name::<Self>(),
-                }),
-            }
-        }
-    }
+    // /// Create `XmlElementPtr` from a raw pointer.
+    // ///
+    // /// If `ptr` is a NULL pointer, return `Ok(None)`.
+    // /// If `ptr` is a valid pointer of `XmlElement`, return `Ok(Some(Self))`.
+    // /// Otherwise, return `Err`.
+    // ///
+    // /// # Safety
+    // /// - `ptr` must be a pointer of types that is implemented `NodeCommon` at least.
+    // pub(crate) unsafe fn from_raw(
+    //     ptr: *mut XmlElement,
+    // ) -> Result<Option<Self>, InvalidNodePointerCastError> {
+    //     unsafe {
+    //         if ptr.is_null() {
+    //             return Ok(None);
+    //         }
+    //         match (*ptr).element_type() {
+    //             XmlElementType::XmlElementDecl => Ok(Some(Self(NonNull::new_unchecked(ptr)))),
+    //             _ => Err(InvalidNodePointerCastError {
+    //                 from: (*ptr).element_type(),
+    //                 to: type_name::<Self>(),
+    //             }),
+    //         }
+    //     }
+    // }
 
     // pub(crate) fn as_ptr(self) -> *mut XmlElement {
     //     self.0.as_ptr()
@@ -180,15 +180,15 @@ impl XmlElementPtr {
         }
     }
 
-    /// Acquire the ownership of the inner value.  
-    /// As a result, `self` will be invalid. `self` must not be used after performs this method.
-    ///
-    /// # Safety
-    /// This method should be called only once.  
-    /// If called more than twice, the behavior is undefined.
-    pub(crate) unsafe fn into_inner(self) -> Box<XmlElement> {
-        unsafe { Box::from_raw(self.0.as_ptr()) }
-    }
+    // /// Acquire the ownership of the inner value.
+    // /// As a result, `self` will be invalid. `self` must not be used after performs this method.
+    // ///
+    // /// # Safety
+    // /// This method should be called only once.
+    // /// If called more than twice, the behavior is undefined.
+    // pub(crate) unsafe fn into_inner(self) -> Box<XmlElement> {
+    //     unsafe { Box::from_raw(self.0.as_ptr()) }
+    // }
 }
 
 impl Clone for XmlElementPtr {

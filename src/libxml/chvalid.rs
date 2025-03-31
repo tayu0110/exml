@@ -1,6 +1,6 @@
-//! Provide methods and data structures for handling Unicode characters and strings.  
-//! This module is based on `libxml/chvalid.h`, `chvalid.c`, and so on in `libxml2-v2.11.8`.
+//! Provide methods and data structures for handling Unicode characters and strings.
 //!
+//! This module is based on `libxml/chvalid.h`, `chvalid.c`, and so on in `libxml2-v2.11.8`.  
 //! Please refer to original libxml2 documents also.
 
 // Copyright of the original code is the following.
@@ -574,22 +574,6 @@ pub(crate) fn xml_is_ideographic(c: u32) -> bool {
         (0x4e00..=0x9fa5).contains(&c) || c == 0x3007 || (0x3021..=0x3029).contains(&c)
     }
 }
-
-// const XML_IS_IDEOGRAPHIC_SRNG: &[XmlChSRange] = &[
-//     XmlChSRange {
-//         range: 0x3007..=0x3007,
-//     },
-//     XmlChSRange {
-//         range: 0x3021..=0x3029,
-//     },
-//     XmlChSRange {
-//         range: 0x4e00..=0x9fa5,
-//     },
-// ];
-// pub(crate) const XML_IS_IDEOGRAPHIC_GROUP: XmlChRangeGroup = XmlChRangeGroup {
-//     short_range: XML_IS_IDEOGRAPHIC_SRNG,
-//     long_range: &[],
-// };
 
 pub const XML_IS_PUBID_CHAR_TAB: [bool; 256] = [
     false, false, false, false, false, false, false, false, false, false, true, false, false, true,

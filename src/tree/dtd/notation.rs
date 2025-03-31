@@ -54,12 +54,12 @@ pub fn xml_dump_notation_decl<'a>(out: &mut (impl Write + 'a), nota: &XmlNotatio
         write!(out, " PUBLIC ").ok();
         write_quoted(out, public_id).ok();
         if let Some(system_id) = nota.system_id.as_deref() {
-            write!(out, " ");
+            write!(out, " ").ok();
             write_quoted(out, system_id).ok();
         }
     } else {
-        write!(out, " SYSTEM ");
-        write_quoted(out, nota.system_id.as_deref().unwrap());
+        write!(out, " SYSTEM ").ok();
+        write_quoted(out, nota.system_id.as_deref().unwrap()).ok();
     }
     writeln!(out, " >").ok();
 }

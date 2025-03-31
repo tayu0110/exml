@@ -1419,11 +1419,6 @@ impl XmlStreamCtxt {
             != 0
     }
 
-    #[doc(alias = "XML_STREAM_XS_IDC_SEL")]
-    fn is_xs_idc_sel(&self) -> bool {
-        self.flags & XmlPatternFlags::XmlPatternXSSel as i32 != 0
-    }
-
     /// Add a new state to the stream context
     ///
     /// Returns -1 in case of error or the state index if successful

@@ -60,9 +60,9 @@ impl XmlParserNodeInfoSeq {
         self.buffer.clear();
     }
 
-    pub(crate) fn len(&self) -> usize {
-        self.buffer.len()
-    }
+    // pub(crate) fn len(&self) -> usize {
+    //     self.buffer.len()
+    // }
 
     pub(crate) fn insert(&mut self, index: usize, info: Rc<RefCell<XmlParserNodeInfo>>) {
         self.buffer.insert(index, info);

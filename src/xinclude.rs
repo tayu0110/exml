@@ -44,8 +44,7 @@ use crate::{
             XML_DETECT_IDS, XmlParserOption, xml_ctxt_use_options, xml_init_parser,
             xml_load_external_entity, xml_parse_document,
         },
-        parser_internals::xml_string_current_char,
-        xmlstring::{XmlChar, xml_str_equal},
+        xmlstring::xml_str_equal,
         xpointer::{xml_xptr_eval, xml_xptr_new_context},
     },
     parser::{xml_free_parser_ctxt, xml_new_parser_ctxt},
@@ -1512,7 +1511,6 @@ impl XmlXIncludeCtxt {
     #[doc(alias = "xmlXIncludeLoadTxt")]
     unsafe fn load_txt(&mut self, mut url: &str, ref_index: usize) -> i32 {
         unsafe {
-            let mut i: i32;
             let mut ret: i32 = -1;
             let mut enc = XmlCharEncoding::None;
 
@@ -1610,21 +1608,13 @@ impl XmlXIncludeCtxt {
             // Scan all chars from the resource and add the to the node
             while buf.borrow_mut().grow(4096) > 0 {}
 
-            let content: *const XmlChar = buf.borrow().buffer.map_or(null_mut(), |buf| {
-                if buf.is_ok() {
-                    buf.as_ref().as_ptr()
-                } else {
-                    null_mut()
+            let content = buf.borrow().buffer.unwrap();
+            let content = content.as_ref();
+            match std::str::from_utf8(content) {
+                Ok(content) if content.chars().all(|c| xml_is_char(c as u32)) => {
+                    node.add_content_len(content.as_ptr(), content.len() as i32);
                 }
-            });
-            let len: i32 = buf.borrow().buffer.map_or(0, |buf| buf.len()) as i32;
-            i = 0;
-            while i < len {
-                let mut l: i32 = 0;
-
-                let cur: i32 =
-                    xml_string_current_char(null_mut(), content.add(i as usize), addr_of_mut!(l));
-                if !xml_is_char(cur as u32) {
+                _ => {
                     xml_xinclude_err!(
                         self,
                         self.inc_tab[ref_index].elem.map(|node| node.into()),
@@ -1637,11 +1627,7 @@ impl XmlXIncludeCtxt {
                     xml_free_parser_ctxt(pctxt);
                     return ret;
                 }
-
-                i += l;
             }
-
-            node.add_content_len(content, len);
 
             self.txt_tab.push(XmlXIncludeTxt {
                 text: node.content.as_deref().unwrap().into(),

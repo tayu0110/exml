@@ -1,6 +1,6 @@
-//! Provide methods and data structures for parsing XML documents.  
-//! This module is based on `libxml/parser.h`, `parser.c`, and so on in `libxml2-v2.11.8`.
+//! Provide methods and data structures for parsing XML documents.
 //!
+//! This module is based on `libxml/parser.h`, `parser.c`, and so on in `libxml2-v2.11.8`.  
 //! Please refer to original libxml2 documents also.
 
 // Copyright of the original code is the following.
@@ -2206,7 +2206,6 @@ pub unsafe fn xml_create_push_parser_ctxt(
 }
 
 pub(crate) const XML_PARSER_BIG_BUFFER_SIZE: usize = 300;
-const XML_PARSER_BUFFER_SIZE: usize = 100;
 
 /// Check whether the input buffer contains a string.
 #[doc(alias = "xmlParseLookupString")]

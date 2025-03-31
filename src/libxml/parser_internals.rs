@@ -1,6 +1,6 @@
-//! Provide internal methods and data structures for parsing XML documents.  
-//! This module is based on `libxml/parserInternals.h`, `parserInternals.c`, and so on in `libxml2-v2.11.8`.
+//! Provide internal methods and data structures for parsing XML documents.
 //!
+//! This module is based on `libxml/parserInternals.h`, `parserInternals.c`, and so on in `libxml2-v2.11.8`.  
 //! Please refer to original libxml2 documents also.
 
 // Copyright of the original code is the following.
@@ -28,20 +28,18 @@ use std::{
 };
 
 use crate::{
-    encoding::XmlCharEncoding,
     error::XmlParserErrors,
     globals::GenericErrorContext,
     libxml::{
-        chvalid::{xml_is_base_char, xml_is_char, xml_is_ideographic},
+        chvalid::{xml_is_base_char, xml_is_ideographic},
         dict::xml_dict_free,
         parser::{XML_SKIP_IDS, XmlParserInputState, XmlParserOption},
         valid::xml_validate_element,
         xmlstring::XmlChar,
     },
     parser::{
-        __xml_err_encoding, XmlParserCtxtPtr, parse_comment, parse_content, parse_pi,
-        xml_create_memory_parser_ctxt, xml_err_encoding_int, xml_fatal_err, xml_fatal_err_msg,
-        xml_free_parser_ctxt,
+        XmlParserCtxtPtr, parse_comment, parse_content, parse_pi, xml_create_memory_parser_ctxt,
+        xml_err_encoding_int, xml_fatal_err, xml_fatal_err_msg, xml_free_parser_ctxt,
     },
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlDocProperties, XmlElementType, XmlGenericNodePtr,
@@ -113,8 +111,6 @@ pub fn xml_is_letter(c: u32) -> bool {
 pub(crate) const XML_VCTXT_DTD_VALIDATED: usize = 1usize << 0;
 /// Set if the validation context is part of a parser context.
 pub(crate) const XML_VCTXT_USE_PCTXT: usize = 1usize << 1;
-
-const XML_PARSER_BUFFER_SIZE: usize = 100;
 
 // #[doc(alias = "xmlParseCharData")]
 // pub(crate) unsafe fn xml_parse_char_data(ctxt: XmlParserCtxtPtr, _cdata: i32) {
@@ -353,122 +349,6 @@ pub(crate) const XML_SUBSTITUTE_PEREF: usize = 2;
 // /// Both general and parameter entities need to be substituted.
 // const XML_SUBSTITUTE_BOTH: usize = 3;
 
-/// The current c_char value, if using UTF-8 this may actually span multiple
-/// bytes in the input buffer.
-///
-/// Returns the current c_char value and its length
-#[doc(alias = "xmlStringCurrentChar")]
-pub(crate) unsafe fn xml_string_current_char(
-    ctxt: XmlParserCtxtPtr,
-    cur: *const XmlChar,
-    len: *mut i32,
-) -> i32 {
-    unsafe {
-        if len.is_null() || cur.is_null() {
-            return 0;
-        }
-        'encoding_error: {
-            if ctxt.is_null() || (*ctxt).charset == XmlCharEncoding::UTF8 {
-                // We are supposed to handle UTF8, check it's valid
-                // From rfc2044: encoding of the Unicode values on UTF-8:
-                //
-                // UCS-4 range (hex.)           UTF-8 octet sequence (binary)
-                // 0000 0000-0000 007F   0xxxxxxx
-                // 0000 0080-0000 07FF   110xxxxx 10xxxxxx
-                // 0000 0800-0000 FFFF   1110xxxx 10xxxxxx 10xxxxxx
-                //
-                // Check for the 0x110000 limit too
-
-                let mut val: u32;
-                let c: u8 = *cur;
-                if c & 0x80 != 0 {
-                    if *cur.add(1) & 0xc0 != 0x80 {
-                        break 'encoding_error;
-                    }
-                    if c & 0xe0 == 0xe0 {
-                        if *cur.add(2) & 0xc0 != 0x80 {
-                            break 'encoding_error;
-                        }
-                        if c & 0xf0 == 0xf0 {
-                            if c & 0xf8 != 0xf0 || *cur.add(3) & 0xc0 != 0x80 {
-                                break 'encoding_error;
-                            }
-                            // 4-byte code
-                            *len = 4;
-                            val = (*cur.add(0) as u32 & 0x7) << 18;
-                            val |= (*cur.add(1) as u32 & 0x3f) << 12;
-                            val |= (*cur.add(2) as u32 & 0x3f) << 6;
-                            val |= *cur.add(3) as u32 & 0x3f;
-                        } else {
-                            // 3-byte code
-                            *len = 3;
-                            val = (*cur.add(0) as u32 & 0xf) << 12;
-                            val |= (*cur.add(1) as u32 & 0x3f) << 6;
-                            val |= *cur.add(2) as u32 & 0x3f;
-                        }
-                    } else {
-                        // 2-byte code
-                        *len = 2;
-                        val = (*cur.add(0) as u32 & 0x1f) << 6;
-                        val |= *cur.add(1) as u32 & 0x3f;
-                    }
-                    if !xml_is_char(val) {
-                        xml_err_encoding_int!(
-                            ctxt,
-                            XmlParserErrors::XmlErrInvalidChar,
-                            "Char 0x{:X} out of allowed range\n",
-                            val as i32
-                        );
-                    }
-                    return val as _;
-                } else {
-                    // 1-byte code
-                    *len = 1;
-                    return *cur as _;
-                }
-            }
-            // Assume it's a fixed length encoding (1) with
-            // a compatible encoding for the ASCII set, since
-            // XML constructs only use < 128 chars
-            *len = 1;
-            return *cur as _;
-        }
-        // encoding_error:
-
-        // An encoding problem may arise from a truncated input buffer
-        // splitting a character in the middle. In that case do not raise
-        // an error but return 0 to indicate an end of stream problem
-        if ctxt.is_null()
-            || (*ctxt).input().is_none()
-            || (*ctxt).input().unwrap().remainder_len() < 4
-        {
-            *len = 0;
-            return 0;
-        }
-        // If we detect an UTF8 error that probably mean that the
-        // input encoding didn't get properly advertised in the
-        // declaration header. Report the error and switch the encoding
-        // to ISO-Latin-1 (if you don't like this policy, just declare the encoding !)
-        {
-            let buffer = format!(
-                "Bytes: 0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}\n",
-                *(*ctxt).input().unwrap().cur.add(0),
-                *(*ctxt).input().unwrap().cur.add(1),
-                *(*ctxt).input().unwrap().cur.add(2),
-                *(*ctxt).input().unwrap().cur.add(3),
-            );
-            __xml_err_encoding!(
-                ctxt,
-                XmlParserErrors::XmlErrInvalidChar,
-                "Input is not proper UTF-8, indicate encoding !\n{}",
-                buffer
-            );
-        }
-        *len = 1;
-        *cur as _
-    }
-}
-
 /// Append the char value in the array
 ///
 /// Returns the number of xmlChar written
@@ -612,45 +492,6 @@ mod tests {
                         );
                         eprint!(" {}", n_out);
                         eprintln!(" {}", n_val);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_string_current_char() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_PARSER_CTXT_PTR {
-                for n_cur in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_len in 0..GEN_NB_INT_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 0);
-                        let cur = gen_const_xml_char_ptr(n_cur, 1);
-                        let len = gen_int_ptr(n_len, 2);
-
-                        let ret_val = xml_string_current_char(ctxt, cur, len);
-                        desret_int(ret_val);
-                        des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                        des_const_xml_char_ptr(n_cur, cur, 1);
-                        des_int_ptr(n_len, len, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlStringCurrentChar",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlStringCurrentChar()"
-                            );
-                            eprint!(" {}", n_ctxt);
-                            eprint!(" {}", n_cur);
-                            eprintln!(" {}", n_len);
-                        }
                     }
                 }
             }

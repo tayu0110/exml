@@ -1015,15 +1015,15 @@ impl XmlParserCtxt {
         res
     }
 
-    /// Pushes a new element name on top of the name stack
-    ///
-    /// Returns -1 in case of error, the index in the stack otherwise
-    #[doc(alias = "namePush")]
-    pub(crate) fn name_push(&mut self, value: &str) -> i32 {
-        self.name = Some(value.to_owned());
-        self.name_tab.push(value.to_owned());
-        self.name_tab.len() as i32 - 1
-    }
+    // /// Pushes a new element name on top of the name stack
+    // ///
+    // /// Returns -1 in case of error, the index in the stack otherwise
+    // #[doc(alias = "namePush")]
+    // pub(crate) fn name_push(&mut self, value: &str) -> i32 {
+    //     self.name = Some(value.to_owned());
+    //     self.name_tab.push(value.to_owned());
+    //     self.name_tab.len() as i32 - 1
+    // }
 
     /// Pops the top element name from the name stack
     ///
@@ -1913,18 +1913,18 @@ pub unsafe fn xml_new_sax_parser_ctxt(
     }
 }
 
-/// Initialize a parser context
-///
-/// Returns 0 in case of success and -1 in case of error
-#[doc(alias = "xmlInitParserCtxt")]
-pub(crate) unsafe fn xml_init_parser_ctxt(ctxt: XmlParserCtxtPtr) -> i32 {
-    unsafe {
-        match xml_init_sax_parser_ctxt(ctxt, None, None) {
-            Ok(_) => 0,
-            Err(_) => -1,
-        }
-    }
-}
+// /// Initialize a parser context
+// ///
+// /// Returns 0 in case of success and -1 in case of error
+// #[doc(alias = "xmlInitParserCtxt")]
+// pub(crate) unsafe fn xml_init_parser_ctxt(ctxt: XmlParserCtxtPtr) -> i32 {
+//     unsafe {
+//         match xml_init_sax_parser_ctxt(ctxt, None, None) {
+//             Ok(_) => 0,
+//             Err(_) => -1,
+//         }
+//     }
+// }
 
 /// Clear (release owned resources) and reinitialize a parser context
 #[doc(alias = "xmlClearParserCtxt")]

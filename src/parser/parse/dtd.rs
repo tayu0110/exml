@@ -34,52 +34,47 @@ use super::{
 impl XmlParserCtxt {
     /// Add a defaulted attribute for an element
     #[doc(alias = "xmlAddDefAttrs")]
-    unsafe fn add_def_attrs(&mut self, fullname: &str, fullattr: &str, value: &str) {
-        unsafe {
-            // Allows to detect attribute redefinitions
-            if self
-                .atts_special
-                .filter(|t| t.lookup2(fullname, Some(fullattr)).is_some())
-                .is_some()
-            {
-                return;
-            }
-
-            // split the element name into prefix:localname , the string found
-            // are within the DTD and then not associated to namespace names.
-            let (prefix, name) = split_qname2(fullname)
-                .map(|(pre, loc)| (Some(pre), loc))
-                .unwrap_or((None, fullname));
-
-            // make sure there is some storage
-            let defaults = self
-                .atts_default
-                .entry((
-                    name.to_owned().into(),
-                    prefix.map(|prefix| prefix.to_owned().into()),
-                ))
-                .or_default();
-
-            // Split the element name into prefix:localname , the string found
-            // are within the DTD and hen not associated to namespace names.
-            let (prefix, name) = split_qname2(fullattr)
-                .map(|(pre, loc)| (Some(pre), loc))
-                .unwrap_or((None, fullattr));
-
-            defaults.push((
-                name.to_owned(),
-                prefix.map(|prefix| prefix.to_owned()),
-                value.to_owned(),
-                if self.external != 0 {
-                    Some("external")
-                } else {
-                    None
-                },
-            ));
+    fn add_def_attrs(&mut self, fullname: &str, fullattr: &str, value: &str) {
+        // Allows to detect attribute redefinitions
+        if self
+            .atts_special
+            .filter(|t| t.lookup2(fullname, Some(fullattr)).is_some())
+            .is_some()
+        {
             return;
-
-            xml_err_memory(self, None);
         }
+
+        // split the element name into prefix:localname , the string found
+        // are within the DTD and then not associated to namespace names.
+        let (prefix, name) = split_qname2(fullname)
+            .map(|(pre, loc)| (Some(pre), loc))
+            .unwrap_or((None, fullname));
+
+        // make sure there is some storage
+        let defaults = self
+            .atts_default
+            .entry((
+                name.to_owned().into(),
+                prefix.map(|prefix| prefix.to_owned().into()),
+            ))
+            .or_default();
+
+        // Split the element name into prefix:localname , the string found
+        // are within the DTD and hen not associated to namespace names.
+        let (prefix, name) = split_qname2(fullattr)
+            .map(|(pre, loc)| (Some(pre), loc))
+            .unwrap_or((None, fullattr));
+
+        defaults.push((
+            name.to_owned(),
+            prefix.map(|prefix| prefix.to_owned()),
+            value.to_owned(),
+            if self.external != 0 {
+                Some("external")
+            } else {
+                None
+            },
+        ));
     }
 
     /// Register this attribute type

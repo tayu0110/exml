@@ -78,25 +78,6 @@ use super::{
 // Many of these macros may later turn into functions.
 // They shouldn't be used in #ifdef's preprocessor instructions.
 
-/// Raises an error.
-#[doc(alias = "xmlXPathSetError")]
-macro_rules! xml_xpath_set_error {
-    ($ctxt:expr, $err:expr) => {{
-        xml_xpatherror($ctxt, $err);
-        if !$ctxt.is_null() {
-            (*$ctxt).error = $err;
-        }
-    }};
-}
-
-/// Raises an XPATH_INVALID_TYPE error.
-#[doc(alias = "xmlXPathSetTypeError")]
-macro_rules! xml_xpath_set_type_error {
-    ($ctxt:expr) => {
-        xml_xpath_set_error!($ctxt, XmlXPathError::XPathInvalidType as i32)
-    };
-}
-
 /// Macro to return from the function if an XPath error was detected.
 #[doc(hidden)]
 #[macro_export]

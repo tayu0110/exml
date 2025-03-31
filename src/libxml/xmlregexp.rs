@@ -72,12 +72,6 @@ macro_rules! CUR {
     };
 }
 
-macro_rules! NEXTL {
-    ( $ctxt:expr, $l:expr ) => {
-        (*$ctxt).cur = (*$ctxt).cur.add($l as usize);
-    };
-}
-
 macro_rules! NEXT {
     ( $ctxt:expr ) => {
         (*$ctxt).cur = (*$ctxt).cur.add(1);
@@ -91,21 +85,6 @@ macro_rules! ERROR {
     };
 }
 
-macro_rules! NXT {
-    ( $ctxt:expr, $index:expr ) => {
-        *(*$ctxt).cur.add($index as usize)
-    };
-}
-
-// Need PREV to check on a '-' within a Character Group. May only be used
-// when it's guaranteed that cur is not at the beginning of (*ctxt).string!
-macro_rules! PREV {
-    ( $ctxt:expr ) => {
-        *(*$ctxt).cur.sub(1)
-    };
-}
-
-const SIZE_MAX: usize = usize::MAX;
 const MAX_PUSH: usize = 10000000;
 
 // Note: the order of the enums below is significant, do not shuffle
@@ -2604,7 +2583,7 @@ impl XmlRegexp {
 
         writeln!(f, "{}, {} transitions:", state.no, state.trans.len(),)?;
         for trans in &state.trans {
-            self.print_trans(f, trans);
+            self.print_trans(f, trans)?;
         }
         Ok(())
     }
@@ -3587,37 +3566,6 @@ impl Default for XmlRegExecCtxt {
             err_counts: vec![],
             nb_push: 0,
         }
-    }
-}
-
-/// Handle an out of memory condition
-#[doc(alias = "xmlRegexpErrMemory")]
-unsafe fn xml_regexp_err_memory(ctxt: XmlRegParserCtxtPtr, extra: &str) {
-    unsafe {
-        let mut regexp = None;
-        if !ctxt.is_null() && !(*ctxt).string.is_empty() {
-            regexp = Some((*ctxt).string.to_string().into());
-            (*ctxt).error = XmlParserErrors::XmlErrNoMemory as _;
-        }
-        __xml_raise_error!(
-            None,
-            None,
-            None,
-            null_mut(),
-            None,
-            XmlErrorDomain::XmlFromRegexp,
-            XmlParserErrors::XmlErrNoMemory,
-            XmlErrorLevel::XmlErrFatal,
-            None,
-            0,
-            Some(extra.to_owned().into()),
-            regexp,
-            None,
-            0,
-            0,
-            "Memory allocation failed : {}\n",
-            extra
-        );
     }
 }
 
