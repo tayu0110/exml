@@ -3592,7 +3592,7 @@ pub fn xml_has_feature(feature: Option<XmlFeature>) -> bool {
         Some(XmlFeature::XmlWithPattern) => cfg!(feature = "libxml_pattern"),
         Some(XmlFeature::XmlWithWriter) => cfg!(feature = "libxml_writer"),
         Some(XmlFeature::XmlWithSax1) => cfg!(feature = "sax1"),
-        Some(XmlFeature::XmlWithFtp) => cfg!(feature = "ftp"),
+        // Some(XmlFeature::XmlWithFtp) => cfg!(feature = "ftp"),
         Some(XmlFeature::XmlWithHttp) => cfg!(feature = "http"),
         Some(XmlFeature::XmlWithValid) => cfg!(feature = "libxml_valid"),
         Some(XmlFeature::XmlWithHtml) => cfg!(feature = "html"),

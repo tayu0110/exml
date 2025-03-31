@@ -24,8 +24,6 @@ mod input;
 #[cfg(feature = "libxml_output")]
 mod output;
 
-#[cfg(feature = "ftp")]
-use std::ffi::{c_char, c_void};
 #[cfg(feature = "libxml_output")]
 use std::io::Write;
 use std::{
@@ -50,8 +48,6 @@ use url::Url;
 use crate::libxml::catalog::{
     XmlCatalogAllow, xml_catalog_get_defaults, xml_catalog_resolve, xml_catalog_resolve_uri,
 };
-#[cfg(feature = "ftp")]
-use crate::libxml::nanoftp::{xml_nanoftp_close, xml_nanoftp_open, xml_nanoftp_read};
 use crate::{
     encoding::find_encoding_handler,
     error::{__xml_simple_error, __xml_simple_oom_error, XmlErrorDomain, XmlParserErrors},
@@ -662,50 +658,6 @@ pub fn xml_check_filename(path: impl AsRef<Path>) -> i32 {
     check_filename(path.as_ref())
 }
 
-/// check if the URI matches an FTP one
-///
-/// Returns 1 if matches, 0 otherwise
-#[doc(alias = "xmlIOFTPMatch")]
-#[cfg(feature = "ftp")]
-pub fn xml_io_ftp_match(filename: &str) -> i32 {
-    filename.starts_with("ftp://") as i32
-}
-
-/// open an FTP I/O channel
-///
-/// Returns an I/O context or NULL in case of error
-#[doc(alias = "xmlIOFTPOpen")]
-#[cfg(feature = "ftp")]
-pub unsafe fn xml_io_ftp_open(filename: &str) -> *mut c_void {
-    let filename = CString::new(filename).unwrap();
-    xml_nanoftp_open(filename.as_ptr())
-}
-
-/// Read `len` bytes to `buffer` from the I/O channel.
-///
-/// Returns the number of bytes written
-#[doc(alias = "xmlIOFTPRead")]
-#[cfg(feature = "ftp")]
-pub unsafe extern "C" fn xml_io_ftp_read(
-    context: *mut c_void,
-    buffer: *mut c_char,
-    len: i32,
-) -> i32 {
-    if buffer.is_null() || len < 0 {
-        return -1;
-    }
-    xml_nanoftp_read(context, buffer.add(0) as _, len)
-}
-
-/// Close an FTP I/O channel
-///
-/// Returns 0
-#[doc(alias = "xmlIOFTPClose")]
-#[cfg(feature = "ftp")]
-pub unsafe extern "C" fn xml_io_ftp_close(context: *mut c_void) -> i32 {
-    xml_nanoftp_close(context)
-}
-
 #[derive(Debug, Clone, Copy)]
 pub struct DefaultFileIOCallbacks;
 
@@ -808,70 +760,6 @@ mod tests {
                     leaks == 0,
                     "{leaks} Leaks are found in xmlCleanupOutputCallbacks()"
                 );
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ioftpclose() {
-        #[cfg(feature = "ftp")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_context in 0..GEN_NB_VOID_PTR {
-                let mem_base = xml_mem_blocks();
-                let context = gen_void_ptr(n_context, 0);
-
-                let ret_val = xml_io_ftp_close(context);
-                desret_int(ret_val);
-                des_void_ptr(n_context, context, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlIOFTPClose",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlIOFTPClose()");
-                    eprintln!(" {}", n_context);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ioftpread() {
-        #[cfg(feature = "ftp")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_context in 0..GEN_NB_VOID_PTR {
-                for n_buffer in 0..GEN_NB_CHAR_PTR {
-                    for n_len in 0..GEN_NB_INT {
-                        let mem_base = xml_mem_blocks();
-                        let context = gen_void_ptr(n_context, 0);
-                        let buffer = gen_char_ptr(n_buffer, 1);
-                        let len = gen_int(n_len, 2);
-
-                        let ret_val = xml_io_ftp_read(context, buffer, len);
-                        desret_int(ret_val);
-                        des_void_ptr(n_context, context, 0);
-                        des_char_ptr(n_buffer, buffer, 1);
-                        des_int(n_len, len, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlIOFTPRead",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(leaks == 0, "{leaks} Leaks are found in xmlIOFTPRead()");
-                            eprint!(" {}", n_context);
-                            eprint!(" {}", n_buffer);
-                            eprintln!(" {}", n_len);
-                        }
-                    }
-                }
             }
         }
     }

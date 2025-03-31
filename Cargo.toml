@@ -48,7 +48,6 @@ default = [
 ]
 c14n = []
 catalog = []
-ftp = []
 html = []
 http = []
 sax1 = []

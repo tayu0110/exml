@@ -58,9 +58,9 @@ impl<T> XmlLinkRef<T> {
         NonNull::new(leaked).map(Self)
     }
 
-    fn from_raw(ptr: *mut XmlLink<T>) -> Option<Self> {
-        NonNull::new(ptr).map(Self)
-    }
+    // fn from_raw(ptr: *mut XmlLink<T>) -> Option<Self> {
+    //     NonNull::new(ptr).map(Self)
+    // }
 
     fn into_inner(self) -> XmlLink<T> {
         unsafe { *Box::from_raw(self.0.as_ptr()) }
@@ -1004,9 +1004,9 @@ impl<T> XmlListRef<T> {
         NonNull::new(leaked).map(Self)
     }
 
-    fn from_raw(ptr: *mut XmlList<T>) -> Option<Self> {
-        NonNull::new(ptr).map(Self)
-    }
+    // fn from_raw(ptr: *mut XmlList<T>) -> Option<Self> {
+    //     NonNull::new(ptr).map(Self)
+    // }
 
     pub fn free(self) {
         unsafe {

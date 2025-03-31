@@ -70,8 +70,6 @@ pub(crate) static mut GLOBALKEY: pthread_key_t = 0;
 pub(crate) static mut MAINTHREAD: pthread_t = 0;
 pub(crate) static mut GLOBAL_INIT_LOCK: pthread_mutex_t = PTHREAD_MUTEX_INITIALIZER;
 
-static mut XML_LIBRARY_LOCK: XmlRMutexPtr = null_mut();
-
 /// xmlNewMutex() is used to allocate a libxml2 token struct for use in
 /// synchronizing access to data.
 ///

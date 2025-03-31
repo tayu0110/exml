@@ -22,7 +22,6 @@ use crate::{
         parser::XmlFeature,
         relaxng::XmlRelaxNGPtr,
         schemas_internals::{XmlSchemaFacetPtr, XmlSchemaValType},
-        uri::XmlURIPtr,
         valid::xml_free_element_content,
         xmlreader::XmlTextReaderLocatorPtr,
         xmlregexp::{XmlExpCtxtPtr, XmlExpNodePtr},
@@ -73,7 +72,6 @@ pub(crate) const GEN_NB_XML_FEATURE: i32 = 4;
 pub(crate) const GEN_NB_XML_CHAR: i32 = 4;
 #[cfg(feature = "schema")]
 pub(crate) const GEN_NB_XML_RELAXNG_PTR: i32 = 1;
-pub(crate) const GEN_NB_XML_URIPTR: i32 = 1;
 pub(crate) const GEN_NB_XML_ELEMENT_CONTENT_PTR: i32 = 1;
 #[cfg(feature = "libxml_reader")]
 pub(crate) const GEN_NB_XML_TEXT_READER_LOCATOR_PTR: i32 = 1;
@@ -373,12 +371,6 @@ pub(crate) fn gen_xml_text_reader_locator_ptr(_no: i32, _nr: i32) -> XmlTextRead
 
 #[cfg(feature = "libxml_reader")]
 pub(crate) fn des_xml_text_reader_locator_ptr(_no: i32, _val: XmlTextReaderLocatorPtr, _nr: i32) {}
-
-pub(crate) fn gen_xml_uriptr(_no: i32, _nr: i32) -> XmlURIPtr {
-    null_mut()
-}
-
-pub(crate) fn des_xml_uriptr(_no: i32, _val: XmlURIPtr, _nr: i32) {}
 
 #[cfg(feature = "schema")]
 pub(crate) unsafe fn desret_xml_schema_parser_ctxt_ptr(val: XmlSchemaParserCtxtPtr) {

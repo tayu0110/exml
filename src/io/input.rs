@@ -416,16 +416,6 @@ pub fn register_default_input_callbacks() {
     {
         register_input_callbacks(DefaultHTTPIOCallbacks { write_method: "" }).ok();
     }
-    #[cfg(feature = "ftp")]
-    {
-        // TODO:
-        // xml_register_input_callbacks(
-        //     Some(xml_io_ftp_match),
-        //     Some(xml_io_ftp_open),
-        //     Some(xml_io_ftp_read),
-        //     Some(xml_io_ftp_close),
-        // );
-    }
     XML_INPUT_CALLBACK_INITIALIZED.store(true, Ordering::Release);
 }
 

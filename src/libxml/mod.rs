@@ -8,8 +8,6 @@ pub mod hash;
 pub mod htmlparser;
 #[cfg(feature = "html")]
 pub mod htmltree;
-#[cfg(feature = "ftp")]
-pub mod nanoftp;
 pub mod parser;
 pub mod parser_internals;
 #[cfg(feature = "schema")]
@@ -18,7 +16,6 @@ pub mod sax2;
 #[cfg(feature = "schema")]
 pub mod schemas_internals;
 pub mod threads;
-pub mod uri;
 pub mod valid;
 #[cfg(feature = "xpointer")]
 pub mod xlink;
