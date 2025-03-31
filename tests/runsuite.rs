@@ -2,6 +2,7 @@
 //! If you want this to work, copy the `test/` and `result/` directories from the original libxml2.
 
 use std::{
+    borrow::Cow,
     env::args,
     ffi::{CStr, CString, c_char, c_int},
     fs::{File, metadata},
@@ -33,7 +34,7 @@ use exml::{
         },
         xmlschemas::xml_schema_validate_doc,
         xmlschemastypes::xml_schema_init_types,
-        xmlstring::{XmlChar, xml_str_equal, xml_strdup, xml_strndup},
+        xmlstring::{XmlChar, xml_strndup},
     },
     parser::{XmlParserCtxtPtr, XmlParserInput, xml_read_file, xml_read_memory},
     relaxng::{
@@ -56,7 +57,7 @@ use exml::{
         xml_xpath_free_object, xml_xpath_new_context,
     },
 };
-use libc::{snprintf, strcmp, strstr};
+use libc::strstr;
 
 static mut VERBOSE: c_int = 0;
 
@@ -67,25 +68,11 @@ fn check_test_file(filename: &str) -> bool {
     }
 }
 
-unsafe fn compose_dir(dir: *const XmlChar, path: *const XmlChar) -> *mut XmlChar {
-    unsafe {
-        let mut buf: [c_char; 500] = [0; 500];
-
-        if dir.is_null() {
-            return xml_strdup(path);
-        }
-        if path.is_null() {
-            return null_mut();
-        }
-
-        snprintf(
-            buf.as_mut_ptr(),
-            500,
-            c"%s/%s".as_ptr(),
-            dir as *const c_char,
-            path as *const c_char,
-        );
-        xml_strdup(buf.as_ptr() as *const XmlChar)
+fn compose_dir<'a>(dir: Option<&str>, path: &'a str) -> Cow<'a, str> {
+    if let Some(dir) = dir {
+        Cow::Owned(format!("{dir}/{path}"))
+    } else {
+        Cow::Borrowed(path)
     }
 }
 
@@ -98,15 +85,13 @@ static NB_LEAKS: AtomicI32 = AtomicI32::new(0);
 static EXTRA_MEMORY_FROM_RESOLVER: AtomicI32 = AtomicI32::new(0);
 
 const MAX_ENTITIES: usize = 20;
-static mut TEST_ENTITIES_NAME: [*mut c_char; MAX_ENTITIES] = [null_mut(); MAX_ENTITIES];
+static mut TEST_ENTITIES_NAME: [Option<String>; MAX_ENTITIES] = [const { None }; MAX_ENTITIES];
 static mut TEST_ENTITIES_VALUE: [*mut c_char; MAX_ENTITIES] = [null_mut(); MAX_ENTITIES];
 static mut NB_ENTITIES: usize = 0;
 unsafe fn reset_entities() {
     unsafe {
         for i in 0..NB_ENTITIES {
-            if !TEST_ENTITIES_NAME[i].is_null() {
-                xml_free(TEST_ENTITIES_NAME[i] as _);
-            }
+            TEST_ENTITIES_NAME[i] = None;
             if !TEST_ENTITIES_VALUE[i].is_null() {
                 xml_free(TEST_ENTITIES_VALUE[i] as _);
             }
@@ -114,13 +99,13 @@ unsafe fn reset_entities() {
         NB_ENTITIES = 0;
     }
 }
-unsafe fn add_entity(name: *mut c_char, content: *mut c_char) -> c_int {
+unsafe fn add_entity(name: &str, content: *mut c_char) -> c_int {
     unsafe {
         if NB_ENTITIES >= MAX_ENTITIES {
             eprintln!("Too many entities defined");
             return -1;
         }
-        TEST_ENTITIES_NAME[NB_ENTITIES] = name;
+        TEST_ENTITIES_NAME[NB_ENTITIES] = Some(name.to_owned());
         TEST_ENTITIES_VALUE[NB_ENTITIES] = content;
         NB_ENTITIES += 1;
         0
@@ -137,18 +122,13 @@ unsafe fn test_external_entity_loader(
 ) -> Option<XmlParserInput> {
     unsafe {
         for i in 0..NB_ENTITIES {
-            let url = CString::new(url.unwrap()).unwrap();
-            if strcmp(TEST_ENTITIES_NAME[i], url.as_ptr()) == 0 {
+            if TEST_ENTITIES_NAME[i].as_deref() == url {
                 let mut ret = XmlParserInput::from_str(
                     (!ctxt.is_null()).then(|| &mut *ctxt),
                     &CStr::from_ptr(TEST_ENTITIES_VALUE[i]).to_string_lossy(),
                 );
                 if let Some(ret) = ret.as_mut() {
-                    ret.filename = Some(
-                        CStr::from_ptr(TEST_ENTITIES_NAME[i])
-                            .to_string_lossy()
-                            .into_owned(),
-                    );
+                    ret.filename = Some(TEST_ENTITIES_NAME[i].as_deref().unwrap().to_owned());
                 }
                 return ret;
             }
@@ -280,31 +260,25 @@ unsafe fn get_next(cur: Option<XmlNodePtr>, xpath: &str) -> Option<XmlNodePtr> {
     }
 }
 
-unsafe fn get_string(cur: XmlNodePtr, xpath: &str) -> *mut XmlChar {
+unsafe fn get_string(cur: XmlNodePtr, xpath: &str) -> Option<String> {
     unsafe {
-        let mut ret: *mut XmlChar = null_mut();
-
-        let Some(cur_doc) = cur.doc else {
-            return null_mut();
-        };
+        let cur_doc = cur.doc?;
         (*CTXT_XPATH.load(Ordering::Relaxed)).doc = Some(cur_doc);
         (*CTXT_XPATH.load(Ordering::Relaxed)).node = Some(XmlGenericNodePtr::from(cur));
         let comp: XmlXPathCompExprPtr = xml_xpath_compile(xpath);
         if comp.is_null() {
             eprintln!("Failed to compile {}", xpath);
-            return null_mut();
+            return None;
         }
         let res: XmlXPathObjectPtr =
             xml_xpath_compiled_eval(comp, CTXT_XPATH.load(Ordering::Relaxed));
         xml_xpath_free_comp_expr(comp);
         if res.is_null() {
-            return null_mut();
+            return None;
         }
+        let mut ret = None;
         if (*res).typ == XmlXPathObjectType::XPathString {
-            let res = (*res).stringval.take().map(|s| CString::new(s).unwrap());
-            ret = res
-                .as_deref()
-                .map_or(null_mut(), |s| xml_strdup(s.as_ptr() as *const u8));
+            ret = (*res).stringval.take();
         }
         xml_xpath_free_object(res);
         ret
@@ -370,11 +344,9 @@ unsafe fn xsd_incorrect_test_case(logfile: &mut Option<File>, cur: Option<XmlNod
     }
 }
 
-unsafe fn install_resources(mut tst: XmlNodePtr, base: *const XmlChar) {
+unsafe fn install_resources(mut tst: XmlNodePtr, base: Option<&str>) {
     unsafe {
-        let mut name: *mut XmlChar;
         let mut content: *mut XmlChar;
-        let mut res: *mut XmlChar;
 
         let mut buf = vec![];
         let test_doc = tst.doc;
@@ -386,19 +358,13 @@ unsafe fn install_resources(mut tst: XmlNodePtr, base: *const XmlChar) {
                 buf.clear();
                 let test_doc = test.doc;
                 test.dump_memory(&mut buf, test_doc, 0, 0);
-                name = get_string(now, "string(@name)");
+                let name = get_string(now, "string(@name)");
                 content = xml_strndup(buf.as_ptr(), buf.len() as i32);
-                if !name.is_null() && !content.is_null() {
-                    res = compose_dir(base, name);
-                    xml_free(name as _);
-                    add_entity(res as *mut c_char, content as *mut c_char);
-                } else {
-                    if !name.is_null() {
-                        xml_free(name as _);
-                    }
-                    if !content.is_null() {
-                        xml_free(content as _);
-                    }
+                if let Some(name) = name.filter(|_| !content.is_null()) {
+                    let res = compose_dir(base, &name);
+                    add_entity(&res, content as *mut c_char);
+                } else if !content.is_null() {
+                    xml_free(content as _);
                 }
             }
             tst = get_next(Some(now), "following-sibling::resource[1]");
@@ -406,28 +372,22 @@ unsafe fn install_resources(mut tst: XmlNodePtr, base: *const XmlChar) {
     }
 }
 
-unsafe fn install_dirs(tst: XmlNodePtr, base: *const XmlChar) {
+unsafe fn install_dirs(tst: XmlNodePtr, base: Option<&str>) {
     unsafe {
-        let name: *mut XmlChar = get_string(tst, "string(@name)");
-        if name.is_null() {
+        let Some(name) = get_string(tst, "string(@name)") else {
             return;
-        }
-        let res: *mut XmlChar = compose_dir(base, name);
-        xml_free(name as _);
-        if res.is_null() {
-            return;
-        }
+        };
+        let res = compose_dir(base, &name);
         // Now process resources and subdir recursively
         let test = get_next(Some(tst), "./resource[1]");
         if let Some(test) = test {
-            install_resources(test, res);
+            install_resources(test, Some(&res));
         }
         let mut test = get_next(Some(tst), "./dir[1]");
         while let Some(now) = test {
-            install_dirs(now, res);
+            install_dirs(now, Some(&res));
             test = get_next(Some(now), "following-sibling::dir[1]");
         }
-        xml_free(res as _);
     }
 }
 
@@ -444,11 +404,11 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: Option<XmlNodePtr>) -> 
 
         let tmp = get_next(tst, "./dir[1]");
         if let Some(tmp) = tmp {
-            install_dirs(tmp, null_mut());
+            install_dirs(tmp, None);
         }
         let tmp = get_next(tst, "./resource[1]");
         if let Some(tmp) = tmp {
-            install_resources(tmp, null_mut());
+            install_resources(tmp, None);
         }
 
         let Some(cur) = get_next(tst, "./correct[1]") else {
@@ -668,11 +628,8 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: Option<XmlNodePtr>) -> 
 unsafe fn xsd_test_suite(logfile: &mut Option<File>, cur: XmlNodePtr) -> c_int {
     unsafe {
         if VERBOSE != 0 {
-            let doc: *mut XmlChar = get_string(cur, "string(documentation)");
-
-            if !doc.is_null() {
-                println!("Suite {}", CStr::from_ptr(doc as _).to_string_lossy());
-                xml_free(doc as _);
+            if let Some(doc) = get_string(cur, "string(documentation)") {
+                println!("Suite {doc}");
             }
         }
         let mut cur = get_next(Some(cur), "./testCase[1]");
@@ -724,17 +681,10 @@ unsafe fn xsd_test(logfile: &mut Option<File>) -> c_int {
 unsafe fn rng_test_suite(logfile: &mut Option<File>, cur: XmlNodePtr) -> i32 {
     unsafe {
         if VERBOSE != 0 {
-            let mut doc: *mut XmlChar = get_string(cur, "string(documentation)");
-
-            if !doc.is_null() {
-                println!("Suite {}", CStr::from_ptr(doc as _).to_string_lossy());
-                xml_free(doc as _);
-            } else {
-                doc = get_string(cur, "string(section)");
-                if !doc.is_null() {
-                    println!("Section {}", CStr::from_ptr(doc as _).to_string_lossy());
-                    xml_free(doc as _);
-                }
+            if let Some(doc) = get_string(cur, "string(documentation)") {
+                println!("Suite {doc}");
+            } else if let Some(doc) = get_string(cur, "string(section)") {
+                println!("Section {doc}");
             }
         }
         let mut cur = get_next(Some(cur), "./testSuite[1]");
@@ -824,10 +774,9 @@ unsafe fn xstc_test_instance(
     cur: XmlNodePtr,
     schemas: XmlSchemaPtr,
     spath: *const XmlChar,
-    base: *const c_char,
+    base: &str,
 ) -> c_int {
     unsafe {
-        let mut validity: *mut XmlChar = null_mut();
         let mut ctxt: XmlSchemaValidCtxtPtr = null_mut();
         let mut ret: c_int;
 
@@ -835,38 +784,20 @@ unsafe fn xstc_test_instance(
         TEST_ERRORS_SIZE.store(0, Ordering::Relaxed);
         TEST_ERRORS.lock().unwrap()[0] = 0;
         let mem: c_int = xml_mem_used();
-        let href: *mut XmlChar = get_string(cur, "string(ts:instanceDocument/@xlink:href)");
-        if href.is_null() || *href.add(0) == 0 {
-            test_log!(
-                logfile,
-                "testGroup line {} misses href for schemaDocument\n",
-                cur.get_line_no()
-            );
-            ret = -1;
-        // goto done;
-        } else if let Some(path) = build_uri(
-            &CStr::from_ptr(href as *const i8).to_string_lossy(),
-            &CStr::from_ptr(base).to_string_lossy(),
-        ) {
-            if !check_test_file(&path) {
-                test_log!(
-                    logfile,
-                    "schemas for testGroup line {} is missing: {}\n",
-                    cur.get_line_no(),
-                    path
-                );
-                ret = -1;
-                // goto done;
-            } else {
-                validity = get_string(cur, "string(ts:expected/@validity)");
-                if validity.is_null() {
-                    eprintln!(
-                        "instanceDocument line {} misses expected validity",
-                        cur.get_line_no()
+        if let Some(href) = get_string(cur, "string(ts:instanceDocument/@xlink:href)")
+            .filter(|href| !href.is_empty())
+        {
+            if let Some(path) = build_uri(&href, base) {
+                if !check_test_file(&path) {
+                    test_log!(
+                        logfile,
+                        "schemas for testGroup line {} is missing: {}\n",
+                        cur.get_line_no(),
+                        path
                     );
                     ret = -1;
                     // goto done;
-                } else {
+                } else if let Some(validity) = get_string(cur, "string(ts:expected/@validity)") {
                     NB_TESTS.fetch_add(1, Ordering::Relaxed);
                     if let Some(doc) =
                         xml_read_file(&path, None, XmlParserOption::XmlParseNoEnt as i32)
@@ -879,7 +810,7 @@ unsafe fn xstc_test_instance(
                         );
                         ret = xml_schema_validate_doc(ctxt, doc);
 
-                        if xml_str_equal(validity, c"valid".as_ptr() as _) {
+                        if validity == "valid" {
                             match ret.cmp(&0) {
                                 std::cmp::Ordering::Greater => {
                                     test_log!(
@@ -902,7 +833,7 @@ unsafe fn xstc_test_instance(
                                 }
                                 _ => {}
                             }
-                        } else if xml_str_equal(validity, c"invalid".as_ptr() as _) {
+                        } else if validity == "invalid" {
                             if ret == 0 {
                                 test_log!(
                                     logfile,
@@ -917,7 +848,7 @@ unsafe fn xstc_test_instance(
                                 logfile,
                                 "instanceDocument line {} has unexpected validity value{}\n",
                                 cur.get_line_no(),
-                                CStr::from_ptr(validity as _).to_string_lossy()
+                                validity
                             );
                             ret = -1;
                             // goto done;
@@ -929,24 +860,31 @@ unsafe fn xstc_test_instance(
                         NB_ERRORS.fetch_add(1, Ordering::Relaxed);
                         // goto done;
                     }
+                } else {
+                    eprintln!(
+                        "instanceDocument line {} misses expected validity",
+                        cur.get_line_no()
+                    );
+                    ret = -1;
                 }
+            } else {
+                eprintln!(
+                    "Failed to build path to schemas testGroup line {} : {}",
+                    cur.get_line_no(),
+                    href
+                );
+                ret = -1;
             }
         } else {
-            eprintln!(
-                "Failed to build path to schemas testGroup line {} : {}",
-                cur.get_line_no(),
-                CStr::from_ptr(href as _).to_string_lossy()
+            test_log!(
+                logfile,
+                "testGroup line {} misses href for schemaDocument\n",
+                cur.get_line_no()
             );
             ret = -1;
         }
 
         // done:
-        if !href.is_null() {
-            xml_free(href as _);
-        }
-        if !validity.is_null() {
-            xml_free(validity as _);
-        }
         if !ctxt.is_null() {
             xml_schema_free_valid_ctxt(ctxt);
         }
@@ -964,14 +902,9 @@ unsafe fn xstc_test_instance(
     }
 }
 
-unsafe fn xstc_test_group(
-    logfile: &mut Option<File>,
-    cur: XmlNodePtr,
-    base: *const c_char,
-) -> c_int {
+unsafe fn xstc_test_group(logfile: &mut Option<File>, cur: XmlNodePtr, base: &str) -> c_int {
     unsafe {
         let mut p = None::<String>;
-        let mut validity: *mut XmlChar = null_mut();
         let mut schemas: XmlSchemaPtr = null_mut();
         let ctxt: XmlSchemaParserCtxtPtr;
         let mut ret: c_int = 0;
@@ -980,42 +913,24 @@ unsafe fn xstc_test_group(
         TEST_ERRORS_SIZE.store(0, Ordering::Relaxed);
         TEST_ERRORS.lock().unwrap()[0] = 0;
         let mem: c_int = xml_mem_used();
-        let href: *mut XmlChar =
-            get_string(cur, "string(ts:schemaTest/ts:schemaDocument/@xlink:href)");
-        if href.is_null() || *href.add(0) == 0 {
-            test_log!(
-                logfile,
-                "testGroup line {} misses href for schemaDocument\n",
-                cur.get_line_no()
-            );
-            ret = -1;
-        // goto done;
-        } else if let Some(path) = build_uri(
-            &CStr::from_ptr(href as *const i8).to_string_lossy(),
-            &CStr::from_ptr(base).to_string_lossy(),
-        ) {
-            if !check_test_file(&path) {
-                test_log!(
-                    logfile,
-                    "schemas for testGroup line {} is missing: {}\n",
-                    cur.get_line_no(),
-                    path
-                );
-                ret = -1;
-                // goto done;
-            } else {
-                validity = get_string(cur, "string(ts:schemaTest/ts:expected/@validity)");
-                if validity.is_null() {
+        if let Some(href) = get_string(cur, "string(ts:schemaTest/ts:schemaDocument/@xlink:href)")
+            .filter(|href| !href.is_empty())
+        {
+            if let Some(path) = build_uri(&href, base) {
+                if !check_test_file(&path) {
                     test_log!(
                         logfile,
-                        "testGroup line {} misses expected validity\n",
-                        cur.get_line_no()
+                        "schemas for testGroup line {} is missing: {}\n",
+                        cur.get_line_no(),
+                        path
                     );
                     ret = -1;
                     // goto done;
-                } else {
+                } else if let Some(validity) =
+                    get_string(cur, "string(ts:schemaTest/ts:expected/@validity)")
+                {
                     NB_TESTS.fetch_add(1, Ordering::Relaxed);
-                    if xml_str_equal(validity, c"valid".as_ptr() as _) {
+                    if validity == "valid" {
                         NB_SCHEMATAS.fetch_add(1, Ordering::Relaxed);
                         let cpath = CString::new(path.as_str()).unwrap();
                         ctxt = xml_schema_new_parser_ctxt(&path);
@@ -1064,7 +979,7 @@ unsafe fn xstc_test_group(
                             }
                             instance = get_next(Some(now), "following-sibling::ts:instanceTest[1]");
                         }
-                    } else if xml_str_equal(validity, c"invalid".as_ptr() as _) {
+                    } else if validity == "invalid" {
                         NB_SCHEMATAS.fetch_add(1, Ordering::Relaxed);
                         ctxt = xml_schema_new_parser_ctxt(&path);
                         (*ctxt).set_errors(
@@ -1100,31 +1015,39 @@ unsafe fn xstc_test_group(
                             logfile,
                             "testGroup line {} misses unexpected validity value{}\n",
                             cur.get_line_no(),
-                            CStr::from_ptr(validity as _).to_string_lossy()
+                            validity
                         );
                         ret = -1;
                         // goto done;
                     }
+                } else {
+                    test_log!(
+                        logfile,
+                        "testGroup line {} misses expected validity\n",
+                        cur.get_line_no()
+                    );
+                    ret = -1;
                 }
+                p = Some(path);
+            } else {
+                test_log!(
+                    logfile,
+                    "Failed to build path to schemas testGroup line {} : {}\n",
+                    cur.get_line_no(),
+                    href
+                );
+                ret = -1;
             }
-            p = Some(path);
         } else {
             test_log!(
                 logfile,
-                "Failed to build path to schemas testGroup line {} : {}\n",
-                cur.get_line_no(),
-                CStr::from_ptr(href as _).to_string_lossy()
+                "testGroup line {} misses href for schemaDocument\n",
+                cur.get_line_no()
             );
             ret = -1;
         }
 
         // done:
-        if !href.is_null() {
-            xml_free(href as _);
-        }
-        if !validity.is_null() {
-            xml_free(validity as _);
-        }
         if !schemas.is_null() {
             xml_schema_free(schemas);
         }
@@ -1143,7 +1066,7 @@ unsafe fn xstc_test_group(
     }
 }
 
-unsafe fn xstc_metadata(logfile: &mut Option<File>, metadata: &str, base: *const c_char) -> c_int {
+unsafe fn xstc_metadata(logfile: &mut Option<File>, metadata: &str, base: &str) -> c_int {
     unsafe {
         let mut ret: c_int = 0;
 
@@ -1275,7 +1198,7 @@ fn main() {
         xstc_metadata(
             &mut logfile,
             "xstc/Tests/Metadata/NISTXMLSchemaDatatypes.testSet",
-            c"xstc/Tests/Metadata/".as_ptr(),
+            "xstc/Tests/Metadata/",
         );
         if NB_ERRORS.load(Ordering::Relaxed) == old_errors
             && NB_LEAKS.load(Ordering::Relaxed) == old_leaks
@@ -1304,7 +1227,7 @@ fn main() {
         xstc_metadata(
             &mut logfile,
             "xstc/Tests/Metadata/SunXMLSchema1-0-20020116.testSet",
-            c"xstc/Tests/".as_ptr(),
+            "xstc/Tests/",
         );
         if NB_ERRORS.load(Ordering::Relaxed) == old_errors
             && NB_LEAKS.load(Ordering::Relaxed) == old_leaks
@@ -1335,7 +1258,7 @@ fn main() {
         xstc_metadata(
             &mut logfile,
             "xstc/Tests/Metadata/MSXMLSchema1-0-20020116.testSet",
-            c"xstc/Tests/".as_ptr(),
+            "xstc/Tests/",
         );
         if NB_ERRORS.load(Ordering::Relaxed) == old_errors
             && NB_LEAKS.load(Ordering::Relaxed) == old_leaks
