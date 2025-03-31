@@ -17,7 +17,6 @@ use exml::{
     libxml::{
         catalog::{xml_catalog_cleanup, xml_load_catalog},
         parser::{xml_cleanup_parser, xml_init_parser, xml_parse_file},
-        xmlmemory::xml_memory_dump,
     },
     tree::xml_free_doc,
 };
@@ -142,6 +141,5 @@ fn main() {
             }
         }
         xml_cleanup_parser();
-        xml_memory_dump();
     }
 }

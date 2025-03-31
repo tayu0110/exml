@@ -19,7 +19,6 @@ use exml::{
     libxml::{
         globals::{xml_free, xml_malloc},
         parser::xml_cleanup_parser,
-        xmlmemory::xml_memory_dump,
         xmlstring::XmlChar,
     },
     parser::{
@@ -779,7 +778,5 @@ fn main() {
 
         // Cleanup function for the XML library.
         xml_cleanup_parser();
-        // this is to debug memory for regression tests
-        xml_memory_dump();
     }
 }

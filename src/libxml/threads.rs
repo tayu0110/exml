@@ -231,22 +231,6 @@ pub unsafe extern "C" fn xml_init_threads() {
     }
 }
 
-/// xmlLockLibrary() is used to take out a re-entrant lock on the libxml2 library.
-#[doc(alias = "xmlLockLibrary")]
-pub unsafe extern "C" fn xml_lock_library() {
-    unsafe {
-        xml_rmutex_lock(XML_LIBRARY_LOCK);
-    }
-}
-
-/// xmlUnlockLibrary() is used to release a re-entrant lock on the libxml2 library.
-#[doc(alias = "xmlUnlockLibrary")]
-pub unsafe extern "C" fn xml_unlock_library() {
-    unsafe {
-        xml_rmutex_unlock(XML_LIBRARY_LOCK);
-    }
-}
-
 /// xmlGetThreadId() find the current thread ID number
 /// Note that this is likely to be broken on some platforms using pthreads
 /// as the specification doesn't mandate pthread_t to be an integer type
@@ -281,13 +265,6 @@ pub(crate) unsafe extern "C" fn xml_is_main_thread() -> i32 {
         pthread_equal(MAINTHREAD, pthread_self())
     }
 }
-
-#[doc(alias = "xmlCleanupThreads")]
-#[deprecated = "This function is a no-op. Call xmlCleanupParser
-to free global state but see the warnings there. xmlCleanupParser
-should be only called once at program exit. In most cases, you don't
-have call cleanup functions at all"]
-pub unsafe extern "C" fn xml_cleanup_threads() {}
 
 /// xmlNewGlobalState() allocates a global state. This structure is used to
 /// hold all data for use by a thread when supporting backwards compatibility

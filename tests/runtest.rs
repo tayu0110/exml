@@ -62,7 +62,7 @@ use exml::{
         relaxng::XmlRelaxNGPtr,
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
-            xml_memory_dump, xml_memory_strdup,
+            xml_memory_strdup,
         },
         xmlreader::XmlTextReaderPtr,
         xmlschemastypes::xml_schema_init_types,
@@ -5526,7 +5526,6 @@ fn test_cleanup() {
             if prev == 1 {
                 unsafe {
                     xml_cleanup_parser();
-                    xml_memory_dump();
                 }
 
                 *lock = false;

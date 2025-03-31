@@ -29,7 +29,7 @@ use exml::{
         },
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
-            xml_memory_dump, xml_memory_strdup,
+            xml_memory_strdup,
         },
         xmlstring::xml_strlen,
     },
@@ -1049,7 +1049,6 @@ fn main() {
             );
         }
         xml_cleanup_parser();
-        xml_memory_dump();
     }
 
     assert_eq!(ret, 0);

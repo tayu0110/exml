@@ -30,7 +30,7 @@ use exml::{
         },
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
-            xml_memory_dump, xml_memory_strdup,
+            xml_memory_strdup,
         },
         xmlschemas::xml_schema_validate_doc,
         xmlschemastypes::xml_schema_init_types,
@@ -525,7 +525,6 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: Option<XmlNodePtr>) -> 
                         now.get_line_no(),
                         xml_mem_used() - mem
                     );
-                    xml_memory_dump();
                     NB_LEAKS.fetch_add(1, Ordering::Relaxed);
                 }
             } else {
@@ -596,7 +595,6 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: Option<XmlNodePtr>) -> 
                         now.get_line_no(),
                         xml_mem_used() - mem
                     );
-                    xml_memory_dump();
                     NB_LEAKS.fetch_add(1, Ordering::Relaxed);
                 }
             } else {
@@ -1298,7 +1296,6 @@ fn main() {
         }
         xml_xpath_free_context(CTXT_XPATH.load(Ordering::Relaxed));
         xml_cleanup_parser();
-        xml_memory_dump();
     }
 
     assert_eq!(ret, 0);

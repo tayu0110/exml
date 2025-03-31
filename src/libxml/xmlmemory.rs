@@ -23,14 +23,9 @@ use std::io::Write;
 use std::mem::{size_of, zeroed};
 use std::ptr::{addr_of_mut, null_mut};
 
-use libc::{
-    FILE, fclose, fopen, fprintf, free, getenv, malloc, memset, realloc, sscanf, strcpy, strlen,
-};
+use libc::{free, getenv, malloc, memset, realloc, sscanf, strcpy, strlen};
 
 use crate::generic_error;
-use crate::libxml::globals::{
-    xml_free, xml_malloc, xml_malloc_atomic, xml_mem_strdup, xml_realloc,
-};
 use crate::libxml::parser::xml_init_parser;
 
 use super::globals::{_XML_FREE, _XML_MALLOC, _XML_MALLOC_ATOMIC, _XML_MEM_STRDUP, _XML_REALLOC};
@@ -166,123 +161,6 @@ pub unsafe extern "C" fn xml_mem_setup(
     }
 }
 
-/// Provides the memory access functions set currently in use
-///
-/// Returns 0 on success
-#[doc(alias = "xmlMemGet")]
-pub unsafe extern "C" fn xml_mem_get(
-    free_func: *mut XmlFreeFunc,
-    malloc_func: *mut XmlMallocFunc,
-    realloc_func: *mut XmlReallocFunc,
-    strdup_func: *mut XmlStrdupFunc,
-) -> i32 {
-    unsafe {
-        if !free_func.is_null() {
-            *free_func = xml_free;
-        }
-        if !malloc_func.is_null() {
-            *malloc_func = xml_malloc;
-        }
-        if !realloc_func.is_null() {
-            *realloc_func = xml_realloc;
-        }
-        if !strdup_func.is_null() {
-            *strdup_func = xml_mem_strdup;
-        }
-        0
-    }
-}
-
-/// Override the default memory access functions with a new set
-/// This has to be called before any other libxml routines !
-/// The mallocAtomicFunc is specialized for atomic block
-/// allocations (i.e. of areas  useful for garbage collected memory allocators
-///
-/// Should this be blocked if there was already some allocations done ?
-///
-/// Returns 0 on success
-#[doc(alias = "xmlGcMemSetup")]
-pub unsafe extern "C" fn xml_gc_mem_setup(
-    free_func: Option<XmlFreeFunc>,
-    malloc_func: Option<XmlMallocFunc>,
-    malloc_atomic_func: Option<XmlMallocFunc>,
-    realloc_func: Option<XmlReallocFunc>,
-    strdup_func: Option<XmlStrdupFunc>,
-) -> i32 {
-    unsafe {
-        if free_func.is_none() {
-            return -1;
-        }
-        if malloc_func.is_none() {
-            return -1;
-        }
-        if malloc_atomic_func.is_none() {
-            return -1;
-        }
-        if realloc_func.is_none() {
-            return -1;
-        }
-        if strdup_func.is_none() {
-            return -1;
-        }
-        _XML_FREE = free_func;
-        _XML_MALLOC = malloc_func;
-        _XML_MALLOC_ATOMIC = malloc_atomic_func.unwrap();
-        _XML_REALLOC = realloc_func;
-        _XML_MEM_STRDUP = strdup_func;
-        0
-    }
-}
-
-/// Provides the memory access functions set currently in use
-/// The mallocAtomicFunc is specialized for atomic block
-/// allocations (i.e. of areas  useful for garbage collected memory allocators
-///
-/// Returns 0 on success
-#[doc(alias = "xmlGcMemGet")]
-pub unsafe extern "C" fn xml_gc_mem_get(
-    free_func: *mut XmlFreeFunc,
-    malloc_func: *mut XmlMallocFunc,
-    malloc_atomic_func: *mut XmlMallocFunc,
-    realloc_func: *mut XmlReallocFunc,
-    strdup_func: *mut XmlStrdupFunc,
-) -> i32 {
-    unsafe {
-        if !free_func.is_null() {
-            *free_func = xml_free;
-        }
-        if !malloc_func.is_null() {
-            *malloc_func = xml_malloc;
-        }
-        if !malloc_atomic_func.is_null() {
-            *malloc_atomic_func = xml_malloc_atomic;
-        }
-        if !realloc_func.is_null() {
-            *realloc_func = xml_realloc;
-        }
-        if !strdup_func.is_null() {
-            *strdup_func = xml_mem_strdup;
-        }
-        0
-    }
-}
-
-#[doc(alias = "xmlInitMemory")]
-#[deprecated = "Alias for xmlInitParser"]
-pub unsafe extern "C" fn xml_init_memory() -> i32 {
-    unsafe {
-        xml_init_parser();
-        0
-    }
-}
-
-#[doc(alias = "xmlCleanupMemory")]
-#[deprecated = "This function is a no-op. Call xmlCleanupParser
-to free global state but see the warnings there. xmlCleanupParser
-should be only called once at program exit. In most cases, you don't
-have call cleanup functions at all"]
-pub unsafe extern "C" fn xml_cleanup_memory() {}
-
 /// Returns the size of a memory allocation.
 #[doc(alias = "xmlMemSize")]
 pub unsafe extern "C" fn xml_mem_size(ptr: *mut c_void) -> usize {
@@ -321,57 +199,6 @@ pub unsafe extern "C" fn xml_mem_blocks() -> i32 {
     }
 }
 
-/// show in-extenso the memory blocks allocated
-#[doc(alias = "xmlMemDisplay")]
-pub unsafe extern "C" fn xml_mem_display(mut fp: *mut FILE) {
-    unsafe {
-        let old_fp: *mut FILE = fp;
-
-        if fp.is_null() {
-            fp = fopen(c".memorylist".as_ptr() as _, c"w".as_ptr() as _);
-            if fp.is_null() {
-                return;
-            }
-        }
-
-        fprintf(
-            fp,
-            c"Memory list not compiled (MEM_LIST not defined !)\n".as_ptr() as _,
-        );
-        if old_fp.is_null() {
-            fclose(fp);
-        }
-    }
-}
-
-/// The last nbBytes of memory allocated and not freed, useful for dumping
-/// the memory left allocated between two places at runtime.
-#[doc(alias = "xmlMemDisplayLast")]
-pub unsafe extern "C" fn xml_mem_display_last(mut fp: *mut FILE, nb_bytes: i64) {
-    unsafe {
-        let old_fp: *mut FILE = fp;
-
-        if nb_bytes <= 0 {
-            return;
-        }
-
-        if fp.is_null() {
-            fp = fopen(c".memorylist".as_ptr() as _, c"w".as_ptr() as _);
-            if fp.is_null() {
-                return;
-            }
-        }
-
-        fprintf(
-            fp,
-            c"Memory list not compiled (MEM_LIST not defined !)\n".as_ptr() as _,
-        );
-        if old_fp.is_null() {
-            fclose(fp);
-        }
-    }
-}
-
 /// Show a show display of the memory allocated, and dump
 /// the @nr last allocated areas which were not freed
 #[doc(alias = "xmlMemShow")]
@@ -384,10 +211,6 @@ pub unsafe extern "C" fn xml_mem_show<'a>(fp: &mut (impl Write + 'a), _nr: i32) 
     )
     .ok();
 }
-
-/// Dump in-extenso the memory blocks allocated to the file .memorylist
-#[doc(alias = "xmlMemoryDump")]
-pub unsafe extern "C" fn xml_memory_dump() {}
 
 /// A malloc() equivalent, with logging of the allocation info.
 ///
@@ -475,7 +298,6 @@ pub unsafe extern "C" fn xml_malloc_loc(
 
         if size > MAX_SIZE_T - RESERVE_SIZE {
             generic_error!("xmlMallocLoc : Unsigned overflow\n");
-            xml_memory_dump();
             return null_mut();
         }
 
@@ -483,7 +305,6 @@ pub unsafe extern "C" fn xml_malloc_loc(
 
         if p.is_null() {
             generic_error!("xmlMallocLoc : Out of free space\n");
-            xml_memory_dump();
             return null_mut();
         }
         (*p).mh_tag = MEMTAG as _;
@@ -554,7 +375,6 @@ pub unsafe extern "C" fn xml_realloc_loc(
 
         if size > MAX_SIZE_T - RESERVE_SIZE {
             generic_error!("xmlReallocLoc : Unsigned overflow\n");
-            xml_memory_dump();
             return null_mut();
         }
 
@@ -610,7 +430,6 @@ pub unsafe extern "C" fn xml_malloc_atomic_loc(
 
         if size > MAX_SIZE_T - RESERVE_SIZE {
             generic_error!("xmlMallocAtomicLoc : Unsigned overflow\n");
-            xml_memory_dump();
             return null_mut();
         }
 
@@ -618,7 +437,6 @@ pub unsafe extern "C" fn xml_malloc_atomic_loc(
 
         if p.is_null() {
             generic_error!("xmlMallocAtomicLoc : Out of free space\n");
-            xml_memory_dump();
             return null_mut();
         }
         (*p).mh_tag = MEMTAG as _;
@@ -668,7 +486,6 @@ pub unsafe extern "C" fn xml_mem_strdup_loc(
 
         if size > MAX_SIZE_T - RESERVE_SIZE {
             generic_error!("xmlMemStrdupLoc : Unsigned overflow\n");
-            xml_memory_dump();
             return null_mut();
         }
 

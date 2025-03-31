@@ -26,7 +26,7 @@ use exml::{
         parser_internals::{XML_MAX_LOOKUP_LIMIT, XML_MAX_TEXT_LENGTH},
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
-            xml_memory_dump, xml_memory_strdup,
+            xml_memory_strdup,
         },
     },
     parser::{
@@ -1345,7 +1345,6 @@ fn cleanup_test() {
                 if old == 1 {
                     unsafe {
                         xml_cleanup_parser();
-                        xml_memory_dump();
                     }
                 }
                 old.checked_sub(1)

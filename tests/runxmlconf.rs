@@ -5,7 +5,6 @@ use std::{
     env::args,
     ffi::{CStr, c_int},
     fs::{File, metadata},
-    os::fd::AsRawFd,
     ptr::null_mut,
     sync::{
         Mutex,
@@ -24,8 +23,8 @@ use exml::{
             XmlParserOption, xml_cleanup_parser, xml_init_parser, xml_set_external_entity_loader,
         },
         xmlmemory::{
-            xml_mem_display_last, xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup,
-            xml_mem_used, xml_memory_dump, xml_memory_strdup,
+            xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
+            xml_memory_strdup,
         },
     },
     parser::{
@@ -37,7 +36,6 @@ use exml::{
         XmlXPathContext, xml_xpath_context_set_cache, xml_xpath_free_context, xml_xpath_new_context,
     },
 };
-use libc::fdopen;
 
 static mut VERBOSE: c_int = 0;
 
@@ -415,10 +413,6 @@ unsafe fn xmlconf_test_item(logfile: &mut Option<File>, doc: XmlDocPtr, cur: Xml
                 is_final - mem
             );
             NB_LEAKS.fetch_add(1, Ordering::Relaxed);
-            let fp = logfile
-                .as_ref()
-                .map_or(null_mut(), |f| fdopen(f.as_raw_fd(), c"w".as_ptr()));
-            xml_mem_display_last(fp, is_final as i64 - mem as i64);
         }
         NB_TESTS.fetch_add(1, Ordering::Relaxed);
 
@@ -602,7 +596,6 @@ fn main() {
         }
         xml_xpath_free_context(CTXT_XPATH.load(Ordering::Relaxed));
         xml_cleanup_parser();
-        xml_memory_dump();
     }
 
     assert_eq!(ret, 0);

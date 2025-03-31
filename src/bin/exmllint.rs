@@ -76,7 +76,7 @@ use exml::{
         },
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_size,
-            xml_mem_used, xml_memory_dump, xml_memory_strdup,
+            xml_mem_used, xml_memory_strdup,
         },
         xmlreader::XmlTextReaderPtr,
         xmlschemas::{xml_schema_validate_doc, xml_schema_validate_stream},
@@ -652,7 +652,6 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
                     PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
                     // goto error;
                     xml_cleanup_parser();
-                    xml_memory_dump();
                     exit(PROGRESULT.load(Ordering::Relaxed));
                 };
 
@@ -684,7 +683,6 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
                     PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
                     // goto error;
                     xml_cleanup_parser();
-                    xml_memory_dump();
                     exit(PROGRESULT.load(Ordering::Relaxed));
                 }
                 (*ctxt).set_parser_errors(
@@ -714,7 +712,6 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
                     PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
                     // goto error;
                     xml_cleanup_parser();
-                    xml_memory_dump();
                     exit(PROGRESULT.load(Ordering::Relaxed));
                 }
                 (*ctxt).set_errors(
@@ -3437,7 +3434,6 @@ fn main() {
 
     unsafe {
         xml_cleanup_parser();
-        xml_memory_dump();
 
         exit(PROGRESULT.load(Ordering::Relaxed))
     }
