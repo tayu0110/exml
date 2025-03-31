@@ -31,7 +31,7 @@ use exml::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
             xml_memory_dump, xml_memory_strdup,
         },
-        xmlstring::{XmlChar, xml_strlen},
+        xmlstring::xml_strlen,
     },
     parser::{
         XmlParserCtxtPtr, XmlParserInput, xml_ctxt_read_file, xml_free_parser_ctxt,
@@ -228,7 +228,6 @@ fn channel(_ctx: Option<GenericErrorContext>, msg: &str) {
 }
 
 fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlError) {
-    let mut name: *const XmlChar = null_mut();
     let mut ctxt: XmlParserCtxtPtr = null_mut();
 
     let file = err.file();
@@ -253,10 +252,10 @@ fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlErr
     }
 
     unsafe {
-        if let Some(node) = node.filter(|n| n.element_type() == XmlElementType::XmlElementNode) {
-            let node = XmlNodePtr::try_from(node).unwrap();
-            name = node.name;
-        }
+        let name = node
+            .filter(|n| n.element_type() == XmlElementType::XmlElementNode)
+            .and_then(|node| XmlNodePtr::try_from(node).ok())
+            .map(|node| node.name.clone());
 
         // Maintain the compatibility with the legacy error handling
         let mut input = None;
@@ -281,8 +280,7 @@ fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlErr
         } else if line != 0 && domain == XmlErrorDomain::XmlFromParser {
             channel(None, format!("Entity: line {line}: ").as_str());
         }
-        if !name.is_null() {
-            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+        if let Some(name) = name {
             channel(None, format!("element {name}: ").as_str());
         }
         if code.is_ok() {

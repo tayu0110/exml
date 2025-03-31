@@ -38,7 +38,7 @@ mod node;
 use std::{
     any::type_name,
     borrow::Cow,
-    ffi::{CStr, CString},
+    ffi::CStr,
     fmt::Display,
     ptr::null_mut,
     sync::atomic::{AtomicBool, AtomicI32, Ordering},
@@ -54,7 +54,7 @@ use crate::{
             xml_deregister_node_default_value, xml_free, xml_malloc_atomic,
             xml_register_node_default_value,
         },
-        parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
+        parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT},
         xmlstring::{XmlChar, xml_strdup, xml_strndup},
     },
 };
@@ -895,15 +895,7 @@ pub(crate) unsafe fn xml_static_copy_node(
             xml_tree_err_memory("copying node");
             return None;
         };
-        if node.name == XML_STRING_TEXT.as_ptr() as _ {
-            ret.name = XML_STRING_TEXT.as_ptr() as _;
-        } else if node.name == XML_STRING_TEXT_NOENC.as_ptr() as _ {
-            ret.name = XML_STRING_TEXT_NOENC.as_ptr() as _;
-        } else if node.name == XML_STRING_COMMENT.as_ptr() as _ {
-            ret.name = XML_STRING_COMMENT.as_ptr() as _;
-        } else if !node.name.is_null() {
-            ret.name = xml_strdup(node.name);
-        }
+        ret.name = node.name.clone();
         if !matches!(node.element_type(), XmlElementType::XmlElementNode)
             && node.content.is_some()
             && !matches!(node.element_type(), XmlElementType::XmlEntityRefNode)
@@ -1234,8 +1226,7 @@ pub unsafe fn xml_new_doc_node(
     content: Option<&str>,
 ) -> Option<XmlNodePtr> {
     unsafe {
-        let name = CString::new(name).unwrap();
-        let cur = xml_new_node(ns, name.as_ptr() as *const u8);
+        let cur = xml_new_node(ns, name);
         if let Some(mut cur) = cur {
             cur.doc = doc;
             if let Some(content) = content {
@@ -1271,7 +1262,7 @@ pub unsafe fn xml_new_doc_node(
 pub unsafe fn xml_new_doc_node_eat_name(
     doc: Option<XmlDocPtr>,
     ns: Option<XmlNsPtr>,
-    name: *mut XmlChar,
+    name: &str,
     content: Option<&str>,
 ) -> Option<XmlNodePtr> {
     unsafe {
@@ -1293,11 +1284,6 @@ pub unsafe fn xml_new_doc_node_eat_name(
                     cur.set_last(None);
                 }
             }
-        } else {
-            // if name don't come from the doc dictionary free it here
-            if !name.is_null() {
-                xml_free(name as _);
-            }
         }
         cur
     }
@@ -1309,16 +1295,12 @@ pub unsafe fn xml_new_doc_node_eat_name(
 ///
 /// Returns a pointer to the new node object. Uses xml_strdup() to make copy of @name.
 #[doc(alias = "xmlNewNode")]
-pub unsafe fn xml_new_node(ns: Option<XmlNsPtr>, name: *const XmlChar) -> Option<XmlNodePtr> {
+pub unsafe fn xml_new_node(ns: Option<XmlNsPtr>, name: &str) -> Option<XmlNodePtr> {
     unsafe {
-        if name.is_null() {
-            return None;
-        }
-
         // Allocate a new node and fill the fields.
         let Some(cur) = XmlNodePtr::new(XmlNode {
             typ: XmlElementType::XmlElementNode,
-            name: xml_strdup(name),
+            name: name.to_owned().into(),
             ns,
             ..Default::default()
         }) else {
@@ -1343,19 +1325,12 @@ pub unsafe fn xml_new_node(ns: Option<XmlNsPtr>, name: *const XmlChar) -> Option
 /// new node's name. Use xmlNewNode() if a copy of @name string is
 /// is needed as new node's name.
 #[doc(alias = "xmlNewNodeEatName")]
-pub unsafe fn xml_new_node_eat_name(
-    ns: Option<XmlNsPtr>,
-    name: *mut XmlChar,
-) -> Option<XmlNodePtr> {
+pub unsafe fn xml_new_node_eat_name(ns: Option<XmlNsPtr>, name: &str) -> Option<XmlNodePtr> {
     unsafe {
-        if name.is_null() {
-            return None;
-        }
-
         // Allocate a new node and fill the fields.
         let Some(cur) = XmlNodePtr::new(XmlNode {
             typ: XmlElementType::XmlElementNode,
-            name,
+            name: name.to_owned().into(),
             ns,
             ..Default::default()
         }) else {
@@ -1458,7 +1433,7 @@ pub unsafe fn xml_new_text(content: Option<&str>) -> Option<XmlNodePtr> {
         // Allocate a new node and fill the fields.
         let Some(mut cur) = XmlNodePtr::new(XmlNode {
             typ: XmlElementType::XmlTextNode,
-            name: XML_STRING_TEXT.as_ptr() as _,
+            name: Cow::Borrowed(XML_STRING_TEXT.to_str().unwrap()),
             ..Default::default()
         }) else {
             xml_tree_err_memory("building text");
@@ -1487,7 +1462,7 @@ pub unsafe fn xml_new_doc_pi(
         // Allocate a new node and fill the fields.
         let Some(mut cur) = XmlNodePtr::new(XmlNode {
             typ: XmlElementType::XmlPINode,
-            name: xml_strndup(name.as_ptr(), name.len() as i32),
+            name: name.to_owned().into(),
             ..Default::default()
         }) else {
             xml_tree_err_memory("building PI");
@@ -1585,7 +1560,7 @@ pub unsafe fn xml_new_comment(content: &str) -> Option<XmlNodePtr> {
         // Allocate a new node and fill the fields.
         let Some(cur) = XmlNodePtr::new(XmlNode {
             typ: XmlElementType::XmlCommentNode,
-            name: XML_STRING_COMMENT.as_ptr() as _,
+            name: Cow::Borrowed(XML_STRING_COMMENT.to_str().unwrap()),
             content: Some(content.to_owned()),
             ..Default::default()
         }) else {
@@ -1642,15 +1617,13 @@ pub unsafe fn xml_new_char_ref(doc: Option<XmlDocPtr>, name: &str) -> Option<Xml
             return None;
         };
         if let Some(name) = name.strip_prefix('&') {
-            let len = name.len();
             if let Some(name) = name.strip_suffix(';') {
-                cur.name = xml_strndup(name.as_ptr(), len as i32 - 1);
+                cur.name = name.to_owned().into();
             } else {
-                cur.name = xml_strndup(name.as_ptr(), len as i32);
+                cur.name = name.to_owned().into();
             }
         } else {
-            let name = CString::new(name).unwrap();
-            cur.name = xml_strdup(name.as_ptr() as *const u8);
+            cur.name = name.to_owned().into();
         }
 
         if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
@@ -1677,15 +1650,13 @@ pub unsafe fn xml_new_reference(doc: Option<XmlDocPtr>, name: &str) -> Option<Xm
             return None;
         };
         if let Some(name) = name.strip_prefix('&') {
-            let len = name.len();
             if let Some(name) = name.strip_suffix(';') {
-                cur.name = xml_strndup(name.as_ptr(), len as i32 - 1);
+                cur.name = name.to_owned().into();
             } else {
-                cur.name = xml_strndup(name.as_ptr(), len as i32);
+                cur.name = name.to_owned().into();
             }
         } else {
-            let name = CString::new(name).unwrap();
-            cur.name = xml_strdup(name.as_ptr() as *const u8);
+            cur.name = name.to_owned().into();
         }
 
         let ent = xml_get_doc_entity(doc, &cur.name().unwrap());
@@ -2040,14 +2011,6 @@ pub unsafe fn xml_free_node_list(cur: Option<impl Into<XmlGenericNodePtr>>) {
                 {
                     xml_free_prop_list(cur.properties);
                 }
-                // if !matches!(cur.element_type(), XmlElementType::XmlElementNode)
-                //     && !matches!(cur.element_type(), XmlElementType::XmlXIncludeStart)
-                //     && !matches!(cur.element_type(), XmlElementType::XmlXIncludeEnd)
-                //     && !matches!(cur.element_type(), XmlElementType::XmlEntityRefNode)
-                //     && !cur.content.is_null()
-                // {
-                //     xml_free(cur.content as _);
-                // }
                 if matches!(cur.element_type(), XmlElementType::XmlElementNode)
                     || matches!(cur.element_type(), XmlElementType::XmlXIncludeStart)
                     || matches!(cur.element_type(), XmlElementType::XmlXIncludeEnd)
@@ -2057,16 +2020,6 @@ pub unsafe fn xml_free_node_list(cur: Option<impl Into<XmlGenericNodePtr>>) {
                     }
                 }
 
-                // When a node is a text node or a comment, it uses a global static
-                // variable for the name of the node.
-                // Otherwise the node name might come from the document's
-                // dictionary
-                if !cur.name.is_null()
-                    && !matches!(cur.element_type(), XmlElementType::XmlTextNode)
-                    && !matches!(cur.element_type(), XmlElementType::XmlCommentNode)
-                {
-                    xml_free(cur.name as _);
-                }
                 cur.free();
             }
 
@@ -2137,22 +2090,6 @@ pub unsafe fn xml_free_node(cur: impl Into<XmlGenericNodePtr>) {
                 if let Some(ns_def) = cur.ns_def.take() {
                     xml_free_ns_list(ns_def);
                 }
-            }
-            // else if !cur.content.is_null()
-            //     && !matches!(cur.element_type(), XmlElementType::XmlEntityRefNode)
-            //     && !cur.content.is_null()
-            // {
-            //     xml_free(cur.content as _);
-            // }
-
-            // When a node is a text node or a comment, it uses a global static
-            // variable for the name of the node.
-            // Otherwise the node name might come from the document's dictionary
-            if !cur.name.is_null()
-                && !matches!(cur.element_type(), XmlElementType::XmlTextNode)
-                && !matches!(cur.element_type(), XmlElementType::XmlCommentNode)
-            {
-                xml_free(cur.name as _);
             }
 
             cur.free();

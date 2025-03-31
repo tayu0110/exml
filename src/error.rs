@@ -15,7 +15,7 @@
 
 use std::{
     borrow::Cow,
-    ffi::{CStr, c_void},
+    ffi::c_void,
     io::{Stderr, Stdout, Write, stderr},
     ptr::{NonNull, null_mut},
     slice::from_raw_parts,
@@ -1076,8 +1076,6 @@ pub unsafe fn report_error(
     data: Option<GenericErrorContext>,
 ) {
     unsafe {
-        let mut name: *const u8 = null_mut();
-
         let channel = GLOBAL_STATE.with_borrow_mut(|state| {
             if let Some(channel) = channel {
                 channel
@@ -1096,12 +1094,10 @@ pub unsafe fn report_error(
             return;
         }
 
-        if let Some(node) = node
+        let name = node
             .filter(|node| node.element_type() == XmlElementType::XmlElementNode)
             .map(|node| XmlNodePtr::try_from(node).unwrap())
-        {
-            name = node.name;
-        }
+            .map(|node| node.name.clone());
 
         let mut input = None;
         let mut cur = None;
@@ -1139,15 +1135,8 @@ pub unsafe fn report_error(
         {
             channel(data.clone(), format!("Entity: line {line}: ").as_str());
         }
-        if !name.is_null() {
-            channel(
-                data.clone(),
-                format!(
-                    "element {}: ",
-                    CStr::from_ptr(name as *const i8).to_string_lossy()
-                )
-                .as_str(),
-            );
+        if let Some(name) = name {
+            channel(data.clone(), format!("element {}: ", name).as_str());
         }
         match domain {
             XmlErrorDomain::XmlFromParser => channel(data.clone(), "parser "),

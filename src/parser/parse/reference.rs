@@ -1,7 +1,6 @@
-use std::{ffi::CStr, str::from_utf8_unchecked};
+use std::{borrow::Cow, ffi::CStr, str::from_utf8_unchecked};
 
 use crate::{
-    dict::xml_dict_lookup,
     encoding::XmlCharEncoding,
     error::XmlParserErrors,
     globals::GenericErrorContext,
@@ -810,7 +809,7 @@ pub(crate) unsafe fn parse_reference(ctxt: &mut XmlParserCtxt) {
         }
 
         // The first reference to the entity trigger a parsing phase
-        // where the (*ent).children is filled with the result from the parsing.
+        // where the ent.children is filled with the result from the parsing.
         // Note: external parsed entities will not be loaded, it is not
         // required for a non-validating parser, unless the parsing option
         // of validating, or substituting entities were given. Doing so is
@@ -1077,7 +1076,7 @@ pub(crate) unsafe fn parse_reference(ctxt: &mut XmlParserCtxt) {
                     // when operating on a reader, the entities definitions
                     // are always owning the entities subtree.
                     // if (ctxt.parseMode == XML_PARSE_READER)
-                    //     (*ent).owner = 1;
+                    //     ent.owner = 1;
 
                     let mut cur = ent.children;
                     while let Some(cur_node) = cur {
@@ -1149,14 +1148,12 @@ pub(crate) unsafe fn parse_reference(ctxt: &mut XmlParserCtxt) {
                 } else {
                     // the name change is to avoid coalescing of the
                     // node with a possible previous text one which
-                    // would make (*ent).children a dangling pointer
-                    let nbktext: *const u8 =
-                        xml_dict_lookup(ctxt.dict, c"nbktext".as_ptr() as _, -1);
+                    // would make ent.children a dangling pointer
                     if matches!(
                         ent.children.unwrap().element_type(),
                         XmlElementType::XmlTextNode
                     ) {
-                        ent.children.unwrap().name = nbktext;
+                        ent.children.unwrap().name = Cow::Borrowed("nbktext");
                     }
                     if ent.last != ent.children
                         && matches!(
@@ -1164,7 +1161,7 @@ pub(crate) unsafe fn parse_reference(ctxt: &mut XmlParserCtxt) {
                             XmlElementType::XmlTextNode
                         )
                     {
-                        ent.last.unwrap().name = nbktext;
+                        ent.last.unwrap().name = Cow::Borrowed("nbktext");
                     }
                     context_node.add_child_list(ent.children.unwrap().into());
                 }

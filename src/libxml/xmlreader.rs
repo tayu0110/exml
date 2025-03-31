@@ -4185,18 +4185,6 @@ const CHUNK_SIZE: usize = 512;
 #[cfg(feature = "libxml_reader")]
 const MAX_FREE_NODES: i32 = 100;
 
-/// Free a string if it is not owned by the "dict" dictionary in the current scope
-#[cfg(feature = "libxml_reader")]
-macro_rules! DICT_FREE {
-    ($dict:expr, $str:expr) => {
-        if !$str.is_null()
-            && ($dict.is_null() || $crate::libxml::dict::xml_dict_owns($dict, $str as _) == 0)
-        {
-            xml_free($str as _);
-        }
-    };
-}
-
 /// Free a property and all its siblings, all the children are freed too.
 #[doc(alias = "xmlTextReaderFreePropList")]
 #[cfg(feature = "libxml_reader")]
@@ -4219,11 +4207,6 @@ unsafe fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mut cur: XmlG
 
         let mut depth: usize = 0;
 
-        let dict = if !reader.is_null() && !(*reader).ctxt.is_null() {
-            (*(*reader).ctxt).dict
-        } else {
-            null_mut()
-        };
         if let Ok(ns) = XmlNsPtr::try_from(cur) {
             xml_free_ns_list(ns);
             return;
@@ -4277,13 +4260,6 @@ unsafe fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mut cur: XmlG
                     }
                 }
 
-                // we don't free element names here they are interned now
-                if !matches!(
-                    cur.element_type(),
-                    XmlElementType::XmlTextNode | XmlElementType::XmlCommentNode
-                ) {
-                    DICT_FREE!(dict, cur.name);
-                }
                 if matches!(
                     cur.element_type(),
                     XmlElementType::XmlElementNode | XmlElementType::XmlTextNode
@@ -4353,11 +4329,6 @@ unsafe fn xml_text_reader_free_node(reader: XmlTextReaderPtr, mut cur: XmlGeneri
     unsafe {
         use crate::tree::{NodeCommon, XmlDtdPtr, XmlNodePtr, XmlNsPtr};
 
-        let dict = if !reader.is_null() && !(*reader).ctxt.is_null() {
-            (*(*reader).ctxt).dict
-        } else {
-            null_mut()
-        };
         if let Ok(dtd) = XmlDtdPtr::try_from(cur) {
             xml_free_dtd(dtd);
             return;
@@ -4408,14 +4379,6 @@ unsafe fn xml_text_reader_free_node(reader: XmlTextReaderPtr, mut cur: XmlGeneri
             if let Some(ns_def) = cur.ns_def {
                 xml_free_ns_list(ns_def);
             }
-        }
-
-        // we don't free names here they are interned now
-        if !matches!(
-            cur.element_type(),
-            XmlElementType::XmlTextNode | XmlElementType::XmlCommentNode
-        ) {
-            DICT_FREE!(dict, cur.name);
         }
 
         if matches!(

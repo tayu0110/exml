@@ -764,7 +764,7 @@ pub unsafe fn xml_get_predefined_entity(name: &str) -> Option<XmlEntityPtr> {
 ///
 /// Returns A pointer to the entity structure or NULL if not found.
 #[doc(alias = "xmlGetEntityFromTable")]
-unsafe fn xml_get_entity_from_table(
+fn xml_get_entity_from_table(
     table: XmlHashTableRef<'static, XmlEntityPtr>,
     name: &str,
 ) -> Option<XmlEntityPtr> {
@@ -809,18 +809,13 @@ pub unsafe fn xml_get_doc_entity(doc: Option<XmlDocPtr>, name: &str) -> Option<X
 ///
 /// Returns A pointer to the entity structure or NULL if not found.
 #[doc(alias = "xmlGetDtdEntity")]
-pub unsafe fn xml_get_dtd_entity(doc: XmlDocPtr, name: &str) -> Option<XmlEntityPtr> {
-    unsafe {
-        // if doc.is_null() {
-        //     return None;
-        // }
-        if let Some(ext_subset) = doc.ext_subset {
-            if let Some(table) = ext_subset.entities {
-                return xml_get_entity_from_table(table, name);
-            }
+pub fn xml_get_dtd_entity(doc: XmlDocPtr, name: &str) -> Option<XmlEntityPtr> {
+    if let Some(ext_subset) = doc.ext_subset {
+        if let Some(table) = ext_subset.entities {
+            return xml_get_entity_from_table(table, name);
         }
-        None
     }
+    None
 }
 
 /// Do an entity lookup in the internal and external subsets and
@@ -828,43 +823,21 @@ pub unsafe fn xml_get_dtd_entity(doc: XmlDocPtr, name: &str) -> Option<XmlEntity
 ///
 /// Returns A pointer to the entity structure or NULL if not found.
 #[doc(alias = "xmlGetParameterEntity")]
-pub unsafe fn xml_get_parameter_entity(doc: XmlDocPtr, name: &str) -> Option<XmlEntityPtr> {
-    unsafe {
-        // if doc.is_null() {
-        //     return None;
-        // }
-        if let Some(int_subset) = doc.int_subset {
-            if let Some(table) = int_subset.pentities {
-                let ret = xml_get_entity_from_table(table, name);
-                if ret.is_some() {
-                    return ret;
-                }
+pub fn xml_get_parameter_entity(doc: XmlDocPtr, name: &str) -> Option<XmlEntityPtr> {
+    if let Some(int_subset) = doc.int_subset {
+        if let Some(table) = int_subset.pentities {
+            let ret = xml_get_entity_from_table(table, name);
+            if ret.is_some() {
+                return ret;
             }
         }
-        if let Some(ext_subset) = doc.ext_subset {
-            if let Some(table) = ext_subset.pentities {
-                return xml_get_entity_from_table(table, name);
-            }
-        }
-        None
     }
-}
-
-// Macro used to grow the current buffer.
-macro_rules! grow_buffer_reentrant {
-    ($buffer:expr, $buffer_size:expr, $mem_error:tt) => {
-        let tmp: *mut XmlChar;
-        let new_size: size_t = $buffer_size * 2;
-        if new_size < $buffer_size {
-            break $mem_error;
+    if let Some(ext_subset) = doc.ext_subset {
+        if let Some(table) = ext_subset.pentities {
+            return xml_get_entity_from_table(table, name);
         }
-        tmp = $crate::libxml::globals::xml_realloc($buffer as _, new_size) as *mut XmlChar;
-        if tmp.is_null() {
-            break $mem_error;
-        }
-        $buffer = tmp;
-        $buffer_size = new_size;
-    };
+    }
+    None
 }
 
 /// Do a global encoding of a string, replacing the predefined entities

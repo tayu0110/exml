@@ -63,7 +63,7 @@ use crate::{
     io::{XmlParserInputBuffer, xml_parser_get_directory},
     libxml::{
         chvalid::xml_is_blank_char, globals::xml_free, parser::xml_parse_document,
-        parser_internals::XML_MAX_NAMELEN, threads::xml_get_thread_id, xmlstring::xml_str_equal,
+        parser_internals::XML_MAX_NAMELEN, threads::xml_get_thread_id,
     },
     parser::{XmlParserInput, xml_free_parser_ctxt, xml_new_parser_ctxt},
     tree::{
@@ -2633,7 +2633,7 @@ unsafe fn xml_parse_xml_catalog_file(
         }
 
         if let Some(cur) = doc.get_root_element().filter(|cur| {
-            xml_str_equal(cur.name, c"catalog".as_ptr() as _)
+            cur.name == "catalog"
                 && cur
                     .ns
                     .as_deref()
@@ -2649,7 +2649,7 @@ unsafe fn xml_parse_xml_catalog_file(
                 None,
             );
 
-            if let Some(prop) = (*cur).get_prop("prefer") {
+            if let Some(prop) = cur.get_prop("prefer") {
                 if prop == "system" {
                     prefer = XmlCatalogPrefer::System;
                 } else if prop == "public" {

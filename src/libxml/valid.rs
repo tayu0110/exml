@@ -26,7 +26,7 @@ use std::{
     ffi::{CStr, CString, c_char},
     mem::size_of,
     os::raw::c_void,
-    ptr::{addr_of_mut, null, null_mut},
+    ptr::{addr_of_mut, null_mut},
     rc::Rc,
 };
 
@@ -2155,69 +2155,66 @@ pub fn xml_get_id(doc: XmlDocPtr, id: &str) -> Option<Result<XmlAttrPtr, XmlDocP
 ///
 /// Returns 0 or 1 depending on the lookup result
 #[doc(alias = "xmlIsID")]
-pub unsafe fn xml_is_id(
+pub fn xml_is_id(
     doc: Option<XmlDocPtr>,
     elem: Option<XmlNodePtr>,
     attr: Option<XmlAttrPtr>,
 ) -> i32 {
-    unsafe {
-        let Some(attr) = attr else {
-            return 0;
-        };
-        if attr.name().as_deref() == Some("id")
-            && attr
-                .ns
-                .is_some_and(|ns| ns.prefix().as_deref() == Some("xml"))
+    let Some(attr) = attr else {
+        return 0;
+    };
+    if attr.name().as_deref() == Some("id")
+        && attr
+            .ns
+            .is_some_and(|ns| ns.prefix().as_deref() == Some("xml"))
+    {
+        return 1;
+    }
+    let Some(doc) = doc else {
+        return 0;
+    };
+    if doc.int_subset.is_none()
+        && doc.ext_subset.is_none()
+        && !matches!(doc.typ, XmlElementType::XmlHTMLDocumentNode)
+    {
+        return 0;
+    } else if matches!(doc.typ, XmlElementType::XmlHTMLDocumentNode) {
+        if "id" == attr.name.as_ref()
+            || ("name" == attr.name.as_ref() && elem.is_none_or(|elem| elem.name == "a"))
         {
             return 1;
         }
-        let Some(doc) = doc else {
-            return 0;
-        };
-        if doc.int_subset.is_none()
-            && doc.ext_subset.is_none()
-            && !matches!(doc.typ, XmlElementType::XmlHTMLDocumentNode)
-        {
-            return 0;
-        } else if matches!(doc.typ, XmlElementType::XmlHTMLDocumentNode) {
-            if "id" == attr.name.as_ref()
-                || ("name" == attr.name.as_ref()
-                    && elem.is_none_or(|elem| xml_str_equal(elem.name, c"a".as_ptr() as _)))
-            {
-                return 1;
-            }
-            return 0;
-        } else if let Some(elem) = elem {
-            let elemname = elem.name().unwrap();
-            let attrname = attr.name().unwrap();
-            let fullelemname = build_qname(
-                &elemname,
-                elem.ns.as_deref().and_then(|ns| ns.prefix()).as_deref(),
-            );
-            let fullattrname = build_qname(
-                &attrname,
-                attr.ns.as_deref().and_then(|ns| ns.prefix()).as_deref(),
-            );
+        return 0;
+    } else if let Some(elem) = elem {
+        let elemname = elem.name().unwrap();
+        let attrname = attr.name().unwrap();
+        let fullelemname = build_qname(
+            &elemname,
+            elem.ns.as_deref().and_then(|ns| ns.prefix()).as_deref(),
+        );
+        let fullattrname = build_qname(
+            &attrname,
+            attr.ns.as_deref().and_then(|ns| ns.prefix()).as_deref(),
+        );
 
-            let mut attr_decl = doc
-                .int_subset
-                .and_then(|dtd| dtd.get_attr_desc(&fullelemname, &fullattrname));
-            if attr_decl.is_none() {
-                if let Some(ext_subset) = doc.ext_subset {
-                    attr_decl = ext_subset.get_attr_desc(&fullelemname, &fullattrname);
-                }
+        let mut attr_decl = doc
+            .int_subset
+            .and_then(|dtd| dtd.get_attr_desc(&fullelemname, &fullattrname));
+        if attr_decl.is_none() {
+            if let Some(ext_subset) = doc.ext_subset {
+                attr_decl = ext_subset.get_attr_desc(&fullelemname, &fullattrname);
             }
-
-            if attr_decl.is_some_and(|attr_decl| {
-                matches!(attr_decl.atype, XmlAttributeType::XmlAttributeID)
-            }) {
-                return 1;
-            }
-        } else {
-            return 0;
         }
-        0
+
+        if attr_decl
+            .is_some_and(|attr_decl| matches!(attr_decl.atype, XmlAttributeType::XmlAttributeID))
+        {
+            return 1;
+        }
+    } else {
+        return 0;
     }
+    0
 }
 
 /// Normalize a string in-place.
@@ -2462,7 +2459,7 @@ pub unsafe fn xml_validate_root(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i32 {
     use crate::parser::build_qname;
 
     unsafe {
-        let Some(root) = doc.get_root_element().filter(|root| !root.name.is_null()) else {
+        let Some(root) = doc.get_root_element() else {
             xml_err_valid!(ctxt, XmlParserErrors::XmlDTDNoRoot, "no root element\n");
             return 0;
         };
@@ -2479,9 +2476,7 @@ pub unsafe fn xml_validate_root(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i32 {
                         return 1;
                     }
                 }
-                if int_subset.name.as_deref() == Some("HTML")
-                    && xml_str_equal(root.name, c"html".as_ptr() as _)
-                {
+                if int_subset.name.as_deref() == Some("HTML") && root.name == "html" {
                     // goto name_ok;
                     return 1;
                 }
@@ -3609,10 +3604,7 @@ unsafe fn xml_valid_get_elem_decl(
     extsubset: *mut i32,
 ) -> Option<XmlElementPtr> {
     unsafe {
-        // if elem.is_null() {
-        //     return None;
-        // }
-        if ctxt.is_null() || elem.name.is_null() {
+        if ctxt.is_null() {
             return None;
         }
         if !extsubset.is_null() {
@@ -3785,13 +3777,17 @@ unsafe fn xml_snprintf_elements(
                         strncat(buf, prefix.as_ptr() as *const i8, prefix.len());
                         strcat(buf, c":".as_ptr() as _);
                     }
-                    if size - len < xml_strlen(cur_node.name) + 10 {
+                    if size - len < cur_node.name.len() as i32 + 10 {
                         if size - len > 4 && *buf.add(len as usize - 1) != b'.' as i8 {
                             strcat(buf, c" ...".as_ptr() as _);
                         }
                         return;
                     }
-                    strcat(buf, cur_node.name as *mut c_char);
+                    strncat(
+                        buf,
+                        cur_node.name.as_ptr() as *const i8,
+                        cur_node.name.len(),
+                    );
                     if cur_node.next.is_some() {
                         strcat(buf, c" ".as_ptr() as _);
                     }
@@ -4680,7 +4676,6 @@ pub unsafe fn xml_validate_one_element(
         let mut cont: XmlElementContentPtr;
         let mut ret: i32 = 1;
         let tmp: i32;
-        let mut name: *const XmlChar;
         let mut extsubset: i32 = 0;
 
         if doc.int_subset.is_none() && doc.ext_subset.is_none() {
@@ -4891,12 +4886,11 @@ pub unsafe fn xml_validate_one_element(
                         while let Some(cur_node) = child {
                             if matches!(cur_node.element_type(), XmlElementType::XmlElementNode) {
                                 let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                                name = cur_node.name;
+                                let name = cur_node.name.clone();
                                 if let Some(prefix) =
                                     cur_node.ns.as_deref().and_then(|ns| ns.prefix())
                                 {
-                                    let cur_node_name = cur_node.name().unwrap();
-                                    let fullname = build_qname(&cur_node_name, Some(&prefix));
+                                    let fullname = build_qname(&cur_node.name, Some(&prefix));
                                     cont = elem_decl.content;
                                     while !cont.is_null() {
                                         if matches!(
@@ -4952,7 +4946,10 @@ pub unsafe fn xml_validate_one_element(
                                         (*cont).typ,
                                         XmlElementContentType::XmlElementContentElement
                                     ) {
-                                        if xml_str_equal((*cont).name, name) {
+                                        if CStr::from_ptr((*cont).name as *const i8)
+                                            .to_string_lossy()
+                                            == name
+                                        {
                                             break;
                                         }
                                     } else if matches!(
@@ -4964,7 +4961,10 @@ pub unsafe fn xml_validate_one_element(
                                             XmlElementContentType::XmlElementContentElement
                                         )
                                     {
-                                        if xml_str_equal((*(*cont).c1).name, name) {
+                                        if CStr::from_ptr((*(*cont).c1).name as *const i8)
+                                            .to_string_lossy()
+                                            == name
+                                        {
                                             break;
                                         }
                                     } else if !matches!(
@@ -4986,17 +4986,20 @@ pub unsafe fn xml_validate_one_element(
                                     cont = (*cont).c2;
                                 }
                                 if cont.is_null() {
-                                    let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                                     let elem_name = elem.name().unwrap();
                                     xml_err_valid_node(
-                                    Some(&mut *ctxt),
-                                    Some(elem.into()),
-                                    XmlParserErrors::XmlDTDInvalidChild,
-                                    format!("Element {name} is not declared in {elem_name} list of possible children\n").as_str(),
-                                    Some(&name),
-                                    Some(&elem_name),
-                                    None
-                                );
+                                        Some(&mut *ctxt),
+                                        Some(elem.into()),
+                                        XmlParserErrors::XmlDTDInvalidChild,
+                                        format!(
+                                            "Element {} is not declared in {} list of possible children\n",
+                                            name,
+                                            elem_name
+                                        ).as_str(),
+                                        Some(&name),
+                                        Some(&elem_name),
+                                        None
+                                    );
                                     ret = 0;
                                 }
                             }
@@ -5255,9 +5258,6 @@ pub unsafe fn xml_validate_one_attribute(
         if doc.int_subset.is_none() && doc.ext_subset.is_none() {
             return 0;
         };
-        if elem.name.is_null() {
-            return 0;
-        }
         let Some(mut attr) = attr else {
             return 0;
         };
@@ -5558,17 +5558,13 @@ pub unsafe fn xml_validate_one_namespace(
         if doc.int_subset.is_none() && doc.ext_subset.is_none() {
             return 0;
         };
-        if elem.name.is_null() {
-            return 0;
-        }
         if ns.href.is_none() {
             return 0;
         }
 
         let mut attr_decl = None;
         if let Some(prefix) = prefix {
-            let name = elem.name().unwrap();
-            let fullname = build_qname(&name, Some(prefix));
+            let fullname = build_qname(&elem.name, Some(prefix));
 
             if let Some(prefix) = ns.prefix() {
                 attr_decl = doc
@@ -6145,44 +6141,45 @@ pub fn xml_get_dtd_element_desc(dtd: Option<XmlDtdPtr>, name: &str) -> Option<Xm
 #[cfg(feature = "libxml_valid")]
 pub unsafe fn xml_valid_get_potential_children(
     ctree: *mut XmlElementContent,
-    names: *mut *const XmlChar,
-    len: *mut i32,
-    max: i32,
-) -> i32 {
+    names: &mut [Cow<'static, str>],
+    len: &mut usize,
+) -> usize {
     unsafe {
-        if ctree.is_null() || names.is_null() || len.is_null() {
-            return -1;
+        if ctree.is_null() {
+            return usize::MAX;
         }
-        if *len >= max {
+
+        if *len >= names.len() {
             return *len;
         }
 
         match (*ctree).typ {
             XmlElementContentType::XmlElementContentPCDATA => {
-                for i in 0..*len {
-                    if xml_str_equal(c"#PCDATA".as_ptr() as _, *names.add(i as usize)) {
-                        return *len;
-                    }
+                if names.iter().take(*len).any(|name| name == "#PCDATA") {
+                    return *len;
                 }
-                *names.add(*len as usize) = c"#PCDATA".as_ptr() as _;
+                names[*len] = "#PCDATA".into();
                 *len += 1;
             }
             XmlElementContentType::XmlElementContentElement => {
-                for i in 0..*len {
-                    if xml_str_equal((*ctree).name, *names.add(i as usize)) {
-                        return *len;
-                    }
+                if names.iter().take(*len).any(|name| {
+                    *name == CStr::from_ptr((*ctree).name as *const i8).to_string_lossy()
+                }) {
+                    return *len;
                 }
-                *names.add(*len as usize) = (*ctree).name;
+                names[*len] = CStr::from_ptr((*ctree).name as *const i8)
+                    .to_string_lossy()
+                    .into_owned()
+                    .into();
                 *len += 1;
             }
             XmlElementContentType::XmlElementContentSeq => {
-                xml_valid_get_potential_children((*ctree).c1, names, len, max);
-                xml_valid_get_potential_children((*ctree).c2, names, len, max);
+                xml_valid_get_potential_children((*ctree).c1, names, len);
+                xml_valid_get_potential_children((*ctree).c2, names, len);
             }
             XmlElementContentType::XmlElementContentOr => {
-                xml_valid_get_potential_children((*ctree).c1, names, len, max);
-                xml_valid_get_potential_children((*ctree).c2, names, len, max);
+                xml_valid_get_potential_children((*ctree).c1, names, len);
+                xml_valid_get_potential_children((*ctree).c2, names, len);
             }
         }
 
@@ -6214,30 +6211,22 @@ fn xml_no_validity_err(_ctx: Option<GenericErrorContext>, _msg: &str) {}
 pub unsafe fn xml_valid_get_valid_elements(
     prev: Option<XmlGenericNodePtr>,
     next: Option<XmlGenericNodePtr>,
-    names: *mut *const XmlChar,
-    max: i32,
+    names: &mut [Cow<'static, str>],
 ) -> i32 {
     unsafe {
         let mut vctxt = XmlValidCtxt::default();
-        let mut nb_valid_elements: i32;
-        let mut elements: [*const XmlChar; 256] = [null(); 256];
-        let mut nb_elements: i32 = 0;
 
         if prev.is_none() && next.is_none() {
             return -1;
         }
 
-        if names.is_null() {
-            return -1;
-        }
-        if max <= 0 {
+        if names.is_empty() {
             return -1;
         }
 
         std::ptr::write(&mut vctxt, XmlValidCtxt::default());
         vctxt.error = Some(xml_no_validity_err); /* this suppresses err/warn output */
 
-        nb_valid_elements = 0;
         let ref_node = prev.or(next).unwrap();
         // Why can I do `unwrap` for parent without checking ????????
         let mut parent = ref_node.parent().unwrap();
@@ -6270,7 +6259,7 @@ pub unsafe fn xml_valid_get_valid_elements(
         test_node.parent = Some(parent);
         test_node.prev = prev;
         test_node.next = next;
-        let name: *const XmlChar = test_node.name;
+        let name = test_node.name.clone();
 
         if let Some(mut prev) = prev {
             prev.set_next(Some(test_node.into()));
@@ -6285,15 +6274,17 @@ pub unsafe fn xml_valid_get_valid_elements(
         }
 
         // Insert each potential child node and check if the parent is still valid
-        nb_elements = xml_valid_get_potential_children(
+        let mut elements = [const { Cow::Borrowed("") }; 256];
+        let mut nb_elements = 0;
+        let nb_elements = xml_valid_get_potential_children(
             element_desc.content,
-            elements.as_mut_ptr(),
-            addr_of_mut!(nb_elements),
-            256,
+            &mut elements[..],
+            &mut nb_elements,
         );
 
-        for i in 0..nb_elements {
-            test_node.name = elements[i as usize];
+        let mut nb_valid_elements = 0;
+        for element in elements.into_iter().take(nb_elements) {
+            test_node.name = element.clone();
             if xml_validate_one_element(
                 addr_of_mut!(vctxt) as _,
                 parent.document().unwrap(),
@@ -6301,13 +6292,13 @@ pub unsafe fn xml_valid_get_valid_elements(
             ) != 0
             {
                 for j in 0..nb_valid_elements {
-                    if xml_str_equal(elements[i as usize], *names.add(j as usize)) {
+                    if element == names[j] {
                         break;
                     }
                 }
-                *names.add(nb_valid_elements as usize) = elements[i as usize];
+                names[nb_elements] = element;
                 nb_valid_elements += 1;
-                if nb_valid_elements >= max {
+                if nb_valid_elements >= names.len() {
                     break;
                 }
             }
@@ -6327,7 +6318,7 @@ pub unsafe fn xml_valid_get_valid_elements(
         test_node.name = name;
         xml_free_node(test_node);
 
-        nb_valid_elements
+        nb_valid_elements as i32
     }
 }
 
@@ -6895,56 +6886,6 @@ mod tests {
                         "{leaks} Leaks are found in xmlCopyElementContent()"
                     );
                     eprintln!(" {}", n_cur);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_valid_get_potential_children() {
-        #[cfg(feature = "libxml_valid")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctree in 0..GEN_NB_XML_ELEMENT_CONTENT_PTR {
-                for n_names in 0..GEN_NB_CONST_XML_CHAR_PTR_PTR {
-                    for n_len in 0..GEN_NB_INT_PTR {
-                        for n_max in 0..GEN_NB_INT {
-                            let mem_base = xml_mem_blocks();
-                            let ctree = gen_xml_element_content_ptr(n_ctree, 0);
-                            let names = gen_const_xml_char_ptr_ptr(n_names, 1);
-                            let len = gen_int_ptr(n_len, 2);
-                            let max = gen_int(n_max, 3);
-
-                            let ret_val = xml_valid_get_potential_children(
-                                ctree,
-                                names as *mut *const XmlChar,
-                                len,
-                                max,
-                            );
-                            desret_int(ret_val);
-                            des_xml_element_content_ptr(n_ctree, ctree, 0);
-                            des_const_xml_char_ptr_ptr(n_names, names as *mut *const XmlChar, 1);
-                            des_int_ptr(n_len, len, 2);
-                            des_int(n_max, max, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlValidGetPotentialChildren",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                assert!(
-                                    leaks == 0,
-                                    "{leaks} Leaks are found in xmlValidGetPotentialChildren()"
-                                );
-                                eprint!(" {}", n_ctree);
-                                eprint!(" {}", n_names);
-                                eprint!(" {}", n_len);
-                                eprintln!(" {}", n_max);
-                            }
-                        }
-                    }
                 }
             }
         }

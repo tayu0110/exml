@@ -22,9 +22,7 @@ use std::{ffi::CStr, os::raw::c_void, ptr::null_mut};
 
 use crate::libxml::{
     globals::{xml_free, xml_malloc},
-    parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
     valid::{xml_add_id, xml_is_id, xml_remove_id},
-    xmlstring::xml_strdup,
 };
 
 use super::{
@@ -2024,18 +2022,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                                 result_clone = Some(XmlGenericNodePtr::from(new));
                             }
                             // Clone the name of the node if any.
-                            if cur_node.name == XML_STRING_TEXT.as_ptr() as _ {
-                                new.name = XML_STRING_TEXT.as_ptr() as _;
-                            } else if cur_node.name == XML_STRING_TEXT_NOENC.as_ptr() as _ {
-                                // NOTE: Although xmlStringTextNoenc is never assigned to a node
-                                //   in tree.c, it might be set in Libxslt via
-                                //   "xsl:disable-output-escaping".
-                                new.name = XML_STRING_TEXT_NOENC.as_ptr() as _;
-                            } else if cur_node.name == XML_STRING_COMMENT.as_ptr() as _ {
-                                new.name = XML_STRING_COMMENT.as_ptr() as _;
-                            } else if !cur_node.name.is_null() {
-                                new.name = xml_strdup(cur_node.name);
-                            }
+                            new.name = cur_node.name.clone();
                             XmlGenericNodePtr::from(new)
                         }
                         XmlElementType::XmlAttributeNode => {

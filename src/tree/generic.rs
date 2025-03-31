@@ -1,15 +1,14 @@
 use std::{
     borrow::Cow,
-    ffi::{CStr, CString},
+    ffi::CStr,
     ops::{Deref, DerefMut},
-    ptr::{NonNull, null_mut},
+    ptr::NonNull,
 };
 
 use crate::{
     libxml::{
-        globals::xml_free,
         valid::xml_remove_id,
-        xmlstring::{XmlChar, xml_strcat, xml_strlen, xml_strncat},
+        xmlstring::{XmlChar, xml_strlen},
     },
     uri::build_uri,
 };
@@ -1222,7 +1221,7 @@ impl XmlGenericNodePtr {
     pub unsafe fn get_string(self, doc: Option<XmlDocPtr>, in_line: i32) -> Option<String> {
         unsafe {
             let mut node = Some(self);
-            let mut ret: *mut XmlChar = null_mut();
+            let mut ret = None::<String>;
 
             let attr = self
                 .parent()
@@ -1237,14 +1236,14 @@ impl XmlGenericNodePtr {
                     let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
                     let content = cur_node.content.as_deref().unwrap();
                     if in_line != 0 {
-                        ret = xml_strncat(ret, content.as_ptr(), content.len() as i32);
+                        ret.get_or_insert_default().push_str(content);
                     } else {
                         let buffer = if attr {
                             xml_encode_attribute_entities(doc, cur_node.content.as_deref().unwrap())
                         } else {
                             xml_encode_entities_reentrant(doc, cur_node.content.as_deref().unwrap())
                         };
-                        ret = xml_strncat(ret, buffer.as_ptr(), buffer.len() as i32);
+                        ret.get_or_insert_default().push_str(&buffer);
                     }
                 } else if matches!(cur_node.element_type(), XmlElementType::XmlEntityRefNode) {
                     let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
@@ -1260,34 +1259,20 @@ impl XmlGenericNodePtr {
                             // which handles these types
                             let children = ent.children();
                             if let Some(buffer) = children.and_then(|c| c.get_string(doc, 1)) {
-                                let buffer = CString::new(buffer).unwrap();
-                                ret = xml_strcat(ret, buffer.as_ptr() as *const u8);
+                                ret.get_or_insert_default().push_str(&buffer);
                             }
                         } else {
                             let content = cur_node.content.as_deref().unwrap();
-                            ret = xml_strncat(ret, content.as_ptr(), content.len() as i32);
+                            ret.get_or_insert_default().push_str(content);
                         }
                     } else {
-                        let mut buf: [XmlChar; 2] = [0; 2];
-
-                        buf[0] = b'&';
-                        buf[1] = 0;
-                        ret = xml_strncat(ret, buf.as_ptr() as _, 1);
-                        ret = xml_strcat(ret, cur_node.name);
-                        buf[0] = b';';
-                        buf[1] = 0;
-                        ret = xml_strncat(ret, buf.as_ptr() as _, 1);
+                        ret.get_or_insert_default()
+                            .push_str(format!("&{};", cur_node.name).as_str());
                     }
                 }
                 node = cur_node.next();
             }
-            let r = (!ret.is_null()).then(|| {
-                CStr::from_ptr(ret as *const i8)
-                    .to_string_lossy()
-                    .into_owned()
-            });
-            xml_free(ret as _);
-            r
+            ret
         }
     }
 
@@ -1303,7 +1288,7 @@ impl XmlGenericNodePtr {
             use super::xml_encode_special_chars;
 
             let mut node = Some(self);
-            let mut ret: *mut XmlChar = null_mut();
+            let mut ret = None::<String>;
 
             while let Some(cur_node) = node {
                 if matches!(
@@ -1313,11 +1298,11 @@ impl XmlGenericNodePtr {
                     let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
                     if in_line != 0 {
                         let content = cur_node.content.as_deref().unwrap();
-                        ret = xml_strncat(ret, content.as_ptr(), content.len() as i32);
+                        ret.get_or_insert_default().push_str(content);
                     } else {
                         let buffer =
                             xml_encode_special_chars(doc, cur_node.content.as_deref().unwrap());
-                        ret = xml_strncat(ret, buffer.as_ptr(), buffer.len() as i32);
+                        ret.get_or_insert_default().push_str(&buffer);
                     }
                 } else if matches!(cur_node.element_type(), XmlElementType::XmlEntityRefNode) {
                     let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
@@ -1333,34 +1318,21 @@ impl XmlGenericNodePtr {
                             // which handles these types
                             let children = ent.children();
                             let buffer = children.and_then(|c| c.get_raw_string(doc, 1));
-                            if let Some(buffer) = buffer.map(|b| CString::new(b).unwrap()) {
-                                ret = xml_strcat(ret, buffer.as_ptr() as *const u8);
+                            if let Some(buffer) = buffer {
+                                ret.get_or_insert_default().push_str(&buffer);
                             }
                         } else {
                             let content = cur_node.content.as_deref().unwrap();
-                            ret = xml_strncat(ret, content.as_ptr(), content.len() as i32);
+                            ret.get_or_insert_default().push_str(content);
                         }
                     } else {
-                        let mut buf: [u8; 2] = [0; 2];
-
-                        buf[0] = b'&';
-                        buf[1] = 0;
-                        ret = xml_strncat(ret, buf.as_ptr(), 1);
-                        ret = xml_strcat(ret, cur_node.name);
-                        buf[0] = b';';
-                        buf[1] = 0;
-                        ret = xml_strncat(ret, buf.as_ptr(), 1);
+                        ret.get_or_insert_default()
+                            .push_str(format!("&{};", cur_node.name).as_str());
                     }
                 }
                 node = cur_node.next();
             }
-            let r = (!ret.is_null()).then(|| {
-                CStr::from_ptr(ret as *const i8)
-                    .to_string_lossy()
-                    .into_owned()
-            });
-            xml_free(ret as _);
-            r
+            ret
         }
     }
 

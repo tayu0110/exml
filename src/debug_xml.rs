@@ -938,7 +938,7 @@ impl XmlDebugCtxt<'_> {
                     if self.check == 0 {
                         self.dump_spaces();
                         let node = XmlNodePtr::try_from(node).unwrap();
-                        if node.name == XML_STRING_TEXT_NOENC.as_ptr() as *const u8 {
+                        if node.name == XML_STRING_TEXT_NOENC.to_str().unwrap() {
                             write!(self.output, "TEXT no enc").ok();
                         } else {
                             write!(self.output, "TEXT").ok();
@@ -1642,7 +1642,7 @@ pub unsafe fn xml_debug_check_document<'a>(
 
 /// Dump to `output` the type and name of @node.
 #[doc(alias = "xmlLsOneNode")]
-pub unsafe fn xml_ls_one_node<'a>(output: &mut (impl Write + 'a), node: Option<XmlGenericNodePtr>) {
+pub fn xml_ls_one_node<'a>(output: &mut (impl Write + 'a), node: Option<XmlGenericNodePtr>) {
     let Some(node) = node else {
         writeln!(output, "NULL").ok();
         return;
@@ -1680,74 +1680,60 @@ pub unsafe fn xml_ls_one_node<'a>(output: &mut (impl Write + 'a), node: Option<X
             write!(output, "--").ok();
         }
     }
-    unsafe {
-        write!(output, " {} ", xml_ls_count_node(Some(node))).ok();
+    write!(output, " {} ", xml_ls_count_node(Some(node))).ok();
 
-        match node.element_type() {
-            XmlElementType::XmlElementNode => {
-                let node = XmlNodePtr::try_from(node).unwrap();
-                if !node.name.is_null() {
-                    if let Some(prefix) = node.ns.as_deref().and_then(|ns| ns.prefix()) {
-                        write!(output, "{prefix}:").ok();
-                    }
-                    let name = CStr::from_ptr(node.name as *const i8).to_string_lossy();
-                    write!(output, "{name}").ok();
-                }
+    match node.element_type() {
+        XmlElementType::XmlElementNode => {
+            let node = XmlNodePtr::try_from(node).unwrap();
+            if let Some(prefix) = node.ns.as_deref().and_then(|ns| ns.prefix()) {
+                write!(output, "{prefix}:").ok();
             }
-            XmlElementType::XmlAttributeNode => {
-                let node = XmlAttrPtr::try_from(node).unwrap();
-                write!(output, "{}", node.name).ok();
-            }
-            XmlElementType::XmlTextNode => {
-                let node = XmlNodePtr::try_from(node).unwrap();
-                if let Some(content) = node.content.as_deref() {
-                    xml_debug_dump_string(Some(output), Some(content));
-                }
-            }
-            XmlElementType::XmlCDATASectionNode => {}
-            XmlElementType::XmlEntityRefNode => {
-                let node = XmlNodePtr::try_from(node).unwrap();
-                if !node.name.is_null() {
-                    let name = CStr::from_ptr(node.name as *const i8).to_string_lossy();
-                    write!(output, "{name}").ok();
-                }
-            }
-            XmlElementType::XmlEntityNode => {
-                let node = XmlNodePtr::try_from(node).unwrap();
-                if !node.name.is_null() {
-                    let name = CStr::from_ptr(node.name as *const i8).to_string_lossy();
-                    write!(output, "{name}").ok();
-                }
-            }
-            XmlElementType::XmlPINode => {
-                let node = XmlNodePtr::try_from(node).unwrap();
-                if !node.name.is_null() {
-                    let name = CStr::from_ptr(node.name as *const i8).to_string_lossy();
-                    write!(output, "{name}").ok();
-                }
-            }
-            XmlElementType::XmlCommentNode => {}
-            XmlElementType::XmlDocumentNode => {}
-            XmlElementType::XmlHTMLDocumentNode => {}
-            XmlElementType::XmlDocumentTypeNode => {}
-            XmlElementType::XmlDocumentFragNode => {}
-            XmlElementType::XmlNotationNode => {}
-            XmlElementType::XmlNamespaceDecl => {
-                let ns = XmlNsPtr::try_from(node).unwrap();
-                if let Some(prefix) = ns.prefix() {
-                    write!(output, "{prefix} -> {}", ns.href.as_deref().unwrap()).ok();
-                } else {
-                    write!(output, "default -> {}", ns.href.as_deref().unwrap()).ok();
-                }
-            }
-            _ => {
-                if let Some(name) = node.name() {
-                    write!(output, "{name}").ok();
-                }
+            write!(output, "{}", node.name).ok();
+        }
+        XmlElementType::XmlAttributeNode => {
+            let node = XmlAttrPtr::try_from(node).unwrap();
+            write!(output, "{}", node.name).ok();
+        }
+        XmlElementType::XmlTextNode => {
+            let node = XmlNodePtr::try_from(node).unwrap();
+            if let Some(content) = node.content.as_deref() {
+                xml_debug_dump_string(Some(output), Some(content));
             }
         }
-        writeln!(output).ok();
+        XmlElementType::XmlCDATASectionNode => {}
+        XmlElementType::XmlEntityRefNode => {
+            let node = XmlNodePtr::try_from(node).unwrap();
+            write!(output, "{}", node.name).ok();
+        }
+        XmlElementType::XmlEntityNode => {
+            let node = XmlNodePtr::try_from(node).unwrap();
+            write!(output, "{}", node.name).ok();
+        }
+        XmlElementType::XmlPINode => {
+            let node = XmlNodePtr::try_from(node).unwrap();
+            write!(output, "{}", node.name).ok();
+        }
+        XmlElementType::XmlCommentNode => {}
+        XmlElementType::XmlDocumentNode => {}
+        XmlElementType::XmlHTMLDocumentNode => {}
+        XmlElementType::XmlDocumentTypeNode => {}
+        XmlElementType::XmlDocumentFragNode => {}
+        XmlElementType::XmlNotationNode => {}
+        XmlElementType::XmlNamespaceDecl => {
+            let ns = XmlNsPtr::try_from(node).unwrap();
+            if let Some(prefix) = ns.prefix() {
+                write!(output, "{prefix} -> {}", ns.href.as_deref().unwrap()).ok();
+            } else {
+                write!(output, "default -> {}", ns.href.as_deref().unwrap()).ok();
+            }
+        }
+        _ => {
+            if let Some(name) = node.name() {
+                write!(output, "{name}").ok();
+            }
+        }
     }
+    writeln!(output).ok();
 }
 
 /// Count the children of @node.
@@ -1837,34 +1823,32 @@ impl XmlShellCtxt<'_> {
     /// Returns 0
     #[doc(alias = "xmlShellList")]
     #[cfg(feature = "xpath")]
-    pub unsafe fn xml_shell_list(
+    pub fn xml_shell_list(
         &mut self,
         _arg: Option<&str>,
         node: Option<XmlGenericNodePtr>,
         _node2: Option<XmlGenericNodePtr>,
     ) -> i32 {
-        unsafe {
-            let Some(node) = node else {
-                writeln!(self.output, "NULL").ok();
-                return 0;
-            };
-            let mut cur = if let Ok(doc) = XmlDocPtr::try_from(node) {
-                doc.children()
-            } else if let Ok(ns) = XmlNsPtr::try_from(node) {
-                xml_ls_one_node(&mut self.output, Some(ns.into()));
-                return 0;
-            } else if let Some(children) = node.children() {
-                Some(children)
-            } else {
-                xml_ls_one_node(&mut self.output, Some(node));
-                return 0;
-            };
-            while let Some(now) = cur {
-                xml_ls_one_node(&mut self.output, Some(now));
-                cur = now.next();
-            }
-            0
+        let Some(node) = node else {
+            writeln!(self.output, "NULL").ok();
+            return 0;
+        };
+        let mut cur = if let Ok(doc) = XmlDocPtr::try_from(node) {
+            doc.children()
+        } else if let Ok(ns) = XmlNsPtr::try_from(node) {
+            xml_ls_one_node(&mut self.output, Some(ns.into()));
+            return 0;
+        } else if let Some(children) = node.children() {
+            Some(children)
+        } else {
+            xml_ls_one_node(&mut self.output, Some(node));
+            return 0;
+        };
+        while let Some(now) = cur {
+            xml_ls_one_node(&mut self.output, Some(now));
+            cur = now.next();
         }
+        0
     }
 
     /// Implements the XML shell function "base"
@@ -2210,78 +2194,75 @@ impl XmlShellCtxt<'_> {
     /// Returns 0 or -1 in case of error
     #[doc(alias = "xmlShellDu")]
     #[cfg(feature = "xpath")]
-    pub unsafe fn xml_shell_du(
+    pub fn xml_shell_du(
         &mut self,
         _arg: Option<&str>,
         tree: XmlGenericNodePtr,
         _node2: Option<XmlGenericNodePtr>,
     ) -> i32 {
-        unsafe {
-            let mut indent: i32 = 0;
+        let mut indent: i32 = 0;
 
-            let mut node = Some(tree);
-            while let Some(now) = node {
-                if now.element_type() == XmlElementType::XmlDocumentNode
-                    || now.element_type() == XmlElementType::XmlHTMLDocumentNode
-                {
-                    writeln!(self.output, "/").ok();
-                } else if let Some(node) = XmlNodePtr::try_from(now)
-                    .ok()
-                    .filter(|node| node.element_type() == XmlElementType::XmlElementNode)
-                {
-                    for _ in 0..indent {
-                        write!(self.output, "  ").ok();
-                    }
-                    if let Some(prefix) = node.ns.as_deref().and_then(|ns| ns.prefix()) {
-                        write!(self.output, "{prefix}:").ok();
-                    }
-                    let name = CStr::from_ptr(node.name as *const i8).to_string_lossy();
-                    writeln!(self.output, "{name}").ok();
+        let mut node = Some(tree);
+        while let Some(now) = node {
+            if now.element_type() == XmlElementType::XmlDocumentNode
+                || now.element_type() == XmlElementType::XmlHTMLDocumentNode
+            {
+                writeln!(self.output, "/").ok();
+            } else if let Some(node) = XmlNodePtr::try_from(now)
+                .ok()
+                .filter(|node| node.element_type() == XmlElementType::XmlElementNode)
+            {
+                for _ in 0..indent {
+                    write!(self.output, "  ").ok();
                 }
+                if let Some(prefix) = node.ns.as_deref().and_then(|ns| ns.prefix()) {
+                    write!(self.output, "{prefix}:").ok();
+                }
+                writeln!(self.output, "{}", node.name).ok();
+            }
 
-                // Browse the full subtree, deep first
-                if let Ok(doc) = XmlDocPtr::try_from(now) {
-                    node = doc.children;
-                } else if let Some(children) = now
-                    .children()
-                    .filter(|_| now.element_type() != XmlElementType::XmlEntityRefNode)
-                {
-                    // deep first
-                    node = Some(children);
-                    indent += 1;
-                } else if let Some(next) = now.next().filter(|_| node != Some(tree)) {
-                    // then siblings
-                    node = Some(next);
-                } else if node != Some(tree) {
-                    // go up to parents->next if needed
-                    while node != Some(tree) {
-                        if let Some(parent) = now.parent() {
-                            node = Some(parent);
-                            indent -= 1;
-                        }
-                        if let Some(next) = now.next().filter(|_| node != Some(tree)) {
-                            node = Some(next);
-                            break;
-                        }
-                        if now.parent().is_none() {
-                            node = None;
-                            break;
-                        }
-                        if node == Some(tree) {
-                            node = None;
-                            break;
-                        }
+            // Browse the full subtree, deep first
+            if let Ok(doc) = XmlDocPtr::try_from(now) {
+                node = doc.children;
+            } else if let Some(children) = now
+                .children()
+                .filter(|_| now.element_type() != XmlElementType::XmlEntityRefNode)
+            {
+                // deep first
+                node = Some(children);
+                indent += 1;
+            } else if let Some(next) = now.next().filter(|_| node != Some(tree)) {
+                // then siblings
+                node = Some(next);
+            } else if node != Some(tree) {
+                // go up to parents->next if needed
+                while node != Some(tree) {
+                    if let Some(parent) = now.parent() {
+                        node = Some(parent);
+                        indent -= 1;
                     }
-                    // exit condition
+                    if let Some(next) = now.next().filter(|_| node != Some(tree)) {
+                        node = Some(next);
+                        break;
+                    }
+                    if now.parent().is_none() {
+                        node = None;
+                        break;
+                    }
                     if node == Some(tree) {
                         node = None;
+                        break;
                     }
-                } else {
+                }
+                // exit condition
+                if node == Some(tree) {
                     node = None;
                 }
+            } else {
+                node = None;
             }
-            0
         }
+        0
     }
 
     /// Implements the XML shell function "pwd"
@@ -2377,76 +2358,74 @@ impl XmlShellCtxt<'_> {
     ///
     /// Returns 0
     #[doc(alias = "xmlShellGrep")]
-    unsafe fn xml_shell_grep(
+    fn xml_shell_grep(
         &mut self,
         arg: Option<&str>,
         mut node: Option<XmlGenericNodePtr>,
         _node2: Option<XmlGenericNodePtr>,
     ) -> i32 {
-        unsafe {
-            if node.is_none() {
-                return 0;
-            }
-            let Some(arg) = arg else {
-                return 0;
-            };
-            // what does the following do... ?
-            // #[cfg(feature = "regexp")]
-            // if !xmlStrchr(arg as *mut xmlChar, b'?').is_null()
-            //     || !xmlStrchr(arg as *mut xmlChar, b'*').is_null()
-            //     || !xmlStrchr(arg as *mut xmlChar, b'.').is_null()
-            //     || !xmlStrchr(arg as *mut xmlChar, b'[').is_null()
-            // {}
-            while let Some(now) = node {
-                if let Ok(now) = XmlNodePtr::try_from(now) {
-                    if now.element_type() == XmlElementType::XmlCommentNode {
-                        let content = now.content.as_deref().unwrap();
-                        if content.contains(arg) {
-                            let path = now.get_node_path().unwrap();
-                            write!(self.output, "{path} : ").ok();
-                            self.xml_shell_list(None, Some(now.into()), None);
-                        }
-                    } else if now.element_type() == XmlElementType::XmlTextNode {
-                        let content = now.content.as_deref().unwrap();
-                        if content.contains(arg) {
-                            let path = now.parent().unwrap().get_node_path().unwrap();
-                            write!(self.output, "{path} : ").ok();
-                            self.xml_shell_list(None, now.parent, None);
-                        }
-                    }
-                }
-
-                // Browse the full subtree, deep first
-                if let Ok(doc) = XmlDocPtr::try_from(now) {
-                    node = doc.children;
-                } else if let Some(children) = now
-                    .children()
-                    .filter(|_| now.element_type() != XmlElementType::XmlEntityRefNode)
-                {
-                    // deep first
-                    node = Some(children);
-                } else if let Some(next) = now.next() {
-                    // then siblings
-                    node = Some(next);
-                } else {
-                    // go up to parents->next if needed
-                    while let Some(now) = node {
-                        if let Some(parent) = now.parent() {
-                            node = Some(parent);
-                        }
-                        if let Some(next) = now.next() {
-                            node = Some(next);
-                            break;
-                        }
-                        if now.parent().is_none() {
-                            node = None;
-                            break;
-                        }
-                    }
-                }
-            }
-            0
+        if node.is_none() {
+            return 0;
         }
+        let Some(arg) = arg else {
+            return 0;
+        };
+        // what does the following do... ?
+        // #[cfg(feature = "regexp")]
+        // if !xmlStrchr(arg as *mut xmlChar, b'?').is_null()
+        //     || !xmlStrchr(arg as *mut xmlChar, b'*').is_null()
+        //     || !xmlStrchr(arg as *mut xmlChar, b'.').is_null()
+        //     || !xmlStrchr(arg as *mut xmlChar, b'[').is_null()
+        // {}
+        while let Some(now) = node {
+            if let Ok(now) = XmlNodePtr::try_from(now) {
+                if now.element_type() == XmlElementType::XmlCommentNode {
+                    let content = now.content.as_deref().unwrap();
+                    if content.contains(arg) {
+                        let path = now.get_node_path().unwrap();
+                        write!(self.output, "{path} : ").ok();
+                        self.xml_shell_list(None, Some(now.into()), None);
+                    }
+                } else if now.element_type() == XmlElementType::XmlTextNode {
+                    let content = now.content.as_deref().unwrap();
+                    if content.contains(arg) {
+                        let path = now.parent().unwrap().get_node_path().unwrap();
+                        write!(self.output, "{path} : ").ok();
+                        self.xml_shell_list(None, now.parent, None);
+                    }
+                }
+            }
+
+            // Browse the full subtree, deep first
+            if let Ok(doc) = XmlDocPtr::try_from(now) {
+                node = doc.children;
+            } else if let Some(children) = now
+                .children()
+                .filter(|_| now.element_type() != XmlElementType::XmlEntityRefNode)
+            {
+                // deep first
+                node = Some(children);
+            } else if let Some(next) = now.next() {
+                // then siblings
+                node = Some(next);
+            } else {
+                // go up to parents->next if needed
+                while let Some(now) = node {
+                    if let Some(parent) = now.parent() {
+                        node = Some(parent);
+                    }
+                    if let Some(next) = now.next() {
+                        node = Some(next);
+                        break;
+                    }
+                    if now.parent().is_none() {
+                        node = None;
+                        break;
+                    }
+                }
+            }
+        }
+        0
     }
 
     /// Implements the XML shell function "dir"

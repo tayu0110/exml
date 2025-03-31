@@ -543,7 +543,7 @@ pub(super) unsafe fn xml_xpath_name_function(ctxt: &mut XmlXPathParserContext, m
                 match table[i].element_type() {
                     XmlElementType::XmlElementNode => {
                         let node = XmlNodePtr::try_from(table[i]).unwrap();
-                        if *node.name.add(0) == b' ' {
+                        if node.name.starts_with(' ') {
                             ctxt.value_push(xml_xpath_cache_new_string(ctxt.context, Some("")));
                         } else if let Some(prefix) =
                             node.ns.as_deref().and_then(|ns| ns.prefix.as_deref())

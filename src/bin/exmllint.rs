@@ -10,6 +10,7 @@
 #![allow(unused)]
 
 use std::{
+    borrow::Cow,
     cell::RefCell,
     env::args,
     ffi::{CStr, CString, c_char, c_long, c_void},
@@ -2817,7 +2818,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         if cfg!(feature = "libxml_valid") && CMD_ARGS.insert && !CMD_ARGS.html {
             #[cfg(feature = "libxml_valid")]
             {
-                let mut list: [*const XmlChar; 256] = [null(); 256];
+                let mut list = [const { Cow::Borrowed("") }; 256];
 
                 if let Some(children) = doc.children() {
                     let mut node = Some(children);
@@ -2825,8 +2826,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         node = now.next();
                     }
                     if let Some(node) = node {
-                        let nb =
-                            xml_valid_get_valid_elements(node.last(), None, list.as_mut_ptr(), 256);
+                        let nb = xml_valid_get_valid_elements(node.last(), None, &mut list[..]);
                         match nb.cmp(&0) {
                             std::cmp::Ordering::Less => {
                                 eprintln!("could not get valid list of elements")
@@ -2836,8 +2836,8 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                             }
                             std::cmp::Ordering::Greater => {
                                 eprintln!("{} element types can be inserted under root:", nb);
-                                for &l in list.iter().take(nb as usize) {
-                                    eprintln!("{}", CStr::from_ptr(l as _).to_string_lossy());
+                                for l in list.iter().take(nb as usize) {
+                                    eprintln!("{l}");
                                 }
                             }
                         }

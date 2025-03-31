@@ -41,7 +41,7 @@ use crate::{error::XmlParserErrors, io::XmlOutputBuffer, tree::XmlGenericNodePtr
 use super::{
     globals::xml_register_node_default_value,
     htmlparser::{HtmlDocPtr, HtmlNodePtr, html_err_memory},
-    xmlstring::{XmlChar, xml_str_equal, xml_strcasecmp},
+    xmlstring::XmlChar,
 };
 
 /// Macro. A text node in a HTML document is really implemented
@@ -126,103 +126,96 @@ pub unsafe fn html_new_doc_no_dtd(
 ///
 /// Returns the current encoding as flagged in the HTML source
 #[doc(alias = "htmlGetMetaEncoding")]
-pub unsafe fn html_get_meta_encoding(doc: XmlDocPtr) -> Option<String> {
-    unsafe {
-        let mut cur = doc.children;
+pub fn html_get_meta_encoding(doc: XmlDocPtr) -> Option<String> {
+    let mut cur = doc.children;
 
-        // Search the html
-        'goto_found_meta: {
-            'goto_found_head: {
-                while let Some(now) = cur {
-                    if matches!(now.element_type(), XmlElementType::XmlElementNode) {
-                        let cur = HtmlNodePtr::try_from(now).unwrap();
-                        if !cur.name.is_null() {
-                            if xml_str_equal(cur.name, c"html".as_ptr() as _) {
-                                break;
-                            }
-                            if xml_str_equal(cur.name, c"head".as_ptr() as _) {
-                                break 'goto_found_head;
-                            }
-                            if xml_str_equal(cur.name, c"meta".as_ptr() as _) {
-                                break 'goto_found_meta;
-                            }
-                        }
+    // Search the html
+    'goto_found_meta: {
+        'goto_found_head: {
+            while let Some(now) = cur {
+                if matches!(now.element_type(), XmlElementType::XmlElementNode) {
+                    let cur = HtmlNodePtr::try_from(now).unwrap();
+                    if cur.name == "html" {
+                        break;
                     }
-                    cur = now.next();
-                }
-                cur = cur?.children();
-                // Search the head
-                while let Some(now) = cur {
-                    if matches!(now.element_type(), XmlElementType::XmlElementNode) {
-                        let now = HtmlNodePtr::try_from(now).unwrap();
-                        if !now.name.is_null() {
-                            if xml_str_equal(now.name, c"head".as_ptr() as _) {
-                                break;
-                            }
-                            if xml_str_equal(now.name, c"meta".as_ptr() as _) {
-                                break 'goto_found_meta;
-                            }
-                        }
+                    if cur.name == "head" {
+                        break 'goto_found_head;
                     }
-                    cur = now.next();
+                    if cur.name == "meta" {
+                        break 'goto_found_meta;
+                    }
                 }
+                cur = now.next();
             }
-            // found_head:
             cur = cur?.children();
-        }
-
-        // Search the meta elements
-
-        // found_meta:
-        while let Some(cur_node) = cur {
-            if matches!(cur_node.element_type(), XmlElementType::XmlElementNode) {
-                let cur_node = HtmlNodePtr::try_from(cur_node).unwrap();
-                if !cur_node.name.is_null() && cur_node.name().as_deref() == Some("meta") {
-                    let mut attr = cur_node.properties;
-                    let mut http = 0;
-
-                    let mut content = None;
-                    while let Some(now) = attr {
-                        if let Some(children) = now
-                            .children()
-                            .filter(|c| {
-                                matches!(c.element_type(), XmlElementType::XmlTextNode)
-                                    && c.next().is_none()
-                            })
-                            .map(|children| XmlNodePtr::try_from(children).unwrap())
-                        {
-                            let value = children.content.as_deref();
-                            if now.name.eq_ignore_ascii_case("http-equiv")
-                                && value
-                                    .is_some_and(|value| value.eq_ignore_ascii_case("Content-Type"))
-                            {
-                                http = 1;
-                            } else if value.is_some() && now.name.eq_ignore_ascii_case("content") {
-                                content = value.map(|value| value.to_owned());
-                            }
-                            if http != 0 {
-                                if let Some(content) = content {
-                                    return content
-                                        .split_once("charset=")
-                                        .or_else(|| content.split_once("Charset="))
-                                        .or_else(|| content.split_once("CHARSET="))
-                                        .or_else(|| content.split_once("charset ="))
-                                        .or_else(|| content.split_once("Charset ="))
-                                        .or_else(|| content.split_once("CHARSET ="))
-                                        .map(|encoding| {
-                                            encoding.1.trim_start_matches([' ', '\t']).to_owned()
-                                        });
-                                }
-                            }
-                        }
-                        attr = now.next;
+            // Search the head
+            while let Some(now) = cur {
+                if matches!(now.element_type(), XmlElementType::XmlElementNode) {
+                    let now = HtmlNodePtr::try_from(now).unwrap();
+                    if now.name == "head" {
+                        break;
+                    }
+                    if now.name == "meta" {
+                        break 'goto_found_meta;
                     }
                 }
+                cur = now.next();
             }
-            cur = cur_node.next();
         }
-        None
+        // found_head:
+        cur = cur?.children();
     }
+
+    // Search the meta elements
+
+    // found_meta:
+    while let Some(cur_node) = cur {
+        if matches!(cur_node.element_type(), XmlElementType::XmlElementNode) {
+            let cur_node = HtmlNodePtr::try_from(cur_node).unwrap();
+            if cur_node.name == "meta" {
+                let mut attr = cur_node.properties;
+                let mut http = 0;
+
+                let mut content = None;
+                while let Some(now) = attr {
+                    if let Some(children) = now
+                        .children()
+                        .filter(|c| {
+                            matches!(c.element_type(), XmlElementType::XmlTextNode)
+                                && c.next().is_none()
+                        })
+                        .map(|children| XmlNodePtr::try_from(children).unwrap())
+                    {
+                        let value = children.content.as_deref();
+                        if now.name.eq_ignore_ascii_case("http-equiv")
+                            && value.is_some_and(|value| value.eq_ignore_ascii_case("Content-Type"))
+                        {
+                            http = 1;
+                        } else if value.is_some() && now.name.eq_ignore_ascii_case("content") {
+                            content = value.map(|value| value.to_owned());
+                        }
+                        if http != 0 {
+                            if let Some(content) = content {
+                                return content
+                                    .split_once("charset=")
+                                    .or_else(|| content.split_once("Charset="))
+                                    .or_else(|| content.split_once("CHARSET="))
+                                    .or_else(|| content.split_once("charset ="))
+                                    .or_else(|| content.split_once("Charset ="))
+                                    .or_else(|| content.split_once("CHARSET ="))
+                                    .map(|encoding| {
+                                        encoding.1.trim_start_matches([' ', '\t']).to_owned()
+                                    });
+                            }
+                        }
+                    }
+                    attr = now.next;
+                }
+            }
+        }
+        cur = cur_node.next();
+    }
+    None
 }
 
 /// Sets the current encoding in the Meta tags
@@ -253,20 +246,18 @@ pub unsafe fn html_set_meta_encoding(doc: XmlDocPtr, encoding: Option<&str>) -> 
         while let Some(now) = cur {
             if matches!(now.element_type(), XmlElementType::XmlElementNode) {
                 let now = HtmlNodePtr::try_from(now).unwrap();
-                if !now.name.is_null() {
-                    if xml_strcasecmp(now.name, c"html".as_ptr() as _) == 0 {
-                        break;
-                    }
-                    if xml_strcasecmp(now.name, c"head".as_ptr() as _) == 0 {
-                        // goto found_head;
-                        found_head = true;
-                        break;
-                    }
-                    if xml_strcasecmp(now.name, c"meta".as_ptr() as _) == 0 {
-                        // goto found_meta;
-                        found_meta = true;
-                        break;
-                    }
+                if now.name.eq_ignore_ascii_case("html") {
+                    break;
+                }
+                if now.name.eq_ignore_ascii_case("head") {
+                    // goto found_head;
+                    found_head = true;
+                    break;
+                }
+                if now.name.eq_ignore_ascii_case("meta") {
+                    // goto found_meta;
+                    found_meta = true;
+                    break;
                 }
             }
 
@@ -284,15 +275,13 @@ pub unsafe fn html_set_meta_encoding(doc: XmlDocPtr, encoding: Option<&str>) -> 
             while let Some(now) = cur {
                 if matches!(now.element_type(), XmlElementType::XmlElementNode) {
                     let now = HtmlNodePtr::try_from(now).unwrap();
-                    if !now.name.is_null() {
-                        if xml_strcasecmp(now.name, c"head".as_ptr() as _) == 0 {
-                            break;
-                        }
-                        if xml_strcasecmp(now.name, c"meta".as_ptr() as _) == 0 {
-                            head = now.parent();
-                            // goto found_meta;
-                            found_meta = true;
-                        }
+                    if now.name.eq_ignore_ascii_case("head") {
+                        break;
+                    }
+                    if now.name.eq_ignore_ascii_case("meta") {
+                        head = now.parent();
+                        // goto found_meta;
+                        found_meta = true;
                     }
                 }
                 cur = now.next();
@@ -875,7 +864,7 @@ unsafe fn html_attr_dump_output(buf: &mut XmlOutputBuffer, doc: Option<XmlDocPtr
                                     || cur.name.eq_ignore_ascii_case("action")
                                     || cur.name.eq_ignore_ascii_case("src")
                                     || (cur.name.eq_ignore_ascii_case("name")
-                                        && xml_strcasecmp(p.name, c"a".as_ptr() as _) == 0))
+                                        && p.name.eq_ignore_ascii_case("a")))
                         })
                         .is_some()
                 {
@@ -914,8 +903,6 @@ pub unsafe fn html_node_dump_format_output(
     format: i32,
 ) {
     unsafe {
-        use std::ffi::CStr;
-
         use crate::{
             libxml::{
                 htmlparser::html_tag_lookup,
@@ -974,9 +961,7 @@ pub unsafe fn html_node_dump_format_output(
                         buf.write_str(&prefix).ok();
                         buf.write_str(":").ok();
                     }
-
-                    buf.write_str(CStr::from_ptr(node.name as _).to_string_lossy().as_ref())
-                        .ok();
+                    buf.write_str(&node.name).ok();
                     if let Some(ns_def) = node.ns_def {
                         xml_ns_list_dump_output(buf, Some(ns_def));
                     }
@@ -997,8 +982,7 @@ pub unsafe fn html_node_dump_format_output(
                                 HTML_TEXT_NODE | HTML_ENTITY_REF_NODE
                             )
                             && node.children() != node.last()
-                            && !node.name.is_null()
-                            && *node.name.add(0) != b'p'
+                            && !node.name.starts_with('p')
                         {
                             // p, pre, param
                             buf.write_str("\n").ok();
@@ -1016,9 +1000,7 @@ pub unsafe fn html_node_dump_format_output(
                             buf.write_str(&prefix).ok();
                             buf.write_str(":").ok();
                         }
-
-                        buf.write_str(CStr::from_ptr(node.name as _).to_string_lossy().as_ref())
-                            .ok();
+                        buf.write_str(&node.name).ok();
                         buf.write_str(">").ok();
                     }
 
@@ -1047,8 +1029,8 @@ pub unsafe fn html_node_dump_format_output(
                     let Some(content) = node.content.as_deref() else {
                         break 'to_break;
                     };
-                    if (node.name == XML_STRING_TEXT.as_ptr() as _
-                        || node.name != XML_STRING_TEXT_NOENC.as_ptr() as _)
+                    if (node.name == XML_STRING_TEXT.to_str().unwrap()
+                        || node.name != XML_STRING_TEXT_NOENC.to_str().unwrap())
                         && parent.is_none_or(|parent| {
                             !parent.name().unwrap().eq_ignore_ascii_case("script")
                                 && !parent.name().unwrap().eq_ignore_ascii_case("style")
@@ -1072,23 +1054,18 @@ pub unsafe fn html_node_dump_format_output(
 
                 HTML_PI_NODE => {
                     let node = XmlNodePtr::try_from(cur).unwrap();
-                    if !node.name.is_null() {
-                        buf.write_str("<?").ok();
-                        buf.write_str(CStr::from_ptr(node.name as _).to_string_lossy().as_ref())
-                            .ok();
-                        if let Some(content) = node.content.as_deref() {
-                            buf.write_str(" ").ok();
-                            buf.write_str(content).ok();
-                        }
-                        buf.write_str(">").ok();
+                    buf.write_str("<?").ok();
+                    buf.write_str(&node.name).ok();
+                    if let Some(content) = node.content.as_deref() {
+                        buf.write_str(" ").ok();
+                        buf.write_str(content).ok();
                     }
+                    buf.write_str(">").ok();
                 }
                 HTML_ENTITY_REF_NODE => {
                     let node = XmlNodePtr::try_from(cur).unwrap();
                     buf.write_str("&").ok();
-
-                    buf.write_str(CStr::from_ptr(node.name as _).to_string_lossy().as_ref())
-                        .ok();
+                    buf.write_str(&node.name).ok();
                     buf.write_str(";").ok();
                 }
                 HTML_PRESERVE_NODE => {
@@ -1134,8 +1111,7 @@ pub unsafe fn html_node_dump_format_output(
                             HTML_TEXT_NODE | HTML_ENTITY_REF_NODE
                         )
                         && node.children() != node.last()
-                        && !node.name.is_null()
-                        && *node.name.add(0) != b'p'
+                        && !node.name.starts_with('p')
                     {
                         // p, pre, param
                         buf.write_str("\n").ok();
@@ -1146,9 +1122,7 @@ pub unsafe fn html_node_dump_format_output(
                         buf.write_str(&prefix).ok();
                         buf.write_str(":").ok();
                     }
-
-                    buf.write_str(CStr::from_ptr(node.name as _).to_string_lossy().as_ref())
-                        .ok();
+                    buf.write_str(&node.name).ok();
                     buf.write_str(">").ok();
 
                     if format != 0

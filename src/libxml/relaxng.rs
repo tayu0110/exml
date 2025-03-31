@@ -22,6 +22,7 @@
 use std::io::Write;
 use std::{
     any::type_name,
+    borrow::Cow,
     ffi::{CStr, CString, c_char},
     mem::{size_of, take},
     os::raw::c_void,
@@ -577,7 +578,7 @@ unsafe fn xml_relaxng_get_elements(
     }
 }
 
-const INVALID_NAME: &CStr = c"\u{1}";
+const INVALID_NAME: &str = "\u{1}";
 
 /// Check if the element matches the definition nameClass
 ///
@@ -592,7 +593,9 @@ unsafe fn xml_relaxng_element_match(
         let mut ret: i32 = 0;
         let mut oldflags: i32 = 0;
 
-        if !(*define).name.is_null() && !xml_str_equal(elem.name, (*define).name) {
+        if !(*define).name.is_null()
+            && elem.name != CStr::from_ptr((*define).name as *const i8).to_string_lossy()
+        {
             VALID_ERR3!(
                 ctxt,
                 XmlRelaxNGValidErr::XmlRelaxngErrElemname,
@@ -754,9 +757,12 @@ unsafe fn xml_relaxng_compare_name_classes(
                 return 1;
             }
             if !(*def1).name.is_null() {
-                node.name = (*def1).name;
+                node.name = CStr::from_ptr((*def1).name as *const i8)
+                    .to_string_lossy()
+                    .into_owned()
+                    .into();
             } else {
-                node.name = INVALID_NAME.as_ptr() as _;
+                node.name = Cow::Borrowed(INVALID_NAME);
             }
             if !(*def1).ns.is_null() {
                 if *(*def1).ns.add(0) == 0 {
@@ -811,9 +817,12 @@ unsafe fn xml_relaxng_compare_name_classes(
             XmlRelaxNGType::Element | XmlRelaxNGType::Attribute
         ) {
             if !(*def2).name.is_null() {
-                node.name = (*def2).name;
+                node.name = CStr::from_ptr((*def2).name as *const i8)
+                    .to_string_lossy()
+                    .into_owned()
+                    .into();
             } else {
-                node.name = INVALID_NAME.as_ptr() as _;
+                node.name = Cow::Borrowed(INVALID_NAME);
             }
             node.ns = XmlNsPtr::from_raw(addr_of_mut!(ns)).unwrap();
             if !(*def2).ns.is_null() {
@@ -828,7 +837,7 @@ unsafe fn xml_relaxng_compare_name_classes(
                     );
                 }
             } else {
-                ns.href = Some(INVALID_NAME.to_str().unwrap().into());
+                ns.href = Some(INVALID_NAME.into());
             }
             if xml_relaxng_element_match(
                 addr_of_mut!(ctxt),
@@ -1775,7 +1784,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                                             text.set_prop("ns", Some(ns.as_str()));
                                             // xmlUnsetProp(cur, c"ns".as_ptr() as _);
                                         }
-                                    } else if xml_str_equal(now.name, c"attribute".as_ptr() as _) {
+                                    } else if now.name == "attribute" {
                                         if let Some(mut text) = text {
                                             text.set_prop("ns", Some(""));
                                         }
@@ -4151,7 +4160,7 @@ unsafe fn xml_relaxng_parse_include(ctxt: XmlRelaxNGParserCtxtPtr, node: XmlNode
             );
             return -1;
         };
-        if !xml_str_equal(root.name, c"grammar".as_ptr() as _) {
+        if root.name != "grammar" {
             xml_rng_perr!(
                 ctxt,
                 Some(node.into()),
@@ -8531,12 +8540,13 @@ unsafe fn xml_relaxng_validate_state(
                             list =
                                 xml_hash_lookup2(triage, c"#text".as_ptr() as _, null_mut()) as _;
                         } else if node.element_type() == XmlElementType::XmlElementNode {
+                            let nodename = CString::new(node.name.as_ref()).unwrap();
                             if let Some(ns) = node.ns {
                                 let href =
                                     ns.href.as_deref().map(|href| CString::new(href).unwrap());
                                 list = xml_hash_lookup2(
                                     triage,
-                                    node.name,
+                                    nodename.as_ptr() as *const u8,
                                     href.as_deref()
                                         .map_or(null_mut(), |href| href.as_ptr() as *const u8),
                                 ) as _;
@@ -8549,7 +8559,11 @@ unsafe fn xml_relaxng_validate_state(
                                     ) as _;
                                 }
                             } else {
-                                list = xml_hash_lookup2(triage, node.name, null_mut()) as _;
+                                list = xml_hash_lookup2(
+                                    triage,
+                                    nodename.as_ptr() as *const u8,
+                                    null_mut(),
+                                ) as _;
                             }
                             if list.is_null() {
                                 list = xml_hash_lookup2(triage, c"#any".as_ptr() as _, null_mut())

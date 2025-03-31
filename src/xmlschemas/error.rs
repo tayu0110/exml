@@ -467,11 +467,7 @@ unsafe fn xml_schema_format_item_for_report(
                             .as_str(),
                     );
                 } else {
-                    res.push_str(
-                        CStr::from_ptr(elem.name as *const i8)
-                            .to_string_lossy()
-                            .as_ref(),
-                    );
+                    res.push_str(&elem.name);
                 }
                 res.push('\'');
             }

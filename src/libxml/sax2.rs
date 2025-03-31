@@ -1,6 +1,6 @@
-//! Provide methods and data structures for SAX2 handlers.  
-//! This module is based on `libxml/SAX2.h`, `SAX2.c`, and so on in `libxml2-v2.11.8`.
+//! Provide methods and data structures for SAX2 handlers.
 //!
+//! This module is based on `libxml/SAX2.h`, `SAX2.c`, and so on in `libxml2-v2.11.8`.  
 //! Please refer to original libxml2 documents also.
 
 // Copyright of the original code is the following.
@@ -2131,14 +2131,9 @@ pub unsafe fn xml_sax2_start_element_ns(
             ret.typ = XmlElementType::XmlElementNode;
 
             if let Some(lname) = lname {
-                ret.name = xml_strndup(lname.as_ptr(), lname.len() as i32);
+                ret.name = lname.into_owned().into();
             } else {
-                ret.name = xml_strndup(localname.as_ptr(), localname.len() as i32);
-            }
-            if ret.name.is_null() {
-                xml_sax2_err_memory(ctxt, "xmlSAX2StartElementNs");
-                ret.free();
-                return;
+                ret.name = localname.to_owned().into();
             }
             if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
             // && xmlRegisterNodeDefaultValue.is_some()
@@ -2340,7 +2335,7 @@ unsafe fn xml_sax2_text_node(ctxt: XmlParserCtxtPtr, s: &str) -> Option<XmlNodeP
             return None;
         };
         ret.typ = XmlElementType::XmlTextNode;
-        ret.name = XML_STRING_TEXT.as_ptr() as _;
+        ret.name = XML_STRING_TEXT.to_str().unwrap().into();
         ret.content = Some(s.to_owned());
 
         if (*ctxt).linenumbers != 0 && (*ctxt).input().is_some() {
@@ -2706,11 +2701,10 @@ unsafe fn xml_sax2_text(ctxt: XmlParserCtxtPtr, ch: &str, typ: XmlElementType) {
         // Here we needed an accelerator mechanism in case of very large elements.
         // Use an attribute in the structure !!!
         if let Some(mut last_child) = last_child {
-            let coalesce_text: i32 = (last_child.element_type() == typ
+            let coalesce_text = last_child.element_type() == typ
                 && (!matches!(typ, XmlElementType::XmlTextNode)
-                    || (last_child.name == XML_STRING_TEXT.as_ptr() as _)))
-                as i32;
-            if coalesce_text != 0 && (*ctxt).nodemem != 0 {
+                    || last_child.name == XML_STRING_TEXT.to_str().unwrap());
+            if coalesce_text && (*ctxt).nodemem != 0 {
                 // The whole point of maintaining nodelen and nodemem,
                 // xmlTextConcat is too costly, i.e. compute length,
                 // reallocate a new buffer, move data, append ch. Here
@@ -2730,7 +2724,7 @@ unsafe fn xml_sax2_text(ctxt: XmlParserCtxtPtr, ch: &str, typ: XmlElementType) {
                 let buffer = last_child.content.get_or_insert_default();
                 buffer.push_str(ch);
                 (*ctxt).nodelen = nodelen;
-            } else if coalesce_text != 0 {
+            } else if coalesce_text {
                 if xml_text_concat(last_child, ch) != 0 {
                     xml_sax2_err_memory(ctxt, "xmlSAX2Characters");
                 }

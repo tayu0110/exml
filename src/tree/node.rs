@@ -21,21 +21,13 @@
 use std::{
     any::type_name,
     borrow::Cow,
-    ffi::{CStr, CString},
     ops::{Deref, DerefMut},
     os::raw::c_void,
-    ptr::{NonNull, null, null_mut},
+    ptr::{NonNull, null_mut},
     sync::atomic::Ordering,
 };
 
-use crate::{
-    libxml::{
-        globals::xml_free,
-        valid::xml_remove_id,
-        xmlstring::{XmlChar, xml_strcat, xml_strncat, xml_strndup},
-    },
-    tree::xml_free_node_list,
-};
+use crate::{libxml::valid::xml_remove_id, tree::xml_free_node_list};
 
 use super::{
     InvalidNodePointerCastError, NodeCommon, XML_CHECK_DTD, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
@@ -66,7 +58,7 @@ fn verify_xml_node(node: &XmlNode) -> bool {
 pub struct XmlNode {
     pub _private: *mut c_void,                      /* application data */
     pub(crate) typ: XmlElementType,                 /* type number, must be second ! */
-    pub name: *const XmlChar,                       /* the name of the node, or the entity */
+    pub name: Cow<'static, str>,                    /* the name of the node, or the entity */
     pub(crate) children: Option<XmlGenericNodePtr>, /* parent->childs link */
     pub(crate) last: Option<XmlGenericNodePtr>,     /* last child link */
     pub(crate) parent: Option<XmlGenericNodePtr>,   /* child->parent link */
@@ -585,159 +577,114 @@ impl XmlNode {
     /// If `use_dtd` is `true` and no suitable attribute is found,
     /// and a Default/Fixed attribute declaration is found,
     /// this method may return `Err(XmlAttributePtr)` pointing to that declaration.
-    unsafe fn get_prop_node_internal(
+    fn get_prop_node_internal(
         &self,
         name: &str,
         ns_name: Option<&str>,
         use_dtd: bool,
     ) -> Option<Result<XmlAttrPtr, XmlAttributePtr>> {
-        unsafe {
-            if !matches!(self.element_type(), XmlElementType::XmlElementNode) {
+        if !matches!(self.element_type(), XmlElementType::XmlElementNode) {
+            return None;
+        }
+
+        if self.properties.is_some() {
+            let mut prop = self.properties;
+            if let Some(ns_name) = ns_name {
+                // We want the attr to be in the specified namespace.
+                while let Some(now) = prop {
+                    if now.name().as_deref() == Some(name)
+                        && now.ns.is_some_and(|ns| ns.href.as_deref() == Some(ns_name))
+                    {
+                        return Some(Ok(now));
+                    }
+                    prop = now.next;
+                }
+            } else {
+                // We want the attr to be in no namespace.
+                while let Some(now) = prop {
+                    if now.ns.is_none() && now.name().as_deref() == Some(name) {
+                        return Some(Ok(now));
+                    }
+                    prop = now.next;
+                }
+            }
+        }
+
+        #[cfg(feature = "libxml_tree")]
+        {
+            if !use_dtd {
                 return None;
             }
-
-            if self.properties.is_some() {
-                let mut prop = self.properties;
-                if let Some(ns_name) = ns_name {
-                    // We want the attr to be in the specified namespace.
-                    while let Some(now) = prop {
-                        if now.name().as_deref() == Some(name)
-                            && now.ns.is_some_and(|ns| ns.href.as_deref() == Some(ns_name))
-                        {
-                            return Some(Ok(now));
-                        }
-                        prop = now.next;
-                    }
-                } else {
-                    // We want the attr to be in no namespace.
-                    while let Some(now) = prop {
-                        if now.ns.is_none() && now.name().as_deref() == Some(name) {
-                            return Some(Ok(now));
-                        }
-                        prop = now.next;
-                    }
-                }
-            }
-
-            #[cfg(feature = "libxml_tree")]
-            {
-                if !use_dtd {
-                    return None;
-                }
-                // Check if there is a default/fixed attribute declaration in
-                // the internal or external subset.
-                if let Some(doc) = self.doc {
-                    if let Some(int_subset) = doc.int_subset {
-                        let elem_qname: *mut XmlChar;
-                        let mut tmpstr: *mut XmlChar = null_mut();
-
-                        // We need the QName of the element for the DTD-lookup.
-                        if let Some(prefix) = self.ns.as_deref().and_then(|ns| ns.prefix.as_deref())
-                        {
-                            tmpstr = xml_strndup(prefix.as_ptr(), prefix.len() as i32);
-                            tmpstr = xml_strcat(tmpstr, c":".as_ptr() as _);
-                            tmpstr = xml_strcat(tmpstr, self.name);
-                            if tmpstr.is_null() {
-                                return None;
+            // Check if there is a default/fixed attribute declaration in
+            // the internal or external subset.
+            if let Some(doc) = self.doc {
+                if let Some(int_subset) = doc.int_subset {
+                    // We need the QName of the element for the DTD-lookup.
+                    let elem_qname = if let Some(prefix) =
+                        self.ns.as_deref().and_then(|ns| ns.prefix.as_deref())
+                    {
+                        Cow::Owned(format!("{prefix}:{}", self.name))
+                    } else {
+                        self.name.clone()
+                    };
+                    let mut attr_decl = None;
+                    if let Some(ns_name) = ns_name {
+                        if ns_name == XML_XML_NAMESPACE.to_string_lossy() {
+                            // The XML namespace must be bound to prefix 'xml'.
+                            attr_decl = int_subset.get_qattr_desc(&elem_qname, name, Some("xml"));
+                            if attr_decl.is_none() {
+                                if let Some(ext_subset) = doc.ext_subset {
+                                    attr_decl =
+                                        ext_subset.get_qattr_desc(&elem_qname, name, Some("xml"));
+                                }
                             }
-                            elem_qname = tmpstr;
                         } else {
-                            elem_qname = self.name as _;
-                        }
-                        let mut attr_decl = None;
-                        if let Some(ns_name) = ns_name {
-                            if ns_name == XML_XML_NAMESPACE.to_string_lossy() {
-                                // The XML namespace must be bound to prefix 'xml'.
-                                attr_decl = int_subset.get_qattr_desc(
-                                    CStr::from_ptr(elem_qname as *const i8)
-                                        .to_string_lossy()
-                                        .as_ref(),
-                                    name,
-                                    Some("xml"),
-                                );
-                                if attr_decl.is_none() {
+                            // The ugly case: Search using the prefixes of in-scope
+                            // ns-decls corresponding to @nsName.
+                            let ns_list = self.get_ns_list(self.doc)?;
+                            for cur in ns_list {
+                                if cur.href.as_deref() == Some(ns_name) {
+                                    let prefix = (*cur).prefix();
+                                    attr_decl = int_subset.get_qattr_desc(
+                                        &elem_qname,
+                                        name,
+                                        prefix.as_deref(),
+                                    );
+                                    if attr_decl.is_some() {
+                                        break;
+                                    }
                                     if let Some(ext_subset) = doc.ext_subset {
                                         attr_decl = ext_subset.get_qattr_desc(
-                                            CStr::from_ptr(elem_qname as *const i8)
-                                                .to_string_lossy()
-                                                .as_ref(),
-                                            name,
-                                            Some("xml"),
-                                        );
-                                    }
-                                }
-                            } else {
-                                // The ugly case: Search using the prefixes of in-scope
-                                // ns-decls corresponding to @nsName.
-                                let Some(ns_list) = self.get_ns_list(self.doc) else {
-                                    if !tmpstr.is_null() {
-                                        xml_free(tmpstr as _);
-                                    }
-                                    return None;
-                                };
-                                for cur in ns_list {
-                                    if cur.href.as_deref() == Some(ns_name) {
-                                        let prefix = (*cur).prefix();
-                                        attr_decl = int_subset.get_qattr_desc(
-                                            CStr::from_ptr(elem_qname as *const i8)
-                                                .to_string_lossy()
-                                                .as_ref(),
+                                            &elem_qname,
                                             name,
                                             prefix.as_deref(),
                                         );
                                         if attr_decl.is_some() {
                                             break;
                                         }
-                                        if let Some(ext_subset) = doc.ext_subset {
-                                            attr_decl = ext_subset.get_qattr_desc(
-                                                CStr::from_ptr(elem_qname as *const i8)
-                                                    .to_string_lossy()
-                                                    .as_ref(),
-                                                name,
-                                                prefix.as_deref(),
-                                            );
-                                            if attr_decl.is_some() {
-                                                break;
-                                            }
-                                        }
                                     }
                                 }
                             }
-                        } else {
-                            // The common and nice case: Attr in no namespace.
-                            attr_decl = int_subset.get_qattr_desc(
-                                CStr::from_ptr(elem_qname as *const i8)
-                                    .to_string_lossy()
-                                    .as_ref(),
-                                name,
-                                None,
-                            );
-                            if attr_decl.is_none() {
-                                if let Some(ext_subset) = doc.ext_subset {
-                                    attr_decl = ext_subset.get_qattr_desc(
-                                        CStr::from_ptr(elem_qname as *const i8)
-                                            .to_string_lossy()
-                                            .as_ref(),
-                                        name,
-                                        None,
-                                    );
-                                }
+                        }
+                    } else {
+                        // The common and nice case: Attr in no namespace.
+                        attr_decl = int_subset.get_qattr_desc(&elem_qname, name, None);
+                        if attr_decl.is_none() {
+                            if let Some(ext_subset) = doc.ext_subset {
+                                attr_decl = ext_subset.get_qattr_desc(&elem_qname, name, None);
                             }
                         }
-                        if !tmpstr.is_null() {
-                            xml_free(tmpstr as _);
-                        }
-                        // Only default/fixed attrs are relevant.
-                        if let Some(attr_decl) =
-                            attr_decl.filter(|attr_decl| !attr_decl.default_value.is_null())
-                        {
-                            return Some(Err(attr_decl));
-                        }
+                    }
+                    // Only default/fixed attrs are relevant.
+                    if let Some(attr_decl) =
+                        attr_decl.filter(|attr_decl| !attr_decl.default_value.is_null())
+                    {
+                        return Some(Err(attr_decl));
                     }
                 }
             }
-            None
         }
+        None
     }
 
     /// Search and get the value of an attribute associated to a node.  
@@ -896,7 +843,7 @@ impl XmlNode {
     pub unsafe fn get_string(&self, doc: Option<XmlDocPtr>, in_line: i32) -> Option<String> {
         unsafe {
             let mut node = XmlGenericNodePtr::from_raw(self as *const Self as *mut Self);
-            let mut ret: *mut XmlChar = null_mut();
+            let mut ret = None::<String>;
 
             let attr = self
                 .parent()
@@ -911,14 +858,14 @@ impl XmlNode {
                     let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
                     if in_line != 0 {
                         let content = cur_node.content.as_deref().unwrap();
-                        ret = xml_strncat(ret, content.as_ptr(), content.len() as i32);
+                        ret.get_or_insert_default().push_str(content);
                     } else {
                         let buffer = if attr {
                             xml_encode_attribute_entities(doc, cur_node.content.as_deref().unwrap())
                         } else {
                             xml_encode_entities_reentrant(doc, cur_node.content.as_deref().unwrap())
                         };
-                        ret = xml_strncat(ret, buffer.as_ptr(), buffer.len() as i32);
+                        ret.get_or_insert_default().push_str(&buffer);
                     }
                 } else if matches!(cur_node.element_type(), XmlElementType::XmlEntityRefNode) {
                     let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
@@ -934,34 +881,20 @@ impl XmlNode {
                             // which handles these types
                             let children = ent.children();
                             if let Some(buffer) = children.and_then(|c| c.get_string(doc, 1)) {
-                                let buffer = CString::new(buffer).unwrap();
-                                ret = xml_strcat(ret, buffer.as_ptr() as *const u8);
+                                ret.get_or_insert_default().push_str(&buffer);
                             }
                         } else {
                             let content = cur_node.content.as_deref().unwrap();
-                            ret = xml_strncat(ret, content.as_ptr(), content.len() as i32);
+                            ret.get_or_insert_default().push_str(content);
                         }
                     } else {
-                        let mut buf: [XmlChar; 2] = [0; 2];
-
-                        buf[0] = b'&';
-                        buf[1] = 0;
-                        ret = xml_strncat(ret, buf.as_ptr() as _, 1);
-                        ret = xml_strcat(ret, cur_node.name);
-                        buf[0] = b';';
-                        buf[1] = 0;
-                        ret = xml_strncat(ret, buf.as_ptr() as _, 1);
+                        ret.get_or_insert_default()
+                            .push_str(format!("&{};", cur_node.name).as_str());
                     }
                 }
                 node = cur_node.next();
             }
-            let r = (!ret.is_null()).then(|| {
-                CStr::from_ptr(ret as *const i8)
-                    .to_string_lossy()
-                    .into_owned()
-            });
-            xml_free(ret as _);
-            r
+            ret
         }
     }
 
@@ -1028,46 +961,33 @@ impl XmlNode {
     /// Set (or reset) the name of a node.
     #[doc(alias = "xmlNodeSetName")]
     #[cfg(feature = "libxml_tree")]
-    pub unsafe fn set_name(&mut self, name: &str) {
-        unsafe {
-            use crate::libxml::{globals::xml_free, xmlstring::xml_strdup};
-
-            match self.element_type() {
-                XmlElementType::XmlTextNode
-                | XmlElementType::XmlCDATASectionNode
-                | XmlElementType::XmlCommentNode
-                | XmlElementType::XmlDocumentTypeNode
-                | XmlElementType::XmlDocumentFragNode
-                | XmlElementType::XmlNotationNode
-                | XmlElementType::XmlHTMLDocumentNode
-                | XmlElementType::XmlNamespaceDecl
-                | XmlElementType::XmlXIncludeStart
-                | XmlElementType::XmlXIncludeEnd => {
-                    return;
-                }
-                XmlElementType::XmlElementNode
-                | XmlElementType::XmlAttributeNode
-                | XmlElementType::XmlPINode
-                | XmlElementType::XmlEntityRefNode
-                | XmlElementType::XmlEntityNode
-                | XmlElementType::XmlDTDNode
-                | XmlElementType::XmlDocumentNode
-                | XmlElementType::XmlElementDecl
-                | XmlElementType::XmlAttributeDecl
-                | XmlElementType::XmlEntityDecl => {}
-                _ => unreachable!(),
+    pub fn set_name(&mut self, name: &str) {
+        match self.element_type() {
+            XmlElementType::XmlTextNode
+            | XmlElementType::XmlCDATASectionNode
+            | XmlElementType::XmlCommentNode
+            | XmlElementType::XmlDocumentTypeNode
+            | XmlElementType::XmlDocumentFragNode
+            | XmlElementType::XmlNotationNode
+            | XmlElementType::XmlHTMLDocumentNode
+            | XmlElementType::XmlNamespaceDecl
+            | XmlElementType::XmlXIncludeStart
+            | XmlElementType::XmlXIncludeEnd => {
+                return;
             }
-            let mut freeme: *const XmlChar = null_mut();
-            let name = CString::new(name).unwrap();
-            if !self.name.is_null() {
-                freeme = self.name;
-            }
-            self.name = xml_strdup(name.as_ptr() as *const u8);
-
-            if !freeme.is_null() {
-                xml_free(freeme as _);
-            }
+            XmlElementType::XmlElementNode
+            | XmlElementType::XmlAttributeNode
+            | XmlElementType::XmlPINode
+            | XmlElementType::XmlEntityRefNode
+            | XmlElementType::XmlEntityNode
+            | XmlElementType::XmlDTDNode
+            | XmlElementType::XmlDocumentNode
+            | XmlElementType::XmlElementDecl
+            | XmlElementType::XmlAttributeDecl
+            | XmlElementType::XmlEntityDecl => {}
+            _ => unreachable!(),
         }
+        self.name = name.to_owned().into();
     }
 
     /// Set (or reset) an attribute carried by a node.
@@ -1555,14 +1475,12 @@ impl XmlNode {
     ///
     /// Returns the attribute or the attribute declaration or NULL if neither was found.
     #[doc(alias = "xmlHasNsProp")]
-    pub unsafe fn has_ns_prop(
+    pub fn has_ns_prop(
         &self,
         name: &str,
         namespace: Option<&str>,
     ) -> Option<Result<XmlAttrPtr, XmlAttributePtr>> {
-        unsafe {
-            self.get_prop_node_internal(name, namespace, XML_CHECK_DTD.load(Ordering::Relaxed))
-        }
+        self.get_prop_node_internal(name, namespace, XML_CHECK_DTD.load(Ordering::Relaxed))
     }
 
     /// Add a new element `elem` to the list of siblings of `self`
@@ -2163,7 +2081,7 @@ impl Default for XmlNode {
         Self {
             _private: null_mut(),
             typ: XmlElementType::XmlElementNode,
-            name: null(),
+            name: Cow::Borrowed(""),
             children: None,
             last: None,
             parent: None,
@@ -2196,8 +2114,7 @@ impl NodeCommon for XmlNode {
     }
     fn name(&self) -> Option<Cow<'_, str>> {
         assert!(verify_xml_node(self), "Actual node type: {:?}", self.typ);
-        (!self.name.is_null())
-            .then(|| unsafe { CStr::from_ptr(self.name as *const i8).to_string_lossy() })
+        Some(Cow::Borrowed(self.name.as_ref()))
     }
     fn children(&self) -> Option<XmlGenericNodePtr> {
         assert!(verify_xml_node(self), "Actual node type: {:?}", self.typ);

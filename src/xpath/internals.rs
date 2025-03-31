@@ -47,7 +47,7 @@ use crate::{
         chvalid::xml_is_blank_char,
         globals::{xml_free, xml_malloc, xml_realloc},
         valid::xml_get_id,
-        xmlstring::{XmlChar, xml_str_equal, xml_strndup},
+        xmlstring::{XmlChar, xml_strndup},
     },
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlAttrPtr, XmlDocPtr, XmlDtdPtr, XmlElementType,
@@ -2508,7 +2508,8 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
                     XmlXPathTestVal::NodeTestPI => {
                         if matches!(cur.element_type(), XmlElementType::XmlPINode)
                             && (name.is_null()
-                                || xml_str_equal(name, XmlNodePtr::try_from(cur).unwrap().name))
+                                || CStr::from_ptr(name as *const i8).to_string_lossy()
+                                    == XmlNodePtr::try_from(cur).unwrap().name)
                         {
                             xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                         }
@@ -2560,7 +2561,8 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
                         match cur.element_type() {
                             XmlElementType::XmlElementNode => {
                                 let node = XmlNodePtr::try_from(cur).unwrap();
-                                if xml_str_equal(name, node.name) {
+                                if CStr::from_ptr(name as *const i8).to_string_lossy() == node.name
+                                {
                                     if prefix.is_null() {
                                         if node.ns.is_none() {
                                             xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);

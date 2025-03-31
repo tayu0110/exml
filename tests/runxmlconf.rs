@@ -27,7 +27,6 @@ use exml::{
             xml_mem_display_last, xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup,
             xml_mem_used, xml_memory_dump, xml_memory_strdup,
         },
-        xmlstring::xml_str_equal,
     },
     parser::{
         XmlParserCtxtPtr, XmlParserInput, xml_ctxt_read_file, xml_free_parser_ctxt,
@@ -451,18 +450,15 @@ unsafe fn xmlconf_test_cases(
             // look only at elements we ignore everything else
             if cur_node.element_type() == XmlElementType::XmlElementNode {
                 let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                if xml_str_equal(cur_node.name, c"TESTCASES".as_ptr() as _) {
+                if cur_node.name == "TESTCASES" {
                     ret += xmlconf_test_cases(logfile, doc, cur_node, level);
-                } else if xml_str_equal(cur_node.name, c"TEST".as_ptr() as _) {
+                } else if cur_node.name == "TEST" {
                     if xmlconf_test_item(logfile, doc, cur_node) >= 0 {
                         ret += 1;
                     }
                     tests += 1;
                 } else {
-                    eprintln!(
-                        "Unhandled element {}",
-                        CStr::from_ptr(cur_node.name as _).to_string_lossy(),
-                    );
+                    eprintln!("Unhandled element {}", cur_node.name);
                 }
             }
             cur = cur_node.next();
@@ -488,13 +484,10 @@ unsafe fn xmlconf_test_suite(logfile: &mut Option<File>, doc: XmlDocPtr, cur: Xm
             // look only at elements we ignore everything else
             if cur_node.element_type() == XmlElementType::XmlElementNode {
                 let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                if xml_str_equal(cur_node.name, c"TESTCASES".as_ptr() as _) {
+                if cur_node.name == "TESTCASES" {
                     ret += xmlconf_test_cases(logfile, doc, cur_node, 1);
                 } else {
-                    eprintln!(
-                        "Unhandled element {}",
-                        CStr::from_ptr(cur_node.name as _).to_string_lossy(),
-                    );
+                    eprintln!("Unhandled element {}", cur_node.name);
                 }
             }
             cur = cur_node.next();
@@ -525,10 +518,7 @@ unsafe fn xmlconf_test(logfile: &mut Option<File>) -> c_int {
             return -1;
         };
 
-        let Some(cur) = doc
-            .get_root_element()
-            .filter(|cur| xml_str_equal(cur.name, c"TESTSUITE".as_ptr() as _))
-        else {
+        let Some(cur) = doc.get_root_element().filter(|cur| cur.name == "TESTSUITE") else {
             eprintln!("Unexpected format {}", confxml);
             xmlconf_info();
             xml_free_doc(doc);

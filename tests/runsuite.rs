@@ -40,7 +40,7 @@ use exml::{
         XmlRelaxNGValidCtxtPtr, xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt,
         xml_relaxng_init_types, xml_relaxng_new_mem_parser_ctxt, xml_relaxng_new_valid_ctxt,
     },
-    tree::{XmlGenericNodePtr, XmlNode, xml_free_doc},
+    tree::{XmlGenericNodePtr, XmlNodePtr, xml_free_doc},
     uri::build_uri,
     xmlschemas::{
         context::{
@@ -251,26 +251,21 @@ unsafe fn initialize_libxml2() {
     }
 }
 
-unsafe fn get_next(cur: *mut XmlNode, xpath: &str) -> *mut XmlNode {
+unsafe fn get_next(cur: Option<XmlNodePtr>, xpath: &str) -> Option<XmlNodePtr> {
     unsafe {
-        if cur.is_null() {
-            return null_mut();
-        }
-        let Some(cur_doc) = (*cur).doc else {
-            return null_mut();
-        };
+        let cur_doc = cur?.doc?;
         (*CTXT_XPATH.load(Ordering::Relaxed)).doc = Some(cur_doc);
-        (*CTXT_XPATH.load(Ordering::Relaxed)).node = XmlGenericNodePtr::from_raw(cur);
+        (*CTXT_XPATH.load(Ordering::Relaxed)).node = Some(XmlGenericNodePtr::from(cur?));
         let comp: XmlXPathCompExprPtr = xml_xpath_compile(xpath);
         if comp.is_null() {
             eprintln!("Failed to compile {}", xpath);
-            return null_mut();
+            return None;
         }
         let res: XmlXPathObjectPtr =
             xml_xpath_compiled_eval(comp, CTXT_XPATH.load(Ordering::Relaxed));
         xml_xpath_free_comp_expr(comp);
         if res.is_null() {
-            return null_mut();
+            return None;
         }
         let mut ret = None;
         if (*res).typ == XmlXPathObjectType::XPathNodeset {
@@ -281,22 +276,19 @@ unsafe fn get_next(cur: *mut XmlNode, xpath: &str) -> *mut XmlNode {
             }
         }
         xml_xpath_free_object(res);
-        ret.map_or(null_mut(), |node| node.as_ptr())
+        ret.and_then(|ret| XmlNodePtr::try_from(ret).ok())
     }
 }
 
-unsafe fn get_string(cur: *mut XmlNode, xpath: &str) -> *mut XmlChar {
+unsafe fn get_string(cur: XmlNodePtr, xpath: &str) -> *mut XmlChar {
     unsafe {
         let mut ret: *mut XmlChar = null_mut();
 
-        if cur.is_null() {
-            return null_mut();
-        }
-        let Some(cur_doc) = (*cur).doc else {
+        let Some(cur_doc) = cur.doc else {
             return null_mut();
         };
         (*CTXT_XPATH.load(Ordering::Relaxed)).doc = Some(cur_doc);
-        (*CTXT_XPATH.load(Ordering::Relaxed)).node = XmlGenericNodePtr::from_raw(cur);
+        (*CTXT_XPATH.load(Ordering::Relaxed)).node = Some(XmlGenericNodePtr::from(cur));
         let comp: XmlXPathCompExprPtr = xml_xpath_compile(xpath);
         if comp.is_null() {
             eprintln!("Failed to compile {}", xpath);
@@ -319,30 +311,29 @@ unsafe fn get_string(cur: *mut XmlNode, xpath: &str) -> *mut XmlChar {
     }
 }
 
-unsafe fn xsd_incorrect_test_case(logfile: &mut Option<File>, mut cur: *mut XmlNode) -> c_int {
+unsafe fn xsd_incorrect_test_case(logfile: &mut Option<File>, cur: Option<XmlNodePtr>) -> c_int {
     unsafe {
         let mut ret: c_int = 0;
 
-        cur = get_next(cur, "./incorrect[1]");
-        if cur.is_null() {
+        let Some(cur) = get_next(cur, "./incorrect[1]") else {
             return 0;
-        }
+        };
 
-        let test: *mut XmlNode = get_next(cur, "./*");
-        if test.is_null() {
+        let Some(mut test) = get_next(Some(cur), "./*") else {
             test_log!(
                 logfile,
                 "Failed to find test in correct line {}\n",
-                (*cur).get_line_no()
+                cur.get_line_no()
             );
             return 1;
-        }
+        };
 
         let memt: c_int = xml_mem_used();
         EXTRA_MEMORY_FROM_RESOLVER.store(0, Ordering::Relaxed);
         // dump the schemas to a buffer, then reparse it and compile the schemas
         let mut buf = vec![];
-        (*test).dump_memory(&mut buf, (*test).doc, 0, 0);
+        let test_doc = test.doc;
+        test.dump_memory(&mut buf, test_doc, 0, 0);
         let pctxt = xml_relaxng_new_mem_parser_ctxt(buf.as_ptr() as *const c_char, buf.len() as _);
         (*pctxt).set_parser_errors(
             Some(test_error_handler),
@@ -370,7 +361,7 @@ unsafe fn xsd_incorrect_test_case(logfile: &mut Option<File>, mut cur: *mut XmlN
             test_log!(
                 logfile,
                 "Validation of tests starting line {} leaked {}\n",
-                (*cur).get_line_no(),
+                cur.get_line_no(),
                 xml_mem_used() - memt
             );
             NB_LEAKS.fetch_add(1, Ordering::Relaxed);
@@ -379,22 +370,23 @@ unsafe fn xsd_incorrect_test_case(logfile: &mut Option<File>, mut cur: *mut XmlN
     }
 }
 
-unsafe fn install_resources(mut tst: *mut XmlNode, base: *const XmlChar) {
+unsafe fn install_resources(mut tst: XmlNodePtr, base: *const XmlChar) {
     unsafe {
-        let mut test: *mut XmlNode;
         let mut name: *mut XmlChar;
         let mut content: *mut XmlChar;
         let mut res: *mut XmlChar;
 
         let mut buf = vec![];
-        (*tst).dump_memory(&mut buf, (*tst).doc, 0, 0);
+        let test_doc = tst.doc;
+        tst.dump_memory(&mut buf, test_doc, 0, 0);
 
-        while !tst.is_null() {
-            test = get_next(tst, "./*");
-            if !test.is_null() {
+        let mut tst = Some(tst);
+        while let Some(now) = tst {
+            if let Some(mut test) = get_next(Some(now), "./*") {
                 buf.clear();
-                (*test).dump_memory(&mut buf, (*test).doc, 0, 0);
-                name = get_string(tst, "string(@name)");
+                let test_doc = test.doc;
+                test.dump_memory(&mut buf, test_doc, 0, 0);
+                name = get_string(now, "string(@name)");
                 content = xml_strndup(buf.as_ptr(), buf.len() as i32);
                 if !name.is_null() && !content.is_null() {
                     res = compose_dir(base, name);
@@ -409,15 +401,13 @@ unsafe fn install_resources(mut tst: *mut XmlNode, base: *const XmlChar) {
                     }
                 }
             }
-            tst = get_next(tst, "following-sibling::resource[1]");
+            tst = get_next(Some(now), "following-sibling::resource[1]");
         }
     }
 }
 
-unsafe fn install_dirs(tst: *mut XmlNode, base: *const XmlChar) {
+unsafe fn install_dirs(tst: XmlNodePtr, base: *const XmlChar) {
     unsafe {
-        let mut test: *mut XmlNode;
-
         let name: *mut XmlChar = get_string(tst, "string(@name)");
         if name.is_null() {
             return;
@@ -428,23 +418,21 @@ unsafe fn install_dirs(tst: *mut XmlNode, base: *const XmlChar) {
             return;
         }
         // Now process resources and subdir recursively
-        test = get_next(tst, "./resource[1]");
-        if !test.is_null() {
+        let test = get_next(Some(tst), "./resource[1]");
+        if let Some(test) = test {
             install_resources(test, res);
         }
-        test = get_next(tst, "./dir[1]");
-        while !test.is_null() {
-            install_dirs(test, res);
-            test = get_next(test, "following-sibling::dir[1]");
+        let mut test = get_next(Some(tst), "./dir[1]");
+        while let Some(now) = test {
+            install_dirs(now, res);
+            test = get_next(Some(now), "following-sibling::dir[1]");
         }
         xml_free(res as _);
     }
 }
 
-unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: *mut XmlNode) -> c_int {
+unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: Option<XmlNodePtr>) -> c_int {
     unsafe {
-        let mut test: *mut XmlNode;
-        let mut tmp: *mut XmlNode;
         let mut ctxt: XmlRelaxNGValidCtxtPtr;
         let mut ret: c_int = 0;
         let mut mem: c_int;
@@ -454,34 +442,30 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: *mut XmlNode) -> c_int 
         TEST_ERRORS_SIZE.store(0, Ordering::Relaxed);
         TEST_ERRORS.lock().unwrap()[0] = 0;
 
-        tmp = get_next(tst, "./dir[1]");
-        if !tmp.is_null() {
+        let tmp = get_next(tst, "./dir[1]");
+        if let Some(tmp) = tmp {
             install_dirs(tmp, null_mut());
         }
-        tmp = get_next(tst, "./resource[1]");
-        if !tmp.is_null() {
+        let tmp = get_next(tst, "./resource[1]");
+        if let Some(tmp) = tmp {
             install_resources(tmp, null_mut());
         }
 
-        let cur: *mut XmlNode = get_next(tst, "./correct[1]");
-        if cur.is_null() {
+        let Some(cur) = get_next(tst, "./correct[1]") else {
             return xsd_incorrect_test_case(logfile, tst);
-        }
+        };
 
-        test = get_next(cur, "./*");
-        if test.is_null() {
-            eprintln!(
-                "Failed to find test in correct line {}",
-                (*cur).get_line_no()
-            );
+        let Some(mut test) = get_next(Some(cur), "./*") else {
+            eprintln!("Failed to find test in correct line {}", cur.get_line_no());
             return 1;
-        }
+        };
 
         memt = xml_mem_used();
         EXTRA_MEMORY_FROM_RESOLVER.store(0, Ordering::Relaxed);
         // dump the schemas to a buffer, then reparse it and compile the schemas
         let mut buf = vec![];
-        (*test).dump_memory(&mut buf, (*test).doc, 0, 0);
+        let test_doc = test.doc;
+        test.dump_memory(&mut buf, test_doc, 0, 0);
         let pctxt = xml_relaxng_new_mem_parser_ctxt(buf.as_ptr() as *const c_char, buf.len() as _);
         (*pctxt).set_parser_errors(
             Some(test_error_handler),
@@ -510,7 +494,7 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: *mut XmlNode) -> c_int 
                 test_log!(
                     logfile,
                     "Validation of tests starting line {} leaked {}\n",
-                    (*cur).get_line_no(),
+                    cur.get_line_no(),
                     xml_mem_used() - memt
                 );
                 NB_LEAKS.fetch_add(1, Ordering::Relaxed);
@@ -518,21 +502,16 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: *mut XmlNode) -> c_int 
             return ret;
         }
         // now scan all the siblings of correct to process the <valid> tests
-        tmp = get_next(cur, "following-sibling::valid[1]");
-        while !tmp.is_null() {
-            let dtd = (*tmp).get_prop("dtd");
-            test = get_next(tmp, "./*");
-            if test.is_null() {
-                eprintln!(
-                    "Failed to find test in <valid> line {}\n",
-                    (*tmp).get_line_no(),
-                );
-            } else {
+        let mut tmp = get_next(Some(cur), "following-sibling::valid[1]");
+        while let Some(now) = tmp {
+            let dtd = now.get_prop("dtd");
+            if let Some(mut test) = get_next(Some(now), "./*") {
                 buf.clear();
                 if let Some(dtd) = dtd {
                     buf.extend(dtd.as_bytes());
                 }
-                (*test).dump_memory(&mut buf, (*test).doc, 0, 0);
+                let test_doc = test.doc;
+                test.dump_memory(&mut buf, test_doc, 0, 0);
 
                 // We are ready to run the test
                 mem = xml_mem_used();
@@ -554,7 +533,7 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: *mut XmlNode) -> c_int 
                             test_log!(
                                 logfile,
                                 "Failed to validate valid instance line {}\n",
-                                (*tmp).get_line_no()
+                                now.get_line_no()
                             );
                             NB_ERRORS.fetch_add(1, Ordering::Relaxed);
                         }
@@ -562,7 +541,7 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: *mut XmlNode) -> c_int 
                             test_log!(
                                 logfile,
                                 "Internal error validating instance line {}\n",
-                                (*tmp).get_line_no()
+                                now.get_line_no()
                             );
                             NB_ERRORS.fetch_add(1, Ordering::Relaxed);
                         }
@@ -573,7 +552,7 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: *mut XmlNode) -> c_int 
                     test_log!(
                         logfile,
                         "Failed to parse valid instance line {}\n",
-                        (*tmp).get_line_no()
+                        now.get_line_no()
                     );
                     NB_ERRORS.fetch_add(1, Ordering::Relaxed);
                 }
@@ -583,27 +562,27 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: *mut XmlNode) -> c_int 
                     test_log!(
                         logfile,
                         "Validation of instance line {} leaked {}\n",
-                        (*tmp).get_line_no(),
+                        now.get_line_no(),
                         xml_mem_used() - mem
                     );
                     xml_memory_dump();
                     NB_LEAKS.fetch_add(1, Ordering::Relaxed);
                 }
+            } else {
+                eprintln!(
+                    "Failed to find test in <valid> line {}\n",
+                    now.get_line_no(),
+                );
             }
-            tmp = get_next(tmp, "following-sibling::valid[1]");
+            tmp = get_next(Some(now), "following-sibling::valid[1]");
         }
         // now scan all the siblings of correct to process the <invalid> tests
-        tmp = get_next(cur, "following-sibling::invalid[1]");
-        while !tmp.is_null() {
-            test = get_next(tmp, "./*");
-            if test.is_null() {
-                eprintln!(
-                    "Failed to find test in <invalid> line {}",
-                    (*tmp).get_line_no()
-                );
-            } else {
+        let mut tmp = get_next(Some(cur), "following-sibling::invalid[1]");
+        while let Some(now) = tmp {
+            if let Some(mut test) = get_next(Some(now), "./*") {
                 buf.clear();
-                (*test).dump_memory(&mut buf, (*test).doc, 0, 0);
+                let test_doc = test.doc;
+                test.dump_memory(&mut buf, test_doc, 0, 0);
 
                 // We are ready to run the test
                 mem = xml_mem_used();
@@ -625,7 +604,7 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: *mut XmlNode) -> c_int 
                             test_log!(
                                 logfile,
                                 "Failed to detect invalid instance line {}\n",
-                                (*tmp).get_line_no()
+                                now.get_line_no()
                             );
                             NB_ERRORS.fetch_add(1, Ordering::Relaxed);
                         }
@@ -633,7 +612,7 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: *mut XmlNode) -> c_int 
                             test_log!(
                                 logfile,
                                 "Internal error validating instance line {}\n",
-                                (*tmp).get_line_no()
+                                now.get_line_no()
                             );
                             NB_ERRORS.fetch_add(1, Ordering::Relaxed);
                         }
@@ -644,7 +623,7 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: *mut XmlNode) -> c_int 
                     test_log!(
                         logfile,
                         "Failed to parse valid instance line {}\n",
-                        (*tmp).get_line_no()
+                        now.get_line_no()
                     );
                     NB_ERRORS.fetch_add(1, Ordering::Relaxed);
                 }
@@ -654,14 +633,19 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: *mut XmlNode) -> c_int 
                     test_log!(
                         logfile,
                         "Validation of instance line {} leaked {}\n",
-                        (*tmp).get_line_no(),
+                        now.get_line_no(),
                         xml_mem_used() - mem
                     );
                     xml_memory_dump();
                     NB_LEAKS.fetch_add(1, Ordering::Relaxed);
                 }
+            } else {
+                eprintln!(
+                    "Failed to find test in <invalid> line {}",
+                    now.get_line_no()
+                );
             }
-            tmp = get_next(tmp, "following-sibling::invalid[1]");
+            tmp = get_next(Some(now), "following-sibling::invalid[1]");
         }
 
         if !rng.is_null() {
@@ -672,7 +656,7 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: *mut XmlNode) -> c_int 
             test_log!(
                 logfile,
                 "Validation of tests starting line {} leaked {}\n",
-                (*cur).get_line_no(),
+                cur.get_line_no(),
                 xml_mem_used() - memt
             );
             NB_LEAKS.fetch_add(1, Ordering::Relaxed);
@@ -681,7 +665,7 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: *mut XmlNode) -> c_int 
     }
 }
 
-unsafe fn xsd_test_suite(logfile: &mut Option<File>, mut cur: *mut XmlNode) -> c_int {
+unsafe fn xsd_test_suite(logfile: &mut Option<File>, cur: XmlNodePtr) -> c_int {
     unsafe {
         if VERBOSE != 0 {
             let doc: *mut XmlChar = get_string(cur, "string(documentation)");
@@ -691,10 +675,10 @@ unsafe fn xsd_test_suite(logfile: &mut Option<File>, mut cur: *mut XmlNode) -> c
                 xml_free(doc as _);
             }
         }
-        cur = get_next(cur, "./testCase[1]");
-        while !cur.is_null() {
-            xsd_test_case(logfile, cur);
-            cur = get_next(cur, "following-sibling::testCase[1]");
+        let mut cur = get_next(Some(cur), "./testCase[1]");
+        while let Some(now) = cur {
+            xsd_test_case(logfile, Some(now));
+            cur = get_next(Some(now), "following-sibling::testCase[1]");
         }
 
         0
@@ -713,10 +697,7 @@ unsafe fn xsd_test(logfile: &mut Option<File>) -> c_int {
         println!("## XML Schemas datatypes test suite from James Clark");
         test_log!(logfile, "filename: {}\n", filename);
 
-        let Some(cur) = doc
-            .get_root_element()
-            .filter(|cur| xml_str_equal(cur.name, c"testSuite".as_ptr() as _))
-        else {
+        let Some(cur) = doc.get_root_element().filter(|cur| cur.name == "testSuite") else {
             eprintln!("Unexpected format {}", filename);
             ret = -1;
             xml_free_doc(doc);
@@ -724,15 +705,15 @@ unsafe fn xsd_test(logfile: &mut Option<File>) -> c_int {
         };
 
         let mut cur = get_next(cur.into(), "./testSuite[1]");
-        if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as *const u8) {
+        if cur.is_none_or(|cur| cur.name != "testSuite") {
             eprintln!("Unexpected format {}", filename);
             ret = -1;
             xml_free_doc(doc);
             return ret;
         }
-        while !cur.is_null() {
-            xsd_test_suite(logfile, cur);
-            cur = get_next(cur, "following-sibling::testSuite[1]");
+        while let Some(now) = cur {
+            xsd_test_suite(logfile, now);
+            cur = get_next(Some(now), "following-sibling::testSuite[1]");
         }
 
         xml_free_doc(doc);
@@ -740,7 +721,7 @@ unsafe fn xsd_test(logfile: &mut Option<File>) -> c_int {
     }
 }
 
-unsafe fn rng_test_suite(logfile: &mut Option<File>, mut cur: *mut XmlNode) -> c_int {
+unsafe fn rng_test_suite(logfile: &mut Option<File>, cur: XmlNodePtr) -> i32 {
     unsafe {
         if VERBOSE != 0 {
             let mut doc: *mut XmlChar = get_string(cur, "string(documentation)");
@@ -756,10 +737,10 @@ unsafe fn rng_test_suite(logfile: &mut Option<File>, mut cur: *mut XmlNode) -> c
                 }
             }
         }
-        cur = get_next(cur, "./testSuite[1]");
-        while !cur.is_null() {
-            xsd_test_suite(logfile, cur);
-            cur = get_next(cur, "following-sibling::testSuite[1]");
+        let mut cur = get_next(Some(cur), "./testSuite[1]");
+        while let Some(now) = cur {
+            xsd_test_suite(logfile, now);
+            cur = get_next(Some(now), "following-sibling::testSuite[1]");
         }
 
         0
@@ -778,10 +759,7 @@ unsafe fn rng_test1(logfile: &mut Option<File>) -> c_int {
         println!("## Relax NG test suite from James Clark");
         test_log!(logfile, "filename: {}\n", filename);
 
-        let Some(cur) = doc
-            .get_root_element()
-            .filter(|cur| xml_str_equal(cur.name, c"testSuite".as_ptr() as _))
-        else {
+        let Some(cur) = doc.get_root_element().filter(|cur| cur.name == "testSuite") else {
             eprintln!("Unexpected format {}", filename);
             ret = -1;
             xml_free_doc(doc);
@@ -789,15 +767,15 @@ unsafe fn rng_test1(logfile: &mut Option<File>) -> c_int {
         };
 
         let mut cur = get_next(cur.into(), "./testSuite[1]");
-        if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) {
+        if cur.is_none_or(|cur| cur.name != "testSuite") {
             eprintln!("Unexpected format {}", filename);
             ret = -1;
             xml_free_doc(doc);
             return ret;
         }
-        while !cur.is_null() {
-            rng_test_suite(logfile, cur);
-            cur = get_next(cur, "following-sibling::testSuite[1]");
+        while let Some(now) = cur {
+            rng_test_suite(logfile, now);
+            cur = get_next(Some(now), "following-sibling::testSuite[1]");
         }
 
         xml_free_doc(doc);
@@ -817,10 +795,7 @@ unsafe fn rng_test2(logfile: &mut Option<File>) -> c_int {
         println!("## Relax NG test suite for libxml2");
         test_log!(logfile, "filename: {}\n", filename);
 
-        let Some(cur) = doc
-            .get_root_element()
-            .filter(|cur| xml_str_equal(cur.name, c"testSuite".as_ptr() as _))
-        else {
+        let Some(cur) = doc.get_root_element().filter(|cur| cur.name == "testSuite") else {
             eprintln!("Unexpected format {}", filename);
             ret = -1;
             xml_free_doc(doc);
@@ -828,15 +803,15 @@ unsafe fn rng_test2(logfile: &mut Option<File>) -> c_int {
         };
 
         let mut cur = get_next(cur.into(), "./testSuite[1]");
-        if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) {
+        if cur.is_none_or(|cur| cur.name != "testSuite") {
             eprintln!("Unexpected format {}", filename);
             ret = -1;
             xml_free_doc(doc);
             return ret;
         }
-        while !cur.is_null() {
-            xsd_test_suite(logfile, cur);
-            cur = get_next(cur, "following-sibling::testSuite[1]");
+        while let Some(now) = cur {
+            xsd_test_suite(logfile, now);
+            cur = get_next(Some(now), "following-sibling::testSuite[1]");
         }
 
         xml_free_doc(doc);
@@ -846,7 +821,7 @@ unsafe fn rng_test2(logfile: &mut Option<File>) -> c_int {
 
 unsafe fn xstc_test_instance(
     logfile: &mut Option<File>,
-    cur: *mut XmlNode,
+    cur: XmlNodePtr,
     schemas: XmlSchemaPtr,
     spath: *const XmlChar,
     base: *const c_char,
@@ -865,7 +840,7 @@ unsafe fn xstc_test_instance(
             test_log!(
                 logfile,
                 "testGroup line {} misses href for schemaDocument\n",
-                (*cur).get_line_no()
+                cur.get_line_no()
             );
             ret = -1;
         // goto done;
@@ -877,7 +852,7 @@ unsafe fn xstc_test_instance(
                 test_log!(
                     logfile,
                     "schemas for testGroup line {} is missing: {}\n",
-                    (*cur).get_line_no(),
+                    cur.get_line_no(),
                     path
                 );
                 ret = -1;
@@ -887,7 +862,7 @@ unsafe fn xstc_test_instance(
                 if validity.is_null() {
                     eprintln!(
                         "instanceDocument line {} misses expected validity",
-                        (*cur).get_line_no()
+                        cur.get_line_no()
                     );
                     ret = -1;
                     // goto done;
@@ -941,7 +916,7 @@ unsafe fn xstc_test_instance(
                             test_log!(
                                 logfile,
                                 "instanceDocument line {} has unexpected validity value{}\n",
-                                (*cur).get_line_no(),
+                                cur.get_line_no(),
                                 CStr::from_ptr(validity as _).to_string_lossy()
                             );
                             ret = -1;
@@ -959,7 +934,7 @@ unsafe fn xstc_test_instance(
         } else {
             eprintln!(
                 "Failed to build path to schemas testGroup line {} : {}",
-                (*cur).get_line_no(),
+                cur.get_line_no(),
                 CStr::from_ptr(href as _).to_string_lossy()
             );
             ret = -1;
@@ -980,7 +955,7 @@ unsafe fn xstc_test_instance(
             test_log!(
                 logfile,
                 "Validation of tests starting line {} leaked {}\n",
-                (*cur).get_line_no(),
+                cur.get_line_no(),
                 xml_mem_used() - mem
             );
             NB_LEAKS.fetch_add(1, Ordering::Relaxed);
@@ -991,7 +966,7 @@ unsafe fn xstc_test_instance(
 
 unsafe fn xstc_test_group(
     logfile: &mut Option<File>,
-    cur: *mut XmlNode,
+    cur: XmlNodePtr,
     base: *const c_char,
 ) -> c_int {
     unsafe {
@@ -999,7 +974,6 @@ unsafe fn xstc_test_group(
         let mut validity: *mut XmlChar = null_mut();
         let mut schemas: XmlSchemaPtr = null_mut();
         let ctxt: XmlSchemaParserCtxtPtr;
-        let mut instance: *mut XmlNode;
         let mut ret: c_int = 0;
 
         reset_last_error();
@@ -1012,7 +986,7 @@ unsafe fn xstc_test_group(
             test_log!(
                 logfile,
                 "testGroup line {} misses href for schemaDocument\n",
-                (*cur).get_line_no()
+                cur.get_line_no()
             );
             ret = -1;
         // goto done;
@@ -1024,7 +998,7 @@ unsafe fn xstc_test_group(
                 test_log!(
                     logfile,
                     "schemas for testGroup line {} is missing: {}\n",
-                    (*cur).get_line_no(),
+                    cur.get_line_no(),
                     path
                 );
                 ret = -1;
@@ -1035,7 +1009,7 @@ unsafe fn xstc_test_group(
                     test_log!(
                         logfile,
                         "testGroup line {} misses expected validity\n",
-                        (*cur).get_line_no()
+                        cur.get_line_no()
                     );
                     ret = -1;
                     // goto done;
@@ -1073,12 +1047,12 @@ unsafe fn xstc_test_group(
                             NB_UNIMPLEMENTED.fetch_add(1, Ordering::Relaxed);
                             NB_ERRORS.fetch_add(1, Ordering::Relaxed);
                         }
-                        instance = get_next(cur, "./ts:instanceTest[1]");
-                        while !instance.is_null() {
+                        let mut instance = get_next(Some(cur), "./ts:instanceTest[1]");
+                        while let Some(now) = instance {
                             if !schemas.is_null() {
                                 xstc_test_instance(
                                     logfile,
-                                    instance,
+                                    now,
                                     schemas,
                                     cpath.as_ptr() as *const u8,
                                     base,
@@ -1088,7 +1062,7 @@ unsafe fn xstc_test_group(
                                 // if the schema was broken.
                                 NB_ERRORS.fetch_add(1, Ordering::Relaxed);
                             }
-                            instance = get_next(instance, "following-sibling::ts:instanceTest[1]");
+                            instance = get_next(Some(now), "following-sibling::ts:instanceTest[1]");
                         }
                     } else if xml_str_equal(validity, c"invalid".as_ptr() as _) {
                         NB_SCHEMATAS.fetch_add(1, Ordering::Relaxed);
@@ -1125,7 +1099,7 @@ unsafe fn xstc_test_group(
                         test_log!(
                             logfile,
                             "testGroup line {} misses unexpected validity value{}\n",
-                            (*cur).get_line_no(),
+                            cur.get_line_no(),
                             CStr::from_ptr(validity as _).to_string_lossy()
                         );
                         ret = -1;
@@ -1138,7 +1112,7 @@ unsafe fn xstc_test_group(
             test_log!(
                 logfile,
                 "Failed to build path to schemas testGroup line {} : {}\n",
-                (*cur).get_line_no(),
+                cur.get_line_no(),
                 CStr::from_ptr(href as _).to_string_lossy()
             );
             ret = -1;
@@ -1159,7 +1133,7 @@ unsafe fn xstc_test_group(
             test_log!(
                 logfile,
                 "Processing test line {} {} leaked {}\n",
-                (*cur).get_line_no(),
+                cur.get_line_no(),
                 p.as_deref().unwrap_or("(null)"),
                 xml_mem_used() - mem
             );
@@ -1178,27 +1152,24 @@ unsafe fn xstc_metadata(logfile: &mut Option<File>, metadata: &str, base: *const
             return -1;
         };
 
-        let Some(cur) = doc
-            .get_root_element()
-            .filter(|cur| xml_str_equal(cur.name, c"testSet".as_ptr() as _))
-        else {
+        let Some(cur) = doc.get_root_element().filter(|cur| cur.name == "testSet") else {
             eprintln!("Unexpected format {metadata}");
             return -1;
         };
         let contributor = cur.get_prop("contributor").unwrap_or("Unknown".to_owned());
-        let name = (*cur).get_prop("name").unwrap_or("Unknown".to_owned());
+        let name = cur.get_prop("name").unwrap_or("Unknown".to_owned());
         println!("## {contributor} test suite for Schemas version {name}");
 
         let mut cur = get_next(cur.into(), "./ts:testGroup[1]");
-        if cur.is_null() || !xml_str_equal((*cur).name, c"testGroup".as_ptr() as _) {
+        if cur.is_none_or(|cur| cur.name != "testGroup") {
             eprintln!("Unexpected format {metadata}");
             ret = -1;
             xml_free_doc(doc);
             return ret;
         }
-        while !cur.is_null() {
-            xstc_test_group(logfile, cur, base);
-            cur = get_next(cur, "following-sibling::ts:testGroup[1]");
+        while let Some(now) = cur {
+            xstc_test_group(logfile, now, base);
+            cur = get_next(Some(now), "following-sibling::ts:testGroup[1]");
         }
 
         xml_free_doc(doc);

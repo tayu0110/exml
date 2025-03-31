@@ -30,7 +30,7 @@
 //
 // Author: Aleksey Sanin <aleksey@aleksey.com>
 
-use std::{cmp::Ordering, ffi::CStr, ptr::null_mut, rc::Rc};
+use std::{cmp::Ordering, ptr::null_mut, rc::Rc};
 
 use crate::{
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
@@ -590,7 +590,7 @@ impl<T> XmlC14NCtx<'_, T> {
 
             let mut state: XmlC14NVisibleNsStack = XmlC14NVisibleNsStack::default();
             // Save ns_rendered stack position
-            (*self.ns_rendered).save(&mut state);
+            self.ns_rendered.save(&mut state);
 
             if visible {
                 if self.parent_is_doc {
@@ -606,9 +606,7 @@ impl<T> XmlC14NCtx<'_, T> {
                     self.buf.write_str(":").ok();
                 }
 
-                self.buf
-                    .write_str(CStr::from_ptr(cur.name as _).to_string_lossy().as_ref())
-                    .ok();
+                self.buf.write_str(&cur.name).ok();
             }
 
             let ret = if !self.is_exclusive() {
@@ -648,9 +646,7 @@ impl<T> XmlC14NCtx<'_, T> {
                     self.buf.write_str(":").ok();
                 }
 
-                self.buf
-                    .write_str(CStr::from_ptr(cur.name as _).to_string_lossy().as_ref())
-                    .ok();
+                self.buf.write_str(&cur.name).ok();
                 self.buf.write_str(">").ok();
                 if parent_is_doc {
                     // restore this flag from the stack for next node
