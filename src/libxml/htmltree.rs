@@ -91,7 +91,6 @@ pub unsafe fn html_new_doc_no_dtd(
             typ: XmlElementType::XmlHTMLDocumentNode,
             version: None,
             int_subset: None,
-            name: null_mut(),
             children: None,
             ext_subset: None,
             old_ns: None,

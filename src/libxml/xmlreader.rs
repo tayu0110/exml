@@ -4484,15 +4484,9 @@ unsafe fn xml_text_reader_free_doc(reader: &mut XmlTextReader, mut cur: XmlDocPt
             xml_text_reader_free_node_list(reader, children);
         }
 
-        cur.version = None;
-        if !cur.name.is_null() {
-            xml_free(cur.name as _);
-        }
-        cur.encoding = None;
         if let Some(old_ns) = cur.old_ns.take() {
             xml_free_ns_list(old_ns);
         }
-        cur.url = None;
         cur.free();
     }
 }

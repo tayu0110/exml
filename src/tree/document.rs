@@ -33,9 +33,7 @@ use crate::{
     encoding::XmlCharEncoding,
     error::XmlParserErrors,
     hash::XmlHashTable,
-    libxml::globals::{
-        xml_deregister_node_default_value, xml_free, xml_register_node_default_value,
-    },
+    libxml::globals::{xml_deregister_node_default_value, xml_register_node_default_value},
     list::XmlList,
 };
 
@@ -51,7 +49,7 @@ use super::{
 pub struct XmlDoc {
     pub _private: *mut c_void,                  /* application data */
     pub(crate) typ: XmlElementType,             /* XML_DOCUMENT_NODE, must be second ! */
-    pub(crate) name: *mut i8,                   /* name/filename/URI of the document */
+    pub(crate) name: Cow<'static, str>,         /* name/filename/URI of the document */
     pub children: Option<XmlGenericNodePtr>,    /* the document tree */
     pub(crate) last: Option<XmlGenericNodePtr>, /* last child link */
     pub(crate) parent: Option<XmlDocPtr>,       /* child->parent link */
@@ -521,8 +519,7 @@ impl NodeCommon for XmlDoc {
         self.typ
     }
     fn name(&self) -> Option<Cow<'_, str>> {
-        (!self.name.is_null())
-            .then(|| unsafe { CStr::from_ptr(self.name as *const i8).to_string_lossy() })
+        Some(Cow::Borrowed(self.name.as_ref()))
     }
     fn children(&self) -> Option<XmlGenericNodePtr> {
         self.children
@@ -561,7 +558,7 @@ impl Default for XmlDoc {
         Self {
             _private: null_mut(),
             typ: XmlElementType::XmlDocumentNode,
-            name: null_mut(),
+            name: "".into(),
             children: None,
             last: None,
             parent: None,
@@ -755,16 +752,11 @@ pub unsafe fn xml_new_doc(version: Option<&str>) -> Option<XmlDocPtr> {
 #[cfg(any(feature = "libxml_tree", feature = "schema"))]
 pub unsafe fn xml_copy_doc(doc: XmlDocPtr, recursive: i32) -> Option<XmlDocPtr> {
     unsafe {
-        use crate::{
-            libxml::globals::xml_mem_strdup,
-            tree::{xml_copy_dtd, xml_copy_namespace_list, xml_static_copy_node_list},
-        };
+        use crate::tree::{xml_copy_dtd, xml_copy_namespace_list, xml_static_copy_node_list};
 
         let mut ret = xml_new_doc(doc.version.as_deref())?;
         ret.typ = doc.typ;
-        if !doc.name.is_null() {
-            ret.name = xml_mem_strdup(doc.name as _) as _;
-        }
+        ret.name = doc.name.clone();
         ret.encoding = doc.encoding.clone();
         if let Some(url) = doc.url.as_deref() {
             ret.url = Some(url.to_owned());
@@ -840,12 +832,6 @@ pub unsafe fn xml_free_doc(mut cur: XmlDocPtr) {
             xml_free_ns_list(old_ns);
         }
 
-        cur.version = None;
-        if !cur.name.is_null() {
-            xml_free(cur.name as _);
-        }
-        cur.encoding = None;
-        cur.url = None;
         cur.free();
     }
 }
