@@ -677,7 +677,7 @@ impl XmlNode {
                     }
                     // Only default/fixed attrs are relevant.
                     if let Some(attr_decl) =
-                        attr_decl.filter(|attr_decl| !attr_decl.default_value.is_null())
+                        attr_decl.filter(|attr_decl| attr_decl.default_value.is_some())
                     {
                         return Some(Err(attr_decl));
                     }
@@ -1453,7 +1453,7 @@ impl XmlNode {
                     }
                 }
                 if let Some(attr_decl) =
-                    attr_decl.filter(|attr_decl| !attr_decl.default_value.is_null())
+                    attr_decl.filter(|attr_decl| attr_decl.default_value.is_some())
                 {
                     // return attribute declaration only if a default value is given
                     // (that includes #FIXED declarations)

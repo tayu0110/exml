@@ -702,10 +702,8 @@ unsafe fn xml_buf_dump_element_decl<'a>(buf: &mut (impl Write + 'a), elem: XmlEl
 
 /// This will dump the content of the attribute declaration as an XML DTD definition
 #[doc(alias = "xmlBufDumpAttributeDecl")]
-unsafe fn xml_buf_dump_attribute_decl<'a>(buf: &mut (impl Write + 'a), attr: XmlAttributePtr) {
-    unsafe {
-        xml_dump_attribute_decl(buf, attr);
-    }
+fn xml_buf_dump_attribute_decl<'a>(buf: &mut (impl Write + 'a), attr: XmlAttributePtr) {
+    xml_dump_attribute_decl(buf, attr);
 }
 
 /// This will dump the content of the entity table as an XML DTD definition

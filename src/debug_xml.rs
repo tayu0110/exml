@@ -555,7 +555,7 @@ impl XmlDebugCtxt<'_> {
                 );
                 return;
             }
-            if let Some(name) = attr.name() {
+            if let Some(name) = attr.name.as_deref() {
                 if self.check == 0 {
                     write!(self.output, "ATTRDECL({name})").ok();
                 }
@@ -642,12 +642,9 @@ impl XmlDebugCtxt<'_> {
                         write!(self.output, " FIXED").ok();
                     }
                 }
-                if !attr.default_value.is_null() {
+                if let Some(def) = attr.default_value.as_deref() {
                     write!(self.output, "\"").ok();
-                    let def_value = attr.default_value;
-                    self.dump_string(
-                        Some(CStr::from_ptr(def_value as *const i8).to_string_lossy()).as_deref(),
-                    );
+                    self.dump_string(Some(def));
                     write!(self.output, "\"").ok();
                 }
                 writeln!(self.output).ok();

@@ -26,12 +26,9 @@ use std::{
     ptr::{NonNull, null_mut},
 };
 
-use crate::{
-    libxml::{globals::xml_free, xmlstring::XmlChar},
-    tree::{
-        InvalidNodePointerCastError, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDocPtr,
-        XmlElementType, XmlGenericNodePtr,
-    },
+use crate::tree::{
+    InvalidNodePointerCastError, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDocPtr,
+    XmlElementType, XmlGenericNodePtr,
 };
 
 use super::{XmlDtdPtr, XmlEnumeration};
@@ -52,7 +49,7 @@ pub struct XmlAttribute {
     pub(crate) nexth: Option<XmlAttributePtr>, /* next in hash table */
     pub(crate) atype: XmlAttributeType,        /* The attribute type */
     pub(crate) def: XmlAttributeDefault,       /* the default */
-    pub(crate) default_value: *const XmlChar,  /* or the default value */
+    pub(crate) default_value: Option<Box<str>>, /* or the default value */
     pub(crate) tree: Option<Box<XmlEnumeration>>, /* or the enumeration tree if any */
     pub(crate) prefix: Option<String>,         /* the namespace prefix if any */
     pub(crate) elem: Option<String>,           /* Element holding the attribute */
@@ -73,7 +70,7 @@ impl Default for XmlAttribute {
             nexth: None,
             atype: XmlAttributeType::XmlAttributeCDATA,
             def: XmlAttributeDefault::XmlAttributeNone,
-            default_value: null_mut(),
+            default_value: None,
             tree: None,
             prefix: None,
             elem: None,
@@ -252,11 +249,6 @@ impl From<XmlAttributePtr> for *mut XmlAttribute {
 pub(crate) unsafe fn xml_free_attribute(mut attr: XmlAttributePtr) {
     unsafe {
         attr.unlink();
-        attr.elem = None;
-        if !attr.default_value.is_null() {
-            xml_free(attr.default_value as _);
-        }
-        attr.prefix = None;
         attr.free();
     }
 }

@@ -1,6 +1,5 @@
 use std::{
     borrow::Cow,
-    ffi::CStr,
     ops::{Deref, DerefMut},
     ptr::NonNull,
 };
@@ -149,12 +148,7 @@ pub trait NodeCommon {
                 let attr_decl = XmlAttributePtr::from_raw(self as *const Self as *mut XmlAttribute)
                     .unwrap()
                     .unwrap();
-                let def = attr_decl.default_value;
-                (!def.is_null()).then(|| {
-                    CStr::from_ptr(def as *const i8)
-                        .to_string_lossy()
-                        .into_owned()
-                })
+                attr_decl.default_value.as_deref().map(|def| def.to_owned())
             } else {
                 None
             }

@@ -1787,7 +1787,7 @@ unsafe fn xml_check_defaulted_attributes(
             if my_doc.standalone == 1 && my_doc.ext_subset.is_some() && (*ctxt).validate != 0 {
                 while let Some(cur_attr) = attr {
                     let elem = cur_attr.elem.as_deref().map(|p| CString::new(p).unwrap());
-                    if !cur_attr.default_value.is_null()
+                    if cur_attr.default_value.is_some()
                         && my_doc.ext_subset.and_then(|dtd| {
                             dtd.get_qattr_desc(
                                 cur_attr.elem.as_deref().unwrap(),
@@ -1832,7 +1832,7 @@ unsafe fn xml_check_defaulted_attributes(
             while let Some(cur_attr) = attr {
                 // Make sure that attributes redefinition occurring in the
                 // internal subset are not overridden by definitions in the external subset.
-                if !cur_attr.default_value.is_null() {
+                if let Some(def) = cur_attr.default_value.as_deref() {
                     // the element should be instantiated in the tree if:
                     //  - this is a namespace prefix
                     //  - the user required for completion in the tree
@@ -1857,15 +1857,10 @@ unsafe fn xml_check_defaulted_attributes(
 
                             // Check that the attribute is not declared in the serialization
                             if !atts.iter().any(|(att, _)| att.as_str() == fulln) {
-                                let value = cur_attr.default_value;
                                 xml_sax2_attribute_internal(
                                     Some(GenericErrorContext::new(ctxt)),
                                     &fulln,
-                                    (!value.is_null())
-                                        .then(|| {
-                                            CStr::from_ptr(value as *const i8).to_string_lossy()
-                                        })
-                                        .as_deref(),
+                                    Some(def),
                                     prefix,
                                 );
                             }
