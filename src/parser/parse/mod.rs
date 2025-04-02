@@ -55,15 +55,7 @@ mod xmldecl;
 
 pub(crate) use attribute::*;
 pub(crate) use cdata::*;
-pub(crate) use comment::*;
-pub(crate) use dtd::*;
-pub(crate) use element::*;
 pub(crate) use entity::*;
-pub(crate) use literal::*;
-pub(crate) use names::*;
-pub(crate) use pi::*;
-pub(crate) use reference::*;
-pub(crate) use xmldecl::*;
 
 use crate::libxml::parser::XmlParserInputState;
 
@@ -81,9 +73,9 @@ pub(crate) unsafe fn parse_misc(ctxt: &mut XmlParserCtxt) {
             ctxt.skip_blanks();
             ctxt.grow();
             if ctxt.content_bytes().starts_with(b"<?") {
-                parse_pi(&mut *ctxt);
+                ctxt.parse_pi();
             } else if ctxt.content_bytes().starts_with(b"<!--") {
-                parse_comment(&mut *ctxt);
+                ctxt.parse_comment();
             } else {
                 break;
             }

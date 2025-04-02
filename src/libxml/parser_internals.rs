@@ -38,8 +38,8 @@ use crate::{
         xmlstring::XmlChar,
     },
     parser::{
-        XmlParserCtxtPtr, parse_content, xml_create_memory_parser_ctxt, xml_err_encoding_int,
-        xml_fatal_err, xml_fatal_err_msg, xml_free_parser_ctxt,
+        XmlParserCtxtPtr, xml_create_memory_parser_ctxt, xml_err_encoding_int, xml_fatal_err,
+        xml_fatal_err_msg, xml_free_parser_ctxt,
     },
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlDocProperties, XmlElementType, XmlGenericNodePtr,
@@ -244,7 +244,7 @@ pub(crate) unsafe fn xml_parse_balanced_chunk_memory_internal(
         (*ctxt).atts_default = take(&mut (*oldctxt).atts_default);
         (*ctxt).atts_special = (*oldctxt).atts_special;
 
-        parse_content(&mut *ctxt);
+        (*ctxt).parse_content();
         if (*ctxt).content_bytes().starts_with(b"</") {
             xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrNotWellBalanced, None);
         } else if (*ctxt).current_byte() != 0 {

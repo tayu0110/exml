@@ -56,8 +56,7 @@ use crate::{
 };
 
 use super::{
-    XmlParserInput, XmlParserNodeInfo, XmlParserNodeInfoSeq, parse_pe_reference,
-    parser_entity_check, xml_err_memory, xml_fatal_err,
+    XmlParserInput, XmlParserNodeInfo, XmlParserNodeInfoSeq, xml_err_memory, xml_fatal_err,
 };
 
 /// The parser context.
@@ -747,7 +746,7 @@ impl XmlParserCtxt {
                         {
                             break;
                         }
-                        parse_pe_reference(self);
+                        self.parse_pe_reference();
                     } else if self.current_byte() == 0 {
                         let mut consumed: u64;
 
@@ -770,7 +769,7 @@ impl XmlParserCtxt {
                             self.sizeentities = self.sizeentities.saturating_add(consumed);
                         }
 
-                        parser_entity_check(self, consumed);
+                        self.parser_entity_check(consumed);
 
                         self.pop_input();
                     } else {

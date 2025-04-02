@@ -42,10 +42,7 @@ use crate::{
         },
         xmlstring::XmlChar,
     },
-    parser::{
-        XmlParserCtxtPtr, XmlParserInput, build_qname, parse_external_subset, split_qname,
-        xml_err_memory,
-    },
+    parser::{XmlParserCtxtPtr, XmlParserInput, build_qname, split_qname, xml_err_memory},
     tree::{
         __XML_REGISTER_CALLBACKS, NodeCommon, XmlAttr, XmlAttributeDefault, XmlAttributeType,
         XmlDocProperties, XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr,
@@ -369,7 +366,7 @@ pub unsafe fn xml_sax2_external_subset(
             }
 
             // let's parse that entity knowing it's an external subset.
-            parse_external_subset(&mut *ctxt, external_id, system_id);
+            (*ctxt).parse_external_subset(external_id, system_id);
 
             // Free up the external entities
             while (*ctxt).input_tab.len() > 1 {
@@ -1330,7 +1327,7 @@ unsafe fn xml_sax2_attribute_internal(
     value: Option<&str>,
     prefix: Option<&str>,
 ) {
-    use crate::{parser::string_decode_entities, uri::XmlURI};
+    use crate::uri::XmlURI;
 
     unsafe {
         use super::htmltree::html_is_boolean_attr;
@@ -1421,14 +1418,8 @@ unsafe fn xml_sax2_attribute_internal(
 
             if (*ctxt).replace_entities == 0 {
                 (*ctxt).depth += 1;
-                let value = string_decode_entities(
-                    &mut *ctxt,
-                    &val,
-                    XML_SUBSTITUTE_REF as _,
-                    '\0',
-                    '\0',
-                    '\0',
-                );
+                let value =
+                    (*ctxt).string_decode_entities(&val, XML_SUBSTITUTE_REF as _, '\0', '\0', '\0');
                 (*ctxt).depth -= 1;
                 let Some(value) = value else {
                     xml_sax2_err_memory(ctxt, "xmlSAX2StartElement");
@@ -1490,8 +1481,7 @@ unsafe fn xml_sax2_attribute_internal(
 
             if !(*ctxt).replace_entities != 0 {
                 (*ctxt).depth += 1;
-                let value = string_decode_entities(
-                    &mut *ctxt,
+                let value = (*ctxt).string_decode_entities(
                     &val,
                     XML_SUBSTITUTE_REF as i32,
                     '\0',
@@ -1650,8 +1640,7 @@ unsafe fn xml_sax2_attribute_internal(
                 // done on a value with replaced entities anyway.
                 if (*ctxt).replace_entities == 0 {
                     (*ctxt).depth += 1;
-                    let val = string_decode_entities(
-                        &mut *ctxt,
+                    let val = (*ctxt).string_decode_entities(
                         &CStr::from_ptr(value as *const i8).to_string_lossy(),
                         XML_SUBSTITUTE_REF as i32,
                         '\0',
@@ -2359,14 +2348,11 @@ unsafe fn xml_sax2_text_node(ctxt: XmlParserCtxtPtr, s: &str) -> Option<XmlNodeP
 #[doc(alias = "xmlSAX2DecodeAttrEntities")]
 #[cfg(feature = "libxml_valid")]
 unsafe fn xml_sax2_decode_attr_entities(ctxt: XmlParserCtxtPtr, s: &str) -> Option<String> {
-    use crate::parser::string_decode_entities;
-
     unsafe {
         let pos = s.find('&')?;
         let s = &s[pos..];
         (*ctxt).depth += 1;
-        let ret =
-            string_decode_entities(&mut *ctxt, s, XML_SUBSTITUTE_REF as i32, '\0', '\0', '\0');
+        let ret = (*ctxt).string_decode_entities(s, XML_SUBSTITUTE_REF as i32, '\0', '\0', '\0');
         (*ctxt).depth -= 1;
         ret
     }
