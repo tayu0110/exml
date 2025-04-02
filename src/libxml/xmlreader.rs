@@ -454,26 +454,20 @@ impl XmlTextReader {
                         self.ctxt = xml_create_push_parser_ctxt(
                             (*self.ctxt).sax.take(),
                             None,
-                            self.input
+                            &self
+                                .input
                                 .as_mut()
                                 .unwrap()
                                 .buffer
                                 .expect("Internal Error")
-                                .as_ref()
-                                .as_ptr() as _,
-                            4,
+                                .as_ref()[..4],
                             url,
                         );
                         self.base = 0;
                         self.cur = 4;
                     } else {
-                        self.ctxt = xml_create_push_parser_ctxt(
-                            (*self.ctxt).sax.take(),
-                            None,
-                            null_mut(),
-                            0,
-                            url,
-                        );
+                        self.ctxt =
+                            xml_create_push_parser_ctxt((*self.ctxt).sax.take(), None, b"", url);
                         self.base = 0;
                         self.cur = 0;
                     }
@@ -573,7 +567,7 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderRead")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn read(&mut self) -> i32 {
-        use crate::parser::{XmlParserInputState, xml_parse_chunk};
+        use crate::parser::XmlParserInputState;
 
         unsafe {
             use crate::{
@@ -808,7 +802,7 @@ impl XmlTextReader {
                             )
                         {
                             if self.mode != XmlTextReaderMode::XmlTextreaderModeEof {
-                                val = xml_parse_chunk(self.ctxt, c"".as_ptr() as _, 0, 1);
+                                val = (*self.ctxt).parse_chunk(b"", 1);
                                 self.state = XmlTextReaderState::Done;
                                 if val != 0 {
                                     return -1;
@@ -1316,11 +1310,8 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderPushData")]
     #[cfg(feature = "libxml_reader")]
     unsafe fn push_data(&mut self) -> i32 {
-        use crate::parser::xml_parse_chunk;
-
         unsafe {
             let mut val: i32;
-            let mut s: i32;
 
             if self.input.is_none() || self.input.as_ref().unwrap().buffer.is_none() {
                 return -1;
@@ -1360,10 +1351,8 @@ impl XmlTextReader {
                 // parse by block of CHUNK_SIZE bytes, various tests show that
                 // it's the best tradeoff at least on a 1.2GH Duron
                 if inbuf.len() >= self.cur as usize + CHUNK_SIZE {
-                    val = xml_parse_chunk(
-                        self.ctxt,
-                        inbuf.as_ref().as_ptr().add(self.cur as usize) as _,
-                        CHUNK_SIZE as _,
+                    val = (*self.ctxt).parse_chunk(
+                        &inbuf.as_ref()[self.cur as usize..self.cur as usize + CHUNK_SIZE],
                         0,
                     );
                     self.cur += CHUNK_SIZE as u32;
@@ -1374,13 +1363,8 @@ impl XmlTextReader {
                         break;
                     }
                 } else {
-                    s = inbuf.len() as i32 - self.cur as i32;
-                    val = xml_parse_chunk(
-                        self.ctxt,
-                        inbuf.as_ref().as_ptr().add(self.cur as usize) as _,
-                        s,
-                        0,
-                    );
+                    let s = inbuf.len() as i32 - self.cur as i32;
+                    val = (*self.ctxt).parse_chunk(&inbuf.as_ref()[self.cur as usize..], 0);
                     self.cur += s as u32;
                     if val != 0 {
                         (*self.ctxt).well_formed = 0;
@@ -1399,18 +1383,11 @@ impl XmlTextReader {
                         self.cur -= val as u32;
                     }
                 }
-            }
-            // At the end of the stream signal that the work is done to the Push parser.
-            else if self.mode == XmlTextReaderMode::XmlTextreaderModeEof
+            } else if self.mode == XmlTextReaderMode::XmlTextreaderModeEof
                 && self.state != XmlTextReaderState::Done
             {
-                s = (inbuf.len() - self.cur as usize) as i32;
-                val = xml_parse_chunk(
-                    self.ctxt,
-                    inbuf.as_ref().as_ptr().add(self.cur as usize) as _,
-                    s,
-                    1,
-                );
+                // At the end of the stream signal that the work is done to the Push parser.
+                val = (*self.ctxt).parse_chunk(&inbuf.as_ref()[self.cur as usize..], 1);
                 self.cur = inbuf.len() as _;
                 self.state = XmlTextReaderState::Done;
                 if val != 0 {
@@ -4046,22 +4023,19 @@ pub unsafe fn xml_new_text_reader(
             (*ret).ctxt = xml_create_push_parser_ctxt(
                 Some(Box::new(sax)),
                 None,
-                (*ret)
+                &(*ret)
                     .input
                     .as_ref()
                     .unwrap()
                     .buffer
                     .expect("Internal Error")
-                    .as_ref()
-                    .as_ptr() as _,
-                4,
+                    .as_ref()[..4],
                 uri,
             );
             (*ret).base = 0;
             (*ret).cur = 4;
         } else {
-            (*ret).ctxt =
-                xml_create_push_parser_ctxt(Some(Box::new(sax)), None, null_mut(), 0, uri);
+            (*ret).ctxt = xml_create_push_parser_ctxt(Some(Box::new(sax)), None, b"", uri);
             (*ret).base = 0;
             (*ret).cur = 0;
         }

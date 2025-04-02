@@ -1645,7 +1645,7 @@ unsafe fn push_parse_test(
         use exml::{
             encoding::XmlCharEncoding,
             libxml::htmlparser::{html_create_push_parser_ctxt, html_parse_chunk},
-            parser::{xml_create_push_parser_ctxt, xml_parse_chunk},
+            parser::xml_create_push_parser_ctxt,
         };
 
         let mut base: *const c_char = null();
@@ -1677,11 +1677,14 @@ unsafe fn push_parse_test(
                 XmlCharEncoding::None,
             )
         } else {
-            xml_create_push_parser_ctxt(None, None, base.add(cur as _), chunk_size, Some(filename))
+            let chunk = from_raw_parts(base.add(cur as usize) as *const u8, chunk_size as usize);
+            xml_create_push_parser_ctxt(None, None, chunk, Some(filename))
         };
         #[cfg(not(feature = "html"))]
-        let ctxt =
-            xml_create_push_parser_ctxt(None, None, base.add(cur as _), chunk_size, filename);
+        let ctxt = {
+            let chunk = from_raw_parts(base.add(cur as usize) as *const u8, chunk_size as usize);
+            xml_create_push_parser_ctxt(None, None, chunk, filename)
+        };
         (*ctxt).use_options(options);
         cur += chunk_size;
         chunk_size = 1024;
@@ -1691,11 +1694,19 @@ unsafe fn push_parse_test(
                 if options & XML_PARSE_HTML != 0 {
                     html_parse_chunk(ctxt, base.add(cur as _), size - cur, 1);
                 } else {
-                    xml_parse_chunk(ctxt, base.add(cur as _), size - cur, 1);
+                    let chunk = from_raw_parts(
+                        base.add(cur as usize) as *const u8,
+                        size as usize - cur as usize,
+                    );
+                    (*ctxt).parse_chunk(chunk, 1);
                 }
                 #[cfg(not(feature = "html"))]
                 {
-                    xml_parse_chunk(ctxt, base.add(cur as _), size - cur, 1);
+                    let chunk = from_raw_parts(
+                        base.add(cur as usize) as *const u8,
+                        size as usize - cur as usize,
+                    );
+                    (*ctxt).parse_chunk(chunk, 1);
                 }
                 break 'b;
             } else {
@@ -1703,11 +1714,15 @@ unsafe fn push_parse_test(
                 if options & XML_PARSE_HTML != 0 {
                     html_parse_chunk(ctxt, base.add(cur as _), chunk_size, 0);
                 } else {
-                    xml_parse_chunk(ctxt, base.add(cur as _), chunk_size, 0);
+                    let chunk =
+                        from_raw_parts(base.add(cur as usize) as *const u8, chunk_size as usize);
+                    (*ctxt).parse_chunk(chunk, 0);
                 }
                 #[cfg(not(feature = "html"))]
                 {
-                    xml_parse_chunk(ctxt, base.add(cur as _), chunk_size, 0);
+                    let chunk =
+                        from_raw_parts(base.add(cur as usize) as *const u8, chunk_size as usize);
+                    (*ctxt).parse_chunk(chunk, 0);
                 }
                 cur += chunk_size;
             }
@@ -1964,7 +1979,7 @@ unsafe fn push_boundary_test(
     err: Option<String>,
     options: i32,
 ) -> i32 {
-    use exml::parser::{xml_create_push_parser_ctxt, xml_parse_chunk};
+    use exml::parser::xml_create_push_parser_ctxt;
 
     unsafe {
         use exml::{
@@ -2008,8 +2023,8 @@ unsafe fn push_boundary_test(
         #[cfg(not(feature = "html"))]
         {
             xml_sax_version(addr_of_mut!(bndSAX) as _, 2);
-            bndSAX.startElementNs = Some(start_element_ns_bnd);
-            bndSAX.endElementNs = Some(end_element_ns_bnd);
+            bnd_sax.start_element_ns = Some(start_element_ns_bnd);
+            bnd_sax.end_element_ns = Some(end_element_ns_bnd);
         }
 
         bnd_sax.internal_subset = Some(internal_subset_bnd);
@@ -2036,7 +2051,12 @@ unsafe fn push_boundary_test(
                 XmlCharEncoding::None,
             )
         } else {
-            xml_create_push_parser_ctxt(Some(Box::new(bnd_sax)), None, base, 1, Some(filename))
+            xml_create_push_parser_ctxt(
+                Some(Box::new(bnd_sax)),
+                None,
+                &[*base as u8],
+                Some(filename),
+            )
         };
         #[cfg(not(feature = "html"))]
         let ctxt =
@@ -2051,9 +2071,8 @@ unsafe fn push_boundary_test(
             let mut is_text: i32 = 0;
 
             if (*ctxt).instate == XmlParserInputState::XmlParserContent {
-                let first_char: i32 = if (*ctxt).input().unwrap().end > (*ctxt).input().unwrap().cur
-                {
-                    *(*ctxt).input().unwrap().cur as i32
+                let first_char: i32 = if !(*ctxt).content_bytes().is_empty() {
+                    (*ctxt).content_bytes()[0] as i32
                 } else {
                     *base.add(cur as usize) as i32
                 };
@@ -2081,11 +2100,11 @@ unsafe fn push_boundary_test(
             if options & XML_PARSE_HTML != 0 {
                 html_parse_chunk(ctxt, base.add(cur as _), 1, terminate);
             } else {
-                xml_parse_chunk(ctxt, base.add(cur as _), 1, terminate);
+                (*ctxt).parse_chunk(&[*base.add(cur as _) as u8], terminate);
             }
             #[cfg(not(feature = "html"))]
             {
-                xml_parse_chunk(ctxt, base.add(cur as _), 1, terminate);
+                (*ctxt).parse_chunk(&[*base.add(cur as _) as u8], terminate);
             }
             cur += 1;
 

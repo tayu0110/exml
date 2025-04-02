@@ -619,7 +619,7 @@ impl XmlParserCtxt {
         }
     }
 
-    pub(crate) unsafe fn content_bytes(&self) -> &[u8] {
+    pub unsafe fn content_bytes(&self) -> &[u8] {
         unsafe {
             let len = self.input().unwrap().remainder_len();
             from_raw_parts(self.input().unwrap().cur, len)
@@ -968,7 +968,7 @@ impl XmlParserCtxt {
     //
     // Returns the namespace name or NULL if not bound
     #[doc(alias = "xmlGetNamespace")]
-    pub(super) unsafe fn get_namespace(&self, prefix: Option<&str>) -> Option<&str> {
+    pub(crate) unsafe fn get_namespace(&self, prefix: Option<&str>) -> Option<&str> {
         if prefix == self.str_xml.as_deref() {
             return self.str_xml_ns.as_deref();
         }

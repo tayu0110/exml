@@ -28,7 +28,6 @@ use std::{
     borrow::Cow,
     cell::{Cell, RefCell},
     collections::VecDeque,
-    ffi::c_char,
     io::{self, Write},
     os::raw::c_void,
     ptr::null_mut,
@@ -49,7 +48,7 @@ use crate::{
     list::XmlList,
     parser::{
         XML_DEFAULT_VERSION, XmlParserCtxtPtr, XmlParserInputState, xml_create_push_parser_ctxt,
-        xml_free_parser_ctxt, xml_parse_chunk,
+        xml_free_parser_ctxt,
     },
     save::attr_serialize_text_content,
     tree::{XmlDocPtr, XmlNodePtr, xml_encode_special_chars, xml_free_doc, xml_new_doc},
@@ -231,7 +230,7 @@ impl<'a> XmlTextWriter<'a> {
             sax_handler.end_element = Some(xml_sax2_end_element);
 
             let ctxt: XmlParserCtxtPtr =
-                xml_create_push_parser_ctxt(Some(Box::new(sax_handler)), None, null_mut(), 0, None);
+                xml_create_push_parser_ctxt(Some(Box::new(sax_handler)), None, b"", None);
             if ctxt.is_null() {
                 xml_writer_err_msg(
                     None,
@@ -293,7 +292,7 @@ impl<'a> XmlTextWriter<'a> {
             sax_handler.end_element = Some(xml_sax2_end_element);
 
             let ctxt: XmlParserCtxtPtr =
-                xml_create_push_parser_ctxt(Some(Box::new(sax_handler)), None, null_mut(), 0, None);
+                xml_create_push_parser_ctxt(Some(Box::new(sax_handler)), None, b"", None);
             if ctxt.is_null() {
                 xml_writer_err_msg(
                     None,
@@ -2109,15 +2108,11 @@ macro_rules! xml_writer_err_msg_int {
 ///
 /// Returns -1, 0, 1
 #[doc(alias = "xmlTextWriterWriteDocCallback")]
-unsafe fn xml_text_writer_write_doc_callback(
-    context: *mut c_void,
-    str: *const c_char,
-    len: i32,
-) -> i32 {
+unsafe fn xml_text_writer_write_doc_callback(context: *mut c_void, s: &[u8]) -> i32 {
     unsafe {
         let ctxt: XmlParserCtxtPtr = context as XmlParserCtxtPtr;
 
-        let rc = xml_parse_chunk(ctxt, str, len, 0);
+        let rc = (*ctxt).parse_chunk(s, 0);
         if rc != 0 {
             xml_writer_err_msg_int!(
                 null_mut(),
@@ -2128,7 +2123,7 @@ unsafe fn xml_text_writer_write_doc_callback(
             return -1;
         }
 
-        len
+        s.len() as i32
     }
 }
 
@@ -2142,7 +2137,7 @@ unsafe fn xml_text_writer_close_doc_callback(context: *mut c_void) -> i32 {
         let rc: i32;
 
         let res = {
-            rc = xml_parse_chunk(ctxt, null_mut(), 0, 1);
+            rc = (*ctxt).parse_chunk(&[], 1);
             rc != 0
         };
         if res {
@@ -2165,9 +2160,7 @@ struct TextWriterPushContext {
 
 impl Write for TextWriterPushContext {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        let ptr = buf.as_ptr() as *const i8;
-        let len = buf.len() as i32;
-        let res = unsafe { xml_text_writer_write_doc_callback(self.context as _, ptr, len) };
+        let res = unsafe { xml_text_writer_write_doc_callback(self.context as _, buf) };
         if res >= 0 {
             Ok(res as usize)
         } else {

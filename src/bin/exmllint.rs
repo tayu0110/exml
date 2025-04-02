@@ -84,8 +84,7 @@ use exml::{
     parser::{
         XmlParserCtxtPtr, XmlParserInput, XmlParserOption, xml_create_push_parser_ctxt,
         xml_ctxt_read_file, xml_ctxt_read_io, xml_ctxt_read_memory, xml_free_parser_ctxt,
-        xml_new_parser_ctxt, xml_new_sax_parser_ctxt, xml_parse_chunk, xml_read_file, xml_read_io,
-        xml_read_memory,
+        xml_new_parser_ctxt, xml_new_sax_parser_ctxt, xml_read_file, xml_read_io, xml_read_memory,
     },
     relaxng::{
         xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt, xml_relaxng_new_parser_ctxt,
@@ -2574,14 +2573,18 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                     let ret: i32;
                     let mut res: i32;
                     let size: i32 = 1024;
-                    let mut chars: [c_char; 1024] = [0; 1024];
+                    let mut chars: [u8; 1024] = [0; 1024];
                     let ctxt: XmlParserCtxtPtr;
 
                     // if (repeat) size = 1024;
                     res = fread(chars.as_mut_ptr() as _, 1, 4, f) as _;
                     if res > 0 {
-                        ctxt =
-                            xml_create_push_parser_ctxt(None, None, chars.as_ptr(), res, filename);
+                        ctxt = xml_create_push_parser_ctxt(
+                            None,
+                            None,
+                            &chars[..res as usize],
+                            filename,
+                        );
                         if ctxt.is_null() {
                             PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
                             if f != stdin {
@@ -2594,9 +2597,9 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                             res = fread(chars.as_mut_ptr() as _, 1, size as _, f) as i32;
                             res > 0
                         } {
-                            xml_parse_chunk(ctxt, chars.as_ptr(), res, 0);
+                            (*ctxt).parse_chunk(&chars[..res as usize], 0);
                         }
-                        xml_parse_chunk(ctxt, chars.as_ptr(), 0, 1);
+                        (*ctxt).parse_chunk(b"", 1);
                         doc = (*ctxt).my_doc;
                         ret = (*ctxt).well_formed;
                         xml_free_parser_ctxt(ctxt);

@@ -744,28 +744,6 @@ pub unsafe fn xml_parse_balanced_chunk_memory(
     unsafe { xml_parse_balanced_chunk_memory_recover(doc, sax, user_data, depth, string, lst, 0) }
 }
 
-// Lookup the namespace name for the @prefix (which ca be NULL)
-// The prefix must come from the @(*ctxt).dict dictionary
-//
-// Returns the namespace name or NULL if not bound
-#[doc(alias = "xmlGetNamespace")]
-unsafe fn xml_get_namespace(ctxt: XmlParserCtxtPtr, prefix: Option<&str>) -> Option<String> {
-    unsafe {
-        if prefix == (*ctxt).str_xml.as_deref() {
-            return (*ctxt).str_xml_ns.as_deref().map(|ns| ns.to_owned());
-        }
-        for (pre, href) in (*ctxt).ns_tab.iter().rev() {
-            if pre.as_deref() == prefix {
-                if prefix.is_none() && href.is_empty() {
-                    return None;
-                }
-                return Some(href.clone());
-            }
-        }
-        None
-    }
-}
-
 /// Parse a well-balanced chunk of an XML document
 /// within the context (DTD, namespaces, etc ...) of the given node.
 ///
@@ -883,7 +861,7 @@ pub unsafe fn xml_parse_in_node_context(
             {
                 let mut ns = now.ns_def;
                 while let Some(cur_ns) = ns {
-                    if xml_get_namespace(ctxt, cur_ns.prefix().as_deref()).is_none() {
+                    if (*ctxt).get_namespace(cur_ns.prefix().as_deref()).is_none() {
                         (*ctxt).ns_push(cur_ns.prefix().as_deref(), &cur_ns.href().unwrap());
                         nsnr += 1;
                     }

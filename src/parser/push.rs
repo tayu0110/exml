@@ -1,4 +1,4 @@
-use std::{cell::RefCell, ptr::null_mut, rc::Rc, slice::from_raw_parts, str::from_utf8_unchecked};
+use std::{cell::RefCell, ptr::null_mut, rc::Rc, str::from_utf8_unchecked};
 
 use libc::strncmp;
 
@@ -1009,159 +1009,141 @@ impl XmlParserCtxt {
             0
         }
     }
-}
 
-/// Parse a Chunk of memory
-///
-/// Returns zero if no error, the xmlParserErrors otherwise.
-#[doc(alias = "xmlParseChunk")]
-pub unsafe fn xml_parse_chunk(
-    ctxt: XmlParserCtxtPtr,
-    chunk: *const i8,
-    mut size: i32,
-    terminate: i32,
-) -> i32 {
-    unsafe {
-        let mut end_in_lf: i32 = 0;
+    /// Parse a Chunk of memory
+    ///
+    /// Returns zero if no error, the xmlParserErrors otherwise.
+    #[doc(alias = "xmlParseChunk")]
+    pub unsafe fn parse_chunk(&mut self, mut chunk: &[u8], terminate: i32) -> i32 {
+        unsafe {
+            let mut end_in_lf: i32 = 0;
 
-        if ctxt.is_null() {
-            return XmlParserErrors::XmlErrInternalError as i32;
-        }
-        if (*ctxt).err_no != XmlParserErrors::XmlErrOK as i32 && (*ctxt).disable_sax == 1 {
-            return (*ctxt).err_no;
-        }
-        if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-            return -1;
-        }
-        if (*ctxt).input().is_none() {
-            return -1;
-        }
-
-        (*ctxt).progressive = 1;
-        if matches!((*ctxt).instate, XmlParserInputState::XmlParserStart) {
-            (*ctxt).detect_sax2();
-        }
-        if size > 0
-            && !chunk.is_null()
-            && terminate == 0
-            && *chunk.add(size as usize - 1) == b'\r' as i8
-        {
-            end_in_lf = 1;
-            size -= 1;
-        }
-
-        if size > 0
-            && !chunk.is_null()
-            && (*ctxt).input().is_some()
-            && (*ctxt).input().unwrap().buf.is_some()
-            && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
-        {
-            let base: usize = (*ctxt).input().unwrap().get_base();
-            let cur = (*ctxt).input().unwrap().offset_from_base();
-
-            let res: i32 = (*ctxt)
-                .input_mut()
-                .unwrap()
-                .buf
-                .as_mut()
-                .unwrap()
-                .borrow_mut()
-                .push_bytes(from_raw_parts(chunk as *const u8, size as usize));
-            (*ctxt).input_mut().unwrap().set_base_and_cursor(base, cur);
-            if res < 0 {
-                (*ctxt).err_no = XmlParserInputState::XmlParserEOF as i32;
-                (*ctxt).halt();
-                return XmlParserInputState::XmlParserEOF as i32;
+            if self.err_no != XmlParserErrors::XmlErrOK as i32 && self.disable_sax == 1 {
+                return self.err_no;
             }
-        } else if !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
-            && ((*ctxt).input().is_some() && (*ctxt).input().unwrap().buf.is_some())
-        {
-            let input = (*ctxt).input_mut().unwrap().buf.as_mut().unwrap();
-            if input.borrow().encoder.is_some()
-                && input.borrow().buffer.is_some()
-                && input.borrow().raw.is_some()
-            {
-                let base: usize = (*ctxt).input().unwrap().get_base();
-                let current = (*ctxt).input().unwrap().offset_from_base();
+            if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+                return -1;
+            }
+            if self.input().is_none() {
+                return -1;
+            }
 
-                let res = input.borrow_mut().decode(terminate != 0);
-                (*ctxt)
+            self.progressive = 1;
+            if matches!(self.instate, XmlParserInputState::XmlParserStart) {
+                self.detect_sax2();
+            }
+            if terminate == 0 {
+                if let Some(rem) = chunk.strip_suffix(b"\r") {
+                    end_in_lf = 1;
+                    chunk = rem;
+                }
+            }
+
+            if !chunk.is_empty()
+                && self.input().is_some()
+                && self.input().unwrap().buf.is_some()
+                && !matches!(self.instate, XmlParserInputState::XmlParserEOF)
+            {
+                let base: usize = self.input().unwrap().get_base();
+                let cur = self.input().unwrap().offset_from_base();
+
+                let res: i32 = self
                     .input_mut()
                     .unwrap()
-                    .set_base_and_cursor(base, current);
-                if res.is_err() {
-                    // TODO 2.6.0
-                    generic_error!("xmlParseChunk: encoder error\n");
-                    (*ctxt).halt();
-                    return XmlParserErrors::XmlErrInvalidEncoding as i32;
+                    .buf
+                    .as_mut()
+                    .unwrap()
+                    .borrow_mut()
+                    .push_bytes(chunk);
+                self.input_mut().unwrap().set_base_and_cursor(base, cur);
+                if res < 0 {
+                    self.err_no = XmlParserInputState::XmlParserEOF as i32;
+                    self.halt();
+                    return XmlParserInputState::XmlParserEOF as i32;
                 }
-            }
-        }
-
-        (*ctxt).parse_try_or_finish(terminate);
-        if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-            return (*ctxt).err_no;
-        }
-
-        if (*ctxt).input().is_some_and(|input| {
-            input.remainder_len() > XML_MAX_LOOKUP_LIMIT
-                || input.offset_from_base() > XML_MAX_LOOKUP_LIMIT
-        }) && (*ctxt).options & XmlParserOption::XmlParseHuge as i32 == 0
-        {
-            xml_fatal_err(
-                &mut *ctxt,
-                XmlParserErrors::XmlErrInternalError,
-                Some(format!("Huge input lookup: {}:{}", file!(), line!()).as_str()),
-            );
-            (*ctxt).halt();
-        }
-        if (*ctxt).err_no != XmlParserErrors::XmlErrOK as i32 && (*ctxt).disable_sax == 1 {
-            return (*ctxt).err_no;
-        }
-
-        if end_in_lf == 1 && (*ctxt).input().is_some() && (*ctxt).input().unwrap().buf.is_some() {
-            let base: usize = (*ctxt).input().unwrap().get_base();
-            let current = (*ctxt).input().unwrap().offset_from_base();
-
-            (*ctxt)
-                .input_mut()
-                .unwrap()
-                .buf
-                .as_mut()
-                .unwrap()
-                .borrow_mut()
-                .push_bytes(b"\r");
-            (*ctxt)
-                .input_mut()
-                .unwrap()
-                .set_base_and_cursor(base, current);
-        }
-        if terminate != 0 {
-            // Check for termination
-            if !matches!(
-                (*ctxt).instate,
-                XmlParserInputState::XmlParserEOF | XmlParserInputState::XmlParserEpilog
-            ) {
-                xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrDocumentEnd, None);
-            }
-            if matches!((*ctxt).instate, XmlParserInputState::XmlParserEpilog)
-                && !(*ctxt).content_bytes().is_empty()
+            } else if !matches!(self.instate, XmlParserInputState::XmlParserEOF)
+                && (self.input().is_some() && self.input().unwrap().buf.is_some())
             {
-                xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrDocumentEnd, None);
-            }
-            if !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-                if let Some(end_document) =
-                    (*ctxt).sax.as_deref_mut().and_then(|sax| sax.end_document)
+                let input = self.input().unwrap().buf.as_deref().unwrap();
+                if input.borrow().encoder.is_some()
+                    && input.borrow().buffer.is_some()
+                    && input.borrow().raw.is_some()
                 {
-                    end_document((*ctxt).user_data.clone());
+                    let base: usize = self.input().unwrap().get_base();
+                    let current = self.input().unwrap().offset_from_base();
+
+                    let res = input.borrow_mut().decode(terminate != 0);
+                    self.input_mut().unwrap().set_base_and_cursor(base, current);
+                    if res.is_err() {
+                        // TODO 2.6.0
+                        generic_error!("xmlParseChunk: encoder error\n");
+                        self.halt();
+                        return XmlParserErrors::XmlErrInvalidEncoding as i32;
+                    }
                 }
             }
-            (*ctxt).instate = XmlParserInputState::XmlParserEOF;
-        }
-        if (*ctxt).well_formed == 0 {
-            (*ctxt).err_no
-        } else {
-            0
+
+            self.parse_try_or_finish(terminate);
+            if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+                return self.err_no;
+            }
+
+            if self.input().is_some_and(|input| {
+                input.remainder_len() > XML_MAX_LOOKUP_LIMIT
+                    || input.offset_from_base() > XML_MAX_LOOKUP_LIMIT
+            }) && self.options & XmlParserOption::XmlParseHuge as i32 == 0
+            {
+                xml_fatal_err(
+                    &mut *self,
+                    XmlParserErrors::XmlErrInternalError,
+                    Some(format!("Huge input lookup: {}:{}", file!(), line!()).as_str()),
+                );
+                self.halt();
+            }
+            if self.err_no != XmlParserErrors::XmlErrOK as i32 && self.disable_sax == 1 {
+                return self.err_no;
+            }
+
+            if end_in_lf == 1 && self.input().is_some() && self.input().unwrap().buf.is_some() {
+                let base: usize = self.input().unwrap().get_base();
+                let current = self.input().unwrap().offset_from_base();
+
+                self.input_mut()
+                    .unwrap()
+                    .buf
+                    .as_mut()
+                    .unwrap()
+                    .borrow_mut()
+                    .push_bytes(b"\r");
+                self.input_mut().unwrap().set_base_and_cursor(base, current);
+            }
+            if terminate != 0 {
+                // Check for termination
+                if !matches!(
+                    self.instate,
+                    XmlParserInputState::XmlParserEOF | XmlParserInputState::XmlParserEpilog
+                ) {
+                    xml_fatal_err(&mut *self, XmlParserErrors::XmlErrDocumentEnd, None);
+                }
+                if matches!(self.instate, XmlParserInputState::XmlParserEpilog)
+                    && !self.content_bytes().is_empty()
+                {
+                    xml_fatal_err(&mut *self, XmlParserErrors::XmlErrDocumentEnd, None);
+                }
+                if !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+                    if let Some(end_document) =
+                        self.sax.as_deref_mut().and_then(|sax| sax.end_document)
+                    {
+                        end_document(self.user_data.clone());
+                    }
+                }
+                self.instate = XmlParserInputState::XmlParserEOF;
+            }
+            if self.well_formed == 0 {
+                self.err_no
+            } else {
+                0
+            }
         }
     }
 }
@@ -1179,8 +1161,7 @@ pub unsafe fn xml_parse_chunk(
 pub unsafe fn xml_create_push_parser_ctxt(
     sax: Option<Box<XmlSAXHandler>>,
     user_data: Option<GenericErrorContext>,
-    chunk: *const i8,
-    size: i32,
+    chunk: &[u8],
     filename: Option<&str>,
 ) -> XmlParserCtxtPtr {
     use crate::parser::XmlParserInput;
@@ -1223,11 +1204,7 @@ pub unsafe fn xml_create_push_parser_ctxt(
         // that it can be automatically determined later
         (*ctxt).charset = XmlCharEncoding::None;
 
-        if size != 0
-            && !chunk.is_null()
-            && (*ctxt).input().is_some()
-            && (*ctxt).input().unwrap().buf.is_some()
-        {
+        if !chunk.is_empty() && (*ctxt).input().is_some_and(|input| input.buf.is_some()) {
             let base: usize = (*ctxt).input().unwrap().get_base();
             let cur = (*ctxt).input().unwrap().offset_from_base();
 
@@ -1238,7 +1215,7 @@ pub unsafe fn xml_create_push_parser_ctxt(
                 .as_mut()
                 .unwrap()
                 .borrow_mut()
-                .push_bytes(from_raw_parts(chunk as *const u8, size as usize));
+                .push_bytes(chunk);
             (*ctxt).input_mut().unwrap().set_base_and_cursor(base, cur);
         }
 
