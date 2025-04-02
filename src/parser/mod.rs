@@ -45,6 +45,7 @@
 mod context;
 mod error;
 mod input;
+mod legacy;
 mod node_info;
 mod parse;
 mod qname;
@@ -65,6 +66,7 @@ use crate::{
 pub use context::*;
 pub(crate) use error::*;
 pub use input::*;
+pub use legacy::*;
 pub use node_info::*;
 pub(crate) use parse::*;
 pub use qname::*;
@@ -426,15 +428,12 @@ pub(crate) fn check_language_id(lang: &str) -> bool {
 /// Returns the resulting document tree
 #[doc(alias = "xmlReadDoc")]
 pub unsafe fn xml_read_doc(
-    cur: *const u8,
+    cur: Vec<u8>,
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
 ) -> Option<XmlDocPtr> {
     unsafe {
-        if cur.is_null() {
-            return None;
-        }
         xml_init_parser();
 
         let ctxt: XmlParserCtxtPtr = xml_create_doc_parser_ctxt(cur);

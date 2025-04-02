@@ -56,7 +56,7 @@ use exml::{
         htmltree::html_doc_dump_memory,
         parser::{
             XML_SAX2_MAGIC, XmlSAXHandler, XmlSAXLocatorPtr, xml_cleanup_parser, xml_init_parser,
-            xml_parse_file, xml_set_external_entity_loader,
+            xml_set_external_entity_loader,
         },
         relaxng::XmlRelaxNGPtr,
         xmlmemory::{
@@ -69,7 +69,7 @@ use exml::{
     },
     parser::{
         XmlParserCtxtPtr, XmlParserInput, XmlParserOption, xml_create_file_parser_ctxt,
-        xml_free_parser_ctxt, xml_read_file, xml_read_memory,
+        xml_free_parser_ctxt, xml_parse_file, xml_read_file, xml_read_memory,
     },
     relaxng::xml_relaxng_init_types,
     tree::{

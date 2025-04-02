@@ -19,7 +19,6 @@ use crate::{
     libxml::{
         globals::xml_free,
         htmlparser::{HtmlParserCtxtPtr, html_free_parser_ctxt},
-        parser::XmlFeature,
         relaxng::XmlRelaxNGPtr,
         schemas_internals::{XmlSchemaFacetPtr, XmlSchemaValType},
         valid::xml_free_element_content,
@@ -406,24 +405,6 @@ pub(crate) fn gen_xml_char(no: i32, _nr: i32) -> XmlChar {
 }
 
 pub(crate) fn des_xml_char(_no: i32, _val: XmlChar, _nr: i32) {}
-
-pub(crate) fn gen_xml_feature(no: i32, _nr: i32) -> Option<XmlFeature> {
-    if no == 1 {
-        return Some(XmlFeature::XmlWithAutomata);
-    }
-    if no == 2 {
-        return Some(XmlFeature::XmlWithC14n);
-    }
-    if no == 3 {
-        return Some(XmlFeature::XmlWithCatalog);
-    }
-    if no == 4 {
-        return Some(XmlFeature::XmlWithDebug);
-    }
-    None
-}
-
-pub(crate) fn des_xml_feature(_no: i32, _val: Option<XmlFeature>, _nr: i32) {}
 
 pub(crate) unsafe fn desret_xml_parser_ctxt_ptr(val: XmlParserCtxtPtr) {
     unsafe {

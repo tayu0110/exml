@@ -16,8 +16,9 @@ use exml::{
     },
     libxml::{
         catalog::{xml_catalog_cleanup, xml_load_catalog},
-        parser::{xml_cleanup_parser, xml_init_parser, xml_parse_file},
+        parser::{xml_cleanup_parser, xml_init_parser},
     },
+    parser::xml_parse_file,
     tree::xml_free_doc,
 };
 use libc::{pthread_create, pthread_join, pthread_t};
@@ -81,7 +82,7 @@ extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
         #[cfg(feature = "sax1")]
         let my_doc = xml_parse_file(Some(filename));
         #[cfg(not(feature = "sax1"))]
-        let my_doc = xmlReadFile(filename, NULL, XML_WITH_CATALOG);
+        let my_doc = xml_read_file(filename, NULL, XML_WITH_CATALOG);
         if let Some(my_doc) = my_doc {
             xml_free_doc(my_doc);
         } else {
