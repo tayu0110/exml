@@ -1,6 +1,6 @@
 use std::{cell::RefCell, ptr::null_mut, rc::Rc, slice::from_raw_parts, str::from_utf8};
 
-use libc::{strncmp, strstr};
+use libc::strncmp;
 
 use crate::{
     encoding::{XmlCharEncoding, detect_encoding},
@@ -97,48 +97,45 @@ impl XmlParserCtxt {
             }
         }
     }
-}
 
-/// Check whether the input buffer contains a string.
-#[doc(alias = "xmlParseLookupString")]
-unsafe fn xml_parse_lookup_string(
-    ctxt: XmlParserCtxtPtr,
-    start_delta: usize,
-    str: *const i8,
-    str_len: usize,
-) -> *const u8 {
-    unsafe {
-        let cur = if (*ctxt).check_index == 0 {
-            (*ctxt).input().unwrap().cur.add(start_delta)
-        } else {
-            (*ctxt)
-                .input()
-                .unwrap()
-                .cur
-                .add((*ctxt).check_index as usize)
-        };
-
-        let term: *const u8 = strstr(cur as _, str) as _;
-        if term.is_null() {
-            let mut end: *const u8 = (*ctxt).input().unwrap().end;
-
-            // Rescan (strLen - 1) characters.
-            if end.offset_from(cur) < str_len as isize {
-                end = cur;
+    /// Check whether the input buffer contains a string.
+    ///
+    /// If found, return buffer which start with `s` wrapped `Some`,
+    /// otherwise return `None`.
+    #[doc(alias = "xmlParseLookupString")]
+    unsafe fn parse_lookup_string<'a>(
+        &'a mut self,
+        start_delta: usize,
+        s: &str,
+    ) -> Option<&'a [u8]> {
+        unsafe {
+            let cur = if self.check_index == 0 {
+                &self.content_bytes()[start_delta..]
             } else {
-                end = end.sub(str_len - 1);
-            }
-            let index: usize = end.offset_from((*ctxt).input().unwrap().cur) as _;
-            if index > i64::MAX as usize {
-                (*ctxt).check_index = 0;
-                return (*ctxt).input().unwrap().end.sub(str_len);
-            }
-            (*ctxt).check_index = index as _;
-        } else {
-            (*ctxt).check_index = 0;
-        }
+                &self.content_bytes()[self.check_index as usize..]
+            };
+            let len = cur.len();
 
-        term
+            if let Some(term) = cur.windows(s.len()).position(|chunk| chunk == s.as_bytes()) {
+                self.check_index = 0;
+                let cur = self.content_bytes().windows(len).next_back().unwrap();
+                Some(&cur[term..])
+            } else {
+                // Rescan (strLen - 1) characters.
+                let end = if cur.len() < s.len() {
+                    cur
+                } else {
+                    cur.windows(s.len() - 1).next_back().unwrap()
+                };
+                let index = self.content_bytes().len() - end.len();
+                if index > i64::MAX as usize {
+                    self.check_index = 0;
+                    return self.content_bytes().windows(s.len()).next_back();
+                }
+                self.check_index = index as _;
+                None
+            }
+        }
     }
 }
 
@@ -405,10 +402,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                                 // goto done;
                                 return ret;
                             }
-                            if terminate == 0
-                                && xml_parse_lookup_string(ctxt, 2, c"?>".as_ptr() as _, 2)
-                                    .is_null()
-                            {
+                            if terminate == 0 && (*ctxt).parse_lookup_string(2, "?>").is_none() {
                                 // goto done;
                                 return ret;
                             }
@@ -637,10 +631,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                             (*ctxt).instate = XmlParserInputState::XmlParserEndTag;
                             break 'to_break;
                         } else if cur == b'<' && next == b'?' {
-                            if terminate == 0
-                                && xml_parse_lookup_string(ctxt, 2, c"?>".as_ptr() as _, 2)
-                                    .is_null()
-                            {
+                            if terminate == 0 && (*ctxt).parse_lookup_string(2, "?>").is_none() {
                                 // goto done;
                                 return ret;
                             }
@@ -650,10 +641,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                             (*ctxt).instate = XmlParserInputState::XmlParserStartTag;
                             break 'to_break;
                         } else if (*ctxt).content_bytes().starts_with(b"<!--") {
-                            if terminate == 0
-                                && xml_parse_lookup_string(ctxt, 4, c"-->".as_ptr() as _, 3)
-                                    .is_null()
-                            {
+                            if terminate == 0 && (*ctxt).parse_lookup_string(4, "-->").is_none() {
                                 // goto done;
                                 return ret;
                             }
@@ -734,12 +722,67 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                         let term = if terminate != 0 {
                             // Don't call xmlParseLookupString. If 'terminate'
                             // is set, checkIndex is invalid.
-                            strstr((*ctxt).input().unwrap().cur as _, c"]]>".as_ptr() as _) as _
+                            let target = b"]]>".as_slice();
+                            (*ctxt)
+                                .content_bytes()
+                                .windows(target.len())
+                                .position(|s| s == target)
+                                .map(|pos| &(*ctxt).content_bytes()[pos..])
                         } else {
-                            xml_parse_lookup_string(ctxt, 0, c"]]>".as_ptr() as _, 3)
+                            (*ctxt).parse_lookup_string(0, "]]>")
                         };
 
-                        if term.is_null() {
+                        if let Some(term) = term {
+                            let base = (*ctxt).content_bytes().len() - term.len();
+
+                            match check_cdata_push(&(*ctxt).content_bytes()[..base], true) {
+                                Ok(tmp) if tmp == base => {}
+                                Ok(tmp) | Err(tmp) => {
+                                    (*ctxt).input_mut().unwrap().cur =
+                                        (*ctxt).input().unwrap().cur.add(tmp);
+                                    break 'encoding_error;
+                                }
+                            }
+                            if (*ctxt).disable_sax == 0 {
+                                if let Some(cdata_block) = (*ctxt)
+                                    .sax
+                                    .as_deref_mut()
+                                    .filter(|_| base == 0)
+                                    .and_then(|sax| sax.cdata_block)
+                                {
+                                    // Special case to provide identical behaviour
+                                    // between pull and push parsers on enpty CDATA sections
+                                    if (*ctxt).input().unwrap().offset_from_base() >= 9
+                                        && strncmp(
+                                            (*ctxt).input().unwrap().cur.sub(9) as _,
+                                            c"<![CDATA[".as_ptr() as _,
+                                            9,
+                                        ) == 0
+                                    {
+                                        cdata_block((*ctxt).user_data.clone(), "");
+                                    }
+                                } else if let Some(sax) =
+                                    (*ctxt).sax.as_deref_mut().filter(|_| base > 0)
+                                {
+                                    let s = from_utf8(from_raw_parts(
+                                        (*ctxt).input().unwrap().cur,
+                                        base,
+                                    ))
+                                    .expect("Internal Error");
+                                    if let Some(cdata_block) = sax.cdata_block {
+                                        cdata_block((*ctxt).user_data.clone(), s);
+                                    } else if let Some(characters) = sax.characters {
+                                        characters((*ctxt).user_data.clone(), s);
+                                    }
+                                }
+                            }
+                            if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
+                                // goto done;
+                                return ret;
+                            }
+                            (*ctxt).advance_with_line_handling(base + 3);
+                            (*ctxt).instate = XmlParserInputState::XmlParserContent;
+                        } else {
                             let size = if terminate != 0 {
                                 // Unfinished CDATA section
                                 (*ctxt).input().unwrap().remainder_len()
@@ -780,56 +823,6 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                                 return ret;
                             }
                             (*ctxt).advance_with_line_handling(tmp as usize);
-                        } else {
-                            let base = term.offset_from((*ctxt).input().unwrap().cur) as usize;
-
-                            match check_cdata_push(&(*ctxt).content_bytes()[..base], true) {
-                                Ok(tmp) if tmp == base => {}
-                                Ok(tmp) | Err(tmp) => {
-                                    (*ctxt).input_mut().unwrap().cur =
-                                        (*ctxt).input().unwrap().cur.add(tmp);
-                                    break 'encoding_error;
-                                }
-                            }
-                            if (*ctxt).disable_sax == 0 {
-                                if let Some(cdata_block) = (*ctxt)
-                                    .sax
-                                    .as_deref_mut()
-                                    .filter(|_| base == 0)
-                                    .and_then(|sax| sax.cdata_block)
-                                {
-                                    // Special case to provide identical behaviour
-                                    // between pull and push parsers on enpty CDATA sections
-                                    if (*ctxt).input().unwrap().offset_from_base() >= 9
-                                        && strncmp(
-                                            (*ctxt).input().unwrap().cur.sub(9) as _,
-                                            c"<![CDATA[".as_ptr() as _,
-                                            9,
-                                        ) == 0
-                                    {
-                                        cdata_block((*ctxt).user_data.clone(), "");
-                                    }
-                                } else if let Some(sax) =
-                                    (*ctxt).sax.as_deref_mut().filter(|_| base > 0)
-                                {
-                                    let s = from_utf8(from_raw_parts(
-                                        (*ctxt).input().unwrap().cur,
-                                        base as usize,
-                                    ))
-                                    .expect("Internal Error");
-                                    if let Some(cdata_block) = sax.cdata_block {
-                                        cdata_block((*ctxt).user_data.clone(), s);
-                                    } else if let Some(characters) = sax.characters {
-                                        characters((*ctxt).user_data.clone(), s);
-                                    }
-                                }
-                            }
-                            if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-                                // goto done;
-                                return ret;
-                            }
-                            (*ctxt).advance_with_line_handling(base as usize + 3);
-                            (*ctxt).instate = XmlParserInputState::XmlParserContent;
                         }
                     }
                     XmlParserInputState::XmlParserMisc
@@ -844,10 +837,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                         cur = *(*ctxt).input().unwrap().cur.add(0);
                         next = *(*ctxt).input().unwrap().cur.add(1);
                         if cur == b'<' && next == b'?' {
-                            if terminate == 0
-                                && xml_parse_lookup_string(ctxt, 2, c"?>".as_ptr() as _, 2)
-                                    .is_null()
-                            {
+                            if terminate == 0 && (*ctxt).parse_lookup_string(2, "?>").is_none() {
                                 // goto done;
                                 return ret;
                             }
@@ -857,10 +847,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                                 return ret;
                             }
                         } else if (*ctxt).content_bytes().starts_with(b"<!--") {
-                            if terminate == 0
-                                && xml_parse_lookup_string(ctxt, 4, c"-->".as_ptr() as _, 3)
-                                    .is_null()
-                            {
+                            if terminate == 0 && (*ctxt).parse_lookup_string(4, "-->").is_none() {
                                 // goto done;
                                 return ret;
                             }
