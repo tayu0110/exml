@@ -54,8 +54,7 @@ use crate::{
         parser::{
             CDATABlockSAXFunc, CharactersSAXFunc, EndElementNsSAX2Func, EndElementSAXFunc,
             StartElementNsSAX2Func, StartElementSAXFunc, XML_COMPLETE_ATTRS, XML_DETECT_IDS,
-            XML_SAX2_MAGIC, XmlParserMode, XmlSAXHandler, xml_create_push_parser_ctxt,
-            xml_parse_chunk,
+            XML_SAX2_MAGIC, XmlParserMode, XmlSAXHandler,
         },
         relaxng::{
             XmlRelaxNGPtr, xml_relaxng_free, xml_relaxng_parse, xml_relaxng_set_valid_errors,
@@ -366,7 +365,7 @@ impl XmlTextReader {
         encoding: Option<&str>,
         mut options: i32,
     ) -> i32 {
-        use crate::parser::XmlParserInput;
+        use crate::parser::{XmlParserInput, xml_create_push_parser_ctxt};
 
         unsafe {
             use std::{cell::RefCell, rc::Rc};
@@ -574,7 +573,7 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderRead")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn read(&mut self) -> i32 {
-        use crate::parser::XmlParserInputState;
+        use crate::parser::{XmlParserInputState, xml_parse_chunk};
 
         unsafe {
             use crate::{
@@ -1317,6 +1316,8 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderPushData")]
     #[cfg(feature = "libxml_reader")]
     unsafe fn push_data(&mut self) -> i32 {
+        use crate::parser::xml_parse_chunk;
+
         unsafe {
             let mut val: i32;
             let mut s: i32;
@@ -3975,6 +3976,8 @@ pub unsafe fn xml_new_text_reader(
     input: XmlParserInputBuffer,
     uri: Option<&str>,
 ) -> XmlTextReaderPtr {
+    use crate::parser::xml_create_push_parser_ctxt;
+
     unsafe {
         use std::ptr::drop_in_place;
 

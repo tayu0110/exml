@@ -433,43 +433,6 @@ impl XmlParserCtxt {
         }
     }
 
-    /// Check whether the input buffer contains a character.
-    #[doc(alias = "xmlParseLookupChar")]
-    pub(crate) unsafe fn parse_lookup_char(&mut self, c: u8) -> i32 {
-        unsafe {
-            let cur = &self.content_bytes()[self.check_index.max(1) as usize..];
-
-            if !cur.contains(&c) {
-                if cur.len() > i64::MAX as usize {
-                    self.check_index = 0;
-                    1
-                } else {
-                    self.check_index = cur.len() as i64;
-                    0
-                }
-            } else {
-                self.check_index = 0;
-                1
-            }
-        }
-    }
-
-    /// Check whether the input buffer contains terminated c_char data.
-    #[doc(alias = "xmlParseLookupCharData")]
-    pub(crate) unsafe fn parse_lookup_char_data(&mut self) -> i32 {
-        unsafe {
-            let cur = &self.content_bytes()[self.check_index as usize..];
-
-            if cur.contains(&b'<') || cur.contains(&b'&') || cur.len() > i64::MAX as usize {
-                self.check_index = 0;
-                1
-            } else {
-                self.check_index = cur.len() as i64;
-                0
-            }
-        }
-    }
-
     /// Parse escaped pure raw content. Always consumes '<!['.
     ///
     /// ```text
@@ -569,41 +532,4 @@ impl XmlParserCtxt {
             }
         }
     }
-}
-
-/// Check that the block of characters is okay as SCdata content [20]
-///
-/// Returns the number of bytes to pass if okay, a negative index where an
-/// UTF-8 error occurred otherwise
-#[doc(alias = "xmlCheckCdataPush")]
-#[cfg(feature = "libxml_push")]
-pub(crate) fn check_cdata_push(utf: &[u8], complete: bool) -> Result<usize, usize> {
-    use std::str::{from_utf8, from_utf8_unchecked};
-
-    if utf.is_empty() {
-        return Ok(0);
-    }
-
-    let s = match from_utf8(utf) {
-        Ok(s) => s,
-        Err(e) => {
-            let s = unsafe {
-                // # Safety
-                // Refer to the document of `from_utf8` and `Utf8Error`.
-                from_utf8_unchecked(&utf[..e.valid_up_to()])
-            };
-            // If `complete` is `true`, it is invalid not to reach the end.
-            // If `e.error_len().is_some()` is `true`,
-            // it is still invalid because it contains an invalid byte sequence.
-            if complete || e.error_len().is_some() {
-                return Err(s.find(|c: char| !xml_is_char(c as u32)).unwrap_or(s.len()));
-            }
-            s
-        }
-    };
-
-    // Even a valid UTF-8 sequence may contain characters
-    // that do not conform to the XML specification.
-    s.find(|c: char| !xml_is_char(c as u32))
-        .map_or(Ok(s.len()), Err)
 }

@@ -54,7 +54,6 @@ mod reference;
 mod xmldecl;
 
 pub(crate) use attribute::*;
-pub(crate) use cdata::*;
 pub(crate) use entity::*;
 
 use crate::{

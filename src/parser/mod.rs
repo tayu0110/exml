@@ -48,6 +48,8 @@ mod input;
 mod legacy;
 mod node_info;
 mod parse;
+mod push;
+#[cfg(feature = "libxml_push")]
 mod qname;
 
 use std::{cell::RefCell, ffi::CStr, io::Read, rc::Rc};
@@ -69,6 +71,8 @@ pub use input::*;
 pub use legacy::*;
 pub use node_info::*;
 pub(crate) use parse::*;
+pub use push::*;
+#[cfg(feature = "libxml_push")]
 pub use qname::*;
 
 pub(crate) trait XmlParserCharValid {

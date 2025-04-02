@@ -1644,10 +1644,8 @@ unsafe fn push_parse_test(
     unsafe {
         use exml::{
             encoding::XmlCharEncoding,
-            libxml::{
-                htmlparser::{html_create_push_parser_ctxt, html_parse_chunk},
-                parser::{xml_create_push_parser_ctxt, xml_parse_chunk},
-            },
+            libxml::htmlparser::{html_create_push_parser_ctxt, html_parse_chunk},
+            parser::{xml_create_push_parser_ctxt, xml_parse_chunk},
         };
 
         let mut base: *const c_char = null();
@@ -1966,13 +1964,15 @@ unsafe fn push_boundary_test(
     err: Option<String>,
     options: i32,
 ) -> i32 {
+    use exml::parser::{xml_create_push_parser_ctxt, xml_parse_chunk};
+
     unsafe {
         use exml::{
             encoding::XmlCharEncoding,
             libxml::{
                 htmlparser::{html_create_push_parser_ctxt, html_parse_chunk},
                 htmltree::html_doc_dump_memory,
-                parser::{XmlSAXHandler, xml_create_push_parser_ctxt, xml_parse_chunk},
+                parser::XmlSAXHandler,
                 sax2::{xml_sax_version, xml_sax2_init_html_default_sax_handler},
             },
             parser::XmlParserInputState,
