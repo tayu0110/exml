@@ -23,7 +23,6 @@ use std::{
     ffi::{CStr, CString, c_void},
     mem::replace,
     ptr::{null, null_mut},
-    slice::from_raw_parts,
     sync::atomic::Ordering,
 };
 
@@ -347,8 +346,7 @@ pub unsafe fn xml_sax2_external_subset(
 
             // On the fly encoding conversion if needed
             if (*ctxt).input().unwrap().length >= 4 {
-                let input = from_raw_parts((*ctxt).input().unwrap().cur, 4);
-                let enc = detect_encoding(input);
+                let enc = detect_encoding(&(*ctxt).content_bytes()[..4]);
                 (*ctxt).switch_encoding(enc);
             }
 

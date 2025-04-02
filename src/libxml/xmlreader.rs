@@ -3798,11 +3798,7 @@ unsafe fn xml_text_reader_start_element(
             if let Some(start_element) = (*reader).start_element {
                 start_element(ctx, fullname, atts);
                 if let Some(mut node) = (*ctxt).node.filter(|_| {
-                    (*ctxt).input().is_some_and(|input| {
-                        !input.cur.is_null()
-                            && *input.cur.add(0) == b'/'
-                            && *input.cur.add(1) == b'>'
-                    })
+                    (*ctxt).input().is_some() && (*ctxt).content_bytes().starts_with(b"/>")
                 }) {
                     node.extra = NODE_IS_EMPTY as _;
                 }
@@ -3866,11 +3862,7 @@ unsafe fn xml_text_reader_start_element_ns(
                     attributes,
                 );
                 if let Some(mut node) = (*ctxt).node.filter(|_| {
-                    (*ctxt).input().is_some_and(|input| {
-                        !input.cur.is_null()
-                            && *input.cur.add(0) == b'/'
-                            && *input.cur.add(1) == b'>'
-                    })
+                    (*ctxt).input().is_some() && (*ctxt).content_bytes().starts_with(b"/>")
                 }) {
                     node.extra = NODE_IS_EMPTY as _;
                 }

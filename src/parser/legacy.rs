@@ -557,8 +557,6 @@ pub(crate) unsafe fn xml_sax_parse_dtd(
     };
 
     unsafe {
-        use std::slice::from_raw_parts;
-
         use crate::parser::{xml_free_parser_ctxt, xml_new_sax_parser_ctxt};
 
         if external_id.is_none() && system_id.is_none() {
@@ -597,8 +595,7 @@ pub(crate) unsafe fn xml_sax_parse_dtd(
             return None;
         }
         if (*ctxt).input().unwrap().remainder_len() >= 4 {
-            let input = from_raw_parts((*ctxt).input().unwrap().cur, 4);
-            let enc = detect_encoding(input);
+            let enc = detect_encoding(&(*ctxt).content_bytes()[..4]);
             (*ctxt).switch_encoding(enc);
         }
 

@@ -5445,9 +5445,9 @@ unsafe fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) -> i32 {
             // Assume it's a fixed length encoding (1) with
             // a compatible encoding for the ASCII set, since
             // HTML constructs only use < 128 chars
-            if *(*ctxt).input().unwrap().cur < 0x80 {
+            if (*ctxt).current_byte() < 0x80 {
                 *len = 1;
-                if *(*ctxt).input().unwrap().cur == 0 && !(*ctxt).content_bytes().is_empty() {
+                if (*ctxt).current_byte() == 0 && !(*ctxt).content_bytes().is_empty() {
                     html_parse_err_int!(
                         ctxt,
                         XmlParserErrors::XmlErrInvalidChar,
@@ -5456,7 +5456,7 @@ unsafe fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) -> i32 {
                     );
                     return b' ' as _;
                 }
-                return *(*ctxt).input().unwrap().cur as _;
+                return (*ctxt).current_byte() as _;
             }
 
             // Humm this is bad, do an automatic flow conversion
@@ -5559,7 +5559,7 @@ unsafe fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) -> i32 {
                 }
                 return val as _;
             } else {
-                if *(*ctxt).input().unwrap().cur == 0 && !(*ctxt).content_bytes().is_empty() {
+                if (*ctxt).current_byte() == 0 && !(*ctxt).content_bytes().is_empty() {
                     html_parse_err_int!(
                         ctxt,
                         XmlParserErrors::XmlErrInvalidChar,
@@ -5571,7 +5571,7 @@ unsafe fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) -> i32 {
                 }
                 // 1-byte code
                 *len = 1;
-                return *(*ctxt).input().unwrap().cur as _;
+                return (*ctxt).current_byte() as _;
             }
         }
 
@@ -5585,22 +5585,15 @@ unsafe fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) -> i32 {
             let mut buffer = String::new();
 
             if (*ctxt).input().unwrap().remainder_len() >= 4 {
+                let content = (*ctxt).content_bytes();
                 writeln!(
                     buffer,
                     "Bytes: 0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}",
-                    *(*ctxt).input().unwrap().cur.add(0) as u32,
-                    *(*ctxt).input().unwrap().cur.add(1) as u32,
-                    *(*ctxt).input().unwrap().cur.add(2) as u32,
-                    *(*ctxt).input().unwrap().cur.add(3) as u32,
+                    content[0] as u32, content[1] as u32, content[2] as u32, content[3] as u32,
                 )
                 .ok();
             } else {
-                writeln!(
-                    buffer,
-                    "Bytes: 0x{:02X}",
-                    *(*ctxt).input().unwrap().cur.add(0) as u32,
-                )
-                .ok();
+                writeln!(buffer, "Bytes: 0x{:02X}", (*ctxt).current_byte() as u32,).ok();
             }
             html_parse_err(
                 ctxt,
@@ -5632,7 +5625,7 @@ unsafe fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) -> i32 {
             (*ctxt).switch_encoding(XmlCharEncoding::ISO8859_1);
         }
         *len = 1;
-        *(*ctxt).input().unwrap().cur as _
+        (*ctxt).current_byte() as _
     }
 }
 
