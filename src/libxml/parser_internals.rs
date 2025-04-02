@@ -38,8 +38,8 @@ use crate::{
         xmlstring::XmlChar,
     },
     parser::{
-        XmlParserCtxtPtr, parse_comment, parse_content, parse_pi, xml_create_memory_parser_ctxt,
-        xml_err_encoding_int, xml_fatal_err, xml_fatal_err_msg, xml_free_parser_ctxt,
+        XmlParserCtxtPtr, parse_content, xml_create_memory_parser_ctxt, xml_err_encoding_int,
+        xml_fatal_err, xml_fatal_err_msg, xml_free_parser_ctxt,
     },
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlDocProperties, XmlElementType, XmlGenericNodePtr,
@@ -245,7 +245,7 @@ pub(crate) unsafe fn xml_parse_balanced_chunk_memory_internal(
         (*ctxt).atts_special = (*oldctxt).atts_special;
 
         parse_content(&mut *ctxt);
-        if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1) == b'/' {
+        if (*ctxt).content_bytes().starts_with(b"</") {
             xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrNotWellBalanced, None);
         } else if (*ctxt).current_byte() != 0 {
             xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrExtraContent, None);
@@ -316,27 +316,6 @@ pub(crate) unsafe fn xml_parse_balanced_chunk_memory_internal(
         }
 
         ret
-    }
-}
-
-/// Parse an XML Misc* optional field.
-///
-/// `[27] Misc ::= Comment | PI |  S`
-#[doc(alias = "xmlParseMisc")]
-pub(crate) unsafe fn xml_parse_misc(ctxt: XmlParserCtxtPtr) {
-    unsafe {
-        #[allow(clippy::while_immutable_condition)]
-        while !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-            (*ctxt).skip_blanks();
-            (*ctxt).grow();
-            if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1) == b'?' {
-                parse_pi(&mut *ctxt);
-            } else if (*ctxt).content_bytes().starts_with(b"<!--") {
-                parse_comment(&mut *ctxt);
-            } else {
-                break;
-            }
-        }
     }
 }
 

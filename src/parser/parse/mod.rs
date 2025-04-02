@@ -64,3 +64,29 @@ pub(crate) use names::*;
 pub(crate) use pi::*;
 pub(crate) use reference::*;
 pub(crate) use xmldecl::*;
+
+use crate::libxml::parser::XmlParserInputState;
+
+use super::XmlParserCtxt;
+
+/// Parse an XML Misc* optional field.
+///
+/// ```text
+/// [27] Misc ::= Comment | PI |  S
+/// ```
+#[doc(alias = "xmlParseMisc")]
+pub(crate) unsafe fn parse_misc(ctxt: &mut XmlParserCtxt) {
+    unsafe {
+        while !matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
+            ctxt.skip_blanks();
+            ctxt.grow();
+            if ctxt.content_bytes().starts_with(b"<?") {
+                parse_pi(&mut *ctxt);
+            } else if ctxt.content_bytes().starts_with(b"<!--") {
+                parse_comment(&mut *ctxt);
+            } else {
+                break;
+            }
+        }
+    }
+}
