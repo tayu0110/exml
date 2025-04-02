@@ -172,103 +172,95 @@ impl XmlParserCtxt {
             0
         }
     }
-}
 
-/// Check whether there's enough data in the input buffer to finish parsing the internal subset.
-#[doc(alias = "xmlParseLookupInternalSubset")]
-unsafe fn xml_parse_lookup_internal_subset(ctxt: XmlParserCtxtPtr) -> i32 {
-    unsafe {
-        // Sorry, but progressive parsing of the internal subset is not
-        // supported. We first check that the full content of the internal
-        // subset is available and parsing is launched only at that point.
-        // Internal subset ends with "']' S? '>'" in an unescaped section and
-        // not in a ']]>' sequence which are conditional sections.
-        let mut cur: *const u8;
-        let mut start: *const u8;
-        let end: *const u8 = (*ctxt).input().unwrap().end;
-        let mut state: i32 = (*ctxt).end_check_state;
+    /// Check whether there's enough data in the input buffer to finish parsing the internal subset.
+    #[doc(alias = "xmlParseLookupInternalSubset")]
+    unsafe fn lookup_internal_subset(&mut self) -> i32 {
+        unsafe {
+            // Sorry, but progressive parsing of the internal subset is not
+            // supported. We first check that the full content of the internal
+            // subset is available and parsing is launched only at that point.
+            // Internal subset ends with "']' S? '>'" in an unescaped section and
+            // not in a ']]>' sequence which are conditional sections.
 
-        if (*ctxt).check_index == 0 {
-            cur = (*ctxt).input().unwrap().cur.add(1);
-        } else {
-            cur = (*ctxt)
-                .input()
-                .unwrap()
-                .cur
-                .add((*ctxt).check_index as usize);
-        }
-        start = cur;
-
-        while cur < end {
-            if state == b'-' as i32 {
-                if *cur == b'-' && *cur.add(1) == b'-' && *cur.add(2) == b'>' {
-                    state = 0;
-                    cur = cur.add(3);
-                    start = cur;
-                    continue;
-                }
-            } else if state == b']' as i32 {
-                if *cur == b'>' {
-                    (*ctxt).check_index = 0;
-                    (*ctxt).end_check_state = 0;
-                    return 1;
-                }
-                if xml_is_blank_char(*cur as u32) {
-                    state = b' ' as i32;
-                } else if *cur != b']' {
-                    state = 0;
-                    start = cur;
-                    continue;
-                }
-            } else if state == b' ' as i32 {
-                if *cur == b'>' {
-                    (*ctxt).check_index = 0;
-                    (*ctxt).end_check_state = 0;
-                    return 1;
-                }
-                if !xml_is_blank_char(*cur as u32) {
-                    state = 0;
-                    start = cur;
-                    continue;
-                }
-            } else if state != 0 {
-                if *cur as i32 == state {
-                    state = 0;
-                    start = cur.add(1);
-                }
-            } else if *cur == b'<' {
-                if *cur.add(1) == b'!' && *cur.add(2) == b'-' && *cur.add(3) == b'-' {
-                    state = b'-' as i32;
-                    cur = cur.add(4);
-                    // Don't treat <!--> as comment
-                    start = cur;
-                    continue;
-                }
-            } else if *cur == b'"' || *cur == b'\'' || *cur == b']' {
-                state = *cur as _;
-            }
-
-            cur = cur.add(1);
-        }
-
-        // Rescan the three last characters to detect "<!--" and "-->"
-        // split across chunks.
-        if state == 0 || state == b'-' as i32 {
-            if cur.offset_from(start) < 3 {
-                cur = start;
+            let mut cur = if self.check_index == 0 {
+                &self.content_bytes()[1..]
             } else {
-                cur = cur.sub(3);
+                &self.content_bytes()[self.check_index as usize..]
+            };
+
+            let mut start = cur;
+            let mut state = self.end_check_state as u8;
+            while !cur.is_empty() {
+                if state == b'-' {
+                    if let Some(rem) = cur.strip_prefix(b"-->") {
+                        state = 0;
+                        cur = rem;
+                        start = rem;
+                        continue;
+                    }
+                } else if state == b']' {
+                    if cur[0] == b'>' {
+                        self.check_index = 0;
+                        self.end_check_state = 0;
+                        return 1;
+                    }
+                    if xml_is_blank_char(cur[0] as u32) {
+                        state = b' ';
+                    } else if cur[0] != b']' {
+                        state = 0;
+                        start = cur;
+                        continue;
+                    }
+                } else if state == b' ' {
+                    if cur[0] == b'>' {
+                        self.check_index = 0;
+                        self.end_check_state = 0;
+                        return 1;
+                    }
+                    if !xml_is_blank_char(cur[0] as u32) {
+                        state = 0;
+                        start = cur;
+                        continue;
+                    }
+                } else if state != 0 {
+                    if cur[0] == state {
+                        state = 0;
+                        start = &cur[1..];
+                    }
+                } else if let Some(rem) = cur.strip_prefix(b"<!--") {
+                    state = b'-';
+                    cur = rem;
+                    // Don't treat <!--> as comment
+                    start = rem;
+                    continue;
+                } else if matches!(cur[0], b'"' | b'\'' | b']') {
+                    state = cur[0];
+                }
+
+                cur = &cur[1..];
             }
+
+            // Rescan the three last characters to detect "<!--" and "-->"
+            // split across chunks.
+            if state == 0 || state == b'-' {
+                let diff = start.len() - cur.len();
+                if diff < 3 {
+                    cur = start;
+                } else {
+                    cur = &start[diff - 3..];
+                }
+            }
+            let index = self.content_bytes().len() - cur.len();
+            if index > i64::MAX as usize {
+                self.check_index = 0;
+                self.end_check_state = 0;
+                return 1;
+            }
+            self.check_index = index as _;
+            self.end_check_state = state as i32;
+            0
         }
-        let index: usize = cur.offset_from((*ctxt).input().unwrap().cur) as _;
-        if index > i64::MAX as usize {
-            (*ctxt).check_index = 0;
-            (*ctxt).end_check_state = 0;
-            return 1;
-        }
-        (*ctxt).check_index = index as _;
-        (*ctxt).end_check_state = state;
-        0
     }
 }
 
@@ -907,7 +899,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                         }
                     }
                     XmlParserInputState::XmlParserDTD => {
-                        if terminate == 0 && xml_parse_lookup_internal_subset(ctxt) == 0 {
+                        if terminate == 0 && (*ctxt).lookup_internal_subset() == 0 {
                             // goto done;
                             return ret;
                         }
