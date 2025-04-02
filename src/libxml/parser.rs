@@ -2918,7 +2918,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                             }
                             (*ctxt).advance_with_line_handling(tmp as usize);
                         } else {
-                            let base = term.offset_from((*ctxt).current_ptr()) as usize;
+                            let base = term.offset_from((*ctxt).input().unwrap().cur) as usize;
 
                             match check_cdata_push(&(*ctxt).content_bytes()[..base], true) {
                                 Ok(tmp) if tmp == base => {}

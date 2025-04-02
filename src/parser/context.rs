@@ -283,14 +283,6 @@ impl XmlParserCtxt {
         }
     }
 
-    pub(crate) fn current_ptr(&self) -> *const u8 {
-        self.input().unwrap().cur
-    }
-
-    pub(crate) fn base_ptr(&self) -> *const u8 {
-        self.input().unwrap().base
-    }
-
     pub fn input(&self) -> Option<&XmlParserInput> {
         self.input_tab.last()
     }
@@ -1452,14 +1444,14 @@ impl XmlParserCtxt {
 
             // Specific handling of the Byte Order Mark for UTF-16
             if matches!(
-                (*input_buf).borrow().encoder.as_ref().unwrap().name(),
+                input_buf.borrow().encoder.as_ref().unwrap().name(),
                 "UTF-16LE" | "UTF-16"
             ) && *input.cur.add(0) == 0xFF
                 && *input.cur.add(1) == 0xFE
             {
                 input.cur = input.cur.add(2);
             }
-            if (*input_buf).borrow().encoder.as_ref().unwrap().name() == "UTF-16BE"
+            if input_buf.borrow().encoder.as_ref().unwrap().name() == "UTF-16BE"
                 && *input.cur.add(0) == 0xFE
                 && *input.cur.add(1) == 0xFF
             {
@@ -1467,7 +1459,7 @@ impl XmlParserCtxt {
             }
             // Errata on XML-1.0 June 20 2001
             // Specific handling of the Byte Order Mark for UTF-8
-            if (*input_buf).borrow().encoder.as_ref().unwrap().name() == "UTF-8"
+            if input_buf.borrow().encoder.as_ref().unwrap().name() == "UTF-8"
                 && *input.cur.add(0) == 0xEF
                 && *input.cur.add(1) == 0xBB
                 && *input.cur.add(2) == 0xBF
@@ -1504,8 +1496,8 @@ impl XmlParserCtxt {
                 return -1;
             }
             let input_buf = input.buf.as_mut().unwrap();
-            let consumed = using - (*input_buf).borrow().raw.map_or(0, |raw| raw.len());
-            let rawconsumed = (*input_buf)
+            let consumed = using - input_buf.borrow().raw.map_or(0, |raw| raw.len());
+            let rawconsumed = input_buf
                 .borrow()
                 .rawconsumed
                 .saturating_add(consumed as u64);

@@ -7318,10 +7318,14 @@ unsafe fn html_parse_system_literal(ctxt: HtmlParserCtxtPtr) -> *mut XmlChar {
         let quote: i32 = (*ctxt).current_byte() as _;
         (*ctxt).skip_char();
 
-        if (*ctxt).current_ptr() < (*ctxt).base_ptr() {
+        if (*ctxt).input().unwrap().cur < (*ctxt).input().unwrap().base {
             return ret;
         }
-        let start_position: size_t = (*ctxt).current_ptr().offset_from((*ctxt).base_ptr()) as _;
+        let start_position: size_t = (*ctxt)
+            .input()
+            .unwrap()
+            .cur
+            .offset_from((*ctxt).input().unwrap().base) as _;
 
         #[allow(clippy::while_immutable_condition)]
         while (*ctxt).current_byte() != 0 && (*ctxt).current_byte() as i32 != quote {
@@ -7348,7 +7352,7 @@ unsafe fn html_parse_system_literal(ctxt: HtmlParserCtxtPtr) -> *mut XmlChar {
             );
         } else {
             if err == 0 {
-                ret = xml_strndup((*ctxt).base_ptr().add(start_position), len as _);
+                ret = xml_strndup((*ctxt).input().unwrap().base.add(start_position), len as _);
             }
             (*ctxt).skip_char();
         }
@@ -7384,10 +7388,14 @@ unsafe fn html_parse_pubid_literal(ctxt: HtmlParserCtxtPtr) -> *mut XmlChar {
         (*ctxt).skip_char();
 
         // Name ::= (Letter | '_') (NameChar)*
-        if (*ctxt).current_ptr() < (*ctxt).base_ptr() {
+        if (*ctxt).input().unwrap().cur < (*ctxt).input().unwrap().base {
             return ret;
         }
-        let start_position: size_t = (*ctxt).current_ptr().offset_from((*ctxt).base_ptr()) as _;
+        let start_position: size_t = (*ctxt)
+            .input()
+            .unwrap()
+            .cur
+            .offset_from((*ctxt).input().unwrap().base) as _;
 
         #[allow(clippy::while_immutable_condition)]
         while (*ctxt).current_byte() != 0 && (*ctxt).current_byte() as i32 != quote {
@@ -7414,7 +7422,7 @@ unsafe fn html_parse_pubid_literal(ctxt: HtmlParserCtxtPtr) -> *mut XmlChar {
             );
         } else {
             if err == 0 {
-                ret = xml_strndup((*ctxt).base_ptr().add(start_position), len as _);
+                ret = xml_strndup((*ctxt).input().unwrap().base.add(start_position), len as _);
             }
             (*ctxt).skip_char();
         }
