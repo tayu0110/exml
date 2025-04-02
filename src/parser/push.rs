@@ -63,7 +63,7 @@ pub(crate) fn check_cdata_push(utf: &[u8], complete: bool) -> Result<usize, usiz
 impl XmlParserCtxt {
     /// Check whether the input buffer contains a character.
     #[doc(alias = "xmlParseLookupChar")]
-    pub(crate) unsafe fn parse_lookup_char(&mut self, c: u8) -> i32 {
+    unsafe fn lookup_char(&mut self, c: u8) -> i32 {
         unsafe {
             let cur = &self.content_bytes()[self.check_index.max(1) as usize..];
 
@@ -84,7 +84,7 @@ impl XmlParserCtxt {
 
     /// Check whether the input buffer contains terminated char data.
     #[doc(alias = "xmlParseLookupCharData")]
-    pub(crate) unsafe fn parse_lookup_char_data(&mut self) -> i32 {
+    unsafe fn lookup_char_data(&mut self) -> i32 {
         unsafe {
             let cur = &self.content_bytes()[self.check_index as usize..];
 
@@ -103,11 +103,7 @@ impl XmlParserCtxt {
     /// If found, return buffer which start with `s` wrapped `Some`,
     /// otherwise return `None`.
     #[doc(alias = "xmlParseLookupString")]
-    unsafe fn parse_lookup_string<'a>(
-        &'a mut self,
-        start_delta: usize,
-        s: &str,
-    ) -> Option<&'a [u8]> {
+    unsafe fn lookup_string<'a>(&'a mut self, start_delta: usize, s: &str) -> Option<&'a [u8]> {
         unsafe {
             let cur = if self.check_index == 0 {
                 &self.content_bytes()[start_delta..]
@@ -137,51 +133,44 @@ impl XmlParserCtxt {
             }
         }
     }
-}
 
-/// Check whether there's enough data in the input buffer to finish parsing
-/// a start tag. This has to take quotes into account.
-#[doc(alias = "xmlParseLookupGt")]
-unsafe fn xml_parse_lookup_gt(ctxt: XmlParserCtxtPtr) -> i32 {
-    unsafe {
-        let mut cur: *const u8;
-        let end: *const u8 = (*ctxt).input().unwrap().end;
-        let mut state: i32 = (*ctxt).end_check_state;
+    /// Check whether there's enough data in the input buffer to finish parsing
+    /// a start tag. This has to take quotes into account.
+    #[doc(alias = "xmlParseLookupGt")]
+    unsafe fn lookup_gt(&mut self) -> i32 {
+        unsafe {
+            let mut cur = if self.check_index == 0 {
+                &self.content_bytes()[1..]
+            } else {
+                &self.content_bytes()[self.check_index as usize..]
+            };
 
-        if (*ctxt).check_index == 0 {
-            cur = (*ctxt).input().unwrap().cur.add(1);
-        } else {
-            cur = (*ctxt)
-                .input()
-                .unwrap()
-                .cur
-                .add((*ctxt).check_index as usize);
-        }
-
-        while cur < end {
-            if state != 0 {
-                if *cur == state as u8 {
-                    state = 0;
+            let mut state = self.end_check_state as u8;
+            while !cur.is_empty() {
+                if state != 0 {
+                    if cur[0] == state {
+                        state = 0;
+                    }
+                } else if matches!(cur[0], b'\'' | b'"') {
+                    state = cur[0];
+                } else if cur[0] == b'>' {
+                    self.check_index = 0;
+                    self.end_check_state = 0;
+                    return 1;
                 }
-            } else if *cur == b'\'' || *cur == b'"' {
-                state = *cur as _;
-            } else if *cur == b'>' {
-                (*ctxt).check_index = 0;
-                (*ctxt).end_check_state = 0;
+                cur = &cur[1..];
+            }
+
+            let index = self.content_bytes().len() - cur.len();
+            if index > i64::MAX as usize {
+                self.check_index = 0;
+                self.end_check_state = 0;
                 return 1;
             }
-            cur = cur.add(1);
+            self.check_index = index as i64;
+            self.end_check_state = state as i32;
+            0
         }
-
-        let index: usize = cur.offset_from((*ctxt).input().unwrap().cur) as _;
-        if index > i64::MAX as usize {
-            (*ctxt).check_index = 0;
-            (*ctxt).end_check_state = 0;
-            return 1;
-        }
-        (*ctxt).check_index = index as _;
-        (*ctxt).end_check_state = state;
-        0
     }
 }
 
@@ -402,7 +391,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                                 // goto done;
                                 return ret;
                             }
-                            if terminate == 0 && (*ctxt).parse_lookup_string(2, "?>").is_none() {
+                            if terminate == 0 && (*ctxt).lookup_string(2, "?>").is_none() {
                                 // goto done;
                                 return ret;
                             }
@@ -503,7 +492,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                             // goto done;
                             return ret;
                         }
-                        if terminate == 0 && xml_parse_lookup_gt(ctxt) == 0 {
+                        if terminate == 0 && (*ctxt).lookup_gt() == 0 {
                             // goto done;
                             return ret;
                         }
@@ -631,7 +620,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                             (*ctxt).instate = XmlParserInputState::XmlParserEndTag;
                             break 'to_break;
                         } else if cur == b'<' && next == b'?' {
-                            if terminate == 0 && (*ctxt).parse_lookup_string(2, "?>").is_none() {
+                            if terminate == 0 && (*ctxt).lookup_string(2, "?>").is_none() {
                                 // goto done;
                                 return ret;
                             }
@@ -641,7 +630,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                             (*ctxt).instate = XmlParserInputState::XmlParserStartTag;
                             break 'to_break;
                         } else if (*ctxt).content_bytes().starts_with(b"<!--") {
-                            if terminate == 0 && (*ctxt).parse_lookup_string(4, "-->").is_none() {
+                            if terminate == 0 && (*ctxt).lookup_string(4, "-->").is_none() {
                                 // goto done;
                                 return ret;
                             }
@@ -662,7 +651,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                             );
                             (*ctxt).advance(1);
                         } else if cur == b'&' {
-                            if terminate == 0 && (*ctxt).parse_lookup_char(b';') == 0 {
+                            if terminate == 0 && (*ctxt).lookup_char(b';') == 0 {
                                 // goto done;
                                 return ret;
                             }
@@ -680,7 +669,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                             //    callbacks between the push and pull versions
                             //    of the parser.
                             if ((*ctxt).input_tab.len() == 1 && avail < XML_PARSER_BIG_BUFFER_SIZE)
-                                && (terminate == 0 && (*ctxt).parse_lookup_char_data() == 0)
+                                && (terminate == 0 && (*ctxt).lookup_char_data() == 0)
                             {
                                 // goto done;
                                 return ret;
@@ -694,7 +683,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                             // goto done;
                             return ret;
                         }
-                        if terminate == 0 && (*ctxt).parse_lookup_char(b'>' as _) == 0 {
+                        if terminate == 0 && (*ctxt).lookup_char(b'>' as _) == 0 {
                             // goto done;
                             return ret;
                         }
@@ -729,7 +718,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                                 .position(|s| s == target)
                                 .map(|pos| &(*ctxt).content_bytes()[pos..])
                         } else {
-                            (*ctxt).parse_lookup_string(0, "]]>")
+                            (*ctxt).lookup_string(0, "]]>")
                         };
 
                         if let Some(term) = term {
@@ -837,7 +826,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                         cur = *(*ctxt).input().unwrap().cur.add(0);
                         next = *(*ctxt).input().unwrap().cur.add(1);
                         if cur == b'<' && next == b'?' {
-                            if terminate == 0 && (*ctxt).parse_lookup_string(2, "?>").is_none() {
+                            if terminate == 0 && (*ctxt).lookup_string(2, "?>").is_none() {
                                 // goto done;
                                 return ret;
                             }
@@ -847,7 +836,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                                 return ret;
                             }
                         } else if (*ctxt).content_bytes().starts_with(b"<!--") {
-                            if terminate == 0 && (*ctxt).parse_lookup_string(4, "-->").is_none() {
+                            if terminate == 0 && (*ctxt).lookup_string(4, "-->").is_none() {
                                 // goto done;
                                 return ret;
                             }
@@ -859,7 +848,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                         } else if matches!((*ctxt).instate, XmlParserInputState::XmlParserMisc)
                             && (*ctxt).content_bytes().starts_with(b"<!DOCTYPE")
                         {
-                            if terminate == 0 && xml_parse_lookup_gt(ctxt) == 0 {
+                            if terminate == 0 && (*ctxt).lookup_gt() == 0 {
                                 // goto done;
                                 return ret;
                             }
