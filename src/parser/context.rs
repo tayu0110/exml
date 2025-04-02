@@ -556,8 +556,7 @@ impl XmlParserCtxt {
 
     pub(crate) unsafe fn advance(&mut self, nth: usize) {
         unsafe {
-            let input = self.input_mut().unwrap();
-            if input.cur.add(nth) > input.end {
+            if self.content_bytes().len() < nth {
                 self.force_grow();
             }
             let input = self.input_mut().unwrap();
@@ -571,8 +570,7 @@ impl XmlParserCtxt {
     /// If `'\n'` is found, line number is also increased.
     pub(crate) unsafe fn advance_with_line_handling(&mut self, nth: usize) {
         unsafe {
-            let input = self.input().unwrap();
-            if input.cur.add(nth) > input.end {
+            if self.content_bytes().len() < nth {
                 self.force_grow();
             }
             let input = self.input_mut().unwrap();
@@ -617,8 +615,7 @@ impl XmlParserCtxt {
                 if self.force_grow() < 0 {
                     return;
                 }
-                let input = self.input().unwrap();
-                if input.cur >= input.end {
+                if self.content_bytes().is_empty() {
                     return;
                 }
             }
@@ -893,7 +890,7 @@ impl XmlParserCtxt {
                 }
             };
             if (*len > 1 && !xml_is_char(c as u32))
-                || (*len == 1 && c == '\0' && self.input().unwrap().cur < self.input().unwrap().end)
+                || (*len == 1 && c == '\0' && !self.content_bytes().is_empty())
             {
                 xml_err_encoding_int!(
                     self,
@@ -903,9 +900,8 @@ impl XmlParserCtxt {
                 );
             }
             if c == '\r' {
-                let input = self.input_mut().unwrap();
-                let next = input.cur.add(1);
-                if next < input.end && *next == b'\n' {
+                if self.content_bytes().get(1) == Some(&b'\n') {
+                    let input = self.input_mut().unwrap();
                     input.cur = input.cur.add(1);
                 }
                 return Some('\n');

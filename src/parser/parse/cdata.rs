@@ -57,13 +57,10 @@ unsafe fn are_blanks(ctxt: &mut XmlParserCtxt, s: &str, blank_chars: bool) -> bo
         }
 
         // Otherwise, heuristic :-\
-        if ctxt.current_byte() != b'<' && ctxt.current_byte() != 0xD {
+        if !matches!(ctxt.current_byte(), b'<' | 0xD) {
             return false;
         }
-        if context_node.children().is_none()
-            && ctxt.current_byte() == b'<'
-            && ctxt.nth_byte(1) == b'/'
-        {
+        if context_node.children().is_none() && ctxt.content_bytes().starts_with(b"</") {
             // index out of bound may occur at this `nth_byte` ??? It may be necessary to fix.
             return false;
         }

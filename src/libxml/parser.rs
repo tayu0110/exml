@@ -3313,7 +3313,7 @@ pub unsafe fn xml_parse_chunk(
                 xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrDocumentEnd, None);
             }
             if matches!((*ctxt).instate, XmlParserInputState::XmlParserEpilog)
-                && (*ctxt).input().unwrap().cur < (*ctxt).input().unwrap().end
+                && !(*ctxt).content_bytes().is_empty()
             {
                 xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrDocumentEnd, None);
             }

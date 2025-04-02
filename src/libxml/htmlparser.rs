@@ -5449,9 +5449,7 @@ unsafe fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) -> i32 {
             // HTML constructs only use < 128 chars
             if *(*ctxt).input().unwrap().cur < 0x80 {
                 *len = 1;
-                if *(*ctxt).input().unwrap().cur == 0
-                    && (*ctxt).input().unwrap().cur < (*ctxt).input().unwrap().end
-                {
+                if *(*ctxt).input().unwrap().cur == 0 && !(*ctxt).content_bytes().is_empty() {
                     html_parse_err_int!(
                         ctxt,
                         XmlParserErrors::XmlErrInvalidChar,
@@ -5563,9 +5561,7 @@ unsafe fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) -> i32 {
                 }
                 return val as _;
             } else {
-                if *(*ctxt).input().unwrap().cur == 0
-                    && (*ctxt).input().unwrap().cur < (*ctxt).input().unwrap().end
-                {
+                if *(*ctxt).input().unwrap().cur == 0 && !(*ctxt).content_bytes().is_empty() {
                     html_parse_err_int!(
                         ctxt,
                         XmlParserErrors::XmlErrInvalidChar,
@@ -10341,7 +10337,7 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
                         (*ctxt).check_index = 0;
                         while !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
                             && cur != b'<'
-                            && input.cur < input.end
+                            && !(*ctxt).content_bytes().is_empty()
                         {
                             if cur == b'&' {
                                 html_parse_reference(ctxt);
