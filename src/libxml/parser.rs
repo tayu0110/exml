@@ -90,10 +90,9 @@ use crate::{
         xmlstring::XmlChar,
     },
     parser::{
-        __xml_err_encoding, XmlParserCtxtPtr, XmlParserInput, check_cdata_push,
-        parse_external_entity_private, parse_misc, xml_create_memory_parser_ctxt, xml_err_memory,
-        xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_str, xml_free_parser_ctxt,
-        xml_new_sax_parser_ctxt,
+        __xml_err_encoding, XmlParserCtxtPtr, XmlParserInput, check_cdata_push, parse_misc,
+        xml_create_memory_parser_ctxt, xml_err_memory, xml_fatal_err, xml_fatal_err_msg,
+        xml_fatal_err_msg_str, xml_free_parser_ctxt, xml_new_sax_parser_ctxt,
     },
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlAttributeDefault, XmlAttributeType, XmlDocProperties,
@@ -2051,55 +2050,6 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
         xml_free_doc(new_doc);
 
         ret
-    }
-}
-
-/// Parse an external general entity within an existing parsing context
-/// An external general parsed entity is well-formed if it matches the
-/// production labeled extParsedEnt.
-///
-/// `[78] extParsedEnt ::= TextDecl? content`
-///
-/// Returns 0 if the entity is well formed, -1 in case of args problem and
-/// the parser error code otherwise
-#[doc(alias = "xmlParseCtxtExternalEntity")]
-pub unsafe fn xml_parse_ctxt_external_entity(
-    ctx: XmlParserCtxtPtr,
-    url: Option<&str>,
-    id: Option<&str>,
-    lst: Option<&mut Option<XmlGenericNodePtr>>,
-) -> i32 {
-    unsafe {
-        if ctx.is_null() {
-            return -1;
-        }
-        // If the user provided their own SAX callbacks, then reuse the
-        // userData callback field, otherwise the expected setup in a
-        // DOM builder is to have userData == ctxt
-        let user_data = if (*ctx)
-            .user_data
-            .as_ref()
-            .and_then(|d| d.lock().downcast_ref::<XmlParserCtxtPtr>().copied())
-            == Some(ctx)
-        {
-            None
-        } else {
-            (*ctx).user_data.clone()
-        };
-        let has_sax = (*ctx).sax.is_some();
-        let (sax, error) = parse_external_entity_private(
-            (*ctx).my_doc.unwrap(),
-            &mut *ctx,
-            (*ctx).sax.take(),
-            user_data,
-            (*ctx).depth + 1,
-            url,
-            id,
-            lst,
-        );
-        assert_eq!(has_sax, sax.is_some());
-        (*ctx).sax = sax;
-        error as i32
     }
 }
 

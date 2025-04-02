@@ -495,6 +495,55 @@ impl XmlParserCtxt {
             (ret, Some(buf))
         }
     }
+
+    /// Parse an external general entity within an existing parsing context
+    /// An external general parsed entity is well-formed if it matches the
+    /// production labeled extParsedEnt.
+    ///
+    /// ```text
+    /// [78] extParsedEnt ::= TextDecl? content
+    /// ```
+    ///
+    /// Returns 0 if the entity is well formed, -1 in case of args problem and
+    /// the parser error code otherwise
+    #[doc(alias = "xmlParseCtxtExternalEntity")]
+    pub unsafe fn parse_external_entity(
+        &mut self,
+        url: Option<&str>,
+        id: Option<&str>,
+        lst: Option<&mut Option<XmlGenericNodePtr>>,
+    ) -> i32 {
+        unsafe {
+            // If the user provided their own SAX callbacks, then reuse the
+            // userData callback field, otherwise the expected setup in a
+            // DOM builder is to have userData == ctxt
+            let user_data = if self
+                .user_data
+                .as_ref()
+                .and_then(|d| d.lock().downcast_ref::<*mut XmlParserCtxt>().copied())
+                == Some(self)
+            {
+                None
+            } else {
+                self.user_data.clone()
+            };
+            let has_sax = self.sax.is_some();
+            let sax = self.sax.take();
+            let (sax, error) = parse_external_entity_private(
+                self.my_doc.unwrap(),
+                self,
+                sax,
+                user_data,
+                self.depth + 1,
+                url,
+                id,
+                lst,
+            );
+            assert_eq!(has_sax, sax.is_some());
+            self.sax = sax;
+            error as i32
+        }
+    }
 }
 
 /// Private version of xmlParseExternalEntity()
