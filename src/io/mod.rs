@@ -51,9 +51,8 @@ use crate::libxml::catalog::{
 use crate::{
     encoding::find_encoding_handler,
     error::{__xml_simple_error, __xml_simple_oom_error, XmlErrorDomain, XmlParserErrors},
-    libxml::parser::XmlParserOption,
     nanohttp::XmlNanoHTTPCtxt,
-    parser::{__xml_err_encoding, XmlParserCtxtPtr, XmlParserInput},
+    parser::{__xml_err_encoding, XmlParserCtxtPtr, XmlParserInput, XmlParserOption},
     uri::canonic_path,
 };
 
@@ -355,7 +354,7 @@ macro_rules! __xml_loader_err {
 
         if ctxt.is_null()
             || (*ctxt).disable_sax == 0
-            || !matches!((*ctxt).instate, $crate::libxml::parser::XmlParserInputState::XmlParserEOF)
+            || !matches!((*ctxt).instate, $crate::parser::XmlParserInputState::XmlParserEOF)
         {
             if !ctxt.is_null() {
                 if let Some(sax) = (*ctxt).sax.as_deref_mut() {

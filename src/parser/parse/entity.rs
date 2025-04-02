@@ -9,8 +9,7 @@ use crate::{
     libxml::{
         chvalid::{xml_is_blank_char, xml_is_char},
         parser::{
-            XML_ENT_FIXED_COST, XML_PARSER_ALLOWED_EXPANSION, XML_PARSER_NON_LINEAR,
-            XmlParserInputState, XmlParserOption, XmlSAXHandler,
+            XML_ENT_FIXED_COST, XML_PARSER_ALLOWED_EXPANSION, XML_PARSER_NON_LINEAR, XmlSAXHandler,
         },
         parser_internals::{
             XML_MAX_HUGE_LENGTH, XML_MAX_TEXT_LENGTH, XML_SUBSTITUTE_PEREF, XML_SUBSTITUTE_REF,
@@ -18,8 +17,9 @@ use crate::{
         xmlstring::xml_strndup,
     },
     parser::{
-        XmlParserCtxt, XmlParserInput, xml_create_entity_parser_ctxt_internal, xml_fatal_err,
-        xml_fatal_err_msg, xml_fatal_err_msg_int, xml_free_parser_ctxt, xml_warning_msg,
+        XmlParserCtxt, XmlParserInput, XmlParserInputState, XmlParserOption,
+        xml_create_entity_parser_ctxt_internal, xml_fatal_err, xml_fatal_err_msg,
+        xml_fatal_err_msg_int, xml_free_parser_ctxt, xml_warning_msg,
     },
     tree::{
         NodeCommon, XML_ENT_EXPANDING, XML_ENT_PARSED, XML_XML_NAMESPACE, XmlDocProperties,

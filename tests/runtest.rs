@@ -55,9 +55,8 @@ use exml::{
         },
         htmltree::html_doc_dump_memory,
         parser::{
-            XML_SAX2_MAGIC, XmlParserOption, XmlSAXHandler, XmlSAXLocatorPtr, xml_cleanup_parser,
-            xml_ctxt_use_options, xml_init_parser, xml_parse_document, xml_parse_file,
-            xml_set_external_entity_loader,
+            XML_SAX2_MAGIC, XmlSAXHandler, XmlSAXLocatorPtr, xml_cleanup_parser, xml_init_parser,
+            xml_parse_file, xml_set_external_entity_loader,
         },
         relaxng::XmlRelaxNGPtr,
         xmlmemory::{
@@ -69,8 +68,8 @@ use exml::{
         xmlstring::XmlChar,
     },
     parser::{
-        XmlParserCtxtPtr, XmlParserInput, xml_create_file_parser_ctxt, xml_free_parser_ctxt,
-        xml_read_file, xml_read_memory,
+        XmlParserCtxtPtr, XmlParserInput, XmlParserOption, xml_create_file_parser_ctxt,
+        xml_free_parser_ctxt, xml_read_file, xml_read_memory,
     },
     relaxng::xml_relaxng_init_types,
     tree::{
@@ -1451,8 +1450,8 @@ unsafe fn sax_parse_test(
             let mut sax = XmlSAXHandler::default();
             std::ptr::copy(&EMPTY_SAXHANDLER_STRUCT, &mut sax, 1);
             (*ctxt).sax = Some(Box::new(sax));
-            xml_ctxt_use_options(ctxt, options);
-            xml_parse_document(ctxt);
+            (*ctxt).use_options(options);
+            (*ctxt).parse_document();
             ret = if (*ctxt).well_formed != 0 {
                 0
             } else {
@@ -1472,7 +1471,7 @@ unsafe fn sax_parse_test(
                 addr_of_mut!(EMPTY_SAXHANDLER_STRUCT),
                 sizeof(XmlSAXHandler),
             );
-            xml_ctxt_use_options(ctxt, options);
+            (*ctxt).use_options(options);
             xml_parse_document(ctxt);
             ret = if (*ctxt).wellFormed { 0 } else { (*ctxt).errNo };
             xml_free_doc((*ctxt).myDoc);
@@ -1507,8 +1506,8 @@ unsafe fn sax_parse_test(
                     std::ptr::copy(&DEBUG_SAX2_HANDLER_STRUCT, &mut sax, 1);
                 }
                 (*ctxt).sax = Some(Box::new(sax));
-                xml_ctxt_use_options(ctxt, options);
-                xml_parse_document(ctxt);
+                (*ctxt).use_options(options);
+                (*ctxt).parse_document();
                 ret = if (*ctxt).well_formed != 0 {
                     0
                 } else {
@@ -1536,7 +1535,7 @@ unsafe fn sax_parse_test(
                         size_of::<XmlSAXHandler>(),
                     );
                 }
-                xml_ctxt_use_options(ctxt, options);
+                (*ctxt).use_options(options);
                 xml_parse_document(ctxt);
                 ret = if (*ctxt).well_formed != 0 {
                     0
@@ -1685,7 +1684,7 @@ unsafe fn push_parse_test(
         #[cfg(not(feature = "html"))]
         let ctxt =
             xml_create_push_parser_ctxt(None, None, base.add(cur as _), chunk_size, filename);
-        xml_ctxt_use_options(ctxt, options);
+        (*ctxt).use_options(options);
         cur += chunk_size;
         chunk_size = 1024;
         'b: while {
@@ -1973,12 +1972,10 @@ unsafe fn push_boundary_test(
             libxml::{
                 htmlparser::{html_create_push_parser_ctxt, html_parse_chunk},
                 htmltree::html_doc_dump_memory,
-                parser::{
-                    XmlParserInputState, XmlSAXHandler, xml_create_push_parser_ctxt,
-                    xml_parse_chunk,
-                },
+                parser::{XmlSAXHandler, xml_create_push_parser_ctxt, xml_parse_chunk},
                 sax2::{xml_sax_version, xml_sax2_init_html_default_sax_handler},
             },
+            parser::XmlParserInputState,
         };
 
         let mut bnd_sax = XmlSAXHandler::default();
@@ -2044,7 +2041,7 @@ unsafe fn push_boundary_test(
         #[cfg(not(feature = "html"))]
         let ctxt =
             xml_create_push_parser_ctxt(Some(Box::new(bnd_sax)), null_mut(), base, 1, filename);
-        xml_ctxt_use_options(ctxt, options);
+        (*ctxt).use_options(options);
         cur = 1;
         consumed = 0;
         num_callbacks = 0;
@@ -4340,7 +4337,7 @@ unsafe fn load_xpath_expr(parent_doc: XmlDocPtr, filename: &str) -> XmlXPathObje
     unsafe {
         use exml::{
             globals::{set_load_ext_dtd_default_value, set_substitute_entities_default_value},
-            libxml::parser::{XML_COMPLETE_ATTRS, XML_DETECT_IDS, XmlParserOption},
+            libxml::parser::{XML_COMPLETE_ATTRS, XML_DETECT_IDS},
             tree::NodeCommon,
             xpath::{
                 XmlXPathContextPtr, internals::xml_xpath_register_ns, xml_xpath_eval_expression,
@@ -4455,7 +4452,7 @@ unsafe fn c14n_run_test(
         use exml::{
             c14n::xml_c14n_doc_dump_memory,
             globals::{set_load_ext_dtd_default_value, set_substitute_entities_default_value},
-            libxml::parser::{XML_COMPLETE_ATTRS, XML_DETECT_IDS, XmlParserOption},
+            libxml::parser::{XML_COMPLETE_ATTRS, XML_DETECT_IDS},
             xpath::xml_xpath_free_object,
         };
 

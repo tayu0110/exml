@@ -4,14 +4,13 @@ use crate::{
     error::XmlParserErrors,
     libxml::{
         chvalid::{xml_is_blank_char, xml_is_char},
-        parser::{XmlParserInputState, XmlParserOption},
         parser_internals::XML_PARSER_MAX_DEPTH,
         valid::xml_validate_root,
     },
     parser::{
-        XmlParserCtxt, XmlParserNodeInfo, xml_err_attribute_dup, xml_fatal_err, xml_fatal_err_msg,
-        xml_fatal_err_msg_int, xml_fatal_err_msg_str_int_str, xml_ns_err, xml_ns_warn,
-        xml_validity_error,
+        XmlParserCtxt, XmlParserInputState, XmlParserNodeInfo, XmlParserOption,
+        xml_err_attribute_dup, xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_int,
+        xml_fatal_err_msg_str_int_str, xml_ns_err, xml_ns_warn, xml_validity_error,
     },
     uri::XmlURI,
 };

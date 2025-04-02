@@ -56,9 +56,7 @@ use crate::{
     io::XmlParserInputBuffer,
     libxml::{
         chvalid::{xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender},
-        parser::{
-            XmlParserOption, xml_create_doc_parser_ctxt, xml_init_parser, xml_load_external_entity,
-        },
+        parser::{xml_create_doc_parser_ctxt, xml_init_parser, xml_load_external_entity},
         parser_internals::xml_is_letter,
     },
     tree::XmlDocPtr,

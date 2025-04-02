@@ -1,6 +1,6 @@
 use crate::{
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
-    libxml::parser::XmlParserInputState,
+    parser::XmlParserInputState,
 };
 
 /// Handle a fatal parser error, i.e. violating Well-Formedness constraints
@@ -171,7 +171,7 @@ macro_rules! xml_fatal_err_msg_str {
         let ctxt = $ctxt as *mut $crate::parser::XmlParserCtxt;
         if ctxt.is_null()
             || (*ctxt).disable_sax == 0
-            || !matches!((*ctxt).instate, $crate::libxml::parser::XmlParserInputState::XmlParserEOF)
+            || !matches!((*ctxt).instate, $crate::parser::XmlParserInputState::XmlParserEOF)
         {
             if !ctxt.is_null() {
                 (*ctxt).err_no = $error as i32;
@@ -225,7 +225,7 @@ macro_rules! xml_warning_msg {
 
         if ctxt.is_null()
             || (*ctxt).disable_sax == 0
-            || !matches!((*ctxt).instate, $crate::libxml::parser::XmlParserInputState::XmlParserEOF)
+            || !matches!((*ctxt).instate, $crate::parser::XmlParserInputState::XmlParserEOF)
         {
             if !ctxt.is_null()
             {
@@ -516,7 +516,7 @@ macro_rules! xml_ns_err {
         let ctxt = $ctxt as *mut $crate::parser::XmlParserCtxt;
         if ctxt.is_null()
             || (*ctxt).disable_sax == 0
-            || !matches!((*ctxt).instate, $crate::libxml::parser::XmlParserInputState::XmlParserEOF)
+            || !matches!((*ctxt).instate, $crate::parser::XmlParserInputState::XmlParserEOF)
         {
             if !ctxt.is_null() {
                 (*ctxt).err_no = $error as i32;
@@ -561,7 +561,7 @@ macro_rules! xml_err_internal {
         let ctxt = $ctxt as *mut $crate::parser::XmlParserCtxt;
         if ctxt.is_null()
             || (*ctxt).disable_sax == 0
-            || !matches!((*ctxt).instate, $crate::libxml::parser::XmlParserInputState::XmlParserEOF)
+            || !matches!((*ctxt).instate, $crate::parser::XmlParserInputState::XmlParserEOF)
         {
             if !ctxt.is_null() {
                 (*ctxt).err_no = $crate::error::XmlParserErrors::XmlErrInternalError as i32;
@@ -671,7 +671,7 @@ macro_rules! __xml_err_encoding {
         let ctxt = $ctxt as *mut $crate::parser::XmlParserCtxt;
         if ctxt.is_null()
             || (*ctxt).disable_sax == 0
-            || !matches!((*ctxt).instate, $crate::libxml::parser::XmlParserInputState::XmlParserEOF)
+            || !matches!((*ctxt).instate, $crate::parser::XmlParserInputState::XmlParserEOF)
         {
             if !ctxt.is_null() {
                 (*ctxt).err_no = $xmlerr as _;
@@ -714,7 +714,7 @@ macro_rules! xml_err_encoding_int {
             || (*ctxt).disable_sax == 0
             || !matches!(
                 (*ctxt).instate,
-                $crate::libxml::parser::XmlParserInputState::XmlParserEOF
+                $crate::parser::XmlParserInputState::XmlParserEOF
             )
         {
             if !ctxt.is_null() {

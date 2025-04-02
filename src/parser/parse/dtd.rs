@@ -8,14 +8,13 @@ use crate::{
     hash::{XmlHashTable, XmlHashTableRef},
     libxml::{
         chvalid::xml_is_blank_char,
-        parser::{SAX_COMPAT_MODE, XmlParserInputState, XmlParserOption},
         sax2::{xml_sax2_entity_decl, xml_sax2_get_entity},
         valid::{xml_free_doc_element_content, xml_new_doc_element_content},
     },
     parser::{
-        XmlParserCtxt, XmlParserInput, split_qname2, xml_err_memory, xml_err_msg_str,
-        xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_int, xml_fatal_err_msg_str, xml_ns_err,
-        xml_validity_error, xml_warning_msg,
+        XmlParserCtxt, XmlParserInput, XmlParserInputState, XmlParserOption, split_qname2,
+        xml_err_memory, xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_int,
+        xml_fatal_err_msg_str, xml_ns_err, xml_validity_error, xml_warning_msg,
     },
     tree::{
         XML_ENT_EXPANDING, XML_ENT_PARSED, XmlAttributeDefault, XmlAttributeType, XmlDocProperties,
@@ -26,7 +25,7 @@ use crate::{
     uri::XmlURI,
 };
 
-use super::attr_normalize_space;
+use super::{SAX_COMPAT_MODE, attr_normalize_space};
 
 impl XmlParserCtxt {
     /// Add a defaulted attribute for an element
@@ -95,6 +94,25 @@ impl XmlParserCtxt {
             }
 
             atts_special.add_entry2(fullname, Some(fullattr), typ).ok();
+        }
+    }
+
+    /// Trim the list of attributes defined to remove all those of type
+    /// CDATA as they are not special. This call should be done when finishing
+    /// to parse the DTD and before starting to parse the document root.
+    #[doc(alias = "xmlCleanSpecialAttr")]
+    pub(crate) fn clean_special_attr(&mut self) {
+        let Some(mut atts) = self.atts_special else {
+            return;
+        };
+
+        atts.remove_if(
+            |data, _, _, _| *data == XmlAttributeType::XmlAttributeCDATA,
+            |_, _| {},
+        );
+        if atts.is_empty() {
+            atts.free();
+            self.atts_special = None;
         }
     }
 

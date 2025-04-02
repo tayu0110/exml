@@ -43,7 +43,6 @@
 // daniel@veillard.com
 
 use std::{
-    any::type_name,
     cell::RefCell,
     ffi::{CStr, c_char, c_void},
     io::Read,
@@ -90,9 +89,10 @@ use crate::{
         xmlstring::XmlChar,
     },
     parser::{
-        __xml_err_encoding, XmlParserCtxtPtr, XmlParserInput, check_cdata_push, parse_misc,
-        xml_create_memory_parser_ctxt, xml_err_memory, xml_fatal_err, xml_fatal_err_msg,
-        xml_fatal_err_msg_str, xml_free_parser_ctxt, xml_new_sax_parser_ctxt,
+        __xml_err_encoding, XML_DEFAULT_VERSION, XmlParserCtxtPtr, XmlParserInput,
+        XmlParserInputState, XmlParserOption, check_cdata_push, xml_create_memory_parser_ctxt,
+        xml_err_memory, xml_fatal_err, xml_fatal_err_msg_str, xml_free_parser_ctxt,
+        xml_new_sax_parser_ctxt,
     },
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlAttributeDefault, XmlAttributeType, XmlDocProperties,
@@ -112,87 +112,9 @@ use super::{
     },
 };
 
-/// The default version of XML used: 1.0
-pub(crate) const XML_DEFAULT_VERSION: &str = "1.0";
-
 /// Callback for freeing some parser input allocations.
 #[doc(alias = "xmlParserInputDeallocate")]
 pub type XmlParserInputDeallocate = unsafe fn(*mut XmlChar) -> c_void;
-
-/// The parser is now working also as a state based parser.
-/// The recursive one use the state info for entities processing.
-#[doc(alias = "xmlParserInputState")]
-#[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum XmlParserInputState {
-    XmlParserEOF = -1, /* nothing is to be parsed */
-    #[default]
-    XmlParserStart = 0, /* nothing has been parsed */
-    XmlParserMisc,     /* Misc* before int subset */
-    XmlParserPI,       /* Within a processing instruction */
-    XmlParserDTD,      /* within some DTD content */
-    XmlParserProlog,   /* Misc* after internal subset */
-    XmlParserComment,  /* within a comment */
-    XmlParserStartTag, /* within a start tag */
-    XmlParserContent,  /* within the content */
-    XmlParserCDATASection, /* within a CDATA section */
-    XmlParserEndTag,   /* within a closing tag */
-    XmlParserEntityDecl, /* within an entity declaration */
-    XmlParserEntityValue, /* within an entity value in a decl */
-    XmlParserAttributeValue, /* within an attribute value */
-    XmlParserSystemLiteral, /* within a SYSTEM value */
-    XmlParserEpilog,   /* the Misc* after the last end tag */
-    XmlParserIgnore,   /* within an IGNORED section */
-    XmlParserPublicLiteral, /* within a PUBLIC value */
-}
-
-impl TryFrom<i32> for XmlParserInputState {
-    type Error = anyhow::Error;
-    fn try_from(value: i32) -> Result<Self, Self::Error> {
-        if value == Self::XmlParserEOF as i32 {
-            Ok(Self::XmlParserEOF)
-        } else if value == Self::XmlParserStart as i32 {
-            Ok(Self::XmlParserStart)
-        } else if value == Self::XmlParserMisc as i32 {
-            Ok(Self::XmlParserMisc)
-        } else if value == Self::XmlParserPI as i32 {
-            Ok(Self::XmlParserPI)
-        } else if value == Self::XmlParserDTD as i32 {
-            Ok(Self::XmlParserDTD)
-        } else if value == Self::XmlParserProlog as i32 {
-            Ok(Self::XmlParserProlog)
-        } else if value == Self::XmlParserComment as i32 {
-            Ok(Self::XmlParserComment)
-        } else if value == Self::XmlParserStartTag as i32 {
-            Ok(Self::XmlParserStartTag)
-        } else if value == Self::XmlParserContent as i32 {
-            Ok(Self::XmlParserContent)
-        } else if value == Self::XmlParserCDATASection as i32 {
-            Ok(Self::XmlParserCDATASection)
-        } else if value == Self::XmlParserEndTag as i32 {
-            Ok(Self::XmlParserEndTag)
-        } else if value == Self::XmlParserEntityDecl as i32 {
-            Ok(Self::XmlParserEntityDecl)
-        } else if value == Self::XmlParserEntityValue as i32 {
-            Ok(Self::XmlParserEntityValue)
-        } else if value == Self::XmlParserAttributeValue as i32 {
-            Ok(Self::XmlParserAttributeValue)
-        } else if value == Self::XmlParserSystemLiteral as i32 {
-            Ok(Self::XmlParserSystemLiteral)
-        } else if value == Self::XmlParserEpilog as i32 {
-            Ok(Self::XmlParserEpilog)
-        } else if value == Self::XmlParserIgnore as i32 {
-            Ok(Self::XmlParserIgnore)
-        } else if value == Self::XmlParserPublicLiteral as i32 {
-            Ok(Self::XmlParserPublicLiteral)
-        } else {
-            Err(anyhow::anyhow!(
-                "Invalid convert from value '{value}' to {}",
-                type_name::<Self>()
-            ))
-        }
-    }
-}
 
 /// Bit in the loadsubset context field to tell to do ID/REFs lookups.
 /// Use it to initialize xmlLoadExtDtdDefaultValue.
@@ -482,7 +404,7 @@ pub struct XmlSAXHandler {
     pub comment: Option<CommentSAXFunc>,
     pub warning: Option<WarningSAXFunc>,
     pub error: Option<ErrorSAXFunc>,
-    pub fatal_error: Option<FatalErrorSAXFunc>, /* unused error() get all the errors */
+    pub fatal_error: Option<FatalErrorSAXFunc>, // unused error() get all the errors
     pub get_parameter_entity: Option<GetParameterEntitySAXFunc>,
     pub cdata_block: Option<CDATABlockSAXFunc>,
     pub external_subset: Option<ExternalSubsetSAXFunc>,
@@ -727,232 +649,6 @@ pub unsafe fn xml_recover_file(filename: Option<&str>) -> Option<XmlDocPtr> {
     unsafe { xml_sax_parse_file(None, filename, 1) }
 }
 
-/// Trim the list of attributes defined to remove all those of type
-/// CDATA as they are not special. This call should be done when finishing
-/// to parse the DTD and before starting to parse the document root.
-#[doc(alias = "xmlCleanSpecialAttr")]
-unsafe fn xml_clean_special_attr(ctxt: XmlParserCtxtPtr) {
-    unsafe {
-        let Some(mut atts) = (*ctxt).atts_special else {
-            return;
-        };
-
-        atts.remove_if(
-            |data, _, _, _| *data == XmlAttributeType::XmlAttributeCDATA,
-            |_, _| {},
-        );
-        if atts.is_empty() {
-            atts.free();
-            (*ctxt).atts_special = None;
-        }
-    }
-}
-
-pub(crate) const SAX_COMPAT_MODE: &str = "SAX compatibility mode document";
-
-/// Parse an XML document (and build a tree if using the standard SAX
-/// interface).
-///
-/// `[1] document ::= prolog element Misc*`
-///
-/// `[22] prolog ::= XMLDecl? Misc* (doctypedecl Misc*)?`
-///
-/// Returns 0, -1 in case of error. the parser context is augmented
-///                as a result of the parsing.
-#[doc(alias = "xmlParseDocument")]
-pub unsafe fn xml_parse_document(ctxt: XmlParserCtxtPtr) -> i32 {
-    unsafe {
-        let mut start: [XmlChar; 4] = [0; 4];
-
-        xml_init_parser();
-
-        if ctxt.is_null() || (*ctxt).input().is_none() {
-            return -1;
-        }
-
-        (*ctxt).grow();
-
-        // SAX: detecting the level.
-        (*ctxt).detect_sax2();
-
-        // SAX: beginning of the document processing.
-        if let Some(sax) = (*ctxt).sax.as_deref_mut() {
-            if let Some(set_document_locator) = sax.set_document_locator {
-                set_document_locator((*ctxt).user_data.clone(), xml_default_sax_locator());
-            }
-        }
-        if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-            return -1;
-        }
-
-        if (*ctxt).encoding().is_none() && (*ctxt).input().unwrap().remainder_len() >= 4 {
-            // Get the 4 first bytes and decode the charset
-            // if enc != XML_CHAR_ENCODING_NONE
-            // plug some encoding conversion routines.
-            start[0] = (*ctxt).current_byte();
-            start[1] = (*ctxt).nth_byte(1);
-            start[2] = (*ctxt).nth_byte(2);
-            start[3] = (*ctxt).nth_byte(3);
-            let enc = detect_encoding(&start);
-            if !matches!(enc, XmlCharEncoding::None) {
-                (*ctxt).switch_encoding(enc);
-            }
-        }
-
-        (*ctxt).grow();
-        if (*ctxt).content_bytes().starts_with(b"<?xml")
-            && xml_is_blank_char((*ctxt).nth_byte(5) as u32)
-        {
-            // Note that we will switch encoding on the fly.
-            (*ctxt).parse_xmldecl();
-            if (*ctxt).err_no == XmlParserErrors::XmlErrUnsupportedEncoding as i32
-                || matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
-            {
-                // The XML REC instructs us to stop parsing right here
-                return -1;
-            }
-            (*ctxt).standalone = (*ctxt).input().unwrap().standalone;
-            (*ctxt).skip_blanks();
-        } else {
-            (*ctxt).version = Some(XML_DEFAULT_VERSION.to_owned());
-        }
-        if (*ctxt).disable_sax == 0 {
-            if let Some(start_document) = (*ctxt)
-                .sax
-                .as_deref_mut()
-                .and_then(|sax| sax.start_document)
-            {
-                start_document((*ctxt).user_data.clone());
-            }
-        }
-        if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-            return -1;
-        }
-        if (*ctxt).input().is_some()
-            && (*ctxt).input().unwrap().buf.is_some()
-            && (*ctxt)
-                .input()
-                .unwrap()
-                .buf
-                .as_ref()
-                .unwrap()
-                .borrow()
-                .compressed
-                >= 0
-        {
-            if let Some(mut my_doc) = (*ctxt).my_doc {
-                my_doc.compression = (*ctxt)
-                    .input()
-                    .unwrap()
-                    .buf
-                    .as_ref()
-                    .unwrap()
-                    .borrow()
-                    .compressed;
-            }
-        }
-
-        // The Misc part of the Prolog
-        parse_misc(&mut *ctxt);
-
-        // Then possibly doc type declaration(s) and more Misc
-        // (doctypedecl Misc*)?
-        (*ctxt).grow();
-        if (*ctxt).content_bytes().starts_with(b"<!DOCTYPE") {
-            (*ctxt).in_subset = 1;
-            (*ctxt).parse_doctypedecl();
-            if (*ctxt).current_byte() == b'[' {
-                (*ctxt).instate = XmlParserInputState::XmlParserDTD;
-                (*ctxt).parse_internal_subset();
-                if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-                    return -1;
-                }
-            }
-
-            // Create and update the external subset.
-            (*ctxt).in_subset = 2;
-            if (*ctxt).disable_sax == 0 {
-                if let Some(external_subset) = (*ctxt)
-                    .sax
-                    .as_deref_mut()
-                    .and_then(|sax| sax.external_subset)
-                {
-                    external_subset(
-                        (*ctxt).user_data.clone(),
-                        (*ctxt).int_sub_name.as_deref(),
-                        (*ctxt).ext_sub_system.as_deref(),
-                        (*ctxt).ext_sub_uri.as_deref(),
-                    );
-                }
-            }
-            if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-                return -1;
-            }
-            (*ctxt).in_subset = 0;
-
-            xml_clean_special_attr(ctxt);
-
-            (*ctxt).instate = XmlParserInputState::XmlParserProlog;
-            parse_misc(&mut *ctxt);
-        }
-
-        // Time to start parsing the tree itself
-        (*ctxt).grow();
-        if (*ctxt).current_byte() != b'<' {
-            xml_fatal_err_msg(
-                &mut *ctxt,
-                XmlParserErrors::XmlErrDocumentEmpty,
-                "Start tag expected, '<' not found\n",
-            );
-        } else {
-            (*ctxt).instate = XmlParserInputState::XmlParserContent;
-            (*ctxt).parse_element();
-            (*ctxt).instate = XmlParserInputState::XmlParserEpilog;
-
-            // The Misc part at the end
-            parse_misc(&mut *ctxt);
-
-            if (*ctxt).current_byte() != 0 {
-                xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrDocumentEnd, None);
-            }
-            (*ctxt).instate = XmlParserInputState::XmlParserEOF;
-        }
-
-        // SAX: end of the document processing.
-        if let Some(end_document) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.end_document) {
-            end_document((*ctxt).user_data.clone());
-        }
-
-        // Remove locally kept entity definitions if the tree was not built
-        if let Some(my_doc) = (*ctxt)
-            .my_doc
-            .take_if(|doc| doc.version.as_deref() == Some(SAX_COMPAT_MODE))
-        {
-            xml_free_doc(my_doc);
-        }
-
-        if (*ctxt).well_formed != 0 {
-            if let Some(mut my_doc) = (*ctxt).my_doc {
-                my_doc.properties |= XmlDocProperties::XmlDocWellformed as i32;
-                if (*ctxt).valid != 0 {
-                    my_doc.properties |= XmlDocProperties::XmlDocDTDValid as i32;
-                }
-                if (*ctxt).ns_well_formed != 0 {
-                    my_doc.properties |= XmlDocProperties::XmlDocNsvalid as i32;
-                }
-                if (*ctxt).options & XmlParserOption::XmlParseOld10 as i32 != 0 {
-                    my_doc.properties |= XmlDocProperties::XmlDocOld10 as i32;
-                }
-            }
-        }
-        if (*ctxt).well_formed == 0 {
-            (*ctxt).valid = 0;
-            return -1;
-        }
-        0
-    }
-}
-
 /// parse a general parsed entity
 /// An external general parsed entity is well-formed if it matches the
 /// production labeled extParsedEnt.
@@ -1083,7 +779,7 @@ pub unsafe fn xml_sax_user_parse_file(
 
         (*ctxt).user_data = user_data;
 
-        xml_parse_document(ctxt);
+        (*ctxt).parse_document();
 
         if (*ctxt).well_formed != 0 {
             ret = 0;
@@ -1128,7 +824,7 @@ pub unsafe fn xml_sax_user_parse_memory(
         (*ctxt).detect_sax2();
         (*ctxt).user_data = user_data;
 
-        xml_parse_document(ctxt);
+        (*ctxt).parse_document();
 
         if (*ctxt).well_formed != 0 {
             ret = 0;
@@ -1177,8 +873,7 @@ pub unsafe fn xml_sax_parse_doc(
             (*ctxt).user_data = None;
         }
         (*ctxt).detect_sax2();
-
-        xml_parse_document(ctxt);
+        (*ctxt).parse_document();
         let ret = if (*ctxt).well_formed != 0 || recovery != 0 {
             (*ctxt).my_doc
         } else {
@@ -1248,7 +943,7 @@ pub unsafe fn xml_sax_parse_memory_with_data(
 
         (*ctxt).recovery = recovery;
 
-        xml_parse_document(ctxt);
+        (*ctxt).parse_document();
 
         let ret = if (*ctxt).well_formed != 0 || recovery != 0 {
             (*ctxt).my_doc
@@ -1331,7 +1026,7 @@ pub unsafe fn xml_sax_parse_file_with_data(
 
         (*ctxt).recovery = recovery;
 
-        xml_parse_document(ctxt);
+        (*ctxt).parse_document();
 
         let ret = if (*ctxt).well_formed != 0 || recovery != 0 {
             let ret = (*ctxt).my_doc;
@@ -1448,6 +1143,8 @@ pub(crate) unsafe fn xml_sax_parse_dtd(
     external_id: Option<&str>,
     system_id: Option<&str>,
 ) -> Option<XmlDtdPtr> {
+    use crate::parser::XmlParserOption;
+
     unsafe {
         use std::slice::from_raw_parts;
 
@@ -1566,6 +1263,8 @@ pub unsafe fn xml_io_parse_dtd(
     input: XmlParserInputBuffer,
     mut enc: XmlCharEncoding,
 ) -> Option<XmlDtdPtr> {
+    use crate::parser::XmlParserOption;
+
     unsafe {
         use crate::parser::xml_new_sax_parser_ctxt;
 
@@ -1797,7 +1496,7 @@ pub unsafe fn xml_parse_in_node_context(
             }
         }
 
-        (*ctxt).ctxt_use_options_internal(options, None);
+        (*ctxt).use_options_internal(options, None);
         (*ctxt).detect_sax2();
         (*ctxt).my_doc = Some(doc);
         // parsing in context, i.e. as within existing content
@@ -1960,7 +1659,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
             return -1;
         };
         new_doc.properties = XmlDocProperties::XmlDocInternal as i32;
-        (*ctxt).ctxt_use_options_internal(XmlParserOption::XmlParseNoDict as i32, None);
+        (*ctxt).use_options_internal(XmlParserOption::XmlParseNoDict as i32, None);
         // doc.is_null() is only supported for historic reasons
         if let Some(doc) = doc {
             new_doc.int_subset = doc.int_subset;
@@ -2968,7 +2667,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                                     }
                                 }
                                 (*ctxt).in_subset = 0;
-                                xml_clean_special_attr(ctxt);
+                                (*ctxt).clean_special_attr();
                                 (*ctxt).instate = XmlParserInputState::XmlParserProlog;
                             }
                         } else if cur == b'<'
@@ -3022,7 +2721,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                             }
                         }
                         (*ctxt).in_subset = 0;
-                        xml_clean_special_attr(ctxt);
+                        (*ctxt).clean_special_attr();
                         if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
                             // goto done;
                             return ret;
@@ -3314,38 +3013,6 @@ pub unsafe fn xml_load_external_entity(
     }
 }
 
-/// This is the set of XML parser options that can be passed down
-/// to the xmlReadDoc() and similar calls.
-#[doc(alias = "xmlParserOption")]
-#[repr(C)]
-pub enum XmlParserOption {
-    XmlParseRecover = 1 << 0,     /* recover on errors */
-    XmlParseNoEnt = 1 << 1,       /* substitute entities */
-    XmlParseDTDLoad = 1 << 2,     /* load the external subset */
-    XmlParseDTDAttr = 1 << 3,     /* default DTD attributes */
-    XmlParseDTDValid = 1 << 4,    /* validate with the DTD */
-    XmlParseNoError = 1 << 5,     /* suppress error reports */
-    XmlParseNoWarning = 1 << 6,   /* suppress warning reports */
-    XmlParsePedantic = 1 << 7,    /* pedantic error reporting */
-    XmlParseNoBlanks = 1 << 8,    /* remove blank nodes */
-    XmlParseSAX1 = 1 << 9,        /* use the SAX1 interface internally */
-    XmlParseXInclude = 1 << 10,   /* Implement XInclude substitution  */
-    XmlParseNoNet = 1 << 11,      /* Forbid network access */
-    XmlParseNoDict = 1 << 12,     /* Do not reuse the context dictionary */
-    XmlParseNsClean = 1 << 13,    /* remove redundant namespaces declarations */
-    XmlParseNoCDATA = 1 << 14,    /* merge CDATA as text nodes */
-    XmlParseNoXIncnode = 1 << 15, /* do not generate XINCLUDE START/END nodes */
-    XmlParseCompact = 1 << 16,    /* compact small text nodes; no modification of
-                                                  the tree allowed afterwards (will possibly
-                                  crash if you try to modify the tree) */
-    XmlParseOld10 = 1 << 17,     /* parse using XML-1.0 before update 5 */
-    XmlParseNoBasefix = 1 << 18, /* do not fixup XINCLUDE xml:base uris */
-    XmlParseHuge = 1 << 19,      /* relax any hardcoded limit from the parser */
-    XmlParseOldSAX = 1 << 20,    /* parse using SAX2 interface before 2.7.0 */
-    XmlParseIgnoreEnc = 1 << 21, /* ignore internal document encoding hint */
-    XmlParseBigLines = 1 << 22,  /* Store big lines numbers in text PSVI field */
-}
-
 /// Reset a push parser context
 ///
 /// Returns 0 in case of success and 1 in case of error
@@ -3439,15 +3106,6 @@ pub unsafe fn xml_ctxt_reset_push(
 
         0
     }
-}
-
-/// Applies the options to the parser context
-///
-/// Returns 0 in case of success, the set of unknown or unimplemented options
-/// in case of error.
-#[doc(alias = "xmlCtxtUseOptions")]
-pub unsafe fn xml_ctxt_use_options(ctxt: XmlParserCtxtPtr, options: i32) -> i32 {
-    unsafe { (*ctxt).ctxt_use_options_internal(options, None) }
 }
 
 /// Used to examine the existence of features that can be enabled

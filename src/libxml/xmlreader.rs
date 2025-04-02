@@ -54,8 +54,8 @@ use crate::{
         parser::{
             CDATABlockSAXFunc, CharactersSAXFunc, EndElementNsSAX2Func, EndElementSAXFunc,
             StartElementNsSAX2Func, StartElementSAXFunc, XML_COMPLETE_ATTRS, XML_DETECT_IDS,
-            XML_SAX2_MAGIC, XmlParserInputState, XmlParserMode, XmlParserOption, XmlSAXHandler,
-            xml_create_push_parser_ctxt, xml_ctxt_use_options, xml_parse_chunk,
+            XML_SAX2_MAGIC, XmlParserMode, XmlSAXHandler, xml_create_push_parser_ctxt,
+            xml_parse_chunk,
         },
         relaxng::{
             XmlRelaxNGPtr, xml_relaxng_free, xml_relaxng_parse, xml_relaxng_set_valid_errors,
@@ -69,7 +69,7 @@ use crate::{
         },
         xmlstring::{XmlChar, xml_strdup},
     },
-    parser::XmlParserCtxtPtr,
+    parser::{XmlParserCtxtPtr, XmlParserOption},
     tree::{
         __XML_REGISTER_CALLBACKS, XmlElementType, XmlGenericNodePtr, XmlNodePtr, xml_copy_dtd,
         xml_doc_copy_node, xml_free_doc, xml_free_dtd, xml_free_node, xml_free_ns,
@@ -545,7 +545,7 @@ impl XmlTextReader {
                 self.validate = XmlTextReaderValidate::ValidateDtd;
             }
 
-            xml_ctxt_use_options(self.ctxt, options);
+            (*self.ctxt).use_options(options);
             if let Some(encoding) = encoding {
                 if let Some(handler) = find_encoding_handler(encoding) {
                     (*self.ctxt).switch_to_encoding(handler);
@@ -574,6 +574,8 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderRead")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn read(&mut self) -> i32 {
+        use crate::parser::XmlParserInputState;
+
         unsafe {
             use crate::{
                 tree::{NodeCommon, XmlEntityPtr},
@@ -1253,6 +1255,8 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderDoExpand")]
     #[cfg(feature = "libxml_reader")]
     unsafe fn do_expand(&mut self) -> i32 {
+        use crate::parser::XmlParserInputState;
+
         unsafe {
             let mut val: i32;
 

@@ -43,14 +43,11 @@ use crate::{
     io::XmlOutputBuffer,
     libxml::{
         htmltree::html_new_doc_no_dtd,
-        parser::{
-            XML_DEFAULT_VERSION, XmlParserInputState, XmlSAXHandler, xml_create_push_parser_ctxt,
-            xml_parse_chunk,
-        },
+        parser::{XmlSAXHandler, xml_create_push_parser_ctxt, xml_parse_chunk},
         sax2::{xml_sax2_end_element, xml_sax2_init_default_sax_handler, xml_sax2_start_element},
     },
     list::XmlList,
-    parser::{XmlParserCtxtPtr, xml_free_parser_ctxt},
+    parser::{XML_DEFAULT_VERSION, XmlParserCtxtPtr, XmlParserInputState, xml_free_parser_ctxt},
     save::attr_serialize_text_content,
     tree::{XmlDocPtr, XmlNodePtr, xml_encode_special_chars, xml_free_doc, xml_new_doc},
     uri::canonic_path,

@@ -50,10 +50,7 @@ use crate::{
             XmlHashTablePtr, xml_hash_add_entry, xml_hash_add_entry2, xml_hash_create,
             xml_hash_free, xml_hash_lookup, xml_hash_lookup2,
         },
-        parser::{
-            XML_SAX2_MAGIC, XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr, XmlSAXLocatorPtr,
-            xml_parse_document,
-        },
+        parser::{XML_SAX2_MAGIC, XmlSAXHandler, XmlSAXHandlerPtr, XmlSAXLocatorPtr},
         sax2::xml_sax2_get_line_number,
         schemas_internals::{
             XML_SCHEMAS_ANY_LAX, XML_SCHEMAS_ANY_SKIP, XML_SCHEMAS_ANY_STRICT,
@@ -107,8 +104,8 @@ use crate::{
         },
     },
     parser::{
-        XmlParserCtxtPtr, XmlParserInput, split_qname2, xml_ctxt_read_file, xml_ctxt_read_memory,
-        xml_free_parser_ctxt, xml_new_parser_ctxt, xml_new_sax_parser_ctxt,
+        XmlParserCtxtPtr, XmlParserInput, XmlParserOption, split_qname2, xml_ctxt_read_file,
+        xml_ctxt_read_memory, xml_free_parser_ctxt, xml_new_parser_ctxt, xml_new_sax_parser_ctxt,
     },
     tree::{
         NodeCommon, XmlAttrPtr, XmlAttributeDefault, XmlAttributeType, XmlDocPtr,
@@ -18682,7 +18679,7 @@ unsafe fn xml_schema_vstart(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
             // #endif
         } else if !(*vctxt).parser_ctxt.is_null() && (*(*vctxt).parser_ctxt).sax.is_some() {
             // SAX validation.
-            ret = xml_parse_document((*vctxt).parser_ctxt);
+            ret = (*(*vctxt).parser_ctxt).parse_document();
         } else {
             VERROR_INT!(vctxt, "xmlSchemaVStart", "no instance to validate");
             ret = -1;

@@ -33,10 +33,11 @@ use crate::{
     generic_error,
     libxml::{
         chvalid::xml_is_blank_char,
-        parser::{XmlParserOption, xml_parse_in_node_context},
+        parser::xml_parse_in_node_context,
         parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
         valid::xml_snprintf_element_content,
     },
+    parser::XmlParserOption,
     tree::{
         NodeCommon, XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDocPtr,
         XmlDtdPtr, XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEntity, XmlEntityPtr,

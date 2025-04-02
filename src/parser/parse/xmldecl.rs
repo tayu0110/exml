@@ -3,11 +3,11 @@ use crate::{
     error::XmlParserErrors,
     libxml::{
         chvalid::xml_is_blank_char,
-        parser::{XML_DEFAULT_VERSION, XmlParserInputState, XmlParserOption},
         parser_internals::{XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH},
     },
     parser::{
-        XmlParserCtxt, xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_str, xml_warning_msg,
+        XML_DEFAULT_VERSION, XmlParserCtxt, XmlParserInputState, XmlParserOption, xml_fatal_err,
+        xml_fatal_err_msg, xml_fatal_err_msg_str, xml_warning_msg,
     },
 };
 

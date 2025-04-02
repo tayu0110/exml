@@ -36,13 +36,16 @@ use crate::{
     globals::{GenericErrorContext, StructuredError},
     libxml::{
         htmltree::html_new_doc_no_dtd,
-        parser::{XmlParserInputState, XmlSAXLocatorPtr},
+        parser::XmlSAXLocatorPtr,
         valid::{
             xml_validate_attribute_decl, xml_validate_document_final, xml_validate_one_element,
         },
         xmlstring::XmlChar,
     },
-    parser::{XmlParserCtxtPtr, XmlParserInput, build_qname, split_qname, xml_err_memory},
+    parser::{
+        XmlParserCtxtPtr, XmlParserInput, XmlParserInputState, XmlParserOption, build_qname,
+        split_qname, xml_err_memory,
+    },
     tree::{
         __XML_REGISTER_CALLBACKS, NodeCommon, XmlAttr, XmlAttributeDefault, XmlAttributeType,
         XmlDocProperties, XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr,
@@ -59,8 +62,7 @@ use crate::{
 use super::{
     globals::{xml_free, xml_register_node_default_value},
     parser::{
-        XML_COMPLETE_ATTRS, XML_SAX2_MAGIC, XML_SKIP_IDS, XmlParserOption, XmlSAXHandler,
-        xml_load_external_entity,
+        XML_COMPLETE_ATTRS, XML_SAX2_MAGIC, XML_SKIP_IDS, XmlSAXHandler, xml_load_external_entity,
     },
     parser_internals::{
         XML_MAX_TEXT_LENGTH, XML_STRING_TEXT, XML_SUBSTITUTE_REF, XML_VCTXT_DTD_VALIDATED,

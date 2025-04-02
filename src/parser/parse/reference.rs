@@ -5,14 +5,13 @@ use crate::{
     error::XmlParserErrors,
     globals::GenericErrorContext,
     libxml::{
-        parser::{XmlParserInputState, XmlParserMode, XmlParserOption},
-        parser_internals::xml_parse_balanced_chunk_memory_internal,
+        parser::XmlParserMode, parser_internals::xml_parse_balanced_chunk_memory_internal,
         sax2::xml_sax2_get_entity,
     },
     parser::{
-        XmlParserCtxt, XmlParserCtxtPtr, parse_external_entity_private, xml_err_msg_str,
-        xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_int, xml_fatal_err_msg_str,
-        xml_is_char, xml_warning_msg,
+        XmlParserCtxt, XmlParserCtxtPtr, XmlParserInputState, XmlParserOption,
+        parse_external_entity_private, xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg,
+        xml_fatal_err_msg_int, xml_fatal_err_msg_str, xml_is_char, xml_warning_msg,
     },
     tree::{
         NodeCommon, XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,

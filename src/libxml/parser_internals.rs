@@ -33,13 +33,13 @@ use crate::{
     libxml::{
         chvalid::{xml_is_base_char, xml_is_ideographic},
         dict::xml_dict_free,
-        parser::{XML_SKIP_IDS, XmlParserInputState, XmlParserOption},
+        parser::XML_SKIP_IDS,
         valid::xml_validate_element,
         xmlstring::XmlChar,
     },
     parser::{
-        XmlParserCtxtPtr, xml_create_memory_parser_ctxt, xml_err_encoding_int, xml_fatal_err,
-        xml_fatal_err_msg, xml_free_parser_ctxt,
+        XmlParserCtxtPtr, XmlParserInputState, XmlParserOption, xml_create_memory_parser_ctxt,
+        xml_err_encoding_int, xml_fatal_err, xml_fatal_err_msg, xml_free_parser_ctxt,
     },
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlDocProperties, XmlElementType, XmlGenericNodePtr,

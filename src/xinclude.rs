@@ -40,14 +40,11 @@ use crate::{
     io::xml_parser_get_directory,
     libxml::{
         chvalid::xml_is_char,
-        parser::{
-            XML_DETECT_IDS, XmlParserOption, xml_ctxt_use_options, xml_init_parser,
-            xml_load_external_entity, xml_parse_document,
-        },
+        parser::{XML_DETECT_IDS, xml_init_parser, xml_load_external_entity},
         xmlstring::xml_str_equal,
         xpointer::{xml_xptr_eval, xml_xptr_new_context},
     },
-    parser::{xml_free_parser_ctxt, xml_new_parser_ctxt},
+    parser::{XmlParserOption, xml_free_parser_ctxt, xml_new_parser_ctxt},
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlDocPtr, XmlElementType, XmlEntityPtr, XmlEntityType,
         XmlGenericNodePtr, XmlNode, XmlNodePtr, xml_add_doc_entity, xml_create_int_subset,
@@ -1802,10 +1799,7 @@ impl XmlXIncludeCtxt {
             // pass in the application data to the parser context.
             (*pctxt)._private = self._private;
 
-            xml_ctxt_use_options(
-                pctxt,
-                self.parse_flags | XmlParserOption::XmlParseDTDLoad as i32,
-            );
+            (*pctxt).use_options(self.parse_flags | XmlParserOption::XmlParseDTDLoad as i32);
 
             // Don't read from stdin.
             if url == "-" {
@@ -1826,8 +1820,7 @@ impl XmlXIncludeCtxt {
             }
 
             (*pctxt).loadsubset |= XML_DETECT_IDS as i32;
-
-            xml_parse_document(pctxt);
+            (*pctxt).parse_document();
 
             let ret = if (*pctxt).well_formed != 0 {
                 (*pctxt).my_doc

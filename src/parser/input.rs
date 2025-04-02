@@ -66,6 +66,33 @@ use crate::{
 
 use super::{XmlParserCtxt, XmlParserCtxtPtr, xml_err_memory};
 
+/// The parser is now working also as a state based parser.
+/// The recursive one use the state info for entities processing.
+#[doc(alias = "xmlParserInputState")]
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum XmlParserInputState {
+    XmlParserEOF = -1, // nothing is to be parsed
+    #[default]
+    XmlParserStart = 0, // nothing has been parsed
+    XmlParserMisc,     // Misc* before int subset
+    XmlParserPI,       // Within a processing instruction
+    XmlParserDTD,      // within some DTD content
+    XmlParserProlog,   // Misc* after internal subset
+    XmlParserComment,  // within a comment
+    XmlParserStartTag, // within a start tag
+    XmlParserContent,  // within the content
+    XmlParserCDATASection, // within a CDATA section
+    XmlParserEndTag,   // within a closing tag
+    XmlParserEntityDecl, // within an entity declaration
+    XmlParserEntityValue, // within an entity value in a decl
+    XmlParserAttributeValue, // within an attribute value
+    XmlParserSystemLiteral, // within a SYSTEM value
+    XmlParserEpilog,   // the Misc* after the last end tag
+    XmlParserIgnore,   // within an IGNORED section
+    XmlParserPublicLiteral, // within a PUBLIC value
+}
+
 /// An xmlParserInput is an input flow for the XML processor.
 /// Each entity parsed is associated an xmlParserInput (except the
 /// few predefined ones). This is the case both for internal entities

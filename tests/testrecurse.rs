@@ -24,9 +24,7 @@ use exml::{
     },
     io::{XmlInputCallback, register_input_callbacks, xml_no_net_external_entity_loader},
     libxml::{
-        parser::{
-            XmlParserOption, xml_cleanup_parser, xml_init_parser, xml_set_external_entity_loader,
-        },
+        parser::{xml_cleanup_parser, xml_init_parser, xml_set_external_entity_loader},
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
             xml_memory_strdup,
@@ -34,8 +32,8 @@ use exml::{
         xmlstring::xml_strlen,
     },
     parser::{
-        XmlParserCtxtPtr, XmlParserInput, xml_ctxt_read_file, xml_free_parser_ctxt,
-        xml_new_parser_ctxt,
+        XmlParserCtxtPtr, XmlParserInput, XmlParserOption, xml_ctxt_read_file,
+        xml_free_parser_ctxt, xml_new_parser_ctxt,
     },
     tree::{XmlElementType, XmlNodePtr, xml_free_doc, xml_get_doc_entity},
 };

@@ -33,9 +33,8 @@ use crate::{
         chvalid::{xml_is_blank_char, xml_is_char},
         globals::{xml_free, xml_malloc},
         parser::{
-            XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SAX2_MAGIC, XmlParserInputState, XmlParserMode,
-            XmlParserOption, XmlSAXHandler, XmlStartTag, xml_init_parser, xml_load_external_entity,
-            xml_parse_document,
+            XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SAX2_MAGIC, XmlParserMode, XmlSAXHandler,
+            XmlStartTag, xml_init_parser, xml_load_external_entity,
         },
         parser_internals::{
             INPUT_CHUNK, LINE_LEN, XML_MAX_DICTIONARY_LIMIT, XML_MAX_LOOKUP_LIMIT,
@@ -47,7 +46,10 @@ use crate::{
         },
         valid::XmlValidCtxt,
     },
-    parser::{__xml_err_encoding, xml_err_encoding_int, xml_err_internal, xml_fatal_err_msg_int},
+    parser::{
+        __xml_err_encoding, XmlParserInputState, xml_err_encoding_int, xml_err_internal,
+        xml_fatal_err_msg_int,
+    },
     tree::{
         XML_ENT_EXPANDING, XML_ENT_PARSED, XML_XML_NAMESPACE, XmlAttrPtr, XmlAttributeType,
         XmlDocPtr, XmlEntityType, XmlNodePtr, xml_free_doc,
@@ -58,6 +60,38 @@ use crate::{
 use super::{
     XmlParserInput, XmlParserNodeInfo, XmlParserNodeInfoSeq, xml_err_memory, xml_fatal_err,
 };
+
+/// This is the set of XML parser options that can be passed down
+/// to the xmlReadDoc() and similar calls.
+#[doc(alias = "xmlParserOption")]
+#[repr(C)]
+pub enum XmlParserOption {
+    XmlParseRecover = 1 << 0,     /* recover on errors */
+    XmlParseNoEnt = 1 << 1,       /* substitute entities */
+    XmlParseDTDLoad = 1 << 2,     /* load the external subset */
+    XmlParseDTDAttr = 1 << 3,     /* default DTD attributes */
+    XmlParseDTDValid = 1 << 4,    /* validate with the DTD */
+    XmlParseNoError = 1 << 5,     /* suppress error reports */
+    XmlParseNoWarning = 1 << 6,   /* suppress warning reports */
+    XmlParsePedantic = 1 << 7,    /* pedantic error reporting */
+    XmlParseNoBlanks = 1 << 8,    /* remove blank nodes */
+    XmlParseSAX1 = 1 << 9,        /* use the SAX1 interface internally */
+    XmlParseXInclude = 1 << 10,   /* Implement XInclude substitution  */
+    XmlParseNoNet = 1 << 11,      /* Forbid network access */
+    XmlParseNoDict = 1 << 12,     /* Do not reuse the context dictionary */
+    XmlParseNsClean = 1 << 13,    /* remove redundant namespaces declarations */
+    XmlParseNoCDATA = 1 << 14,    /* merge CDATA as text nodes */
+    XmlParseNoXIncnode = 1 << 15, /* do not generate XINCLUDE START/END nodes */
+    XmlParseCompact = 1 << 16,    /* compact small text nodes; no modification of
+                                                  the tree allowed afterwards (will possibly
+                                  crash if you try to modify the tree) */
+    XmlParseOld10 = 1 << 17,     /* parse using XML-1.0 before update 5 */
+    XmlParseNoBasefix = 1 << 18, /* do not fixup XINCLUDE xml:base uris */
+    XmlParseHuge = 1 << 19,      /* relax any hardcoded limit from the parser */
+    XmlParseOldSAX = 1 << 20,    /* parse using SAX2 interface before 2.7.0 */
+    XmlParseIgnoreEnc = 1 << 21, /* ignore internal document encoding hint */
+    XmlParseBigLines = 1 << 22,  /* Store big lines numbers in text PSVI field */
+}
 
 /// The parser context.
 ///
@@ -1219,7 +1253,7 @@ impl XmlParserCtxt {
     ///
     /// Returns 0 in case of success, the set of unknown or unimplemented options in case of error.
     #[doc(alias = "xmlCtxtUseOptionsInternal")]
-    pub(crate) unsafe fn ctxt_use_options_internal(
+    pub(crate) unsafe fn use_options_internal(
         &mut self,
         mut options: i32,
         encoding: Option<&str>,
@@ -1366,6 +1400,15 @@ impl XmlParserCtxt {
         options
     }
 
+    /// Applies the options to the parser context
+    ///
+    /// Returns 0 in case of success, the set of unknown or unimplemented options
+    /// in case of error.
+    #[doc(alias = "xmlCtxtUseOptions")]
+    pub unsafe fn use_options(&mut self, options: i32) -> i32 {
+        unsafe { self.use_options_internal(options, None) }
+    }
+
     /// Common front-end for the xmlRead functions
     ///
     /// Returns the resulting document tree or NULL
@@ -1377,7 +1420,7 @@ impl XmlParserCtxt {
         options: i32,
     ) -> Option<XmlDocPtr> {
         unsafe {
-            self.ctxt_use_options_internal(options, encoding);
+            self.use_options_internal(options, encoding);
             if let Some(encoding) = encoding {
                 // TODO: We should consider to set XML_PARSE_IGNORE_ENC if the
                 // caller provided an encoding. Otherwise, we might match to
@@ -1392,7 +1435,7 @@ impl XmlParserCtxt {
                     input.filename = url.map(|u| u.to_owned());
                 }
             }
-            xml_parse_document(self);
+            self.parse_document();
             if self.well_formed != 0 || self.recovery != 0 {
                 self.my_doc.take()
             } else {
@@ -1967,7 +2010,7 @@ pub unsafe fn xml_create_url_parser_ctxt(filename: Option<&str>, options: i32) -
         }
 
         if options != 0 {
-            (*ctxt).ctxt_use_options_internal(options, None);
+            (*ctxt).use_options_internal(options, None);
         }
         (*ctxt).linenumbers = 1;
 

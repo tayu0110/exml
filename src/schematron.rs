@@ -31,8 +31,7 @@ use crate::{
     generic_error,
     globals::{GenericError, GenericErrorContext, StructuredError},
     io::{XmlOutputCloseCallback, XmlOutputWriteCallback},
-    libxml::parser::XmlParserOption,
-    parser::{xml_read_file, xml_read_memory},
+    parser::{XmlParserOption, xml_read_file, xml_read_memory},
     tree::{
         NodeCommon, XmlAttrPtr, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNodePtr,
         xml_free_doc,

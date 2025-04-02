@@ -62,8 +62,8 @@ use crate::{
     generic_error,
     io::{XmlParserInputBuffer, xml_parser_get_directory},
     libxml::{
-        chvalid::xml_is_blank_char, globals::xml_free, parser::xml_parse_document,
-        parser_internals::XML_MAX_NAMELEN, threads::xml_get_thread_id,
+        chvalid::xml_is_blank_char, globals::xml_free, parser_internals::XML_MAX_NAMELEN,
+        threads::xml_get_thread_id,
     },
     parser::{XmlParserInput, xml_free_parser_ctxt, xml_new_parser_ctxt},
     tree::{
@@ -3177,7 +3177,7 @@ pub unsafe fn xml_parse_catalog_file(filename: &str) -> Option<XmlDocPtr> {
         (*ctxt).pedantic = 0;
         (*ctxt).dict_names = 1;
 
-        xml_parse_document(ctxt);
+        (*ctxt).parse_document();
 
         let ret = if (*ctxt).well_formed != 0 {
             (*ctxt).my_doc

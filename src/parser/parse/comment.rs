@@ -2,13 +2,10 @@ use std::str::from_utf8_unchecked;
 
 use crate::{
     error::XmlParserErrors,
-    libxml::{
-        parser::{XmlParserInputState, XmlParserOption},
-        parser_internals::{XML_MAX_HUGE_LENGTH, XML_MAX_TEXT_LENGTH},
-    },
+    libxml::parser_internals::{XML_MAX_HUGE_LENGTH, XML_MAX_TEXT_LENGTH},
     parser::{
-        XmlParserCtxt, xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_int,
-        xml_fatal_err_msg_str, xml_is_char,
+        XmlParserCtxt, XmlParserInputState, XmlParserOption, xml_fatal_err, xml_fatal_err_msg,
+        xml_fatal_err_msg_int, xml_fatal_err_msg_str, xml_is_char,
     },
 };
 

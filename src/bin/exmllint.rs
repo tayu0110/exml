@@ -62,9 +62,9 @@ use exml::{
         htmltree::{html_doc_dump, html_save_file_format},
         parser::{
             XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SAX2_MAGIC, XmlExternalEntityLoader,
-            XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr, XmlSAXLocatorPtr, xml_cleanup_parser,
-            xml_create_push_parser_ctxt, xml_ctxt_use_options, xml_get_external_entity_loader,
-            xml_parse_chunk, xml_parse_dtd, xml_set_external_entity_loader,
+            XmlSAXHandler, XmlSAXHandlerPtr, XmlSAXLocatorPtr, xml_cleanup_parser,
+            xml_create_push_parser_ctxt, xml_get_external_entity_loader, xml_parse_chunk,
+            xml_parse_dtd, xml_set_external_entity_loader,
         },
         relaxng::{
             XmlRelaxNG, xml_relaxng_free, xml_relaxng_parse, xml_relaxng_set_valid_errors,
@@ -83,7 +83,7 @@ use exml::{
         xmlstring::XmlChar,
     },
     parser::{
-        XmlParserCtxtPtr, XmlParserInput, xml_ctxt_read_file, xml_ctxt_read_io,
+        XmlParserCtxtPtr, XmlParserInput, XmlParserOption, xml_ctxt_read_file, xml_ctxt_read_io,
         xml_ctxt_read_memory, xml_free_parser_ctxt, xml_new_parser_ctxt, xml_new_sax_parser_ctxt,
         xml_read_file, xml_read_io, xml_read_memory,
     },
@@ -2589,7 +2589,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                             }
                             return;
                         }
-                        xml_ctxt_use_options(ctxt, OPTIONS.load(Ordering::Relaxed));
+                        (*ctxt).use_options(OPTIONS.load(Ordering::Relaxed));
                         while {
                             res = fread(chars.as_mut_ptr() as _, 1, size as _, f) as i32;
                             res > 0
