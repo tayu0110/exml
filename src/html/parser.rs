@@ -24,7 +24,7 @@
 use std::{
     borrow::Cow,
     cell::RefCell,
-    ffi::{CStr, CString, c_char},
+    ffi::{CStr, c_char},
     io::Read,
     mem::size_of,
     os::raw::c_void,
@@ -57,7 +57,7 @@ use crate::{
             XML_VCTXT_USE_PCTXT, xml_is_letter,
         },
         sax2::{xml_sax2_ignorable_whitespace, xml_sax2_init_html_default_sax_handler},
-        xmlstring::{XmlChar, xml_str_equal, xml_strlen, xml_strncasecmp, xml_strndup},
+        xmlstring::{XmlChar, xml_str_equal, xml_strndup},
     },
     parser::{
         XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput, XmlParserInputState, XmlParserOption,
@@ -2010,12 +2010,10 @@ unsafe fn html_parse_script(ctxt: HtmlParserCtxtPtr) {
                 // CDATA.
                 if (*ctxt).recovery != 0 {
                     let context_name = (*ctxt).name.as_deref().unwrap();
-                    let context_name = CString::new(context_name).unwrap();
-                    if xml_strncasecmp(
-                        context_name.as_ptr() as *const u8,
-                        (*ctxt).input().unwrap().cur.add(2),
-                        xml_strlen(context_name.as_ptr() as *const u8),
-                    ) == 0
+                    let content = &(*ctxt).content_bytes()[2..];
+                    if context_name.len() <= content.len()
+                        && content[..context_name.len()]
+                            .eq_ignore_ascii_case(context_name.as_bytes())
                     {
                         break;
                     } else {
@@ -2105,19 +2103,14 @@ unsafe fn html_parse_system_literal(ctxt: HtmlParserCtxtPtr) -> *mut XmlChar {
             );
             return null_mut();
         }
-        let quote: i32 = (*ctxt).current_byte() as _;
+        let quote = (*ctxt).current_byte() as i32;
         (*ctxt).skip_char();
 
-        if (*ctxt).input().unwrap().cur < (*ctxt).input().unwrap().base {
-            return ret;
-        }
-        let start_position: size_t = (*ctxt)
-            .input()
-            .unwrap()
-            .cur
-            .offset_from((*ctxt).input().unwrap().base) as _;
+        // if (*ctxt).input().unwrap().cur < (*ctxt).input().unwrap().base {
+        //     return ret;
+        // }
+        let start_position = (*ctxt).input().unwrap().offset_from_base();
 
-        #[allow(clippy::while_immutable_condition)]
         while (*ctxt).current_byte() != 0 && (*ctxt).current_byte() as i32 != quote {
             // TODO: Handle UTF-8
             if !xml_is_char((*ctxt).current_byte() as u32) {
@@ -2178,16 +2171,11 @@ unsafe fn html_parse_pubid_literal(ctxt: HtmlParserCtxtPtr) -> *mut XmlChar {
         (*ctxt).skip_char();
 
         // Name ::= (Letter | '_') (NameChar)*
-        if (*ctxt).input().unwrap().cur < (*ctxt).input().unwrap().base {
-            return ret;
-        }
-        let start_position: size_t = (*ctxt)
-            .input()
-            .unwrap()
-            .cur
-            .offset_from((*ctxt).input().unwrap().base) as _;
+        // if (*ctxt).input().unwrap().cur < (*ctxt).input().unwrap().base {
+        //     return ret;
+        // }
+        let start_position = (*ctxt).input().unwrap().offset_from_base();
 
-        #[allow(clippy::while_immutable_condition)]
         while (*ctxt).current_byte() != 0 && (*ctxt).current_byte() as i32 != quote {
             if !xml_is_pubid_char((*ctxt).current_byte() as u32) {
                 html_parse_err_int!(
@@ -4435,15 +4423,15 @@ unsafe fn html_parse_lookup_sequence(
     unsafe {
         let mut quote: i32;
 
-        let Some(input) = (*ctxt).input() else {
+        if (*ctxt).input().is_none() {
             return -1;
-        };
+        }
 
         let base: size_t = (*ctxt).check_index as _;
         quote = (*ctxt).end_check_state;
 
-        let buf: *const XmlChar = input.cur;
-        let mut len = (*input).remainder_len();
+        let buf = (*ctxt).content_bytes();
+        let mut len = buf.len();
 
         // take into account the sequence length
         if third != 0 {
@@ -4459,22 +4447,22 @@ unsafe fn html_parse_lookup_sequence(
             }
             if ignoreattrval != 0 {
                 if quote != 0 {
-                    if *buf.add(base) == quote as u8 {
+                    if buf[base] == quote as u8 {
                         quote = 0;
                     }
                     continue;
                 }
-                if *buf.add(base) == b'"' || *buf.add(base) == b'\'' {
-                    quote = *buf.add(base) as _;
+                if buf[base] == b'"' || buf[base] == b'\'' {
+                    quote = buf[base] as _;
                     continue;
                 }
             }
-            if *buf.add(base) == first {
+            if buf[base] == first {
                 if third != 0 {
-                    if *buf.add(base + 1) != next || *buf.add(base + 2) != third {
+                    if buf[base + 1] != next || buf[base + 2] != third {
                         continue;
                     }
-                } else if next != 0 && *buf.add(base + 1) != next {
+                } else if next != 0 && buf[base + 1] != next {
                     continue;
                 }
                 (*ctxt).check_index = 0;
