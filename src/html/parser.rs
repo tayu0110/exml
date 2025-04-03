@@ -4527,8 +4527,6 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
     unsafe {
         let ret: i32 = 0;
         let mut avail = 0;
-        let mut cur: XmlChar;
-        let mut next: XmlChar;
 
         'done: loop {
             let Some(input) = (*ctxt).input() else {
@@ -4557,8 +4555,7 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
             // if a parsing attempt was aborted by hitting a NUL byte. After
             // changing html_current_char, this probably isn't necessary anymore.
             // We should consider removing this check.
-            cur = *input.cur.add(0);
-            if cur == 0 {
+            if (*ctxt).current_byte() == 0 {
                 (*ctxt).advance(1);
                 continue;
             }
@@ -4571,7 +4568,7 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
                 }
                 XmlParserInputState::XmlParserStart => {
                     // Very first chars read from the document flow.
-                    cur = *input.cur.add(0);
+                    let cur = (*ctxt).current_byte();
                     if xml_is_blank_char(cur as u32) {
                         html_skip_blank_chars(&mut *ctxt);
                         avail = input.remainder_len();
@@ -4593,11 +4590,8 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
                         }
                     }
 
-                    cur = *input.cur.add(0);
-                    next = *input.cur.add(1);
-                    if cur == b'<'
-                        && next == b'!'
-                        && (*ctxt).content_bytes().len() >= 9
+                    if (*ctxt).content_bytes().len() >= 9
+                        && (*ctxt).content_bytes().starts_with(b"<!")
                         && (*ctxt).content_bytes()[2..9].eq_ignore_ascii_case(b"DOCTYPE")
                     {
                         if terminate == 0 && html_parse_lookup_sequence(ctxt, b'>', 0, 0, 1) < 0 {
@@ -4619,38 +4613,26 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
                         break 'done;
                     }
                     // not enough chars input buffer
-                    if avail < 2 {
-                        if terminate == 0 {
-                            // goto done;
-                            break 'done;
-                        } else {
-                            next = b' ';
-                        }
-                    } else {
-                        next = *input.cur.add(1);
+                    if avail < 2 && terminate == 0 {
+                        // goto done;
+                        break 'done;
                     }
-                    cur = *input.cur.add(0);
-                    if cur == b'<'
-                        && next == b'!'
-                        && *input.cur.add(2) == b'-'
-                        && *input.cur.add(3) == b'-'
-                    {
+                    if (*ctxt).content_bytes().starts_with(b"<!--") {
                         if terminate == 0 && html_parse_lookup_comment_end(ctxt) < 0 {
                             // goto done;
                             break 'done;
                         }
                         html_parse_comment(ctxt);
                         (*ctxt).instate = XmlParserInputState::XmlParserMisc;
-                    } else if cur == b'<' && next == b'?' {
+                    } else if (*ctxt).content_bytes().starts_with(b"<?") {
                         if terminate == 0 && html_parse_lookup_sequence(ctxt, b'>', 0, 0, 0) < 0 {
                             // goto done;
                             break 'done;
                         }
                         html_parse_pi(ctxt);
                         (*ctxt).instate = XmlParserInputState::XmlParserMisc;
-                    } else if cur == b'<'
-                        && next == b'!'
-                        && (*ctxt).content_bytes().len() >= 9
+                    } else if (*ctxt).content_bytes().len() >= 9
+                        && (*ctxt).content_bytes().starts_with(b"<!")
                         && (*ctxt).content_bytes()[2..9].eq_ignore_ascii_case(b"DOCTYPE")
                     {
                         if terminate == 0 && html_parse_lookup_sequence(ctxt, b'>', 0, 0, 1) < 0 {
@@ -4659,7 +4641,7 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
                         }
                         html_parse_doc_type_decl(ctxt);
                         (*ctxt).instate = XmlParserInputState::XmlParserProlog;
-                    } else if cur == b'<' && next == b'!' && avail < 9 {
+                    } else if (*ctxt).content_bytes().starts_with(b"<!") && avail < 9 {
                         // goto done;
                         break 'done;
                     } else {
@@ -4673,27 +4655,21 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
                         // goto done;
                         break 'done;
                     }
-                    cur = *input.cur.add(0);
-                    next = *input.cur.add(1);
-                    if cur == b'<'
-                        && next == b'!'
-                        && *input.cur.add(2) == b'-'
-                        && *input.cur.add(3) == b'-'
-                    {
+                    if (*ctxt).content_bytes().starts_with(b"<!--") {
                         if terminate == 0 && html_parse_lookup_comment_end(ctxt) < 0 {
                             // goto done;
                             break 'done;
                         }
                         html_parse_comment(ctxt);
                         (*ctxt).instate = XmlParserInputState::XmlParserProlog;
-                    } else if cur == b'<' && next == b'?' {
+                    } else if (*ctxt).content_bytes().starts_with(b"<?") {
                         if terminate == 0 && html_parse_lookup_sequence(ctxt, b'>', 0, 0, 0) < 0 {
                             // goto done;
                             break 'done;
                         }
                         html_parse_pi(ctxt);
                         (*ctxt).instate = XmlParserInputState::XmlParserProlog;
-                    } else if cur == b'<' && next == b'!' && avail < 4 {
+                    } else if (*ctxt).content_bytes().starts_with(b"<!") && avail < 4 {
                         // goto done;
                         break 'done;
                     } else {
@@ -4706,8 +4682,7 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
                         // goto done;
                         break 'done;
                     }
-                    cur = *input.cur.add(0);
-                    if xml_is_blank_char(cur as u32) {
+                    if xml_is_blank_char((*ctxt).current_byte() as u32) {
                         html_parse_char_data(ctxt);
                         // goto done;
                         break 'done;
@@ -4716,26 +4691,21 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
                         // goto done;
                         break 'done;
                     }
-                    next = *input.cur.add(1);
-                    if cur == b'<'
-                        && next == b'!'
-                        && *input.cur.add(2) == b'-'
-                        && *input.cur.add(3) == b'-'
-                    {
+                    if (*ctxt).content_bytes().starts_with(b"<!--") {
                         if terminate == 0 && html_parse_lookup_comment_end(ctxt) < 0 {
                             // goto done;
                             break 'done;
                         }
                         html_parse_comment(ctxt);
                         (*ctxt).instate = XmlParserInputState::XmlParserEpilog;
-                    } else if cur == b'<' && next == b'?' {
+                    } else if (*ctxt).content_bytes().starts_with(b"<?") {
                         if terminate == 0 && html_parse_lookup_sequence(ctxt, b'>', 0, 0, 0) < 0 {
                             // goto done;
                             break 'done;
                         }
                         html_parse_pi(ctxt);
                         (*ctxt).instate = XmlParserInputState::XmlParserEpilog;
-                    } else if cur == b'<' && next == b'!' && avail < 4 {
+                    } else if (*ctxt).content_bytes().starts_with(b"<!") && avail < 4 {
                         // goto done;
                         break 'done;
                     } else {
@@ -4758,22 +4728,15 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
                         break 'done;
                     }
                     // not enough chars in buffer
-                    if avail < 2 {
-                        if terminate == 0 {
-                            // goto done;
-                            break 'done;
-                        } else {
-                            next = b' ';
-                        }
-                    } else {
-                        next = *input.cur.add(1);
+                    if avail < 2 && terminate == 0 {
+                        // goto done;
+                        break 'done;
                     }
-                    cur = *input.cur.add(0);
-                    if cur != b'<' {
+                    if (*ctxt).current_byte() != b'<' {
                         (*ctxt).instate = XmlParserInputState::XmlParserContent;
                         break 'to_break;
                     }
-                    if next == b'/' {
+                    if (*ctxt).nth_byte(1) == b'/' {
                         (*ctxt).instate = XmlParserInputState::XmlParserEndTag;
                         (*ctxt).check_index = 0;
                         break 'to_break;
@@ -4882,7 +4845,7 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
                         (*ctxt).check_index = 0;
                     }
                     if avail == 1 && terminate != 0 {
-                        cur = *input.cur.add(0);
+                        let cur = (*ctxt).current_byte();
                         if cur != b'<' && cur != b'&' {
                             if let Some(sax) = (*ctxt).sax.as_deref_mut() {
                                 chr[0] = cur;
@@ -4906,7 +4869,7 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
                             }
                             (*ctxt).token = 0;
                             (*ctxt).check_index = 0;
-                            (*ctxt).input_mut().unwrap().cur = input.cur.add(1);
+                            (*ctxt).input_mut().unwrap().cur = (*ctxt).input().unwrap().cur.add(1);
                             break 'to_break;
                         }
                     }
@@ -4914,8 +4877,6 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
                         // goto done;
                         break 'done;
                     }
-                    cur = *input.cur.add(0);
-                    next = *input.cur.add(1);
                     if (*ctxt).name.as_deref() == Some("script")
                         || (*ctxt).name.as_deref() == Some("style")
                     {
@@ -4926,7 +4887,7 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
                                 // goto done;
                                 break 'done;
                             }
-                            let val: XmlChar = *input.cur.add(idx as usize + 2);
+                            let val = (*ctxt).nth_byte(idx as usize + 2);
                             if val == 0 {
                                 // bad cut of input
                                 // FIXME: htmlParseScript checks for additional characters after '</'.
@@ -4936,12 +4897,12 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
                             }
                         }
                         html_parse_script(ctxt);
-                        if cur == b'<' && next == b'/' {
+                        if (*ctxt).content_bytes().starts_with(b"</") {
                             (*ctxt).instate = XmlParserInputState::XmlParserEndTag;
                             (*ctxt).check_index = 0;
                             break 'to_break;
                         }
-                    } else if cur == b'<' && next == b'!' {
+                    } else if (*ctxt).content_bytes().starts_with(b"<!") {
                         if avail < 4 {
                             // goto done;
                             break 'done;
@@ -4963,7 +4924,7 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
                                 None,
                             );
                             html_parse_doc_type_decl(ctxt);
-                        } else if *input.cur.add(2) == b'-' && *input.cur.add(3) == b'-' {
+                        } else if (*ctxt).content_bytes()[2..].starts_with(b"--") {
                             if terminate == 0 && html_parse_lookup_comment_end(ctxt) < 0 {
                                 // goto done;
                                 break 'done;
@@ -4978,26 +4939,28 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
                             }
                             html_skip_bogus_comment(ctxt);
                         }
-                    } else if cur == b'<' && next == b'?' {
+                    } else if (*ctxt).content_bytes().starts_with(b"<?") {
                         if terminate == 0 && html_parse_lookup_sequence(ctxt, b'>', 0, 0, 0) < 0 {
                             // goto done;
                             break 'done;
                         }
                         html_parse_pi(ctxt);
                         (*ctxt).instate = XmlParserInputState::XmlParserContent;
-                    } else if cur == b'<' && next == b'/' {
+                    } else if (*ctxt).content_bytes().starts_with(b"</") {
                         (*ctxt).instate = XmlParserInputState::XmlParserEndTag;
                         (*ctxt).check_index = 0;
                         break 'to_break;
-                    } else if cur == b'<' && next.is_ascii_alphabetic() {
-                        if terminate == 0 && (next == 0) {
+                    } else if (*ctxt).current_byte() == b'<'
+                        && (*ctxt).nth_byte(1).is_ascii_alphabetic()
+                    {
+                        if terminate == 0 && (*ctxt).nth_byte(1) == 0 {
                             // goto done;
                             break 'done;
                         }
                         (*ctxt).instate = XmlParserInputState::XmlParserStartTag;
                         (*ctxt).check_index = 0;
                         break 'to_break;
-                    } else if cur == b'<' {
+                    } else if (*ctxt).current_byte() == b'<' {
                         if (*ctxt).disable_sax == 0 {
                             if let Some(characters) =
                                 (*ctxt).sax.as_deref_mut().and_then(|sax| sax.characters)
@@ -5017,15 +4980,14 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
                         }
                         (*ctxt).check_index = 0;
                         while !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
-                            && cur != b'<'
                             && !(*ctxt).content_bytes().is_empty()
+                            && (*ctxt).current_byte() != b'<'
                         {
-                            if cur == b'&' {
+                            if (*ctxt).current_byte() == b'&' {
                                 html_parse_reference(ctxt);
                             } else {
                                 html_parse_char_data(ctxt);
                             }
-                            cur = *input.cur.add(0);
                         }
                     }
                 }
@@ -5251,12 +5213,7 @@ pub unsafe fn html_parse_chunk(
                 && input.borrow().raw.is_some()
             {
                 let base: size_t = (*ctxt).input().unwrap().get_base();
-                let current: size_t = (*ctxt)
-                    .input()
-                    .unwrap()
-                    .cur
-                    .offset_from((*ctxt).input().unwrap().base)
-                    as _;
+                let current = (*ctxt).input().unwrap().offset_from_base();
 
                 let res = input.borrow_mut().decode(terminate != 0);
                 (*ctxt)
