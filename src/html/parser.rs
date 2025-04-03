@@ -171,23 +171,7 @@ pub fn html_auto_close_tag(_doc: HtmlDocPtr, name: &str, elem: HtmlNodePtr) -> i
  *
  * Clean macros, not dependent of an ASCII context, expect UTF-8 encoding
  *
- *   NEXTL(l) Skip the current unicode character of l xmlChars long.
  */
-
-/* Imported from XML */
-
-macro_rules! NEXTL {
-    ($ctxt:expr, $l:expr) => {
-        if *((*(*$ctxt).input().unwrap()).cur) == b'\n' {
-            (*(*$ctxt).input_mut().unwrap()).line += 1;
-            (*(*$ctxt).input_mut().unwrap()).col = 1;
-        } else {
-            (*(*$ctxt).input_mut().unwrap()).col += 1;
-        }
-        (*$ctxt).token = 0;
-        (*(*$ctxt).input_mut().unwrap()).cur = (*(*$ctxt).input().unwrap()).cur.add($l as usize);
-    };
-}
 
 macro_rules! COPY_BUF {
     ($ctxt:expr, $l:expr, $b:expr, $i:expr, $v:expr) => {
@@ -219,24 +203,44 @@ pub(crate) unsafe fn __html_parse_content(ctxt: *mut c_void) {
 ///
 /// Returns the number of space chars skipped
 #[doc(alias = "htmlSkipBlankChars")]
-unsafe fn html_skip_blank_chars(ctxt: XmlParserCtxtPtr) -> i32 {
+unsafe fn html_skip_blank_chars(ctxt: &mut XmlParserCtxt) -> i32 {
     unsafe {
-        let mut res: i32 = 0;
-
-        while xml_is_blank_char(*(*ctxt).input().unwrap().cur as u32) {
-            if *(*ctxt).input().unwrap().cur == b'\n' {
-                (*ctxt).input_mut().unwrap().line += 1;
-                (*ctxt).input_mut().unwrap().col = 1;
+        let input = ctxt.input().unwrap();
+        let mut line = input.line;
+        let mut col = input.col;
+        ctxt.force_grow();
+        let mut buffer = ctxt.content_bytes();
+        let mut res = 0;
+        while !buffer.is_empty() && xml_is_blank_char(buffer[0] as u32) {
+            if buffer[0] == b'\n' {
+                line += 1;
+                col = 1;
             } else {
-                (*ctxt).input_mut().unwrap().col += 1;
+                col += 1;
             }
-            (*ctxt).input_mut().unwrap().cur = (*ctxt).input().unwrap().cur.add(1);
-            if *(*ctxt).input().unwrap().cur == 0 {
-                (*ctxt).force_grow();
+            buffer = &buffer[1..];
+            if buffer.is_empty() {
+                let len = ctxt.content_bytes().len();
+                res += len;
+                // commit input buffer
+                let input = ctxt.input_mut().unwrap();
+                input.cur = input.cur.add(len);
+                input.line = line;
+                input.col = col;
+                ctxt.force_grow();
+                buffer = ctxt.content_bytes();
             }
-            res = res.saturating_add(1);
         }
-        res
+
+        let diff = ctxt.content_bytes().len() - buffer.len();
+        res += diff;
+
+        let input = ctxt.input_mut().unwrap();
+        input.cur = input.cur.add(diff);
+        input.line = line;
+        input.col = col;
+
+        res as i32
     }
 }
 
@@ -650,7 +654,8 @@ unsafe fn html_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
                 );
                 return null_mut();
             }
-            NEXTL!(ctxt, l);
+            (*ctxt).advance_with_line_handling(l as usize);
+            (*ctxt).token = 0;
             c = html_current_char(ctxt, addr_of_mut!(l));
             if (*ctxt).input().unwrap().base != base {
                 // We changed encoding from an unknown encoding
@@ -1359,7 +1364,8 @@ unsafe fn html_parse_html_attribute(ctxt: HtmlParserCtxtPtr, stop: u8) -> *mut X
                     out = out.add(1);
                     bits -= 6;
                 }
-                NEXTL!(ctxt, l);
+                (*ctxt).advance_with_line_handling(l as usize);
+                (*ctxt).token = 0;
             }
             if out.offset_from(buffer) > max_length as isize {
                 html_parse_err(
@@ -1471,10 +1477,10 @@ unsafe fn html_parse_attribute(
         }
 
         // read the value
-        html_skip_blank_chars(ctxt);
+        html_skip_blank_chars(&mut *ctxt);
         if (*ctxt).current_byte() == b'=' {
             (*ctxt).skip_char();
-            html_skip_blank_chars(ctxt);
+            html_skip_blank_chars(&mut *ctxt);
             val = html_parse_att_value(ctxt);
         }
 
@@ -1768,7 +1774,7 @@ unsafe fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
         // Now parse the attributes, it ends up with the ending
         //
         // (S Attribute)* S?
-        html_skip_blank_chars(ctxt);
+        html_skip_blank_chars(&mut *ctxt);
         'failed: while (*ctxt).current_byte() != 0
             && (*ctxt).current_byte() != b'>'
             && !(*ctxt).content_bytes().starts_with(b"/>")
@@ -1795,7 +1801,7 @@ unsafe fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
                             xml_free(attvalue as _);
                         }
                         // goto failed;
-                        html_skip_blank_chars(ctxt);
+                        html_skip_blank_chars(&mut *ctxt);
                         continue 'failed;
                     }
                 }
@@ -1823,7 +1829,7 @@ unsafe fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
                 }
             }
             // failed:
-            html_skip_blank_chars(ctxt);
+            html_skip_blank_chars(&mut *ctxt);
         }
 
         // Handle specific association to the META tag
@@ -1941,7 +1947,7 @@ unsafe fn html_parse_end_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
             return 0;
         }
         // We should definitely be at the ending "S? '>'" part
-        html_skip_blank_chars(ctxt);
+        html_skip_blank_chars(&mut *ctxt);
         if (*ctxt).current_byte() != b'>' {
             html_parse_err(
                 ctxt,
@@ -2138,7 +2144,8 @@ unsafe fn html_parse_script(ctxt: HtmlParserCtxtPtr) {
                     cur
                 );
             }
-            NEXTL!(ctxt, l);
+            (*ctxt).advance_with_line_handling(l as usize);
+            (*ctxt).token = 0;
             if nbchar >= HTML_PARSER_BIG_BUFFER_SIZE as i32 {
                 buf[nbchar as usize] = 0;
                 let s = from_utf8(&buf[..nbchar as usize]).expect("Internal Error");
@@ -2344,7 +2351,7 @@ unsafe fn html_parse_external_id(
                     None,
                 );
             }
-            html_skip_blank_chars(ctxt);
+            html_skip_blank_chars(&mut *ctxt);
             uri = html_parse_system_literal(ctxt);
             if uri.is_null() {
                 html_parse_err(
@@ -2368,7 +2375,7 @@ unsafe fn html_parse_external_id(
                     None,
                 );
             }
-            html_skip_blank_chars(ctxt);
+            html_skip_blank_chars(&mut *ctxt);
             *public_id = html_parse_pubid_literal(ctxt);
             if (*public_id).is_null() {
                 html_parse_err(
@@ -2379,7 +2386,7 @@ unsafe fn html_parse_external_id(
                     None,
                 );
             }
-            html_skip_blank_chars(ctxt);
+            html_skip_blank_chars(&mut *ctxt);
             if (*ctxt).current_byte() == b'"' || (*ctxt).current_byte() == b'\'' {
                 uri = html_parse_system_literal(ctxt);
             }
@@ -2399,7 +2406,7 @@ unsafe fn html_parse_doc_type_decl(ctxt: HtmlParserCtxtPtr) {
         // We know that '<!DOCTYPE' has been detected.
         (*ctxt).advance(9);
 
-        html_skip_blank_chars(ctxt);
+        html_skip_blank_chars(&mut *ctxt);
 
         // Parse the DOCTYPE name.
         let name: *const XmlChar = html_parse_name(ctxt);
@@ -2414,11 +2421,11 @@ unsafe fn html_parse_doc_type_decl(ctxt: HtmlParserCtxtPtr) {
         }
         // Check that upper(name) == "HTML" !!!!!!!!!!!!!
 
-        html_skip_blank_chars(ctxt);
+        html_skip_blank_chars(&mut *ctxt);
 
         // Check for SystemID and ExternalID
         let uri: *mut XmlChar = html_parse_external_id(ctxt, addr_of_mut!(external_id));
-        html_skip_blank_chars(ctxt);
+        html_skip_blank_chars(&mut *ctxt);
 
         // We should be at the end of the DOCTYPE declaration.
         if (*ctxt).current_byte() != b'>' {
@@ -2528,7 +2535,8 @@ unsafe fn html_parse_comment(ctxt: HtmlParserCtxtPtr) {
                 cur = b'>' as i32;
                 // goto finished;
             } else {
-                NEXTL!(ctxt, ql);
+                (*ctxt).advance_with_line_handling(ql as usize);
+                (*ctxt).token = 0;
                 r = html_current_char(ctxt, addr_of_mut!(rl));
                 if r == 0 {
                     // goto unfinished;
@@ -2554,10 +2562,12 @@ unsafe fn html_parse_comment(ctxt: HtmlParserCtxtPtr) {
                     cur = b'>' as i32;
                     // goto finished;
                 } else {
-                    NEXTL!(ctxt, rl);
+                    (*ctxt).advance_with_line_handling(rl as usize);
+                    (*ctxt).token = 0;
                     cur = html_current_char(ctxt, addr_of_mut!(l));
                     while cur != 0 && (cur != b'>' as i32 || r != b'-' as i32 || q != b'-' as i32) {
-                        NEXTL!(ctxt, l);
+                        (*ctxt).advance_with_line_handling(l as usize);
+                        (*ctxt).token = 0;
                         next = html_current_char(ctxt, addr_of_mut!(nl));
 
                         if q == b'-' as i32
@@ -2737,7 +2747,7 @@ unsafe fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
                         None,
                     );
                 }
-                html_skip_blank_chars(ctxt);
+                html_skip_blank_chars(&mut *ctxt);
                 cur = html_current_char(ctxt, addr_of_mut!(l));
                 while cur != 0 && cur != b'>' as i32 {
                     if len + 5 >= size {
@@ -2773,7 +2783,8 @@ unsafe fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
                         (*ctxt).instate = state;
                         return;
                     }
-                    NEXTL!(ctxt, l);
+                    (*ctxt).advance_with_line_handling(l as usize);
+                    (*ctxt).token = 0;
                     cur = html_current_char(ctxt, addr_of_mut!(l));
                 }
                 *buf.add(len as usize) = 0;
@@ -3101,7 +3112,8 @@ unsafe fn html_parse_char_data_internal(ctxt: HtmlParserCtxtPtr, readahead: i32)
             } else {
                 COPY_BUF!(ctxt, l, buf.as_mut_ptr(), nbchar, cur);
             }
-            NEXTL!(ctxt, l);
+            (*ctxt).advance_with_line_handling(l as usize);
+            (*ctxt).token = 0;
             if nbchar >= HTML_PARSER_BIG_BUFFER_SIZE as i32 {
                 buf[nbchar as usize] = 0;
 
@@ -3888,7 +3900,7 @@ pub unsafe fn html_parse_document(ctxt: HtmlParserCtxtPtr) -> i32 {
         }
 
         // Wipe out everything which is before the first '<'
-        html_skip_blank_chars(ctxt);
+        html_skip_blank_chars(&mut *ctxt);
         if (*ctxt).current_byte() == 0 {
             html_parse_err(
                 ctxt,
@@ -3915,7 +3927,7 @@ pub unsafe fn html_parse_document(ctxt: HtmlParserCtxtPtr) -> i32 {
         {
             html_parse_comment(ctxt);
             html_parse_pi(ctxt);
-            html_skip_blank_chars(ctxt);
+            html_skip_blank_chars(&mut *ctxt);
         }
 
         // Then possibly doc type declaration(s) and more Misc (doctypedecl Misc*)?
@@ -3924,7 +3936,7 @@ pub unsafe fn html_parse_document(ctxt: HtmlParserCtxtPtr) -> i32 {
         {
             html_parse_doc_type_decl(ctxt);
         }
-        html_skip_blank_chars(ctxt);
+        html_skip_blank_chars(&mut *ctxt);
 
         // Parse possible comments and PIs before any content
         while (*ctxt).content_bytes().starts_with(b"<!--")
@@ -3932,7 +3944,7 @@ pub unsafe fn html_parse_document(ctxt: HtmlParserCtxtPtr) -> i32 {
         {
             html_parse_comment(ctxt);
             html_parse_pi(ctxt);
-            html_skip_blank_chars(ctxt);
+            html_skip_blank_chars(&mut *ctxt);
         }
 
         // Time to start parsing the tree itself
@@ -4683,7 +4695,7 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
                     // Very first chars read from the document flow.
                     cur = *input.cur.add(0);
                     if xml_is_blank_char(cur as u32) {
-                        html_skip_blank_chars(ctxt);
+                        html_skip_blank_chars(&mut *ctxt);
                         avail = input.remainder_len();
                     }
                     if let Some(set_document_locator) = (*ctxt)
@@ -4721,7 +4733,7 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
                     }
                 }
                 XmlParserInputState::XmlParserMisc => {
-                    html_skip_blank_chars(ctxt);
+                    html_skip_blank_chars(&mut *ctxt);
                     avail = input.remainder_len();
                     // no chars input buffer
                     if avail < 1 {
@@ -4777,7 +4789,7 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
                     }
                 }
                 XmlParserInputState::XmlParserProlog => {
-                    html_skip_blank_chars(ctxt);
+                    html_skip_blank_chars(&mut *ctxt);
                     avail = input.remainder_len();
                     if avail < 2 {
                         // goto done;
