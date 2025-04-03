@@ -246,18 +246,13 @@ unsafe fn html_skip_blank_chars(ctxt: &mut XmlParserCtxt) -> i32 {
 #[doc(alias = "htmlParseErrInt")]
 macro_rules! html_parse_err_int {
     ($ctxt:expr, $error:expr, $msg:literal, $val:expr) => {
-        if $ctxt.is_null()
-            || (*$ctxt).disable_sax == 0
-            || !matches!((*$ctxt).instate, XmlParserInputState::XmlParserEOF)
-        {
-            if !$ctxt.is_null() {
-                (*$ctxt).err_no = $error as i32;
-            }
+        if $ctxt.disable_sax == 0 || !matches!($ctxt.instate, XmlParserInputState::XmlParserEOF) {
+            $ctxt.err_no = $error as i32;
             __xml_raise_error!(
                 None,
                 None,
                 None,
-                $ctxt as _,
+                $ctxt as *mut XmlParserCtxt as _,
                 None,
                 XmlErrorDomain::XmlFromHTML,
                 $error,
@@ -271,9 +266,7 @@ macro_rules! html_parse_err_int {
                 0,
                 Some(format!($msg, $val).as_str()),
             );
-            if !$ctxt.is_null() {
-                (*$ctxt).well_formed = 0;
-            }
+            $ctxt.well_formed = 0;
         }
     };
 }
@@ -386,30 +379,28 @@ unsafe fn html_parse_err(
 ///
 /// Returns the current char value and its length
 #[doc(alias = "htmlCurrentChar")]
-unsafe fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) -> i32 {
+unsafe fn html_current_char(ctxt: &mut XmlParserCtxt, len: &mut i32) -> i32 {
     unsafe {
-        let mut val: u32;
-
-        if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
+        if matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
             return 0;
         }
 
-        if (*ctxt).token != 0 {
+        if ctxt.token != 0 {
             *len = 0;
-            return (*ctxt).token;
+            return ctxt.token;
         }
 
-        if (*ctxt).input().unwrap().remainder_len() < INPUT_CHUNK && (*ctxt).force_grow() < 0 {
+        if ctxt.input().unwrap().remainder_len() < INPUT_CHUNK && ctxt.force_grow() < 0 {
             return 0;
         }
 
-        if (*ctxt).charset != XmlCharEncoding::UTF8 {
+        if ctxt.charset != XmlCharEncoding::UTF8 {
             // Assume it's a fixed length encoding (1) with
             // a compatible encoding for the ASCII set, since
             // HTML constructs only use < 128 chars
-            if (*ctxt).current_byte() < 0x80 {
+            if ctxt.current_byte() < 0x80 {
                 *len = 1;
-                if (*ctxt).current_byte() == 0 && !(*ctxt).content_bytes().is_empty() {
+                if ctxt.current_byte() == 0 && !ctxt.content_bytes().is_empty() {
                     html_parse_err_int!(
                         ctxt,
                         XmlParserErrors::XmlErrInvalidChar,
@@ -418,17 +409,17 @@ unsafe fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) -> i32 {
                     );
                     return b' ' as _;
                 }
-                return (*ctxt).current_byte() as _;
+                return ctxt.current_byte() as _;
             }
 
             // Humm this is bad, do an automatic flow conversion
-            if let Some(guess) = html_find_encoding(&mut *ctxt) {
-                (*ctxt).input_mut().unwrap().encoding = Some(guess.clone());
+            if let Some(guess) = html_find_encoding(ctxt) {
+                ctxt.input_mut().unwrap().encoding = Some(guess.clone());
                 if let Some(handler) = find_encoding_handler(&guess) {
                     // Don't use UTF-8 encoder which isn't required and
                     // can produce invalid UTF-8.
                     if handler.name() != "UTF-8" {
-                        (*ctxt).switch_to_encoding(handler);
+                        ctxt.switch_to_encoding(handler);
                     }
                 } else {
                     html_parse_err(
@@ -440,9 +431,9 @@ unsafe fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) -> i32 {
                     );
                 }
             } else {
-                (*ctxt).switch_encoding(XmlCharEncoding::ISO8859_1);
+                ctxt.switch_encoding(XmlCharEncoding::ISO8859_1);
             }
-            (*ctxt).charset = XmlCharEncoding::UTF8;
+            ctxt.charset = XmlCharEncoding::UTF8;
         }
 
         // We are supposed to handle UTF8, check it's valid
@@ -454,132 +445,98 @@ unsafe fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) -> i32 {
         // 0000 0800-0000 FFFF   1110xxxx 10xxxxxx 10xxxxxx
         //
         // Check for the 0x110000 limit too
-        let cur: *const u8 = (*ctxt).input().unwrap().cur;
-        let c: u8 = *cur;
-        'goto_encoding_error: {
-            if c & 0x80 != 0 {
-                if c & 0x40 == 0 {
-                    break 'goto_encoding_error;
-                }
-                let avail = (*ctxt).input().unwrap().remainder_len();
-
-                if avail < 2 || *cur.add(1) & 0xc0 != 0x80 {
-                    break 'goto_encoding_error;
-                }
-                if c & 0xe0 == 0xe0 {
-                    if avail < 3 || *cur.add(2) & 0xc0 != 0x80 {
-                        break 'goto_encoding_error;
-                    }
-                    if c & 0xf0 == 0xf0 {
-                        if c & 0xf8 != 0xf0 || avail < 4 || *cur.add(3) & 0xc0 != 0x80 {
-                            break 'goto_encoding_error;
-                        }
-                        // 4-byte code
-                        *len = 4;
-                        val = (*cur.add(0) as u32 & 0x7) << 18;
-                        val |= (*cur.add(1) as u32 & 0x3f) << 12;
-                        val |= (*cur.add(2) as u32 & 0x3f) << 6;
-                        val |= *cur.add(3) as u32 & 0x3f;
-                        if val < 0x10000 {
-                            break 'goto_encoding_error;
-                        }
-                    } else {
-                        // 3-byte code
-                        *len = 3;
-                        val = (*cur.add(0) as u32 & 0xf) << 12;
-                        val |= (*cur.add(1) as u32 & 0x3f) << 6;
-                        val |= *cur.add(2) as u32 & 0x3f;
-                        if val < 0x800 {
-                            break 'goto_encoding_error;
-                        }
-                    }
-                } else {
-                    // 2-byte code
-                    *len = 2;
-                    val = (*cur.add(0) as u32 & 0x1f) << 6;
-                    val |= *cur.add(1) as u32 & 0x3f;
-                    if val < 0x80 {
-                        break 'goto_encoding_error;
-                    }
-                }
-
-                if !xml_is_char(val) {
-                    html_parse_err_int!(
-                        ctxt,
-                        XmlParserErrors::XmlErrInvalidChar,
-                        "Char 0x{:X} out of allowed range\n",
-                        val as i32
-                    );
-                }
-                return val as _;
-            } else {
-                if (*ctxt).current_byte() == 0 && !(*ctxt).content_bytes().is_empty() {
-                    html_parse_err_int!(
-                        ctxt,
-                        XmlParserErrors::XmlErrInvalidChar,
-                        "Char 0x{:X} out of allowed range\n",
-                        0
-                    );
-                    *len = 1;
-                    return b' ' as _;
-                }
-                // 1-byte code
-                *len = 1;
-                return (*ctxt).current_byte() as _;
-            }
+        let content = ctxt.content_bytes();
+        let l = 4.min(content.len());
+        if l == 0 {
+            *len = 0;
+            return 0;
         }
-
-        //  encoding_error:
-        // If we detect an UTF8 error that probably mean that the
-        // input encoding didn't get properly advertised in the declaration header.
-        // Report the error and match the encoding
-        // to ISO-Latin-1 (if you don't like this policy, just declare the encoding !)
-        {
-            use std::fmt::Write as _;
-            let mut buffer = String::new();
-
-            if (*ctxt).input().unwrap().remainder_len() >= 4 {
-                let content = (*ctxt).content_bytes();
-                writeln!(
-                    buffer,
-                    "Bytes: 0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}",
-                    content[0] as u32, content[1] as u32, content[2] as u32, content[3] as u32,
-                )
-                .ok();
-            } else {
-                writeln!(buffer, "Bytes: 0x{:02X}", (*ctxt).current_byte() as u32,).ok();
+        let c = match from_utf8(&content[..l]) {
+            Ok(s) => {
+                let c = s.chars().next().unwrap();
+                *len = c.len_utf8() as i32;
+                c
             }
-            html_parse_err(
+            Err(e) if e.valid_up_to() > 0 => {
+                let s = from_utf8_unchecked(&content[..e.valid_up_to()]);
+                let c = s.chars().next().unwrap();
+                *len = c.len_utf8() as i32;
+                c
+            }
+            Err(e) => {
+                match e.error_len() {
+                    Some(l) => {
+                        *len = l as i32;
+                        // If we detect an UTF8 error that probably mean that the
+                        // input encoding didn't get properly advertised in the
+                        // declaration header. Report the error and switch the encoding
+                        // to ISO-Latin-1 (if you don't like this policy, just declare the encoding !)
+                        use std::fmt::Write as _;
+                        let mut buffer = String::new();
+
+                        if ctxt.input().unwrap().remainder_len() >= 4 {
+                            let content = ctxt.content_bytes();
+                            writeln!(
+                                buffer,
+                                "Bytes: 0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}",
+                                content[0] as u32,
+                                content[1] as u32,
+                                content[2] as u32,
+                                content[3] as u32,
+                            )
+                            .ok();
+                        } else {
+                            writeln!(buffer, "Bytes: 0x{:02X}", ctxt.current_byte() as u32,).ok();
+                        }
+                        html_parse_err(
+                            ctxt,
+                            XmlParserErrors::XmlErrInvalidEncoding,
+                            "Input is not proper UTF-8, indicate encoding !\n",
+                            Some(&buffer),
+                            None,
+                        );
+
+                        // Don't match encodings twice. Note that if there's an encoder, we
+                        // shouldn't receive invalid UTF-8 anyway.
+                        //
+                        // Note that if ctxt.input().unwrap().buf.is_null(), switching encodings is
+                        // impossible, see Gitlab issue #34.
+                        if ctxt.input().unwrap().buf.is_some()
+                            && ctxt
+                                .input()
+                                .unwrap()
+                                .buf
+                                .as_ref()
+                                .unwrap()
+                                .borrow()
+                                .encoder
+                                .is_none()
+                        {
+                            ctxt.switch_encoding(XmlCharEncoding::ISO8859_1);
+                        }
+                        *len = 1;
+                        return ctxt.current_byte() as i32;
+                    }
+                    None => {
+                        *len = 0;
+                        return 0;
+                    }
+                }
+            }
+        };
+
+        if (*len > 1 && !xml_is_char(c as u32))
+            || (*len == 1 && c == '\0' && !ctxt.content_bytes().is_empty())
+        {
+            html_parse_err_int!(
                 ctxt,
-                XmlParserErrors::XmlErrInvalidEncoding,
-                "Input is not proper UTF-8, indicate encoding !\n",
-                Some(&buffer),
-                None,
+                XmlParserErrors::XmlErrInvalidChar,
+                "Char 0x{:X} out of allowed range\n",
+                c as i32
             );
         }
 
-        /*
-         * Don't match encodings twice. Note that if there's an encoder, we
-         * shouldn't receive invalid UTF-8 anyway.
-         *
-         * Note that if (*ctxt).input().unwrap().buf.is_null(), switching encodings is
-         * impossible, see Gitlab issue #34.
-         */
-        if (*ctxt).input().unwrap().buf.is_some()
-            && (*ctxt)
-                .input()
-                .unwrap()
-                .buf
-                .as_ref()
-                .unwrap()
-                .borrow()
-                .encoder
-                .is_none()
-        {
-            (*ctxt).switch_encoding(XmlCharEncoding::ISO8859_1);
-        }
-        *len = 1;
-        (*ctxt).current_byte() as _
+        c as i32
     }
 }
 
@@ -597,7 +554,7 @@ unsafe fn html_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
         let base: *const XmlChar = (*ctxt).input().unwrap().base;
 
         // Handler for more complex cases
-        c = html_current_char(ctxt, addr_of_mut!(l));
+        c = html_current_char(&mut *ctxt, &mut l);
         if c == b' ' as i32
         || c == b'>' as i32
         || c == b'/' as i32  /* accelerators */
@@ -631,7 +588,7 @@ unsafe fn html_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
             }
             (*ctxt).advance_with_line_handling(l as usize);
             (*ctxt).token = 0;
-            c = html_current_char(ctxt, addr_of_mut!(l));
+            c = html_current_char(&mut *ctxt, &mut l);
             if (*ctxt).input().unwrap().base != base {
                 // We changed encoding from an unknown encoding
                 // Input buffer changed location, so we better start again
@@ -874,7 +831,7 @@ pub(crate) unsafe fn html_parse_char_ref(ctxt: HtmlParserCtxtPtr) -> i32 {
             );
         } else {
             html_parse_err_int!(
-                ctxt,
+                &mut *ctxt,
                 XmlParserErrors::XmlErrInvalidChar,
                 "htmlParseCharRef: invalid xmlChar value {}\n",
                 val
@@ -1311,7 +1268,7 @@ unsafe fn html_parse_html_attribute(ctxt: HtmlParserCtxtPtr, stop: u8) -> *mut X
                     grow_buffer!(ctxt, buffer, buffer_size);
                     out = buffer.add(indx as usize) as _;
                 }
-                let c: u32 = html_current_char(ctxt, addr_of_mut!(l)) as _;
+                let c: u32 = html_current_char(&mut *ctxt, &mut l) as _;
                 if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
                     xml_free(buffer as _);
                     return null_mut();
@@ -2071,7 +2028,7 @@ unsafe fn html_parse_script(ctxt: HtmlParserCtxtPtr) {
         let mut cur: i32;
         let mut l: i32 = 0;
 
-        cur = html_current_char(ctxt, addr_of_mut!(l));
+        cur = html_current_char(&mut *ctxt, &mut l);
         while cur != 0 {
             if cur == b'<' as i32 && (*ctxt).nth_byte(1) == b'/' {
                 // One should break here, the specification is clear:
@@ -2113,7 +2070,7 @@ unsafe fn html_parse_script(ctxt: HtmlParserCtxtPtr) {
                 COPY_BUF!(ctxt, l, buf.as_mut_ptr(), nbchar, cur);
             } else {
                 html_parse_err_int!(
-                    ctxt,
+                    &mut *ctxt,
                     XmlParserErrors::XmlErrInvalidChar,
                     "Invalid char in CDATA 0x{:X}\n",
                     cur
@@ -2135,7 +2092,7 @@ unsafe fn html_parse_script(ctxt: HtmlParserCtxtPtr) {
                 nbchar = 0;
                 (*ctxt).shrink();
             }
-            cur = html_current_char(ctxt, addr_of_mut!(l));
+            cur = html_current_char(&mut *ctxt, &mut l);
         }
 
         if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
@@ -2197,7 +2154,7 @@ unsafe fn html_parse_system_literal(ctxt: HtmlParserCtxtPtr) -> *mut XmlChar {
             // TODO: Handle UTF-8
             if !xml_is_char((*ctxt).current_byte() as u32) {
                 html_parse_err_int!(
-                    ctxt,
+                    &mut *ctxt,
                     XmlParserErrors::XmlErrInvalidChar,
                     "Invalid char in SystemLiteral 0x{:X}\n",
                     (*ctxt).current_byte() as i32
@@ -2266,7 +2223,7 @@ unsafe fn html_parse_pubid_literal(ctxt: HtmlParserCtxtPtr) -> *mut XmlChar {
         while (*ctxt).current_byte() != 0 && (*ctxt).current_byte() as i32 != quote {
             if !xml_is_pubid_char((*ctxt).current_byte() as u32) {
                 html_parse_err_int!(
-                    ctxt,
+                    &mut *ctxt,
                     XmlParserErrors::XmlErrInvalidChar,
                     "Invalid char in PubidLiteral 0x{:X}\n",
                     (*ctxt).current_byte() as i32
@@ -2495,7 +2452,7 @@ unsafe fn html_parse_comment(ctxt: HtmlParserCtxtPtr) {
         }
         len = 0;
         *buf.add(len as usize) = 0;
-        q = html_current_char(ctxt, addr_of_mut!(ql));
+        q = html_current_char(&mut *ctxt, &mut ql);
         if q == 0 {
             // goto unfinished;
         } else {
@@ -2512,7 +2469,7 @@ unsafe fn html_parse_comment(ctxt: HtmlParserCtxtPtr) {
             } else {
                 (*ctxt).advance_with_line_handling(ql as usize);
                 (*ctxt).token = 0;
-                r = html_current_char(ctxt, addr_of_mut!(rl));
+                r = html_current_char(&mut *ctxt, &mut rl);
                 if r == 0 {
                     // goto unfinished;
                     let b = CStr::from_ptr(buf as *const i8).to_string_lossy();
@@ -2539,11 +2496,11 @@ unsafe fn html_parse_comment(ctxt: HtmlParserCtxtPtr) {
                 } else {
                     (*ctxt).advance_with_line_handling(rl as usize);
                     (*ctxt).token = 0;
-                    cur = html_current_char(ctxt, addr_of_mut!(l));
+                    cur = html_current_char(&mut *ctxt, &mut l);
                     while cur != 0 && (cur != b'>' as i32 || r != b'-' as i32 || q != b'-' as i32) {
                         (*ctxt).advance_with_line_handling(l as usize);
                         (*ctxt).token = 0;
-                        next = html_current_char(ctxt, addr_of_mut!(nl));
+                        next = html_current_char(&mut *ctxt, &mut nl);
 
                         if q == b'-' as i32
                             && r == b'-' as i32
@@ -2576,7 +2533,7 @@ unsafe fn html_parse_comment(ctxt: HtmlParserCtxtPtr) {
                             COPY_BUF!(ctxt, ql, buf, len, q);
                         } else {
                             html_parse_err_int!(
-                                ctxt,
+                                &mut *ctxt,
                                 XmlParserErrors::XmlErrInvalidChar,
                                 "Invalid char in comment 0x{:X}\n",
                                 q
@@ -2723,7 +2680,7 @@ unsafe fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
                     );
                 }
                 html_skip_blank_chars(&mut *ctxt);
-                cur = html_current_char(ctxt, addr_of_mut!(l));
+                cur = html_current_char(&mut *ctxt, &mut l);
                 while cur != 0 && cur != b'>' as i32 {
                     if len + 5 >= size {
                         size *= 2;
@@ -2740,7 +2697,7 @@ unsafe fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
                         COPY_BUF!(ctxt, l, buf, len, cur);
                     } else {
                         html_parse_err_int!(
-                            ctxt,
+                            &mut *ctxt,
                             XmlParserErrors::XmlErrInvalidChar,
                             "Invalid char in processing instruction 0x{:X}\n",
                             cur
@@ -2760,7 +2717,7 @@ unsafe fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
                     }
                     (*ctxt).advance_with_line_handling(l as usize);
                     (*ctxt).token = 0;
-                    cur = html_current_char(ctxt, addr_of_mut!(l));
+                    cur = html_current_char(&mut *ctxt, &mut l);
                 }
                 *buf.add(len as usize) = 0;
                 if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
@@ -3072,14 +3029,14 @@ unsafe fn html_parse_char_data_internal(ctxt: HtmlParserCtxtPtr, readahead: i32)
             nbchar += 1;
         }
 
-        cur = html_current_char(ctxt, addr_of_mut!(l));
+        cur = html_current_char(&mut *ctxt, &mut l);
         while (cur != b'<' as i32 || (*ctxt).token == b'<' as i32)
             && (cur != b'&' as i32 || (*ctxt).token == b'&' as i32)
             && cur != 0
         {
             if !xml_is_char(cur as u32) {
                 html_parse_err_int!(
-                    ctxt,
+                    &mut *ctxt,
                     XmlParserErrors::XmlErrInvalidChar,
                     "Invalid char in CDATA 0x{:X}\n",
                     cur
@@ -3115,7 +3072,7 @@ unsafe fn html_parse_char_data_internal(ctxt: HtmlParserCtxtPtr, readahead: i32)
                 nbchar = 0;
                 (*ctxt).shrink();
             }
-            cur = html_current_char(ctxt, addr_of_mut!(l));
+            cur = html_current_char(&mut *ctxt, &mut l);
         }
         if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
             return;
