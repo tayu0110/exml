@@ -44,9 +44,9 @@ use exml::{
         set_pedantic_parser_default_value, set_structured_error,
     },
     html::{
+        HtmlParserCtxtPtr,
         parser::{
-            HtmlParserCtxtPtr, html_ctxt_read_file, html_free_parser_ctxt,
-            html_new_sax_parser_ctxt, html_read_file,
+            html_ctxt_read_file, html_free_parser_ctxt, html_new_sax_parser_ctxt, html_read_file,
         },
         tree::html_doc_dump_memory,
     },

@@ -29,7 +29,7 @@ use std::{
 
 use crate::{
     encoding::XmlCharEncoding,
-    html::parser::{HtmlDocPtr, HtmlNodePtr, html_err_memory},
+    html::parser::html_err_memory,
     libxml::{globals::xml_register_node_default_value, xmlstring::XmlChar},
     tree::{
         __XML_REGISTER_CALLBACKS, NodeCommon, XmlAttr, XmlAttrPtr, XmlDoc, XmlDocProperties,
@@ -39,6 +39,8 @@ use crate::{
 };
 #[cfg(feature = "libxml_output")]
 use crate::{error::XmlParserErrors, io::XmlOutputBuffer, tree::XmlGenericNodePtr};
+
+use super::{HtmlDocPtr, HtmlNodePtr};
 
 /// Macro. A text node in a HTML document is really implemented
 /// the same way as a text node in an XML document.

@@ -52,10 +52,10 @@ use exml::{
         set_load_ext_dtd_default_value, set_parser_debug_entities, set_tree_indent_string,
     },
     html::{
+        HtmlParserCtxtPtr,
         parser::{
-            HtmlParserCtxtPtr, HtmlParserOption, html_create_push_parser_ctxt,
-            html_ctxt_use_options, html_free_parser_ctxt, html_parse_chunk, html_read_file,
-            html_read_memory,
+            HtmlParserOption, html_create_push_parser_ctxt, html_ctxt_use_options,
+            html_free_parser_ctxt, html_parse_chunk, html_read_file, html_read_memory,
         },
         tree::{html_doc_dump, html_save_file_format},
     },

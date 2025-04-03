@@ -7,6 +7,8 @@ use std::{
     sync::Mutex,
 };
 
+#[cfg(feature = "html")]
+use crate::html::HtmlParserCtxtPtr;
 #[cfg(feature = "catalog")]
 use crate::libxml::catalog::{XmlCatalogAllow, XmlCatalogPrefer};
 #[cfg(feature = "schema")]
@@ -16,7 +18,7 @@ use crate::xmlschemas::{
     schema::XmlSchemaPtr,
 };
 use crate::{
-    html::parser::{HtmlParserCtxtPtr, html_free_parser_ctxt},
+    html::parser::html_free_parser_ctxt,
     libxml::{
         globals::xml_free,
         relaxng::XmlRelaxNGPtr,
