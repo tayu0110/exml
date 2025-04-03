@@ -22,6 +22,8 @@ pub mod encoding;
 pub mod error;
 pub mod globals;
 pub mod hash;
+#[cfg(feature = "html")]
+pub mod html;
 pub mod io;
 pub mod libxml;
 pub mod list;

@@ -4,10 +4,6 @@ pub mod chvalid;
 pub mod dict;
 pub mod globals;
 pub mod hash;
-#[cfg(feature = "html")]
-pub mod htmlparser;
-#[cfg(feature = "html")]
-pub mod htmltree;
 pub mod parser;
 pub mod parser_internals;
 #[cfg(feature = "schema")]

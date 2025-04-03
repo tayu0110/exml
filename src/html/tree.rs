@@ -29,6 +29,8 @@ use std::{
 
 use crate::{
     encoding::XmlCharEncoding,
+    html::parser::{HtmlDocPtr, HtmlNodePtr, html_err_memory},
+    libxml::{globals::xml_register_node_default_value, xmlstring::XmlChar},
     tree::{
         __XML_REGISTER_CALLBACKS, NodeCommon, XmlAttr, XmlAttrPtr, XmlDoc, XmlDocProperties,
         XmlDocPtr, XmlElementType, XmlNodePtr, xml_create_int_subset, xml_free_node,
@@ -37,12 +39,6 @@ use crate::{
 };
 #[cfg(feature = "libxml_output")]
 use crate::{error::XmlParserErrors, io::XmlOutputBuffer, tree::XmlGenericNodePtr};
-
-use super::{
-    globals::xml_register_node_default_value,
-    htmlparser::{HtmlDocPtr, HtmlNodePtr, html_err_memory},
-    xmlstring::XmlChar,
-};
 
 /// Macro. A text node in a HTML document is really implemented
 /// the same way as a text node in an XML document.
@@ -903,8 +899,8 @@ pub unsafe fn html_node_dump_format_output(
 ) {
     unsafe {
         use crate::{
+            html::parser::html_tag_lookup,
             libxml::{
-                htmlparser::html_tag_lookup,
                 parser::xml_init_parser,
                 parser_internals::{XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
             },

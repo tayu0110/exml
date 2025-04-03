@@ -28,9 +28,9 @@ use std::{
 use crate::{
     encoding::find_encoding_handler,
     error::XmlParserErrors,
+    html::tree::html_node_dump_output,
     io::XmlOutputBuffer,
     libxml::{
-        htmltree::html_node_dump_output,
         parser::xml_init_parser,
         xmlstring::{XmlChar, xml_strndup},
     },

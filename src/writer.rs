@@ -39,9 +39,9 @@ use crate::{
     encoding::find_encoding_handler,
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     globals::GenericErrorContext,
+    html::tree::html_new_doc_no_dtd,
     io::XmlOutputBuffer,
     libxml::{
-        htmltree::html_new_doc_no_dtd,
         parser::XmlSAXHandler,
         sax2::{xml_sax2_end_element, xml_sax2_init_default_sax_handler, xml_sax2_start_element},
     },

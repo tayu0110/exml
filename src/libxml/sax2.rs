@@ -33,8 +33,8 @@ use crate::{
         parser_warning,
     },
     globals::{GenericErrorContext, StructuredError},
+    html::tree::html_new_doc_no_dtd,
     libxml::{
-        htmltree::html_new_doc_no_dtd,
         parser::XmlSAXLocatorPtr,
         valid::{
             xml_validate_attribute_decl, xml_validate_document_final, xml_validate_one_element,
@@ -1327,11 +1327,9 @@ unsafe fn xml_sax2_attribute_internal(
     value: Option<&str>,
     prefix: Option<&str>,
 ) {
-    use crate::uri::XmlURI;
+    use crate::{html::tree::html_is_boolean_attr, uri::XmlURI};
 
     unsafe {
-        use super::htmltree::html_is_boolean_attr;
-
         let nval: *mut XmlChar;
         let value = value.map(|v| CString::new(v).unwrap());
         let mut value = value.as_deref().map_or(null(), |v| v.as_ptr() as *const u8);

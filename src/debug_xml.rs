@@ -1918,7 +1918,7 @@ impl XmlShellCtxt<'_> {
     ) -> i32 {
         unsafe {
             use crate::{
-                libxml::htmlparser::html_parse_file,
+                html::parser::html_parse_file,
                 parser::xml_read_file,
                 uri::canonic_path,
                 xpath::{xml_xpath_free_context, xml_xpath_new_context},
@@ -1982,7 +1982,7 @@ impl XmlShellCtxt<'_> {
         _node2: Option<XmlGenericNodePtr>,
     ) -> i32 {
         unsafe {
-            use crate::libxml::htmltree::{html_doc_dump, html_node_dump_file};
+            use crate::html::tree::{html_doc_dump, html_node_dump_file};
 
             let Some(node) = node else {
                 writeln!(self.output, "NULL").ok();
@@ -2042,7 +2042,7 @@ impl XmlShellCtxt<'_> {
         unsafe {
             use std::fs::File;
 
-            use crate::libxml::htmltree::html_save_file;
+            use crate::html::tree::html_save_file;
 
             if filename.is_empty() {
                 return -1;
@@ -2105,7 +2105,7 @@ impl XmlShellCtxt<'_> {
         _node2: Option<XmlGenericNodePtr>,
     ) -> i32 {
         unsafe {
-            use crate::libxml::htmltree::html_save_file;
+            use crate::html::tree::html_save_file;
 
             let Some(mut doc) = self.doc else {
                 return -1;

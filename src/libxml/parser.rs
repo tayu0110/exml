@@ -64,6 +64,7 @@ use crate::{
     encoding::{XmlCharEncoding, detect_encoding, find_encoding_handler},
     error::{XmlError, XmlParserErrors},
     globals::{GenericErrorContext, StructuredError},
+    html::parser::{__html_parse_content, HtmlParserOption, html_create_memory_parser_ctxt},
     io::{
         XmlParserInputBuffer, cleanup_input_callbacks, cleanup_output_callbacks,
         register_default_input_callbacks, register_default_output_callbacks,
@@ -74,7 +75,6 @@ use crate::{
         globals::{
             xml_cleanup_globals_internal, xml_default_sax_locator, xml_init_globals_internal,
         },
-        htmlparser::{__html_parse_content, HtmlParserOption, html_create_memory_parser_ctxt},
         xmlmemory::{xml_cleanup_memory_internal, xml_init_memory_internal},
         xmlschemastypes::xml_schema_cleanup_types,
         xmlstring::XmlChar,

@@ -487,7 +487,7 @@ fn decode_html(_src: &[u8], _dst: &mut str) -> Result<(usize, usize), EncodingEr
 fn encode_html(src: &str, dst: &mut [u8]) -> Result<(usize, usize), EncodingError> {
     use std::ptr::addr_of_mut;
 
-    use crate::libxml::htmlparser::utf8_to_html;
+    use crate::html::parser::utf8_to_html;
 
     let mut outlen = dst.len() as i32;
     let out = dst.as_mut_ptr();

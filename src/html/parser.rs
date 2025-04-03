@@ -45,11 +45,16 @@ use crate::{
     globals::{GenericErrorContext, get_keep_blanks_default_value, get_line_numbers_default_value},
     io::XmlParserInputBuffer,
     libxml::{
+        chvalid::{
+            xml_is_blank_char, xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender,
+            xml_is_pubid_char,
+        },
         dict::{xml_dict_create, xml_dict_lookup},
         globals::{xml_default_sax_locator, xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         parser::{XmlSAXHandler, XmlSAXHandlerPtr, xml_init_parser, xml_load_external_entity},
         parser_internals::{
             INPUT_CHUNK, XML_MAX_HUGE_LENGTH, XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH,
+            XML_VCTXT_USE_PCTXT, xml_is_letter,
         },
         sax2::{xml_sax2_ignorable_whitespace, xml_sax2_init_html_default_sax_handler},
         xmlstring::{
@@ -64,14 +69,6 @@ use crate::{
         NodeCommon, XmlDocPtr, XmlElementType, XmlNodePtr, xml_create_int_subset, xml_free_doc,
     },
     uri::canonic_path,
-};
-
-use super::{
-    chvalid::{
-        xml_is_blank_char, xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender,
-        xml_is_pubid_char,
-    },
-    parser_internals::{XML_VCTXT_USE_PCTXT, xml_is_letter},
 };
 
 // Most of the back-end structures from XML and HTML are shared.
@@ -6578,34 +6575,15 @@ unsafe fn html_check_encoding_direct(ctxt: HtmlParserCtxtPtr, encoding: Option<&
                 }
             }
 
-            if (*ctxt).input().unwrap().buf.is_some()
-                && (*ctxt)
-                    .input()
-                    .unwrap()
-                    .buf
-                    .as_ref()
-                    .unwrap()
-                    .borrow()
-                    .encoder
-                    .is_some()
-                && (*ctxt)
-                    .input()
-                    .unwrap()
-                    .buf
-                    .as_ref()
-                    .unwrap()
-                    .borrow()
-                    .raw
-                    .is_some()
-                && (*ctxt)
-                    .input()
-                    .unwrap()
-                    .buf
-                    .as_ref()
-                    .unwrap()
-                    .borrow()
-                    .buffer
-                    .is_some()
+            if (*ctxt)
+                .input()
+                .unwrap()
+                .buf
+                .as_deref()
+                .map(|buf| buf.borrow())
+                .is_some_and(|buf| {
+                    buf.encoder.is_some() && buf.buffer.is_some() && buf.raw.is_some()
+                })
             {
                 // convert as much as possible to the parser reading buffer.
                 let processed = (*ctxt).input().unwrap().offset_from_base();

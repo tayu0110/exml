@@ -51,15 +51,17 @@ use exml::{
         GenericError, GenericErrorContext, get_load_ext_dtd_default_value,
         set_load_ext_dtd_default_value, set_parser_debug_entities, set_tree_indent_string,
     },
-    io::{XmlParserInputBuffer, xml_no_net_external_entity_loader},
-    libxml::{
-        globals::{xml_deregister_node_default, xml_free, xml_register_node_default},
-        htmlparser::{
+    html::{
+        parser::{
             HtmlParserCtxtPtr, HtmlParserOption, html_create_push_parser_ctxt,
             html_ctxt_use_options, html_free_parser_ctxt, html_parse_chunk, html_read_file,
             html_read_memory,
         },
-        htmltree::{html_doc_dump, html_save_file_format},
+        tree::{html_doc_dump, html_save_file_format},
+    },
+    io::{XmlParserInputBuffer, xml_no_net_external_entity_loader},
+    libxml::{
+        globals::{xml_deregister_node_default, xml_free, xml_register_node_default},
         parser::{
             XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SAX2_MAGIC, XmlExternalEntityLoader,
             XmlSAXHandler, XmlSAXHandlerPtr, XmlSAXLocatorPtr, xml_cleanup_parser,

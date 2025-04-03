@@ -36,12 +36,12 @@ use crate::{
     encoding::{XmlCharEncoding, XmlCharEncodingHandler, find_encoding_handler},
     error::{__xml_simple_error, __xml_simple_oom_error, XmlErrorDomain, XmlParserErrors},
     globals::{GLOBAL_STATE, get_indent_tree_output},
+    html::tree::{
+        html_doc_content_dump_format_output, html_get_meta_encoding, html_set_meta_encoding,
+    },
     io::XmlOutputBuffer,
     libxml::{
         chvalid::xml_is_char,
-        htmltree::{
-            html_doc_content_dump_format_output, html_get_meta_encoding, html_set_meta_encoding,
-        },
         parser::xml_init_parser,
         parser_internals::XML_STRING_TEXT_NOENC,
         valid::{xml_dump_attribute_decl, xml_dump_element_decl, xml_dump_notation_table},
@@ -1145,7 +1145,7 @@ unsafe fn xml_ns_dump_output_ctxt(ctxt: &mut XmlSaveCtxt, cur: XmlNsPtr) {
 unsafe fn xhtml_attr_list_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Option<XmlAttrPtr>) {
     unsafe {
         use crate::{
-            libxml::htmltree::html_is_boolean_attr,
+            html::tree::html_is_boolean_attr,
             tree::{xml_free_node, xml_new_doc_text},
         };
 
@@ -1622,7 +1622,7 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Xml
 #[cfg(feature = "html")]
 unsafe fn html_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, cur: XmlGenericNodePtr) -> i32 {
     unsafe {
-        use crate::libxml::htmltree::html_node_dump_format_output;
+        use crate::html::tree::html_node_dump_format_output;
 
         let mut oldenc = None;
         let oldctxtenc = ctxt.encoding.clone();

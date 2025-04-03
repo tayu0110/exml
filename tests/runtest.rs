@@ -43,17 +43,19 @@ use exml::{
         GenericErrorContext, reset_last_error, set_generic_error,
         set_pedantic_parser_default_value, set_structured_error,
     },
+    html::{
+        parser::{
+            HtmlParserCtxtPtr, html_ctxt_read_file, html_free_parser_ctxt,
+            html_new_sax_parser_ctxt, html_read_file,
+        },
+        tree::html_doc_dump_memory,
+    },
     io::{
         XmlInputCallback, pop_input_callbacks, register_input_callbacks,
         xml_no_net_external_entity_loader,
     },
     libxml::{
         globals::{set_xml_free, set_xml_malloc, set_xml_mem_strdup, set_xml_realloc, xml_free},
-        htmlparser::{
-            HtmlParserCtxtPtr, html_ctxt_read_file, html_free_parser_ctxt,
-            html_new_sax_parser_ctxt, html_read_file,
-        },
-        htmltree::html_doc_dump_memory,
         parser::{
             XML_SAX2_MAGIC, XmlSAXHandler, XmlSAXLocatorPtr, xml_cleanup_parser, xml_init_parser,
             xml_set_external_entity_loader,
@@ -1136,7 +1138,7 @@ unsafe fn htmlstart_element_debug(
     atts: &[(String, Option<String>)],
 ) {
     unsafe {
-        use exml::libxml::htmlparser::html_encode_entities;
+        use exml::html::parser::html_encode_entities;
 
         sax_debug!("SAX.startElement({name}");
         for (key, value) in atts {
@@ -1179,7 +1181,7 @@ unsafe fn htmlcharacters_debug(_ctx: Option<GenericErrorContext>, ch: &str) {
     unsafe {
         use std::ffi::c_uchar;
 
-        use exml::libxml::htmlparser::html_encode_entities;
+        use exml::html::parser::html_encode_entities;
 
         let len = ch.len();
         let mut output: [c_uchar; 40] = [0; 40];
@@ -1212,7 +1214,7 @@ unsafe fn htmlcdata_debug(_ctx: Option<GenericErrorContext>, ch: &str) {
     unsafe {
         use std::ffi::c_uchar;
 
-        use exml::libxml::htmlparser::html_encode_entities;
+        use exml::html::parser::html_encode_entities;
 
         let len = ch.len();
         let mut output: [c_uchar; 40] = [0; 40];
@@ -1644,7 +1646,7 @@ unsafe fn push_parse_test(
     unsafe {
         use exml::{
             encoding::XmlCharEncoding,
-            libxml::htmlparser::{html_create_push_parser_ctxt, html_parse_chunk},
+            html::parser::{html_create_push_parser_ctxt, html_parse_chunk},
             parser::xml_create_push_parser_ctxt,
         };
 
@@ -1984,9 +1986,11 @@ unsafe fn push_boundary_test(
     unsafe {
         use exml::{
             encoding::XmlCharEncoding,
+            html::{
+                parser::{html_create_push_parser_ctxt, html_parse_chunk},
+                tree::html_doc_dump_memory,
+            },
             libxml::{
-                htmlparser::{html_create_push_parser_ctxt, html_parse_chunk},
-                htmltree::html_doc_dump_memory,
                 parser::XmlSAXHandler,
                 sax2::{xml_sax_version, xml_sax2_init_html_default_sax_handler},
             },

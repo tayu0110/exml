@@ -16,9 +16,9 @@ use crate::xmlschemas::{
     schema::XmlSchemaPtr,
 };
 use crate::{
+    html::parser::{HtmlParserCtxtPtr, html_free_parser_ctxt},
     libxml::{
         globals::xml_free,
-        htmlparser::{HtmlParserCtxtPtr, html_free_parser_ctxt},
         relaxng::XmlRelaxNGPtr,
         schemas_internals::{XmlSchemaFacetPtr, XmlSchemaValType},
         valid::xml_free_element_content,
@@ -540,7 +540,7 @@ pub(crate) fn gen_const_xml_char_ptr_ptr(_no: i32, _nr: i32) -> *mut *mut XmlCha
 #[cfg(feature = "html")]
 pub(crate) unsafe fn gen_html_parser_ctxt_ptr(no: i32, _nr: i32) -> HtmlParserCtxtPtr {
     unsafe {
-        use crate::libxml::htmlparser::html_create_memory_parser_ctxt;
+        use crate::html::parser::html_create_memory_parser_ctxt;
 
         if no == 0 {
             return xml_new_parser_ctxt();
