@@ -305,15 +305,11 @@ impl XmlParserCtxt {
     }
 
     pub(crate) unsafe fn current_byte(&self) -> u8 {
-        unsafe { *self.input().unwrap().cur }
+        unsafe { *self.content_bytes().first().unwrap_or(&0) }
     }
 
     pub(crate) unsafe fn nth_byte(&self, nth: usize) -> u8 {
-        unsafe {
-            let ptr = self.input().unwrap().cur.add(nth);
-            // debug_assert!(ptr < self.input().unwrap().end);
-            *ptr
-        }
+        unsafe { *self.content_bytes().get(nth).unwrap_or(&0) }
     }
 
     pub fn input(&self) -> Option<&XmlParserInput> {
@@ -711,13 +707,10 @@ impl XmlParserCtxt {
                     "Input is not proper UTF-8, indicate encoding !\n"
                 );
             } else {
-                let input = self.input().unwrap();
+                let content = self.content_bytes();
                 let buffer = format!(
                     "Bytes: 0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}\n",
-                    *input.cur.add(0),
-                    *input.cur.add(1),
-                    *input.cur.add(2),
-                    *input.cur.add(3),
+                    content[0], content[1], content[2], content[3],
                 );
                 __xml_err_encoding!(
                     self,
@@ -747,24 +740,41 @@ impl XmlParserCtxt {
                 || matches!(self.instate, XmlParserInputState::XmlParserStart)
             {
                 // if we are in the document content, go really fast
-                let mut cur = self.input().unwrap().cur;
-                while xml_is_blank_char(*cur as u32) {
-                    let input = self.input_mut().unwrap();
-                    if *cur == b'\n' {
-                        input.line += 1;
-                        input.col = 1;
+                let input = self.input().unwrap();
+                let mut line = input.line;
+                let mut col = input.col;
+                self.force_grow();
+                let mut content = self.content_bytes();
+                while content
+                    .first()
+                    .is_some_and(|&b| xml_is_blank_char(b as u32))
+                {
+                    if content[0] == b'\n' {
+                        line += 1;
+                        col = 1;
                     } else {
-                        input.col += 1;
+                        col += 1;
                     }
-                    cur = cur.add(1);
+                    content = &content[1..];
                     res = res.saturating_add(1);
-                    if *cur == 0 {
-                        self.input_mut().unwrap().cur = cur;
+                    if content.is_empty() {
+                        let len = self.content_bytes().len();
+                        let input = self.input_mut().unwrap();
+                        input.cur = input.cur.add(len);
+                        input.line = line;
+                        input.col = col;
                         self.force_grow();
-                        cur = self.input().unwrap().cur;
+                        content = self.content_bytes();
                     }
                 }
-                self.input_mut().unwrap().cur = cur;
+
+                let diff = self.content_bytes().len() - content.len();
+                if diff > 0 {
+                    let input = self.input_mut().unwrap();
+                    input.cur = input.cur.add(diff);
+                    input.line = line;
+                    input.col = col;
+                }
             } else {
                 let expand_pe = self.external != 0 || self.input_tab.len() != 1;
 
@@ -848,10 +858,10 @@ impl XmlParserCtxt {
                 return None;
             }
 
-            let input = self.input()?;
-            if *input.cur >= 0x20 && *input.cur <= 0x7F {
+            self.input()?;
+            if (0x20..0x80).contains(&self.current_byte()) {
                 *len = 1;
-                return Some(*input.cur as char);
+                return Some(self.current_byte() as char);
             }
 
             if self.charset != XmlCharEncoding::UTF8 {
@@ -859,14 +869,14 @@ impl XmlParserCtxt {
                 // a compatible encoding for the ASCII set, since
                 // XML constructs only use < 128 chars
                 *len = 1;
-                if *input.cur == 0xD {
-                    if *input.cur.add(1) == 0xA {
+                if self.current_byte() == 0xD {
+                    if self.nth_byte(1) == 0xA {
                         let input = self.input_mut()?;
                         input.cur = input.cur.add(1);
                     }
                     return Some('\u{A}');
                 }
-                return Some(*input.cur as char);
+                return Some(self.current_byte() as char);
             }
             let content = self.content_bytes();
             let l = 4.min(content.len());
@@ -913,7 +923,7 @@ impl XmlParserCtxt {
                             }
                             self.charset = XmlCharEncoding::ISO8859_1;
                             *len = 1;
-                            return Some(*self.input().unwrap().cur as char);
+                            return Some(self.current_byte() as char);
                         }
                         None => {
                             *len = 0;
@@ -1217,7 +1227,7 @@ impl XmlParserCtxt {
                 entity.flags &= !XML_ENT_EXPANDING as i32;
             }
 
-            if *self.input().unwrap().cur == 0 {
+            if self.current_byte() == 0 {
                 self.force_grow();
             }
             self.current_byte()
@@ -1569,10 +1579,9 @@ impl XmlParserCtxt {
             // Note that we look for a decoded UTF-8 BOM when switching to UTF-16.
             // This is mostly useless but Webkit/Chromium relies on this behavior.
             // See https://bugs.chromium.org/p/chromium/issues/detail?id=1451026
-            if self.input().is_some()
-                && self.input().unwrap().consumed == 0
-                && !self.input().unwrap().cur.is_null()
-                && self.input().unwrap().offset_from_base() == 0
+            if self
+                .input()
+                .is_some_and(|input| input.consumed == 0 && input.offset_from_base() == 0)
                 && matches!(
                     enc,
                     XmlCharEncoding::UTF8 | XmlCharEncoding::UTF16LE | XmlCharEncoding::UTF16BE
@@ -1580,10 +1589,7 @@ impl XmlParserCtxt {
             {
                 // Errata on XML-1.0 June 20 2001
                 // Specific handling of the Byte Order Mark for UTF-8
-                if *self.input().unwrap().cur.add(0) == 0xEF
-                    && *self.input().unwrap().cur.add(1) == 0xBB
-                    && *self.input().unwrap().cur.add(2) == 0xBF
-                {
+                if self.content_bytes().starts_with(&[0xEF, 0xBB, 0xBF]) {
                     self.input_mut().unwrap().cur = self.input().unwrap().cur.add(3);
                 }
             }
