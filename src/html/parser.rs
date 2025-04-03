@@ -30,7 +30,7 @@ use std::{
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
     rc::Rc,
-    str::from_utf8,
+    str::{from_utf8, from_utf8_unchecked},
     sync::atomic::{AtomicI32, Ordering},
 };
 
@@ -57,9 +57,7 @@ use crate::{
             XML_VCTXT_USE_PCTXT, xml_is_letter,
         },
         sax2::{xml_sax2_ignorable_whitespace, xml_sax2_init_html_default_sax_handler},
-        xmlstring::{
-            XmlChar, xml_str_equal, xml_strcasestr, xml_strlen, xml_strncasecmp, xml_strndup,
-        },
+        xmlstring::{XmlChar, xml_str_equal, xml_strlen, xml_strncasecmp, xml_strndup},
     },
     parser::{
         XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput, XmlParserInputState, XmlParserOption,
@@ -289,66 +287,51 @@ macro_rules! html_parse_err_int {
 ///
 /// Returns an encoding string or NULL if not found, the string need to be freed
 #[doc(alias = "htmlFindEncoding")]
-unsafe fn html_find_encoding(ctxt: XmlParserCtxtPtr) -> *mut XmlChar {
+unsafe fn html_find_encoding(ctxt: &mut XmlParserCtxt) -> Option<String> {
     unsafe {
-        let mut start: *const XmlChar;
-        let mut cur: *const XmlChar;
-
-        if ctxt.is_null()
-            || (*ctxt).input().is_none()
-            || (*ctxt).input().unwrap().encoding.is_some()
-            || (*ctxt).input().unwrap().buf.is_none()
-            || (*ctxt)
-                .input()
-                .unwrap()
-                .buf
-                .as_ref()
-                .unwrap()
-                .borrow()
-                .encoder
-                .is_some()
-        {
-            return null_mut();
+        if ctxt.input().is_none_or(|input| {
+            input.encoding.is_some()
+                || input
+                    .buf
+                    .as_deref()
+                    .is_none_or(|buf| buf.borrow().encoder.is_some())
+        }) {
+            return None;
         }
-        if (*ctxt).input().unwrap().cur.is_null() || (*ctxt).input().unwrap().end.is_null() {
-            return null_mut();
+        if ctxt.content_bytes().is_empty() {
+            return None;
         }
 
-        start = (*ctxt).input().unwrap().cur;
-        let end: *const XmlChar = (*ctxt).input().unwrap().end;
-        // we also expect the input buffer to be zero terminated
-        if *end != 0 {
-            return null_mut();
-        }
+        const HTTP_EQUIV: &[u8] = b"HTTP-EQUIV";
+        const CONTENT: &[u8] = b"CONTENT";
+        const CHARSET: &[u8] = b"CHARSET=";
 
-        cur = xml_strcasestr(start, c"HTTP-EQUIV".as_ptr() as _);
-        if cur.is_null() {
-            return null_mut();
+        let start = ctxt.content_bytes();
+        let cur = start
+            .windows(HTTP_EQUIV.len())
+            .position(|chunk| chunk.eq_ignore_ascii_case(HTTP_EQUIV))
+            .map(|pos| &start[pos..])?;
+        let cur = cur
+            .windows(CONTENT.len())
+            .position(|chunk| chunk.eq_ignore_ascii_case(CONTENT))
+            .map(|pos| &start[pos..])?;
+        let cur = cur
+            .windows(CHARSET.len())
+            .position(|chunk| chunk.eq_ignore_ascii_case(CHARSET))
+            .map(|pos| &start[pos..])?;
+        let cur = &cur[CHARSET.len()..];
+        let start = cur;
+        let count = cur
+            .iter()
+            .position(|c| !c.is_ascii_alphanumeric() && !matches!(c, b'-' | b'_' | b':' | b'/'))
+            .unwrap_or(cur.len());
+        if count == 0 {
+            return None;
         }
-        cur = xml_strcasestr(cur, c"CONTENT".as_ptr() as _);
-        if cur.is_null() {
-            return null_mut();
-        }
-        cur = xml_strcasestr(cur, c"CHARSET=".as_ptr() as _);
-        if cur.is_null() {
-            return null_mut();
-        }
-        cur = cur.add(8);
-        start = cur;
-        while (*cur >= b'A' && *cur <= b'Z')
-            || (*cur >= b'a' && *cur <= b'z')
-            || (*cur >= b'0' && *cur <= b'9')
-            || *cur == b'-'
-            || *cur == b'_'
-            || *cur == b':'
-            || *cur == b'/'
-        {
-            cur = cur.add(1);
-        }
-        if cur == start {
-            return null_mut();
-        }
-        xml_strndup(start, cur.offset_from(start) as _)
+        // # Safety
+        // `start[..count]` only contains ASCII alphanumeric, '-', '_', ':' or '/'.
+        // Therefore, UTF-8 validation won't fail.
+        Some(from_utf8_unchecked(&start[..count]).to_owned())
     }
 }
 
@@ -439,25 +422,15 @@ unsafe fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) -> i32 {
             }
 
             // Humm this is bad, do an automatic flow conversion
-            let guess: *mut XmlChar = html_find_encoding(ctxt);
-            if guess.is_null() {
-                (*ctxt).switch_encoding(XmlCharEncoding::ISO8859_1);
-            } else {
-                (*ctxt).input_mut().unwrap().encoding = Some(
-                    CStr::from_ptr(guess as *const i8)
-                        .to_string_lossy()
-                        .into_owned(),
-                );
-                if let Some(handler) =
-                    find_encoding_handler(CStr::from_ptr(guess as *const i8).to_str().unwrap())
-                {
+            if let Some(guess) = html_find_encoding(&mut *ctxt) {
+                (*ctxt).input_mut().unwrap().encoding = Some(guess.clone());
+                if let Some(handler) = find_encoding_handler(&guess) {
                     // Don't use UTF-8 encoder which isn't required and
                     // can produce invalid UTF-8.
                     if handler.name() != "UTF-8" {
                         (*ctxt).switch_to_encoding(handler);
                     }
                 } else {
-                    let guess = CStr::from_ptr(guess as *const i8).to_string_lossy();
                     html_parse_err(
                         ctxt,
                         XmlParserErrors::XmlErrInvalidEncoding,
@@ -466,6 +439,8 @@ unsafe fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) -> i32 {
                         None,
                     );
                 }
+            } else {
+                (*ctxt).switch_encoding(XmlCharEncoding::ISO8859_1);
             }
             (*ctxt).charset = XmlCharEncoding::UTF8;
         }
