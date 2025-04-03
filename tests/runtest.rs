@@ -2240,10 +2240,11 @@ unsafe fn push_boundary_test(
             from_raw_parts(base as _, size as usize),
         );
         if base.is_null() || res != 0 {
+            eprintln!("Result for {filename} failed in {}", result.unwrap());
             if !base.is_null() {
+                eprintln!("{}", CStr::from_ptr(base).to_string_lossy());
                 xml_free(base as _);
             }
-            eprintln!("Result for {filename} failed in {}", result.unwrap());
             return -1;
         }
         xml_free(base as _);
