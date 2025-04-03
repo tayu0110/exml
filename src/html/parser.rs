@@ -121,7 +121,7 @@ pub fn html_entity_value_lookup(value: u32) -> Option<&'static HtmlEntityDesc> {
 ///
 /// Returns 1 if autoclosed, 0 otherwise
 #[doc(alias = "htmlIsAutoClosed")]
-pub unsafe fn html_is_auto_closed(doc: HtmlDocPtr, elem: HtmlNodePtr) -> i32 {
+pub fn html_is_auto_closed(doc: HtmlDocPtr, elem: HtmlNodePtr) -> i32 {
     let mut child = elem.children().map(|c| XmlNodePtr::try_from(c).unwrap());
     while let Some(now) = child {
         if html_auto_close_tag(doc, elem.name().as_deref().unwrap(), now) != 0 {
@@ -169,52 +169,12 @@ pub fn html_auto_close_tag(_doc: HtmlDocPtr, name: &str, elem: HtmlNodePtr) -> i
  * Macros for accessing the content. Those should be used only by the parser,
  * and not exported.
  *
- * Dirty macros, i.e. one need to make assumption on the context to use them
- *
- *   CUR_PTR return the current pointer to the XmlChar to be parsed.
- *   CUR     returns the current XmlChar value, i.e. a 8 bit value if compiled
- *           in ISO-Latin or UTF-8, and the current 16 bit value if compiled
- *           in UNICODE mode. This should be used internally by the parser
- *           only to compare to ASCII values otherwise it would break when
- *           running with UTF-8 encoding.
- *   NXT(n)  returns the n'th next XmlChar. Same as CUR is should be used only
- *           to compare on ASCII based substring.
- *   UPP!(ctxt, n)  returns the n'th next XmlChar converted to uppercase. Same as CUR
- *           it should be used only to compare on ASCII based substring.
- *   SKIP(n) Skip n XmlChar, and must also be used only to skip ASCII defined
- *           strings without newlines within the parser.
- *
  * Clean macros, not dependent of an ASCII context, expect UTF-8 encoding
  *
- *   NEXT    Skip to the next character, this does the proper decoding
- *           in UTF-8 mode. It also pop-up unfinished entities on the fly.
  *   NEXTL(l) Skip the current unicode character of l xmlChars long.
- *   COPY(to) copy one c_char to *to, increment CUR_PTR and to accordingly
  */
 
-macro_rules! NXT {
-    ($ctxt:expr, $val:expr) => {
-        *(*(*$ctxt).input().unwrap()).cur.add($val as usize)
-    };
-}
-
-macro_rules! SKIP_BLANKS {
-    ($ctxt:expr) => {
-        html_skip_blank_chars($ctxt)
-    };
-}
-
 /* Imported from XML */
-
-macro_rules! RAW {
-    ($ctxt:expr) => {
-        if (*$ctxt).token != 0 {
-            1u8.wrapping_neg()
-        } else {
-            *(*(*$ctxt).input().unwrap()).cur as u8
-        }
-    };
-}
 
 macro_rules! NEXTL {
     ($ctxt:expr, $l:expr) => {
@@ -228,17 +188,7 @@ macro_rules! NEXTL {
         (*(*$ctxt).input_mut().unwrap()).cur = (*(*$ctxt).input().unwrap()).cur.add($l as usize);
     };
 }
-/************
-   \
-   if (*(*ctxt).input().unwrap().cur == b'%') xmlParserHandlePEReference(ctxt);	\
-   if (*(*ctxt).input().unwrap().cur == b'&') xmlParserHandleReference(ctxt);
-************/
 
-macro_rules! CUR_CHAR {
-    ($ctxt:expr, $l:expr) => {
-        html_current_char($ctxt, addr_of_mut!($l))
-    };
-}
 macro_rules! COPY_BUF {
     ($ctxt:expr, $l:expr, $b:expr, $i:expr, $v:expr) => {
         if $l == 1 {
@@ -668,7 +618,7 @@ unsafe fn html_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
         let base: *const XmlChar = (*ctxt).input().unwrap().base;
 
         // Handler for more complex cases
-        c = CUR_CHAR!(ctxt, l);
+        c = html_current_char(ctxt, addr_of_mut!(l));
         if c == b' ' as i32
         || c == b'>' as i32
         || c == b'/' as i32  /* accelerators */
@@ -701,7 +651,7 @@ unsafe fn html_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
                 return null_mut();
             }
             NEXTL!(ctxt, l);
-            c = CUR_CHAR!(ctxt, l);
+            c = html_current_char(ctxt, addr_of_mut!(l));
             if (*ctxt).input().unwrap().base != base {
                 // We changed encoding from an unknown encoding
                 // Input buffer changed location, so we better start again
@@ -866,8 +816,8 @@ pub(crate) unsafe fn html_parse_char_ref(ctxt: HtmlParserCtxtPtr) -> i32 {
             return 0;
         }
         if (*ctxt).current_byte() == b'&'
-            && NXT!(ctxt, 1) == b'#'
-            && (NXT!(ctxt, 2) == b'x' || NXT!(ctxt, 2) == b'X')
+            && (*ctxt).nth_byte(1) == b'#'
+            && ((*ctxt).nth_byte(2) == b'x' || (*ctxt).nth_byte(2) == b'X')
         {
             (*ctxt).advance(3);
             #[allow(clippy::while_immutable_condition)]
@@ -899,11 +849,11 @@ pub(crate) unsafe fn html_parse_char_ref(ctxt: HtmlParserCtxtPtr) -> i32 {
             if (*ctxt).current_byte() == b';' {
                 (*ctxt).skip_char();
             }
-        } else if (*ctxt).current_byte() == b'&' && NXT!(ctxt, 1) == b'#' {
+        } else if (*ctxt).content_bytes().starts_with(b"&#") {
             (*ctxt).advance(2);
             #[allow(clippy::while_immutable_condition)]
             while (*ctxt).current_byte() != b';' {
-                if (*ctxt).current_byte() >= b'0' && (*ctxt).current_byte() <= b'9' {
+                if (*ctxt).current_byte().is_ascii_digit() {
                     if val < 0x110000 {
                         val = val * 10 + ((*ctxt).current_byte() - b'0') as i32;
                     }
@@ -1276,7 +1226,7 @@ unsafe fn html_parse_html_attribute(ctxt: HtmlParserCtxtPtr, stop: u8) -> *mut X
                 break;
             }
             if (*ctxt).current_byte() == b'&' {
-                if NXT!(ctxt, 1) == b'#' {
+                if (*ctxt).nth_byte(1) == b'#' {
                     let mut bits: i32;
 
                     let c: u32 = html_parse_char_ref(ctxt) as _;
@@ -1381,7 +1331,7 @@ unsafe fn html_parse_html_attribute(ctxt: HtmlParserCtxtPtr, stop: u8) -> *mut X
                     grow_buffer!(ctxt, buffer, buffer_size);
                     out = buffer.add(indx as usize) as _;
                 }
-                let c: u32 = CUR_CHAR!(ctxt, l) as _;
+                let c: u32 = html_current_char(ctxt, addr_of_mut!(l)) as _;
                 if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
                     xml_free(buffer as _);
                     return null_mut();
@@ -1521,10 +1471,10 @@ unsafe fn html_parse_attribute(
         }
 
         // read the value
-        SKIP_BLANKS!(ctxt);
+        html_skip_blank_chars(ctxt);
         if (*ctxt).current_byte() == b'=' {
             (*ctxt).skip_char();
-            SKIP_BLANKS!(ctxt);
+            html_skip_blank_chars(ctxt);
             val = html_parse_att_value(ctxt);
         }
 
@@ -1818,10 +1768,10 @@ unsafe fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
         // Now parse the attributes, it ends up with the ending
         //
         // (S Attribute)* S?
-        SKIP_BLANKS!(ctxt);
+        html_skip_blank_chars(ctxt);
         'failed: while (*ctxt).current_byte() != 0
             && (*ctxt).current_byte() != b'>'
-            && ((*ctxt).current_byte() != b'/' || NXT!(ctxt, 1) != b'>')
+            && !(*ctxt).content_bytes().starts_with(b"/>")
             && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
         {
             (*ctxt).grow();
@@ -1845,7 +1795,7 @@ unsafe fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
                             xml_free(attvalue as _);
                         }
                         // goto failed;
-                        SKIP_BLANKS!(ctxt);
+                        html_skip_blank_chars(ctxt);
                         continue 'failed;
                     }
                 }
@@ -1866,14 +1816,14 @@ unsafe fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
                 while (*ctxt).current_byte() != 0
                     && !xml_is_blank_char((*ctxt).current_byte() as u32)
                     && (*ctxt).current_byte() != b'>'
-                    && ((*ctxt).current_byte() != b'/' || NXT!(ctxt, 1) != b'>')
+                    && !(*ctxt).content_bytes().starts_with(b"/>")
                     && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
                 {
                     (*ctxt).skip_char();
                 }
             }
             // failed:
-            SKIP_BLANKS!(ctxt);
+            html_skip_blank_chars(ctxt);
         }
 
         // Handle specific association to the META tag
@@ -1974,7 +1924,7 @@ unsafe fn html_parse_end_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
     unsafe {
         let ret: i32;
 
-        if (*ctxt).current_byte() != b'<' || NXT!(ctxt, 1) != b'/' {
+        if !(*ctxt).content_bytes().starts_with(b"</") {
             html_parse_err(
                 ctxt,
                 XmlParserErrors::XmlErrLtSlashRequired,
@@ -1991,7 +1941,7 @@ unsafe fn html_parse_end_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
             return 0;
         }
         // We should definitely be at the ending "S? '>'" part
-        SKIP_BLANKS!(ctxt);
+        html_skip_blank_chars(ctxt);
         if (*ctxt).current_byte() != b'>' {
             html_parse_err(
                 ctxt,
@@ -2090,21 +2040,22 @@ unsafe fn html_parse_html_name_non_invasive(ctxt: HtmlParserCtxtPtr) -> *const X
         let mut i: usize = 0;
         let mut loc: [XmlChar; HTML_PARSER_BUFFER_SIZE] = [0; HTML_PARSER_BUFFER_SIZE];
 
-        if !NXT!(ctxt, 1).is_ascii_alphabetic() && NXT!(ctxt, 1) != b'_' && NXT!(ctxt, 1) != b':' {
+        let next = (*ctxt).nth_byte(1);
+        if !next.is_ascii_alphabetic() && next != b'_' && next != b':' {
             return null_mut();
         }
 
         while i < HTML_PARSER_BUFFER_SIZE
-            && (NXT!(ctxt, 1 + i).is_ascii_alphabetic()
-                || NXT!(ctxt, 1 + i).is_ascii_digit()
-                || NXT!(ctxt, 1 + i) == b':'
-                || NXT!(ctxt, 1 + i) == b'-'
-                || NXT!(ctxt, 1 + i) == b'_')
+            && ((*ctxt).nth_byte(1 + i).is_ascii_alphabetic()
+                || (*ctxt).nth_byte(1 + i).is_ascii_digit()
+                || (*ctxt).nth_byte(1 + i) == b':'
+                || (*ctxt).nth_byte(1 + i) == b'-'
+                || (*ctxt).nth_byte(1 + i) == b'_')
         {
-            if NXT!(ctxt, 1 + i) >= b'A' && NXT!(ctxt, 1 + i) <= b'Z' {
-                loc[i] = NXT!(ctxt, 1 + i) + 0x20;
+            if (*ctxt).nth_byte(1 + i) >= b'A' && (*ctxt).nth_byte(1 + i) <= b'Z' {
+                loc[i] = (*ctxt).nth_byte(1 + i) + 0x20;
             } else {
-                loc[i] = NXT!(ctxt, 1 + i);
+                loc[i] = (*ctxt).nth_byte(1 + i);
             }
             i += 1;
         }
@@ -2139,9 +2090,9 @@ unsafe fn html_parse_script(ctxt: HtmlParserCtxtPtr) {
         let mut cur: i32;
         let mut l: i32 = 0;
 
-        cur = CUR_CHAR!(ctxt, l);
+        cur = html_current_char(ctxt, addr_of_mut!(l));
         while cur != 0 {
-            if cur == b'<' as i32 && NXT!(ctxt, 1) == b'/' {
+            if cur == b'<' as i32 && (*ctxt).nth_byte(1) == b'/' {
                 // One should break here, the specification is clear:
                 // Authors should therefore escape "</" within the content.
                 // Escape mechanisms are specific to each scripting or
@@ -2171,8 +2122,8 @@ unsafe fn html_parse_script(ctxt: HtmlParserCtxtPtr) {
                             None,
                         );
                     }
-                } else if (NXT!(ctxt, 2) >= b'A' && NXT!(ctxt, 2) <= b'Z')
-                    || (NXT!(ctxt, 2) >= b'a' && NXT!(ctxt, 2) <= b'z')
+                } else if ((*ctxt).nth_byte(2) >= b'A' && (*ctxt).nth_byte(2) <= b'Z')
+                    || ((*ctxt).nth_byte(2) >= b'a' && (*ctxt).nth_byte(2) <= b'z')
                 {
                     break;
                 }
@@ -2202,7 +2153,7 @@ unsafe fn html_parse_script(ctxt: HtmlParserCtxtPtr) {
                 nbchar = 0;
                 (*ctxt).shrink();
             }
-            cur = CUR_CHAR!(ctxt, l);
+            cur = html_current_char(ctxt, addr_of_mut!(l));
         }
 
         if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
@@ -2393,7 +2344,7 @@ unsafe fn html_parse_external_id(
                     None,
                 );
             }
-            SKIP_BLANKS!(ctxt);
+            html_skip_blank_chars(ctxt);
             uri = html_parse_system_literal(ctxt);
             if uri.is_null() {
                 html_parse_err(
@@ -2417,7 +2368,7 @@ unsafe fn html_parse_external_id(
                     None,
                 );
             }
-            SKIP_BLANKS!(ctxt);
+            html_skip_blank_chars(ctxt);
             *public_id = html_parse_pubid_literal(ctxt);
             if (*public_id).is_null() {
                 html_parse_err(
@@ -2428,7 +2379,7 @@ unsafe fn html_parse_external_id(
                     None,
                 );
             }
-            SKIP_BLANKS!(ctxt);
+            html_skip_blank_chars(ctxt);
             if (*ctxt).current_byte() == b'"' || (*ctxt).current_byte() == b'\'' {
                 uri = html_parse_system_literal(ctxt);
             }
@@ -2448,7 +2399,7 @@ unsafe fn html_parse_doc_type_decl(ctxt: HtmlParserCtxtPtr) {
         // We know that '<!DOCTYPE' has been detected.
         (*ctxt).advance(9);
 
-        SKIP_BLANKS!(ctxt);
+        html_skip_blank_chars(ctxt);
 
         // Parse the DOCTYPE name.
         let name: *const XmlChar = html_parse_name(ctxt);
@@ -2463,11 +2414,11 @@ unsafe fn html_parse_doc_type_decl(ctxt: HtmlParserCtxtPtr) {
         }
         // Check that upper(name) == "HTML" !!!!!!!!!!!!!
 
-        SKIP_BLANKS!(ctxt);
+        html_skip_blank_chars(ctxt);
 
         // Check for SystemID and ExternalID
         let uri: *mut XmlChar = html_parse_external_id(ctxt, addr_of_mut!(external_id));
-        SKIP_BLANKS!(ctxt);
+        html_skip_blank_chars(ctxt);
 
         // We should be at the end of the DOCTYPE declaration.
         if (*ctxt).current_byte() != b'>' {
@@ -2547,11 +2498,7 @@ unsafe fn html_parse_comment(ctxt: HtmlParserCtxtPtr) {
         };
 
         // Check that there is a comment right here.
-        if RAW!(ctxt) != b'<'
-            || NXT!(ctxt, 1) != b'!'
-            || NXT!(ctxt, 2) != b'-'
-            || NXT!(ctxt, 3) != b'-'
-        {
+        if (*ctxt).token == 0 && !(*ctxt).content_bytes().starts_with(b"<!--") {
             return;
         }
 
@@ -2566,7 +2513,7 @@ unsafe fn html_parse_comment(ctxt: HtmlParserCtxtPtr) {
         }
         len = 0;
         *buf.add(len as usize) = 0;
-        q = CUR_CHAR!(ctxt, ql);
+        q = html_current_char(ctxt, addr_of_mut!(ql));
         if q == 0 {
             // goto unfinished;
         } else {
@@ -2582,7 +2529,7 @@ unsafe fn html_parse_comment(ctxt: HtmlParserCtxtPtr) {
                 // goto finished;
             } else {
                 NEXTL!(ctxt, ql);
-                r = CUR_CHAR!(ctxt, rl);
+                r = html_current_char(ctxt, addr_of_mut!(rl));
                 if r == 0 {
                     // goto unfinished;
                     let b = CStr::from_ptr(buf as *const i8).to_string_lossy();
@@ -2608,10 +2555,10 @@ unsafe fn html_parse_comment(ctxt: HtmlParserCtxtPtr) {
                     // goto finished;
                 } else {
                     NEXTL!(ctxt, rl);
-                    cur = CUR_CHAR!(ctxt, l);
+                    cur = html_current_char(ctxt, addr_of_mut!(l));
                     while cur != 0 && (cur != b'>' as i32 || r != b'-' as i32 || q != b'-' as i32) {
                         NEXTL!(ctxt, l);
-                        next = CUR_CHAR!(ctxt, nl);
+                        next = html_current_char(ctxt, addr_of_mut!(nl));
 
                         if q == b'-' as i32
                             && r == b'-' as i32
@@ -2748,7 +2695,7 @@ unsafe fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
         let target: *const XmlChar;
         let state: XmlParserInputState;
 
-        if RAW!(ctxt) == b'<' && NXT!(ctxt, 1) == b'?' {
+        if (*ctxt).token == 0 && (*ctxt).content_bytes().starts_with(b"<?") {
             state = (*ctxt).instate;
             (*ctxt).instate = XmlParserInputState::XmlParserPI;
             // this is a Processing Instruction.
@@ -2758,7 +2705,7 @@ unsafe fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
             target = html_parse_name(ctxt);
             if !target.is_null() {
                 let target = CStr::from_ptr(target as *const i8).to_string_lossy();
-                if RAW!(ctxt) == b'>' {
+                if (*ctxt).token == 0 && (*ctxt).current_byte() == b'>' {
                     (*ctxt).advance(1);
 
                     // SAX: PI detected.
@@ -2790,8 +2737,8 @@ unsafe fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
                         None,
                     );
                 }
-                SKIP_BLANKS!(ctxt);
-                cur = CUR_CHAR!(ctxt, l);
+                html_skip_blank_chars(ctxt);
+                cur = html_current_char(ctxt, addr_of_mut!(l));
                 while cur != 0 && cur != b'>' as i32 {
                     if len + 5 >= size {
                         size *= 2;
@@ -2827,7 +2774,7 @@ unsafe fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
                         return;
                     }
                     NEXTL!(ctxt, l);
-                    cur = CUR_CHAR!(ctxt, l);
+                    cur = html_current_char(ctxt, addr_of_mut!(l));
                 }
                 *buf.add(len as usize) = 0;
                 if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
@@ -2936,7 +2883,7 @@ unsafe fn html_parse_reference(ctxt: HtmlParserCtxtPtr) {
             return;
         }
 
-        if NXT!(ctxt, 1) == b'#' {
+        if (*ctxt).nth_byte(1) == b'#' {
             let mut bits: i32;
             let mut i: i32 = 0;
 
@@ -3139,7 +3086,7 @@ unsafe fn html_parse_char_data_internal(ctxt: HtmlParserCtxtPtr, readahead: i32)
             nbchar += 1;
         }
 
-        cur = CUR_CHAR!(ctxt, l);
+        cur = html_current_char(ctxt, addr_of_mut!(l));
         while (cur != b'<' as i32 || (*ctxt).token == b'<' as i32)
             && (cur != b'&' as i32 || (*ctxt).token == b'&' as i32)
             && cur != 0
@@ -3181,7 +3128,7 @@ unsafe fn html_parse_char_data_internal(ctxt: HtmlParserCtxtPtr, readahead: i32)
                 nbchar = 0;
                 (*ctxt).shrink();
             }
-            cur = CUR_CHAR!(ctxt, l);
+            cur = html_current_char(ctxt, addr_of_mut!(l));
         }
         if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
             return;
@@ -3241,7 +3188,7 @@ unsafe fn html_parse_char_data(ctxt: HtmlParserCtxtPtr) {
 //             }
 
 //             // Our tag or one of it's parent or children is ending.
-//             if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1) == b'/' {
+//             if (*ctxt).current_byte() == b'<' && (*ctxt).nth_byte(1) == b'/' {
 //                 if html_parse_end_tag(ctxt) != 0
 //                     && (current_node.is_some() || (*ctxt).name_tab.is_empty())
 //                 {
@@ -3249,9 +3196,9 @@ unsafe fn html_parse_char_data(ctxt: HtmlParserCtxtPtr) {
 //                 }
 //                 continue; /* while */
 //             } else if (*ctxt).current_byte() == b'<'
-//                 && (NXT!(ctxt, 1).is_ascii_alphabetic()
-//                     || NXT!(ctxt, 1) == b'_'
-//                     || NXT!(ctxt, 1) == b':')
+//                 && ((*ctxt).nth_byte(1).is_ascii_alphabetic()
+//                     || (*ctxt).nth_byte(1) == b'_'
+//                     || (*ctxt).nth_byte(1) == b':')
 //             {
 //                 name = html_parse_html_name_non_invasive(ctxt);
 //                 if name.is_null() {
@@ -3293,7 +3240,7 @@ unsafe fn html_parse_char_data(ctxt: HtmlParserCtxtPtr) {
 //             {
 //                 // Handle SCRIPT/STYLE separately
 //                 html_parse_script(ctxt);
-//             } else if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1) == b'!' {
+//             } else if (*ctxt).current_byte() == b'<' && (*ctxt).nth_byte(1) == b'!' {
 //                 // Sometimes DOCTYPE arrives in the middle of the document
 //                 if (*ctxt).content_bytes().len() >= 9
 //                     && (*ctxt).content_bytes()[2..9].eq_ignore_ascii_case(b"DOCTYPE")
@@ -3306,16 +3253,16 @@ unsafe fn html_parse_char_data(ctxt: HtmlParserCtxtPtr) {
 //                         None,
 //                     );
 //                     html_parse_doc_type_decl(ctxt);
-//                 } else if NXT!(ctxt, 2) == b'-' && NXT!(ctxt, 3) == b'-' {
+//                 } else if (*ctxt).nth_byte(2) == b'-' && (*ctxt).nth_byte(3) == b'-' {
 //                     //  case :  a comment
 //                     html_parse_comment(ctxt);
 //                 } else {
 //                     html_skip_bogus_comment(ctxt);
 //                 }
-//             } else if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1) == b'?' {
+//             } else if (*ctxt).current_byte() == b'<' && (*ctxt).nth_byte(1) == b'?' {
 //                 // Second case : a Processing Instruction.
 //                 html_parse_pi(ctxt);
-//             } else if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1).is_ascii_alphabetic() {
+//             } else if (*ctxt).current_byte() == b'<' && (*ctxt).nth_byte(1).is_ascii_alphabetic() {
 //                 // Third case :  a sub-element.
 //                 html_parse_element(ctxt);
 //             } else if (*ctxt).current_byte() == b'<' {
@@ -3402,7 +3349,7 @@ unsafe fn html_parse_char_data(ctxt: HtmlParserCtxtPtr) {
 //         }
 
 //         // Check for an Empty Element labeled the XML/SGML way
-//         if (*ctxt).current_byte() == b'/' && NXT!(ctxt, 1) == b'>' {
+//         if (*ctxt).current_byte() == b'/' && (*ctxt).nth_byte(1) == b'>' {
 //             (*ctxt).advance(2);
 //             if let Some(end_element) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.end_element) {
 //                 end_element((*ctxt).user_data.clone(), &name);
@@ -3705,7 +3652,7 @@ unsafe fn html_parse_element_internal(ctxt: HtmlParserCtxtPtr) {
         }
 
         // Check for an Empty Element labeled the XML/SGML way
-        if (*ctxt).current_byte() == b'/' && NXT!(ctxt, 1) == b'>' {
+        if (*ctxt).current_byte() == b'/' && (*ctxt).nth_byte(1) == b'>' {
             (*ctxt).advance(2);
             if let Some(end_element) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.end_element) {
                 end_element((*ctxt).user_data.clone(), &name);
@@ -3773,7 +3720,7 @@ unsafe fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
             }
 
             // Our tag or one of it's parent or children is ending.
-            if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1) == b'/' {
+            if (*ctxt).current_byte() == b'<' && (*ctxt).nth_byte(1) == b'/' {
                 if html_parse_end_tag(ctxt) != 0
                     && (current_node.is_some() || (*ctxt).name_tab.is_empty())
                 {
@@ -3786,9 +3733,9 @@ unsafe fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
                 }
                 continue; /* while */
             } else if (*ctxt).current_byte() == b'<'
-                && (NXT!(ctxt, 1).is_ascii_alphabetic()
-                    || NXT!(ctxt, 1) == b'_'
-                    || NXT!(ctxt, 1) == b':')
+                && ((*ctxt).nth_byte(1).is_ascii_alphabetic()
+                    || (*ctxt).nth_byte(1) == b'_'
+                    || (*ctxt).nth_byte(1) == b':')
             {
                 name = html_parse_html_name_non_invasive(ctxt);
                 if name.is_null() {
@@ -3844,7 +3791,7 @@ unsafe fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
             {
                 // Handle SCRIPT/STYLE separately
                 html_parse_script(ctxt);
-            } else if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1) == b'!' {
+            } else if (*ctxt).current_byte() == b'<' && (*ctxt).nth_byte(1) == b'!' {
                 // Sometimes DOCTYPE arrives in the middle of the document
                 if (*ctxt).content_bytes().len() >= 9
                     && (*ctxt).content_bytes()[2..9].eq_ignore_ascii_case(b"DOCTYPE")
@@ -3857,16 +3804,16 @@ unsafe fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
                         None,
                     );
                     html_parse_doc_type_decl(ctxt);
-                } else if NXT!(ctxt, 2) == b'-' && NXT!(ctxt, 3) == b'-' {
+                } else if (*ctxt).nth_byte(2) == b'-' && (*ctxt).nth_byte(3) == b'-' {
                     // First case :  a comment
                     html_parse_comment(ctxt);
                 } else {
                     html_skip_bogus_comment(ctxt);
                 }
-            } else if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1) == b'?' {
+            } else if (*ctxt).current_byte() == b'<' && (*ctxt).nth_byte(1) == b'?' {
                 // Second case : a Processing Instruction.
                 html_parse_pi(ctxt);
-            } else if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1).is_ascii_alphabetic() {
+            } else if (*ctxt).current_byte() == b'<' && (*ctxt).nth_byte(1).is_ascii_alphabetic() {
                 // Third case :  a sub-element.
                 html_parse_element_internal(ctxt);
 
@@ -3906,8 +3853,6 @@ unsafe fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
 #[doc(alias = "htmlParseDocument")]
 pub unsafe fn html_parse_document(ctxt: HtmlParserCtxtPtr) -> i32 {
     unsafe {
-        let mut start: [XmlChar; 4] = [0; 4];
-
         xml_init_parser();
 
         if ctxt.is_null() || (*ctxt).input().is_none() {
@@ -3934,18 +3879,16 @@ pub unsafe fn html_parse_document(ctxt: HtmlParserCtxtPtr) -> i32 {
             // Get the 4 first bytes and decode the charset
             // if enc != xmlCharEncoding::XML_CHAR_ENCODING_NONE
             // plug some encoding conversion routines.
-            start[0] = RAW!(ctxt);
-            start[1] = NXT!(ctxt, 1);
-            start[2] = NXT!(ctxt, 2);
-            start[3] = NXT!(ctxt, 3);
-            let enc = detect_encoding(&start);
-            if !matches!(enc, XmlCharEncoding::None) {
-                (*ctxt).switch_encoding(enc);
+            if (*ctxt).token == 0 {
+                let enc = detect_encoding(&(*ctxt).content_bytes()[..4]);
+                if !matches!(enc, XmlCharEncoding::None) {
+                    (*ctxt).switch_encoding(enc);
+                }
             }
         }
 
         // Wipe out everything which is before the first '<'
-        SKIP_BLANKS!(ctxt);
+        html_skip_blank_chars(ctxt);
         if (*ctxt).current_byte() == 0 {
             html_parse_err(
                 ctxt,
@@ -3967,15 +3910,12 @@ pub unsafe fn html_parse_document(ctxt: HtmlParserCtxtPtr) -> i32 {
         }
 
         // Parse possible comments and PIs before any content
-        while ((*ctxt).current_byte() == b'<'
-            && NXT!(ctxt, 1) == b'!'
-            && NXT!(ctxt, 2) == b'-'
-            && NXT!(ctxt, 3) == b'-')
-            || ((*ctxt).current_byte() == b'<' && NXT!(ctxt, 1) == b'?')
+        while (*ctxt).content_bytes().starts_with(b"<!--")
+            || (*ctxt).content_bytes().starts_with(b"<?")
         {
             html_parse_comment(ctxt);
             html_parse_pi(ctxt);
-            SKIP_BLANKS!(ctxt);
+            html_skip_blank_chars(ctxt);
         }
 
         // Then possibly doc type declaration(s) and more Misc (doctypedecl Misc*)?
@@ -3984,18 +3924,15 @@ pub unsafe fn html_parse_document(ctxt: HtmlParserCtxtPtr) -> i32 {
         {
             html_parse_doc_type_decl(ctxt);
         }
-        SKIP_BLANKS!(ctxt);
+        html_skip_blank_chars(ctxt);
 
         // Parse possible comments and PIs before any content
-        while ((*ctxt).current_byte() == b'<'
-            && NXT!(ctxt, 1) == b'!'
-            && NXT!(ctxt, 2) == b'-'
-            && NXT!(ctxt, 3) == b'-')
-            || ((*ctxt).current_byte() == b'<' && NXT!(ctxt, 1) == b'?')
+        while (*ctxt).content_bytes().starts_with(b"<!--")
+            || (*ctxt).content_bytes().starts_with(b"<?")
         {
             html_parse_comment(ctxt);
             html_parse_pi(ctxt);
-            SKIP_BLANKS!(ctxt);
+            html_skip_blank_chars(ctxt);
         }
 
         // Time to start parsing the tree itself
@@ -4669,13 +4606,18 @@ unsafe fn html_parse_lookup_comment_end(ctxt: HtmlParserCtxtPtr) -> i32 {
             if mark < 0 {
                 break;
             }
-            if NXT!(ctxt, mark + 2) == b'>'
-                || (NXT!(ctxt, mark + 2) == b'!' && NXT!(ctxt, mark + 3) == b'>')
+            if (*ctxt).nth_byte(mark as usize + 2) == b'>'
+                || ((*ctxt).nth_byte(mark as usize + 2) == b'!'
+                    && (*ctxt).nth_byte(mark as usize + 3) == b'>')
             {
                 (*ctxt).check_index = 0;
                 break;
             }
-            let offset = if NXT!(ctxt, mark + 2) == b'!' { 3 } else { 2 };
+            let offset = if (*ctxt).nth_byte(mark as usize + 2) == b'!' {
+                3
+            } else {
+                2
+            };
             if mark + offset >= (*ctxt).input().unwrap().remainder_len() as i32 {
                 (*ctxt).check_index = mark as _;
                 return -1;
@@ -4741,7 +4683,7 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
                     // Very first chars read from the document flow.
                     cur = *input.cur.add(0);
                     if xml_is_blank_char(cur as u32) {
-                        SKIP_BLANKS!(ctxt);
+                        html_skip_blank_chars(ctxt);
                         avail = input.remainder_len();
                     }
                     if let Some(set_document_locator) = (*ctxt)
@@ -4779,7 +4721,7 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
                     }
                 }
                 XmlParserInputState::XmlParserMisc => {
-                    SKIP_BLANKS!(ctxt);
+                    html_skip_blank_chars(ctxt);
                     avail = input.remainder_len();
                     // no chars input buffer
                     if avail < 1 {
@@ -4835,7 +4777,7 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
                     }
                 }
                 XmlParserInputState::XmlParserProlog => {
-                    SKIP_BLANKS!(ctxt);
+                    html_skip_blank_chars(ctxt);
                     avail = input.remainder_len();
                     if avail < 2 {
                         // goto done;
@@ -4980,7 +4922,7 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
                     }
 
                     // Check for an Empty Element labeled the XML/SGML way
-                    if (*ctxt).current_byte() == b'/' && NXT!(ctxt, 1) == b'>' {
+                    if (*ctxt).content_bytes().starts_with(b"/>") {
                         (*ctxt).advance(2);
                         if let Some(end_element) =
                             (*ctxt).sax.as_deref_mut().and_then(|sax| sax.end_element)
