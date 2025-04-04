@@ -1,4 +1,4 @@
-use std::{cell::RefCell, ptr::null_mut, rc::Rc, str::from_utf8_unchecked};
+use std::{ptr::null_mut, str::from_utf8_unchecked};
 
 use crate::{
     encoding::{XmlCharEncoding, detect_encoding},
@@ -276,11 +276,10 @@ impl XmlParserCtxt {
                     if self.input().is_none() {
                         break;
                     }
-                    if let Some(input_buffer) = self.input().unwrap().buf.as_deref() {
+                    if let Some(input_buffer) = self.input().unwrap().buf.as_ref() {
                         // If we are operating on converted input, try to flush
                         // remaining chars to avoid them stalling in the non-converted buffer.
                         if input_buffer
-                            .borrow()
                             .raw
                             .as_deref()
                             .is_some_and(|raw| !raw.is_empty())
@@ -288,7 +287,8 @@ impl XmlParserCtxt {
                             let base = self.input().unwrap().get_base();
                             let current = self.input().unwrap().offset_from_base();
 
-                            input_buffer.borrow_mut().push_bytes(b"");
+                            let input_buffer = self.input_mut().unwrap().buf.as_mut().unwrap();
+                            input_buffer.push_bytes(b"");
                             self.input_mut().unwrap().set_base_and_cursor(base, current);
                         }
                     }
@@ -1035,7 +1035,6 @@ impl XmlParserCtxt {
                     .buf
                     .as_mut()
                     .unwrap()
-                    .borrow_mut()
                     .push_bytes(chunk);
                 self.input_mut().unwrap().set_base_and_cursor(base, cur);
                 if res < 0 {
@@ -1046,15 +1045,13 @@ impl XmlParserCtxt {
             } else if !matches!(self.instate, XmlParserInputState::XmlParserEOF)
                 && (self.input().is_some() && self.input().unwrap().buf.is_some())
             {
-                let input = self.input().unwrap().buf.as_deref().unwrap();
-                if input.borrow().encoder.is_some()
-                    && input.borrow().buffer.is_some()
-                    && input.borrow().raw.is_some()
-                {
+                let input = self.input().unwrap().buf.as_ref().unwrap();
+                if input.encoder.is_some() && input.buffer.is_some() && input.raw.is_some() {
                     let base: usize = self.input().unwrap().get_base();
                     let current = self.input().unwrap().offset_from_base();
 
-                    let res = input.borrow_mut().decode(terminate != 0);
+                    let input = self.input_mut().unwrap().buf.as_mut().unwrap();
+                    let res = input.decode(terminate != 0);
                     self.input_mut().unwrap().set_base_and_cursor(base, current);
                     if res.is_err() {
                         // TODO 2.6.0
@@ -1095,7 +1092,6 @@ impl XmlParserCtxt {
                     .buf
                     .as_mut()
                     .unwrap()
-                    .borrow_mut()
                     .push_bytes(b"\r");
                 self.input_mut().unwrap().set_base_and_cursor(base, current);
             }
@@ -1151,9 +1147,7 @@ pub unsafe fn xml_create_push_parser_ctxt(
     unsafe {
         use crate::{io::xml_parser_get_directory, parser::xml_new_sax_parser_ctxt};
 
-        let buf = Rc::new(RefCell::new(XmlParserInputBuffer::new(
-            XmlCharEncoding::None,
-        )));
+        let buf = XmlParserInputBuffer::new(XmlCharEncoding::None);
 
         let Ok(ctxt) = xml_new_sax_parser_ctxt(sax, user_data) else {
             xml_err_memory(None, Some("creating parser: out of memory\n"));
@@ -1196,7 +1190,6 @@ pub unsafe fn xml_create_push_parser_ctxt(
                 .buf
                 .as_mut()
                 .unwrap()
-                .borrow_mut()
                 .push_bytes(chunk);
             (*ctxt).input_mut().unwrap().set_base_and_cursor(base, cur);
         }

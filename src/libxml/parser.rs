@@ -43,11 +43,9 @@
 // daniel@veillard.com
 
 use std::{
-    cell::RefCell,
     ffi::{CStr, c_char, c_void},
     io::Read,
     ptr::null_mut,
-    rc::Rc,
     slice::from_raw_parts,
     sync::atomic::{AtomicBool, AtomicPtr, Ordering},
 };
@@ -634,9 +632,7 @@ pub unsafe fn xml_io_parse_dtd(
         (*ctxt).detect_sax2();
 
         // generate a parser input from the I/O handler
-        let Some(pinput) =
-            XmlParserInput::from_io(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None)
-        else {
+        let Some(pinput) = XmlParserInput::from_io(ctxt, input, XmlCharEncoding::None) else {
             xml_free_parser_ctxt(ctxt);
             return None;
         };
@@ -1119,8 +1115,7 @@ pub unsafe fn xml_create_io_parser_ctxt(
             return null_mut();
         };
 
-        let Some(input_stream) = XmlParserInput::from_io(ctxt, Rc::new(RefCell::new(buf)), enc)
-        else {
+        let Some(input_stream) = XmlParserInput::from_io(ctxt, buf, enc) else {
             xml_free_parser_ctxt(ctxt);
             return null_mut();
         };
@@ -1214,7 +1209,7 @@ pub unsafe fn xml_ctxt_reset_push(
         } else {
             input_stream.filename = None;
         }
-        input_stream.buf = Some(Rc::new(RefCell::new(buf)));
+        input_stream.buf = Some(buf);
         input_stream.reset_base();
 
         (*ctxt).input_push(input_stream);
@@ -1233,7 +1228,6 @@ pub unsafe fn xml_ctxt_reset_push(
                 .buf
                 .as_mut()
                 .unwrap()
-                .borrow_mut()
                 .push_bytes(from_raw_parts(chunk as *const u8, size as usize));
             (*ctxt).input_mut().unwrap().set_base_and_cursor(base, cur);
         }

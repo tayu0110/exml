@@ -432,26 +432,10 @@ pub unsafe fn xml_sax_parse_file_with_data(
             let ret = (*ctxt).my_doc;
             if (*ctxt).input().unwrap().buf.is_some() {
                 if let Some(mut ret) = ret {
-                    if (*ctxt)
-                        .input()
-                        .unwrap()
-                        .buf
-                        .as_ref()
-                        .unwrap()
-                        .borrow()
-                        .compressed
-                        > 0
-                    {
+                    if (*ctxt).input().unwrap().buf.as_ref().unwrap().compressed > 0 {
                         ret.compression = 9;
                     } else {
-                        ret.compression = (*ctxt)
-                            .input()
-                            .unwrap()
-                            .buf
-                            .as_ref()
-                            .unwrap()
-                            .borrow()
-                            .compressed;
+                        ret.compression = (*ctxt).input().unwrap().buf.as_ref().unwrap().compressed;
                     }
                 }
             }

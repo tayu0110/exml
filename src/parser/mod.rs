@@ -52,7 +52,7 @@ mod push;
 #[cfg(feature = "libxml_push")]
 mod qname;
 
-use std::{cell::RefCell, ffi::CStr, io::Read, rc::Rc};
+use std::{ffi::CStr, io::Read};
 
 use crate::{
     encoding::XmlCharEncoding,
@@ -512,9 +512,7 @@ pub unsafe fn xml_read_io(
         if ctxt.is_null() {
             return None;
         }
-        let Some(stream) =
-            XmlParserInput::from_io(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None)
-        else {
+        let Some(stream) = XmlParserInput::from_io(ctxt, input, XmlCharEncoding::None) else {
             xml_free_parser_ctxt(ctxt);
             return None;
         };
@@ -596,8 +594,7 @@ pub unsafe fn xml_ctxt_read_memory(
         (*ctxt).reset();
 
         let input = XmlParserInputBuffer::from_memory(buffer, XmlCharEncoding::None)?;
-        let stream =
-            XmlParserInput::from_io(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None)?;
+        let stream = XmlParserInput::from_io(ctxt, input, XmlCharEncoding::None)?;
         (*ctxt).input_push(stream);
         (*ctxt).do_read(url, encoding, options)
     }
@@ -623,8 +620,7 @@ pub unsafe fn xml_ctxt_read_io(
         (*ctxt).reset();
 
         let input = XmlParserInputBuffer::from_reader(ioctx, XmlCharEncoding::None);
-        let stream =
-            XmlParserInput::from_io(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None)?;
+        let stream = XmlParserInput::from_io(ctxt, input, XmlCharEncoding::None)?;
         (*ctxt).input_push(stream);
         (*ctxt).do_read(url, encoding, options)
     }

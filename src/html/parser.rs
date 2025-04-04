@@ -281,11 +281,7 @@ macro_rules! html_parse_err_int {
 unsafe fn html_find_encoding(ctxt: &mut XmlParserCtxt) -> Option<String> {
     unsafe {
         if ctxt.input().is_none_or(|input| {
-            input.encoding.is_some()
-                || input
-                    .buf
-                    .as_deref()
-                    .is_none_or(|buf| buf.borrow().encoder.is_some())
+            input.encoding.is_some() || input.buf.as_ref().is_none_or(|buf| buf.encoder.is_some())
         }) {
             return None;
         }
@@ -506,7 +502,6 @@ unsafe fn html_current_char(ctxt: &mut XmlParserCtxt, len: &mut i32) -> i32 {
                                 .buf
                                 .as_ref()
                                 .unwrap()
-                                .borrow()
                                 .encoder
                                 .is_none()
                         {
@@ -1426,7 +1421,6 @@ unsafe fn html_check_encoding_direct(ctxt: HtmlParserCtxtPtr, encoding: Option<&
                         .buf
                         .as_ref()
                         .unwrap()
-                        .borrow()
                         .encoder
                         .is_none()
                 {
@@ -1457,16 +1451,9 @@ unsafe fn html_check_encoding_direct(ctxt: HtmlParserCtxtPtr, encoding: Option<&
                 }
             }
 
-            if (*ctxt)
-                .input()
-                .unwrap()
-                .buf
-                .as_deref()
-                .map(|buf| buf.borrow())
-                .is_some_and(|buf| {
-                    buf.encoder.is_some() && buf.buffer.is_some() && buf.raw.is_some()
-                })
-            {
+            if (*ctxt).input().unwrap().buf.as_ref().is_some_and(|buf| {
+                buf.encoder.is_some() && buf.buffer.is_some() && buf.raw.is_some()
+            }) {
                 // convert as much as possible to the parser reading buffer.
                 let processed = (*ctxt).input().unwrap().offset_from_base();
                 (*ctxt)
@@ -1475,7 +1462,6 @@ unsafe fn html_check_encoding_direct(ctxt: HtmlParserCtxtPtr, encoding: Option<&
                     .buf
                     .as_mut()
                     .unwrap()
-                    .borrow_mut()
                     .buffer
                     .unwrap()
                     .trim_head(processed);
@@ -1485,7 +1471,6 @@ unsafe fn html_check_encoding_direct(ctxt: HtmlParserCtxtPtr, encoding: Option<&
                     .buf
                     .as_mut()
                     .unwrap()
-                    .borrow_mut()
                     .decode(true);
                 (*ctxt).input_mut().unwrap().reset_base();
                 if res.is_err() {
@@ -3447,7 +3432,7 @@ pub unsafe fn html_create_memory_parser_ctxt(buffer: Vec<u8>) -> HtmlParserCtxtP
         };
 
         input.filename = None;
-        input.buf = Some(Rc::new(RefCell::new(buf)));
+        input.buf = Some(buf);
         input.reset_base();
 
         (*ctxt).input_push(input);
@@ -4375,7 +4360,7 @@ pub unsafe fn html_create_push_parser_ctxt(
         } else {
             input_stream.filename = None;
         }
-        input_stream.buf = Some(Rc::new(RefCell::new(buf)));
+        input_stream.buf = Some(buf);
         input_stream.reset_base();
 
         (*ctxt).input_push(input_stream);
@@ -4394,7 +4379,6 @@ pub unsafe fn html_create_push_parser_ctxt(
                 .buf
                 .as_mut()
                 .unwrap()
-                .borrow_mut()
                 .push_bytes(from_raw_parts(chunk as *const u8, size as usize));
             (*ctxt).input_mut().unwrap().set_base_and_cursor(base, cur);
         }
@@ -5198,7 +5182,6 @@ pub unsafe fn html_parse_chunk(
                 .buf
                 .as_mut()
                 .unwrap()
-                .borrow_mut()
                 .push_bytes(from_raw_parts(chunk as *const u8, size as usize));
             (*ctxt).input_mut().unwrap().set_base_and_cursor(base, cur);
             if res < 0 {
@@ -5209,14 +5192,11 @@ pub unsafe fn html_parse_chunk(
             && ((*ctxt).input().is_some() && (*ctxt).input().unwrap().buf.is_some())
         {
             let input = (*ctxt).input_mut().unwrap().buf.as_mut().unwrap();
-            if input.borrow().encoder.is_some()
-                && input.borrow().buffer.is_some()
-                && input.borrow().raw.is_some()
-            {
+            if input.encoder.is_some() && input.buffer.is_some() && input.raw.is_some() {
                 let base: size_t = (*ctxt).input().unwrap().get_base();
                 let current = (*ctxt).input().unwrap().offset_from_base();
 
-                let res = input.borrow_mut().decode(terminate != 0);
+                let res = input.decode(terminate != 0);
                 (*ctxt)
                     .input_mut()
                     .unwrap()
@@ -5549,9 +5529,7 @@ pub unsafe fn html_read_io(
         if ctxt.is_null() {
             return None;
         }
-        let Some(stream) =
-            XmlParserInput::from_io(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None)
-        else {
+        let Some(stream) = XmlParserInput::from_io(ctxt, input, XmlCharEncoding::None) else {
             xml_free_parser_ctxt(ctxt);
             return None;
         };
@@ -5633,8 +5611,7 @@ pub unsafe fn html_ctxt_read_memory(
 
         let input = XmlParserInputBuffer::from_memory(buffer, XmlCharEncoding::None)?;
 
-        let stream =
-            XmlParserInput::from_io(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None)?;
+        let stream = XmlParserInput::from_io(ctxt, input, XmlCharEncoding::None)?;
         (*ctxt).input_push(stream);
         html_do_read(ctxt, url, encoding, options, 1)
     }
@@ -5661,8 +5638,7 @@ pub unsafe fn html_ctxt_read_io(
         html_ctxt_reset(ctxt);
 
         let input = XmlParserInputBuffer::from_reader(ioctx, XmlCharEncoding::None);
-        let stream =
-            XmlParserInput::from_io(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None)?;
+        let stream = XmlParserInput::from_io(ctxt, input, XmlCharEncoding::None)?;
         (*ctxt).input_push(stream);
         html_do_read(ctxt, url, encoding, options, 1)
     }

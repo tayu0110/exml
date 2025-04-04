@@ -21,7 +21,6 @@
 
 use std::{
     borrow::Cow,
-    cell::RefCell,
     ffi::{CStr, CString, c_char},
     mem::{size_of, take},
     os::raw::c_void,
@@ -18824,11 +18823,9 @@ pub unsafe fn xml_schema_validate_stream(
         (*pctxt).linenumbers = 1;
         xml_schema_validate_set_locator(ctxt, Some(xml_schema_validate_stream_locator), pctxt as _);
 
-        let input = Rc::new(RefCell::new(input));
-        if let Some(input_stream) = XmlParserInput::from_io(pctxt, Rc::clone(&input), enc) {
+        if let Some(input_stream) = XmlParserInput::from_io(pctxt, input, enc) {
             (*pctxt).input_push(input_stream);
             (*ctxt).parser_ctxt = pctxt;
-            (*ctxt).input = Some(Rc::clone(&input));
 
             // Plug the validation and launch the parsing
             plug = xml_schema_sax_plug(ctxt, &mut (*pctxt).sax, &raw mut (*pctxt).user_data);
@@ -18836,7 +18833,7 @@ pub unsafe fn xml_schema_validate_stream(
                 ret = -1;
                 // goto done;
             } else {
-                (*ctxt).input = Some(input);
+                // (*ctxt).input = Some(input);
                 (*ctxt).enc = enc;
                 // (*ctxt).sax = (*pctxt).sax;
                 (*ctxt).flags |= XML_SCHEMA_VALID_CTXT_FLAG_STREAM;
@@ -18856,7 +18853,7 @@ pub unsafe fn xml_schema_validate_stream(
         // done:
         (*ctxt).parser_ctxt = null_mut();
         // (*ctxt).sax = null_mut();
-        (*ctxt).input = None;
+        // (*ctxt).input = None;
         if !plug.is_null() {
             xml_schema_sax_unplug(plug).ok();
         }

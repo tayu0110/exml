@@ -368,8 +368,6 @@ impl XmlTextReader {
         use crate::parser::{XmlParserInput, xml_create_push_parser_ctxt};
 
         unsafe {
-            use std::{cell::RefCell, rc::Rc};
-
             use crate::{
                 encoding::{XmlCharEncoding, find_encoding_handler},
                 generic_error,
@@ -486,7 +484,7 @@ impl XmlTextReader {
                     } else {
                         input_stream.filename = None;
                     }
-                    input_stream.buf = Some(Rc::new(RefCell::new(buf)));
+                    input_stream.buf = Some(buf);
                     input_stream.reset_base();
 
                     (*self.ctxt).input_push(input_stream);

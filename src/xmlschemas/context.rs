@@ -14,10 +14,8 @@
 //
 // Daniel Veillard <veillard@redhat.com>
 use std::{
-    cell::RefCell,
     ffi::{CStr, c_void},
     ptr::{null, null_mut},
-    rc::Rc,
 };
 
 #[cfg(feature = "libxml_automata")]
@@ -358,7 +356,7 @@ pub struct XmlSchemaValidCtxt {
 
     pub(crate) schema: XmlSchemaPtr, /* The schema in use */
     pub(crate) doc: Option<XmlDocPtr>,
-    pub(crate) input: Option<Rc<RefCell<XmlParserInputBuffer>>>,
+    // pub(crate) input: Option<Rc<RefCell<XmlParserInputBuffer>>>,
     pub(crate) enc: XmlCharEncoding,
     // sax: XmlSAXHandlerPtr,
     pub(crate) parser_ctxt: XmlParserCtxtPtr,
@@ -780,7 +778,7 @@ impl Default for XmlSchemaValidCtxt {
             serror: None,
             schema: null_mut(),
             doc: None,
-            input: None,
+            // input: None,
             enc: XmlCharEncoding::None,
             parser_ctxt: null_mut(),
             user_data: null_mut(),

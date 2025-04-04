@@ -38,9 +38,7 @@
 // daniel@veillard.com
 
 use std::{
-    cell::RefCell,
     ops::DerefMut,
-    rc::Rc,
     str::{from_utf8, from_utf8_mut},
 };
 
@@ -99,7 +97,7 @@ pub enum XmlParserInputState {
 #[derive(Default)]
 pub struct XmlParserInput {
     // UTF-8 encoded buffer
-    pub buf: Option<Rc<RefCell<XmlParserInputBuffer>>>,
+    pub buf: Option<XmlParserInputBuffer>,
     // The file analyzed, if any
     pub filename: Option<String>,
     // the directory/base of the file
@@ -178,7 +176,7 @@ impl XmlParserInput {
             xml_err_memory(None, Some("couldn't allocate a new input stream\n"));
             return None;
         };
-        input.buf = Some(Rc::new(RefCell::new(buf)));
+        input.buf = Some(buf);
         input.reset_base();
         Some(input)
     }
@@ -190,7 +188,7 @@ impl XmlParserInput {
     #[doc(alias = "xmlNewIOInputStream")]
     pub unsafe fn from_io(
         ctxt: XmlParserCtxtPtr,
-        input: Rc<RefCell<XmlParserInputBuffer>>,
+        input: XmlParserInputBuffer,
         enc: XmlCharEncoding,
     ) -> Option<XmlParserInput> {
         unsafe {
@@ -229,7 +227,7 @@ impl XmlParserInput {
             };
 
             let mut input_stream = XmlParserInput::new(Some(ctxt))?;
-            input_stream.buf = Some(Rc::new(RefCell::new(buf)));
+            input_stream.buf = Some(buf);
             let mut input_stream = xml_check_http_input(ctxt, Some(input_stream))?;
 
             let uri = input_stream
@@ -348,7 +346,7 @@ impl XmlParserInput {
         let Some(buffer) = self
             .buf
             .as_ref()
-            .and_then(|buf| buf.borrow().buffer)
+            .and_then(|buf| buf.buffer)
             .filter(|buf| buf.is_ok())
         else {
             return -1;
@@ -365,7 +363,7 @@ impl XmlParserInput {
         let Some(mut buffer) = self
             .buf
             .as_ref()
-            .and_then(|buf| buf.borrow().buffer)
+            .and_then(|buf| buf.buffer)
             .filter(|buf| buf.is_ok())
         else {
             return 0;
@@ -387,7 +385,7 @@ impl XmlParserInput {
         let Some(buffer) = self
             .buf
             .as_ref()
-            .and_then(|buf| buf.borrow().buffer)
+            .and_then(|buf| buf.buffer)
             .filter(|buf| buf.is_ok())
         else {
             self.base = vec![];

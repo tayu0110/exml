@@ -1589,7 +1589,7 @@ impl XmlXIncludeCtxt {
                 xml_free_parser_ctxt(pctxt);
                 return ret;
             };
-            buf.borrow_mut().encoder = get_encoding_handler(enc);
+            buf.encoder = get_encoding_handler(enc);
             let Some(mut node) = xml_new_doc_text(Some(self.doc), None) else {
                 let node = self.inc_tab[ref_index].elem.map(|node| node.into());
                 xml_xinclude_err_memory(Some(self), node, None);
@@ -1598,9 +1598,9 @@ impl XmlXIncludeCtxt {
             };
 
             // Scan all chars from the resource and add the to the node
-            while buf.borrow_mut().grow(4096) > 0 {}
+            while buf.grow(4096) > 0 {}
 
-            let content = buf.borrow().buffer.unwrap();
+            let content = buf.buffer.unwrap();
             let content = content.as_ref();
             match std::str::from_utf8(content) {
                 Ok(content) if content.chars().all(|c| xml_is_char(c as u32)) => {

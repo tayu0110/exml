@@ -125,7 +125,6 @@ impl XmlParserCtxt {
                         .buf
                         .as_ref()
                         .unwrap()
-                        .borrow()
                         .encoder
                         .is_none()
                 {

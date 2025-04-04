@@ -35,7 +35,6 @@
 use std::io::Write;
 use std::{
     borrow::Cow,
-    cell::RefCell,
     collections::{BTreeMap, HashMap},
     env::split_paths,
     ffi::CStr,
@@ -43,7 +42,6 @@ use std::{
     io::Read,
     path::{Path, PathBuf},
     ptr::{drop_in_place, null, null_mut},
-    rc::Rc,
     str::from_utf8,
     sync::{
         Arc, RwLock, Weak,
@@ -3162,7 +3160,7 @@ pub unsafe fn xml_parse_catalog_file(filename: &str) -> Option<XmlDocPtr> {
             let canonic = canonic_path(filename);
             input_stream.filename = Some(canonic.into_owned());
         }
-        input_stream.buf = Some(Rc::new(RefCell::new(buf)));
+        input_stream.buf = Some(buf);
         input_stream.reset_base();
 
         (*ctxt).input_push(input_stream);

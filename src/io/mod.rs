@@ -416,15 +416,13 @@ pub unsafe fn xml_check_http_input(
                     .buf
                     .as_mut()
                     .unwrap()
-                    .borrow_mut()
                     .nanohttp_context()
                     .is_some()
             {
-                let mut buf = ret.as_mut().unwrap().buf.as_mut().unwrap().borrow_mut();
+                let buf = ret.as_mut().unwrap().buf.as_mut().unwrap();
                 let context = buf.nanohttp_context().unwrap();
                 let code = context.return_code();
                 if code >= 400 {
-                    drop(buf);
                     // fatal error
                     if let Some(filename) = ret.as_ref().unwrap().filename.as_deref() {
                         __xml_loader_err!(ctxt, "failed to load HTTP resource \"{}\"\n", filename);
@@ -442,7 +440,6 @@ pub unsafe fn xml_check_http_input(
                 let redirection = context
                     .redirection()
                     .map(|redirection| redirection.to_owned());
-                drop(buf);
                 if is_mime_xml {
                     if let Some(encoding) = encoding {
                         if let Some(handler) = find_encoding_handler(&encoding) {
