@@ -82,7 +82,7 @@ use exml::{
 };
 #[cfg(feature = "catalog")]
 use libc::pthread_t;
-use libc::{free, malloc, memcpy, size_t, snprintf, strcmp, strlen};
+use libc::{free, malloc, memcpy, size_t, snprintf, strlen};
 
 /// pseudo flag for the unification of HTML and XML tests
 const XML_PARSE_HTML: i32 = 1 << 24;
@@ -2883,13 +2883,6 @@ unsafe fn xpath_doc_test(
     options: i32,
 ) -> i32 {
     unsafe {
-        use std::mem::zeroed;
-
-        use libc::{GLOB_DOOFFS, glob, glob_t, globfree};
-
-        let mut pattern: [c_char; 500] = [0; 500];
-        let mut result: [c_char; 500] = [0; 500];
-        let mut globbuf: glob_t = zeroed();
         let mut ret: i32 = 0;
         let mut res: i32;
 
@@ -2906,42 +2899,17 @@ unsafe fn xpath_doc_test(
             return -1;
         }
 
-        let cbase = CString::new(base_filename(filename)).unwrap();
-        res = snprintf(
-            pattern.as_mut_ptr() as _,
-            499,
-            c"./test/XPath/tests/%s*".as_ptr(),
-            cbase.as_ptr(),
-        );
-        if res >= 499 {
-            pattern[499] = 0;
-        }
-        globbuf.gl_offs = 0;
-        glob(pattern.as_ptr(), GLOB_DOOFFS, None, addr_of_mut!(globbuf));
-        for i in 0..globbuf.gl_pathc {
-            let cbase = CString::new(base_filename(
-                CStr::from_ptr(*globbuf.gl_pathv.add(i))
-                    .to_string_lossy()
-                    .as_ref(),
-            ))
-            .unwrap();
-            res = snprintf(
-                result.as_mut_ptr() as _,
-                499,
-                c"./result/XPath/tests/%s".as_ptr(),
-                cbase.as_ptr(),
-            );
-            if res >= 499 {
-                result[499] = 0;
-            }
-            let filename = CStr::from_ptr(*globbuf.gl_pathv.add(i)).to_string_lossy();
-            let result = CStr::from_ptr(result.as_ptr()).to_string_lossy();
-            res = xpath_common_test(&filename, Some(result.into_owned()), 0, 0);
+        let base = base_filename(filename);
+        let pattern = format!("./test/XPath/tests/{base}*");
+        for base in glob::glob(&pattern).unwrap() {
+            let filename = format!("./{}", base.as_ref().unwrap().display());
+            let base = base_filename(base.as_ref().unwrap());
+            let result = format!("./result/XPath/tests/{base}");
+            res = xpath_common_test(&filename, Some(result), 0, 0);
             if res != 0 {
                 ret = res;
             }
         }
-        globfree(addr_of_mut!(globbuf));
 
         if let Some(doc) = XPATH_DOCUMENT.get() {
             xml_free_doc(doc);
@@ -2963,20 +2931,9 @@ unsafe fn xptr_doc_test(
     options: i32,
 ) -> i32 {
     unsafe {
-        use std::mem::zeroed;
-
-        use libc::{GLOB_DOOFFS, glob, glob_t, globfree};
-
-        let mut pattern: [c_char; 500] = [0; 500];
-        let mut result: [c_char; 500] = [0; 500];
-        let mut globbuf: glob_t = zeroed();
         let mut ret: i32 = 0;
         let mut res: i32;
-        let subdir: *const c_char = if options == -1 {
-            c"xptr-xp1".as_ptr()
-        } else {
-            c"xptr".as_ptr()
-        };
+        let subdir = if options == -1 { "xptr-xp1" } else { "xptr" };
 
         if let Some(xpath_document) = xml_read_file(
             filename,
@@ -2989,44 +2946,17 @@ unsafe fn xptr_doc_test(
             return -1;
         }
 
-        let cbase = CString::new(base_filename(filename)).unwrap();
-        res = snprintf(
-            pattern.as_mut_ptr() as _,
-            499,
-            c"./test/XPath/%s/%s*".as_ptr(),
-            subdir,
-            cbase.as_ptr(),
-        );
-        if res >= 499 {
-            pattern[499] = 0;
-        }
-        globbuf.gl_offs = 0;
-        glob(pattern.as_ptr(), GLOB_DOOFFS, None, addr_of_mut!(globbuf));
-        for i in 0..globbuf.gl_pathc {
-            let cbase = CString::new(base_filename(
-                CStr::from_ptr(*globbuf.gl_pathv.add(i))
-                    .to_string_lossy()
-                    .as_ref(),
-            ))
-            .unwrap();
-            res = snprintf(
-                result.as_mut_ptr(),
-                499,
-                c"./result/XPath/%s/%s".as_ptr(),
-                subdir,
-                cbase.as_ptr(),
-            );
-            if res >= 499 {
-                result[499] = 0;
-            }
-            let filename = CStr::from_ptr(*globbuf.gl_pathv.add(i)).to_string_lossy();
-            let result = CStr::from_ptr(result.as_ptr()).to_string_lossy();
-            res = xpath_common_test(&filename, Some(result.into_owned()), 1, 0);
+        let base = base_filename(filename);
+        let pattern = format!("./test/XPath/{subdir}/{base}*");
+        for instance in glob::glob(&pattern).unwrap() {
+            let filename = format!("./{}", instance.as_ref().unwrap().display());
+            let base = base_filename(instance.as_ref().unwrap());
+            let result = format!("./result/XPath/{subdir}/{base}");
+            res = xpath_common_test(&filename, Some(result), 1, 0);
             if res != 0 {
                 ret = res;
             }
         }
-        globfree(addr_of_mut!(globbuf));
 
         if let Some(doc) = XPATH_DOCUMENT.get() {
             xml_free_doc(doc);
@@ -3111,7 +3041,7 @@ unsafe fn xmlid_doc_test(
     }
 }
 
-unsafe fn handle_uri(str: &str, base: Option<&str>, o: &mut File) {
+fn handle_uri(str: &str, base: Option<&str>, o: &mut File) {
     let mut uri = XmlURI::new();
 
     if let Some(base) = base {
@@ -3143,93 +3073,91 @@ unsafe fn handle_uri(str: &str, base: Option<&str>, o: &mut File) {
 ///
 /// Returns 0 in case of success, an error code otherwise
 #[doc(alias = "uriCommonTest")]
-unsafe fn uri_common_test(
+fn uri_common_test(
     filename: &str,
     result: Option<String>,
     err: Option<String>,
     base: Option<&str>,
 ) -> i32 {
-    unsafe {
-        let mut res: i32 = 0;
-        let mut ret: i32;
+    let mut res: i32 = 0;
+    let mut ret: i32;
 
-        let temp = result_filename(
-            filename,
-            TEMP_DIRECTORY.get().cloned().as_deref(),
-            Some(".res"),
-        );
-        let Ok(mut o) = File::options()
-            .write(true)
-            .truncate(true)
-            .create(true)
-            .open(temp.as_str())
-        else {
-            eprintln!("failed to open output file {temp}",);
-            return -1;
-        };
-        let Ok(mut f) = File::open(filename).map(BufReader::new) else {
-            eprintln!("failed to open input file {filename}");
-            remove_file(temp).ok();
-            return -1;
-        };
-
-        let mut str = vec![];
-        loop {
-            // read one line in string buffer.
-            match f.read_until(b'\n', &mut str) {
-                Ok(mut len) if len > 0 => {
-                    // remove the ending spaces
-                    while len > 0
-                        && (str[len - 1] == b'\n'
-                            || str[len - 1] == b'\r'
-                            || str[len - 1] == b' '
-                            || str[len - 1] == b'\t')
-                    {
-                        len -= 1;
-                        str.pop();
-                    }
-                    NB_TESTS.set(NB_TESTS.get() + 1);
-                    handle_uri(from_utf8(&str).unwrap(), base, &mut o);
-                }
-                _ => {
-                    break;
-                }
-            }
-            str.clear();
-        }
-
-        if let Some(result) = result {
-            ret = compare_files(temp.as_str(), result.as_str());
-            if ret != 0 {
-                eprintln!("Result for {filename} failed in {result}");
-                res = 1;
-            }
-        }
-        if let Some(err) = err {
-            ret = TEST_ERRORS
-                .with_borrow(|errors| compare_file_mem(err, &errors[..TEST_ERRORS_SIZE.get()]));
-            if ret != 0 {
-                eprintln!("Error for {filename} failed",);
-                res = 1;
-            }
-        }
-
+    let temp = result_filename(
+        filename,
+        TEMP_DIRECTORY.get().cloned().as_deref(),
+        Some(".res"),
+    );
+    let Ok(mut o) = File::options()
+        .write(true)
+        .truncate(true)
+        .create(true)
+        .open(temp.as_str())
+    else {
+        eprintln!("failed to open output file {temp}",);
+        return -1;
+    };
+    let Ok(mut f) = File::open(filename).map(BufReader::new) else {
+        eprintln!("failed to open input file {filename}");
         remove_file(temp).ok();
-        res
+        return -1;
+    };
+
+    let mut str = vec![];
+    loop {
+        // read one line in string buffer.
+        match f.read_until(b'\n', &mut str) {
+            Ok(mut len) if len > 0 => {
+                // remove the ending spaces
+                while len > 0
+                    && (str[len - 1] == b'\n'
+                        || str[len - 1] == b'\r'
+                        || str[len - 1] == b' '
+                        || str[len - 1] == b'\t')
+                {
+                    len -= 1;
+                    str.pop();
+                }
+                NB_TESTS.set(NB_TESTS.get() + 1);
+                handle_uri(from_utf8(&str).unwrap(), base, &mut o);
+            }
+            _ => {
+                break;
+            }
+        }
+        str.clear();
     }
+
+    if let Some(result) = result {
+        ret = compare_files(temp.as_str(), result.as_str());
+        if ret != 0 {
+            eprintln!("Result for {filename} failed in {result}");
+            res = 1;
+        }
+    }
+    if let Some(err) = err {
+        ret = TEST_ERRORS
+            .with_borrow(|errors| compare_file_mem(err, &errors[..TEST_ERRORS_SIZE.get()]));
+        if ret != 0 {
+            eprintln!("Error for {filename} failed",);
+            res = 1;
+        }
+    }
+
+    remove_file(temp).ok();
+    res
 }
 
 /// Parse a file containing URI and check for errors
 ///
 /// Returns 0 in case of success, an error code otherwise
 #[doc(alias = "uriParseTest")]
-unsafe fn uri_parse_test(
+fn uri_parse_test(
     filename: &str,
     result: Option<String>,
     err: Option<String>,
     _options: i32,
 ) -> i32 {
-    unsafe { uri_common_test(filename, result, err, None) }
+    uri_common_test(filename, result, err, None)
 }
 
 /// Parse a file containing URI, compose them against a fixed base and
@@ -3237,20 +3165,18 @@ unsafe fn uri_parse_test(
 ///
 /// Returns 0 in case of success, an error code otherwise
 #[doc(alias = "uriBaseTest")]
-unsafe fn uri_base_test(
+fn uri_base_test(
     filename: &str,
     result: Option<String>,
     err: Option<String>,
     _options: i32,
 ) -> i32 {
-    unsafe {
-        uri_common_test(
-            filename,
-            result,
-            err,
-            Some("http://foo.com/path/to/index.html?orig#help"),
-        )
-    }
+    uri_common_test(
+        filename,
+        result,
+        err,
+        Some("http://foo.com/path/to/index.html?orig#help"),
+    )
 }
 
 const URIP_TEST_URLS: &[&str] = &[
@@ -3313,12 +3239,12 @@ unsafe fn urip_match(uri: &str) -> i32 {
 ///
 /// Returns an Input context or NULL in case or error
 #[doc(alias = "uripOpen")]
-unsafe fn urip_open(uri: &str) -> *mut c_void {
+fn urip_open(uri: &str) -> *mut c_void {
     const CATALOG_URL: &str = concatcp!("file://", SYSCONFDIR, "/xml/catalog");
     if uri == CATALOG_URL {
         return null_mut();
     }
-    /* Verify we received the escaped URL */
+    // Verify we received the escaped URL
     if URIP_RCVS_URLS[URIP_CURRENT.get()] != uri {
         URIP_SUCCESS.set(0);
     }
@@ -3331,7 +3257,7 @@ unsafe fn urip_open(uri: &str) -> *mut c_void {
 ///
 /// Returns 0 or -1 in case of error
 #[doc(alias = "uripClose")]
-unsafe fn urip_close(context: *mut c_void) -> i32 {
+fn urip_close(context: *mut c_void) -> i32 {
     if context.is_null() {
         return -1;
     }
@@ -3403,9 +3329,7 @@ unsafe fn uri_path_test(
         impl Drop for URIPTest {
             fn drop(&mut self) {
                 if !self.0.is_null() {
-                    unsafe {
-                        urip_close(self.0);
-                    }
+                    urip_close(self.0);
                 }
             }
         }
@@ -3414,7 +3338,7 @@ unsafe fn uri_path_test(
                 unsafe { urip_match(filename) != 0 }
             }
             fn open(&mut self, filename: &str) -> std::io::Result<Box<dyn Read>> {
-                let ptr = unsafe { urip_open(filename) };
+                let ptr = urip_open(filename);
                 if ptr.is_null() {
                     Err(io::Error::other("Failed to execute urip_open"))
                 } else {
@@ -3455,9 +3379,9 @@ unsafe fn uri_path_test(
 
 #[cfg(feature = "schema")]
 unsafe fn schemas_one_test(
-    sch: *const c_char,
+    sch: &str,
     filename: &str,
-    result: *const c_char,
+    result: &str,
     options: i32,
     schemas: XmlSchemaPtr,
 ) -> i32 {
@@ -3471,15 +3395,12 @@ unsafe fn schemas_one_test(
         let mut ret: i32 = 0;
 
         let Some(doc) = xml_read_file(filename, None, options) else {
-            eprintln!(
-                "failed to parse instance {filename} for {}",
-                CStr::from_ptr(sch).to_string_lossy(),
-            );
+            eprintln!("failed to parse instance {filename} for {sch}");
             return -1;
         };
 
         let temp = result_filename(
-            CStr::from_ptr(result).to_string_lossy().as_ref(),
+            result,
             TEMP_DIRECTORY.get().cloned().as_deref(),
             Some(".res"),
         );
@@ -3516,16 +3437,8 @@ unsafe fn schemas_one_test(
                 .ok();
             }
         }
-        if !result.is_null()
-            && compare_files(
-                temp.as_str(),
-                CStr::from_ptr(result).to_string_lossy().as_ref(),
-            ) != 0
-        {
-            eprintln!(
-                "Result for {filename} on {} failed",
-                CStr::from_ptr(sch).to_string_lossy()
-            );
+        if compare_files(temp.as_str(), result) != 0 {
+            eprintln!("Result for {filename} on {sch} failed");
             ret = 1;
         }
         remove_file(temp).ok();
@@ -3556,22 +3469,8 @@ unsafe fn schemas_test(
     };
 
     unsafe {
-        use std::mem::zeroed;
-
-        use libc::{GLOB_DOOFFS, glob, glob_t, globfree};
-
-        let cfilename = CString::new(filename).unwrap();
-        let base = CString::new(base_filename(filename)).unwrap();
-        let base = base.as_ptr();
         let mut res: i32 = 0;
-        let mut len: usize;
         let mut ret: i32;
-        let mut pattern: [c_char; 500] = [0; 500];
-        let mut prefix: [c_char; 500] = [0; 500];
-        let mut result: [c_char; 500] = [0; 500];
-        let mut err: [c_char; 500] = [0; 500];
-        let mut globbuf: glob_t = zeroed();
-        let mut count: c_char;
 
         // first compile the schemas if possible
         let ctxt: XmlSchemaParserCtxtPtr = xml_schema_new_parser_ctxt(filename);
@@ -3584,94 +3483,56 @@ unsafe fn schemas_test(
         xml_schema_free_parser_ctxt(ctxt);
         let parse_errors_size = TEST_ERRORS_SIZE.get();
 
+        let base = base_filename(filename);
         // most of the mess is about the output filenames generated by the Makefile
-        len = strlen(base);
-        if !(5..=499).contains(&len) {
+        if !(5..=499).contains(&base.len()) {
             xml_schema_free(schemas);
             return -1;
         }
-        len -= 4; /* remove trailing .xsd */
-        if *base.add(len - 2) == b'_' as _ {
-            len -= 2; /* remove subtest number */
+        // remove trailing .xsd
+        let mut prefix = base.strip_suffix(".xsd").unwrap();
+        if prefix.rfind('_') == Some(prefix.len() - 2) {
+            // remove subtest number
+            prefix = &prefix[..prefix.len() - 2];
         }
-        if *base.add(len - 2) == b'_' as _ {
-            len -= 2; /* remove subtest number */
-        }
-        memcpy(prefix.as_mut_ptr() as _, base as _, len);
-        prefix[len] = 0;
-
-        if snprintf(
-            pattern.as_mut_ptr() as _,
-            499,
-            c"./test/schemas/%s_*.xml".as_ptr(),
-            prefix.as_ptr(),
-        ) >= 499
-        {
-            pattern[499] = 0;
+        if prefix.rfind('_') == Some(prefix.len() - 2) {
+            // remove subtest number
+            prefix = &prefix[..prefix.len() - 2];
         }
 
-        if *base.add(len) == b'_' as _ {
-            len += 2;
-            memcpy(prefix.as_mut_ptr() as _, base as _, len);
-            prefix[len] = 0;
-        }
+        let pattern = format!("./test/schemas/{prefix}_*.xml");
+        let prefix = if base[prefix.len()..].starts_with('_') {
+            &base[..prefix.len() + 2]
+        } else {
+            prefix
+        };
 
-        globbuf.gl_offs = 0;
-        glob(pattern.as_ptr(), GLOB_DOOFFS, None, addr_of_mut!(globbuf));
-        for i in 0..globbuf.gl_pathc {
+        for instance in glob::glob(&pattern).unwrap() {
             TEST_ERRORS_SIZE.set(parse_errors_size);
             TEST_ERRORS.with_borrow_mut(|errors| {
                 errors[parse_errors_size] = 0;
             });
-            let instance = CStr::from_ptr(*globbuf.gl_pathv.add(i)).to_string_lossy();
-            let base2 = CString::new(base_filename(instance.as_ref())).unwrap();
-            let base2 = base2.as_ptr();
-            len = strlen(base2);
-            if len > 6 && *base2.add(len - 6) == b'_' as _ {
-                count = *base2.add(len - 5);
-                ret = snprintf(
-                    result.as_mut_ptr(),
-                    499,
-                    c"./result/schemas/%s_%c".as_ptr(),
-                    prefix.as_ptr(),
-                    count as i32,
-                );
-                if ret >= 499 {
-                    result[499] = 0;
-                }
-                ret = snprintf(
-                    err.as_mut_ptr(),
-                    499,
-                    c"./result/schemas/%s_%c.err".as_ptr(),
-                    prefix.as_ptr(),
-                    count as i32,
-                );
-                if ret >= 499 {
-                    err[499] = 0;
-                }
+            let base = base_filename(instance.as_ref().unwrap());
+            let instance = format!("./{}", instance.as_ref().unwrap().display());
+            let (result, err) = if prefix.len() > 6 && base.as_bytes()[prefix.len() - 6] == b'_' {
+                let count = base.as_bytes()[prefix.len() - 5];
+                (
+                    format!("./result/schemas/{prefix}_{count}"),
+                    format!("./result/schemas/{prefix}_{count}.err"),
+                )
             } else {
                 eprintln!("don't know how to process {}", instance);
                 continue;
-            }
+            };
             if !schemas.is_null() {
                 NB_TESTS.set(NB_TESTS.get() + 1);
-                ret = schemas_one_test(
-                    cfilename.as_ptr(),
-                    &instance,
-                    result.as_ptr(),
-                    options,
-                    schemas,
-                );
+                ret = schemas_one_test(filename, &instance, &result, options, schemas);
                 if ret != 0 {
                     res = ret;
                 }
             }
             TEST_ERRORS.with_borrow(|errors| {
-                if compare_file_mem(
-                    CStr::from_ptr(err.as_ptr()).to_string_lossy().as_ref(),
-                    &errors[..TEST_ERRORS_SIZE.get()],
-                ) != 0
-                {
+                if compare_file_mem(&err, &errors[..TEST_ERRORS_SIZE.get()]) != 0 {
                     eprintln!("Error for {instance} on {filename} failed");
                     eprintln!(
                         "{}",
@@ -3681,7 +3542,6 @@ unsafe fn schemas_test(
                 }
             });
         }
-        globfree(addr_of_mut!(globbuf));
         xml_schema_free(schemas);
 
         res
@@ -3690,9 +3550,9 @@ unsafe fn schemas_test(
 
 #[cfg(feature = "schema")]
 unsafe fn rng_one_test(
-    sch: *const c_char,
+    sch: &str,
     filename: &str,
-    result: *const c_char,
+    result: &str,
     options: i32,
     schemas: XmlRelaxNGPtr,
 ) -> i32 {
@@ -3705,15 +3565,12 @@ unsafe fn rng_one_test(
         let mut ret: i32;
 
         let Some(doc) = xml_read_file(filename, None, options) else {
-            eprintln!(
-                "failed to parse instance {filename} for {}",
-                CStr::from_ptr(sch).to_string_lossy(),
-            );
+            eprintln!("failed to parse instance {filename} for {sch}");
             return -1;
         };
 
         let temp = result_filename(
-            CStr::from_ptr(result).to_string_lossy().as_ref(),
+            result,
             TEMP_DIRECTORY.get().cloned().as_deref(),
             Some(".res"),
         );
@@ -3752,16 +3609,8 @@ unsafe fn rng_one_test(
         }
 
         ret = 0;
-        if !result.is_null()
-            && compare_files(
-                temp.as_str(),
-                CStr::from_ptr(result).to_string_lossy().as_ref(),
-            ) != 0
-        {
-            eprintln!(
-                "Result for {filename} on {} failed",
-                CStr::from_ptr(sch).to_string_lossy()
-            );
+        if compare_files(temp.as_str(), result) != 0 {
+            eprintln!("Result for {filename} on {sch} failed");
             ret = 1;
         }
         remove_file(temp).ok();
@@ -3784,26 +3633,13 @@ unsafe fn rng_test(
     options: i32,
 ) -> i32 {
     unsafe {
-        use std::mem::zeroed;
-
         use exml::{
             libxml::relaxng::{xml_relaxng_free, xml_relaxng_parse},
             relaxng::{xml_relaxng_free_parser_ctxt, xml_relaxng_new_parser_ctxt},
         };
-        use libc::{GLOB_DOOFFS, glob, glob_t, globfree};
 
-        let cfilename = CString::new(filename).unwrap();
-        let base = CString::new(base_filename(filename)).unwrap();
-        let base = base.as_ptr();
         let mut res: i32;
-        let mut len: usize;
         let mut ret: i32 = 0;
-        let mut pattern: [c_char; 500] = [0; 500];
-        let mut prefix: [c_char; 500] = [0; 500];
-        let mut result: [c_char; 500] = [0; 500];
-        let mut err: [c_char; 500] = [0; 500];
-        let mut globbuf: glob_t = zeroed();
-        let mut count: c_char;
 
         // first compile the schemas if possible
         let ctxt = xml_relaxng_new_parser_ctxt(filename);
@@ -3822,67 +3658,41 @@ unsafe fn rng_test(
         }
         let parse_errors_size = TEST_ERRORS_SIZE.get();
 
-        // * most of the mess is about the output filenames generated by the Makefile
-        len = strlen(base);
-        if !(5..=499).contains(&len) {
+        // most of the mess is about the output filenames generated by the Makefile
+        if !(5..=499).contains(&filename.len()) {
             xml_relaxng_free(schemas);
             return -1;
         }
-        len -= 4; /* remove trailing .rng */
-        memcpy(prefix.as_mut_ptr() as _, base as _, len);
-        prefix[len] = 0;
+        // remove trailing .rng
+        let base = base_filename(filename);
+        let prefix = base.strip_suffix(".rng").unwrap();
+        let pattern = format!("./test/relaxng/{prefix}_?.xml");
 
-        if snprintf(
-            pattern.as_mut_ptr(),
-            499,
-            c"./test/relaxng/%s_?.xml".as_ptr(),
-            prefix.as_ptr(),
-        ) >= 499
-        {
-            pattern[499] = 0;
-        }
-
-        globbuf.gl_offs = 0;
-        glob(pattern.as_ptr(), GLOB_DOOFFS, None, addr_of_mut!(globbuf));
-        for i in 0..globbuf.gl_pathc {
+        for instance in glob::glob(&pattern).unwrap() {
+            let instance = instance.unwrap();
             TEST_ERRORS_SIZE.set(parse_errors_size);
             TEST_ERRORS.with_borrow_mut(|errors| errors[parse_errors_size] = 0);
-            let instance = CStr::from_ptr(*globbuf.gl_pathv.add(i)).to_string_lossy();
-            let base2 = CString::new(base_filename(instance.as_ref())).unwrap();
-            let base2 = base2.as_ptr();
-            len = strlen(base2);
-            if len > 6 && *base2.add(len - 6) == b'_' as i8 {
-                count = *base2.add(len - 5);
-                res = snprintf(
-                    result.as_mut_ptr(),
-                    499,
-                    c"./result/relaxng/%s_%c".as_ptr(),
-                    prefix.as_ptr(),
-                    count as i32,
-                );
-                if res >= 499 {
-                    result[499] = 0;
-                }
-                res = snprintf(
-                    err.as_mut_ptr(),
-                    499,
-                    c"./result/relaxng/%s_%c.err".as_ptr(),
-                    prefix.as_ptr(),
-                    count as i32,
-                );
-                if res >= 499 {
-                    err[499] = 0;
-                }
+            let base2 = instance.to_string_lossy();
+            let (result, err) = if let Some(count) = base2
+                .strip_suffix(".xml")
+                .and_then(|base| base.rsplit_once('_'))
+                .map(|base| base.1)
+                .and_then(|count| count.parse::<i32>().ok())
+            {
+                (
+                    format!("./result/relaxng/{prefix}_{count}"),
+                    format!("./result/relaxng/{prefix}_{count}.err"),
+                )
             } else {
-                eprintln!("don't know how to process {instance}");
+                eprintln!("don't know how to process {}", instance.display());
                 continue;
-            }
+            };
             if !schemas.is_null() {
                 NB_TESTS.set(NB_TESTS.get() + 1);
                 res = rng_one_test(
-                    cfilename.as_ptr(),
-                    &instance,
-                    result.as_ptr(),
+                    filename,
+                    &instance.to_string_lossy(),
+                    &result,
                     options,
                     schemas,
                 );
@@ -3891,19 +3701,13 @@ unsafe fn rng_test(
                 }
             }
             TEST_ERRORS.with_borrow(|errors| {
-                if compare_file_mem(
-                    CStr::from_ptr(err.as_ptr()).to_string_lossy().as_ref(),
-                    &errors[..TEST_ERRORS_SIZE.get()],
-                ) != 0
-                {
-                    eprintln!("Error for {instance} on {filename} failed");
+                if compare_file_mem(&err, &errors[..TEST_ERRORS_SIZE.get()]) != 0 {
+                    eprintln!("Error for {} on {filename} failed", instance.display());
                     // res = 1;
                 }
             });
         }
-        globfree(addr_of_mut!(globbuf));
         xml_relaxng_free(schemas);
-
         ret
     }
 }
@@ -3920,115 +3724,61 @@ unsafe fn rng_stream_test(
     options: i32,
 ) -> i32 {
     unsafe {
-        use std::mem::zeroed;
-
         use exml::libxml::xmlreader::{xml_free_text_reader, xml_reader_for_file};
-        use libc::{GLOB_DOOFFS, glob, glob_t, globfree};
 
-        let base = CString::new(base_filename(filename)).unwrap();
-        let base = base.as_ptr();
-        let mut instance: *const c_char;
         let mut res: i32 = 0;
-        let mut len: usize;
         let mut ret: i32;
-        let mut pattern: [c_char; 500] = [0; 500];
-        let mut prefix: [c_char; 500] = [0; 500];
-        let mut result: [c_char; 500] = [0; 500];
-        let mut err: [c_char; 500] = [0; 500];
-        let mut globbuf: glob_t = zeroed();
-        let mut count: c_char;
         let mut reader: XmlTextReaderPtr;
         let mut disable_err: i32 = 0;
 
         // most of the mess is about the output filenames generated by the Makefile
-        len = strlen(base);
-        if !(5..=499).contains(&len) {
-            eprintln!("len(base) == {} !", len);
+        let base = base_filename(filename);
+        if !(5..=499).contains(&base.len()) {
+            eprintln!("len(base) == {} !", base.len());
             return -1;
         }
-        len -= 4; /* remove trailing .rng */
-        memcpy(prefix.as_mut_ptr() as _, base as _, len);
-        prefix[len] = 0;
+        // remove trailing .rng
+        let prefix = base.strip_suffix(".rng").unwrap();
 
         // strictly unifying the error messages is nearly impossible this
         // hack is also done in the Makefile
-        if strcmp(prefix.as_ptr(), c"tutor10_1".as_ptr()) == 0
-            || strcmp(prefix.as_ptr(), c"tutor10_2".as_ptr()) == 0
-            || strcmp(prefix.as_ptr(), c"tutor3_2".as_ptr()) == 0
-            || strcmp(prefix.as_ptr(), c"307377".as_ptr()) == 0
-            || strcmp(prefix.as_ptr(), c"tutor8_2".as_ptr()) == 0
+        if prefix == "tutor10_1"
+            || prefix == "tutor10_2"
+            || prefix == "tutor3_2"
+            || prefix == "307377"
+            || prefix == "tutor8_2"
         {
             disable_err = 1;
         }
 
-        if snprintf(
-            pattern.as_mut_ptr(),
-            499,
-            c"./test/relaxng/%s_?.xml".as_ptr(),
-            prefix.as_ptr(),
-        ) >= 499
-        {
-            pattern[499] = 0;
-        }
+        let pattern = format!("./test/relaxng/{prefix}_?.xml");
 
-        globbuf.gl_offs = 0;
-        glob(pattern.as_ptr(), GLOB_DOOFFS, None, addr_of_mut!(globbuf));
-        for i in 0..globbuf.gl_pathc {
+        for instance in glob::glob(&pattern).unwrap() {
             TEST_ERRORS_SIZE.set(0);
             TEST_ERRORS.with_borrow_mut(|errors| errors[0] = 0);
-            instance = *globbuf.gl_pathv.add(i);
-            let base2 = CString::new(base_filename(
-                CStr::from_ptr(instance).to_string_lossy().as_ref(),
-            ))
-            .unwrap();
-            let base2 = base2.as_ptr();
-            len = strlen(base2);
-            if len > 6 && *base2.add(len - 6) == b'_' as i8 {
-                count = *base2.add(len - 5);
-                ret = snprintf(
-                    result.as_mut_ptr(),
-                    499,
-                    c"./result/relaxng/%s_%c".as_ptr(),
-                    prefix.as_ptr(),
-                    count as i32,
-                );
-                if ret >= 499 {
-                    result[499] = 0;
-                }
-                ret = snprintf(
-                    err.as_mut_ptr(),
-                    499,
-                    c"./result/relaxng/%s_%c.err".as_ptr(),
-                    prefix.as_ptr(),
-                    count as i32,
-                );
-                if ret >= 499 {
-                    err[499] = 0;
-                }
+            let instance = format!("./{}", instance.unwrap().display());
+            let (result, err) = if let Some(count) = instance
+                .strip_suffix(".xml")
+                .and_then(|base| base.rsplit_once('_'))
+                .map(|base| base.1)
+                .and_then(|count| count.parse::<i32>().ok())
+            {
+                (
+                    format!("./result/relaxng/{prefix}_{count}"),
+                    format!("./result/relaxng/{prefix}_{count}.err"),
+                )
             } else {
-                eprintln!(
-                    "don't know how to process {}",
-                    CStr::from_ptr(instance).to_string_lossy()
-                );
+                eprintln!("don't know how to process {instance}");
                 continue;
-            }
-            reader =
-                xml_reader_for_file(&CStr::from_ptr(instance).to_string_lossy(), None, options);
+            };
+            reader = xml_reader_for_file(&instance, None, options);
             if reader.is_null() {
-                eprintln!(
-                    "Failed to build reader for {}",
-                    CStr::from_ptr(instance).to_string_lossy()
-                );
+                eprintln!("Failed to build reader for {instance}");
             }
-            let instance = CStr::from_ptr(instance).to_string_lossy();
             if disable_err == 1 {
                 ret = stream_process_test(
                     &instance,
-                    Some(
-                        CStr::from_ptr(result.as_ptr())
-                            .to_string_lossy()
-                            .into_owned(),
-                    ),
+                    Some(result),
                     None,
                     reader,
                     Some(filename),
@@ -4037,12 +3787,8 @@ unsafe fn rng_stream_test(
             } else {
                 ret = stream_process_test(
                     &instance,
-                    Some(
-                        CStr::from_ptr(result.as_ptr())
-                            .to_string_lossy()
-                            .into_owned(),
-                    ),
-                    Some(CStr::from_ptr(err.as_ptr()).to_string_lossy().into_owned()),
+                    Some(result),
+                    Some(err),
                     reader,
                     Some(filename),
                     options,
@@ -4050,11 +3796,10 @@ unsafe fn rng_stream_test(
             }
             xml_free_text_reader(reader);
             if ret != 0 {
-                eprintln!("instance {instance} failed",);
+                eprintln!("instance {} failed", instance);
                 res = ret;
             }
         }
-        globfree(addr_of_mut!(globbuf));
 
         res
     }
@@ -4113,13 +3858,8 @@ unsafe fn schematron_test(
     use exml::schematron::XmlSchematronParserCtxt;
 
     unsafe {
-        use std::mem::zeroed;
-
-        use libc::{GLOB_DOOFFS, glob_t};
-
         let base = base_filename(filename);
         let mut ret = 0;
-        let mut globbuf: glob_t = zeroed();
 
         let mut pctxt = XmlSchematronParserCtxt::new(filename).unwrap();
         let mut schematron = pctxt.parse();
@@ -4137,19 +3877,14 @@ unsafe fn schematron_test(
             return -1;
         }
         let prefix = base.strip_suffix(".sct").unwrap();
-        let mut pattern = format!("./test/schematron/{prefix}_?.xml");
-        pattern.truncate(500);
-        let cpattern = CString::new(pattern).unwrap();
-
-        globbuf.gl_offs = 0;
-        libc::glob(cpattern.as_ptr(), GLOB_DOOFFS, None, &raw mut globbuf);
-        for i in 0..globbuf.gl_pathc {
+        let pattern = format!("./test/schematron/{prefix}_?.xml");
+        for instance in glob::glob(&pattern).unwrap() {
             TEST_ERRORS_SIZE.set(parse_errors_size);
             TEST_ERRORS.with_borrow_mut(|errors| {
                 errors[parse_errors_size] = 0;
             });
-            let instance = CStr::from_ptr(*globbuf.gl_pathv.add(i)).to_string_lossy();
-            let base2 = base_filename(instance.as_ref());
+            let instance = format!("./{}", instance.unwrap().display());
+            let base2 = base_filename(instance.as_str());
             let len = base2.len();
             let err = if len > 6 && base2.as_bytes()[len - 6] == b'_' {
                 let count = base2.as_bytes()[len - 5] as char;
@@ -4157,7 +3892,7 @@ unsafe fn schematron_test(
                 err.truncate(500);
                 err
             } else {
-                eprintln!("don't know how to process {}", instance);
+                eprintln!("don't know how to process {instance}");
                 continue;
             };
             if let Some(schematron) = schematron.as_mut() {
@@ -4176,7 +3911,6 @@ unsafe fn schematron_test(
                 }
             });
         }
-        libc::globfree(&raw mut globbuf);
 
         ret
     }
