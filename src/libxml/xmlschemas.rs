@@ -2698,7 +2698,7 @@ unsafe fn xml_schema_cleanup_doc(ctxt: XmlSchemaParserCtxtPtr, root: XmlNodePtr)
             cur = loop {
                 let Some(parent) = cur_node
                     .parent
-                    .map(|parent| XmlNodePtr::try_from(parent).unwrap())
+                    .and_then(|parent| XmlNodePtr::try_from(parent).ok())
                 else {
                     break None;
                 };

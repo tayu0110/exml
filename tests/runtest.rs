@@ -4,7 +4,6 @@
 
 use std::{
     cell::{Cell, RefCell},
-    env::args,
     ffi::{CStr, CString, c_char},
     fs::{File, metadata, remove_file},
     io::{self, BufRead, BufReader, Read, Write},
@@ -1404,6 +1403,10 @@ fn sax_compare_file(temp: impl AsRef<Path>, result: impl AsRef<Path>) -> bool {
     tbuf.next().is_none() && rbuf.next().is_none()
 }
 
+thread_local! {
+    static SAX_PARSE_TEST_TEMP_SUFFIX: OnceLock<&'static str> = const { OnceLock::new() };
+}
+
 /// Parse a file using the SAX API and check for errors.
 ///
 /// Returns 0 in case of success, an error code otherwise
@@ -1418,10 +1421,12 @@ unsafe fn sax_parse_test(
         let mut ret: i32;
 
         NB_TESTS.set(NB_TESTS.get() + 1);
+        let suffix = SAX_PARSE_TEST_TEMP_SUFFIX
+            .with(|suf| format!("{}.res", suf.get().copied().unwrap_or_default()));
         let temp = result_filename(
             filename,
             TEMP_DIRECTORY.get().cloned().as_deref(),
-            Some(".res"),
+            Some(&suffix),
         );
 
         let Ok(out) = File::options()
@@ -2293,6 +2298,10 @@ unsafe fn mem_parse_test(
     }
 }
 
+thread_local! {
+    static NOENT_PARSE_TEST_TEMP_SUFFIX: OnceLock<&'static str> = const { OnceLock::new() };
+}
+
 /// Parse a file with entity resolution, then serialize back
 /// reparse the result and serialize again, then check for deviation
 /// in serialization.
@@ -2313,10 +2322,13 @@ unsafe fn noent_parse_test(
         let Some(mut doc) = xml_read_file(filename, None, options) else {
             return 1;
         };
+
+        let suffix = NOENT_PARSE_TEST_TEMP_SUFFIX
+            .with(|suf| format!("{}.res", suf.get().copied().unwrap_or_default()));
         let temp = result_filename(
             filename,
             TEMP_DIRECTORY.get().cloned().as_deref(),
-            Some(".res"),
+            Some(&suffix),
         );
         doc.save_file(temp.as_str());
         if compare_files(temp.as_str(), result.as_deref().unwrap()) != 0 {
@@ -2453,6 +2465,10 @@ unsafe fn process_node(out: &mut File, reader: XmlTextReaderPtr) {
     }
 }
 
+thread_local! {
+    static STREAM_PROCESS_TEST_TEMP_SUFFIX: OnceLock<&'static str> = const { OnceLock::new() };
+}
+
 #[cfg(feature = "libxml_reader")]
 unsafe fn stream_process_test(
     filename: &str,
@@ -2473,10 +2489,12 @@ unsafe fn stream_process_test(
         NB_TESTS.set(NB_TESTS.get() + 1);
         let mut t = None;
         if result.is_some() {
+            let suffix = STREAM_PROCESS_TEST_TEMP_SUFFIX
+                .with(|suf| format!("{}.res", suf.get().copied().unwrap_or_default()));
             let tm = result_filename(
                 filename,
                 TEMP_DIRECTORY.get().cloned().as_deref(),
-                Some(".res"),
+                Some(&suffix),
             );
             match File::options()
                 .write(true)
@@ -2697,6 +2715,10 @@ unsafe fn test_xpath(xpath: &str, xptr: i32, expr: i32) {
     }
 }
 
+thread_local! {
+    static XPATH_TEST_TEMP_SUFFIX: OnceLock<&'static str> = const { OnceLock::new() };
+}
+
 /// Parse a file containing XPath standalone expressions and evaluate them
 ///
 /// Returns 0 in case of success, an error code otherwise
@@ -2710,10 +2732,12 @@ unsafe fn xpath_common_test(filename: &str, result: Option<String>, xptr: i32, e
 
         let mut ret: i32 = 0;
 
+        let suffix = XPATH_TEST_TEMP_SUFFIX
+            .with(|suf| format!("{}.res", suf.get().copied().unwrap_or_default()));
         let temp = result_filename(
             filename,
             TEMP_DIRECTORY.get().cloned().as_deref(),
-            Some(".res"),
+            Some(&suffix),
         );
 
         let Ok(out) = File::options()
@@ -3274,11 +3298,14 @@ unsafe fn urip_match(uri: &str) -> i32 {
     if uri == CATALOG_URL {
         return 0;
     }
-    /* Verify we received the escaped URL */
+    // Verify we received the escaped URL
     if URIP_RCVS_URLS[URIP_CURRENT.get()] != uri {
         URIP_SUCCESS.set(0);
+        0
+    } else {
+        URIP_SUCCESS.set(1);
+        1
     }
-    1
 }
 
 /// Return a pointer to the urip: query handler, in this example simply
@@ -5187,196 +5214,6 @@ unsafe fn automata_test(
     }
 }
 
-const TEST_DESCRIPTIONS: &[TestDesc] = &[
-    #[cfg(feature = "schema")]
-    TestDesc {
-        desc: "Schemas regression tests",
-        func: schemas_test,
-        input: Some("./test/schemas/oss-fuzz-51295_0.xsd"),
-        out: None,
-        suffix: None,
-        err: None,
-        options: 0,
-    },
-    TestDesc {
-        desc: "XML regression tests",
-        func: old_parse_test,
-        input: Some("./test/*"),
-        out: Some("./result/"),
-        suffix: Some(""),
-        err: None,
-        options: 0,
-    },
-    TestDesc {
-        desc: "XML regression tests on memory",
-        func: mem_parse_test,
-        input: Some("./test/*"),
-        out: Some("./result/"),
-        suffix: Some(""),
-        err: None,
-        options: 0,
-    },
-    TestDesc {
-        desc: "XML entity subst regression tests",
-        func: noent_parse_test,
-        input: Some("./test/*"),
-        out: Some("./result/noent/"),
-        suffix: Some(""),
-        err: None,
-        options: XmlParserOption::XmlParseNoEnt as i32,
-    },
-    TestDesc {
-        desc: "XML Namespaces regression tests",
-        func: err_parse_test,
-        input: Some("./test/namespaces/*"),
-        out: Some("./result/namespaces/"),
-        suffix: Some(""),
-        err: Some(".err"),
-        options: 0,
-    },
-    #[cfg(feature = "libxml_valid")]
-    TestDesc {
-        desc: "Error cases regression tests",
-        func: err_parse_test,
-        input: Some("./test/errors/*.xml"),
-        out: Some("./result/errors/"),
-        suffix: Some(""),
-        err: Some(".err"),
-        options: 0,
-    },
-    #[cfg(feature = "libxml_valid")]
-    TestDesc {
-        desc: "Error cases regression tests with entity substitution",
-        func: err_parse_test,
-        input: Some("./test/errors/*.xml"),
-        out: Some("./result/errors/"),
-        suffix: None,
-        err: Some(".ent"),
-        options: XmlParserOption::XmlParseNoEnt as i32,
-    },
-    #[cfg(feature = "libxml_valid")]
-    TestDesc {
-        desc: "Error cases regression tests (old 1.0)",
-        func: err_parse_test,
-        input: Some("./test/errors10/*.xml"),
-        out: Some("./result/errors10/"),
-        suffix: Some(""),
-        err: Some(".err"),
-        options: XmlParserOption::XmlParseOld10 as i32,
-    },
-    #[cfg(all(feature = "libxml_reader", feature = "libxml_valid"))]
-    TestDesc {
-        desc: "Error cases stream regression tests",
-        func: stream_parse_test,
-        input: Some("./test/errors/*.xml"),
-        out: Some("./result/errors/"),
-        suffix: None,
-        err: Some(".str"),
-        options: 0,
-    },
-    #[cfg(feature = "libxml_reader")]
-    TestDesc {
-        desc: "Reader regression tests",
-        func: stream_parse_test,
-        input: Some("./test/*"),
-        out: Some("./result/"),
-        suffix: Some(".rdr"),
-        err: None,
-        options: 0,
-    },
-    #[cfg(feature = "libxml_reader")]
-    TestDesc {
-        desc: "Reader entities substitution regression tests",
-        func: stream_parse_test,
-        input: Some("./test/*"),
-        out: Some("./result/"),
-        suffix: Some(".rde"),
-        err: None,
-        options: XmlParserOption::XmlParseNoEnt as i32,
-    },
-    #[cfg(feature = "libxml_reader")]
-    TestDesc {
-        desc: "Reader on memory regression tests",
-        func: stream_mem_parse_test,
-        input: Some("./test/*"),
-        out: Some("./result/"),
-        suffix: Some(".rdr"),
-        err: None,
-        options: 0,
-    },
-    #[cfg(feature = "libxml_reader")]
-    TestDesc {
-        desc: "Walker regression tests",
-        func: walker_parse_test,
-        input: Some("./test/*"),
-        out: Some("./result/"),
-        suffix: Some(".rdr"),
-        err: None,
-        options: 0,
-    },
-    #[cfg(feature = "sax1")]
-    TestDesc {
-        desc: "SAX1 callbacks regression tests",
-        func: sax_parse_test,
-        input: Some("./test/*"),
-        out: Some("./result/"),
-        suffix: Some(".sax"),
-        err: None,
-        options: XmlParserOption::XmlParseSAX1 as i32,
-    },
-    TestDesc {
-        desc: "SAX2 callbacks regression tests",
-        func: sax_parse_test,
-        input: Some("./test/*"),
-        out: Some("./result/"),
-        suffix: Some(".sax2"),
-        err: None,
-        options: 0,
-    },
-    TestDesc {
-        desc: "SAX2 callbacks regression tests with entity substitution",
-        func: sax_parse_test,
-        input: Some("./test/*"),
-        out: Some("./result/noent/"),
-        suffix: Some(".sax2"),
-        err: None,
-        options: XmlParserOption::XmlParseNoEnt as i32,
-    },
-    #[cfg(all(feature = "xinclude", feature = "libxml_reader"))]
-    TestDesc {
-        desc: "XInclude xmlReader regression tests",
-        func: stream_parse_test,
-        input: Some("./test/XInclude/docs/*"),
-        out: Some("./result/XInclude/"),
-        suffix: Some(".rdr"),
-        err: Some(".err"),
-        options: XmlParserOption::XmlParseXInclude as i32,
-    },
-    #[cfg(all(
-        feature = "xpath",
-        feature = "libxml_debug",
-        feature = "libxml_xptr_locs"
-    ))]
-    TestDesc {
-        desc: "XPointer xpointer() queries regression tests",
-        func: xptr_doc_test,
-        input: Some("./test/XPath/docs/*"),
-        out: None,
-        suffix: None,
-        err: None,
-        options: 0,
-    },
-    TestDesc {
-        desc: "Path URI conversion tests",
-        func: uri_path_test,
-        input: None,
-        out: None,
-        suffix: None,
-        err: None,
-        options: 0,
-    },
-];
-
 unsafe fn launch_tests(tst: &TestDesc) -> i32 {
     unsafe {
         let mut res: i32;
@@ -5463,31 +5300,31 @@ unsafe fn launch_tests(tst: &TestDesc) -> i32 {
     }
 }
 
-unsafe extern "C" fn runtest(i: usize) -> i32 {
-    unsafe {
-        let mut ret: i32 = 0;
+// unsafe extern "C" fn runtest(i: usize) -> i32 {
+//     unsafe {
+//         let mut ret: i32 = 0;
 
-        let old_errors = NB_ERRORS.get();
-        let old_tests = NB_TESTS.get();
-        let old_leaks = NB_LEAKS.get();
-        println!("## {}", TEST_DESCRIPTIONS[i].desc);
-        let res: i32 = launch_tests(&TEST_DESCRIPTIONS[i]);
-        if res != 0 {
-            ret += 1;
-        }
-        if NB_ERRORS.get() == old_errors && NB_LEAKS.get() == old_leaks {
-            println!("Ran {} tests, no errors", NB_TESTS.get() - old_tests);
-        } else {
-            println!(
-                "Ran {} tests, {} errors, {} leaks",
-                NB_TESTS.get() - old_tests,
-                NB_ERRORS.get() - old_errors,
-                NB_LEAKS.get() - old_leaks,
-            );
-        }
-        ret
-    }
-}
+//         let old_errors = NB_ERRORS.get();
+//         let old_tests = NB_TESTS.get();
+//         let old_leaks = NB_LEAKS.get();
+//         println!("## {}", TEST_DESCRIPTIONS[i].desc);
+//         let res: i32 = launch_tests(&TEST_DESCRIPTIONS[i]);
+//         if res != 0 {
+//             ret += 1;
+//         }
+//         if NB_ERRORS.get() == old_errors && NB_LEAKS.get() == old_leaks {
+//             println!("Ran {} tests, no errors", NB_TESTS.get() - old_tests);
+//         } else {
+//             println!(
+//                 "Ran {} tests, {} errors, {} leaks",
+//                 NB_TESTS.get() - old_tests,
+//                 NB_ERRORS.get() - old_errors,
+//                 NB_LEAKS.get() - old_leaks,
+//             );
+//         }
+//         ret
+//     }
+// }
 
 static NUM_STARTED_TESTS: AtomicUsize = AtomicUsize::new(0);
 static TEST_INITIALIZED: (Mutex<bool>, Condvar) = (Mutex::new(false), Condvar::new());
@@ -5560,6 +5397,266 @@ fn test_common(desc: &TestDesc) {
 }
 
 #[test]
+fn xml_regression_test() {
+    test_common(&TestDesc {
+        desc: "XML regression tests",
+        func: old_parse_test,
+        input: Some("./test/*"),
+        out: Some("./result/"),
+        suffix: Some(""),
+        err: None,
+        options: 0,
+    });
+}
+
+#[test]
+fn xml_regression_on_memory_test() {
+    test_common(&TestDesc {
+        desc: "XML regression tests on memory",
+        func: mem_parse_test,
+        input: Some("./test/*"),
+        out: Some("./result/"),
+        suffix: Some(""),
+        err: None,
+        options: 0,
+    });
+}
+
+#[test]
+fn xml_entity_subst_regression_test() {
+    NOENT_PARSE_TEST_TEMP_SUFFIX.with(|suf| suf.set(".noent").ok());
+    test_common(&TestDesc {
+        desc: "XML entity subst regression tests",
+        func: noent_parse_test,
+        input: Some("./test/*"),
+        out: Some("./result/noent/"),
+        suffix: Some(""),
+        err: None,
+        options: XmlParserOption::XmlParseNoEnt as i32,
+    });
+}
+
+#[test]
+fn xml_namespaces_regression_test() {
+    test_common(&TestDesc {
+        desc: "XML Namespaces regression tests",
+        func: err_parse_test,
+        input: Some("./test/namespaces/*"),
+        out: Some("./result/namespaces/"),
+        suffix: Some(""),
+        err: Some(".err"),
+        options: 0,
+    });
+}
+
+#[cfg(feature = "libxml_valid")]
+#[test]
+fn error_cases_regression_test() {
+    test_common(&TestDesc {
+        desc: "Error cases regression tests",
+        func: err_parse_test,
+        input: Some("./test/errors/*.xml"),
+        out: Some("./result/errors/"),
+        suffix: Some(""),
+        err: Some(".err"),
+        options: 0,
+    });
+}
+
+#[cfg(feature = "libxml_valid")]
+#[test]
+fn error_cases_regression_with_entity_substitution_test() {
+    test_common(&TestDesc {
+        desc: "Error cases regression tests with entity substitution",
+        func: err_parse_test,
+        input: Some("./test/errors/*.xml"),
+        out: Some("./result/errors/"),
+        suffix: None,
+        err: Some(".ent"),
+        options: XmlParserOption::XmlParseNoEnt as i32,
+    });
+}
+
+#[cfg(feature = "libxml_valid")]
+#[test]
+fn error_cases_regression_old10_test() {
+    test_common(&TestDesc {
+        desc: "Error cases regression tests (old 1.0)",
+        func: err_parse_test,
+        input: Some("./test/errors10/*.xml"),
+        out: Some("./result/errors10/"),
+        suffix: Some(""),
+        err: Some(".err"),
+        options: XmlParserOption::XmlParseOld10 as i32,
+    });
+}
+
+#[cfg(all(feature = "libxml_reader", feature = "libxml_valid"))]
+#[test]
+fn error_cases_stream_regression_test() {
+    STREAM_PROCESS_TEST_TEMP_SUFFIX.with(|suf| suf.set(".err").ok());
+    test_common(&TestDesc {
+        desc: "Error cases stream regression tests",
+        func: stream_parse_test,
+        input: Some("./test/errors/*.xml"),
+        out: Some("./result/errors/"),
+        suffix: None,
+        err: Some(".str"),
+        options: 0,
+    });
+}
+
+#[cfg(feature = "libxml_reader")]
+#[test]
+fn reader_regression_test() {
+    STREAM_PROCESS_TEST_TEMP_SUFFIX.with(|suf| suf.set(".rdr").ok());
+    test_common(&TestDesc {
+        desc: "Reader regression tests",
+        func: stream_parse_test,
+        input: Some("./test/*"),
+        out: Some("./result/"),
+        suffix: Some(".rdr"),
+        err: None,
+        options: 0,
+    });
+}
+
+#[cfg(feature = "libxml_reader")]
+#[test]
+fn reader_entities_substitution_regression_test() {
+    STREAM_PROCESS_TEST_TEMP_SUFFIX.with(|suf| suf.set(".rdr_ent_subst").ok());
+    test_common(&TestDesc {
+        desc: "Reader entities substitution regression tests",
+        func: stream_parse_test,
+        input: Some("./test/*"),
+        out: Some("./result/"),
+        suffix: Some(".rde"),
+        err: None,
+        options: XmlParserOption::XmlParseNoEnt as i32,
+    });
+}
+
+#[cfg(feature = "libxml_reader")]
+#[test]
+fn reader_on_memory_regression_test() {
+    STREAM_PROCESS_TEST_TEMP_SUFFIX.with(|suf| suf.set(".memory").ok());
+    test_common(&TestDesc {
+        desc: "Reader on memory regression tests",
+        func: stream_mem_parse_test,
+        input: Some("./test/*"),
+        out: Some("./result/"),
+        suffix: Some(".rdr"),
+        err: None,
+        options: 0,
+    });
+}
+
+#[cfg(feature = "libxml_reader")]
+#[test]
+fn walker_regression_test() {
+    STREAM_PROCESS_TEST_TEMP_SUFFIX.with(|suf| suf.set(".walker").ok());
+    test_common(&TestDesc {
+        desc: "Walker regression tests",
+        func: walker_parse_test,
+        input: Some("./test/*"),
+        out: Some("./result/"),
+        suffix: Some(".rdr"),
+        err: None,
+        options: 0,
+    });
+}
+
+#[cfg(feature = "sax1")]
+#[test]
+fn sax1_callbacks_regression_test() {
+    SAX_PARSE_TEST_TEMP_SUFFIX.with(|suf| suf.set(".sax1").ok());
+    test_common(&TestDesc {
+        desc: "SAX1 callbacks regression tests",
+        func: sax_parse_test,
+        input: Some("./test/*"),
+        out: Some("./result/"),
+        suffix: Some(".sax"),
+        err: None,
+        options: XmlParserOption::XmlParseSAX1 as i32,
+    });
+}
+
+#[test]
+fn sax2_callbacks_regression_test() {
+    SAX_PARSE_TEST_TEMP_SUFFIX.with(|suf| suf.set(".sax2").ok());
+    test_common(&TestDesc {
+        desc: "SAX2 callbacks regression tests",
+        func: sax_parse_test,
+        input: Some("./test/*"),
+        out: Some("./result/"),
+        suffix: Some(".sax2"),
+        err: None,
+        options: 0,
+    });
+}
+
+#[test]
+fn sax2_callbacks_regression_with_entity_substitution_test() {
+    SAX_PARSE_TEST_TEMP_SUFFIX.with(|suf| suf.set(".with_ent_subst").ok());
+    test_common(&TestDesc {
+        desc: "SAX2 callbacks regression tests with entity substitution",
+        func: sax_parse_test,
+        input: Some("./test/*"),
+        out: Some("./result/noent/"),
+        suffix: Some(".sax2"),
+        err: None,
+        options: XmlParserOption::XmlParseNoEnt as i32,
+    });
+}
+
+#[cfg(all(feature = "xinclude", feature = "libxml_reader"))]
+#[test]
+fn xinclude_xml_reader_regression_test() {
+    STREAM_PROCESS_TEST_TEMP_SUFFIX.with(|suf| suf.set(".xinclude_stream").ok());
+    test_common(&TestDesc {
+        desc: "XInclude xmlReader regression tests",
+        func: stream_parse_test,
+        input: Some("./test/XInclude/docs/*"),
+        out: Some("./result/XInclude/"),
+        suffix: Some(".rdr"),
+        err: Some(".err"),
+        options: XmlParserOption::XmlParseXInclude as i32,
+    });
+}
+
+#[cfg(all(
+    feature = "xpath",
+    feature = "libxml_debug",
+    feature = "libxml_xptr_locs"
+))]
+#[test]
+fn xpointer_xpointer_queries_regression_test() {
+    XPATH_TEST_TEMP_SUFFIX.with(|suf| suf.set(".xptr_query").ok());
+    test_common(&TestDesc {
+        desc: "XPointer xpointer() queries regression tests",
+        func: xptr_doc_test,
+        input: Some("./test/XPath/docs/*"),
+        out: None,
+        suffix: None,
+        err: None,
+        options: 0,
+    });
+}
+
+#[test]
+fn path_uri_conversion_test() {
+    test_common(&TestDesc {
+        desc: "Path URI conversion tests",
+        func: uri_path_test,
+        input: None,
+        out: None,
+        suffix: None,
+        err: None,
+        options: 0,
+    });
+}
+
+#[test]
 #[cfg(feature = "xinclude")]
 fn xinclude_regression_test() {
     test_common(&TestDesc {
@@ -5591,6 +5688,7 @@ fn xinclude_regression_stripping_include_nodes_test() {
 #[test]
 #[cfg(all(feature = "xinclude", feature = "libxml_reader"))]
 fn xinclude_xmlreader_regression_stripping_include_nodes_test() {
+    STREAM_PROCESS_TEST_TEMP_SUFFIX.with(|suf| suf.set(".xinclude_stream_strip").ok());
     test_common(&TestDesc {
         desc: "XInclude xmlReader regression tests stripping include nodes",
         func: stream_parse_test,
@@ -5690,6 +5788,7 @@ fn push_html_boundary_test() {
 #[test]
 #[cfg(feature = "html")]
 fn html_sax_regression_test() {
+    SAX_PARSE_TEST_TEMP_SUFFIX.with(|suf| suf.set(".html").ok());
     test_common(&TestDesc {
         desc: "HTML SAX regression tests",
         func: sax_parse_test,
@@ -5732,6 +5831,7 @@ fn validity_checking_regression_test() {
 #[test]
 #[cfg(all(feature = "libxml_valid", feature = "libxml_reader"))]
 fn streaming_validity_checking_regression_test() {
+    STREAM_PROCESS_TEST_TEMP_SUFFIX.with(|suf| suf.set(".xinclude_stream_valid").ok());
     test_common(&TestDesc {
         desc: "Streaming validity checking regression tests",
         func: stream_parse_test,
@@ -5746,6 +5846,7 @@ fn streaming_validity_checking_regression_test() {
 #[test]
 #[cfg(all(feature = "libxml_valid", feature = "libxml_reader"))]
 fn streaming_validity_error_checking_regression_test() {
+    STREAM_PROCESS_TEST_TEMP_SUFFIX.with(|suf| suf.set(".xinclude_stream_err").ok());
     test_common(&TestDesc {
         desc: "Streaming validity error checking regression tests",
         func: stream_parse_test,
@@ -5774,6 +5875,7 @@ fn general_documents_valid_regression_test() {
 #[test]
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
 fn xpath_expression_regression_test() {
+    XPATH_TEST_TEMP_SUFFIX.with(|suf| suf.set(".xpath_expr").ok());
     test_common(&TestDesc {
         desc: "XPath expressions regression tests",
         func: xpath_expr_test,
@@ -5802,6 +5904,7 @@ fn xpath_document_queries_regression_test() {
 #[test]
 #[cfg(all(feature = "xpath", feature = "libxml_debug", feature = "xpointer"))]
 fn xpointer_document_queries_regression_test() {
+    XPATH_TEST_TEMP_SUFFIX.with(|suf| suf.set(".xptr_doc").ok());
     test_common(&TestDesc {
         desc: "XPointer document queries regression tests",
         func: xptr_doc_test,
@@ -6041,51 +6144,51 @@ fn automata_regression_test() {
     });
 }
 
-#[test]
-fn main() {
-    let mut ret: i32 = 0;
-    let mut subset: i32 = 0;
+// #[test]
+// fn main() {
+//     let mut ret: i32 = 0;
+//     let mut subset: i32 = 0;
 
-    test_initialize();
-    unsafe {
-        let mut args = args();
-        while let Some(arg) = args.next() {
-            if arg == "-u" {
-                UPDATE_RESULTS
-                    .set(true)
-                    .expect("Failed to set `UPDATE_RESULTS`");
-            } else if arg == "--out" {
-                if let Some(s) = args.next() {
-                    TEMP_DIRECTORY.set(s).unwrap();
-                }
-            } else {
-                for (i, descr) in TEST_DESCRIPTIONS.iter().enumerate() {
-                    if descr.desc.contains(&arg) {
-                        ret += runtest(i);
-                        subset += 1;
-                    }
-                }
-            }
-        }
-        if subset == 0 {
-            for i in 0..TEST_DESCRIPTIONS.len() {
-                ret += runtest(i);
-            }
-        }
-        if NB_ERRORS.get() == 0 && NB_LEAKS.get() == 0 {
-            ret = 0;
-            println!("Total {} tests, no errors", NB_TESTS.get());
-        } else {
-            ret = 1;
-            println!(
-                "Total {} tests, {} errors, {} leaks",
-                NB_TESTS.get(),
-                NB_ERRORS.get(),
-                NB_LEAKS.get(),
-            );
-        }
-    }
-    test_cleanup();
+//     test_initialize();
+//     unsafe {
+//         let mut args = args();
+//         while let Some(arg) = args.next() {
+//             if arg == "-u" {
+//                 UPDATE_RESULTS
+//                     .set(true)
+//                     .expect("Failed to set `UPDATE_RESULTS`");
+//             } else if arg == "--out" {
+//                 if let Some(s) = args.next() {
+//                     TEMP_DIRECTORY.set(s).unwrap();
+//                 }
+//             } else {
+//                 for (i, descr) in TEST_DESCRIPTIONS.iter().enumerate() {
+//                     if descr.desc.contains(&arg) {
+//                         ret += runtest(i);
+//                         subset += 1;
+//                     }
+//                 }
+//             }
+//         }
+//         if subset == 0 {
+//             for i in 0..TEST_DESCRIPTIONS.len() {
+//                 ret += runtest(i);
+//             }
+//         }
+//         if NB_ERRORS.get() == 0 && NB_LEAKS.get() == 0 {
+//             ret = 0;
+//             println!("Total {} tests, no errors", NB_TESTS.get());
+//         } else {
+//             ret = 1;
+//             println!(
+//                 "Total {} tests, {} errors, {} leaks",
+//                 NB_TESTS.get(),
+//                 NB_ERRORS.get(),
+//                 NB_LEAKS.get(),
+//             );
+//         }
+//     }
+//     test_cleanup();
 
-    assert_eq!(ret, 0);
-}
+//     assert_eq!(ret, 0);
+// }

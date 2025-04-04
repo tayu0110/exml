@@ -444,16 +444,12 @@ pub(crate) fn __xml_parser_input_buffer_create_filename(
     }
 
     let mut callbacks = XML_INPUT_CALLBACK_TABLE.lock().unwrap();
-    /*
-     * Try to find one of the input accept method accepting that scheme
-     * Go in reverse to give precedence to user defined handlers.
-     */
+    // Try to find one of the input accept method accepting that scheme
+    // Go in reverse to give precedence to user defined handlers.
     for (callback, is_nanohttp) in callbacks.iter_mut().rev() {
         if callback.is_match(uri) {
             if let Ok(context) = callback.open(uri) {
-                /*
-                 * Allocate the Input buffer front-end.
-                 */
+                // Allocate the Input buffer front-end.
                 let mut ret = XmlParserInputBuffer::new(enc);
                 ret.context = Some(context);
                 ret.use_nanohttp = *is_nanohttp;
