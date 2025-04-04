@@ -21,6 +21,7 @@
 use std::{
     cell::RefCell,
     io::Write,
+    mem::take,
     ptr::{null, null_mut},
     rc::Rc,
 };
@@ -94,22 +95,20 @@ impl XmlDoc {
                 None
             };
 
-            let Some(out_buff) =
-                XmlOutputBuffer::new(conv_hdlr).map(|buf| Rc::new(RefCell::new(buf)))
-            else {
+            let Some(out_buff) = XmlOutputBuffer::new(conv_hdlr) else {
                 xml_save_err_memory("creating buffer");
                 return;
             };
 
-            ctxt.buf = out_buff.clone();
+            ctxt.buf = out_buff;
             ctxt.level = 0;
             ctxt.format = (format != 0) as i32;
             ctxt.encoding = encoding;
             ctxt.init();
             ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
             ctxt.doc_content_dump_output(XmlDocPtr::from_raw(self).unwrap().unwrap());
-            out_buff.borrow_mut().flush();
-            if let Some(conv) = out_buff.borrow().conv {
+            ctxt.buf.flush();
+            if let Some(conv) = ctxt.buf.conv {
                 *doc_txt_len = conv.len() as i32;
                 *doc_txt_ptr = xml_strndup(
                     if conv.is_ok() {
@@ -120,12 +119,9 @@ impl XmlDoc {
                     *doc_txt_len,
                 );
             } else {
-                *doc_txt_len = out_buff.borrow().buffer.map_or(0, |buf| buf.len() as i32);
+                *doc_txt_len = ctxt.buf.buffer.map_or(0, |buf| buf.len() as i32);
                 *doc_txt_ptr = xml_strndup(
-                    out_buff
-                        .borrow()
-                        .buffer
-                        .map_or(null(), |buf| buf.as_ref().as_ptr()),
+                    ctxt.buf.buffer.map_or(null(), |buf| buf.as_ref().as_ptr()),
                     *doc_txt_len,
                 );
             }
@@ -203,9 +199,7 @@ impl XmlDoc {
             } else {
                 None
             };
-            let Some(buf) =
-                XmlOutputBuffer::from_writer(f, handler).map(|buf| Rc::new(RefCell::new(buf)))
-            else {
+            let Some(buf) = XmlOutputBuffer::from_writer(f, handler) else {
                 return -1;
             };
 
@@ -222,9 +216,7 @@ impl XmlDoc {
             ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
             ctxt.doc_content_dump_output(XmlDocPtr::from_raw(self).unwrap().unwrap());
 
-            let buf = ctxt.buf.clone();
-            drop(ctxt);
-            let mut buf = Rc::into_inner(buf).expect("Internal Error").into_inner();
+            let XmlSaveCtxt { ref mut buf, .. } = ctxt;
 
             if buf.error.is_ok() {
                 buf.flush();
@@ -275,8 +267,7 @@ impl XmlDoc {
                 filename,
                 handler.map(|e| Rc::new(RefCell::new(e))),
                 self.compression,
-            )
-            .map(|buf| Rc::new(RefCell::new(buf))) else {
+            ) else {
                 return -1;
             };
             let mut ctxt = XmlSaveCtxt {
@@ -290,12 +281,9 @@ impl XmlDoc {
             };
             ctxt.init();
             ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
-
             ctxt.doc_content_dump_output(XmlDocPtr::from_raw(self).unwrap().unwrap());
 
-            let buf = ctxt.buf.clone();
-            drop(ctxt);
-            let mut buf = Rc::into_inner(buf).expect("Internal Error").into_inner();
+            let XmlSaveCtxt { ref mut buf, .. } = ctxt;
             if buf.error.is_ok() {
                 buf.flush();
                 buf.written
@@ -357,7 +345,7 @@ impl XmlDoc {
                 return -1;
             }
             let mut ctxt = XmlSaveCtxt {
-                buf: Rc::new(RefCell::new(buf)),
+                buf,
                 level: 0,
                 format: (format != 0) as i32,
                 encoding: encoding.map(|e| e.to_owned()),
@@ -368,9 +356,8 @@ impl XmlDoc {
             ctxt.init();
             ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
             ctxt.doc_content_dump_output(XmlDocPtr::from_raw(self).unwrap().unwrap());
-            let buf = ctxt.buf.clone();
-            drop(ctxt);
-            let mut buf = Rc::into_inner(buf).expect("Internal Error").into_inner();
+
+            let XmlSaveCtxt { ref mut buf, .. } = ctxt;
             if buf.error.is_ok() {
                 buf.flush();
                 buf.written
@@ -387,11 +374,7 @@ impl XmlDoc {
     /// # Warning
     ///  This call xmlOutputBufferClose() on buf which is not available after this call.
     #[doc(alias = "xmlSaveFileTo")]
-    pub unsafe fn save_file_to(
-        &mut self,
-        buf: Rc<RefCell<XmlOutputBuffer>>,
-        encoding: Option<&str>,
-    ) -> i32 {
+    pub unsafe fn save_file_to(&mut self, buf: XmlOutputBuffer, encoding: Option<&str>) -> i32 {
         unsafe {
             let mut ctxt = XmlSaveCtxt {
                 buf,
@@ -405,9 +388,8 @@ impl XmlDoc {
             ctxt.init();
             ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
             ctxt.doc_content_dump_output(XmlDocPtr::from_raw(self).unwrap().unwrap());
-            let buf = ctxt.buf.clone();
-            drop(ctxt);
-            let mut buf = Rc::into_inner(buf).expect("Internal Error").into_inner();
+
+            let XmlSaveCtxt { ref mut buf, .. } = ctxt;
             if buf.error.is_ok() {
                 buf.flush();
                 buf.written
@@ -426,7 +408,7 @@ impl XmlNode {
     #[doc(alias = "xmlNodeDumpOutput")]
     pub unsafe fn dump_output(
         &mut self,
-        buf: Rc<RefCell<XmlOutputBuffer>>,
+        buf: XmlOutputBuffer,
         doc: Option<XmlDocPtr>,
         level: i32,
         format: i32,
@@ -475,7 +457,7 @@ impl XmlNode {
             {
                 xml_node_dump_output_internal(addr_of_mut!(ctxt) as _, cur);
             }
-            ctxt.buf.borrow_mut().flush();
+            ctxt.buf.flush();
         }
     }
 
@@ -510,7 +492,7 @@ impl XmlNode {
                 }
                 outbuf.flush();
             } else {
-                self.dump_output(Rc::new(RefCell::new(outbuf)), doc, 0, 1, None);
+                self.dump_output(outbuf, doc, 0, 1, None);
             }
         }
     }
@@ -537,9 +519,7 @@ impl XmlNode {
                 return usize::MAX;
             };
 
-            let outbuf = Rc::new(RefCell::new(outbuf));
-            self.dump_output(outbuf.clone(), doc, level, format, None);
-            drop(outbuf);
+            self.dump_output(outbuf, doc, level, format, None);
             buf.len()
         }
     }
@@ -551,14 +531,14 @@ impl XmlGenericNodePtr {
     /// Note that `format = 1` provide node indenting only if `xmlIndentTreeOutput = 1`
     /// or `xmlKeepBlanksDefault(0)` was called.
     #[doc(alias = "xmlNodeDumpOutput")]
-    pub unsafe fn dump_output(
+    pub unsafe fn dump_output<'a>(
         self,
-        buf: Rc<RefCell<XmlOutputBuffer>>,
+        buf: XmlOutputBuffer<'a>,
         doc: Option<XmlDocPtr>,
         level: i32,
         format: i32,
         mut encoding: Option<&str>,
-    ) {
+    ) -> XmlOutputBuffer<'a> {
         unsafe {
             xml_init_parser();
 
@@ -596,7 +576,8 @@ impl XmlGenericNodePtr {
             {
                 xml_node_dump_output_internal(addr_of_mut!(ctxt) as _, cur);
             }
-            ctxt.buf.borrow_mut().flush();
+            ctxt.buf.flush();
+            take(&mut ctxt.buf)
         }
     }
 
@@ -626,7 +607,7 @@ impl XmlGenericNodePtr {
                 }
                 outbuf.flush();
             } else {
-                self.dump_output(Rc::new(RefCell::new(outbuf)), doc, 0, 1, None);
+                self.dump_output(outbuf, doc, 0, 1, None);
             }
         }
     }
@@ -653,9 +634,7 @@ impl XmlGenericNodePtr {
                 return usize::MAX;
             };
 
-            let outbuf = Rc::new(RefCell::new(outbuf));
-            self.dump_output(outbuf.clone(), doc, level, format, None);
-            drop(outbuf);
+            self.dump_output(outbuf, doc, level, format, None);
             buf.len()
         }
     }

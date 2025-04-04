@@ -2355,17 +2355,16 @@ unsafe fn do_xpath_dump(cur: XmlXPathObjectPtr) {
                 {
                     if let Some(nodeset) = (*cur).nodesetval.as_deref() {
                         if !nodeset.node_tab.is_empty() {
-                            let Some(buf) = XmlOutputBuffer::from_writer(stdout(), None) else {
+                            let Some(mut buf) = XmlOutputBuffer::from_writer(stdout(), None) else {
                                 eprintln!("Out of memory for XPath");
                                 PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
                                 return;
                             };
-                            let buf = Rc::new(RefCell::new(buf));
                             for &node in &nodeset.node_tab {
-                                node.dump_output(buf.clone(), None, 0, 0, None);
-                                buf.borrow_mut().write_bytes(b"\n").ok();
+                                buf = node.dump_output(buf, None, 0, 0, None);
+                                buf.write_bytes(b"\n").ok();
                             }
-                            buf.borrow_mut().flush();
+                            buf.flush();
                         } else if !CMD_ARGS.quiet {
                             eprintln!("XPath set is empty");
                         }
