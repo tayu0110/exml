@@ -3330,16 +3330,8 @@ unsafe fn xml_validate_attribute_callback(cur: XmlAttributePtr, ctxt: XmlValidCt
 unsafe fn xml_validate_notation_callback(cur: XmlEntityPtr, ctxt: XmlValidCtxtPtr) {
     unsafe {
         if matches!(cur.etype, XmlEntityType::XmlExternalGeneralUnparsedEntity) {
-            let notation: *mut XmlChar = cur.content;
-
-            if !notation.is_null() {
-                let ret: i32 = xml_validate_notation_use(
-                    ctxt,
-                    cur.doc.unwrap(),
-                    CStr::from_ptr(notation as *const i8)
-                        .to_string_lossy()
-                        .as_ref(),
-                );
+            if let Some(notation) = cur.content.as_deref() {
+                let ret: i32 = xml_validate_notation_use(ctxt, cur.doc.unwrap(), notation);
                 if ret != 1 {
                     (*ctxt).valid = 0;
                 }

@@ -20,7 +20,7 @@
 // Daniel Veillard <daniel@veillard.com>
 
 use std::{
-    ffi::{CStr, CString},
+    ffi::CString,
     io::{Write, stdout},
     ptr::{addr_of_mut, null, null_mut},
 };
@@ -338,11 +338,7 @@ impl XmlDebugCtxt<'_> {
                 let content = if let Ok(node) = XmlNodePtr::try_from(node) {
                     node.content.clone()
                 } else if let Ok(ent) = XmlEntityPtr::try_from(node) {
-                    (!ent.content.is_null()).then(|| {
-                        CStr::from_ptr(ent.content as *const i8)
-                            .to_string_lossy()
-                            .into_owned()
-                    })
+                    ent.content.as_deref().map(|cont| cont.to_owned())
                 } else {
                     todo!("What is this type ????: {:?}", node.element_type());
                 };
@@ -721,13 +717,10 @@ impl XmlDebugCtxt<'_> {
                     self.dump_spaces();
                     writeln!(self.output, " URI={uri}").ok();
                 }
-                let content = ent.content;
-                if !content.is_null() {
+                if let Some(content) = ent.content.as_deref() {
                     self.dump_spaces();
                     write!(self.output, " content=").ok();
-                    self.dump_string(Some(
-                        &CStr::from_ptr(content as *const i8).to_string_lossy(),
-                    ));
+                    self.dump_string(Some(content));
                     writeln!(self.output).ok();
                 }
             }
@@ -792,59 +785,54 @@ impl XmlDebugCtxt<'_> {
     }
 
     #[doc(alias = "xmlCtxtDumpEntity")]
-    unsafe fn dump_entity(&mut self, ent: Option<&XmlEntity>) {
-        unsafe {
-            self.dump_spaces();
+    fn dump_entity(&mut self, ent: Option<&XmlEntity>) {
+        self.dump_spaces();
 
-            let Some(ent) = ent else {
-                if self.check == 0 {
-                    writeln!(self.output, "Entity is NULL").ok();
-                }
-                return;
-            };
+        let Some(ent) = ent else {
             if self.check == 0 {
-                match ent.etype {
-                    XmlEntityType::XmlInternalGeneralEntity => {
-                        write!(self.output, "INTERNAL_GENERAL_ENTITY ").ok();
-                    }
-                    XmlEntityType::XmlExternalGeneralParsedEntity => {
-                        write!(self.output, "EXTERNAL_GENERAL_PARSED_ENTITY ").ok();
-                    }
-                    XmlEntityType::XmlExternalGeneralUnparsedEntity => {
-                        write!(self.output, "EXTERNAL_GENERAL_UNPARSED_ENTITY ").ok();
-                    }
-                    XmlEntityType::XmlInternalParameterEntity => {
-                        write!(self.output, "INTERNAL_PARAMETER_ENTITY ").ok();
-                    }
-                    XmlEntityType::XmlExternalParameterEntity => {
-                        write!(self.output, "EXTERNAL_PARAMETER_ENTITY ").ok();
-                    }
-                    e => {
-                        write!(self.output, "ENTITY_{} ! ", e as i32).ok();
-                    }
+                writeln!(self.output, "Entity is NULL").ok();
+            }
+            return;
+        };
+        if self.check == 0 {
+            match ent.etype {
+                XmlEntityType::XmlInternalGeneralEntity => {
+                    write!(self.output, "INTERNAL_GENERAL_ENTITY ").ok();
                 }
-                writeln!(self.output, "{}", ent.name().unwrap()).ok();
-                if let Some(external_id) = ent.external_id.as_deref() {
-                    self.dump_spaces();
-                    writeln!(self.output, "ExternalID={external_id}").ok();
+                XmlEntityType::XmlExternalGeneralParsedEntity => {
+                    write!(self.output, "EXTERNAL_GENERAL_PARSED_ENTITY ").ok();
                 }
-                if let Some(system_id) = ent.system_id.as_deref() {
-                    self.dump_spaces();
-                    writeln!(self.output, "SystemID={system_id}").ok();
+                XmlEntityType::XmlExternalGeneralUnparsedEntity => {
+                    write!(self.output, "EXTERNAL_GENERAL_UNPARSED_ENTITY ").ok();
                 }
-                if let Some(uri) = ent.uri.as_deref() {
-                    self.dump_spaces();
-                    writeln!(self.output, "URI={uri}").ok();
+                XmlEntityType::XmlInternalParameterEntity => {
+                    write!(self.output, "INTERNAL_PARAMETER_ENTITY ").ok();
                 }
-                let content = ent.content;
-                if !content.is_null() {
-                    self.dump_spaces();
-                    write!(self.output, "content=").ok();
-                    self.dump_string(Some(
-                        &CStr::from_ptr(content as *const i8).to_string_lossy(),
-                    ));
-                    writeln!(self.output).ok();
+                XmlEntityType::XmlExternalParameterEntity => {
+                    write!(self.output, "EXTERNAL_PARAMETER_ENTITY ").ok();
                 }
+                e => {
+                    write!(self.output, "ENTITY_{} ! ", e as i32).ok();
+                }
+            }
+            writeln!(self.output, "{}", ent.name().unwrap()).ok();
+            if let Some(external_id) = ent.external_id.as_deref() {
+                self.dump_spaces();
+                writeln!(self.output, "ExternalID={external_id}").ok();
+            }
+            if let Some(system_id) = ent.system_id.as_deref() {
+                self.dump_spaces();
+                writeln!(self.output, "SystemID={system_id}").ok();
+            }
+            if let Some(uri) = ent.uri.as_deref() {
+                self.dump_spaces();
+                writeln!(self.output, "URI={uri}").ok();
+            }
+            if let Some(content) = ent.content.as_deref() {
+                self.dump_spaces();
+                write!(self.output, "content=").ok();
+                self.dump_string(Some(content));
+                writeln!(self.output).ok();
             }
         }
     }
@@ -1296,91 +1284,88 @@ impl XmlDebugCtxt<'_> {
     }
 
     #[doc(alias = "xmlCtxtDumpEntityCallback")]
-    unsafe fn dump_entities_callback(&mut self, cur: Option<&XmlEntity>) {
-        unsafe {
-            let Some(cur) = cur else {
-                if self.check == 0 {
-                    write!(self.output, "Entity is NULL").ok();
-                }
-                return;
-            };
+    fn dump_entities_callback(&mut self, cur: Option<&XmlEntity>) {
+        let Some(cur) = cur else {
             if self.check == 0 {
-                write!(self.output, "{} : ", cur.name().unwrap()).ok();
-                match cur.etype {
-                    XmlEntityType::XmlInternalGeneralEntity => {
-                        write!(self.output, "INTERNAL GENERAL, ").ok();
-                    }
-                    XmlEntityType::XmlExternalGeneralParsedEntity => {
-                        write!(self.output, "EXTERNAL PARSED, ").ok();
-                    }
-                    XmlEntityType::XmlExternalGeneralUnparsedEntity => {
-                        write!(self.output, "EXTERNAL UNPARSED, ").ok();
-                    }
-                    XmlEntityType::XmlInternalParameterEntity => {
-                        write!(self.output, "INTERNAL PARAMETER, ").ok();
-                    }
-                    XmlEntityType::XmlExternalParameterEntity => {
-                        write!(self.output, "EXTERNAL PARAMETER, ").ok();
-                    }
-                    e => {
-                        xml_debug_err!(
-                            self,
-                            XmlParserErrors::XmlCheckEntityType,
-                            "Unknown entity type {}\n",
-                            e as i32
-                        );
-                    }
+                write!(self.output, "Entity is NULL").ok();
+            }
+            return;
+        };
+        if self.check == 0 {
+            write!(self.output, "{} : ", cur.name().unwrap()).ok();
+            match cur.etype {
+                XmlEntityType::XmlInternalGeneralEntity => {
+                    write!(self.output, "INTERNAL GENERAL, ").ok();
                 }
-                if let Some(external_id) = cur.external_id.as_deref() {
-                    write!(self.output, "ID \"{external_id}\"").ok();
+                XmlEntityType::XmlExternalGeneralParsedEntity => {
+                    write!(self.output, "EXTERNAL PARSED, ").ok();
                 }
-                if let Some(system_id) = cur.system_id.as_deref() {
-                    write!(self.output, "SYSTEM \"{system_id}\"").ok();
+                XmlEntityType::XmlExternalGeneralUnparsedEntity => {
+                    write!(self.output, "EXTERNAL UNPARSED, ").ok();
                 }
-                if let Some(orig) = cur.orig.as_deref() {
-                    write!(self.output, "\n orig \"{orig}\"").ok();
+                XmlEntityType::XmlInternalParameterEntity => {
+                    write!(self.output, "INTERNAL PARAMETER, ").ok();
                 }
-                if cur.typ != XmlElementType::XmlElementNode && !cur.content.is_null() {
-                    let content = CStr::from_ptr(cur.content as *const i8).to_string_lossy();
+                XmlEntityType::XmlExternalParameterEntity => {
+                    write!(self.output, "EXTERNAL PARAMETER, ").ok();
+                }
+                e => {
+                    xml_debug_err!(
+                        self,
+                        XmlParserErrors::XmlCheckEntityType,
+                        "Unknown entity type {}\n",
+                        e as i32
+                    );
+                }
+            }
+            if let Some(external_id) = cur.external_id.as_deref() {
+                write!(self.output, "ID \"{external_id}\"").ok();
+            }
+            if let Some(system_id) = cur.system_id.as_deref() {
+                write!(self.output, "SYSTEM \"{system_id}\"").ok();
+            }
+            if let Some(orig) = cur.orig.as_deref() {
+                write!(self.output, "\n orig \"{orig}\"").ok();
+            }
+            if cur.typ != XmlElementType::XmlElementNode {
+                if let Some(content) = cur.content.as_deref() {
                     write!(self.output, "\n content \"{content}\"").ok();
                 }
-                writeln!(self.output).ok();
             }
+            writeln!(self.output).ok();
         }
     }
 
     /// Dumps debug information for all the entities in use by the document
     #[doc(alias = "xmlCtxtDumpEntities")]
-    unsafe fn dump_entities(&mut self, doc: Option<XmlDocPtr>) {
-        unsafe {
-            if let Some(doc) = doc {
-                self.dump_doc_head(doc);
-                if let Some(int_subset) = doc.int_subset {
-                    if let Some(table) = int_subset.entities {
-                        if self.check == 0 {
-                            writeln!(self.output, "Entities in internal subset").ok();
-                        }
-                        table.scan(|payload, _, _, _| {
-                            let entity = *payload;
-                            self.dump_entities_callback(Some(&*entity));
-                        });
+    fn dump_entities(&mut self, doc: Option<XmlDocPtr>) {
+        if let Some(doc) = doc {
+            self.dump_doc_head(doc);
+            if let Some(int_subset) = doc.int_subset {
+                if let Some(table) = int_subset.entities {
+                    if self.check == 0 {
+                        writeln!(self.output, "Entities in internal subset").ok();
                     }
-                } else {
-                    writeln!(self.output, "No entities in internal subset").ok();
+                    table.scan(|payload, _, _, _| {
+                        let entity = *payload;
+                        self.dump_entities_callback(Some(&*entity));
+                    });
                 }
-                if let Some(ext_subset) = doc.ext_subset {
-                    if let Some(table) = ext_subset.entities {
-                        if self.check == 0 {
-                            writeln!(self.output, "Entities in external subset").ok();
-                        }
-                        table.scan(|payload, _, _, _| {
-                            let entity = *payload;
-                            self.dump_entities_callback(Some(&*entity));
-                        });
+            } else {
+                writeln!(self.output, "No entities in internal subset").ok();
+            }
+            if let Some(ext_subset) = doc.ext_subset {
+                if let Some(table) = ext_subset.entities {
+                    if self.check == 0 {
+                        writeln!(self.output, "Entities in external subset").ok();
                     }
-                } else if self.check == 0 {
-                    writeln!(self.output, "No entities in external subset").ok();
+                    table.scan(|payload, _, _, _| {
+                        let entity = *payload;
+                        self.dump_entities_callback(Some(&*entity));
+                    });
                 }
+            } else if self.check == 0 {
+                writeln!(self.output, "No entities in external subset").ok();
             }
         }
     }
@@ -1608,14 +1593,12 @@ pub unsafe fn xml_debug_dump_dtd<'a>(output: Option<impl Write + 'a>, dtd: Optio
 
 /// Dumps debug information for all the entities in use by the document
 #[doc(alias = "xmlDebugDumpEntities")]
-pub unsafe fn xml_debug_dump_entities<'a>(output: impl Write + 'a, doc: Option<XmlDocPtr>) {
-    unsafe {
-        let mut ctxt = XmlDebugCtxt {
-            output: Box::new(output),
-            ..Default::default()
-        };
-        ctxt.dump_entities(doc);
-    }
+pub fn xml_debug_dump_entities<'a>(output: impl Write + 'a, doc: Option<XmlDocPtr>) {
+    let mut ctxt = XmlDebugCtxt {
+        output: Box::new(output),
+        ..Default::default()
+    };
+    ctxt.dump_entities(doc);
 }
 
 /// Check the document for potential content problems, and output

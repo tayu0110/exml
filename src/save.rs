@@ -708,10 +708,8 @@ fn xml_buf_dump_attribute_decl<'a>(buf: &mut (impl Write + 'a), attr: XmlAttribu
 
 /// This will dump the content of the entity table as an XML DTD definition
 #[doc(alias = "xmlBufDumpEntityDecl")]
-unsafe fn xml_buf_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: XmlEntityPtr) {
-    unsafe {
-        xml_dump_entity_decl(buf, ent);
-    }
+fn xml_buf_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: XmlEntityPtr) {
+    xml_dump_entity_decl(buf, ent);
 }
 
 /// Dump a list of local namespace definitions to a save context.

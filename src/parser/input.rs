@@ -39,7 +39,6 @@
 
 use std::{
     cell::RefCell,
-    ffi::CStr,
     ops::DerefMut,
     rc::Rc,
     str::{from_utf8, from_utf8_mut},
@@ -56,7 +55,6 @@ use crate::{
     libxml::{
         chvalid::xml_is_blank_char,
         parser::{XmlParserInputDeallocate, xml_load_external_entity},
-        xmlstring::xml_strlen,
     },
     parser::xml_err_internal,
     tree::{XmlEntityPtr, XmlEntityType},
@@ -274,7 +272,7 @@ impl XmlParserInput {
             if get_parser_debug_entities() != 0 {
                 generic_error!("new input from entity: {}\n", entity.name);
             }
-            if entity.content.is_null() {
+            let Some(content) = entity.content.as_deref() else {
                 match entity.etype {
                     XmlEntityType::XmlExternalGeneralUnparsedEntity => {
                         xml_err_internal!(
@@ -318,17 +316,15 @@ impl XmlParserInput {
                     }
                 }
                 return None;
-            }
+            };
             let mut input = XmlParserInput::new((!ctxt.is_null()).then(|| &mut *ctxt))?;
 
             if let Some(uri) = entity.uri.as_deref() {
                 input.filename = Some(uri.to_owned());
             }
-            input.base = CStr::from_ptr(entity.content as *const i8)
-                .to_bytes()
-                .to_vec();
+            input.base = content.as_bytes().to_owned();
             if entity.length == 0 {
-                entity.length = xml_strlen(entity.content as _);
+                entity.length = input.base.len() as i32;
             }
             input.cur = 0;
             input.length = entity.length;

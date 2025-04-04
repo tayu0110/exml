@@ -133,7 +133,7 @@ pub(crate) const XML_VCTXT_USE_PCTXT: usize = 1usize << 1;
 #[doc(alias = "xmlParseBalancedChunkMemoryInternal")]
 pub(crate) unsafe fn xml_parse_balanced_chunk_memory_internal(
     oldctxt: XmlParserCtxtPtr,
-    string: *const XmlChar,
+    string: &str,
     user_data: Option<GenericErrorContext>,
     mut lst: Option<&mut Option<XmlGenericNodePtr>>,
 ) -> XmlParserErrors {
@@ -156,12 +156,8 @@ pub(crate) unsafe fn xml_parse_balanced_chunk_memory_internal(
         if let Some(lst) = lst.as_mut() {
             **lst = None;
         }
-        if string.is_null() {
-            return XmlParserErrors::XmlErrInternalError;
-        }
 
-        let ctxt: XmlParserCtxtPtr =
-            xml_create_memory_parser_ctxt(CStr::from_ptr(string as *const i8).to_bytes().to_vec());
+        let ctxt: XmlParserCtxtPtr = xml_create_memory_parser_ctxt(string.as_bytes().to_vec());
         if ctxt.is_null() {
             return XmlParserErrors::XmlWarUndeclaredEntity;
         }

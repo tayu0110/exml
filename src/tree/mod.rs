@@ -1661,11 +1661,7 @@ pub unsafe fn xml_new_reference(doc: Option<XmlDocPtr>, name: &str) -> Option<Xm
 
         let ent = xml_get_doc_entity(doc, &cur.name().unwrap());
         if let Some(ent) = ent {
-            cur.content = (!ent.content.is_null()).then(|| {
-                CStr::from_ptr(ent.content as *const i8)
-                    .to_string_lossy()
-                    .into_owned()
-            });
+            cur.content = ent.content.as_deref().map(|cont| cont.to_owned());
             // The parent pointer in entity is a DTD pointer and thus is NOT
             // updated.  Not sure if this is 100% correct.
             //  -George
@@ -2093,11 +2089,7 @@ pub unsafe fn xml_free_node(cur: impl Into<XmlGenericNodePtr>) {
             }
 
             cur.free();
-        } else if let Ok(cur) = XmlEntityPtr::try_from(cur) {
-            let content = cur.content;
-            if !content.is_null() {
-                xml_free(content as _);
-            }
+        } else if XmlEntityPtr::try_from(cur).is_ok() {
             // When a node is a text node or a comment, it uses a global static
             // variable for the name of the node.
             // Otherwise the node name might come from the document's dictionary

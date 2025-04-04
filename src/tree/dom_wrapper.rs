@@ -18,7 +18,7 @@
 //
 // daniel@veillard.com
 
-use std::{ffi::CStr, os::raw::c_void, ptr::null_mut};
+use std::{os::raw::c_void, ptr::null_mut};
 
 use crate::libxml::{
     globals::{xml_free, xml_malloc},
@@ -1326,11 +1326,8 @@ unsafe fn xml_dom_wrap_adopt_branch(
                                     let ent =
                                         xml_get_doc_entity(Some(dest_doc), &cur.name().unwrap());
                                     if let Some(ent) = ent {
-                                        cur.content = (!ent.content.is_null()).then(|| {
-                                            CStr::from_ptr(ent.content as *const i8)
-                                                .to_string_lossy()
-                                                .into_owned()
-                                        });
+                                        cur.content =
+                                            ent.content.as_deref().map(|cont| cont.to_owned());
                                         cur.set_children(Some(ent.into()));
                                         cur.set_last(Some(ent.into()));
                                     }
@@ -1511,11 +1508,7 @@ unsafe fn xml_dom_wrap_adopt_attr(
                         // Assign new entity-node if available.
                         let ent = xml_get_doc_entity(Some(dest_doc), &cur.name().unwrap());
                         if let Some(ent) = ent {
-                            cur.content = (!ent.content.is_null()).then(|| {
-                                CStr::from_ptr(ent.content as *const i8)
-                                    .to_string_lossy()
-                                    .into_owned()
-                            });
+                            cur.content = ent.content.as_deref().map(|cont| cont.to_owned());
                             cur.set_children(Some(ent.into()));
                             cur.set_last(Some(ent.into()));
                         }
@@ -1644,11 +1637,7 @@ pub unsafe fn xml_dom_wrap_adopt_node(
                         // Assign new entity-node if available.
                         let ent = xml_get_doc_entity(Some(dest_doc), &node.name().unwrap());
                         if let Some(ent) = ent {
-                            node.content = (!ent.content.is_null()).then(|| {
-                                CStr::from_ptr(ent.content as *const i8)
-                                    .to_string_lossy()
-                                    .into_owned()
-                            });
+                            node.content = ent.content.as_deref().map(|cont| cont.to_owned());
                             node.set_children(Some(ent.into()));
                             node.set_last(Some(ent.into()));
                         }
@@ -2176,11 +2165,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                                     );
                                     if let Some(ent) = ent {
                                         XmlNodePtr::try_from(clone).unwrap().content =
-                                            (!ent.content.is_null()).then(|| {
-                                                CStr::from_ptr(ent.content as *const i8)
-                                                    .to_string_lossy()
-                                                    .into_owned()
-                                            });
+                                            ent.content.as_deref().map(|cont| cont.to_owned());
                                         clone.set_children(Some(ent.into()));
                                         clone.set_last(Some(ent.into()));
                                     }

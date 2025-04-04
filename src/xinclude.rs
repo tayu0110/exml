@@ -26,7 +26,6 @@
 
 use std::{
     borrow::Cow,
-    ffi::CStr,
     mem::take,
     os::raw::c_void,
     ptr::{addr_of_mut, null_mut},
@@ -41,7 +40,6 @@ use crate::{
     libxml::{
         chvalid::xml_is_char,
         parser::{XML_DETECT_IDS, xml_init_parser, xml_load_external_entity},
-        xmlstring::xml_str_equal,
         xpointer::{xml_xptr_eval, xml_xptr_new_context},
     },
     parser::{XmlParserOption, xml_free_parser_ctxt, xml_new_parser_ctxt},
@@ -771,16 +769,13 @@ impl XmlXIncludeCtxt {
                 | XmlEntityType::XmlExternalGeneralUnparsedEntity => {}
             }
 
-            let content = ent.content;
             let ret = xml_add_doc_entity(
                 doc,
                 &ent.name().unwrap(),
                 ent.etype,
                 ent.external_id.as_deref(),
                 ent.system_id.as_deref(),
-                (!content.is_null())
-                    .then(|| CStr::from_ptr(content as *const i8).to_string_lossy())
-                    .as_deref(),
+                ent.content.as_deref(),
             );
             if let Some(mut ret) = ret {
                 ret.uri = ent.uri.clone();
@@ -802,8 +797,8 @@ impl XmlXIncludeCtxt {
                         if ent.external_id != prev.external_id {
                             break 'error;
                         }
-                    } else if !ent.content.is_null() && !prev.content.is_null() {
-                        if !xml_str_equal(ent.content, prev.content) {
+                    } else if ent.content.is_some() && prev.content.is_some() {
+                        if ent.content != prev.content {
                             break 'error;
                         }
                     } else {

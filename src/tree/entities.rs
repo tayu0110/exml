@@ -24,7 +24,6 @@ use std::io::Write;
 use std::{
     any::type_name,
     borrow::Cow,
-    ffi::{CStr, CString},
     ops::{Deref, DerefMut},
     os::raw::c_void,
     ptr::{NonNull, null_mut},
@@ -38,9 +37,7 @@ use crate::{
     hash::{CVoidWrapper, XmlHashTableRef},
     libxml::{
         chvalid::xml_is_char,
-        globals::xml_free,
         hash::{XmlHashTable, xml_hash_create},
-        xmlstring::{XmlChar, xml_strchr, xml_strdup, xml_strndup},
     },
     tree::{NodeCommon, XmlElementType, xml_free_node_list},
 };
@@ -108,7 +105,7 @@ pub struct XmlEntity {
     // content without ref substitution
     pub(crate) orig: Option<Cow<'static, str>>,
     // content or ndata if unparsed
-    pub(crate) content: *mut u8,
+    pub(crate) content: Option<Cow<'static, str>>,
     // the content length
     pub(crate) length: i32,
     // The entity type
@@ -252,7 +249,7 @@ impl Default for XmlEntity {
             prev: Default::default(),
             doc: Default::default(),
             orig: None,
-            content: null_mut(),
+            content: None,
             length: Default::default(),
             etype: Default::default(),
             external_id: None,
@@ -336,46 +333,43 @@ fn xml_entities_err_memory(extra: &str) {
 
 /// internal routine doing the entity node structures allocations
 #[doc(alias = "xmlCreateEntity")]
-unsafe fn xml_create_entity(
+fn xml_create_entity(
     name: &str,
     typ: XmlEntityType,
     external_id: Option<&str>,
     system_id: Option<&str>,
     content: Option<&str>,
 ) -> Option<XmlEntityPtr> {
-    unsafe {
-        let Some(mut ret) = XmlEntityPtr::new(XmlEntity {
-            typ: XmlElementType::XmlEntityDecl,
-            etype: typ,
-            name: Cow::Owned(name.to_owned()),
-            ..Default::default()
-        }) else {
-            xml_entities_err_memory("xmlCreateEntity: malloc failed");
-            return None;
-        };
+    let Some(mut ret) = XmlEntityPtr::new(XmlEntity {
+        typ: XmlElementType::XmlEntityDecl,
+        etype: typ,
+        name: Cow::Owned(name.to_owned()),
+        ..Default::default()
+    }) else {
+        xml_entities_err_memory("xmlCreateEntity: malloc failed");
+        return None;
+    };
 
-        // fill the structure.
-        if let Some(external_id) = external_id {
-            ret.external_id = Some(external_id.to_owned().into_boxed_str());
-        }
-        if let Some(system_id) = system_id {
-            ret.system_id = Some(system_id.to_owned().into_boxed_str());
-        }
-        if let Some(content) = content {
-            ret.length = content.len() as i32;
-            let content = CString::new(content).unwrap();
-            ret.content = xml_strndup(content.as_ptr() as *const u8, ret.length);
-        } else {
-            ret.length = 0;
-            ret.content = null_mut();
-        }
-        // to be computed by the layer knowing the defining entity
-        ret.uri = None;
-        ret.orig = None;
-        ret.owner = 0;
-
-        Some(ret)
+    // fill the structure.
+    if let Some(external_id) = external_id {
+        ret.external_id = Some(external_id.to_owned().into_boxed_str());
     }
+    if let Some(system_id) = system_id {
+        ret.system_id = Some(system_id.to_owned().into_boxed_str());
+    }
+    if let Some(content) = content {
+        ret.length = content.len() as i32;
+        ret.content = Some(Cow::Owned(content.to_owned()));
+    } else {
+        ret.length = 0;
+        ret.content = None;
+    }
+    // to be computed by the layer knowing the defining entity
+    ret.uri = None;
+    ret.orig = None;
+    ret.owner = 0;
+
+    Some(ret)
 }
 
 /// Create a new entity, this differs from xmlAddDocEntity() that if
@@ -455,10 +449,6 @@ unsafe fn xml_free_entity(mut entity: XmlEntityPtr) {
                 entity.children = None;
             }
         }
-        if !entity.content.is_null() {
-            xml_free(entity.content as _);
-            entity.content = null_mut();
-        }
         entity.free();
     }
 }
@@ -484,7 +474,7 @@ unsafe fn xml_add_entity(
                     // 4.6 Predefined Entities
                     if typ == XmlEntityType::XmlInternalGeneralEntity {
                         if let Some(content) = content {
-                            let c = *predef.content.add(0);
+                            let c = predef.content.as_deref().unwrap().as_bytes()[0];
                             if content.as_bytes() == [c]
                                 && (content == ">" || content == "\'" || content == "\"")
                             {
@@ -631,7 +621,7 @@ thread_local! {
         prev: None,
         doc: None,
         orig: Some(Cow::Borrowed("<")),
-        content: c"<".as_ptr() as _,
+        content: Some(Cow::Borrowed("<")),
         length: 1,
         etype: XmlEntityType::XmlInternalPredefinedEntity,
         external_id: None,
@@ -653,7 +643,7 @@ thread_local! {
         prev: None,
         doc: None,
         orig: Some(Cow::Borrowed(">")),
-        content: c">".as_ptr() as _,
+        content: Some(Cow::Borrowed(">")),
         length: 1,
         etype: XmlEntityType::XmlInternalPredefinedEntity,
         external_id: None,
@@ -675,7 +665,7 @@ thread_local! {
         prev: None,
         doc: None,
         orig: Some(Cow::Borrowed("&")),
-        content: c"&".as_ptr() as _,
+        content: Some(Cow::Borrowed("&")),
         length: 1,
         etype: XmlEntityType::XmlInternalPredefinedEntity,
         external_id: None,
@@ -697,7 +687,7 @@ thread_local! {
         prev: None,
         doc: None,
         orig: Some(Cow::Borrowed("\"")),
-        content: c"\"".as_ptr() as _,
+        content: Some(Cow::Borrowed("\"")),
         length: 1,
         etype: XmlEntityType::XmlInternalPredefinedEntity,
         external_id: None,
@@ -719,7 +709,7 @@ thread_local! {
         prev: None,
         doc: None,
         orig: Some(Cow::Borrowed("'")),
-        content: c"'".as_ptr() as _,
+        content: Some(Cow::Borrowed("'")),
         length: 1,
         etype: XmlEntityType::XmlInternalPredefinedEntity,
         external_id: None,
@@ -970,7 +960,7 @@ pub fn xml_encode_special_chars(_doc: Option<XmlDocPtr>, input: &str) -> String 
 ///
 /// Returns the xmlEntitiesTablePtr just created or NULL in case of error.
 #[doc(alias = "xmlCreateEntitiesTable")]
-pub unsafe fn xml_create_entities_table() -> XmlEntitiesTablePtr {
+pub fn xml_create_entities_table() -> XmlEntitiesTablePtr {
     xml_hash_create(0) as XmlEntitiesTablePtr
 }
 
@@ -979,24 +969,20 @@ pub unsafe fn xml_create_entities_table() -> XmlEntitiesTablePtr {
 /// Returns the new xmlEntitiesPtr or NULL in case of error.
 #[doc(alias = "xmlCopyEntity")]
 #[cfg(feature = "libxml_tree")]
-unsafe fn xml_copy_entity(ent: XmlEntityPtr) -> Option<XmlEntityPtr> {
-    unsafe {
-        let mut cur = XmlEntityPtr::new(XmlEntity {
-            typ: XmlElementType::XmlEntityDecl,
-            etype: ent.etype,
-            ..Default::default()
-        })
-        .unwrap();
-        cur.name = ent.name.clone();
-        cur.external_id = ent.external_id.clone();
-        cur.system_id = ent.system_id.clone();
-        if !ent.content.is_null() {
-            cur.content = xml_strdup(ent.content);
-        }
-        cur.orig = ent.orig.clone();
-        cur.uri = ent.uri.clone();
-        Some(cur)
-    }
+fn xml_copy_entity(ent: XmlEntityPtr) -> Option<XmlEntityPtr> {
+    let mut cur = XmlEntityPtr::new(XmlEntity {
+        typ: XmlElementType::XmlEntityDecl,
+        etype: ent.etype,
+        ..Default::default()
+    })
+    .unwrap();
+    cur.name = ent.name.clone();
+    cur.external_id = ent.external_id.clone();
+    cur.system_id = ent.system_id.clone();
+    cur.content = ent.content.clone();
+    cur.orig = ent.orig.clone();
+    cur.uri = ent.uri.clone();
+    Some(cur)
 }
 
 /// Build a copy of an entity table.
@@ -1004,13 +990,11 @@ unsafe fn xml_copy_entity(ent: XmlEntityPtr) -> Option<XmlEntityPtr> {
 /// Returns the new xmlEntitiesTablePtr or NULL in case of error.
 #[doc(alias = "xmlCopyEntitiesTable")]
 #[cfg(feature = "libxml_tree")]
-pub unsafe fn xml_copy_entities_table(
+pub fn xml_copy_entities_table(
     table: XmlHashTableRef<'static, XmlEntityPtr>,
 ) -> Option<XmlHashTableRef<'static, XmlEntityPtr>> {
-    unsafe {
-        let new = table.clone_with(|&ent, _| xml_copy_entity(ent).unwrap());
-        XmlHashTableRef::from_table(new)
-    }
+    let new = table.clone_with(|&ent, _| xml_copy_entity(ent).unwrap());
+    XmlHashTableRef::from_table(new)
 }
 
 /// Deallocate the memory used by an entities hash table.
@@ -1047,155 +1031,111 @@ pub unsafe fn xml_dump_entities_table<'a>(buf: &mut (impl Write + 'a), table: Xm
 /// treatment required by %
 #[doc(alias = "xmlDumpEntityContent")]
 #[cfg(feature = "libxml_output")]
-unsafe fn xml_dump_entity_content<'a>(buf: &mut (impl Write + 'a), content: *const XmlChar) {
-    unsafe {
-        use std::{slice::from_raw_parts, str::from_utf8};
+fn xml_dump_entity_content<'a>(buf: &mut (impl Write + 'a), content: &str) {
+    use crate::io::write_quoted;
 
-        use crate::io::write_quoted;
-
-        if !xml_strchr(content, b'%').is_null() {
-            let mut base: *const XmlChar;
-            let mut cur: *const XmlChar;
-
-            write!(buf, "\"").ok();
-            base = content;
-            cur = content;
-            while *cur != 0 {
-                if *cur == b'"' {
-                    if base != cur {
-                        write!(
-                            buf,
-                            "{}",
-                            from_utf8(from_raw_parts(base, cur.offset_from(base) as _)).unwrap()
-                        )
-                        .ok();
-                    }
-                    write!(buf, "&quot;").ok();
-                    cur = cur.add(1);
-                    base = cur;
-                } else if *cur == b'%' {
-                    if base != cur {
-                        write!(
-                            buf,
-                            "{}",
-                            from_utf8(from_raw_parts(base, cur.offset_from(base) as _)).unwrap()
-                        )
-                        .ok();
-                    }
-                    write!(buf, "&#x25;").ok();
-                    cur = cur.add(1);
-                    base = cur;
-                } else {
-                    cur = cur.add(1);
-                }
+    if content.contains('%') {
+        write!(buf, "\"").ok();
+        let mut cur = content;
+        while let Some(pos) = cur.find(['"', '%']) {
+            let (head, tail) = cur.split_at(pos);
+            write!(buf, "{head}");
+            if tail.starts_with('"') {
+                write!(buf, "&quot;").ok();
+            } else {
+                write!(buf, "&#x25;").ok();
             }
-            if base != cur {
-                write!(
-                    buf,
-                    "{}",
-                    from_utf8(from_raw_parts(base, cur.offset_from(base) as _)).unwrap()
-                )
-                .ok();
-            }
-            write!(buf, "\"").ok();
-        } else {
-            write_quoted(
-                buf,
-                CStr::from_ptr(content as *const i8)
-                    .to_string_lossy()
-                    .as_ref(),
-            )
-            .ok();
+            cur = &tail[1..];
         }
+        if !cur.is_empty() {
+            write!(buf, "{cur}").ok();
+        }
+
+        write!(buf, "\"").ok();
+    } else {
+        write_quoted(buf, content).ok();
     }
 }
 
 /// This will dump the content of the entity table as an XML DTD definition
 #[doc(alias = "xmlDumpEntityDecl")]
 #[cfg(feature = "libxml_output")]
-pub unsafe fn xml_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: XmlEntityPtr) {
-    unsafe {
-        use crate::io::write_quoted;
+pub fn xml_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: XmlEntityPtr) {
+    use crate::io::write_quoted;
 
-        let name = &ent.name;
-        match ent.etype {
-            XmlEntityType::XmlInternalGeneralEntity => {
-                write!(buf, "<!ENTITY {name} ").ok();
+    let name = &ent.name;
+    match ent.etype {
+        XmlEntityType::XmlInternalGeneralEntity => {
+            write!(buf, "<!ENTITY {name} ").ok();
+            if let Some(orig) = ent.orig.as_deref() {
+                write_quoted(buf, orig).ok();
+            } else {
+                xml_dump_entity_content(buf, ent.content.as_deref().unwrap());
+            }
+            writeln!(buf, ">").ok();
+        }
+        XmlEntityType::XmlExternalGeneralParsedEntity => {
+            write!(buf, "<!ENTITY {name}").ok();
+            if let Some(external_id) = ent.external_id.as_deref() {
+                write!(buf, " PUBLIC ").ok();
+                write_quoted(buf, external_id).ok();
+                write!(buf, " ").ok();
+                write_quoted(buf, ent.system_id.as_deref().unwrap()).ok();
+            } else {
+                write!(buf, " SYSTEM ").ok();
+                write_quoted(buf, ent.system_id.as_deref().unwrap()).ok();
+            }
+            writeln!(buf, ">").ok();
+        }
+        XmlEntityType::XmlExternalGeneralUnparsedEntity => {
+            write!(buf, "<!ENTITY {name}").ok();
+            if let Some(external_id) = ent.external_id.as_deref() {
+                write!(buf, " PUBLIC ").ok();
+                write_quoted(buf, external_id).ok();
+                write!(buf, " ").ok();
+                write_quoted(buf, ent.system_id.as_deref().unwrap()).ok();
+            } else {
+                write!(buf, " SYSTEM ").ok();
+                write_quoted(buf, ent.system_id.as_deref().unwrap()).ok();
+            }
+            if let Some(content) = ent.content.as_deref() {
+                // Should be true !
+                write!(buf, " NDATA ").ok();
                 if let Some(orig) = ent.orig.as_deref() {
-                    write_quoted(buf, orig).ok();
+                    write!(buf, "{}", orig).ok();
                 } else {
-                    xml_dump_entity_content(buf, ent.content as _);
+                    write!(buf, "{}", content).ok();
                 }
-                writeln!(buf, ">").ok();
             }
-            XmlEntityType::XmlExternalGeneralParsedEntity => {
-                write!(buf, "<!ENTITY {name}").ok();
-                if let Some(external_id) = ent.external_id.as_deref() {
-                    write!(buf, " PUBLIC ").ok();
-                    write_quoted(buf, external_id).ok();
-                    write!(buf, " ").ok();
-                    write_quoted(buf, ent.system_id.as_deref().unwrap()).ok();
-                } else {
-                    write!(buf, " SYSTEM ").ok();
-                    write_quoted(buf, ent.system_id.as_deref().unwrap()).ok();
-                }
-                writeln!(buf, ">").ok();
+            writeln!(buf, ">").ok();
+        }
+        XmlEntityType::XmlInternalParameterEntity => {
+            write!(buf, "<!ENTITY % {name} ").ok();
+            if let Some(orig) = ent.orig.as_deref() {
+                write_quoted(buf, orig).ok();
+            } else {
+                xml_dump_entity_content(buf, ent.content.as_deref().unwrap());
             }
-            XmlEntityType::XmlExternalGeneralUnparsedEntity => {
-                write!(buf, "<!ENTITY {name}").ok();
-                if let Some(external_id) = ent.external_id.as_deref() {
-                    write!(buf, " PUBLIC ").ok();
-                    write_quoted(buf, external_id).ok();
-                    write!(buf, " ").ok();
-                    write_quoted(buf, ent.system_id.as_deref().unwrap()).ok();
-                } else {
-                    write!(buf, " SYSTEM ").ok();
-                    write_quoted(buf, ent.system_id.as_deref().unwrap()).ok();
-                }
-                if !ent.content.is_null() {
-                    // Should be true !
-                    write!(buf, " NDATA ").ok();
-                    if let Some(orig) = ent.orig.as_deref() {
-                        write!(buf, "{}", orig).ok();
-                    } else {
-                        write!(
-                            buf,
-                            "{}",
-                            CStr::from_ptr(ent.content as _).to_string_lossy().as_ref()
-                        )
-                        .ok();
-                    }
-                }
-                writeln!(buf, ">").ok();
+            writeln!(buf, ">").ok();
+        }
+        XmlEntityType::XmlExternalParameterEntity => {
+            write!(buf, "<!ENTITY % {name}").ok();
+            if let Some(external_id) = ent.external_id.as_deref() {
+                write!(buf, " PUBLIC ").ok();
+                write_quoted(buf, external_id).ok();
+                write!(buf, " ").ok();
+                write_quoted(buf, ent.system_id.as_deref().unwrap()).ok();
+            } else {
+                write!(buf, " SYSTEM ").ok();
+                write_quoted(buf, ent.system_id.as_deref().unwrap()).ok();
             }
-            XmlEntityType::XmlInternalParameterEntity => {
-                write!(buf, "<!ENTITY % {name} ").ok();
-                if let Some(orig) = ent.orig.as_deref() {
-                    write_quoted(buf, orig).ok();
-                } else {
-                    xml_dump_entity_content(buf, ent.content as _);
-                }
-                writeln!(buf, ">").ok();
-            }
-            XmlEntityType::XmlExternalParameterEntity => {
-                write!(buf, "<!ENTITY % {name}").ok();
-                if let Some(external_id) = ent.external_id.as_deref() {
-                    write!(buf, " PUBLIC ").ok();
-                    write_quoted(buf, external_id).ok();
-                    write!(buf, " ").ok();
-                    write_quoted(buf, ent.system_id.as_deref().unwrap()).ok();
-                } else {
-                    write!(buf, " SYSTEM ").ok();
-                    write_quoted(buf, ent.system_id.as_deref().unwrap()).ok();
-                }
-                writeln!(buf, ">").ok();
-            }
-            _ => {
-                xml_entities_err(
-                    XmlParserErrors::XmlDTDUnknownEntity,
-                    "xmlDumpEntitiesDecl: internal: unknown type entity type",
-                );
-            }
+            writeln!(buf, ">").ok();
+        }
+        _ => {
+            xml_entities_err(
+                XmlParserErrors::XmlDTDUnknownEntity,
+                "xmlDumpEntitiesDecl: internal: unknown type entity type",
+            );
         }
     }
 }

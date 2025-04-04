@@ -1,4 +1,4 @@
-use std::{borrow::Cow, ffi::CStr};
+use std::borrow::Cow;
 
 use crate::{
     error::XmlParserErrors,
@@ -328,10 +328,11 @@ impl XmlParserCtxt {
                         if let Some(ent) = ent.filter(|ent| {
                             matches!(ent.etype, XmlEntityType::XmlInternalPredefinedEntity)
                         }) {
-                            if self.replace_entities == 0 && *ent.content.add(0) == b'&' {
+                            let content = ent.content.as_deref().unwrap();
+                            if self.replace_entities == 0 && content.starts_with('&') {
                                 buf.push_str("&#38;");
                             } else {
-                                buf.push(*ent.content as char);
+                                buf.push_str(content);
                             }
                         } else if let Some(ent) = ent.filter(|_| self.replace_entities != 0) {
                             if !matches!(ent.etype, XmlEntityType::XmlInternalPredefinedEntity) {
@@ -340,19 +341,16 @@ impl XmlParserCtxt {
                                 }
 
                                 self.depth += 1;
-                                let rep = (!ent.content.is_null())
-                                    .then(|| {
-                                        self.string_decode_entities_int(
-                                            &CStr::from_ptr(ent.content as *const i8)
-                                                .to_string_lossy(),
-                                            XML_SUBSTITUTE_REF as _,
-                                            '\0',
-                                            '\0',
-                                            '\0',
-                                            1,
-                                        )
-                                    })
-                                    .flatten();
+                                let rep = ent.content.as_deref().and_then(|content| {
+                                    self.string_decode_entities_int(
+                                        content,
+                                        XML_SUBSTITUTE_REF as _,
+                                        '\0',
+                                        '\0',
+                                        '\0',
+                                        1,
+                                    )
+                                });
                                 self.depth -= 1;
                                 if let Some(rep) = rep {
                                     for c in rep.chars() {
@@ -363,15 +361,15 @@ impl XmlParserCtxt {
                                         }
                                     }
                                 }
-                            } else if !ent.content.is_null() {
-                                buf.push(*ent.content as char);
+                            } else if let Some(content) = ent.content.as_deref() {
+                                buf.push_str(content);
                             }
                         } else if let Some(mut ent) = ent {
                             // We also check for recursion and amplification
                             // when entities are not substituted. They're
                             // often expanded later.
                             if !matches!(ent.etype, XmlEntityType::XmlInternalPredefinedEntity)
-                                && !ent.content.is_null()
+                                && ent.content.is_some()
                             {
                                 if ent.flags & XML_ENT_CHECKED as i32 == 0 {
                                     let old_copy: u64 = self.sizeentcopy;
@@ -379,19 +377,14 @@ impl XmlParserCtxt {
                                     self.sizeentcopy = ent.length as _;
 
                                     self.depth += 1;
-                                    let rep = (!ent.content.is_null())
-                                        .then(|| {
-                                            self.string_decode_entities_int(
-                                                &CStr::from_ptr(ent.content as *const i8)
-                                                    .to_string_lossy(),
-                                                XML_SUBSTITUTE_REF as _,
-                                                '\0',
-                                                '\0',
-                                                '\0',
-                                                1,
-                                            )
-                                        })
-                                        .flatten();
+                                    let rep = self.string_decode_entities_int(
+                                        ent.content.as_deref().unwrap(),
+                                        XML_SUBSTITUTE_REF as _,
+                                        '\0',
+                                        '\0',
+                                        '\0',
+                                        1,
+                                    );
                                     self.depth -= 1;
 
                                     // If we're parsing DTD content, the entity
@@ -404,7 +397,7 @@ impl XmlParserCtxt {
                                     }
 
                                     if rep.is_none() {
-                                        *ent.content.add(0) = 0;
+                                        ent.content = Some(Cow::Borrowed(""));
                                     }
 
                                     if self.parser_entity_check(old_copy) != 0 {

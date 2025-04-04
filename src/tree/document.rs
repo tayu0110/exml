@@ -22,7 +22,6 @@ use std::{
     any::type_name,
     borrow::Cow,
     collections::HashMap,
-    ffi::CStr,
     ops::{Deref, DerefMut},
     os::raw::c_void,
     ptr::{NonNull, null_mut},
@@ -318,9 +317,7 @@ impl XmlDoc {
                             if let Some(ent) = ent.filter(|ent| {
                                 matches!(ent.etype, XmlEntityType::XmlInternalPredefinedEntity)
                             }) {
-                                buf.push_str(
-                                    &CStr::from_ptr(ent.content as *const i8).to_string_lossy(),
-                                );
+                                buf.push_str(ent.content.as_deref().unwrap());
                             } else {
                                 // Flush buffer so far
                                 if !buf.is_empty() {

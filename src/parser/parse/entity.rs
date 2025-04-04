@@ -1,4 +1,4 @@
-use std::{borrow::Cow, ffi::CStr, mem::take, ptr::null_mut};
+use std::{borrow::Cow, mem::take, ptr::null_mut};
 
 use crate::{
     dict::xml_dict_free,
@@ -14,7 +14,6 @@ use crate::{
         parser_internals::{
             XML_MAX_HUGE_LENGTH, XML_MAX_TEXT_LENGTH, XML_SUBSTITUTE_PEREF, XML_SUBSTITUTE_REF,
         },
-        xmlstring::xml_strndup,
     },
     parser::{
         XmlParserCtxt, XmlParserInput, XmlParserInputState, XmlParserOption,
@@ -79,8 +78,8 @@ impl XmlParserCtxt {
                     if let Some(ent) = ent.filter(|ent| {
                         matches!(ent.etype, XmlEntityType::XmlInternalPredefinedEntity)
                     }) {
-                        if !ent.content.is_null() {
-                            buffer.push(*ent.content as char);
+                        if let Some(content) = ent.content.as_deref() {
+                            buffer.push_str(content);
                         } else {
                             xml_fatal_err_msg(
                                 self,
@@ -89,7 +88,7 @@ impl XmlParserCtxt {
                             );
                             return None;
                         }
-                    } else if let Some(mut ent) = ent.filter(|ent| !ent.content.is_null()) {
+                    } else if let Some(mut ent) = ent.filter(|ent| ent.content.is_some()) {
                         if check != 0 && self.parser_entity_check(ent.length as _) != 0 {
                             return None;
                         }
@@ -97,25 +96,20 @@ impl XmlParserCtxt {
                         if ent.flags & XML_ENT_EXPANDING as i32 != 0 {
                             xml_fatal_err(self, XmlParserErrors::XmlErrEntityLoop, None);
                             self.halt();
-                            *ent.content.add(0) = 0;
+                            ent.content = Some(Cow::Borrowed(""));
                             return None;
                         }
 
                         ent.flags |= XML_ENT_EXPANDING as i32;
                         self.depth += 1;
-                        let rep = self.string_decode_entities_int(
-                            &CStr::from_ptr(ent.content as *const i8).to_string_lossy(),
-                            what,
-                            '\0',
-                            '\0',
-                            '\0',
-                            check,
-                        );
+                        let rep = ent.content.as_deref().and_then(|content| {
+                            self.string_decode_entities_int(content, what, '\0', '\0', '\0', check)
+                        });
                         self.depth -= 1;
                         ent.flags &= !XML_ENT_EXPANDING as i32;
 
                         let Some(rep) = rep else {
-                            *ent.content.add(0) = 0;
+                            ent.content = Some(Cow::Borrowed(""));
                             return None;
                         };
 
@@ -135,7 +129,7 @@ impl XmlParserCtxt {
                     let (ent, rem) = self.parse_string_pereference(s);
                     s = rem;
                     if let Some(mut ent) = ent {
-                        if ent.content.is_null() {
+                        if ent.content.is_none() {
                             // Note: external parsed entities will not be loaded,
                             // it is not required for a non-validating parser to
                             // complete external PEReferences coming from the
@@ -163,28 +157,23 @@ impl XmlParserCtxt {
                         if ent.flags & XML_ENT_EXPANDING as i32 != 0 {
                             xml_fatal_err(self, XmlParserErrors::XmlErrEntityLoop, None);
                             self.halt();
-                            if !ent.content.is_null() {
-                                *ent.content.add(0) = 0;
+                            if ent.content.is_some() {
+                                ent.content = Some(Cow::Borrowed(""));
                             }
                             return None;
                         }
 
                         ent.flags |= XML_ENT_EXPANDING as i32;
                         self.depth += 1;
-                        let rep = self.string_decode_entities_int(
-                            &CStr::from_ptr(ent.content as *const i8).to_string_lossy(),
-                            what,
-                            '\0',
-                            '\0',
-                            '\0',
-                            check,
-                        );
+                        let rep = ent.content.as_deref().and_then(|content| {
+                            self.string_decode_entities_int(content, what, '\0', '\0', '\0', check)
+                        });
                         self.depth -= 1;
                         ent.flags &= !XML_ENT_EXPANDING as i32;
 
                         let Some(rep) = rep else {
-                            if !ent.content.is_null() {
-                                *ent.content.add(0) = 0;
+                            if ent.content.is_some() {
+                                ent.content = Some(Cow::Borrowed(""));
                             }
                             return None;
                         };
@@ -233,7 +222,7 @@ impl XmlParserCtxt {
                 entity.etype,
                 XmlEntityType::XmlExternalParameterEntity
                     | XmlEntityType::XmlExternalGeneralParsedEntity
-            ) || !entity.content.is_null()
+            ) || entity.content.is_some()
             {
                 xml_fatal_err(
                     self,
@@ -296,7 +285,7 @@ impl XmlParserCtxt {
                 return -1;
             }
             entity.length = buf.len() as i32;
-            entity.content = xml_strndup(buf.as_ptr(), buf.len() as i32);
+            entity.content = Some(Cow::Owned(buf));
 
             0
         }

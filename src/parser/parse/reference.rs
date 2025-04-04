@@ -1,4 +1,4 @@
-use std::{borrow::Cow, ffi::CStr, str::from_utf8_unchecked};
+use std::{borrow::Cow, str::from_utf8_unchecked};
 
 use crate::{
     encoding::XmlCharEncoding,
@@ -336,9 +336,7 @@ impl XmlParserCtxt {
                     // The replacement text of any entity referred to directly or
                     // indirectly in an attribute value (other than "&lt;") must not contain a <.
                     if ent.flags & XML_ENT_CHECKED_LT as i32 == 0 {
-                        if !ent.content.is_null() {
-                            let content =
-                                CStr::from_ptr(ent.content as *const i8).to_string_lossy();
+                        if let Some(content) = ent.content.as_deref() {
                             if content.contains('<') {
                                 ent.flags |= XML_ENT_CONTAINS_LT as i32;
                             }
@@ -537,9 +535,7 @@ impl XmlParserCtxt {
                     // indirectly in an attribute value (other than "&lt;") must
                     // not contain a <.
                     if ent.flags & XML_ENT_CHECKED_LT as i32 == 0 {
-                        if !ent.content.is_null() {
-                            let content =
-                                CStr::from_ptr(ent.content as *const i8).to_string_lossy();
+                        if let Some(content) = ent.content.as_deref() {
                             if content.contains('<') {
                                 ent.flags |= XML_ENT_CONTAINS_LT as i32;
                             }
@@ -792,18 +788,14 @@ impl XmlParserCtxt {
 
             // special case of predefined entities
             if matches!(ent.etype, XmlEntityType::XmlInternalPredefinedEntity) {
-                let val = ent.content;
-                if val.is_null() {
+                let Some(val) = ent.content.as_deref() else {
                     return;
-                }
+                };
                 // inline the entity.
                 if self.disable_sax == 0 {
                     if let Some(characters) = self.sax.as_deref_mut().and_then(|sax| sax.characters)
                     {
-                        characters(
-                            self.user_data.clone(),
-                            &CStr::from_ptr(val as *const i8).to_string_lossy(),
-                        );
+                        characters(self.user_data.clone(), val);
                     }
                 }
                 return;
@@ -857,7 +849,7 @@ impl XmlParserCtxt {
                     self.depth += 1;
                     ret = xml_parse_balanced_chunk_memory_internal(
                         self,
-                        ent.content,
+                        ent.content.as_deref().unwrap(),
                         user_data,
                         Some(&mut list),
                     );
@@ -947,8 +939,8 @@ impl XmlParserCtxt {
                         "Entity '{}' failed to parse\n",
                         ent.name
                     );
-                    if !ent.content.is_null() {
-                        *ent.content.add(0) = 0;
+                    if ent.content.is_some() {
+                        ent.content = Some(Cow::Borrowed(""));
                     }
                 } else if let Some(list) = list.take() {
                     xml_free_node_list(Some(list));
@@ -984,7 +976,7 @@ impl XmlParserCtxt {
                         self.depth += 1;
                         ret = xml_parse_balanced_chunk_memory_internal(
                             self,
-                            ent.content,
+                            ent.content.as_deref().unwrap(),
                             user_data,
                             None,
                         );
