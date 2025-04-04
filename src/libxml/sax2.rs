@@ -361,7 +361,6 @@ pub unsafe fn xml_sax2_external_subset(
                 input.col = 1;
                 input.base.drain(..input.cur);
                 input.cur = 0;
-                input.free = None;
             }
 
             // let's parse that entity knowing it's an external subset.

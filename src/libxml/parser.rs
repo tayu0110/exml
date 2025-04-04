@@ -661,7 +661,6 @@ pub unsafe fn xml_io_parse_dtd(
             pinput.col = 1;
             pinput.base.drain(..pinput.cur);
             pinput.cur = 0;
-            pinput.free = None;
         }
 
         // let's parse that entity knowing it's an external subset.

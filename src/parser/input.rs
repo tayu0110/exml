@@ -52,10 +52,7 @@ use crate::{
     generic_error,
     globals::get_parser_debug_entities,
     io::{__xml_loader_err, XmlParserInputBuffer, xml_check_http_input, xml_parser_get_directory},
-    libxml::{
-        chvalid::xml_is_blank_char,
-        parser::{XmlParserInputDeallocate, xml_load_external_entity},
-    },
+    libxml::{chvalid::xml_is_blank_char, parser::xml_load_external_entity},
     parser::xml_err_internal,
     tree::{XmlEntityPtr, XmlEntityType},
     uri::canonic_path,
@@ -121,8 +118,6 @@ pub struct XmlParserInput {
     pub(crate) col: i32,
     // How many xmlChars already consumed
     pub consumed: u64,
-    // function to deallocate the base
-    pub(crate) free: Option<XmlParserInputDeallocate>,
     // the encoding string for entity
     pub(crate) encoding: Option<String>,
     // the version string for entity

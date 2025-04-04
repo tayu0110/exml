@@ -4317,7 +4317,6 @@ unsafe fn html_new_input_stream(ctxt: HtmlParserCtxtPtr) -> HtmlParserInput {
             buf: None,
             line: 1,
             col: 1,
-            free: None,
             version: None,
             consumed: 0,
             length: 0,
