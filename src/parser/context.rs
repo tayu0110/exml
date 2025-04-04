@@ -481,8 +481,7 @@ impl XmlParserCtxt {
             }
             input.cur = 0;
             input.length = 0;
-            input.base = vec![];
-            // input.end = input.cur;
+            input.base = 0;
         }
     }
 
@@ -497,21 +496,13 @@ impl XmlParserCtxt {
     #[doc(alias = "xmlCtxtReset")]
     pub unsafe fn reset(&mut self) {
         unsafe {
-            while self.input_pop().is_some() {
-                // drop input
-            }
             self.input_tab.clear();
-
             self.space_tab.clear();
-
             self.node_tab.clear();
             self.node = None;
-
             self.name_tab.clear();
             self.name = None;
-
             self.ns_tab.clear();
-
             self.version = None;
             self.encoding = None;
             self.directory = None;
@@ -546,7 +537,6 @@ impl XmlParserCtxt {
             self.sizeentities = 0;
             self.sizeentcopy = 0;
             self.node_seq.clear();
-
             self.atts_default.clear();
             let _ = self.atts_special.take().map(|t| t.into_inner());
 
@@ -569,7 +559,6 @@ impl XmlParserCtxt {
         let input = self.input_mut().unwrap();
         input.cur += nth;
         input.col += nth as i32;
-        assert!(input.cur <= input.base.len());
     }
 
     /// Advance the current pointer.  
@@ -580,7 +569,7 @@ impl XmlParserCtxt {
         }
         let input = self.input_mut().unwrap();
         for _ in 0..nth {
-            if input.base[input.cur] == b'\n' {
+            if input.base_contents()[input.cur] == b'\n' {
                 input.line += 1;
                 input.col = 1;
             } else {
@@ -592,7 +581,7 @@ impl XmlParserCtxt {
 
     pub fn content_bytes(&self) -> &[u8] {
         let input = self.input().unwrap();
-        &input.base[input.cur..]
+        input.current_contents()
     }
 
     /// Skip to the next character.
@@ -603,7 +592,7 @@ impl XmlParserCtxt {
         }
 
         let input = self.input().unwrap();
-        if input.cur > input.base.len() {
+        if input.cur > input.base_contents().len() {
             xml_err_internal!(self, "Parser input data memory error\n");
 
             self.err_no = XmlParserErrors::XmlErrInternalError as i32;
@@ -627,7 +616,7 @@ impl XmlParserCtxt {
             // XML constructs only use < 128 chars
 
             let input = self.input_mut().unwrap();
-            if input.base[input.cur] == b'\n' {
+            if input.base_contents()[input.cur] == b'\n' {
                 input.line += 1;
                 input.col = 1;
             } else {
@@ -642,7 +631,7 @@ impl XmlParserCtxt {
         //   literal #xD, an XML processor must pass to the application
         //   the single character #xA.
         let input = self.input_mut().unwrap();
-        if input.base[input.cur] == b'\n' {
+        if input.base_contents()[input.cur] == b'\n' {
             input.line += 1;
             input.col = 1;
         } else {
@@ -1146,13 +1135,15 @@ impl XmlParserCtxt {
                     self.input().unwrap().line
                 );
             }
-            let cur = match from_utf8(&input.base[input.cur..]) {
+            let cur = match from_utf8(&input.base_contents()[input.cur..]) {
                 Ok(s) => s,
                 Err(e) if e.valid_up_to() > 0 => {
                     unsafe {
                         // # Safety
                         // Refer to the documents for `from_utf8_unchecked` and `Utf8Error`.
-                        from_utf8_unchecked(&input.base[input.cur..input.cur + e.valid_up_to()])
+                        from_utf8_unchecked(
+                            &input.base_contents()[input.cur..input.cur + e.valid_up_to()],
+                        )
                     }
                 }
                 _ => "(Failed to read buffer)",
@@ -1440,12 +1431,19 @@ impl XmlParserCtxt {
         input: &mut XmlParserInput,
         handler: XmlCharEncodingHandler,
     ) -> i32 {
-        let Some(input_buf) = input.buf.as_mut() else {
+        if input.buf.as_mut().is_none() {
             xml_err_internal!(self, "static memory buffer doesn't support encoding\n");
             return -1;
-        };
+        }
 
-        if input_buf.encoder.replace(handler).is_some() {
+        if input
+            .buf
+            .as_mut()
+            .unwrap()
+            .encoder
+            .replace(handler)
+            .is_some()
+        {
             // Switching encodings during parsing is a really bad idea,
             // but Chromium can match between ISO-8859-1 and UTF-16 before
             // separate calls to xmlParseChunk.
@@ -1458,32 +1456,38 @@ impl XmlParserCtxt {
         self.charset = XmlCharEncoding::UTF8;
 
         // Is there already some content down the pipe to convert ?
-        let Some(mut buf) = input_buf.buffer.filter(|buf| !buf.is_empty()) else {
+        let Some(mut buf) = input
+            .buf
+            .as_mut()
+            .unwrap()
+            .buffer
+            .filter(|buf| !buf.is_empty())
+        else {
             return 0;
         };
         // FIXME: The BOM shouldn't be skipped here, but in the parsing code.
 
         // Specific handling of the Byte Order Mark for UTF-16
         if matches!(
-            input_buf.encoder.as_ref().unwrap().name(),
+            input.buf.as_mut().unwrap().encoder.as_ref().unwrap().name(),
             "UTF-16LE" | "UTF-16"
-        ) && input.base[input.cur] == 0xFF
-            && input.base[input.cur + 1] == 0xFE
+        ) && input.base_contents()[input.cur] == 0xFF
+            && input.base_contents()[input.cur + 1] == 0xFE
         {
             input.cur += 2;
         }
-        if input_buf.encoder.as_ref().unwrap().name() == "UTF-16BE"
-            && input.base[input.cur] == 0xFE
-            && input.base[input.cur + 1] == 0xFF
+        if input.buf.as_mut().unwrap().encoder.as_ref().unwrap().name() == "UTF-16BE"
+            && input.base_contents()[input.cur] == 0xFE
+            && input.base_contents()[input.cur + 1] == 0xFF
         {
             input.cur += 2;
         }
         // Errata on XML-1.0 June 20 2001
         // Specific handling of the Byte Order Mark for UTF-8
-        if input_buf.encoder.as_ref().unwrap().name() == "UTF-8"
-            && input.base[input.cur] == 0xEF
-            && input.base[input.cur + 1] == 0xBB
-            && input.base[input.cur + 2] == 0xBF
+        if input.buf.as_mut().unwrap().encoder.as_ref().unwrap().name() == "UTF-8"
+            && input.base_contents()[input.cur] == 0xEF
+            && input.base_contents()[input.cur + 1] == 0xBB
+            && input.base_contents()[input.cur + 2] == 0xBF
         {
             input.cur += 3;
         }

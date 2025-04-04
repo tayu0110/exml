@@ -714,7 +714,8 @@ impl XmlParserCtxt {
                                         // Special case to provide identical behaviour
                                         // between pull and push parsers on enpty CDATA sections
                                         if self.input().is_some_and(|input| {
-                                            input.base[..input.cur].ends_with(b"<![CDATA[")
+                                            input.base_contents()[..input.cur]
+                                                .ends_with(b"<![CDATA[")
                                         }) {
                                             cdata_block(self.user_data.clone(), "");
                                         }

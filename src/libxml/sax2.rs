@@ -359,7 +359,7 @@ pub unsafe fn xml_sax2_external_subset(
                 }
                 input.line = 1;
                 input.col = 1;
-                input.base.drain(..input.cur);
+                input.base += input.cur;
                 input.cur = 0;
             }
 

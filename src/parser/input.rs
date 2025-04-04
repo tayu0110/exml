@@ -37,13 +37,9 @@
 //
 // daniel@veillard.com
 
-use std::{
-    ops::DerefMut,
-    str::{from_utf8, from_utf8_mut},
-};
+use std::str::{from_utf8, from_utf8_mut};
 
 use crate::{
-    buf::xml_buf_overflow_error,
     encoding::{
         XmlCharEncoding, XmlCharEncodingHandler, find_encoding_handler, get_encoding_handler,
     },
@@ -103,11 +99,9 @@ pub struct XmlParserInput {
     // the directory/base of the file
     pub(crate) directory: Option<String>,
     // Base of the array to parse
-    pub base: Vec<u8>,
+    pub base: usize,
     // Current char being parsed
     pub cur: usize,
-    // end of the array to parse
-    // pub end: *const u8,
     // length if known
     pub(crate) length: i32,
     // Current line
@@ -309,9 +303,9 @@ impl XmlParserInput {
             if let Some(uri) = entity.uri.as_deref() {
                 input.filename = Some(uri.to_owned());
             }
-            input.base = content.as_bytes().to_owned();
+            input.base = 0;
             if entity.length == 0 {
-                entity.length = input.base.len() as i32;
+                entity.length = content.len() as i32;
             }
             input.cur = 0;
             input.length = entity.length;
@@ -319,6 +313,28 @@ impl XmlParserInput {
             input.entity = Some(entity);
             Some(input)
         }
+    }
+
+    pub(crate) fn base_contents(&self) -> &[u8] {
+        if self.base == usize::MAX {
+            return &[];
+        }
+        &self
+            .buf
+            .as_ref()
+            .and_then(|buf| buf.buffer.as_deref())
+            .map(|buf| buf.as_ref())
+            .or_else(|| {
+                self.entity
+                    .as_deref()
+                    .and_then(|ent| ent.content.as_deref())
+                    .map(|cont| cont.as_bytes())
+            })
+            .unwrap_or(&[])[self.base..]
+    }
+
+    pub(crate) fn current_contents(&self) -> &[u8] {
+        &self.base_contents()[self.cur..]
     }
 
     /// Return the offset of `cur` from `base`.
@@ -329,7 +345,7 @@ impl XmlParserInput {
     /// Return the length of remainder buffer length.  
     /// In other word, the offset of `end` from `cur`.
     pub(crate) fn remainder_len(&self) -> usize {
-        self.base.len() - self.cur
+        self.current_contents().len()
     }
 
     /// Update the input to use the current set of pointers from the buffer.
@@ -337,16 +353,15 @@ impl XmlParserInput {
     /// Returns `-1` in case of error, `0` otherwise
     #[doc(alias = "xmlBufResetInput")]
     pub(crate) fn reset_base(&mut self) -> i32 {
-        let Some(buffer) = self
+        if self
             .buf
             .as_ref()
             .and_then(|buf| buf.buffer)
-            .filter(|buf| buf.is_ok())
-        else {
+            .is_none_or(|buf| !buf.is_ok())
+        {
             return -1;
-        };
-        self.base.clear();
-        self.base.extend(buffer.as_ref());
+        }
+        self.base = 0;
         self.cur = 0;
         0
     }
@@ -354,20 +369,15 @@ impl XmlParserInput {
     /// Returns the distance between the base and the top of the buffer.
     #[doc(alias = "xmlBufGetInputBase")]
     pub(crate) fn get_base(&self) -> usize {
-        let Some(mut buffer) = self
+        if self
             .buf
             .as_ref()
             .and_then(|buf| buf.buffer)
-            .filter(|buf| buf.is_ok())
-        else {
+            .is_none_or(|buf| !buf.is_ok())
+        {
             return 0;
-        };
-        let mut base = buffer.as_ref().len() - self.base.len();
-        if base > buffer.capacity() {
-            xml_buf_overflow_error(buffer.deref_mut(), "Input reference outside of the buffer");
-            base = 0;
         }
-        base
+        self.base
     }
 
     /// Update the input to use the base and cur relative to the buffer
@@ -376,22 +386,19 @@ impl XmlParserInput {
     /// Returns -1 in case of error, 0 otherwise
     #[doc(alias = "xmlBufSetInputBaseCur")]
     pub(crate) fn set_base_and_cursor(&mut self, base: usize, cur: usize) -> i32 {
-        let Some(buffer) = self
+        if self
             .buf
             .as_ref()
             .and_then(|buf| buf.buffer)
-            .filter(|buf| buf.is_ok())
-        else {
-            self.base = vec![];
+            .is_none_or(|buf| !buf.is_ok())
+        {
+            self.base = usize::MAX;
             self.cur = 0;
-            // self.end = self.base;
             return -1;
         };
 
-        self.base.clear();
-        self.base.extend(&buffer.as_ref()[base..]);
+        self.base = base;
         self.cur = cur;
-        // self.end = buffer.as_mut_ptr().add(buffer.len());
         0
     }
 
@@ -404,7 +411,7 @@ impl XmlParserInput {
         let mut handler = get_encoding_handler(XmlCharEncoding::EBCDIC)?;
         let inlen = self.remainder_len();
         let outstr = from_utf8_mut(&mut out).ok()?;
-        let Ok((_, outlen)) = handler.decode(&self.base[self.cur..self.cur + inlen], outstr) else {
+        let Ok((_, outlen)) = handler.decode(&self.current_contents()[..inlen], outstr) else {
             return Some(handler);
         };
         out[outlen] = 0;

@@ -2118,7 +2118,8 @@ unsafe fn html_parse_system_literal(ctxt: HtmlParserCtxtPtr) -> *mut XmlChar {
             );
         } else {
             if err == 0 {
-                let content = &(*ctxt).input().unwrap().base[start_position..start_position + len];
+                let content =
+                    &(*ctxt).input().unwrap().base_contents()[start_position..start_position + len];
                 ret = xml_strndup(content.as_ptr(), content.len() as i32);
             }
             (*ctxt).skip_char();
@@ -2184,7 +2185,8 @@ unsafe fn html_parse_pubid_literal(ctxt: HtmlParserCtxtPtr) -> *mut XmlChar {
             );
         } else {
             if err == 0 {
-                let content = &(*ctxt).input().unwrap().base[start_position..start_position + len];
+                let content =
+                    &(*ctxt).input().unwrap().base_contents()[start_position..start_position + len];
                 ret = xml_strndup(content.as_ptr(), content.len() as i32);
             }
             (*ctxt).skip_char();
@@ -4297,7 +4299,7 @@ unsafe fn html_new_input_stream(ctxt: HtmlParserCtxtPtr) -> HtmlParserInput {
         let mut input = HtmlParserInput {
             filename: None,
             directory: None,
-            base: vec![],
+            base: 0,
             cur: 0,
             buf: None,
             line: 1,

@@ -655,7 +655,7 @@ pub unsafe fn xml_io_parse_dtd(
             pinput.filename = None;
             pinput.line = 1;
             pinput.col = 1;
-            pinput.base.drain(..pinput.cur);
+            pinput.base += pinput.cur;
             pinput.cur = 0;
         }
 

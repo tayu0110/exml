@@ -987,29 +987,32 @@ pub fn parser_print_file_context_internal(
 
     let mut cur = input.cur;
     // skip backwards over any end-of-lines
-    while 0 < cur && cur < input.base.len() && matches!(input.base[cur], b'\n' | b'\r') {
+    while 0 < cur
+        && cur < input.base_contents().len()
+        && matches!(input.base_contents()[cur], b'\n' | b'\r')
+    {
         cur -= 1;
     }
     let mut n = 0;
-    if cur == input.base.len() {
+    if cur == input.base_contents().len() {
         cur -= 1;
         n += 1;
     }
     // search backwards for beginning-of-line (to max buff size)
-    while n < SIZE && cur > 0 && !matches!(input.base[cur], b'\n' | b'\r') {
+    while n < SIZE && cur > 0 && !matches!(input.base_contents()[cur], b'\n' | b'\r') {
         cur -= 1;
         n += 1;
     }
-    let mut cur = &input.base[cur..];
+    let mut cur = &input.base_contents()[cur..];
     if n > 0 && matches!(cur.first(), Some(&(b'\n' | b'\r'))) {
         cur = &cur[1..];
     } else {
         // skip over continuation bytes
-        while cur.len() > input.base.len() - input.cur && cur[0] & 0xC0 == 0x80 {
+        while cur.len() > input.base_contents().len() - input.cur && cur[0] & 0xC0 == 0x80 {
             cur = &cur[1..];
         }
     }
-    let col = input.cur - (input.base.len() - cur.len());
+    let col = input.cur - (input.base_contents().len() - cur.len());
     let mut content = String::with_capacity(SIZE);
 
     // search forward for end-of-line (to max buff size)
