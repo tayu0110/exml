@@ -75,26 +75,24 @@ impl XmlParserCtxt {
 
     /// Register this attribute type
     #[doc(alias = "xmlAddSpecialAttr")]
-    unsafe fn add_special_attr(&mut self, fullname: &str, fullattr: &str, typ: XmlAttributeType) {
-        unsafe {
-            let mut atts_special = if let Some(table) = self.atts_special {
-                table
-            } else {
-                let table = XmlHashTable::with_capacity(10);
-                let Some(table) = XmlHashTableRef::from_table(table) else {
-                    xml_err_memory(self, None);
-                    return;
-                };
-                self.atts_special = Some(table);
-                table
-            };
-
-            if atts_special.lookup2(fullname, Some(fullattr)).is_some() {
+    fn add_special_attr(&mut self, fullname: &str, fullattr: &str, typ: XmlAttributeType) {
+        let mut atts_special = if let Some(table) = self.atts_special {
+            table
+        } else {
+            let table = XmlHashTable::with_capacity(10);
+            let Some(table) = XmlHashTableRef::from_table(table) else {
+                xml_err_memory(Some(self), None);
                 return;
-            }
+            };
+            self.atts_special = Some(table);
+            table
+        };
 
-            atts_special.add_entry2(fullname, Some(fullattr), typ).ok();
+        if atts_special.lookup2(fullname, Some(fullattr)).is_some() {
+            return;
         }
+
+        atts_special.add_entry2(fullname, Some(fullattr), typ).ok();
     }
 
     /// Trim the list of attributes defined to remove all those of type
@@ -337,7 +335,7 @@ impl XmlParserCtxt {
             } else {
                 self.my_doc = xml_new_doc(Some("1.0"));
                 let Some(mut my_doc) = self.my_doc else {
-                    xml_err_memory(self, Some("New Doc failed"));
+                    xml_err_memory(Some(self), Some("New Doc failed"));
                     return;
                 };
                 my_doc.properties = XmlDocProperties::XmlDocInternal as i32;
@@ -622,7 +620,7 @@ impl XmlParserCtxt {
                 );
                 ret = cur;
                 if cur.is_null() {
-                    xml_err_memory(self, None);
+                    xml_err_memory(Some(self), None);
                     return null_mut();
                 }
                 self.grow();
@@ -1607,7 +1605,7 @@ impl XmlParserCtxt {
                                         ignore_depth += 1;
                                         // Check for integer overflow
                                         if ignore_depth == 0 {
-                                            xml_err_memory(self, None);
+                                            xml_err_memory(Some(self), None);
                                             return;
                                         }
                                     } else if self.content_bytes().starts_with(b"]]>") {
@@ -2026,7 +2024,7 @@ impl XmlParserCtxt {
                         } else {
                             self.my_doc = xml_new_doc(Some(SAX_COMPAT_MODE));
                             let Some(mut my_doc) = self.my_doc else {
-                                xml_err_memory(self, Some("New Doc failed"));
+                                xml_err_memory(Some(self), Some("New Doc failed"));
                                 return;
                             };
                             my_doc.properties = XmlDocProperties::XmlDocInternal as i32;
@@ -2127,7 +2125,7 @@ impl XmlParserCtxt {
                             } else {
                                 self.my_doc = xml_new_doc(Some(SAX_COMPAT_MODE));
                                 let Some(mut my_doc) = self.my_doc else {
-                                    xml_err_memory(self, Some("New Doc failed"));
+                                    xml_err_memory(Some(self), Some("New Doc failed"));
                                     return;
                                 };
                                 my_doc.properties = XmlDocProperties::XmlDocInternal as i32;

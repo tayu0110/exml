@@ -1,3 +1,5 @@
+use std::ptr::null_mut;
+
 use crate::{
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     parser::XmlParserInputState,
@@ -168,19 +170,15 @@ macro_rules! xml_fatal_err_msg_str {
         $crate::parser::xml_fatal_err_msg_str!(@inner $ctxt, $error, msg.as_str(), Some($val.to_owned().into()));
     };
     (@inner $ctxt:expr, $error:expr, $msg:expr, $val:expr) => {
-        let ctxt = $ctxt as *mut $crate::parser::XmlParserCtxt;
-        if ctxt.is_null()
-            || (*ctxt).disable_sax == 0
-            || !matches!((*ctxt).instate, $crate::parser::XmlParserInputState::XmlParserEOF)
+        if $ctxt.disable_sax == 0
+            || !matches!($ctxt.instate, $crate::parser::XmlParserInputState::XmlParserEOF)
         {
-            if !ctxt.is_null() {
-                (*ctxt).err_no = $error as i32;
-            }
+            $ctxt.err_no = $error as i32;
             $crate::error::__xml_raise_error!(
                 None,
                 None,
                 None,
-                ctxt as _,
+                $ctxt as *mut $crate::parser::XmlParserCtxt as _,
                 None,
                 $crate::error::XmlErrorDomain::XmlFromParser,
                 $error,
@@ -194,11 +192,9 @@ macro_rules! xml_fatal_err_msg_str {
                 0,
                 Some($msg),
             );
-            if !ctxt.is_null() {
-                (*ctxt).well_formed = 0;
-                if (*ctxt).recovery == 0 {
-                    (*ctxt).disable_sax = 1;
-                }
+            $ctxt.well_formed = 0;
+            if $ctxt.recovery == 0 {
+                $ctxt.disable_sax = 1;
             }
         }
     };
@@ -220,56 +216,32 @@ macro_rules! xml_warning_msg {
         $crate::parser::xml_warning_msg!(@inner $ctxt, $error, &msg, Some($str1.to_owned().into()), Some($str2.to_owned().into()));
     };
     (@inner $ctxt:expr, $error:expr, $msg:expr, $str1:expr, $str2:expr) => {
-        let ctxt = $ctxt as *mut $crate::parser::XmlParserCtxt;
         let mut schannel: Option<$crate::globals::StructuredError> = None;
 
-        if ctxt.is_null()
-            || (*ctxt).disable_sax == 0
-            || !matches!((*ctxt).instate, $crate::parser::XmlParserInputState::XmlParserEOF)
+        if $ctxt.disable_sax == 0
+            || !matches!($ctxt.instate, $crate::parser::XmlParserInputState::XmlParserEOF)
         {
-            if !ctxt.is_null()
-            {
-                if let Some(sax) = (*ctxt).sax.as_deref().filter(|sax| sax.initialized == $crate::libxml::parser::XML_SAX2_MAGIC as u32) {
-                    schannel = sax.serror;
-                }
-                $crate::error::__xml_raise_error!(
-                    schannel,
-                    (*ctxt).sax.as_deref_mut().and_then(|sax| sax.warning),
-                    (*ctxt).user_data.clone(),
-                    ctxt as _,
-                    None,
-                    $crate::error::XmlErrorDomain::XmlFromParser,
-                    $error,
-                    $crate::error::XmlErrorLevel::XmlErrWarning,
-                    None,
-                    0,
-                    $str1,
-                    $str2,
-                    None,
-                    0,
-                    0,
-                    Some($msg),
-                );
-            } else {
-                $crate::error::__xml_raise_error!(
-                    schannel,
-                    None,
-                    None,
-                    std::ptr::null_mut(),
-                    None,
-                    $crate::error::XmlErrorDomain::XmlFromParser,
-                    $error,
-                    $crate::error::XmlErrorLevel::XmlErrWarning,
-                    None,
-                    0,
-                    $str1,
-                    $str2,
-                    None,
-                    0,
-                    0,
-                    Some($msg),
-                );
+            if let Some(sax) = $ctxt.sax.as_deref().filter(|sax| sax.initialized == $crate::libxml::parser::XML_SAX2_MAGIC as u32) {
+                schannel = sax.serror;
             }
+            $crate::error::__xml_raise_error!(
+                schannel,
+                $ctxt.sax.as_deref_mut().and_then(|sax| sax.warning),
+                $ctxt.user_data.clone(),
+                $ctxt as *mut $crate::parser::XmlParserCtxt as _,
+                None,
+                $crate::error::XmlErrorDomain::XmlFromParser,
+                $error,
+                $crate::error::XmlErrorLevel::XmlErrWarning,
+                None,
+                0,
+                $str1,
+                $str2,
+                None,
+                0,
+                0,
+                Some($msg),
+            );
         }
     };
 }
@@ -286,19 +258,15 @@ macro_rules! xml_err_msg_str {
         $crate::parser::xml_err_msg_str!(@inner $ctxt, $error, &msg, Some($val.to_owned().into()));
     };
     (@inner $ctxt:expr, $error:expr, $msg:expr, $val:expr) => {
-        let ctxt = $ctxt as *mut $crate::parser::XmlParserCtxt;
-        if ctxt.is_null()
-            || (*ctxt).disable_sax == 0
-            || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+        if $ctxt.disable_sax == 0
+            || !matches!($ctxt.instate, XmlParserInputState::XmlParserEOF)
         {
-            if !ctxt.is_null() {
-                (*ctxt).err_no = $error as i32;
-            }
+            $ctxt.err_no = $error as i32;
             $crate::error::__xml_raise_error!(
                 None,
                 None,
                 None,
-                ctxt as _,
+                $ctxt as *mut $crate::parser::XmlParserCtxt as _,
                 None,
                 $crate::error::XmlErrorDomain::XmlFromParser,
                 $error,
@@ -321,19 +289,13 @@ pub(crate) use xml_err_msg_str;
 #[doc(alias = "xmlFatalErrMsgInt")]
 macro_rules! xml_fatal_err_msg_int {
     ($ctxt:expr, $error:expr, $msg:expr, $val:expr) => {
-        let ctxt = $ctxt as *mut $crate::parser::XmlParserCtxt;
-        if ctxt.is_null()
-            || (*ctxt).disable_sax == 0
-            || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
-        {
-            if !ctxt.is_null() {
-                (*ctxt).err_no = $error as i32;
-            }
+        if $ctxt.disable_sax == 0 || !matches!($ctxt.instate, XmlParserInputState::XmlParserEOF) {
+            $ctxt.err_no = $error as i32;
             $crate::error::__xml_raise_error!(
                 None,
                 None,
                 None,
-                ctxt as _,
+                $ctxt as *mut $crate::parser::XmlParserCtxt as _,
                 None,
                 $crate::error::XmlErrorDomain::XmlFromParser,
                 $error,
@@ -347,11 +309,9 @@ macro_rules! xml_fatal_err_msg_int {
                 0,
                 Some($msg),
             );
-            if !ctxt.is_null() {
-                (*ctxt).well_formed = 0;
-                if (*ctxt).recovery == 0 {
-                    (*ctxt).disable_sax = 1;
-                }
+            $ctxt.well_formed = 0;
+            if $ctxt.recovery == 0 {
+                $ctxt.disable_sax = 1;
             }
         }
     };
@@ -373,57 +333,34 @@ macro_rules! xml_validity_error {
         $crate::parser::xml_validity_error!(@inner $ctxt, $error, &msg, Some($str1.to_owned().into()), Some($str2.to_owned().into()));
     };
     (@inner $ctxt:expr, $error:expr, $msg:expr, $str1:expr, $str2:expr) => {
-        let ctxt = $ctxt as *mut $crate::parser::XmlParserCtxt;
         let mut schannel: Option<$crate::globals::StructuredError> = None;
 
-        if ctxt.is_null()
-            || (*ctxt).disable_sax == 0
-            || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+        if $ctxt.disable_sax == 0
+            || !matches!($ctxt.instate, XmlParserInputState::XmlParserEOF)
         {
-            if !ctxt.is_null() {
-                (*ctxt).err_no = $error as i32;
-                if let Some(sax) = (*ctxt).sax.as_deref().filter(|sax| sax.initialized == $crate::libxml::parser::XML_SAX2_MAGIC as u32) {
-                    schannel = sax.serror;
-                }
-                $crate::error::__xml_raise_error!(
-                    schannel,
-                    (*ctxt).vctxt.error,
-                    (*ctxt).vctxt.user_data.clone(),
-                    ctxt as _,
-                    None,
-                    $crate::error::XmlErrorDomain::XmlFromDTD,
-                    $error,
-                    $crate::error::XmlErrorLevel::XmlErrError,
-                    None,
-                    0,
-                    $str1,
-                    $str2,
-                    None,
-                    0,
-                    0,
-                    Some($msg),
-                );
-                (*ctxt).valid = 0;
-            } else {
-                $crate::error::__xml_raise_error!(
-                    schannel,
-                    None,
-                    None,
-                    ctxt as _,
-                    None,
-                    $crate::error::XmlErrorDomain::XmlFromDTD,
-                    $error,
-                    $crate::error::XmlErrorLevel::XmlErrError,
-                    None,
-                    0,
-                    $str1,
-                    $str2,
-                    None,
-                    0,
-                    0,
-                    Some($msg),
-                );
+            $ctxt.err_no = $error as i32;
+            if let Some(sax) = $ctxt.sax.as_deref().filter(|sax| sax.initialized == $crate::libxml::parser::XML_SAX2_MAGIC as u32) {
+                schannel = sax.serror;
             }
+            $crate::error::__xml_raise_error!(
+                schannel,
+                $ctxt.vctxt.error,
+                $ctxt.vctxt.user_data.clone(),
+                $ctxt as *mut $crate::parser::XmlParserCtxt as _,
+                None,
+                $crate::error::XmlErrorDomain::XmlFromDTD,
+                $error,
+                $crate::error::XmlErrorLevel::XmlErrError,
+                None,
+                0,
+                $str1,
+                $str2,
+                None,
+                0,
+                0,
+                Some($msg),
+            );
+            $ctxt.valid = 0;
         }
     };
 }
@@ -457,19 +394,15 @@ macro_rules! xml_fatal_err_msg_str_int_str {
         );
     };
     (@inner $ctxt:expr, $error:expr, $msg:expr, $str1:expr, $val:expr, $str2:expr) => {
-        let ctxt = $ctxt as *mut $crate::parser::XmlParserCtxt;
-        if ctxt.is_null()
-            || (*ctxt).disable_sax == 0
-            || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+        if $ctxt.disable_sax == 0
+            || !matches!($ctxt.instate, XmlParserInputState::XmlParserEOF)
         {
-            if !ctxt.is_null() {
-                (*ctxt).err_no = $error as i32;
-            }
+            $ctxt.err_no = $error as i32;
             $crate::error::__xml_raise_error!(
                 None,
                 None,
                 None,
-                ctxt as _,
+                $ctxt as *mut $crate::parser::XmlParserCtxt as _,
                 None,
                 $crate::error::XmlErrorDomain::XmlFromParser,
                 $error,
@@ -483,11 +416,9 @@ macro_rules! xml_fatal_err_msg_str_int_str {
                 0,
                 Some($msg),
             );
-            if !ctxt.is_null() {
-                (*ctxt).well_formed = 0;
-                if (*ctxt).recovery == 0 {
-                    (*ctxt).disable_sax = 1;
-                }
+            $ctxt.well_formed = 0;
+            if $ctxt.recovery == 0 {
+                $ctxt.disable_sax = 1;
             }
         }
     };
@@ -513,19 +444,15 @@ macro_rules! xml_ns_err {
         $crate::parser::xml_ns_err!(@inner $ctxt, $error, &msg, Some($info1.to_owned().into()), Some($info2.to_owned().into()), Some($info3.to_owned().into()));
     };
     (@inner $ctxt:expr, $error:expr, $msg:expr, $info1:expr, $info2:expr, $info3:expr) => {
-        let ctxt = $ctxt as *mut $crate::parser::XmlParserCtxt;
-        if ctxt.is_null()
-            || (*ctxt).disable_sax == 0
-            || !matches!((*ctxt).instate, $crate::parser::XmlParserInputState::XmlParserEOF)
+        if $ctxt.disable_sax == 0
+            || !matches!($ctxt.instate, $crate::parser::XmlParserInputState::XmlParserEOF)
         {
-            if !ctxt.is_null() {
-                (*ctxt).err_no = $error as i32;
-            }
+            $ctxt.err_no = $error as i32;
             $crate::error::__xml_raise_error!(
                 None,
                 None,
                 None,
-                ctxt as _,
+                $ctxt as *mut $crate::parser::XmlParserCtxt as _,
                 None,
                 $crate::error::XmlErrorDomain::XmlFromNamespace,
                 $error,
@@ -539,9 +466,7 @@ macro_rules! xml_ns_err {
                 0,
                 Some($msg),
             );
-            if !ctxt.is_null() {
-                (*ctxt).ns_well_formed = 0;
-            }
+            $ctxt.ns_well_formed = 0;
         }
     };
 }
@@ -558,19 +483,15 @@ macro_rules! xml_err_internal {
         $crate::parser::xml_err_internal!(@inner $ctxt, &msg, Some($s.into()));
     };
     (@inner $ctxt:expr, $msg:expr, $s:expr) => {
-        let ctxt = $ctxt as *mut $crate::parser::XmlParserCtxt;
-        if ctxt.is_null()
-            || (*ctxt).disable_sax == 0
-            || !matches!((*ctxt).instate, $crate::parser::XmlParserInputState::XmlParserEOF)
+        if $ctxt.disable_sax == 0
+            || !matches!($ctxt.instate, $crate::parser::XmlParserInputState::XmlParserEOF)
         {
-            if !ctxt.is_null() {
-                (*ctxt).err_no = $crate::error::XmlParserErrors::XmlErrInternalError as i32;
-            }
+            $ctxt.err_no = $crate::error::XmlParserErrors::XmlErrInternalError as i32;
             $crate::error::__xml_raise_error!(
                 None,
                 None,
                 None,
-                ctxt as _,
+                $ctxt as XmlParserCtxtPtr as _,
                 None,
                 $crate::error::XmlErrorDomain::XmlFromParser,
                 $crate::error::XmlParserErrors::XmlErrInternalError,
@@ -584,11 +505,9 @@ macro_rules! xml_err_internal {
                 0,
                 Some($msg),
             );
-            if !ctxt.is_null() {
-                (*ctxt).well_formed = 0;
-                if (*ctxt).recovery == 0 {
-                    (*ctxt).disable_sax = 1;
-                }
+            $ctxt.well_formed = 0;
+            if $ctxt.recovery == 0 {
+                $ctxt.disable_sax = 1;
             }
         }
     };
@@ -597,59 +516,56 @@ pub(crate) use xml_err_internal;
 
 /// Handle a redefinition of attribute error
 #[doc(alias = "xmlErrMemory")]
-pub(crate) unsafe fn xml_err_memory(ctxt: XmlParserCtxtPtr, extra: Option<&str>) {
-    unsafe {
-        if !ctxt.is_null()
-            && (*ctxt).disable_sax != 0
-            && matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
-        {
-            return;
-        }
-        if !ctxt.is_null() {
-            (*ctxt).err_no = XmlParserErrors::XmlErrNoMemory as i32;
-            (*ctxt).instate = XmlParserInputState::XmlParserEOF;
-            (*ctxt).disable_sax = 1;
-        }
-        if let Some(extra) = extra {
-            __xml_raise_error!(
-                None,
-                None,
-                None,
-                ctxt as _,
-                None,
-                XmlErrorDomain::XmlFromParser,
-                XmlParserErrors::XmlErrNoMemory,
-                XmlErrorLevel::XmlErrFatal,
-                None,
-                0,
-                Some(extra.to_owned().into()),
-                None,
-                None,
-                0,
-                0,
-                "Memory allocation failed : {}\n",
-                extra
-            );
-        } else {
-            __xml_raise_error!(
-                None,
-                None,
-                None,
-                ctxt as _,
-                None,
-                XmlErrorDomain::XmlFromParser,
-                XmlParserErrors::XmlErrNoMemory,
-                XmlErrorLevel::XmlErrFatal,
-                None,
-                0,
-                None,
-                None,
-                None,
-                0,
-                0,
-                "Memory allocation failed\n",
-            );
-        }
+pub(crate) fn xml_err_memory(mut ctxt: Option<&mut XmlParserCtxt>, extra: Option<&str>) {
+    if ctxt.as_ref().is_some_and(|ctxt| {
+        ctxt.disable_sax != 0 && matches!(ctxt.instate, XmlParserInputState::XmlParserEOF)
+    }) {
+        return;
+    }
+    if let Some(ctxt) = ctxt.as_mut() {
+        ctxt.err_no = XmlParserErrors::XmlErrNoMemory as i32;
+        ctxt.instate = XmlParserInputState::XmlParserEOF;
+        ctxt.disable_sax = 1;
+    }
+    if let Some(extra) = extra {
+        __xml_raise_error!(
+            None,
+            None,
+            None,
+            ctxt.map_or(null_mut(), |ctxt| ctxt as *mut XmlParserCtxt) as _,
+            None,
+            XmlErrorDomain::XmlFromParser,
+            XmlParserErrors::XmlErrNoMemory,
+            XmlErrorLevel::XmlErrFatal,
+            None,
+            0,
+            Some(extra.to_owned().into()),
+            None,
+            None,
+            0,
+            0,
+            "Memory allocation failed : {}\n",
+            extra
+        );
+    } else {
+        __xml_raise_error!(
+            None,
+            None,
+            None,
+            ctxt.map_or(null_mut(), |ctxt| ctxt as *mut XmlParserCtxt) as _,
+            None,
+            XmlErrorDomain::XmlFromParser,
+            XmlParserErrors::XmlErrNoMemory,
+            XmlErrorLevel::XmlErrFatal,
+            None,
+            0,
+            None,
+            None,
+            None,
+            0,
+            0,
+            "Memory allocation failed\n",
+        );
     }
 }
 
@@ -668,19 +584,15 @@ macro_rules! __xml_err_encoding {
         $crate::libxml::parser_internals::__xml_err_encoding!(@inner $ctxt, $xmlerr, &msg, Some($str1.to_owned().into()), Some($str2.to_owned().into()));
     };
     (@inner $ctxt:expr, $xmlerr:expr, $msg:expr, $str1:expr, $str2:expr) => {
-        let ctxt = $ctxt as *mut $crate::parser::XmlParserCtxt;
-        if ctxt.is_null()
-            || (*ctxt).disable_sax == 0
-            || !matches!((*ctxt).instate, $crate::parser::XmlParserInputState::XmlParserEOF)
+        if $ctxt.disable_sax == 0
+            || !matches!($ctxt.instate, $crate::parser::XmlParserInputState::XmlParserEOF)
         {
-            if !ctxt.is_null() {
-                (*ctxt).err_no = $xmlerr as _;
-            }
+            $ctxt.err_no = $xmlerr as _;
             $crate::error::__xml_raise_error!(
                 None,
                 None,
                 None,
-                ctxt as _,
+                $ctxt as XmlParserCtxtPtr as _,
                 None,
                 $crate::error::XmlErrorDomain::XmlFromParser,
                 $xmlerr,
@@ -694,11 +606,9 @@ macro_rules! __xml_err_encoding {
                 0,
                 Some($msg),
             );
-            if !ctxt.is_null() {
-                (*ctxt).well_formed = 0;
-                if (*ctxt).recovery == 0 {
-                    (*ctxt).disable_sax = 1;
-                }
+            $ctxt.well_formed = 0;
+            if $ctxt.recovery == 0 {
+                $ctxt.disable_sax = 1;
             }
         }
     };
@@ -709,22 +619,18 @@ pub(crate) use __xml_err_encoding;
 #[doc(alias = "xmlErrEncodingInt")]
 macro_rules! xml_err_encoding_int {
     ($ctxt:expr, $error:expr, $msg:literal, $val:expr) => {
-        let ctxt = $ctxt as *mut $crate::parser::XmlParserCtxt;
-        if ctxt.is_null()
-            || (*ctxt).disable_sax == 0
+        if $ctxt.disable_sax == 0
             || !matches!(
-                (*ctxt).instate,
+                $ctxt.instate,
                 $crate::parser::XmlParserInputState::XmlParserEOF
             )
         {
-            if !ctxt.is_null() {
-                (*ctxt).err_no = $error as i32;
-            }
+            $ctxt.err_no = $error as i32;
             $crate::error::__xml_raise_error!(
                 None,
                 None,
                 None,
-                ctxt as _,
+                $ctxt as *mut $crate::parser::XmlParserCtxt as _,
                 None,
                 $crate::error::XmlErrorDomain::XmlFromParser,
                 $error,
@@ -738,11 +644,9 @@ macro_rules! xml_err_encoding_int {
                 0,
                 Some(format!($msg, $val).as_str()),
             );
-            if !ctxt.is_null() {
-                (*ctxt).well_formed = 0;
-                if (*ctxt).recovery == 0 {
-                    (*ctxt).disable_sax = 1;
-                }
+            $ctxt.well_formed = 0;
+            if $ctxt.recovery == 0 {
+                $ctxt.disable_sax = 1;
             }
         }
     };
@@ -800,16 +704,14 @@ macro_rules! xml_ns_warn {
         )
     };
     (@inner $ctxt:expr, $error:expr, $msg:expr, $info1:expr, $info2:expr, $info3:expr) => {
-        let ctxt = $ctxt as *mut XmlParserCtxt;
-        if ctxt.is_null()
-            || (*ctxt).disable_sax == 0
-            || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+        if $ctxt.disable_sax == 0
+            || !matches!($ctxt.instate, XmlParserInputState::XmlParserEOF)
         {
             $crate::error::__xml_raise_error!(
                 None,
                 None,
                 None,
-                ctxt as _,
+                $ctxt as *mut XmlParserCtxt as _,
                 None,
                 $crate::error::XmlErrorDomain::XmlFromNamespace,
                 $error,
@@ -828,73 +730,64 @@ macro_rules! xml_ns_warn {
 }
 pub(crate) use xml_ns_warn;
 
-use super::{XmlParserCtxt, XmlParserCtxtPtr};
+use super::XmlParserCtxt;
 
 /// Handle a redefinition of attribute error
 #[doc(alias = "xmlErrAttributeDup")]
-pub(crate) unsafe fn xml_err_attribute_dup(
-    ctxt: XmlParserCtxtPtr,
+pub(crate) fn xml_err_attribute_dup(
+    ctxt: &mut XmlParserCtxt,
     prefix: Option<&str>,
     localname: &str,
 ) {
-    unsafe {
-        if !ctxt.is_null()
-            && (*ctxt).disable_sax != 0
-            && matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
-        {
-            return;
-        }
-        if !ctxt.is_null() {
-            (*ctxt).err_no = XmlParserErrors::XmlErrAttributeRedefined as i32;
-        }
+    if ctxt.disable_sax != 0 && matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
+        return;
+    }
+    ctxt.err_no = XmlParserErrors::XmlErrAttributeRedefined as i32;
 
-        if let Some(prefix) = prefix {
-            __xml_raise_error!(
-                None,
-                None,
-                None,
-                ctxt as _,
-                None,
-                XmlErrorDomain::XmlFromParser,
-                XmlParserErrors::XmlErrAttributeRedefined,
-                XmlErrorLevel::XmlErrFatal,
-                None,
-                0,
-                Some(prefix.to_owned().into()),
-                Some(localname.to_owned().into()),
-                None,
-                0,
-                0,
-                "Attribute {}:{} redefined\n",
-                prefix,
-                localname
-            );
-        } else {
-            __xml_raise_error!(
-                None,
-                None,
-                None,
-                ctxt as _,
-                None,
-                XmlErrorDomain::XmlFromParser,
-                XmlParserErrors::XmlErrAttributeRedefined,
-                XmlErrorLevel::XmlErrFatal,
-                None,
-                0,
-                Some(localname.to_owned().into()),
-                None,
-                None,
-                0,
-                0,
-                "Attribute {} redefined\n",
-                localname
-            );
-        }
-        if !ctxt.is_null() {
-            (*ctxt).well_formed = 0;
-            if (*ctxt).recovery == 0 {
-                (*ctxt).disable_sax = 1;
-            }
-        }
+    if let Some(prefix) = prefix {
+        __xml_raise_error!(
+            None,
+            None,
+            None,
+            ctxt as *mut XmlParserCtxt as _,
+            None,
+            XmlErrorDomain::XmlFromParser,
+            XmlParserErrors::XmlErrAttributeRedefined,
+            XmlErrorLevel::XmlErrFatal,
+            None,
+            0,
+            Some(prefix.to_owned().into()),
+            Some(localname.to_owned().into()),
+            None,
+            0,
+            0,
+            "Attribute {}:{} redefined\n",
+            prefix,
+            localname
+        );
+    } else {
+        __xml_raise_error!(
+            None,
+            None,
+            None,
+            ctxt as *mut XmlParserCtxt as _,
+            None,
+            XmlErrorDomain::XmlFromParser,
+            XmlParserErrors::XmlErrAttributeRedefined,
+            XmlErrorLevel::XmlErrFatal,
+            None,
+            0,
+            Some(localname.to_owned().into()),
+            None,
+            None,
+            0,
+            0,
+            "Attribute {} redefined\n",
+            localname
+        );
+    }
+    ctxt.well_formed = 0;
+    if ctxt.recovery == 0 {
+        ctxt.disable_sax = 1;
     }
 }

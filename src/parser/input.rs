@@ -41,7 +41,6 @@ use std::{
     cell::RefCell,
     ffi::CStr,
     ops::DerefMut,
-    ptr::null_mut,
     rc::Rc,
     str::{from_utf8, from_utf8_mut},
 };
@@ -145,58 +144,50 @@ impl XmlParserInput {
     ///
     /// Returns the new input stream or NULL
     #[doc(alias = "xmlNewInputStream")]
-    pub unsafe fn new(ctxt: Option<&mut XmlParserCtxt>) -> Option<Self> {
-        unsafe {
-            let mut input = XmlParserInput {
-                line: 1,
-                col: 1,
-                standalone: -1,
-                ..Default::default()
-            };
+    pub fn new(ctxt: Option<&mut XmlParserCtxt>) -> Option<Self> {
+        let mut input = XmlParserInput {
+            line: 1,
+            col: 1,
+            standalone: -1,
+            ..Default::default()
+        };
 
-            // If the context is NULL the id cannot be initialized, but that
-            // should not happen while parsing which is the situation where
-            // the id is actually needed.
-            if let Some(ctxt) = ctxt {
-                if input.id == i32::MAX {
-                    xml_err_memory(ctxt, Some("Input ID overflow\n"));
-                    return None;
-                }
-                input.id = ctxt.input_id;
-                ctxt.input_id += 1;
+        // If the context is NULL the id cannot be initialized, but that
+        // should not happen while parsing which is the situation where
+        // the id is actually needed.
+        if let Some(ctxt) = ctxt {
+            if input.id == i32::MAX {
+                xml_err_memory(Some(ctxt), Some("Input ID overflow\n"));
+                return None;
             }
-
-            Some(input)
+            input.id = ctxt.input_id;
+            ctxt.input_id += 1;
         }
+
+        Some(input)
     }
 
     /// Create a new input stream based on a memory buffer.
     ///
     /// Returns the new input stream
     #[doc(alias = "xmlNewStringInputStream")]
-    pub unsafe fn from_str(mut ctxt: Option<&mut XmlParserCtxt>, buffer: &str) -> Option<Self> {
-        unsafe {
-            let ctxt_ptr = ctxt
-                .as_deref_mut()
-                .map_or(null_mut(), |ctxt| ctxt as *mut XmlParserCtxt);
-            if get_parser_debug_entities() != 0 {
-                generic_error!("new fixed input: {buffer}\n");
-            }
-            let Some(buf) = XmlParserInputBuffer::from_memory(
-                buffer.as_bytes().to_vec(),
-                XmlCharEncoding::None,
-            ) else {
-                xml_err_memory(ctxt_ptr, None);
-                return None;
-            };
-            let Some(mut input) = XmlParserInput::new(ctxt) else {
-                xml_err_memory(ctxt_ptr, Some("couldn't allocate a new input stream\n"));
-                return None;
-            };
-            input.buf = Some(Rc::new(RefCell::new(buf)));
-            input.reset_base();
-            Some(input)
+    pub fn from_str(ctxt: Option<&mut XmlParserCtxt>, buffer: &str) -> Option<Self> {
+        if get_parser_debug_entities() != 0 {
+            generic_error!("new fixed input: {buffer}\n");
         }
+        let Some(buf) =
+            XmlParserInputBuffer::from_memory(buffer.as_bytes().to_vec(), XmlCharEncoding::None)
+        else {
+            xml_err_memory(ctxt, None);
+            return None;
+        };
+        let Some(mut input) = XmlParserInput::new(ctxt) else {
+            xml_err_memory(None, Some("couldn't allocate a new input stream\n"));
+            return None;
+        };
+        input.buf = Some(Rc::new(RefCell::new(buf)));
+        input.reset_base();
+        Some(input)
     }
 
     /// Create a new input stream structure encapsulating the @input into
@@ -286,7 +277,11 @@ impl XmlParserInput {
             if entity.content.is_null() {
                 match entity.etype {
                     XmlEntityType::XmlExternalGeneralUnparsedEntity => {
-                        xml_err_internal!(ctxt, "Cannot parse entity {}\n", entity.name.clone());
+                        xml_err_internal!(
+                            &mut *ctxt,
+                            "Cannot parse entity {}\n",
+                            entity.name.clone()
+                        );
                     }
                     XmlEntityType::XmlExternalGeneralParsedEntity
                     | XmlEntityType::XmlExternalParameterEntity => {
@@ -302,21 +297,21 @@ impl XmlParserInput {
                     }
                     XmlEntityType::XmlInternalGeneralEntity => {
                         xml_err_internal!(
-                            ctxt,
+                            &mut *ctxt,
                             "Internal entity {} without content !\n",
                             entity.name.clone()
                         );
                     }
                     XmlEntityType::XmlInternalParameterEntity => {
                         xml_err_internal!(
-                            ctxt,
+                            &mut *ctxt,
                             "Internal parameter entity {} without content !\n",
                             entity.name.clone()
                         );
                     }
                     XmlEntityType::XmlInternalPredefinedEntity => {
                         xml_err_internal!(
-                            ctxt,
+                            &mut *ctxt,
                             "Predefined entity {} without content !\n",
                             entity.name.clone()
                         );

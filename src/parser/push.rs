@@ -1156,7 +1156,7 @@ pub unsafe fn xml_create_push_parser_ctxt(
         )));
 
         let Ok(ctxt) = xml_new_sax_parser_ctxt(sax, user_data) else {
-            xml_err_memory(null_mut(), Some("creating parser: out of memory\n"));
+            xml_err_memory(None, Some("creating parser: out of memory\n"));
             return null_mut();
         };
         (*ctxt).dict_names = 1;

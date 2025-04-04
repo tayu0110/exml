@@ -449,7 +449,7 @@ pub unsafe fn xml_check_http_input(
                             (*ctxt).switch_input_encoding(ret.as_mut().unwrap(), handler);
                         } else {
                             __xml_err_encoding!(
-                                ctxt,
+                                &mut *ctxt,
                                 XmlParserErrors::XmlErrUnknownEncoding,
                                 "Unknown encoding {}",
                                 encoding

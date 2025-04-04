@@ -32,107 +32,105 @@ impl XmlParserCtxt {
     ///
     /// Returns the value parsed (as an int), 0 in case of error
     #[doc(alias = "xmlParseCharRef")]
-    pub(crate) unsafe fn parse_char_ref(&mut self) -> Option<char> {
-        unsafe {
-            let mut val = 0u32;
-            let mut count = 0;
+    pub(crate) fn parse_char_ref(&mut self) -> Option<char> {
+        let mut val = 0u32;
+        let mut count = 0;
 
-            // Using RAW/CUR/NEXT is okay since we are working on ASCII range here
-            if self.content_bytes().starts_with(b"&#x") {
-                self.advance(3);
-                self.grow();
-                while self.current_byte() != b';' {
-                    // loop blocked by count
-                    if count > 20 {
-                        count = 0;
-                        self.grow();
-                        if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                            return None;
-                        }
-                    } else {
-                        count += 1;
+        // Using RAW/CUR/NEXT is okay since we are working on ASCII range here
+        if self.content_bytes().starts_with(b"&#x") {
+            self.advance(3);
+            self.grow();
+            while self.current_byte() != b';' {
+                // loop blocked by count
+                if count > 20 {
+                    count = 0;
+                    self.grow();
+                    if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+                        return None;
                     }
-                    let cur = self.current_byte();
-                    if cur.is_ascii_digit() {
-                        val = val * 16 + (cur - b'0') as u32;
-                    } else if (b'a'..=b'f').contains(&cur) && count < 20 {
-                        val = val * 16 + (cur - b'a') as u32 + 10;
-                    } else if (b'A'..=b'F').contains(&cur) && count < 20 {
-                        val = val * 16 + (cur - b'A') as u32 + 10;
-                    } else {
-                        xml_fatal_err(self, XmlParserErrors::XmlErrInvalidHexCharRef, None);
-                        val = 0;
-                        break;
-                    }
-                    val = val.min(0x110000);
-                    self.skip_char();
+                } else {
                     count += 1;
                 }
-                if self.current_byte() == b';' {
-                    // on purpose to avoid reentrancy problems with NEXT and SKIP
-                    self.input_mut().unwrap().col += 1;
-                    self.input_mut().unwrap().cur += 1;
+                let cur = self.current_byte();
+                if cur.is_ascii_digit() {
+                    val = val * 16 + (cur - b'0') as u32;
+                } else if (b'a'..=b'f').contains(&cur) && count < 20 {
+                    val = val * 16 + (cur - b'a') as u32 + 10;
+                } else if (b'A'..=b'F').contains(&cur) && count < 20 {
+                    val = val * 16 + (cur - b'A') as u32 + 10;
+                } else {
+                    xml_fatal_err(self, XmlParserErrors::XmlErrInvalidHexCharRef, None);
+                    val = 0;
+                    break;
                 }
-            } else if self.current_byte() == b'&' && self.nth_byte(1) == b'#' {
-                self.advance(2);
-                self.grow();
-                while self.current_byte() != b';' {
-                    // loop blocked by count
-                    if count > 20 {
-                        count = 0;
-                        self.grow();
-                        if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                            return None;
-                        }
-                    } else {
-                        count += 1;
+                val = val.min(0x110000);
+                self.skip_char();
+                count += 1;
+            }
+            if self.current_byte() == b';' {
+                // on purpose to avoid reentrancy problems with NEXT and SKIP
+                self.input_mut().unwrap().col += 1;
+                self.input_mut().unwrap().cur += 1;
+            }
+        } else if self.current_byte() == b'&' && self.nth_byte(1) == b'#' {
+            self.advance(2);
+            self.grow();
+            while self.current_byte() != b';' {
+                // loop blocked by count
+                if count > 20 {
+                    count = 0;
+                    self.grow();
+                    if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+                        return None;
                     }
-                    let cur = self.current_byte();
-                    if cur.is_ascii_digit() {
-                        val = val * 10 + (cur - b'0') as u32;
-                    } else {
-                        xml_fatal_err(self, XmlParserErrors::XmlErrInvalidDecCharRef, None);
-                        val = 0;
-                        break;
-                    }
-                    val = val.min(0x110000);
-                    self.skip_char();
+                } else {
                     count += 1;
                 }
-                if self.current_byte() == b';' {
-                    // on purpose to avoid reentrancy problems with NEXT and SKIP
-                    self.input_mut().unwrap().col += 1;
-                    self.input_mut().unwrap().cur += 1;
+                let cur = self.current_byte();
+                if cur.is_ascii_digit() {
+                    val = val * 10 + (cur - b'0') as u32;
+                } else {
+                    xml_fatal_err(self, XmlParserErrors::XmlErrInvalidDecCharRef, None);
+                    val = 0;
+                    break;
                 }
-            } else {
-                if self.current_byte() == b'&' {
-                    self.advance(1);
-                }
-                xml_fatal_err(self, XmlParserErrors::XmlErrInvalidCharRef, None);
+                val = val.min(0x110000);
+                self.skip_char();
+                count += 1;
             }
-
-            // [ WFC: Legal Character ]
-            // Characters referred to using character references must match the
-            // production for Char.
-            if val >= 0x110000 {
-                xml_fatal_err_msg_int!(
-                    self,
-                    XmlParserErrors::XmlErrInvalidChar,
-                    "xmlParseCharRef: character reference out of bounds\n",
-                    val as i32
-                );
-            } else if xml_is_char(val) {
-                return char::from_u32(val);
-            } else {
-                xml_fatal_err_msg_int!(
-                    self,
-                    XmlParserErrors::XmlErrInvalidChar,
-                    format!("xmlParseCharRef: invalid XmlChar value {val}\n").as_str(),
-                    val as i32
-                );
+            if self.current_byte() == b';' {
+                // on purpose to avoid reentrancy problems with NEXT and SKIP
+                self.input_mut().unwrap().col += 1;
+                self.input_mut().unwrap().cur += 1;
             }
-            None
+        } else {
+            if self.current_byte() == b'&' {
+                self.advance(1);
+            }
+            xml_fatal_err(self, XmlParserErrors::XmlErrInvalidCharRef, None);
         }
+
+        // [ WFC: Legal Character ]
+        // Characters referred to using character references must match the
+        // production for Char.
+        if val >= 0x110000 {
+            xml_fatal_err_msg_int!(
+                self,
+                XmlParserErrors::XmlErrInvalidChar,
+                "xmlParseCharRef: character reference out of bounds\n",
+                val as i32
+            );
+        } else if xml_is_char(val) {
+            return char::from_u32(val);
+        } else {
+            xml_fatal_err_msg_int!(
+                self,
+                XmlParserErrors::XmlErrInvalidChar,
+                format!("xmlParseCharRef: invalid XmlChar value {val}\n").as_str(),
+                val as i32
+            );
+        }
+        None
     }
 
     /// Parse Reference declarations, variant parsing from a string rather
@@ -148,63 +146,58 @@ impl XmlParserCtxt {
     /// Returns the value parsed (as an int), 0 in case of error, str will be
     /// updated to the current value of the index
     #[doc(alias = "xmlParseStringCharRef")]
-    pub(super) unsafe fn parse_string_char_ref<'a>(
-        &mut self,
-        s: &'a str,
-    ) -> (Option<char>, &'a str) {
-        unsafe {
-            let mut val = 0;
+    pub(super) fn parse_string_char_ref<'a>(&mut self, s: &'a str) -> (Option<char>, &'a str) {
+        let mut val = 0;
 
-            let mut ptr = s;
-            if let Some(rem) = ptr.strip_prefix("&#x") {
+        let mut ptr = s;
+        if let Some(rem) = ptr.strip_prefix("&#x") {
+            ptr = rem;
+            if let Some((dig, rem)) = ptr
+                .split_once(';')
+                .filter(|(dig, _)| dig.bytes().all(|b| b.is_ascii_hexdigit()))
+            {
+                val = u32::from_str_radix(dig, 16).unwrap_or(0x110000);
                 ptr = rem;
-                if let Some((dig, rem)) = ptr
-                    .split_once(';')
-                    .filter(|(dig, _)| dig.bytes().all(|b| b.is_ascii_hexdigit()))
-                {
-                    val = u32::from_str_radix(dig, 16).unwrap_or(0x110000);
-                    ptr = rem;
-                } else {
-                    xml_fatal_err(self, XmlParserErrors::XmlErrInvalidHexCharRef, None);
-                }
-            } else if let Some(rem) = ptr.strip_prefix("&#") {
+            } else {
+                xml_fatal_err(self, XmlParserErrors::XmlErrInvalidHexCharRef, None);
+            }
+        } else if let Some(rem) = ptr.strip_prefix("&#") {
+            ptr = rem;
+            if let Some((dig, rem)) = ptr
+                .split_once(';')
+                .filter(|(dig, _)| dig.bytes().all(|b| b.is_ascii_digit()))
+            {
+                val = dig.parse::<u32>().unwrap_or(0x110000);
                 ptr = rem;
-                if let Some((dig, rem)) = ptr
-                    .split_once(';')
-                    .filter(|(dig, _)| dig.bytes().all(|b| b.is_ascii_digit()))
-                {
-                    val = dig.parse::<u32>().unwrap_or(0x110000);
-                    ptr = rem;
-                } else {
-                    xml_fatal_err(self, XmlParserErrors::XmlErrInvalidDecCharRef, None);
-                }
             } else {
-                xml_fatal_err(self, XmlParserErrors::XmlErrInvalidCharRef, None);
-                return (None, s);
+                xml_fatal_err(self, XmlParserErrors::XmlErrInvalidDecCharRef, None);
             }
-
-            // [ WFC: Legal Character ]
-            // Characters referred to using character references must match the
-            // production for Char.
-            if val >= 0x110000 {
-                xml_fatal_err_msg_int!(
-                    self,
-                    XmlParserErrors::XmlErrInvalidChar,
-                    "xmlParseStringCharRef: character reference out of bounds\n",
-                    val as i32
-                );
-            } else if xml_is_char(val) {
-                return (Some(char::from_u32(val).expect("Internal Error")), ptr);
-            } else {
-                xml_fatal_err_msg_int!(
-                    self,
-                    XmlParserErrors::XmlErrInvalidChar,
-                    format!("xmlParseStringCharRef: invalid xmlChar value {val}\n").as_str(),
-                    val as i32
-                );
-            }
-            (None, ptr)
+        } else {
+            xml_fatal_err(self, XmlParserErrors::XmlErrInvalidCharRef, None);
+            return (None, s);
         }
+
+        // [ WFC: Legal Character ]
+        // Characters referred to using character references must match the
+        // production for Char.
+        if val >= 0x110000 {
+            xml_fatal_err_msg_int!(
+                self,
+                XmlParserErrors::XmlErrInvalidChar,
+                "xmlParseStringCharRef: character reference out of bounds\n",
+                val as i32
+            );
+        } else if xml_is_char(val) {
+            return (Some(char::from_u32(val).expect("Internal Error")), ptr);
+        } else {
+            xml_fatal_err_msg_int!(
+                self,
+                XmlParserErrors::XmlErrInvalidChar,
+                format!("xmlParseStringCharRef: invalid xmlChar value {val}\n").as_str(),
+                val as i32
+            );
+        }
+        (None, ptr)
     }
 
     /// Parse an entitiy reference. Always consumes '&'.

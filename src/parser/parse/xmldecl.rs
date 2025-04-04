@@ -56,17 +56,15 @@ impl XmlParserCtxt {
     ///
     /// Returns the string giving the XML version number, or NULL
     #[doc(alias = "xmlParseVersionNum")]
-    unsafe fn parse_version_num(&mut self) -> Option<String> {
-        unsafe {
-            let mut buf = String::with_capacity(10);
-            buf.push(self.consume_char_if(|_, c| c.is_ascii_digit())?);
-            self.consume_char_if(|_, c| c == '.')?;
-            buf.push('.');
-            while let Some(c) = self.consume_char_if(|_, c| c.is_ascii_digit()) {
-                buf.push(c);
-            }
-            Some(buf)
+    fn parse_version_num(&mut self) -> Option<String> {
+        let mut buf = String::with_capacity(10);
+        buf.push(self.consume_char_if(|_, c| c.is_ascii_digit())?);
+        self.consume_char_if(|_, c| c == '.')?;
+        buf.push('.');
+        while let Some(c) = self.consume_char_if(|_, c| c.is_ascii_digit()) {
+            buf.push(c);
         }
+        Some(buf)
     }
 
     /// Parse the XML encoding declaration
@@ -175,30 +173,28 @@ impl XmlParserCtxt {
     ///
     /// Returns the encoding name value or NULL
     #[doc(alias = "xmlParseEncName")]
-    unsafe fn parse_enc_name(&mut self) -> Option<String> {
-        unsafe {
-            let max_length = if self.options & XmlParserOption::XmlParseHuge as i32 != 0 {
-                XML_MAX_TEXT_LENGTH
-            } else {
-                XML_MAX_NAME_LENGTH
-            };
-            let Some(first) = self.consume_char_if(|_, c| c.is_ascii_alphabetic()) else {
-                xml_fatal_err(self, XmlParserErrors::XmlErrEncodingName, None);
+    fn parse_enc_name(&mut self) -> Option<String> {
+        let max_length = if self.options & XmlParserOption::XmlParseHuge as i32 != 0 {
+            XML_MAX_TEXT_LENGTH
+        } else {
+            XML_MAX_NAME_LENGTH
+        };
+        let Some(first) = self.consume_char_if(|_, c| c.is_ascii_alphabetic()) else {
+            xml_fatal_err(self, XmlParserErrors::XmlErrEncodingName, None);
+            return None;
+        };
+        let mut buf = String::with_capacity(10);
+        buf.push(first);
+        while let Some(c) =
+            self.consume_char_if(|_, c| c.is_alphanumeric() || c == '.' || c == '_' || c == '-')
+        {
+            buf.push(c);
+            if buf.len() > max_length {
+                xml_fatal_err(self, XmlParserErrors::XmlErrNameTooLong, Some("EncName"));
                 return None;
-            };
-            let mut buf = String::with_capacity(10);
-            buf.push(first);
-            while let Some(c) =
-                self.consume_char_if(|_, c| c.is_alphanumeric() || c == '.' || c == '_' || c == '-')
-            {
-                buf.push(c);
-                if buf.len() > max_length {
-                    xml_fatal_err(self, XmlParserErrors::XmlErrNameTooLong, Some("EncName"));
-                    return None;
-                }
             }
-            Some(buf)
         }
+        Some(buf)
     }
 
     /// Parse the XML standalone declaration

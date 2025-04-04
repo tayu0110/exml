@@ -201,45 +201,43 @@ pub(crate) unsafe fn __html_parse_content(ctxt: *mut c_void) {
 ///
 /// Returns the number of space chars skipped
 #[doc(alias = "htmlSkipBlankChars")]
-unsafe fn html_skip_blank_chars(ctxt: &mut XmlParserCtxt) -> i32 {
-    unsafe {
-        let input = ctxt.input().unwrap();
-        let mut line = input.line;
-        let mut col = input.col;
-        ctxt.force_grow();
-        let mut buffer = ctxt.content_bytes();
-        let mut res = 0;
-        while !buffer.is_empty() && xml_is_blank_char(buffer[0] as u32) {
-            if buffer[0] == b'\n' {
-                line += 1;
-                col = 1;
-            } else {
-                col += 1;
-            }
-            buffer = &buffer[1..];
-            if buffer.is_empty() {
-                let len = ctxt.content_bytes().len();
-                res += len;
-                // commit input buffer
-                let input = ctxt.input_mut().unwrap();
-                input.cur += len;
-                input.line = line;
-                input.col = col;
-                ctxt.force_grow();
-                buffer = ctxt.content_bytes();
-            }
+fn html_skip_blank_chars(ctxt: &mut XmlParserCtxt) -> i32 {
+    let input = ctxt.input().unwrap();
+    let mut line = input.line;
+    let mut col = input.col;
+    ctxt.force_grow();
+    let mut buffer = ctxt.content_bytes();
+    let mut res = 0;
+    while !buffer.is_empty() && xml_is_blank_char(buffer[0] as u32) {
+        if buffer[0] == b'\n' {
+            line += 1;
+            col = 1;
+        } else {
+            col += 1;
         }
-
-        let diff = ctxt.content_bytes().len() - buffer.len();
-        res += diff;
-
-        let input = ctxt.input_mut().unwrap();
-        input.cur += diff;
-        input.line = line;
-        input.col = col;
-
-        res as i32
+        buffer = &buffer[1..];
+        if buffer.is_empty() {
+            let len = ctxt.content_bytes().len();
+            res += len;
+            // commit input buffer
+            let input = ctxt.input_mut().unwrap();
+            input.cur += len;
+            input.line = line;
+            input.col = col;
+            ctxt.force_grow();
+            buffer = ctxt.content_bytes();
+        }
     }
+
+    let diff = ctxt.content_bytes().len() - buffer.len();
+    res += diff;
+
+    let input = ctxt.input_mut().unwrap();
+    input.cur += diff;
+    input.line = line;
+    input.col = col;
+
+    res as i32
 }
 
 /// Handle a fatal parser error, i.e. violating Well-Formedness constraints

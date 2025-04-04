@@ -760,37 +760,35 @@ impl XmlParserCtxt {
     /// Returns NULL for an illegal name, (XmlChar*) 1 for success
     /// and the name for mismatch
     #[doc(alias = "xmlParseNameAndCompare")]
-    unsafe fn parse_name_and_compare(&mut self) -> Result<(), Option<String>> {
-        unsafe {
-            self.grow();
-            if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                return Err(None);
-            }
-
-            let input = self.content_bytes();
-            let count = input
-                .iter()
-                .copied()
-                .zip(self.name.as_deref().unwrap().bytes())
-                .take_while(|(i, o)| i == o)
-                .count();
-            if count == self.name.as_deref().unwrap().len()
-                && input
-                    .get(count)
-                    .is_some_and(|&b| b == b'>' || xml_is_blank_char(b as u32))
-            {
-                // success
-                self.advance(count);
-                return Ok(());
-            }
-            // failure (or end of input buffer), check with full function
-            let ret = self.parse_name();
-            // strings coming from the dictionary direct compare possible
-            if ret == self.name {
-                return Ok(());
-            }
-            Err(ret)
+    fn parse_name_and_compare(&mut self) -> Result<(), Option<String>> {
+        self.grow();
+        if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+            return Err(None);
         }
+
+        let input = self.content_bytes();
+        let count = input
+            .iter()
+            .copied()
+            .zip(self.name.as_deref().unwrap().bytes())
+            .take_while(|(i, o)| i == o)
+            .count();
+        if count == self.name.as_deref().unwrap().len()
+            && input
+                .get(count)
+                .is_some_and(|&b| b == b'>' || xml_is_blank_char(b as u32))
+        {
+            // success
+            self.advance(count);
+            return Ok(());
+        }
+        // failure (or end of input buffer), check with full function
+        let ret = self.parse_name();
+        // strings coming from the dictionary direct compare possible
+        if ret == self.name {
+            return Ok(());
+        }
+        Err(ret)
     }
 
     /// Parse an XML name and compares for match
@@ -799,34 +797,32 @@ impl XmlParserCtxt {
     /// Returns NULL for an illegal name, (XmlChar*) 1 for success
     /// and the name for mismatch
     #[doc(alias = "xmlParseQNameAndCompare")]
-    unsafe fn parse_qname_and_compare(&mut self) -> Result<(), Option<String>> {
-        unsafe {
-            self.grow();
-            let tag_index = self.name_tab.len() - 1;
-            let prefix = self.push_tab[tag_index].prefix.as_deref().unwrap();
-            if self
-                .content_bytes()
-                .strip_prefix(prefix.as_bytes())
-                .and_then(|input| input.strip_prefix(b":"))
-                .and_then(|input| input.strip_prefix(self.name.as_deref().unwrap().as_bytes()))
-                .and_then(|input| input.first())
-                .is_some_and(|&b| b == b'>' || xml_is_blank_char(b as u32))
-            {
-                // success
-                let len = prefix.len() + 1 + self.name.as_deref().unwrap().len();
-                self.advance(len);
-                return Ok(());
-            }
-
-            // all strings coms from the dictionary, equality can be done directly
-            let (pre, ret) = self.parse_qname();
-            let tag_index = self.name_tab.len() - 1;
-            let prefix = self.push_tab[tag_index].prefix.as_deref().unwrap();
-            if ret == self.name && pre.as_deref() == Some(prefix) {
-                return Ok(());
-            }
-            Err(ret)
+    fn parse_qname_and_compare(&mut self) -> Result<(), Option<String>> {
+        self.grow();
+        let tag_index = self.name_tab.len() - 1;
+        let prefix = self.push_tab[tag_index].prefix.as_deref().unwrap();
+        if self
+            .content_bytes()
+            .strip_prefix(prefix.as_bytes())
+            .and_then(|input| input.strip_prefix(b":"))
+            .and_then(|input| input.strip_prefix(self.name.as_deref().unwrap().as_bytes()))
+            .and_then(|input| input.first())
+            .is_some_and(|&b| b == b'>' || xml_is_blank_char(b as u32))
+        {
+            // success
+            let len = prefix.len() + 1 + self.name.as_deref().unwrap().len();
+            self.advance(len);
+            return Ok(());
         }
+
+        // all strings coms from the dictionary, equality can be done directly
+        let (pre, ret) = self.parse_qname();
+        let tag_index = self.name_tab.len() - 1;
+        let prefix = self.push_tab[tag_index].prefix.as_deref().unwrap();
+        if ret == self.name && pre.as_deref() == Some(prefix) {
+            return Ok(());
+        }
+        Err(ret)
     }
 
     /// Parse an end tag. Always consumes '</'.

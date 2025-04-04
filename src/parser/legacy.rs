@@ -616,7 +616,7 @@ pub(crate) unsafe fn xml_sax_parse_dtd(
         (*ctxt).in_subset = 2;
         (*ctxt).my_doc = xml_new_doc(Some("1.0"));
         let Some(mut my_doc) = (*ctxt).my_doc else {
-            xml_err_memory(ctxt, Some("New Doc failed"));
+            xml_err_memory(Some(&mut *ctxt), Some("New Doc failed"));
             xml_free_parser_ctxt(ctxt);
             return None;
         };

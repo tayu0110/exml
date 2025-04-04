@@ -52,8 +52,6 @@ use std::{
     sync::atomic::{AtomicBool, AtomicPtr, Ordering},
 };
 
-use libc::size_t;
-
 #[cfg(feature = "catalog")]
 use crate::libxml::catalog::xml_catalog_cleanup;
 #[cfg(feature = "schema")]
@@ -508,8 +506,6 @@ pub unsafe fn xml_cleanup_parser() {
 #[doc(alias = "xmlParseExtParsedEnt")]
 pub unsafe fn xml_parse_ext_parsed_ent(ctxt: XmlParserCtxtPtr) -> i32 {
     unsafe {
-        let mut start: [XmlChar; 4] = [0; 4];
-
         if ctxt.is_null() || (*ctxt).input().is_none() {
             return -1;
         }
@@ -531,11 +527,7 @@ pub unsafe fn xml_parse_ext_parsed_ent(ctxt: XmlParserCtxtPtr) -> i32 {
         // if enc != XML_CHAR_ENCODING_NONE
         // plug some encoding conversion routines.
         if (*ctxt).input().unwrap().remainder_len() >= 4 {
-            start[0] = (*ctxt).current_byte();
-            start[1] = (*ctxt).nth_byte(1);
-            start[2] = (*ctxt).nth_byte(2);
-            start[3] = (*ctxt).nth_byte(3);
-            let enc = detect_encoding(&start);
+            let enc = detect_encoding(&(*ctxt).content_bytes()[..4]);
             if !matches!(enc, XmlCharEncoding::None) {
                 (*ctxt).switch_encoding(enc);
             }
@@ -632,8 +624,6 @@ pub unsafe fn xml_io_parse_dtd(
     unsafe {
         use crate::parser::xml_new_sax_parser_ctxt;
 
-        let mut start: [XmlChar; 4] = [0; 4];
-
         let Ok(ctxt) = xml_new_sax_parser_ctxt(sax, None) else {
             return None;
         };
@@ -678,7 +668,7 @@ pub unsafe fn xml_io_parse_dtd(
         (*ctxt).in_subset = 2;
         (*ctxt).my_doc = xml_new_doc(Some("1.0"));
         let Some(mut my_doc) = (*ctxt).my_doc else {
-            xml_err_memory(ctxt, Some("New Doc failed"));
+            xml_err_memory(Some(&mut *ctxt), Some("New Doc failed"));
             return None;
         };
         my_doc.properties = XmlDocProperties::XmlDocInternal as i32;
@@ -688,11 +678,7 @@ pub unsafe fn xml_io_parse_dtd(
             // Get the 4 first bytes and decode the charset
             // if enc != xmlCharEncoding::XML_CHAR_ENCODING_NONE
             // plug some encoding conversion routines.
-            start[0] = (*ctxt).current_byte();
-            start[1] = (*ctxt).nth_byte(1);
-            start[2] = (*ctxt).nth_byte(2);
-            start[3] = (*ctxt).nth_byte(3);
-            enc = detect_encoding(&start);
+            enc = detect_encoding(&(*ctxt).content_bytes()[..4]);
             if !matches!(enc, XmlCharEncoding::None) {
                 (*ctxt).switch_encoding(enc);
             }
@@ -1190,14 +1176,14 @@ pub unsafe fn xml_ctxt_reset_push(
     chunk: *const c_char,
     size: i32,
     filename: Option<&str>,
-    encoding: *const c_char,
+    encoding: Option<&str>,
 ) -> i32 {
     unsafe {
         if ctxt.is_null() {
             return 1;
         }
 
-        let enc = if encoding.is_null() && !chunk.is_null() && size >= 4 {
+        let enc = if encoding.is_none() && !chunk.is_null() && size >= 4 {
             let input = from_raw_parts(chunk as *const u8, size as usize);
             detect_encoding(input)
         } else {
@@ -1239,7 +1225,7 @@ pub unsafe fn xml_ctxt_reset_push(
             && (*ctxt).input().is_some()
             && (*ctxt).input().unwrap().buf.is_some()
         {
-            let base: size_t = (*ctxt).input().unwrap().get_base();
+            let base = (*ctxt).input().unwrap().get_base();
             let cur = (*ctxt).input().unwrap().offset_from_base();
 
             (*ctxt)
@@ -1253,16 +1239,14 @@ pub unsafe fn xml_ctxt_reset_push(
             (*ctxt).input_mut().unwrap().set_base_and_cursor(base, cur);
         }
 
-        if !encoding.is_null() {
-            let enc = CStr::from_ptr(encoding).to_string_lossy().into_owned();
-            (*ctxt).encoding = Some(enc);
+        if let Some(encoding) = encoding {
+            (*ctxt).encoding = Some(encoding.to_owned());
 
             if let Some(handler) = find_encoding_handler((*ctxt).encoding().unwrap()) {
                 (*ctxt).switch_to_encoding(handler);
             } else {
-                let encoding = CStr::from_ptr(encoding).to_string_lossy();
                 xml_fatal_err_msg_str!(
-                    ctxt,
+                    &mut *ctxt,
                     XmlParserErrors::XmlErrUnsupportedEncoding,
                     "Unsupported encoding {}\n",
                     encoding

@@ -39,7 +39,7 @@ use crate::{
     },
     parser::{
         XmlParserCtxtPtr, XmlParserInputState, XmlParserOption, xml_create_memory_parser_ctxt,
-        xml_err_encoding_int, xml_fatal_err, xml_fatal_err_msg, xml_free_parser_ctxt,
+        xml_fatal_err, xml_fatal_err_msg, xml_free_parser_ctxt,
     },
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlDocProperties, XmlElementType, XmlGenericNodePtr,
@@ -360,12 +360,12 @@ pub unsafe fn xml_copy_char_multi_byte(mut out: *mut XmlChar, val: i32) -> i32 {
                 out = out.add(1);
                 bits = 12;
             } else {
-                xml_err_encoding_int!(
-                    null_mut(),
-                    XmlParserErrors::XmlErrInvalidChar,
-                    "Internal error, xmlCopyCharMultiByte 0x{:X} out of bound\n",
-                    val
-                );
+                // xml_err_encoding_int!(
+                //     null_mut(),
+                //     XmlParserErrors::XmlErrInvalidChar,
+                //     "Internal error, xmlCopyCharMultiByte 0x{:X} out of bound\n",
+                //     val
+                // );
                 return 0;
             }
 

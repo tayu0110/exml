@@ -443,7 +443,7 @@ impl XmlParserCtxt {
                         XmlParserErrors::XmlErrAttributeNotFinished,
                         "AttValue length too long\n",
                     );
-                    xml_err_memory(self, None);
+                    xml_err_memory(Some(self), None);
                     return None;
                 }
             }

@@ -2312,7 +2312,7 @@ unsafe fn xml_sax2_text_node(ctxt: XmlParserCtxtPtr, s: &str) -> Option<XmlNodeP
             XmlNodePtr::new(XmlNode::default())
         };
         let Some(mut ret) = ret else {
-            xml_err_memory(ctxt, Some("xmlSAX2Characters"));
+            xml_err_memory(Some(&mut *ctxt), Some("xmlSAX2Characters"));
             return None;
         };
         ret.typ = XmlElementType::XmlTextNode;
@@ -2418,7 +2418,7 @@ unsafe fn xml_sax2_attribute_ns(
                 &CStr::from_ptr(localname as *const i8).to_string_lossy(),
                 None,
             ) else {
-                xml_err_memory(ctxt, Some("xmlSAX2AttributeNs"));
+                xml_err_memory(Some(&mut *ctxt), Some("xmlSAX2AttributeNs"));
                 return;
             };
             ret

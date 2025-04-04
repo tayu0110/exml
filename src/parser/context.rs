@@ -9,8 +9,6 @@ use std::{
     sync::atomic::AtomicPtr,
 };
 
-use libc::ptrdiff_t;
-
 use crate::{
     buf::XmlBufRef,
     dict::{XmlDictPtr, xml_dict_create, xml_dict_free, xml_dict_set_limit},
@@ -367,64 +365,57 @@ impl XmlParserCtxt {
     }
 
     #[doc(alias = "xmlParserGrow")]
-    pub(crate) unsafe fn force_grow(&mut self) -> i32 {
-        unsafe {
-            // Don't grow push parser buffer.
-            if self.progressive != 0 {
-                return 0;
-            }
-
-            let input = self.input_mut().unwrap();
-            let cur_end: ptrdiff_t = input.remainder_len() as isize;
-            let cur_base: ptrdiff_t = input.offset_from_base() as isize;
-
-            let Some(buf) = input.buf.as_mut() else {
-                return 0;
-            };
-            // Don't grow memory buffers.
-            if buf.borrow().encoder.is_none() && buf.borrow().context.is_none() {
-                return 0;
-            }
-
-            if (cur_end > XML_MAX_LOOKUP_LIMIT as isize || cur_base > XML_MAX_LOOKUP_LIMIT as isize)
-                && self.options & XmlParserOption::XmlParseHuge as i32 == 0
-            {
-                let backtrace = std::backtrace::Backtrace::force_capture();
-                eprintln!("cur_end: {cur_end}, cur_base: {cur_base}");
-                eprintln!("backtrace:\n{backtrace}");
-                xml_err_internal!(self, "Huge input lookup");
-                self.halt();
-                return -1;
-            }
-
-            if cur_end >= INPUT_CHUNK as isize {
-                return 0;
-            }
-
-            let input = self.input_mut().unwrap();
-            let ret: i32 = input
-                .buf
-                .as_mut()
-                .unwrap()
-                .borrow_mut()
-                .grow(INPUT_CHUNK as _);
-            input.set_base_and_cursor(0, cur_base as usize);
-
-            // TODO: Get error code from xmlParserInputBufferGrow
-            if ret < 0 {
-                xml_err_internal!(self, "Growing input buffer");
-                self.halt();
-            }
-
-            ret
+    pub(crate) fn force_grow(&mut self) -> i32 {
+        // Don't grow push parser buffer.
+        if self.progressive != 0 {
+            return 0;
         }
+
+        let input = self.input_mut().unwrap();
+        let cur_end = input.remainder_len();
+        let cur_base = input.offset_from_base();
+
+        let Some(buf) = input.buf.as_mut() else {
+            return 0;
+        };
+        // Don't grow memory buffers.
+        if buf.borrow().encoder.is_none() && buf.borrow().context.is_none() {
+            return 0;
+        }
+
+        if (cur_end > XML_MAX_LOOKUP_LIMIT || cur_base > XML_MAX_LOOKUP_LIMIT)
+            && self.options & XmlParserOption::XmlParseHuge as i32 == 0
+        {
+            xml_err_internal!(self, "Huge input lookup");
+            self.halt();
+            return -1;
+        }
+
+        if cur_end >= INPUT_CHUNK {
+            return 0;
+        }
+
+        let input = self.input_mut().unwrap();
+        let ret: i32 = input
+            .buf
+            .as_mut()
+            .unwrap()
+            .borrow_mut()
+            .grow(INPUT_CHUNK as _);
+        input.set_base_and_cursor(0, cur_base);
+
+        // TODO: Get error code from xmlParserInputBufferGrow
+        if ret < 0 {
+            xml_err_internal!(self, "Growing input buffer");
+            self.halt();
+        }
+
+        ret
     }
 
-    pub(crate) unsafe fn grow(&mut self) {
-        unsafe {
-            if self.progressive == 0 && self.input().unwrap().remainder_len() < INPUT_CHUNK {
-                self.force_grow();
-            }
+    pub(crate) fn grow(&mut self) {
+        if self.progressive == 0 && self.input().unwrap().remainder_len() < INPUT_CHUNK {
+            self.force_grow();
         }
     }
 
@@ -568,35 +559,31 @@ impl XmlParserCtxt {
         }
     }
 
-    pub(crate) unsafe fn advance(&mut self, nth: usize) {
-        unsafe {
-            if self.content_bytes().len() < nth {
-                self.force_grow();
-            }
-            let input = self.input_mut().unwrap();
-            input.cur += nth;
-            input.col += nth as i32;
-            assert!(input.cur <= input.base.len());
+    pub(crate) fn advance(&mut self, nth: usize) {
+        if self.content_bytes().len() < nth {
+            self.force_grow();
         }
+        let input = self.input_mut().unwrap();
+        input.cur += nth;
+        input.col += nth as i32;
+        assert!(input.cur <= input.base.len());
     }
 
     /// Advance the current pointer.  
     /// If `'\n'` is found, line number is also increased.
-    pub(crate) unsafe fn advance_with_line_handling(&mut self, nth: usize) {
-        unsafe {
-            if self.content_bytes().len() < nth {
-                self.force_grow();
+    pub(crate) fn advance_with_line_handling(&mut self, nth: usize) {
+        if self.content_bytes().len() < nth {
+            self.force_grow();
+        }
+        let input = self.input_mut().unwrap();
+        for _ in 0..nth {
+            if input.base[input.cur] == b'\n' {
+                input.line += 1;
+                input.col = 1;
+            } else {
+                input.col += 1;
             }
-            let input = self.input_mut().unwrap();
-            for _ in 0..nth {
-                if input.base[input.cur] == b'\n' {
-                    input.line += 1;
-                    input.col = 1;
-                } else {
-                    input.col += 1;
-                }
-                input.cur += 1;
-            }
+            input.cur += 1;
         }
     }
 
@@ -607,51 +594,35 @@ impl XmlParserCtxt {
 
     /// Skip to the next character.
     #[doc(alias = "xmlNextChar")]
-    pub(crate) unsafe fn skip_char(&mut self) {
-        unsafe {
-            if matches!(self.instate, XmlParserInputState::XmlParserEOF) || self.input().is_none() {
+    pub(crate) fn skip_char(&mut self) {
+        if matches!(self.instate, XmlParserInputState::XmlParserEOF) || self.input().is_none() {
+            return;
+        }
+
+        let input = self.input().unwrap();
+        if input.cur > input.base.len() {
+            xml_err_internal!(self, "Parser input data memory error\n");
+
+            self.err_no = XmlParserErrors::XmlErrInternalError as i32;
+            self.stop();
+
+            return;
+        }
+
+        if input.remainder_len() < INPUT_CHUNK {
+            if self.force_grow() < 0 {
                 return;
             }
-
-            let input = self.input().unwrap();
-            if input.cur > input.base.len() {
-                xml_err_internal!(self, "Parser input data memory error\n");
-
-                self.err_no = XmlParserErrors::XmlErrInternalError as i32;
-                self.stop();
-
+            if self.content_bytes().is_empty() {
                 return;
             }
+        }
 
-            if input.remainder_len() < INPUT_CHUNK {
-                if self.force_grow() < 0 {
-                    return;
-                }
-                if self.content_bytes().is_empty() {
-                    return;
-                }
-            }
+        if self.charset != XmlCharEncoding::UTF8 {
+            // Assume it's a fixed length encoding (1) with
+            // a compatible encoding for the ASCII set, since
+            // XML constructs only use < 128 chars
 
-            if self.charset != XmlCharEncoding::UTF8 {
-                // Assume it's a fixed length encoding (1) with
-                // a compatible encoding for the ASCII set, since
-                // XML constructs only use < 128 chars
-
-                let input = self.input_mut().unwrap();
-                if input.base[input.cur] == b'\n' {
-                    input.line += 1;
-                    input.col = 1;
-                } else {
-                    input.col += 1;
-                }
-                input.cur += 1;
-                return;
-            }
-
-            // 2.11 End-of-Line Handling
-            //   the literal two-character sequence "#xD#xA" or a standalone
-            //   literal #xD, an XML processor must pass to the application
-            //   the single character #xA.
             let input = self.input_mut().unwrap();
             if input.base[input.cur] == b'\n' {
                 input.line += 1;
@@ -659,53 +630,71 @@ impl XmlParserCtxt {
             } else {
                 input.col += 1;
             }
-
-            let bytes = self.content_bytes();
-            let len = 4.min(bytes.len());
-            match from_utf8(&bytes[..len]) {
-                Ok(s) => {
-                    let c = s.chars().next().unwrap();
-                    let input = self.input_mut().unwrap();
-                    input.cur += c.len_utf8();
-                    return;
-                }
-                Err(e) if e.valid_up_to() > 0 => {
-                    let s = from_utf8_unchecked(&bytes[..e.valid_up_to()]);
-                    let c = s.chars().next().unwrap();
-                    let input = self.input_mut().unwrap();
-                    input.cur += c.len_utf8();
-                    return;
-                }
-                Err(_) => {}
-            }
-
-            // If we detect an UTF8 error that probably mean that the
-            // input encoding didn't get properly advertised in the declaration header.
-            // Report the error and switch the encoding
-            // to ISO-Latin-1 (if you don't like this policy, just declare the encoding !)
-            if self.input().is_none_or(|input| input.remainder_len() < 4) {
-                __xml_err_encoding!(
-                    self,
-                    XmlParserErrors::XmlErrInvalidChar,
-                    "Input is not proper UTF-8, indicate encoding !\n"
-                );
-            } else {
-                let content = self.content_bytes();
-                let buffer = format!(
-                    "Bytes: 0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}\n",
-                    content[0], content[1], content[2], content[3],
-                );
-                __xml_err_encoding!(
-                    self,
-                    XmlParserErrors::XmlErrInvalidChar,
-                    "Input is not proper UTF-8, indicate encoding !\n{}",
-                    buffer
-                );
-            }
-            self.charset = XmlCharEncoding::ISO8859_1;
-            let input = self.input_mut().unwrap();
             input.cur += 1;
+            return;
         }
+
+        // 2.11 End-of-Line Handling
+        //   the literal two-character sequence "#xD#xA" or a standalone
+        //   literal #xD, an XML processor must pass to the application
+        //   the single character #xA.
+        let input = self.input_mut().unwrap();
+        if input.base[input.cur] == b'\n' {
+            input.line += 1;
+            input.col = 1;
+        } else {
+            input.col += 1;
+        }
+
+        let bytes = self.content_bytes();
+        let len = 4.min(bytes.len());
+        match from_utf8(&bytes[..len]) {
+            Ok(s) => {
+                let c = s.chars().next().unwrap();
+                let input = self.input_mut().unwrap();
+                input.cur += c.len_utf8();
+                return;
+            }
+            Err(e) if e.valid_up_to() > 0 => {
+                let s = unsafe {
+                    // # Safety
+                    // Refer to the documents for `from_utf8_unchecked` and `Utf8Error`.
+                    from_utf8_unchecked(&bytes[..e.valid_up_to()])
+                };
+                let c = s.chars().next().unwrap();
+                let input = self.input_mut().unwrap();
+                input.cur += c.len_utf8();
+                return;
+            }
+            Err(_) => {}
+        }
+
+        // If we detect an UTF8 error that probably mean that the
+        // input encoding didn't get properly advertised in the declaration header.
+        // Report the error and switch the encoding
+        // to ISO-Latin-1 (if you don't like this policy, just declare the encoding !)
+        if self.input().is_none_or(|input| input.remainder_len() < 4) {
+            __xml_err_encoding!(
+                self,
+                XmlParserErrors::XmlErrInvalidChar,
+                "Input is not proper UTF-8, indicate encoding !\n"
+            );
+        } else {
+            let content = self.content_bytes();
+            let buffer = format!(
+                "Bytes: 0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}\n",
+                content[0], content[1], content[2], content[3],
+            );
+            __xml_err_encoding!(
+                self,
+                XmlParserErrors::XmlErrInvalidChar,
+                "Input is not proper UTF-8, indicate encoding !\n{}",
+                buffer
+            );
+        }
+        self.charset = XmlCharEncoding::ISO8859_1;
+        let input = self.input_mut().unwrap();
+        input.cur += 1;
     }
 
     /// skip all blanks character found at that point in the input streams.  
@@ -830,138 +819,138 @@ impl XmlParserCtxt {
     /// Returns the current char value and its length
     #[doc(hidden)]
     #[doc(alias = "xmlCurrentChar")]
-    pub unsafe fn current_char(&mut self, len: &mut i32) -> Option<char> {
-        unsafe {
-            let input = self.input()?;
-            if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                return None;
-            }
+    pub fn current_char(&mut self, len: &mut i32) -> Option<char> {
+        let input = self.input()?;
+        if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+            return None;
+        }
 
-            if input.remainder_len() < INPUT_CHUNK && self.force_grow() < 0 {
-                return None;
-            }
+        if input.remainder_len() < INPUT_CHUNK && self.force_grow() < 0 {
+            return None;
+        }
 
-            self.input()?;
-            if (0x20..0x80).contains(&self.current_byte()) {
-                *len = 1;
-                return Some(self.current_byte() as char);
-            }
+        self.input()?;
+        if (0x20..0x80).contains(&self.current_byte()) {
+            *len = 1;
+            return Some(self.current_byte() as char);
+        }
 
-            if self.charset != XmlCharEncoding::UTF8 {
-                // Assume it's a fixed length encoding (1) with
-                // a compatible encoding for the ASCII set, since
-                // XML constructs only use < 128 chars
-                *len = 1;
-                if self.current_byte() == 0xD {
-                    if self.nth_byte(1) == 0xA {
-                        let input = self.input_mut()?;
-                        input.cur += 1;
-                    }
-                    return Some('\u{A}');
-                }
-                return Some(self.current_byte() as char);
-            }
-            let content = self.content_bytes();
-            let l = 4.min(content.len());
-            let c = match from_utf8(&content[..l]) {
-                Ok(s) => {
-                    let Some(c) = s.chars().next() else {
-                        *len = 0;
-                        return None;
-                    };
-                    *len = c.len_utf8() as i32;
-                    c
-                }
-                Err(e) if e.valid_up_to() > 0 => {
-                    let s = from_utf8_unchecked(&content[..e.valid_up_to()]);
-                    let c = s.chars().next().unwrap();
-                    *len = c.len_utf8() as i32;
-                    c
-                }
-                Err(e) => {
-                    match e.error_len() {
-                        Some(l) => {
-                            *len = l as i32;
-                            // If we detect an UTF8 error that probably mean that the
-                            // input encoding didn't get properly advertised in the
-                            // declaration header. Report the error and switch the encoding
-                            // to ISO-Latin-1 (if you don't like this policy, just declare the encoding !)
-                            if self.input().unwrap().remainder_len() < 4 {
-                                __xml_err_encoding!(
-                                    self,
-                                    XmlParserErrors::XmlErrInvalidChar,
-                                    "Input is not proper UTF-8, indicate encoding !\n"
-                                );
-                            } else {
-                                let buffer = format!(
-                                    "Bytes: 0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}\n",
-                                    content[0], content[1], content[2], content[3],
-                                );
-                                __xml_err_encoding!(
-                                    self,
-                                    XmlParserErrors::XmlErrInvalidChar,
-                                    "Input is not proper UTF-8, indicate encoding !\n{}",
-                                    buffer
-                                );
-                            }
-                            self.charset = XmlCharEncoding::ISO8859_1;
-                            *len = 1;
-                            return Some(self.current_byte() as char);
-                        }
-                        None => {
-                            *len = 0;
-                            return Some('\0');
-                        }
-                    }
-                }
-            };
-            if (*len > 1 && !xml_is_char(c as u32))
-                || (*len == 1 && c == '\0' && !self.content_bytes().is_empty())
-            {
-                xml_err_encoding_int!(
-                    self,
-                    XmlParserErrors::XmlErrInvalidChar,
-                    "Char 0x{:X} out of allowed range\n",
-                    c as i32
-                );
-            }
-            if c == '\r' {
-                if self.content_bytes().get(1) == Some(&b'\n') {
-                    let input = self.input_mut().unwrap();
+        if self.charset != XmlCharEncoding::UTF8 {
+            // Assume it's a fixed length encoding (1) with
+            // a compatible encoding for the ASCII set, since
+            // XML constructs only use < 128 chars
+            *len = 1;
+            if self.current_byte() == 0xD {
+                if self.nth_byte(1) == 0xA {
+                    let input = self.input_mut()?;
                     input.cur += 1;
                 }
-                return Some('\n');
+                return Some('\u{A}');
             }
-            Some(c)
+            return Some(self.current_byte() as char);
         }
+        let content = self.content_bytes();
+        let l = 4.min(content.len());
+        let c = match from_utf8(&content[..l]) {
+            Ok(s) => {
+                let Some(c) = s.chars().next() else {
+                    *len = 0;
+                    return None;
+                };
+                *len = c.len_utf8() as i32;
+                c
+            }
+            Err(e) if e.valid_up_to() > 0 => {
+                let s = unsafe {
+                    // # Safety
+                    // Refer to the documents for `from_utf8_unchecked` and `Utf8Error`.
+                    from_utf8_unchecked(&content[..e.valid_up_to()])
+                };
+                let c = s.chars().next().unwrap();
+                *len = c.len_utf8() as i32;
+                c
+            }
+            Err(e) => {
+                match e.error_len() {
+                    Some(l) => {
+                        *len = l as i32;
+                        // If we detect an UTF8 error that probably mean that the
+                        // input encoding didn't get properly advertised in the
+                        // declaration header. Report the error and switch the encoding
+                        // to ISO-Latin-1 (if you don't like this policy, just declare the encoding !)
+                        if self.input().unwrap().remainder_len() < 4 {
+                            __xml_err_encoding!(
+                                self,
+                                XmlParserErrors::XmlErrInvalidChar,
+                                "Input is not proper UTF-8, indicate encoding !\n"
+                            );
+                        } else {
+                            let buffer = format!(
+                                "Bytes: 0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}\n",
+                                content[0], content[1], content[2], content[3],
+                            );
+                            __xml_err_encoding!(
+                                self,
+                                XmlParserErrors::XmlErrInvalidChar,
+                                "Input is not proper UTF-8, indicate encoding !\n{}",
+                                buffer
+                            );
+                        }
+                        self.charset = XmlCharEncoding::ISO8859_1;
+                        *len = 1;
+                        return Some(self.current_byte() as char);
+                    }
+                    None => {
+                        *len = 0;
+                        return Some('\0');
+                    }
+                }
+            }
+        };
+        if (*len > 1 && !xml_is_char(c as u32))
+            || (*len == 1 && c == '\0' && !self.content_bytes().is_empty())
+        {
+            xml_err_encoding_int!(
+                self,
+                XmlParserErrors::XmlErrInvalidChar,
+                "Char 0x{:X} out of allowed range\n",
+                c as i32
+            );
+        }
+        if c == '\r' {
+            if self.content_bytes().get(1) == Some(&b'\n') {
+                let input = self.input_mut().unwrap();
+                input.cur += 1;
+            }
+            return Some('\n');
+        }
+        Some(c)
     }
 
-    pub(super) unsafe fn consume_char_if(
+    pub(super) fn consume_char_if(
         &mut self,
         mut f: impl FnMut(&Self, char) -> bool,
     ) -> Option<char> {
-        unsafe {
-            let mut len = 0;
-            let c = self.current_char(&mut len)?;
-            f(self, c).then(|| {
-                let input = self.input_mut().unwrap();
-                if c == '\n' {
-                    input.line += 1;
-                    input.col = 1;
-                } else {
-                    input.col += 1;
-                }
-                input.cur += c.len_utf8();
-                c
-            })
-        }
+        let mut len = 0;
+        let c = self.current_char(&mut len)?;
+        f(self, c).then(|| {
+            let input = self.input_mut().unwrap();
+            if c == '\n' {
+                input.line += 1;
+                input.col = 1;
+            } else {
+                input.col += 1;
+            }
+            input.cur += c.len_utf8();
+            c
+        })
     }
 
     // Lookup the namespace name for the @prefix (which ca be NULL)
     //
     // Returns the namespace name or NULL if not bound
     #[doc(alias = "xmlGetNamespace")]
-    pub(crate) unsafe fn get_namespace(&self, prefix: Option<&str>) -> Option<&str> {
+    pub(crate) fn get_namespace(&self, prefix: Option<&str>) -> Option<&str> {
         if prefix == self.str_xml.as_deref() {
             return self.str_xml_ns.as_deref();
         }
@@ -997,26 +986,24 @@ impl XmlParserCtxt {
     ///
     /// Returns -1 in case of error, the index in the stack otherwise
     #[doc(alias = "nodePush")]
-    pub(crate) unsafe fn node_push(&mut self, value: XmlNodePtr) -> i32 {
-        unsafe {
-            if self.node_tab.len() as u32 > XML_PARSER_MAX_DEPTH
-                && self.options & XmlParserOption::XmlParseHuge as i32 == 0
-            {
-                let max_depth = XML_PARSER_MAX_DEPTH as i32;
-                xml_fatal_err_msg_int!(
-                    self,
-                    XmlParserErrors::XmlErrInternalError,
-                    format!("Excessive depth in document: {max_depth} use XML_PARSE_HUGE option\n")
-                        .as_str(),
-                    max_depth
-                );
-                self.halt();
-                return -1;
-            }
-            self.node = Some(value);
-            self.node_tab.push(value);
-            self.node_tab.len() as i32 - 1
+    pub(crate) fn node_push(&mut self, value: XmlNodePtr) -> i32 {
+        if self.node_tab.len() as u32 > XML_PARSER_MAX_DEPTH
+            && self.options & XmlParserOption::XmlParseHuge as i32 == 0
+        {
+            let max_depth = XML_PARSER_MAX_DEPTH as i32;
+            xml_fatal_err_msg_int!(
+                self,
+                XmlParserErrors::XmlErrInternalError,
+                format!("Excessive depth in document: {max_depth} use XML_PARSE_HUGE option\n")
+                    .as_str(),
+                max_depth
+            );
+            self.halt();
+            return -1;
         }
+        self.node = Some(value);
+        self.node_tab.push(value);
+        self.node_tab.len() as i32 - 1
     }
 
     /// Pops the top element node from the node stack
@@ -1187,39 +1174,37 @@ impl XmlParserCtxt {
     ///
     /// Returns the current XmlChar in the parser context
     #[doc(alias = "xmlPopInput")]
-    pub unsafe fn pop_input(&mut self) -> u8 {
-        unsafe {
-            if self.input_tab.len() <= 1 {
-                return 0;
-            }
-            if get_parser_debug_entities() != 0 {
-                generic_error!("Popping input {}\n", self.input_tab.len());
-            }
-            if self.input_tab.len() > 1
-                && self.in_subset == 0
-                && !matches!(self.instate, XmlParserInputState::XmlParserEOF)
-            {
-                xml_fatal_err(
-                    self,
-                    XmlParserErrors::XmlErrInternalError,
-                    Some("Unfinished entity outside the DTD"),
-                );
-            }
-            let input = self.input_pop().unwrap();
-            if let Some(mut entity) = input.entity {
-                entity.flags &= !XML_ENT_EXPANDING as i32;
-            }
-
-            if self.current_byte() == 0 {
-                self.force_grow();
-            }
-            self.current_byte()
+    pub fn pop_input(&mut self) -> u8 {
+        if self.input_tab.len() <= 1 {
+            return 0;
         }
+        if get_parser_debug_entities() != 0 {
+            generic_error!("Popping input {}\n", self.input_tab.len());
+        }
+        if self.input_tab.len() > 1
+            && self.in_subset == 0
+            && !matches!(self.instate, XmlParserInputState::XmlParserEOF)
+        {
+            xml_fatal_err(
+                self,
+                XmlParserErrors::XmlErrInternalError,
+                Some("Unfinished entity outside the DTD"),
+            );
+        }
+        let input = self.input_pop().unwrap();
+        if let Some(mut entity) = input.entity {
+            entity.flags &= !XML_ENT_EXPANDING as i32;
+        }
+
+        if self.current_byte() == 0 {
+            self.force_grow();
+        }
+        self.current_byte()
     }
 
     /// Do the SAX2 detection and specific initialization
     #[doc(alias = "xmlDetectSAX2")]
-    pub(crate) unsafe fn detect_sax2(&mut self) {
+    pub(crate) fn detect_sax2(&mut self) {
         let sax = self.sax.as_deref();
         #[cfg(feature = "sax1")]
         {
@@ -1246,11 +1231,7 @@ impl XmlParserCtxt {
     ///
     /// Returns 0 in case of success, the set of unknown or unimplemented options in case of error.
     #[doc(alias = "xmlCtxtUseOptionsInternal")]
-    pub(crate) unsafe fn use_options_internal(
-        &mut self,
-        mut options: i32,
-        encoding: Option<&str>,
-    ) -> i32 {
+    pub(crate) fn use_options_internal(&mut self, mut options: i32, encoding: Option<&str>) -> i32 {
         if let Some(encoding) = encoding {
             self.encoding = Some(encoding.to_owned());
         }
@@ -1398,8 +1379,8 @@ impl XmlParserCtxt {
     /// Returns 0 in case of success, the set of unknown or unimplemented options
     /// in case of error.
     #[doc(alias = "xmlCtxtUseOptions")]
-    pub unsafe fn use_options(&mut self, options: i32) -> i32 {
-        unsafe { self.use_options_internal(options, None) }
+    pub fn use_options(&mut self, options: i32) -> i32 {
+        self.use_options_internal(options, None)
     }
 
     /// Common front-end for the xmlRead functions
@@ -1444,97 +1425,95 @@ impl XmlParserCtxt {
     ///
     /// Returns 0 in case of success, -1 otherwise
     #[doc(alias = "xmlSwitchInputEncoding")]
-    pub(crate) unsafe fn switch_input_encoding(
+    pub(crate) fn switch_input_encoding(
         &mut self,
         input: &mut XmlParserInput,
         handler: XmlCharEncodingHandler,
     ) -> i32 {
-        unsafe {
-            let Some(input_buf) = input.buf.as_mut() else {
-                xml_err_internal!(self, "static memory buffer doesn't support encoding\n");
-                return -1;
-            };
+        let Some(input_buf) = input.buf.as_mut() else {
+            xml_err_internal!(self, "static memory buffer doesn't support encoding\n");
+            return -1;
+        };
 
-            if input_buf.borrow_mut().encoder.replace(handler).is_some() {
-                // Switching encodings during parsing is a really bad idea,
-                // but Chromium can match between ISO-8859-1 and UTF-16 before
-                // separate calls to xmlParseChunk.
-                //
-                // TODO: We should check whether the "raw" input buffer is empty and
-                // convert the old content using the old encoder.
-                return 0;
-            }
-
-            self.charset = XmlCharEncoding::UTF8;
-
-            // Is there already some content down the pipe to convert ?
-            let Some(mut buf) = input_buf.borrow().buffer.filter(|buf| !buf.is_empty()) else {
-                return 0;
-            };
-            // FIXME: The BOM shouldn't be skipped here, but in the parsing code.
-
-            // Specific handling of the Byte Order Mark for UTF-16
-            if matches!(
-                input_buf.borrow().encoder.as_ref().unwrap().name(),
-                "UTF-16LE" | "UTF-16"
-            ) && input.base[input.cur] == 0xFF
-                && input.base[input.cur + 1] == 0xFE
-            {
-                input.cur += 2;
-            }
-            if input_buf.borrow().encoder.as_ref().unwrap().name() == "UTF-16BE"
-                && input.base[input.cur] == 0xFE
-                && input.base[input.cur + 1] == 0xFF
-            {
-                input.cur += 2;
-            }
-            // Errata on XML-1.0 June 20 2001
-            // Specific handling of the Byte Order Mark for UTF-8
-            if input_buf.borrow().encoder.as_ref().unwrap().name() == "UTF-8"
-                && input.base[input.cur] == 0xEF
-                && input.base[input.cur + 1] == 0xBB
-                && input.base[input.cur + 2] == 0xBF
-            {
-                input.cur += 3;
-            }
-
-            // Shrink the current input buffer.
-            // Move it as the raw buffer and create a new input buffer
-            let processed = input.offset_from_base();
-            buf.trim_head(processed);
-            input.consumed += processed as u64;
-            let input_buf = input.buf.as_mut().unwrap();
-            input_buf.borrow_mut().raw = Some(buf);
-            input_buf.borrow_mut().buffer = XmlBufRef::new();
-            assert!(input_buf.borrow_mut().buffer.is_some());
-            input_buf.borrow_mut().rawconsumed = processed as u64;
-            let using = buf.len();
-
-            // TODO: We must flush and decode the whole buffer to make functions
-            // like xmlReadMemory work with a user-provided encoding. If the
-            // encoding is specified directly, we should probably set
-            // XML_PARSE_IGNORE_ENC in xmlDoRead to avoid switching encodings
-            // twice. Then we could set "flush" to false which should save
-            // a considerable amount of memory when parsing from memory.
-            // It's probably even possible to remove this whole if-block
-            // completely.
-            let res = input_buf.borrow_mut().decode(true);
-            input.reset_base();
-            if res.is_err() {
-                // TODO: This could be an out of memory or an encoding error.
-                xml_err_internal!(self, "switching encoding: encoder error\n");
-                self.halt();
-                return -1;
-            }
-            let input_buf = input.buf.as_mut().unwrap();
-            let consumed = using - input_buf.borrow().raw.map_or(0, |raw| raw.len());
-            let rawconsumed = input_buf
-                .borrow()
-                .rawconsumed
-                .saturating_add(consumed as u64);
-            input_buf.borrow_mut().rawconsumed = rawconsumed;
-            0
+        if input_buf.borrow_mut().encoder.replace(handler).is_some() {
+            // Switching encodings during parsing is a really bad idea,
+            // but Chromium can match between ISO-8859-1 and UTF-16 before
+            // separate calls to xmlParseChunk.
+            //
+            // TODO: We should check whether the "raw" input buffer is empty and
+            // convert the old content using the old encoder.
+            return 0;
         }
+
+        self.charset = XmlCharEncoding::UTF8;
+
+        // Is there already some content down the pipe to convert ?
+        let Some(mut buf) = input_buf.borrow().buffer.filter(|buf| !buf.is_empty()) else {
+            return 0;
+        };
+        // FIXME: The BOM shouldn't be skipped here, but in the parsing code.
+
+        // Specific handling of the Byte Order Mark for UTF-16
+        if matches!(
+            input_buf.borrow().encoder.as_ref().unwrap().name(),
+            "UTF-16LE" | "UTF-16"
+        ) && input.base[input.cur] == 0xFF
+            && input.base[input.cur + 1] == 0xFE
+        {
+            input.cur += 2;
+        }
+        if input_buf.borrow().encoder.as_ref().unwrap().name() == "UTF-16BE"
+            && input.base[input.cur] == 0xFE
+            && input.base[input.cur + 1] == 0xFF
+        {
+            input.cur += 2;
+        }
+        // Errata on XML-1.0 June 20 2001
+        // Specific handling of the Byte Order Mark for UTF-8
+        if input_buf.borrow().encoder.as_ref().unwrap().name() == "UTF-8"
+            && input.base[input.cur] == 0xEF
+            && input.base[input.cur + 1] == 0xBB
+            && input.base[input.cur + 2] == 0xBF
+        {
+            input.cur += 3;
+        }
+
+        // Shrink the current input buffer.
+        // Move it as the raw buffer and create a new input buffer
+        let processed = input.offset_from_base();
+        buf.trim_head(processed);
+        input.consumed += processed as u64;
+        let input_buf = input.buf.as_mut().unwrap();
+        input_buf.borrow_mut().raw = Some(buf);
+        input_buf.borrow_mut().buffer = XmlBufRef::new();
+        assert!(input_buf.borrow_mut().buffer.is_some());
+        input_buf.borrow_mut().rawconsumed = processed as u64;
+        let using = buf.len();
+
+        // TODO: We must flush and decode the whole buffer to make functions
+        // like xmlReadMemory work with a user-provided encoding. If the
+        // encoding is specified directly, we should probably set
+        // XML_PARSE_IGNORE_ENC in xmlDoRead to avoid switching encodings
+        // twice. Then we could set "flush" to false which should save
+        // a considerable amount of memory when parsing from memory.
+        // It's probably even possible to remove this whole if-block
+        // completely.
+        let res = input_buf.borrow_mut().decode(true);
+        input.reset_base();
+        if res.is_err() {
+            // TODO: This could be an out of memory or an encoding error.
+            xml_err_internal!(self, "switching encoding: encoder error\n");
+            self.halt();
+            return -1;
+        }
+        let input_buf = input.buf.as_mut().unwrap();
+        let consumed = using - input_buf.borrow().raw.map_or(0, |raw| raw.len());
+        let rawconsumed = input_buf
+            .borrow()
+            .rawconsumed
+            .saturating_add(consumed as u64);
+        input_buf.borrow_mut().rawconsumed = rawconsumed;
+        0
     }
 
     /// change the input functions when discovering the character encoding
@@ -1542,107 +1521,103 @@ impl XmlParserCtxt {
     ///
     /// Returns 0 in case of success, -1 otherwise
     #[doc(alias = "xmlSwitchToEncoding")]
-    pub unsafe fn switch_to_encoding(&mut self, handler: XmlCharEncodingHandler) -> i32 {
-        unsafe {
-            let mut input = self.input_pop().unwrap();
-            let res = self.switch_input_encoding(&mut input, handler);
-            self.input_push(input);
-            res
-        }
+    pub fn switch_to_encoding(&mut self, handler: XmlCharEncodingHandler) -> i32 {
+        let mut input = self.input_pop().unwrap();
+        let res = self.switch_input_encoding(&mut input, handler);
+        self.input_push(input);
+        res
     }
 
     /// Change the input functions when discovering the character encoding of a given entity.
     ///
     /// Returns 0 in case of success, -1 otherwise
     #[doc(alias = "xmlSwitchEncoding")]
-    pub unsafe fn switch_encoding(&mut self, enc: XmlCharEncoding) -> i32 {
-        unsafe {
-            // FIXME: The BOM shouldn't be skipped here, but in the parsing code.
-            //
-            // Note that we look for a decoded UTF-8 BOM when switching to UTF-16.
-            // This is mostly useless but Webkit/Chromium relies on this behavior.
-            // See https://bugs.chromium.org/p/chromium/issues/detail?id=1451026
-            if self
-                .input()
-                .is_some_and(|input| input.consumed == 0 && input.offset_from_base() == 0)
-                && matches!(
-                    enc,
-                    XmlCharEncoding::UTF8 | XmlCharEncoding::UTF16LE | XmlCharEncoding::UTF16BE
-                )
-            {
-                // Errata on XML-1.0 June 20 2001
-                // Specific handling of the Byte Order Mark for UTF-8
-                if self.content_bytes().starts_with(&[0xEF, 0xBB, 0xBF]) {
-                    self.input_mut().unwrap().cur += 3;
-                }
+    pub fn switch_encoding(&mut self, enc: XmlCharEncoding) -> i32 {
+        // FIXME: The BOM shouldn't be skipped here, but in the parsing code.
+        //
+        // Note that we look for a decoded UTF-8 BOM when switching to UTF-16.
+        // This is mostly useless but Webkit/Chromium relies on this behavior.
+        // See https://bugs.chromium.org/p/chromium/issues/detail?id=1451026
+        if self
+            .input()
+            .is_some_and(|input| input.consumed == 0 && input.offset_from_base() == 0)
+            && matches!(
+                enc,
+                XmlCharEncoding::UTF8 | XmlCharEncoding::UTF16LE | XmlCharEncoding::UTF16BE
+            )
+        {
+            // Errata on XML-1.0 June 20 2001
+            // Specific handling of the Byte Order Mark for UTF-8
+            if self.content_bytes().starts_with(&[0xEF, 0xBB, 0xBF]) {
+                self.input_mut().unwrap().cur += 3;
             }
+        }
 
-            let Some(handler) = (match enc {
-                XmlCharEncoding::Error => {
-                    __xml_err_encoding!(
-                        self,
-                        XmlParserErrors::XmlErrUnknownEncoding,
-                        "encoding unknown\n"
-                    );
-                    return -1;
-                }
-                XmlCharEncoding::None => {
-                    // let's assume it's UTF-8 without the XML decl
-                    self.charset = XmlCharEncoding::UTF8;
-                    return 0;
-                }
-                XmlCharEncoding::UTF8 => {
+        let Some(handler) = (match enc {
+            XmlCharEncoding::Error => {
+                __xml_err_encoding!(
+                    self,
+                    XmlParserErrors::XmlErrUnknownEncoding,
+                    "encoding unknown\n"
+                );
+                return -1;
+            }
+            XmlCharEncoding::None => {
+                // let's assume it's UTF-8 without the XML decl
+                self.charset = XmlCharEncoding::UTF8;
+                return 0;
+            }
+            XmlCharEncoding::UTF8 => {
+                // default encoding, no conversion should be needed
+                self.charset = XmlCharEncoding::UTF8;
+                return 0;
+            }
+            XmlCharEncoding::EBCDIC => self.input().unwrap().detect_ebcdic(),
+            _ => get_encoding_handler(enc),
+        }) else {
+            // Default handlers.
+            match enc {
+                XmlCharEncoding::ASCII => {
                     // default encoding, no conversion should be needed
                     self.charset = XmlCharEncoding::UTF8;
                     return 0;
                 }
-                XmlCharEncoding::EBCDIC => self.input().unwrap().detect_ebcdic(),
-                _ => get_encoding_handler(enc),
-            }) else {
-                // Default handlers.
-                match enc {
-                    XmlCharEncoding::ASCII => {
-                        // default encoding, no conversion should be needed
-                        self.charset = XmlCharEncoding::UTF8;
-                        return 0;
+                XmlCharEncoding::ISO8859_1 => {
+                    if self.input_tab.len() == 1
+                        && self.encoding.is_none()
+                        && self.input().is_some()
+                        && self.input().unwrap().encoding.is_some()
+                    {
+                        self.encoding = self.input().unwrap().encoding.clone();
                     }
-                    XmlCharEncoding::ISO8859_1 => {
-                        if self.input_tab.len() == 1
-                            && self.encoding.is_none()
-                            && self.input().is_some()
-                            && self.input().unwrap().encoding.is_some()
-                        {
-                            self.encoding = self.input().unwrap().encoding.clone();
-                        }
-                        self.charset = enc;
-                        return 0;
-                    }
-                    _ => {
-                        let name = enc.get_name().unwrap_or("");
-                        __xml_err_encoding!(
-                            self,
-                            XmlParserErrors::XmlErrUnsupportedEncoding,
-                            "encoding not supported: {}\n",
-                            name
-                        );
-                        // TODO: We could recover from errors in external entities
-                        // if we didn't stop the parser. But most callers of this
-                        // function don't check the return value.
-                        self.stop();
-                        return -1;
-                    }
+                    self.charset = enc;
+                    return 0;
                 }
-            };
-            let mut input = self.input_pop().unwrap();
-            let ret: i32 = self.switch_input_encoding(&mut input, handler);
-            self.input_push(input);
-            if ret < 0 || self.err_no == XmlParserErrors::XmlI18NConvFailed as i32 {
-                // on encoding conversion errors, stop the parser
-                self.stop();
-                self.err_no = XmlParserErrors::XmlI18NConvFailed as i32;
+                _ => {
+                    let name = enc.get_name().unwrap_or("");
+                    __xml_err_encoding!(
+                        self,
+                        XmlParserErrors::XmlErrUnsupportedEncoding,
+                        "encoding not supported: {}\n",
+                        name
+                    );
+                    // TODO: We could recover from errors in external entities
+                    // if we didn't stop the parser. But most callers of this
+                    // function don't check the return value.
+                    self.stop();
+                    return -1;
+                }
             }
-            ret
+        };
+        let mut input = self.input_pop().unwrap();
+        let ret: i32 = self.switch_input_encoding(&mut input, handler);
+        self.input_push(input);
+        if ret < 0 || self.err_no == XmlParserErrors::XmlI18NConvFailed as i32 {
+            // on encoding conversion errors, stop the parser
+            self.stop();
+            self.err_no = XmlParserErrors::XmlI18NConvFailed as i32;
         }
+        ret
     }
 }
 
@@ -1780,10 +1755,10 @@ unsafe fn xml_init_sax_parser_ctxt(
     user_data: Option<GenericErrorContext>,
 ) -> Result<(), Option<Box<XmlSAXHandler>>> {
     unsafe {
-        if ctxt.is_null() {
-            xml_err_internal!(null_mut(), "Got NULL parser context\n");
-            return Err(sax);
-        }
+        // if ctxt.is_null() {
+        //     xml_err_internal!(null_mut(), "Got NULL parser context\n");
+        //     return Err(sax);
+        // }
 
         xml_init_parser();
 
@@ -1791,7 +1766,7 @@ unsafe fn xml_init_sax_parser_ctxt(
             (*ctxt).dict = xml_dict_create();
         }
         if (*ctxt).dict.is_null() {
-            xml_err_memory(null_mut(), Some("cannot initialize parser context\n"));
+            xml_err_memory(None, Some("cannot initialize parser context\n"));
             return Err(sax);
         }
         xml_dict_set_limit((*ctxt).dict, XML_MAX_DICTIONARY_LIMIT);
@@ -1920,7 +1895,7 @@ pub unsafe fn xml_new_sax_parser_ctxt(
     unsafe {
         let ctxt: XmlParserCtxtPtr = xml_malloc(size_of::<XmlParserCtxt>()) as XmlParserCtxtPtr;
         if ctxt.is_null() {
-            xml_err_memory(null_mut(), Some("cannot allocate parser context\n"));
+            xml_err_memory(None, Some("cannot allocate parser context\n"));
             return Err(sax);
         }
         std::ptr::write(&mut *ctxt, XmlParserCtxt::default());
@@ -1994,7 +1969,7 @@ pub unsafe fn xml_create_url_parser_ctxt(filename: Option<&str>, options: i32) -
     unsafe {
         let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
         if ctxt.is_null() {
-            xml_err_memory(null_mut(), Some("cannot allocate parser context"));
+            xml_err_memory(None, Some("cannot allocate parser context"));
             return null_mut();
         }
 

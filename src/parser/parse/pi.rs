@@ -21,40 +21,38 @@ impl XmlParserCtxt {
     ///
     /// Returns the PITarget name or NULL
     #[doc(alias = "xmlParsePITarget")]
-    unsafe fn parse_pi_target(&mut self) -> Option<String> {
-        unsafe {
-            let name = self.parse_name()?;
-            if name.as_bytes()[..name.len().min(3)].eq_ignore_ascii_case(b"xml") {
-                if name == "xml" {
-                    xml_fatal_err_msg(
-                        self,
-                        XmlParserErrors::XmlErrReservedXmlName,
-                        "XML declaration allowed only at the start of the document\n",
-                    );
-                    return Some(name);
-                } else if name.len() == 3 {
-                    xml_fatal_err(self, XmlParserErrors::XmlErrReservedXmlName, None);
-                    return Some(name);
-                }
-                if XML_W3_CPIS.iter().any(|&pi| pi == name) {
-                    return Some(name);
-                }
-                xml_warning_msg!(
+    fn parse_pi_target(&mut self) -> Option<String> {
+        let name = self.parse_name()?;
+        if name.as_bytes()[..name.len().min(3)].eq_ignore_ascii_case(b"xml") {
+            if name == "xml" {
+                xml_fatal_err_msg(
                     self,
                     XmlParserErrors::XmlErrReservedXmlName,
-                    "xmlParsePITarget: invalid name prefix 'xml'\n"
+                    "XML declaration allowed only at the start of the document\n",
                 );
+                return Some(name);
+            } else if name.len() == 3 {
+                xml_fatal_err(self, XmlParserErrors::XmlErrReservedXmlName, None);
+                return Some(name);
             }
-            if name.contains(':') {
-                xml_ns_err!(
-                    self,
-                    XmlParserErrors::XmlNsErrColon,
-                    "colons are forbidden from PI names '{}'\n",
-                    name
-                );
+            if XML_W3_CPIS.iter().any(|&pi| pi == name) {
+                return Some(name);
             }
-            Some(name)
+            xml_warning_msg!(
+                self,
+                XmlParserErrors::XmlErrReservedXmlName,
+                "xmlParsePITarget: invalid name prefix 'xml'\n"
+            );
         }
+        if name.contains(':') {
+            xml_ns_err!(
+                self,
+                XmlParserErrors::XmlNsErrColon,
+                "colons are forbidden from PI names '{}'\n",
+                name
+            );
+        }
+        Some(name)
     }
 
     /// Parse an XML Catalog Processing Instruction.
@@ -67,52 +65,50 @@ impl XmlParserCtxt {
     /// to be used if there is a resolution need further down in the document.
     #[doc(alias = "xmlParseCatalogPI")]
     #[cfg(feature = "catalog")]
-    unsafe fn parse_catalog_pi(&mut self, catalog: &str) {
-        unsafe {
-            use crate::libxml::{catalog::XmlCatalogEntry, chvalid::xml_is_blank_char};
+    fn parse_catalog_pi(&mut self, catalog: &str) {
+        use crate::libxml::{catalog::XmlCatalogEntry, chvalid::xml_is_blank_char};
 
-            macro_rules! syntax_error {
-                () => {
-                    xml_warning_msg!(
-                        self,
-                        XmlParserErrors::XmlWarCatalogPI,
-                        "Catalog PI syntax error: {}\n",
-                        catalog
-                    );
-                };
-            }
+        macro_rules! syntax_error {
+            () => {
+                xml_warning_msg!(
+                    self,
+                    XmlParserErrors::XmlWarCatalogPI,
+                    "Catalog PI syntax error: {}\n",
+                    catalog
+                );
+            };
+        }
 
-            let mut tmp = catalog;
-            tmp = tmp.trim_start_matches(|c| xml_is_blank_char(c as u32));
-            let Some(rem) = tmp.strip_prefix("catalog") else {
-                syntax_error!();
-                return;
-            };
-            tmp = rem.trim_start_matches(|c| xml_is_blank_char(c as u32));
-            let Some(rem) = tmp.strip_prefix('=') else {
-                syntax_error!();
-                return;
-            };
-            tmp = rem.trim_start_matches(|c| xml_is_blank_char(c as u32));
-            let Some(quoto) = tmp.chars().next().filter(|&c| c == '\'' || c == '"') else {
-                syntax_error!();
-                return;
-            };
-            tmp = &tmp[1..];
-            let Some((url, rem)) = tmp.split_once(quoto) else {
-                syntax_error!();
-                return;
-            };
-            tmp = rem.trim_start_matches(|c| xml_is_blank_char(c as u32));
-            if !tmp.is_empty() {
-                syntax_error!();
-                return;
-            }
-            if let Some(catalogs) = self.catalogs.as_mut() {
-                catalogs.add_local(url);
-            } else {
-                self.catalogs = Some(XmlCatalogEntry::new(url));
-            }
+        let mut tmp = catalog;
+        tmp = tmp.trim_start_matches(|c| xml_is_blank_char(c as u32));
+        let Some(rem) = tmp.strip_prefix("catalog") else {
+            syntax_error!();
+            return;
+        };
+        tmp = rem.trim_start_matches(|c| xml_is_blank_char(c as u32));
+        let Some(rem) = tmp.strip_prefix('=') else {
+            syntax_error!();
+            return;
+        };
+        tmp = rem.trim_start_matches(|c| xml_is_blank_char(c as u32));
+        let Some(quoto) = tmp.chars().next().filter(|&c| c == '\'' || c == '"') else {
+            syntax_error!();
+            return;
+        };
+        tmp = &tmp[1..];
+        let Some((url, rem)) = tmp.split_once(quoto) else {
+            syntax_error!();
+            return;
+        };
+        tmp = rem.trim_start_matches(|c| xml_is_blank_char(c as u32));
+        if !tmp.is_empty() {
+            syntax_error!();
+            return;
+        }
+        if let Some(catalogs) = self.catalogs.as_mut() {
+            catalogs.add_local(url);
+        } else {
+            self.catalogs = Some(XmlCatalogEntry::new(url));
         }
     }
 
