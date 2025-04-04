@@ -80,8 +80,6 @@ use exml::{
     uri::{XmlURI, build_uri, normalize_uri_path},
     xpath::XmlXPathObjectPtr,
 };
-#[cfg(feature = "catalog")]
-use libc::pthread_t;
 use libc::{free, malloc, memcpy, size_t, strlen};
 
 /// pseudo flag for the unification of HTML and XML tests
@@ -4415,51 +4413,48 @@ unsafe fn c14n11_without_comment_test(
 
 // mostly a cut and paste from testThreads.c
 #[cfg(feature = "catalog")]
-const MAX_ARGC: usize = 20;
-
-#[cfg(feature = "catalog")]
 #[repr(C)]
 struct XmlThreadParams<'a> {
     filename: &'a str,
-    okay: i32,
+    // okay: i32,
 }
 
 #[cfg(feature = "catalog")]
 const CATALOG: &str = "./test/threads/complex.xml";
 #[cfg(feature = "catalog")]
-static THREAD_PARAMS: Mutex<[XmlThreadParams; 7]> = Mutex::new([
+static THREAD_PARAMS: [XmlThreadParams; 7] = [
     XmlThreadParams {
         filename: "./test/threads/abc.xml",
-        okay: 0,
+        // okay: 0,
     },
     XmlThreadParams {
         filename: "./test/threads/acb.xml",
-        okay: 0,
+        // okay: 0,
     },
     XmlThreadParams {
         filename: "./test/threads/bac.xml",
-        okay: 0,
+        // okay: 0,
     },
     XmlThreadParams {
         filename: "./test/threads/bca.xml",
-        okay: 0,
+        // okay: 0,
     },
     XmlThreadParams {
         filename: "./test/threads/cab.xml",
-        okay: 0,
+        // okay: 0,
     },
     XmlThreadParams {
         filename: "./test/threads/cba.xml",
-        okay: 0,
+        // okay: 0,
     },
     XmlThreadParams {
         filename: "./test/threads/invalid.xml",
-        okay: 0,
+        // okay: 0,
     },
-]);
+];
 
 #[cfg(feature = "catalog")]
-extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
+unsafe fn thread_specific_data(params: &XmlThreadParams) -> i32 {
     use std::io::{stderr, stdout};
 
     use exml::globals::{
@@ -4467,8 +4462,7 @@ extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
     };
 
     unsafe {
-        let params: *mut XmlThreadParams = private_data as *mut XmlThreadParams;
-        let filename = (*params).filename;
+        let filename = params.filename;
         let mut okay: i32 = 1;
 
         if filename == "./test/threads/invalid.xml" {
@@ -4499,62 +4493,44 @@ extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
             println!("ValidityCheckingDefaultValue override failed");
             okay = 0;
         }
-        (*params).okay = okay;
+        okay
     }
-    null_mut()
 }
 
 #[cfg(feature = "catalog")]
-static TID: Mutex<[pthread_t; MAX_ARGC]> = Mutex::new([0; MAX_ARGC]);
-
-#[cfg(feature = "catalog")]
-unsafe extern "C" fn test_thread() -> i32 {
+unsafe fn test_thread() -> i32 {
     unsafe {
         use exml::libxml::catalog::{xml_catalog_cleanup, xml_load_catalog};
-        use libc::{pthread_create, pthread_join};
 
-        let mut ret: i32;
         let mut res: i32 = 0;
 
         xml_init_parser();
 
-        let mut tid = TID.lock().unwrap();
-        let mut thread_params = THREAD_PARAMS.lock().unwrap();
-        let num_threads = thread_params.len();
+        let mut threads = vec![];
         for _ in 0..500 {
             xml_load_catalog(CATALOG);
             NB_TESTS.set(NB_TESTS.get() + 1);
 
-            tid[..num_threads].fill(u64::MAX);
-
-            for i in 0..num_threads {
-                ret = pthread_create(
-                    &raw mut tid[i],
-                    null(),
-                    thread_specific_data,
-                    &raw mut thread_params[i] as _,
-                );
-                if ret != 0 {
-                    eprintln!("pthread_create failed");
-                    return 1;
-                }
+            for param in &THREAD_PARAMS {
+                let th = std::thread::spawn(move || thread_specific_data(param));
+                threads.push(th);
             }
-            for &tid in tid.iter().take(num_threads) {
-                let mut result: *mut c_void = null_mut();
-                ret = pthread_join(tid, addr_of_mut!(result));
-                if ret != 0 {
+            for (i, th) in threads.drain(..).enumerate() {
+                let id = th.thread().id();
+                let Ok(joined) = th.join() else {
                     eprintln!("pthread_join failed");
                     return 1;
+                };
+                if joined == 0 {
+                    eprintln!(
+                        "Thread {id:?} handling {} failed",
+                        THREAD_PARAMS[i].filename
+                    );
+                    res = 1;
                 }
             }
 
             xml_catalog_cleanup();
-            for (i, params) in thread_params.iter().take(num_threads).enumerate() {
-                if params.okay == 0 {
-                    eprintln!("Thread {} handling {} failed", i, params.filename);
-                    res = 1;
-                }
-            }
         }
         res
     }
