@@ -52,7 +52,9 @@ use crate::{
     encoding::find_encoding_handler,
     error::{__xml_simple_error, __xml_simple_oom_error, XmlErrorDomain, XmlParserErrors},
     nanohttp::XmlNanoHTTPCtxt,
-    parser::{__xml_err_encoding, XmlParserCtxtPtr, XmlParserInput, XmlParserOption},
+    parser::{
+        __xml_err_encoding, XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput, XmlParserOption,
+    },
     uri::canonic_path,
 };
 
@@ -346,36 +348,32 @@ macro_rules! __xml_loader_err {
             globals::{GenericError, StructuredError},
             libxml::parser::XML_SAX2_MAGIC,
         };
-        let ctxt: XmlParserCtxtPtr = $ctx as XmlParserCtxtPtr;
         let mut schannel: Option<StructuredError> = None;
         let mut channel: Option<GenericError> = None;
         let mut data = None;
         let mut level = XmlErrorLevel::XmlErrError;
 
-        if ctxt.is_null()
-            || (*ctxt).disable_sax == 0
-            || !matches!((*ctxt).instate, $crate::parser::XmlParserInputState::XmlParserEOF)
+        if $ctx.disable_sax == 0
+            || !matches!($ctx.instate, $crate::parser::XmlParserInputState::XmlParserEOF)
         {
-            if !ctxt.is_null() {
-                if let Some(sax) = (*ctxt).sax.as_deref_mut() {
-                    if (*ctxt).validate != 0 {
-                        channel = sax.error;
-                        level = XmlErrorLevel::XmlErrError;
-                    } else {
-                        channel = sax.warning;
-                        level = XmlErrorLevel::XmlErrWarning;
-                    }
-                    if sax.initialized == XML_SAX2_MAGIC as u32 {
-                        schannel = sax.serror;
-                    }
-                    data = (*ctxt).user_data.clone();
+            if let Some(sax) = $ctx.sax.as_deref_mut() {
+                if $ctx.validate != 0 {
+                    channel = sax.error;
+                    level = XmlErrorLevel::XmlErrError;
+                } else {
+                    channel = sax.warning;
+                    level = XmlErrorLevel::XmlErrWarning;
                 }
+                if sax.initialized == XML_SAX2_MAGIC as u32 {
+                    schannel = sax.serror;
+                }
+                data = $ctx.user_data.clone();
             }
             $crate::error::__xml_raise_error!(
                 schannel,
                 channel,
                 data,
-                ctxt as _,
+                $ctx as XmlParserCtxtPtr as _,
                 None,
                 $crate::error::XmlErrorDomain::XmlFromIO,
                 $crate::error::XmlParserErrors::XmlIOLoadError,
@@ -401,70 +399,68 @@ pub(crate) use __xml_loader_err;
 ///
 /// Returns the input or NULL in case of HTTP error.
 #[doc(alias = "xmlCheckHTTPInput")]
-pub unsafe fn xml_check_http_input(
-    ctxt: XmlParserCtxtPtr,
+pub fn xml_check_http_input(
+    ctxt: &mut XmlParserCtxt,
     mut ret: Option<XmlParserInput>,
 ) -> Option<XmlParserInput> {
-    unsafe {
-        #[cfg(feature = "http")]
+    #[cfg(feature = "http")]
+    {
+        if ret.is_some()
+            && ret.as_ref().unwrap().buf.is_some()
+            && ret
+                .as_mut()
+                .unwrap()
+                .buf
+                .as_mut()
+                .unwrap()
+                .nanohttp_context()
+                .is_some()
         {
-            if ret.is_some()
-                && ret.as_ref().unwrap().buf.is_some()
-                && ret
-                    .as_mut()
-                    .unwrap()
-                    .buf
-                    .as_mut()
-                    .unwrap()
-                    .nanohttp_context()
-                    .is_some()
-            {
-                let buf = ret.as_mut().unwrap().buf.as_mut().unwrap();
-                let context = buf.nanohttp_context().unwrap();
-                let code = context.return_code();
-                if code >= 400 {
-                    // fatal error
-                    if let Some(filename) = ret.as_ref().unwrap().filename.as_deref() {
-                        __xml_loader_err!(ctxt, "failed to load HTTP resource \"{}\"\n", filename);
-                    } else {
-                        __xml_loader_err!(ctxt, "failed to load HTTP resource\n");
-                    }
+            let buf = ret.as_mut().unwrap().buf.as_mut().unwrap();
+            let context = buf.nanohttp_context().unwrap();
+            let code = context.return_code();
+            if code >= 400 {
+                // fatal error
+                if let Some(filename) = ret.as_ref().unwrap().filename.as_deref() {
+                    __xml_loader_err!(ctxt, "failed to load HTTP resource \"{}\"\n", filename);
+                } else {
+                    __xml_loader_err!(ctxt, "failed to load HTTP resource\n");
+                }
 
-                    return None;
-                }
-                let is_mime_xml = context
-                    .mime_type()
-                    .filter(|mime| mime.contains("/xml") || mime.contains("+xml"))
-                    .is_some();
-                let encoding = context.encoding().map(|encoding| encoding.to_owned());
-                let redirection = context
-                    .redirection()
-                    .map(|redirection| redirection.to_owned());
-                if is_mime_xml {
-                    if let Some(encoding) = encoding {
-                        if let Some(handler) = find_encoding_handler(&encoding) {
-                            (*ctxt).switch_input_encoding(ret.as_mut().unwrap(), handler);
-                        } else {
-                            __xml_err_encoding!(
-                                &mut *ctxt,
-                                XmlParserErrors::XmlErrUnknownEncoding,
-                                "Unknown encoding {}",
-                                encoding
-                            );
-                        }
-                        if ret.as_mut().unwrap().encoding.is_none() {
-                            ret.as_mut().unwrap().encoding = Some(encoding);
-                        }
+                return None;
+            }
+            let is_mime_xml = context
+                .mime_type()
+                .filter(|mime| mime.contains("/xml") || mime.contains("+xml"))
+                .is_some();
+            let encoding = context.encoding().map(|encoding| encoding.to_owned());
+            let redirection = context
+                .redirection()
+                .map(|redirection| redirection.to_owned());
+            if is_mime_xml {
+                if let Some(encoding) = encoding {
+                    if let Some(handler) = find_encoding_handler(&encoding) {
+                        ctxt.switch_input_encoding(ret.as_mut().unwrap(), handler);
+                    } else {
+                        __xml_err_encoding!(
+                            &mut *ctxt,
+                            XmlParserErrors::XmlErrUnknownEncoding,
+                            "Unknown encoding {}",
+                            encoding
+                        );
                     }
-                }
-                if let Some(redir) = redirection {
-                    ret.as_mut().unwrap().directory = None;
-                    ret.as_mut().unwrap().filename = Some(redir);
+                    if ret.as_mut().unwrap().encoding.is_none() {
+                        ret.as_mut().unwrap().encoding = Some(encoding);
+                    }
                 }
             }
+            if let Some(redir) = redirection {
+                ret.as_mut().unwrap().directory = None;
+                ret.as_mut().unwrap().filename = Some(redir);
+            }
         }
-        ret
     }
+    ret
 }
 
 /// By default we don't load external entities, yet.
@@ -493,7 +489,7 @@ pub(crate) unsafe fn xml_default_external_entity_loader(
 
         let Some(resource) = resource else {
             let id = id.unwrap_or("NULL").to_owned();
-            __xml_loader_err!(ctxt, "failed to load external entity \"{}\"\n", id);
+            __xml_loader_err!(&mut *ctxt, "failed to load external entity \"{}\"\n", id);
             return None;
         };
         XmlParserInput::from_filename(&mut *ctxt, &resource)

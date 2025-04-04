@@ -204,45 +204,40 @@ impl XmlParserInput {
     ///
     /// Returns the new input stream or NULL in case of error
     #[doc(alias = "xmlNewInputFromFile")]
-    pub unsafe fn from_filename(
-        ctxt: &mut XmlParserCtxt,
-        filename: &str,
-    ) -> Option<XmlParserInput> {
-        unsafe {
-            if get_parser_debug_entities() != 0 {
-                generic_error!("new input from file: {filename}\n");
-            }
-
-            let Some(buf) = XmlParserInputBuffer::from_uri(filename, XmlCharEncoding::None) else {
-                __xml_loader_err!(ctxt, "failed to load external entity \"{}\"\n", filename);
-                return None;
-            };
-
-            let mut input_stream = XmlParserInput::new(Some(ctxt))?;
-            input_stream.buf = Some(buf);
-            let mut input_stream = xml_check_http_input(ctxt, Some(input_stream))?;
-
-            let uri = input_stream
-                .filename
-                .clone()
-                .unwrap_or_else(|| filename.to_owned());
-            let directory = xml_parser_get_directory(&uri);
-            let canonic = canonic_path(&uri);
-            input_stream.filename = Some(canonic.into_owned());
-            if let Some(directory) = directory.as_deref() {
-                input_stream.directory = Some(directory.to_string_lossy().into_owned());
-            } else {
-                input_stream.directory = None;
-            }
-            input_stream.reset_base();
-
-            if ctxt.directory.is_none() {
-                if let Some(directory) = directory {
-                    ctxt.directory = Some(directory.to_string_lossy().into_owned());
-                }
-            }
-            Some(input_stream)
+    pub fn from_filename(ctxt: &mut XmlParserCtxt, filename: &str) -> Option<XmlParserInput> {
+        if get_parser_debug_entities() != 0 {
+            generic_error!("new input from file: {filename}\n");
         }
+
+        let Some(buf) = XmlParserInputBuffer::from_uri(filename, XmlCharEncoding::None) else {
+            __xml_loader_err!(ctxt, "failed to load external entity \"{}\"\n", filename);
+            return None;
+        };
+
+        let mut input_stream = XmlParserInput::new(Some(ctxt))?;
+        input_stream.buf = Some(buf);
+        let mut input_stream = xml_check_http_input(ctxt, Some(input_stream))?;
+
+        let uri = input_stream
+            .filename
+            .clone()
+            .unwrap_or_else(|| filename.to_owned());
+        let directory = xml_parser_get_directory(&uri);
+        let canonic = canonic_path(&uri);
+        input_stream.filename = Some(canonic.into_owned());
+        if let Some(directory) = directory.as_deref() {
+            input_stream.directory = Some(directory.to_string_lossy().into_owned());
+        } else {
+            input_stream.directory = None;
+        }
+        input_stream.reset_base();
+
+        if ctxt.directory.is_none() {
+            if let Some(directory) = directory {
+                ctxt.directory = Some(directory.to_string_lossy().into_owned());
+            }
+        }
+        Some(input_stream)
     }
 
     /// Create a new input stream based on an xmlEntityPtr
