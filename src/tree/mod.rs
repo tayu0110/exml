@@ -1433,7 +1433,7 @@ pub unsafe fn xml_new_text(content: Option<&str>) -> Option<XmlNodePtr> {
         // Allocate a new node and fill the fields.
         let Some(mut cur) = XmlNodePtr::new(XmlNode {
             typ: XmlElementType::XmlTextNode,
-            name: Cow::Borrowed(XML_STRING_TEXT.to_str().unwrap()),
+            name: Cow::Borrowed(XML_STRING_TEXT),
             ..Default::default()
         }) else {
             xml_tree_err_memory("building text");
@@ -1560,7 +1560,7 @@ pub unsafe fn xml_new_comment(content: &str) -> Option<XmlNodePtr> {
         // Allocate a new node and fill the fields.
         let Some(cur) = XmlNodePtr::new(XmlNode {
             typ: XmlElementType::XmlCommentNode,
-            name: Cow::Borrowed(XML_STRING_COMMENT.to_str().unwrap()),
+            name: Cow::Borrowed(XML_STRING_COMMENT),
             content: Some(content.to_owned()),
             ..Default::default()
         }) else {

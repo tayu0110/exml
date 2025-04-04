@@ -1952,7 +1952,7 @@ unsafe fn test_sax(filename: &str) {
                 PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
                 return;
             };
-            xml_ctxt_read_file(ctxt, filename, None, OPTIONS.load(Ordering::Relaxed));
+            xml_ctxt_read_file(&mut *ctxt, filename, None, OPTIONS.load(Ordering::Relaxed));
 
             if let Some(my_doc) = (*ctxt).my_doc.take() {
                 eprintln!("SAX generated a doc !");
@@ -2624,7 +2624,13 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                     if rectxt.is_null() {
                         xml_read_io(f, filename, None, OPTIONS.load(Ordering::Relaxed))
                     } else {
-                        xml_ctxt_read_io(rectxt, f, filename, None, OPTIONS.load(Ordering::Relaxed))
+                        xml_ctxt_read_io(
+                            &mut *rectxt,
+                            f,
+                            filename,
+                            None,
+                            OPTIONS.load(Ordering::Relaxed),
+                        )
                     }
                 } else {
                     None
@@ -2651,7 +2657,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                 (*ctxt).vctxt.warning = Some(xml_html_validity_warning);
 
                 let doc = xml_ctxt_read_file(
-                    ctxt,
+                    &mut *ctxt,
                     filename.unwrap(),
                     None,
                     OPTIONS.load(Ordering::Relaxed),
@@ -2691,7 +2697,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                     xml_read_memory(mem, filename, None, OPTIONS.load(Ordering::Relaxed))
                 } else {
                     xml_ctxt_read_memory(
-                        rectxt,
+                        &mut *rectxt,
                         mem,
                         filename,
                         None,
@@ -2718,7 +2724,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                 }
 
                 let doc = xml_ctxt_read_file(
-                    ctxt,
+                    &mut *ctxt,
                     filename.unwrap(),
                     None,
                     OPTIONS.load(Ordering::Relaxed),
@@ -2735,7 +2741,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             _ => {
                 if !rectxt.is_null() {
                     xml_ctxt_read_file(
-                        rectxt,
+                        &mut *rectxt,
                         filename.unwrap(),
                         None,
                         OPTIONS.load(Ordering::Relaxed),

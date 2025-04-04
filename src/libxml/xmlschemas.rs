@@ -3418,7 +3418,7 @@ pub(crate) unsafe fn xml_schema_add_schema_doc(
                         if !schema_location.is_null() {
                             // Parse from file.
                             doc = xml_ctxt_read_file(
-                                parser_ctxt,
+                                &mut *parser_ctxt,
                                 CStr::from_ptr(schema_location as *const i8)
                                     .to_string_lossy()
                                     .as_ref(),
@@ -3433,7 +3433,7 @@ pub(crate) unsafe fn xml_schema_add_schema_doc(
                             .to_vec();
                             // Parse from memory buffer.
                             doc = xml_ctxt_read_memory(
-                                parser_ctxt,
+                                &mut *parser_ctxt,
                                 mem,
                                 None,
                                 None,
@@ -18823,7 +18823,7 @@ pub unsafe fn xml_schema_validate_stream(
         (*pctxt).linenumbers = 1;
         xml_schema_validate_set_locator(ctxt, Some(xml_schema_validate_stream_locator), pctxt as _);
 
-        if let Some(input_stream) = XmlParserInput::from_io(pctxt, input, enc) {
+        if let Some(input_stream) = XmlParserInput::from_io(&mut *pctxt, input, enc) {
             (*pctxt).input_push(input_stream);
             (*ctxt).parser_ctxt = pctxt;
 

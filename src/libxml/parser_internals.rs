@@ -22,7 +22,6 @@
 
 use std::{
     borrow::Cow,
-    ffi::CStr,
     mem::take,
     ptr::{addr_of_mut, null_mut},
 };
@@ -46,12 +45,6 @@ use crate::{
         XmlNodePtr, xml_free_doc, xml_free_node, xml_new_doc, xml_new_doc_node,
     },
 };
-
-macro_rules! NXT {
-    ($ctxt:expr, $val:expr) => {
-        *(*(*$ctxt).input().unwrap()).cur.add($val as usize)
-    };
-}
 
 /// Arbitrary depth limit for the XML documents that we allow to
 /// process. This is not a limitation of the parser but a safety
@@ -96,9 +89,9 @@ pub const XML_MAX_NAMELEN: usize = 100;
 pub const INPUT_CHUNK: usize = 250;
 
 /// Global variables used for predefined strings.
-pub static XML_STRING_TEXT: &CStr = c"text";
-pub static XML_STRING_TEXT_NOENC: &CStr = c"textnoenc";
-pub static XML_STRING_COMMENT: &CStr = c"comment";
+pub static XML_STRING_TEXT: &str = "text";
+pub static XML_STRING_TEXT_NOENC: &str = "textnoenc";
+pub static XML_STRING_COMMENT: &str = "comment";
 
 /// Check whether the character is allowed by the production
 /// `[84] Letter ::= BaseChar | Ideographic`

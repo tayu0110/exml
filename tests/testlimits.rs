@@ -943,7 +943,7 @@ unsafe fn sax_test(filename: &str, limit: usize, options: i32, fail: i32) -> i32
             eprintln!("Failed to create parser context");
             return 1;
         };
-        if let Some(doc) = xml_ctxt_read_file(ctxt, filename, None, options) {
+        if let Some(doc) = xml_ctxt_read_file(&mut *ctxt, filename, None, options) {
             eprintln!("SAX parsing generated a document !");
             xml_free_doc(doc);
             res = 0;

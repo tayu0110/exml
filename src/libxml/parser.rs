@@ -632,7 +632,7 @@ pub unsafe fn xml_io_parse_dtd(
         (*ctxt).detect_sax2();
 
         // generate a parser input from the I/O handler
-        let Some(pinput) = XmlParserInput::from_io(ctxt, input, XmlCharEncoding::None) else {
+        let Some(pinput) = XmlParserInput::from_io(&mut *ctxt, input, XmlCharEncoding::None) else {
             xml_free_parser_ctxt(ctxt);
             return None;
         };
@@ -1115,7 +1115,7 @@ pub unsafe fn xml_create_io_parser_ctxt(
             return null_mut();
         };
 
-        let Some(input_stream) = XmlParserInput::from_io(ctxt, buf, enc) else {
+        let Some(input_stream) = XmlParserInput::from_io(&mut *ctxt, buf, enc) else {
             xml_free_parser_ctxt(ctxt);
             return null_mut();
         };

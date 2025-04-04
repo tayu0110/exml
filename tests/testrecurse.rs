@@ -517,7 +517,7 @@ unsafe fn recursive_detect_test(
             parser_options |= XmlParserOption::XmlParseNoEnt as i32;
         }
         // base of the test, parse with the old API
-        let doc = xml_ctxt_read_file(ctxt, filename, None, parser_options);
+        let doc = xml_ctxt_read_file(&mut *ctxt, filename, None, parser_options);
         if doc.is_some() || (*ctxt).last_error.code() != XmlParserErrors::XmlErrEntityLoop {
             eprintln!("Failed to detect recursion in {filename}");
             xml_free_parser_ctxt(ctxt);
@@ -557,7 +557,7 @@ unsafe fn not_recursive_detect_test(
             parser_options |= XmlParserOption::XmlParseNoEnt as i32;
         }
         // base of the test, parse with the old API
-        let Some(doc) = xml_ctxt_read_file(ctxt, filename, None, parser_options) else {
+        let Some(doc) = xml_ctxt_read_file(&mut *ctxt, filename, None, parser_options) else {
             eprintln!("Failed to parse correct file {filename}");
             xml_free_parser_ctxt(ctxt);
             return 1;
@@ -592,7 +592,9 @@ unsafe fn not_recursive_huge_test(
         if options & OPT_NO_SUBST == 0 {
             parser_options |= XmlParserOption::XmlParseNoEnt as i32;
         }
-        if let Some(doc) = xml_ctxt_read_file(ctxt, "test/recurse/huge.xml", None, parser_options) {
+        if let Some(doc) =
+            xml_ctxt_read_file(&mut *ctxt, "test/recurse/huge.xml", None, parser_options)
+        {
             let fixed_cost: c_ulong = 20;
             let allowed_expansion: c_ulong = 1000000;
             let f_size: c_ulong = xml_strlen(c"some internal data".as_ptr() as _) as u64;
@@ -696,9 +698,12 @@ unsafe fn huge_dtd_test(
         if options & OPT_NO_SUBST == 0 {
             parser_options |= XmlParserOption::XmlParseNoEnt as i32;
         }
-        if let Some(doc) =
-            xml_ctxt_read_file(ctxt, "test/recurse/huge_dtd.xml", None, parser_options)
-        {
+        if let Some(doc) = xml_ctxt_read_file(
+            &mut *ctxt,
+            "test/recurse/huge_dtd.xml",
+            None,
+            parser_options,
+        ) {
             let fixed_cost: usize = 20;
             let allowed_expansion: usize = 1000000;
             let a_size: usize = xml_strlen(c"<!-- comment -->".as_ptr() as _) as usize;

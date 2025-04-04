@@ -924,7 +924,7 @@ impl XmlDebugCtxt<'_> {
                     if self.check == 0 {
                         self.dump_spaces();
                         let node = XmlNodePtr::try_from(node).unwrap();
-                        if node.name == XML_STRING_TEXT_NOENC.to_str().unwrap() {
+                        if node.name == XML_STRING_TEXT_NOENC {
                             write!(self.output, "TEXT no enc").ok();
                         } else {
                             write!(self.output, "TEXT").ok();

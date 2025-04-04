@@ -512,7 +512,7 @@ pub unsafe fn xml_read_io(
         if ctxt.is_null() {
             return None;
         }
-        let Some(stream) = XmlParserInput::from_io(ctxt, input, XmlCharEncoding::None) else {
+        let Some(stream) = XmlParserInput::from_io(&mut *ctxt, input, XmlCharEncoding::None) else {
             xml_free_parser_ctxt(ctxt);
             return None;
         };
@@ -529,7 +529,7 @@ pub unsafe fn xml_read_io(
 /// Returns the resulting document tree
 #[doc(alias = "xmlCtxtReadDoc")]
 pub unsafe fn xml_ctxt_read_doc(
-    ctxt: XmlParserCtxtPtr,
+    ctxt: &mut XmlParserCtxt,
     cur: *const u8,
     url: Option<&str>,
     encoding: Option<&str>,
@@ -555,22 +555,19 @@ pub unsafe fn xml_ctxt_read_doc(
 /// Returns the resulting document tree
 #[doc(alias = "xmlCtxtReadFile")]
 pub unsafe fn xml_ctxt_read_file(
-    ctxt: XmlParserCtxtPtr,
+    ctxt: &mut XmlParserCtxt,
     filename: &str,
     encoding: Option<&str>,
     options: i32,
 ) -> Option<XmlDocPtr> {
     unsafe {
-        if ctxt.is_null() {
-            return None;
-        }
         xml_init_parser();
 
-        (*ctxt).reset();
+        ctxt.reset();
 
         let stream = xml_load_external_entity(Some(filename), None, ctxt)?;
-        (*ctxt).input_push(stream);
-        (*ctxt).do_read(None, encoding, options)
+        ctxt.input_push(stream);
+        ctxt.do_read(None, encoding, options)
     }
 }
 
@@ -580,23 +577,20 @@ pub unsafe fn xml_ctxt_read_file(
 /// Returns the resulting document tree
 #[doc(alias = "xmlCtxtReadMemory")]
 pub unsafe fn xml_ctxt_read_memory(
-    ctxt: XmlParserCtxtPtr,
+    ctxt: &mut XmlParserCtxt,
     buffer: Vec<u8>,
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
 ) -> Option<XmlDocPtr> {
     unsafe {
-        if ctxt.is_null() {
-            return None;
-        }
         xml_init_parser();
-        (*ctxt).reset();
+        ctxt.reset();
 
         let input = XmlParserInputBuffer::from_memory(buffer, XmlCharEncoding::None)?;
         let stream = XmlParserInput::from_io(ctxt, input, XmlCharEncoding::None)?;
-        (*ctxt).input_push(stream);
-        (*ctxt).do_read(url, encoding, options)
+        ctxt.input_push(stream);
+        ctxt.do_read(url, encoding, options)
     }
 }
 
@@ -606,22 +600,19 @@ pub unsafe fn xml_ctxt_read_memory(
 /// Returns the resulting document tree
 #[doc(alias = "xmlCtxtReadIO")]
 pub unsafe fn xml_ctxt_read_io(
-    ctxt: XmlParserCtxtPtr,
+    ctxt: &mut XmlParserCtxt,
     ioctx: impl Read + 'static,
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
 ) -> Option<XmlDocPtr> {
     unsafe {
-        if ctxt.is_null() {
-            return None;
-        }
         xml_init_parser();
-        (*ctxt).reset();
+        ctxt.reset();
 
         let input = XmlParserInputBuffer::from_reader(ioctx, XmlCharEncoding::None);
         let stream = XmlParserInput::from_io(ctxt, input, XmlCharEncoding::None)?;
-        (*ctxt).input_push(stream);
-        (*ctxt).do_read(url, encoding, options)
+        ctxt.input_push(stream);
+        ctxt.do_read(url, encoding, options)
     }
 }

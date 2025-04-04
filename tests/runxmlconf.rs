@@ -179,7 +179,7 @@ unsafe fn xmlconf_test_invalid(
             test_log!(logfile, "test {id} : {filename} out of memory\n",);
             return 0;
         }
-        if let Some(doc) = xml_ctxt_read_file(ctxt, filename, None, options) {
+        if let Some(doc) = xml_ctxt_read_file(&mut *ctxt, filename, None, options) {
             // invalidity should be reported both in the context and in the document
             if (*ctxt).valid != 0 || doc.properties & XmlDocProperties::XmlDocDTDValid as i32 != 0 {
                 test_log!(
@@ -215,7 +215,7 @@ unsafe fn xmlconf_test_valid(
             test_log!(logfile, "test {id} : {filename} out of memory\n",);
             return 0;
         }
-        if let Some(doc) = xml_ctxt_read_file(ctxt, filename, None, options) {
+        if let Some(doc) = xml_ctxt_read_file(&mut *ctxt, filename, None, options) {
             // validity should be reported both in the context and in the document
             if (*ctxt).valid == 0 || doc.properties & XmlDocProperties::XmlDocDTDValid as i32 == 0 {
                 test_log!(

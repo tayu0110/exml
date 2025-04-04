@@ -907,7 +907,7 @@ pub(crate) unsafe fn xml_node_dump_output_internal(
                 XmlElementType::XmlTextNode => {
                     let node = XmlNodePtr::try_from(cur).unwrap();
                     if let Some(content) = node.content.as_deref() {
-                        if node.name != XML_STRING_TEXT_NOENC.to_str().unwrap() {
+                        if node.name != XML_STRING_TEXT_NOENC {
                             ctxt.buf
                                 .borrow_mut()
                                 .write_str_with_escape(content, ctxt.escape)
@@ -1493,9 +1493,7 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Xml
                     let Some(content) = node.content.as_deref() else {
                         break;
                     };
-                    if node.name == XML_STRING_TEXT.to_str().unwrap()
-                        || node.name != XML_STRING_TEXT_NOENC.to_str().unwrap()
-                    {
+                    if node.name == XML_STRING_TEXT || node.name != XML_STRING_TEXT_NOENC {
                         ctxt.buf
                             .borrow_mut()
                             .write_str_with_escape(content, ctxt.escape)

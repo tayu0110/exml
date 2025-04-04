@@ -186,26 +186,24 @@ impl XmlParserInput {
     ///
     /// Returns the new input stream or NULL
     #[doc(alias = "xmlNewIOInputStream")]
-    pub unsafe fn from_io(
-        ctxt: XmlParserCtxtPtr,
+    pub fn from_io(
+        ctxt: &mut XmlParserCtxt,
         input: XmlParserInputBuffer,
         enc: XmlCharEncoding,
     ) -> Option<XmlParserInput> {
-        unsafe {
-            if get_parser_debug_entities() != 0 {
-                generic_error!("new input from I/O\n");
-            }
-            let mut input_stream = XmlParserInput::new((!ctxt.is_null()).then(|| &mut *ctxt))?;
-            input_stream.filename = None;
-            input_stream.buf = Some(input);
-            input_stream.reset_base();
-
-            if !matches!(enc, XmlCharEncoding::None) {
-                (*ctxt).switch_encoding(enc);
-            }
-
-            Some(input_stream)
+        if get_parser_debug_entities() != 0 {
+            generic_error!("new input from I/O\n");
         }
+        let mut input_stream = XmlParserInput::new(Some(ctxt))?;
+        input_stream.filename = None;
+        input_stream.buf = Some(input);
+        input_stream.reset_base();
+
+        if !matches!(enc, XmlCharEncoding::None) {
+            ctxt.switch_encoding(enc);
+        }
+
+        Some(input_stream)
     }
 
     /// Create a new input stream based on a file or an URL.
@@ -258,7 +256,7 @@ impl XmlParserInput {
     /// Returns the new input stream or NULL
     #[doc(alias = "xmlNewEntityInputStream")]
     pub(crate) unsafe fn from_entity(
-        ctxt: XmlParserCtxtPtr,
+        ctxt: &mut XmlParserCtxt,
         mut entity: XmlEntityPtr,
     ) -> Option<XmlParserInput> {
         unsafe {
@@ -268,11 +266,7 @@ impl XmlParserInput {
             let Some(content) = entity.content.as_deref() else {
                 match entity.etype {
                     XmlEntityType::XmlExternalGeneralUnparsedEntity => {
-                        xml_err_internal!(
-                            &mut *ctxt,
-                            "Cannot parse entity {}\n",
-                            entity.name.clone()
-                        );
+                        xml_err_internal!(ctxt, "Cannot parse entity {}\n", entity.name.clone());
                     }
                     XmlEntityType::XmlExternalGeneralParsedEntity
                     | XmlEntityType::XmlExternalParameterEntity => {
@@ -288,21 +282,21 @@ impl XmlParserInput {
                     }
                     XmlEntityType::XmlInternalGeneralEntity => {
                         xml_err_internal!(
-                            &mut *ctxt,
+                            ctxt,
                             "Internal entity {} without content !\n",
                             entity.name.clone()
                         );
                     }
                     XmlEntityType::XmlInternalParameterEntity => {
                         xml_err_internal!(
-                            &mut *ctxt,
+                            ctxt,
                             "Internal parameter entity {} without content !\n",
                             entity.name.clone()
                         );
                     }
                     XmlEntityType::XmlInternalPredefinedEntity => {
                         xml_err_internal!(
-                            &mut *ctxt,
+                            ctxt,
                             "Predefined entity {} without content !\n",
                             entity.name.clone()
                         );
@@ -310,7 +304,7 @@ impl XmlParserInput {
                 }
                 return None;
             };
-            let mut input = XmlParserInput::new((!ctxt.is_null()).then(|| &mut *ctxt))?;
+            let mut input = XmlParserInput::new(Some(ctxt))?;
 
             if let Some(uri) = entity.uri.as_deref() {
                 input.filename = Some(uri.to_owned());

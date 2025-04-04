@@ -2315,7 +2315,7 @@ unsafe fn xml_sax2_text_node(ctxt: XmlParserCtxtPtr, s: &str) -> Option<XmlNodeP
             return None;
         };
         ret.typ = XmlElementType::XmlTextNode;
-        ret.name = XML_STRING_TEXT.to_str().unwrap().into();
+        ret.name = XML_STRING_TEXT.into();
         ret.content = Some(s.to_owned());
 
         if (*ctxt).linenumbers != 0 && (*ctxt).input().is_some() {
@@ -2680,7 +2680,7 @@ unsafe fn xml_sax2_text(ctxt: XmlParserCtxtPtr, ch: &str, typ: XmlElementType) {
         if let Some(mut last_child) = last_child {
             let coalesce_text = last_child.element_type() == typ
                 && (!matches!(typ, XmlElementType::XmlTextNode)
-                    || last_child.name == XML_STRING_TEXT.to_str().unwrap());
+                    || last_child.name == XML_STRING_TEXT);
             if coalesce_text && (*ctxt).nodemem != 0 {
                 // The whole point of maintaining nodelen and nodemem,
                 // xmlTextConcat is too costly, i.e. compute length,

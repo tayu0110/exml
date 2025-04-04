@@ -1026,8 +1026,7 @@ pub unsafe fn html_node_dump_format_output(
                     let Some(content) = node.content.as_deref() else {
                         break 'to_break;
                     };
-                    if (node.name == XML_STRING_TEXT.to_str().unwrap()
-                        || node.name != XML_STRING_TEXT_NOENC.to_str().unwrap())
+                    if (node.name == XML_STRING_TEXT || node.name != XML_STRING_TEXT_NOENC)
                         && parent.is_none_or(|parent| {
                             !parent.name().unwrap().eq_ignore_ascii_case("script")
                                 && !parent.name().unwrap().eq_ignore_ascii_case("style")
