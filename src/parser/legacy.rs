@@ -7,9 +7,7 @@ use crate::{
         set_indent_tree_output, set_keep_blanks_default_value, set_line_numbers_default_value,
         set_pedantic_parser_default_value, set_substitute_entities_default_value,
     },
-    libxml::parser::{
-        XmlSAXHandler, xml_create_doc_parser_ctxt, xml_init_parser, xml_parse_ext_parsed_ent,
-    },
+    libxml::parser::{XmlSAXHandler, xml_create_doc_parser_ctxt, xml_init_parser},
     parser::{XmlParserCtxtPtr, xml_free_parser_ctxt},
     tree::{XmlDocPtr, XmlDtdPtr, xml_free_doc},
 };
@@ -487,7 +485,7 @@ pub(crate) unsafe fn xml_sax_parse_entity(
             (*ctxt).user_data = None;
         }
 
-        xml_parse_ext_parsed_ent(ctxt);
+        (*ctxt).parse_ext_parsed_ent();
 
         let ret = if (*ctxt).well_formed != 0 {
             (*ctxt).my_doc

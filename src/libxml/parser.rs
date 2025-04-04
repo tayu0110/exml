@@ -52,57 +52,36 @@ use crate::libxml::catalog::xml_catalog_cleanup;
 #[cfg(feature = "schema")]
 use crate::relaxng::xml_relaxng_cleanup_types;
 use crate::{
-    encoding::{XmlCharEncoding, detect_encoding, find_encoding_handler},
     error::{XmlError, XmlParserErrors},
     globals::{GenericErrorContext, StructuredError},
-    html::parser::{__html_parse_content, HtmlParserOption, html_create_memory_parser_ctxt},
     io::{
         cleanup_input_callbacks, cleanup_output_callbacks, register_default_input_callbacks,
         register_default_output_callbacks, xml_default_external_entity_loader, xml_no_net_exists,
     },
     libxml::{
         dict::{__xml_initialize_dict, xml_cleanup_dict_internal},
-        globals::{
-            xml_cleanup_globals_internal, xml_default_sax_locator, xml_init_globals_internal,
-        },
+        globals::{xml_cleanup_globals_internal, xml_init_globals_internal},
         xmlmemory::{xml_cleanup_memory_internal, xml_init_memory_internal},
         xmlschemastypes::xml_schema_cleanup_types,
         xmlstring::XmlChar,
     },
     parser::{
-        XML_DEFAULT_VERSION, XmlParserCtxtPtr, XmlParserInput, XmlParserInputState,
-        XmlParserOption, xml_create_memory_parser_ctxt, xml_fatal_err, xml_free_parser_ctxt,
+        XmlParserCtxtPtr, XmlParserInput, XmlParserInputState, XmlParserOption,
+        xml_create_memory_parser_ctxt, xml_fatal_err, xml_free_parser_ctxt,
     },
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlAttributeDefault, XmlAttributeType, XmlDocProperties,
-        XmlDocPtr, XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr,
-        XmlEntityType, XmlEnumeration, XmlGenericNodePtr, XmlNodePtr, xml_free_doc, xml_free_node,
-        xml_free_node_list, xml_new_doc, xml_new_doc_comment, xml_new_doc_node,
+        XmlDocPtr, XmlElementContentPtr, XmlElementTypeVal, XmlEntityPtr, XmlEntityType,
+        XmlEnumeration, XmlGenericNodePtr, xml_free_doc, xml_new_doc, xml_new_doc_node,
     },
     uri::canonic_path,
     xpath::xml_init_xpath_internal,
 };
 
-use super::{
-    chvalid::xml_is_blank_char,
-    threads::{
-        __xml_global_init_mutex_lock, __xml_global_init_mutex_unlock, xml_cleanup_threads_internal,
-        xml_init_threads_internal,
-    },
+use super::threads::{
+    __xml_global_init_mutex_lock, __xml_global_init_mutex_unlock, xml_cleanup_threads_internal,
+    xml_init_threads_internal,
 };
-
-/// Bit in the loadsubset context field to tell to do ID/REFs lookups.
-/// Use it to initialize xmlLoadExtDtdDefaultValue.
-pub const XML_DETECT_IDS: usize = 2;
-
-/// Bit in the loadsubset context field to tell to do complete the
-/// elements attributes lists with the ones defaulted from the DTDs.
-/// Use it to initialize xmlLoadExtDtdDefaultValue.
-pub const XML_COMPLETE_ATTRS: usize = 4;
-
-/// Bit in the loadsubset context field to tell to not do ID/REFs registration.
-/// Used to initialize xmlLoadExtDtdDefaultValue in some special cases.
-pub const XML_SKIP_IDS: usize = 8;
 
 #[repr(C)]
 #[derive(Clone, Default)]
@@ -466,104 +445,6 @@ pub unsafe fn xml_cleanup_parser() {
     }
 }
 
-/// parse a general parsed entity
-/// An external general parsed entity is well-formed if it matches the
-/// production labeled extParsedEnt.
-///
-/// `[78] extParsedEnt ::= TextDecl? content`
-///
-/// Returns 0, -1 in case of error. the parser context is augmented as a result of the parsing.
-#[doc(alias = "xmlParseExtParsedEnt")]
-pub unsafe fn xml_parse_ext_parsed_ent(ctxt: XmlParserCtxtPtr) -> i32 {
-    unsafe {
-        if ctxt.is_null() || (*ctxt).input().is_none() {
-            return -1;
-        }
-
-        (*ctxt).detect_sax2();
-
-        (*ctxt).grow();
-
-        // SAX: beginning of the document processing.
-        if let Some(set_document_locator) = (*ctxt)
-            .sax
-            .as_deref_mut()
-            .and_then(|sax| sax.set_document_locator)
-        {
-            set_document_locator((*ctxt).user_data.clone(), xml_default_sax_locator());
-        }
-
-        // Get the 4 first bytes and decode the charset
-        // if enc != XML_CHAR_ENCODING_NONE
-        // plug some encoding conversion routines.
-        if (*ctxt).input().unwrap().remainder_len() >= 4 {
-            let enc = detect_encoding(&(*ctxt).content_bytes()[..4]);
-            if !matches!(enc, XmlCharEncoding::None) {
-                (*ctxt).switch_encoding(enc);
-            }
-        }
-
-        if (*ctxt).current_byte() == 0 {
-            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrDocumentEmpty, None);
-        }
-
-        // Check for the XMLDecl in the Prolog.
-        (*ctxt).grow();
-        if (*ctxt).content_bytes().starts_with(b"<?xml")
-            && xml_is_blank_char((*ctxt).nth_byte(5) as u32)
-        {
-            // Note that we will switch encoding on the fly.
-            (*ctxt).parse_xmldecl();
-            if (*ctxt).err_no == XmlParserErrors::XmlErrUnsupportedEncoding as i32 {
-                // The XML REC instructs us to stop parsing right here
-                return -1;
-            }
-            (*ctxt).skip_blanks();
-        } else {
-            (*ctxt).version = Some(XML_DEFAULT_VERSION.to_owned());
-        }
-        if (*ctxt).disable_sax == 0 {
-            if let Some(start_document) = (*ctxt)
-                .sax
-                .as_deref_mut()
-                .and_then(|sax| sax.start_document)
-            {
-                start_document((*ctxt).user_data.clone());
-            }
-        }
-        if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-            return -1;
-        }
-
-        // Doing validity checking on chunk doesn't make sense
-        (*ctxt).instate = XmlParserInputState::XmlParserContent;
-        (*ctxt).validate = 0;
-        (*ctxt).loadsubset = 0;
-        (*ctxt).depth = 0;
-
-        (*ctxt).parse_content();
-        if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-            return -1;
-        }
-
-        if (*ctxt).current_byte() == b'<' && (*ctxt).nth_byte(1) == b'/' {
-            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrNotWellBalanced, None);
-        } else if (*ctxt).current_byte() != 0 {
-            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrExtraContent, None);
-        }
-
-        // SAX: end of the document processing.
-        if let Some(end_document) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.end_document) {
-            end_document((*ctxt).user_data.clone());
-        }
-
-        if (*ctxt).well_formed == 0 {
-            return -1;
-        }
-        0
-    }
-}
-
 /// Parse a well-balanced chunk of an XML document
 /// called by the parser
 /// The allowed sequence for the Well Balanced Chunk is the one defined by
@@ -584,205 +465,6 @@ pub unsafe fn xml_parse_balanced_chunk_memory(
     lst: Option<&mut Option<XmlGenericNodePtr>>,
 ) -> i32 {
     unsafe { xml_parse_balanced_chunk_memory_recover(doc, sax, user_data, depth, string, lst, 0) }
-}
-
-/// Parse a well-balanced chunk of an XML document
-/// within the context (DTD, namespaces, etc ...) of the given node.
-///
-/// The allowed sequence for the data is a Well Balanced Chunk defined by
-/// the content production in the XML grammar:
-///
-/// `[43] content ::= (element | CharData | Reference | CDSect | PI | Comment)*`
-///
-/// Returns xmlParserErrors::XML_ERR_OK if the chunk is well balanced, and the parser
-/// error code otherwise
-#[doc(alias = "xmlParseInNodeContext")]
-pub unsafe fn xml_parse_in_node_context(
-    node: XmlGenericNodePtr,
-    data: Vec<u8>,
-    mut options: i32,
-    lst: &mut Option<XmlGenericNodePtr>,
-) -> XmlParserErrors {
-    unsafe {
-        let ctxt: XmlParserCtxtPtr;
-        let mut nsnr = 0;
-        let ret: XmlParserErrors;
-
-        match node.element_type() {
-            XmlElementType::XmlElementNode
-            | XmlElementType::XmlAttributeNode
-            | XmlElementType::XmlTextNode
-            | XmlElementType::XmlCDATASectionNode
-            | XmlElementType::XmlEntityRefNode
-            | XmlElementType::XmlPINode
-            | XmlElementType::XmlCommentNode
-            | XmlElementType::XmlDocumentNode
-            | XmlElementType::XmlHTMLDocumentNode => {}
-            _ => {
-                return XmlParserErrors::XmlErrInternalError;
-            }
-        }
-        let mut node = Some(node);
-        while let Some(now) = node.filter(|node| {
-            !matches!(
-                node.element_type(),
-                XmlElementType::XmlElementNode
-                    | XmlElementType::XmlDocumentNode
-                    | XmlElementType::XmlHTMLDocumentNode
-            )
-        }) {
-            node = now.parent();
-        }
-        let Some(mut node) = node else {
-            return XmlParserErrors::XmlErrInternalError;
-        };
-        let doc = if let Ok(doc) = XmlDocPtr::try_from(node) {
-            Some(doc)
-        } else {
-            node.document()
-        };
-        let Some(doc) = doc else {
-            return XmlParserErrors::XmlErrInternalError;
-        };
-
-        // allocate a context and set-up everything not related to the
-        // node position in the tree
-        if doc.typ == XmlElementType::XmlDocumentNode {
-            ctxt = xml_create_memory_parser_ctxt(data);
-        } else if cfg!(feature = "html") && doc.typ == XmlElementType::XmlHTMLDocumentNode {
-            #[cfg(feature = "html")]
-            {
-                ctxt = html_create_memory_parser_ctxt(data);
-                // When parsing in context, it makes no sense to add implied
-                // elements like html/body/etc...
-                options |= HtmlParserOption::HtmlParseNoimplied as i32;
-            }
-        } else {
-            return XmlParserErrors::XmlErrInternalError;
-        }
-
-        if ctxt.is_null() {
-            return XmlParserErrors::XmlErrNoMemory;
-        }
-
-        // Use input doc's dict if present, else assure XML_PARSE_NODICT is set.
-        // We need a dictionary for xmlDetectSAX2, so if there's no doc dict
-        // we must wait until the last moment to free the original one.
-        options |= XmlParserOption::XmlParseNoDict as i32;
-
-        if let Some(encoding) = doc.encoding.as_deref() {
-            (*ctxt).encoding = Some(encoding.to_owned());
-
-            if let Some(handler) = find_encoding_handler(encoding) {
-                (*ctxt).switch_to_encoding(handler);
-            } else {
-                return XmlParserErrors::XmlErrUnsupportedEncoding;
-            }
-        }
-
-        (*ctxt).use_options_internal(options, None);
-        (*ctxt).detect_sax2();
-        (*ctxt).my_doc = Some(doc);
-        // parsing in context, i.e. as within existing content
-        (*ctxt).input_id = 2;
-        (*ctxt).instate = XmlParserInputState::XmlParserContent;
-
-        let Some(mut fake) = xml_new_doc_comment(node.document(), "") else {
-            xml_free_parser_ctxt(ctxt);
-            return XmlParserErrors::XmlErrNoMemory;
-        };
-        node.add_child(fake.into());
-
-        // At this point, `node.element_type()` is ElementNode, DocumentNode or HTMLDocumentNode.
-        if let Ok(node) = XmlNodePtr::try_from(node) {
-            (*ctxt).node_push(node);
-            // initialize the SAX2 namespaces stack
-            let mut cur = Some(node);
-            while let Some(now) =
-                cur.filter(|cur| cur.element_type() == XmlElementType::XmlElementNode)
-            {
-                let mut ns = now.ns_def;
-                while let Some(cur_ns) = ns {
-                    if (*ctxt).get_namespace(cur_ns.prefix().as_deref()).is_none() {
-                        (*ctxt).ns_push(cur_ns.prefix().as_deref(), &cur_ns.href().unwrap());
-                        nsnr += 1;
-                    }
-                    ns = cur_ns.next;
-                }
-                cur = now.parent().and_then(|p| XmlNodePtr::try_from(p).ok());
-            }
-        }
-
-        if (*ctxt).validate != 0 || (*ctxt).replace_entities != 0 {
-            // ID/IDREF registration will be done in xmlValidateElement below
-            (*ctxt).loadsubset |= XML_SKIP_IDS as i32;
-        }
-
-        #[cfg(feature = "html")]
-        {
-            if doc.typ == XmlElementType::XmlHTMLDocumentNode {
-                __html_parse_content(ctxt as _);
-            } else {
-                (*ctxt).parse_content();
-            }
-        }
-        #[cfg(not(feature = "html"))]
-        {
-            (*ctxt).parse_content();
-        }
-
-        (*ctxt).ns_pop(nsnr);
-        if (*ctxt).current_byte() == b'<' && (*ctxt).nth_byte(1) == b'/' {
-            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrNotWellBalanced, None);
-        } else if (*ctxt).current_byte() != 0 {
-            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrExtraContent, None);
-        }
-        if (*ctxt)
-            .node
-            .is_some_and(|ctxt_node| XmlGenericNodePtr::from(ctxt_node) != node)
-        {
-            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrNotWellBalanced, None);
-            (*ctxt).well_formed = 0;
-        }
-
-        if (*ctxt).well_formed == 0 {
-            if (*ctxt).err_no == 0 {
-                ret = XmlParserErrors::XmlErrInternalError;
-            } else {
-                ret = XmlParserErrors::try_from((*ctxt).err_no).unwrap();
-            }
-        } else {
-            ret = XmlParserErrors::XmlErrOK;
-        }
-
-        // Return the newly created nodeset after unlinking it from
-        // the pseudo sibling.
-
-        let mut cur = fake.next.take();
-        node.set_last(Some(fake.into()));
-
-        if let Some(mut cur) = cur {
-            cur.set_prev(None);
-        }
-
-        *lst = cur;
-
-        while let Some(mut now) = cur {
-            now.set_parent(None);
-            cur = now.next();
-        }
-
-        fake.unlink();
-        xml_free_node(fake);
-
-        if !matches!(ret, XmlParserErrors::XmlErrOK) {
-            xml_free_node_list(lst.take());
-        }
-
-        xml_free_parser_ctxt(ctxt);
-
-        ret
-    }
 }
 
 /// Parse a well-balanced chunk of an XML document

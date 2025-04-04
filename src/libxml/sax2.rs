@@ -42,8 +42,9 @@ use crate::{
         xmlstring::XmlChar,
     },
     parser::{
-        XML_SAX2_MAGIC, XmlParserCtxtPtr, XmlParserInput, XmlParserInputState, XmlParserOption,
-        build_qname, split_qname, xml_err_memory,
+        XML_COMPLETE_ATTRS, XML_SAX2_MAGIC, XML_SKIP_IDS, XML_SUBSTITUTE_REF, XmlParserCtxtPtr,
+        XmlParserInput, XmlParserInputState, XmlParserOption, build_qname, split_qname,
+        xml_err_memory,
     },
     tree::{
         __XML_REGISTER_CALLBACKS, NodeCommon, XmlAttr, XmlAttributeDefault, XmlAttributeType,
@@ -60,10 +61,8 @@ use crate::{
 
 use super::{
     globals::{xml_free, xml_register_node_default_value},
-    parser::{XML_COMPLETE_ATTRS, XML_SKIP_IDS, XmlSAXHandler, xml_load_external_entity},
-    parser_internals::{
-        XML_MAX_TEXT_LENGTH, XML_STRING_TEXT, XML_SUBSTITUTE_REF, XML_VCTXT_DTD_VALIDATED,
-    },
+    parser::{XmlSAXHandler, xml_load_external_entity},
+    parser_internals::{XML_MAX_TEXT_LENGTH, XML_STRING_TEXT, XML_VCTXT_DTD_VALIDATED},
     valid::{
         xml_add_element_decl, xml_add_id, xml_add_notation_decl, xml_add_ref,
         xml_get_dtd_qelement_desc, xml_is_id, xml_is_ref, xml_valid_ctxt_normalize_attribute_value,
@@ -1323,7 +1322,7 @@ unsafe fn xml_sax2_attribute_internal(
     value: Option<&str>,
     prefix: Option<&str>,
 ) {
-    use crate::{html::tree::html_is_boolean_attr, uri::XmlURI};
+    use crate::{html::tree::html_is_boolean_attr, parser::XML_SKIP_IDS, uri::XmlURI};
 
     unsafe {
         let nval: *mut XmlChar;
@@ -1752,6 +1751,8 @@ unsafe fn xml_check_defaulted_attributes(
     prefix: Option<&str>,
     atts: &[(String, Option<String>)],
 ) {
+    use crate::parser::XML_COMPLETE_ATTRS;
+
     unsafe {
         use crate::parser::build_qname;
 

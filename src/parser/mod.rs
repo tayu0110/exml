@@ -75,6 +75,28 @@ pub use push::*;
 #[cfg(feature = "libxml_push")]
 pub use qname::*;
 
+// /// If no entities need to be substituted.
+// const XML_SUBSTITUTE_NONE: usize = 0;
+/// Whether general entities need to be substituted.
+pub(crate) const XML_SUBSTITUTE_REF: usize = 1;
+/// Whether parameter entities need to be substituted.
+pub(crate) const XML_SUBSTITUTE_PEREF: usize = 2;
+// /// Both general and parameter entities need to be substituted.
+// const XML_SUBSTITUTE_BOTH: usize = 3;
+
+/// Bit in the loadsubset context field to tell to do ID/REFs lookups.
+/// Use it to initialize xmlLoadExtDtdDefaultValue.
+pub const XML_DETECT_IDS: usize = 2;
+
+/// Bit in the loadsubset context field to tell to do complete the
+/// elements attributes lists with the ones defaulted from the DTDs.
+/// Use it to initialize xmlLoadExtDtdDefaultValue.
+pub const XML_COMPLETE_ATTRS: usize = 4;
+
+/// Bit in the loadsubset context field to tell to not do ID/REFs registration.
+/// Used to initialize xmlLoadExtDtdDefaultValue in some special cases.
+pub const XML_SKIP_IDS: usize = 8;
+
 pub(crate) trait XmlParserCharValid {
     fn is_name_char(&self, ctxt: &XmlParserCtxt) -> bool;
     // The two following functions are related to the change of accepted

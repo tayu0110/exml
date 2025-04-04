@@ -63,9 +63,8 @@ use exml::{
     libxml::{
         globals::{xml_deregister_node_default, xml_free, xml_register_node_default},
         parser::{
-            XML_COMPLETE_ATTRS, XML_DETECT_IDS, XmlExternalEntityLoader, XmlSAXHandler,
-            XmlSAXHandlerPtr, XmlSAXLocatorPtr, xml_cleanup_parser, xml_get_external_entity_loader,
-            xml_set_external_entity_loader,
+            XmlExternalEntityLoader, XmlSAXHandler, XmlSAXHandlerPtr, XmlSAXLocatorPtr,
+            xml_cleanup_parser, xml_get_external_entity_loader, xml_set_external_entity_loader,
         },
         relaxng::{
             XmlRelaxNG, xml_relaxng_free, xml_relaxng_parse, xml_relaxng_set_valid_errors,
@@ -84,10 +83,10 @@ use exml::{
         xmlstring::XmlChar,
     },
     parser::{
-        XML_SAX2_MAGIC, XmlParserCtxtPtr, XmlParserInput, XmlParserOption,
-        xml_create_push_parser_ctxt, xml_ctxt_read_file, xml_ctxt_read_io, xml_ctxt_read_memory,
-        xml_free_parser_ctxt, xml_new_parser_ctxt, xml_new_sax_parser_ctxt, xml_parse_dtd,
-        xml_read_file, xml_read_io, xml_read_memory,
+        XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SAX2_MAGIC, XmlParserCtxtPtr, XmlParserInput,
+        XmlParserOption, xml_create_push_parser_ctxt, xml_ctxt_read_file, xml_ctxt_read_io,
+        xml_ctxt_read_memory, xml_free_parser_ctxt, xml_new_parser_ctxt, xml_new_sax_parser_ctxt,
+        xml_parse_dtd, xml_read_file, xml_read_io, xml_read_memory,
     },
     relaxng::{
         xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt, xml_relaxng_new_parser_ctxt,

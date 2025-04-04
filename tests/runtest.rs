@@ -4107,7 +4107,7 @@ unsafe fn load_xpath_expr(parent_doc: XmlDocPtr, filename: &str) -> XmlXPathObje
     unsafe {
         use exml::{
             globals::{set_load_ext_dtd_default_value, set_substitute_entities_default_value},
-            libxml::parser::{XML_COMPLETE_ATTRS, XML_DETECT_IDS},
+            parser::{XML_COMPLETE_ATTRS, XML_DETECT_IDS},
             tree::NodeCommon,
             xpath::{
                 XmlXPathContextPtr, internals::xml_xpath_register_ns, xml_xpath_eval_expression,
@@ -4213,7 +4213,7 @@ unsafe fn c14n_run_test(
         use exml::{
             c14n::xml_c14n_doc_dump_memory,
             globals::{set_load_ext_dtd_default_value, set_substitute_entities_default_value},
-            libxml::parser::{XML_COMPLETE_ATTRS, XML_DETECT_IDS},
+            parser::{XML_COMPLETE_ATTRS, XML_DETECT_IDS},
             xpath::xml_xpath_free_object,
         };
 

@@ -53,8 +53,7 @@ use crate::{
         globals::{xml_deregister_node_default_value, xml_free, xml_malloc},
         parser::{
             CDATABlockSAXFunc, CharactersSAXFunc, EndElementNsSAX2Func, EndElementSAXFunc,
-            StartElementNsSAX2Func, StartElementSAXFunc, XML_COMPLETE_ATTRS, XML_DETECT_IDS,
-            XmlSAXHandler,
+            StartElementNsSAX2Func, StartElementSAXFunc, XmlSAXHandler,
         },
         relaxng::{
             XmlRelaxNGPtr, xml_relaxng_free, xml_relaxng_parse, xml_relaxng_set_valid_errors,
@@ -68,7 +67,10 @@ use crate::{
         },
         xmlstring::{XmlChar, xml_strdup},
     },
-    parser::{XML_SAX2_MAGIC, XmlParserCtxtPtr, XmlParserMode, XmlParserOption},
+    parser::{
+        XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SAX2_MAGIC, XmlParserCtxtPtr, XmlParserMode,
+        XmlParserOption,
+    },
     tree::{
         __XML_REGISTER_CALLBACKS, XmlElementType, XmlGenericNodePtr, XmlNodePtr, xml_copy_dtd,
         xml_doc_copy_node, xml_free_doc, xml_free_dtd, xml_free_node, xml_free_ns,

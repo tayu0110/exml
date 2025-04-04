@@ -32,13 +32,12 @@ use crate::{
     libxml::{
         chvalid::{xml_is_base_char, xml_is_ideographic},
         dict::xml_dict_free,
-        parser::XML_SKIP_IDS,
         valid::xml_validate_element,
         xmlstring::XmlChar,
     },
     parser::{
-        XmlParserCtxtPtr, XmlParserInputState, XmlParserOption, xml_create_memory_parser_ctxt,
-        xml_fatal_err, xml_fatal_err_msg, xml_free_parser_ctxt,
+        XML_SKIP_IDS, XmlParserCtxtPtr, XmlParserInputState, XmlParserOption,
+        xml_create_memory_parser_ctxt, xml_fatal_err, xml_fatal_err_msg, xml_free_parser_ctxt,
     },
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlDocProperties, XmlElementType, XmlGenericNodePtr,
@@ -307,15 +306,6 @@ pub(crate) unsafe fn xml_parse_balanced_chunk_memory_internal(
         ret
     }
 }
-
-// /// If no entities need to be substituted.
-// const XML_SUBSTITUTE_NONE: usize = 0;
-/// Whether general entities need to be substituted.
-pub(crate) const XML_SUBSTITUTE_REF: usize = 1;
-/// Whether parameter entities need to be substituted.
-pub(crate) const XML_SUBSTITUTE_PEREF: usize = 2;
-// /// Both general and parameter entities need to be substituted.
-// const XML_SUBSTITUTE_BOTH: usize = 3;
 
 /// Append the char value in the array
 ///
