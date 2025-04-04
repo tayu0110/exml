@@ -221,7 +221,7 @@ macro_rules! xml_warning_msg {
         if $ctxt.disable_sax == 0
             || !matches!($ctxt.instate, $crate::parser::XmlParserInputState::XmlParserEOF)
         {
-            if let Some(sax) = $ctxt.sax.as_deref().filter(|sax| sax.initialized == $crate::libxml::parser::XML_SAX2_MAGIC as u32) {
+            if let Some(sax) = $ctxt.sax.as_deref().filter(|sax| sax.initialized == $crate::parser::XML_SAX2_MAGIC as u32) {
                 schannel = sax.serror;
             }
             $crate::error::__xml_raise_error!(
@@ -339,7 +339,7 @@ macro_rules! xml_validity_error {
             || !matches!($ctxt.instate, XmlParserInputState::XmlParserEOF)
         {
             $ctxt.err_no = $error as i32;
-            if let Some(sax) = $ctxt.sax.as_deref().filter(|sax| sax.initialized == $crate::libxml::parser::XML_SAX2_MAGIC as u32) {
+            if let Some(sax) = $ctxt.sax.as_deref().filter(|sax| sax.initialized == $crate::parser::XML_SAX2_MAGIC as u32) {
                 schannel = sax.serror;
             }
             $crate::error::__xml_raise_error!(

@@ -42,8 +42,8 @@ use crate::{
         xmlstring::XmlChar,
     },
     parser::{
-        XmlParserCtxtPtr, XmlParserInput, XmlParserInputState, XmlParserOption, build_qname,
-        split_qname, xml_err_memory,
+        XML_SAX2_MAGIC, XmlParserCtxtPtr, XmlParserInput, XmlParserInputState, XmlParserOption,
+        build_qname, split_qname, xml_err_memory,
     },
     tree::{
         __XML_REGISTER_CALLBACKS, NodeCommon, XmlAttr, XmlAttributeDefault, XmlAttributeType,
@@ -60,9 +60,7 @@ use crate::{
 
 use super::{
     globals::{xml_free, xml_register_node_default_value},
-    parser::{
-        XML_COMPLETE_ATTRS, XML_SAX2_MAGIC, XML_SKIP_IDS, XmlSAXHandler, xml_load_external_entity,
-    },
+    parser::{XML_COMPLETE_ATTRS, XML_SKIP_IDS, XmlSAXHandler, xml_load_external_entity},
     parser_internals::{
         XML_MAX_TEXT_LENGTH, XML_STRING_TEXT, XML_SUBSTITUTE_REF, XML_VCTXT_DTD_VALIDATED,
     },

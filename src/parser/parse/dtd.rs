@@ -24,6 +24,8 @@ use crate::{
     },
     uri::XmlURI,
 };
+#[cfg(feature = "libxml_valid")]
+use crate::{io::XmlParserInputBuffer, libxml::parser::XmlSAXHandler, tree::XmlDtdPtr};
 
 use super::{SAX_COMPAT_MODE, attr_normalize_space};
 
@@ -2289,5 +2291,118 @@ impl XmlParserCtxt {
                 }
             }
         }
+    }
+}
+
+/// Load and parse an external subset.
+///
+/// Returns the resulting xmlDtdPtr or NULL in case of error.
+#[doc(alias = "xmlParseDTD")]
+#[cfg(feature = "libxml_valid")]
+pub unsafe fn xml_parse_dtd(
+    external_id: Option<&str>,
+    system_id: Option<&str>,
+) -> Option<XmlDtdPtr> {
+    use crate::parser::xml_sax_parse_dtd;
+
+    unsafe { xml_sax_parse_dtd(None, external_id, system_id) }
+}
+
+/// Load and parse a DTD
+///
+/// Returns the resulting xmlDtdPtr or NULL in case of error.
+/// `input` will be freed by the function in any case.
+#[doc(alias = "xmlIOParseDTD")]
+#[cfg(feature = "libxml_valid")]
+pub unsafe fn xml_io_parse_dtd(
+    sax: Option<Box<XmlSAXHandler>>,
+    input: XmlParserInputBuffer,
+    mut enc: XmlCharEncoding,
+) -> Option<XmlDtdPtr> {
+    use crate::{
+        parser::{XmlParserOption, xml_free_parser_ctxt},
+        tree::xml_free_doc,
+    };
+
+    unsafe {
+        use crate::parser::xml_new_sax_parser_ctxt;
+
+        let Ok(ctxt) = xml_new_sax_parser_ctxt(sax, None) else {
+            return None;
+        };
+
+        // We are loading a DTD
+        (*ctxt).options |= XmlParserOption::XmlParseDTDLoad as i32;
+
+        (*ctxt).detect_sax2();
+
+        // generate a parser input from the I/O handler
+        let Some(pinput) = XmlParserInput::from_io(&mut *ctxt, input, XmlCharEncoding::None) else {
+            xml_free_parser_ctxt(ctxt);
+            return None;
+        };
+        let input_id = pinput.id;
+
+        // plug some encoding conversion routines here.
+        if (*ctxt).push_input(pinput) < 0 {
+            xml_free_parser_ctxt(ctxt);
+            return None;
+        }
+        if !matches!(enc, XmlCharEncoding::None) {
+            (*ctxt).switch_encoding(enc);
+        }
+
+        if let Some(pinput) = (*ctxt)
+            .input_tab
+            .iter_mut()
+            .find(|input| input.id == input_id)
+        {
+            pinput.filename = None;
+            pinput.line = 1;
+            pinput.col = 1;
+            pinput.base += pinput.cur;
+            pinput.cur = 0;
+        }
+
+        // let's parse that entity knowing it's an external subset.
+        (*ctxt).in_subset = 2;
+        (*ctxt).my_doc = xml_new_doc(Some("1.0"));
+        let Some(mut my_doc) = (*ctxt).my_doc else {
+            xml_err_memory(Some(&mut *ctxt), Some("New Doc failed"));
+            return None;
+        };
+        my_doc.properties = XmlDocProperties::XmlDocInternal as i32;
+        my_doc.ext_subset = xml_new_dtd((*ctxt).my_doc, Some("none"), Some("none"), Some("none"));
+
+        if matches!(enc, XmlCharEncoding::None) && (*ctxt).input().unwrap().remainder_len() >= 4 {
+            // Get the 4 first bytes and decode the charset
+            // if enc != xmlCharEncoding::XML_CHAR_ENCODING_NONE
+            // plug some encoding conversion routines.
+            enc = detect_encoding(&(*ctxt).content_bytes()[..4]);
+            if !matches!(enc, XmlCharEncoding::None) {
+                (*ctxt).switch_encoding(enc);
+            }
+        }
+
+        (*ctxt).parse_external_subset(Some("none"), Some("none"));
+
+        let mut ret = None;
+        if let Some(mut my_doc) = (*ctxt).my_doc.take() {
+            if (*ctxt).well_formed != 0 {
+                ret = my_doc.ext_subset.take();
+                if let Some(mut ret) = ret {
+                    ret.doc = None;
+                    let mut tmp = ret.children;
+                    while let Some(mut now) = tmp {
+                        now.set_document(None);
+                        tmp = now.next();
+                    }
+                }
+            }
+            xml_free_doc(my_doc);
+        }
+        xml_free_parser_ctxt(ctxt);
+
+        ret
     }
 }

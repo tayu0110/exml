@@ -20,7 +20,7 @@ use exml::{
     io::{XmlInputCallback, register_input_callbacks, xml_no_net_external_entity_loader},
     libxml::{
         parser::{
-            XML_SAX2_MAGIC, XmlSAXHandler, XmlSAXLocatorPtr, xml_cleanup_parser, xml_init_parser,
+            XmlSAXHandler, XmlSAXLocatorPtr, xml_cleanup_parser, xml_init_parser,
             xml_set_external_entity_loader,
         },
         parser_internals::{XML_MAX_LOOKUP_LIMIT, XML_MAX_TEXT_LENGTH},
@@ -30,7 +30,7 @@ use exml::{
         },
     },
     parser::{
-        XmlParserCtxtPtr, XmlParserInput, XmlParserOption, xml_ctxt_read_file,
+        XML_SAX2_MAGIC, XmlParserCtxtPtr, XmlParserInput, XmlParserOption, xml_ctxt_read_file,
         xml_free_parser_ctxt, xml_new_sax_parser_ctxt,
     },
     tree::{

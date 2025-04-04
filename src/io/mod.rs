@@ -346,7 +346,7 @@ macro_rules! __xml_loader_err {
         use $crate::{
             error::XmlErrorLevel,
             globals::{GenericError, StructuredError},
-            libxml::parser::XML_SAX2_MAGIC,
+            parser::XML_SAX2_MAGIC,
         };
         let mut schannel: Option<StructuredError> = None;
         let mut channel: Option<GenericError> = None;

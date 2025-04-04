@@ -23,7 +23,7 @@ use std::{
 
 use crate::{
     globals::{GLOBAL_STATE, GenericError, GenericErrorContext, StructuredError},
-    libxml::parser::XML_SAX2_MAGIC,
+    parser::XML_SAX2_MAGIC,
     parser::{XmlParserCtxtPtr, XmlParserInput},
     tree::{XmlElementType, XmlGenericNodePtr, XmlNodePtr},
 };

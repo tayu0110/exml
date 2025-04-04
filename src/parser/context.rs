@@ -3,6 +3,7 @@ use std::{
     cell::RefCell,
     collections::HashMap,
     ffi::c_void,
+    io::Read,
     ptr::{drop_in_place, null_mut},
     rc::Rc,
     str::{from_utf8, from_utf8_unchecked},
@@ -13,7 +14,8 @@ use crate::{
     buf::XmlBufRef,
     dict::{XmlDictPtr, xml_dict_create, xml_dict_free, xml_dict_set_limit},
     encoding::{
-        XmlCharEncoding, XmlCharEncodingHandler, find_encoding_handler, get_encoding_handler,
+        XmlCharEncoding, XmlCharEncodingHandler, detect_encoding, find_encoding_handler,
+        get_encoding_handler,
     },
     error::{XmlError, XmlParserErrors, parser_validity_error, parser_validity_warning},
     generic_error,
@@ -30,8 +32,8 @@ use crate::{
         chvalid::{xml_is_blank_char, xml_is_char},
         globals::{xml_free, xml_malloc},
         parser::{
-            XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SAX2_MAGIC, XmlParserMode, XmlSAXHandler,
-            XmlStartTag, xml_init_parser, xml_load_external_entity,
+            XML_COMPLETE_ATTRS, XML_DETECT_IDS, XmlSAXHandler, XmlStartTag, xml_init_parser,
+            xml_load_external_entity,
         },
         parser_internals::{
             INPUT_CHUNK, LINE_LEN, XML_MAX_DICTIONARY_LIMIT, XML_MAX_LOOKUP_LIMIT,
@@ -45,18 +47,21 @@ use crate::{
     },
     parser::{
         __xml_err_encoding, XmlParserInputState, xml_err_encoding_int, xml_err_internal,
-        xml_fatal_err_msg_int,
+        xml_fatal_err_msg_int, xml_fatal_err_msg_str,
     },
     tree::{
         XML_ENT_EXPANDING, XML_ENT_PARSED, XML_XML_NAMESPACE, XmlAttrPtr, XmlAttributeType,
         XmlDocPtr, XmlEntityType, XmlNodePtr, xml_free_doc,
     },
-    uri::build_uri,
+    uri::{build_uri, canonic_path},
 };
 
 use super::{
     XmlParserInput, XmlParserNodeInfo, XmlParserNodeInfoSeq, xml_err_memory, xml_fatal_err,
 };
+
+/// Special constant found in SAX2 blocks initialized fields
+pub const XML_SAX2_MAGIC: usize = 0xDEEDBEAF;
 
 /// This is the set of XML parser options that can be passed down
 /// to the xmlReadDoc() and similar calls.
@@ -90,6 +95,20 @@ pub enum XmlParserOption {
     XmlParseBigLines = 1 << 22,  /* Store big lines numbers in text PSVI field */
 }
 
+/// A parser can operate in various modes
+#[doc(alias = "xmlParserMode")]
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum XmlParserMode {
+    #[default]
+    XmlParseUnknown = 0,
+    XmlParseDOM = 1,
+    XmlParseSAX = 2,
+    XmlParsePushDOM = 3,
+    XmlParsePushSAX = 4,
+    XmlParseReader = 5,
+}
+
 /// The parser context.
 ///
 /// # Note
@@ -100,8 +119,8 @@ pub enum XmlParserOption {
 /// also reflect the parser state. However most of the parsing routines
 /// takes as the only argument the parser context pointer, so migrating
 /// to a state based parser for progressive parsing shouldn't be too hard.
-#[doc(alias = "xmlParserCtxt")]
 pub type XmlParserCtxtPtr = *mut XmlParserCtxt;
+#[doc(alias = "xmlParserCtxt")]
 #[repr(C)]
 pub struct XmlParserCtxt {
     // The SAX handler
@@ -549,6 +568,78 @@ impl XmlParserCtxt {
             if self.last_error.is_err() {
                 self.last_error.reset();
             }
+        }
+    }
+
+    /// Reset a push parser context
+    ///
+    /// Returns 0 in case of success and 1 in case of error
+    #[doc(alias = "xmlCtxtResetPush")]
+    pub unsafe fn reset_push(
+        &mut self,
+        chunk: &[u8],
+        filename: Option<&str>,
+        encoding: Option<&str>,
+    ) -> i32 {
+        unsafe {
+            let enc = if encoding.is_none() && chunk.len() >= 4 {
+                detect_encoding(chunk)
+            } else {
+                XmlCharEncoding::None
+            };
+
+            let buf = XmlParserInputBuffer::new(enc);
+
+            self.reset();
+
+            if filename.is_none() {
+                self.directory = None;
+            } else if let Some(dir) = filename.and_then(xml_parser_get_directory) {
+                self.directory = Some(dir.to_string_lossy().into_owned());
+            }
+
+            let Some(mut input_stream) = XmlParserInput::new(Some(self)) else {
+                return 1;
+            };
+
+            input_stream.filename = filename
+                .map(canonic_path)
+                .map(|filanem| filanem.into_owned());
+            input_stream.buf = Some(buf);
+            input_stream.reset_base();
+
+            self.input_push(input_stream);
+
+            if !chunk.is_empty() && self.input().is_some() && self.input().unwrap().buf.is_some() {
+                let base = self.input().unwrap().get_base();
+                let cur = self.input().unwrap().offset_from_base();
+
+                self.input_mut()
+                    .unwrap()
+                    .buf
+                    .as_mut()
+                    .unwrap()
+                    .push_bytes(chunk);
+                self.input_mut().unwrap().set_base_and_cursor(base, cur);
+            }
+
+            if let Some(encoding) = encoding {
+                self.encoding = Some(encoding.to_owned());
+                if let Some(handler) = find_encoding_handler(self.encoding().unwrap()) {
+                    self.switch_to_encoding(handler);
+                } else {
+                    xml_fatal_err_msg_str!(
+                        self,
+                        XmlParserErrors::XmlErrUnsupportedEncoding,
+                        "Unsupported encoding {}\n",
+                        encoding
+                    );
+                };
+            } else if !matches!(enc, XmlCharEncoding::None) {
+                self.switch_encoding(enc);
+            }
+
+            0
         }
     }
 
@@ -1671,7 +1762,6 @@ impl Default for XmlParserCtxt {
             ext_sub_system: None,
             space_tab: vec![],
             depth: 0,
-            // entity: null_mut(),
             charset: XmlCharEncoding::None,
             nodelen: 0,
             nodemem: 0,
@@ -1918,19 +2008,6 @@ pub unsafe fn xml_new_sax_parser_ctxt(
     }
 }
 
-// /// Initialize a parser context
-// ///
-// /// Returns 0 in case of success and -1 in case of error
-// #[doc(alias = "xmlInitParserCtxt")]
-// pub(crate) unsafe fn xml_init_parser_ctxt(ctxt: XmlParserCtxtPtr) -> i32 {
-//     unsafe {
-//         match xml_init_sax_parser_ctxt(ctxt, None, None) {
-//             Ok(_) => 0,
-//             Err(_) => -1,
-//         }
-//     }
-// }
-
 /// Clear (release owned resources) and reinitialize a parser context
 #[doc(alias = "xmlClearParserCtxt")]
 pub unsafe fn xml_clear_parser_ctxt(ctxt: XmlParserCtxtPtr) {
@@ -1966,6 +2043,32 @@ pub unsafe fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
 #[doc(alias = "xmlCreateFileParserCtxt")]
 pub unsafe fn xml_create_file_parser_ctxt(filename: Option<&str>) -> XmlParserCtxtPtr {
     unsafe { xml_create_url_parser_ctxt(filename, 0) }
+}
+
+/// Create a parser context for using the XML parser with an existing I/O stream
+///
+/// Returns the new parser context or NULL
+#[doc(alias = "xmlCreateIOParserCtxt")]
+pub unsafe fn xml_create_io_parser_ctxt(
+    sax: Option<Box<XmlSAXHandler>>,
+    user_data: Option<GenericErrorContext>,
+    ioctx: impl Read + 'static,
+    enc: XmlCharEncoding,
+) -> XmlParserCtxtPtr {
+    unsafe {
+        let buf = XmlParserInputBuffer::from_reader(ioctx, enc);
+        let Ok(ctxt) = xml_new_sax_parser_ctxt(sax, user_data) else {
+            return null_mut();
+        };
+
+        let Some(input_stream) = XmlParserInput::from_io(&mut *ctxt, buf, enc) else {
+            xml_free_parser_ctxt(ctxt);
+            return null_mut();
+        };
+        (*ctxt).input_push(input_stream);
+
+        ctxt
+    }
 }
 
 /// Create a parser context for a file or URL content.

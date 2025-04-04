@@ -2139,10 +2139,8 @@ impl XmlShellCtxt<'_> {
         unsafe {
             use crate::{
                 globals::GLOBAL_STATE,
-                libxml::{
-                    parser::xml_parse_dtd,
-                    valid::{xml_validate_document, xml_validate_dtd},
-                },
+                libxml::valid::{xml_validate_document, xml_validate_dtd},
+                parser::xml_parse_dtd,
                 tree::xml_free_dtd,
             };
 

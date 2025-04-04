@@ -56,7 +56,7 @@ use exml::{
     libxml::{
         globals::{set_xml_free, set_xml_malloc, set_xml_mem_strdup, set_xml_realloc, xml_free},
         parser::{
-            XML_SAX2_MAGIC, XmlSAXHandler, XmlSAXLocatorPtr, xml_cleanup_parser, xml_init_parser,
+            XmlSAXHandler, XmlSAXLocatorPtr, xml_cleanup_parser, xml_init_parser,
             xml_set_external_entity_loader,
         },
         relaxng::XmlRelaxNGPtr,
@@ -69,8 +69,9 @@ use exml::{
         xmlstring::XmlChar,
     },
     parser::{
-        XmlParserCtxtPtr, XmlParserInput, XmlParserOption, xml_create_file_parser_ctxt,
-        xml_free_parser_ctxt, xml_parse_file, xml_read_file, xml_read_memory,
+        XML_SAX2_MAGIC, XmlParserCtxtPtr, XmlParserInput, XmlParserOption,
+        xml_create_file_parser_ctxt, xml_free_parser_ctxt, xml_parse_file, xml_read_file,
+        xml_read_memory,
     },
     relaxng::xml_relaxng_init_types,
     tree::{

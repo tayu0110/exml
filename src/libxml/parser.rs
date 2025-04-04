@@ -43,10 +43,7 @@
 // daniel@veillard.com
 
 use std::{
-    ffi::{CStr, c_char, c_void},
-    io::Read,
-    ptr::null_mut,
-    slice::from_raw_parts,
+    ffi::{CStr, c_void},
     sync::atomic::{AtomicBool, AtomicPtr, Ordering},
 };
 
@@ -54,17 +51,14 @@ use std::{
 use crate::libxml::catalog::xml_catalog_cleanup;
 #[cfg(feature = "schema")]
 use crate::relaxng::xml_relaxng_cleanup_types;
-#[cfg(feature = "libxml_valid")]
-use crate::tree::XmlDtdPtr;
 use crate::{
     encoding::{XmlCharEncoding, detect_encoding, find_encoding_handler},
     error::{XmlError, XmlParserErrors},
     globals::{GenericErrorContext, StructuredError},
     html::parser::{__html_parse_content, HtmlParserOption, html_create_memory_parser_ctxt},
     io::{
-        XmlParserInputBuffer, cleanup_input_callbacks, cleanup_output_callbacks,
-        register_default_input_callbacks, register_default_output_callbacks,
-        xml_default_external_entity_loader, xml_no_net_exists, xml_parser_get_directory,
+        cleanup_input_callbacks, cleanup_output_callbacks, register_default_input_callbacks,
+        register_default_output_callbacks, xml_default_external_entity_loader, xml_no_net_exists,
     },
     libxml::{
         dict::{__xml_initialize_dict, xml_cleanup_dict_internal},
@@ -77,14 +71,13 @@ use crate::{
     },
     parser::{
         XML_DEFAULT_VERSION, XmlParserCtxtPtr, XmlParserInput, XmlParserInputState,
-        XmlParserOption, xml_create_memory_parser_ctxt, xml_err_memory, xml_fatal_err,
-        xml_fatal_err_msg_str, xml_free_parser_ctxt, xml_new_sax_parser_ctxt,
+        XmlParserOption, xml_create_memory_parser_ctxt, xml_fatal_err, xml_free_parser_ctxt,
     },
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlAttributeDefault, XmlAttributeType, XmlDocProperties,
         XmlDocPtr, XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr,
         XmlEntityType, XmlEnumeration, XmlGenericNodePtr, XmlNodePtr, xml_free_doc, xml_free_node,
-        xml_free_node_list, xml_new_doc, xml_new_doc_comment, xml_new_doc_node, xml_new_dtd,
+        xml_free_node_list, xml_new_doc, xml_new_doc_comment, xml_new_doc_node,
     },
     uri::canonic_path,
     xpath::xml_init_xpath_internal,
@@ -98,10 +91,6 @@ use super::{
     },
 };
 
-/// Callback for freeing some parser input allocations.
-#[doc(alias = "xmlParserInputDeallocate")]
-pub type XmlParserInputDeallocate = unsafe fn(*mut XmlChar) -> c_void;
-
 /// Bit in the loadsubset context field to tell to do ID/REFs lookups.
 /// Use it to initialize xmlLoadExtDtdDefaultValue.
 pub const XML_DETECT_IDS: usize = 2;
@@ -114,20 +103,6 @@ pub const XML_COMPLETE_ATTRS: usize = 4;
 /// Bit in the loadsubset context field to tell to not do ID/REFs registration.
 /// Used to initialize xmlLoadExtDtdDefaultValue in some special cases.
 pub const XML_SKIP_IDS: usize = 8;
-
-/// A parser can operate in various modes
-#[doc(alias = "xmlParserMode")]
-#[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum XmlParserMode {
-    #[default]
-    XmlParseUnknown = 0,
-    XmlParseDOM = 1,
-    XmlParseSAX = 2,
-    XmlParsePushDOM = 3,
-    XmlParsePushSAX = 4,
-    XmlParseReader = 5,
-}
 
 #[repr(C)]
 #[derive(Clone, Default)]
@@ -332,9 +307,6 @@ pub type HasInternalSubsetSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>) 
 /// Returns 1 if true
 #[doc(alias = "hasExternalSubsetSAXFunc")]
 pub type HasExternalSubsetSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>) -> i32;
-
-/// Special constant found in SAX2 blocks initialized fields
-pub const XML_SAX2_MAGIC: usize = 0xDEEDBEAF;
 
 /// SAX2 callback when an element start has been detected by the parser.
 /// It provides the namespace information for the element, as well as
@@ -589,116 +561,6 @@ pub unsafe fn xml_parse_ext_parsed_ent(ctxt: XmlParserCtxtPtr) -> i32 {
             return -1;
         }
         0
-    }
-}
-
-/// Load and parse an external subset.
-///
-/// Returns the resulting xmlDtdPtr or NULL in case of error.
-#[doc(alias = "xmlParseDTD")]
-#[cfg(feature = "libxml_valid")]
-pub unsafe fn xml_parse_dtd(
-    external_id: Option<&str>,
-    system_id: Option<&str>,
-) -> Option<XmlDtdPtr> {
-    use crate::parser::xml_sax_parse_dtd;
-
-    unsafe { xml_sax_parse_dtd(None, external_id, system_id) }
-}
-
-/// Load and parse a DTD
-///
-/// Returns the resulting xmlDtdPtr or NULL in case of error.
-/// `input` will be freed by the function in any case.
-#[doc(alias = "xmlIOParseDTD")]
-#[cfg(feature = "libxml_valid")]
-pub unsafe fn xml_io_parse_dtd(
-    sax: Option<Box<XmlSAXHandler>>,
-    input: XmlParserInputBuffer,
-    mut enc: XmlCharEncoding,
-) -> Option<XmlDtdPtr> {
-    use crate::parser::XmlParserOption;
-
-    unsafe {
-        use crate::parser::xml_new_sax_parser_ctxt;
-
-        let Ok(ctxt) = xml_new_sax_parser_ctxt(sax, None) else {
-            return None;
-        };
-
-        // We are loading a DTD
-        (*ctxt).options |= XmlParserOption::XmlParseDTDLoad as i32;
-
-        (*ctxt).detect_sax2();
-
-        // generate a parser input from the I/O handler
-        let Some(pinput) = XmlParserInput::from_io(&mut *ctxt, input, XmlCharEncoding::None) else {
-            xml_free_parser_ctxt(ctxt);
-            return None;
-        };
-        let input_id = pinput.id;
-
-        // plug some encoding conversion routines here.
-        if (*ctxt).push_input(pinput) < 0 {
-            xml_free_parser_ctxt(ctxt);
-            return None;
-        }
-        if !matches!(enc, XmlCharEncoding::None) {
-            (*ctxt).switch_encoding(enc);
-        }
-
-        if let Some(pinput) = (*ctxt)
-            .input_tab
-            .iter_mut()
-            .find(|input| input.id == input_id)
-        {
-            pinput.filename = None;
-            pinput.line = 1;
-            pinput.col = 1;
-            pinput.base += pinput.cur;
-            pinput.cur = 0;
-        }
-
-        // let's parse that entity knowing it's an external subset.
-        (*ctxt).in_subset = 2;
-        (*ctxt).my_doc = xml_new_doc(Some("1.0"));
-        let Some(mut my_doc) = (*ctxt).my_doc else {
-            xml_err_memory(Some(&mut *ctxt), Some("New Doc failed"));
-            return None;
-        };
-        my_doc.properties = XmlDocProperties::XmlDocInternal as i32;
-        my_doc.ext_subset = xml_new_dtd((*ctxt).my_doc, Some("none"), Some("none"), Some("none"));
-
-        if matches!(enc, XmlCharEncoding::None) && (*ctxt).input().unwrap().remainder_len() >= 4 {
-            // Get the 4 first bytes and decode the charset
-            // if enc != xmlCharEncoding::XML_CHAR_ENCODING_NONE
-            // plug some encoding conversion routines.
-            enc = detect_encoding(&(*ctxt).content_bytes()[..4]);
-            if !matches!(enc, XmlCharEncoding::None) {
-                (*ctxt).switch_encoding(enc);
-            }
-        }
-
-        (*ctxt).parse_external_subset(Some("none"), Some("none"));
-
-        let mut ret = None;
-        if let Some(mut my_doc) = (*ctxt).my_doc.take() {
-            if (*ctxt).well_formed != 0 {
-                ret = my_doc.ext_subset.take();
-                if let Some(mut ret) = ret {
-                    ret.doc = None;
-                    let mut tmp = ret.children();
-                    while let Some(mut now) = tmp {
-                        now.set_document(None);
-                        tmp = now.next();
-                    }
-                }
-            }
-            xml_free_doc(my_doc);
-        }
-        xml_free_parser_ctxt(ctxt);
-
-        ret
     }
 }
 
@@ -1099,32 +961,6 @@ pub(crate) const XML_PARSER_ALLOWED_EXPANSION: usize = 1000000;
 // or very short entities.
 pub(crate) const XML_ENT_FIXED_COST: usize = 20;
 
-/// Create a parser context for using the XML parser with an existing I/O stream
-///
-/// Returns the new parser context or NULL
-#[doc(alias = "xmlCreateIOParserCtxt")]
-pub unsafe fn xml_create_io_parser_ctxt(
-    sax: Option<Box<XmlSAXHandler>>,
-    user_data: Option<GenericErrorContext>,
-    ioctx: impl Read + 'static,
-    enc: XmlCharEncoding,
-) -> XmlParserCtxtPtr {
-    unsafe {
-        let buf = XmlParserInputBuffer::from_reader(ioctx, enc);
-        let Ok(ctxt) = xml_new_sax_parser_ctxt(sax, user_data) else {
-            return null_mut();
-        };
-
-        let Some(input_stream) = XmlParserInput::from_io(&mut *ctxt, buf, enc) else {
-            xml_free_parser_ctxt(ctxt);
-            return null_mut();
-        };
-        (*ctxt).input_push(input_stream);
-
-        ctxt
-    }
-}
-
 static mut XML_CURRENT_EXTERNAL_ENTITY_LOADER: XmlExternalEntityLoader =
     xml_default_external_entity_loader;
 
@@ -1158,97 +994,5 @@ pub unsafe fn xml_load_external_entity(
             return XML_CURRENT_EXTERNAL_ENTITY_LOADER(Some(&canonic_filename), id, ctxt);
         }
         XML_CURRENT_EXTERNAL_ENTITY_LOADER(url, id, ctxt)
-    }
-}
-
-/// Reset a push parser context
-///
-/// Returns 0 in case of success and 1 in case of error
-#[doc(alias = "xmlCtxtResetPush")]
-pub unsafe fn xml_ctxt_reset_push(
-    ctxt: XmlParserCtxtPtr,
-    chunk: *const c_char,
-    size: i32,
-    filename: Option<&str>,
-    encoding: Option<&str>,
-) -> i32 {
-    unsafe {
-        if ctxt.is_null() {
-            return 1;
-        }
-
-        let enc = if encoding.is_none() && !chunk.is_null() && size >= 4 {
-            let input = from_raw_parts(chunk as *const u8, size as usize);
-            detect_encoding(input)
-        } else {
-            XmlCharEncoding::None
-        };
-
-        let buf = XmlParserInputBuffer::new(enc);
-
-        if ctxt.is_null() {
-            return 1;
-        }
-
-        (*ctxt).reset();
-
-        if filename.is_none() {
-            (*ctxt).directory = None;
-        } else if let Some(dir) = filename.and_then(xml_parser_get_directory) {
-            (*ctxt).directory = Some(dir.to_string_lossy().into_owned());
-        }
-
-        let Some(mut input_stream) = XmlParserInput::new((!ctxt.is_null()).then(|| &mut *ctxt))
-        else {
-            return 1;
-        };
-
-        if let Some(filename) = filename {
-            let canonic = canonic_path(filename);
-            input_stream.filename = Some(canonic.into_owned());
-        } else {
-            input_stream.filename = None;
-        }
-        input_stream.buf = Some(buf);
-        input_stream.reset_base();
-
-        (*ctxt).input_push(input_stream);
-
-        if size > 0
-            && !chunk.is_null()
-            && (*ctxt).input().is_some()
-            && (*ctxt).input().unwrap().buf.is_some()
-        {
-            let base = (*ctxt).input().unwrap().get_base();
-            let cur = (*ctxt).input().unwrap().offset_from_base();
-
-            (*ctxt)
-                .input_mut()
-                .unwrap()
-                .buf
-                .as_mut()
-                .unwrap()
-                .push_bytes(from_raw_parts(chunk as *const u8, size as usize));
-            (*ctxt).input_mut().unwrap().set_base_and_cursor(base, cur);
-        }
-
-        if let Some(encoding) = encoding {
-            (*ctxt).encoding = Some(encoding.to_owned());
-
-            if let Some(handler) = find_encoding_handler((*ctxt).encoding().unwrap()) {
-                (*ctxt).switch_to_encoding(handler);
-            } else {
-                xml_fatal_err_msg_str!(
-                    &mut *ctxt,
-                    XmlParserErrors::XmlErrUnsupportedEncoding,
-                    "Unsupported encoding {}\n",
-                    encoding
-                );
-            };
-        } else if !matches!(enc, XmlCharEncoding::None) {
-            (*ctxt).switch_encoding(enc);
-        }
-
-        0
     }
 }

@@ -47,11 +47,10 @@ use crate::{
     libxml::{
         globals::{xml_free, xml_malloc},
         hash::XmlHashTable,
-        parser::XmlParserMode,
         xmlstring::{XmlChar, xml_str_equal, xml_strdup, xml_strlen, xml_strndup},
     },
     list::XmlList,
-    parser::{XmlParserCtxtPtr, build_qname, split_qname2},
+    parser::{XmlParserCtxtPtr, XmlParserMode, build_qname, split_qname2},
     tree::{
         NodeCommon, XmlAttrPtr, XmlAttribute, XmlAttributeDefault, XmlAttributePtr,
         XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElement,
@@ -3405,13 +3404,10 @@ pub unsafe fn xml_validate_dtd_final(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i
 #[cfg(feature = "libxml_valid")]
 pub unsafe fn xml_validate_document(ctxt: XmlValidCtxtPtr, mut doc: XmlDocPtr) -> i32 {
     unsafe {
-        use crate::{libxml::parser::xml_parse_dtd, uri::build_uri};
+        use crate::{parser::xml_parse_dtd, uri::build_uri};
 
         let mut ret: i32;
 
-        // if doc.is_null() {
-        //     return 0;
-        // }
         if doc.int_subset.is_none() && doc.ext_subset.is_none() {
             xml_err_valid!(ctxt, XmlParserErrors::XmlDTDNoDTD, "no DTD found!\n");
             return 0;

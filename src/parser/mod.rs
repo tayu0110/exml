@@ -70,7 +70,7 @@ pub(crate) use error::*;
 pub use input::*;
 pub use legacy::*;
 pub use node_info::*;
-pub(crate) use parse::*;
+pub use parse::*;
 pub use push::*;
 #[cfg(feature = "libxml_push")]
 pub use qname::*;
