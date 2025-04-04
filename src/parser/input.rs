@@ -309,7 +309,6 @@ impl XmlParserInput {
             }
             input.cur = 0;
             input.length = entity.length;
-            // input.end = entity.content.add(input.length as usize);
             input.entity = Some(entity);
             Some(input)
         }

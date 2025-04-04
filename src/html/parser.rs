@@ -3851,16 +3851,9 @@ pub unsafe fn html_parse_document(ctxt: HtmlParserCtxtPtr) -> i32 {
 ///
 /// Returns the new parser context or NULL
 #[doc(alias = "htmlCreateDocParserCtxt")]
-unsafe fn html_create_doc_parser_ctxt(
-    cur: *const XmlChar,
-    encoding: Option<&str>,
-) -> HtmlParserCtxtPtr {
+unsafe fn html_create_doc_parser_ctxt(cur: Vec<u8>, encoding: Option<&str>) -> HtmlParserCtxtPtr {
     unsafe {
-        if cur.is_null() {
-            return null_mut();
-        }
-        let s = CStr::from_ptr(cur as *const i8).to_bytes().to_vec();
-        let ctxt: HtmlParserCtxtPtr = html_create_memory_parser_ctxt(s);
+        let ctxt: HtmlParserCtxtPtr = html_create_memory_parser_ctxt(cur);
         if ctxt.is_null() {
             return null_mut();
         }
@@ -3908,17 +3901,13 @@ unsafe fn html_create_doc_parser_ctxt(
 #[doc(alias = "htmlSAXParseDoc")]
 #[deprecated = "Use htmlNewSAXParserCtxt and htmlCtxtReadDoc"]
 pub unsafe fn html_sax_parse_doc(
-    cur: *const XmlChar,
+    cur: Vec<u8>,
     encoding: Option<&str>,
     sax: Option<Box<HtmlSAXHandler>>,
     user_data: Option<GenericErrorContext>,
 ) -> Option<HtmlDocPtr> {
     unsafe {
         xml_init_parser();
-
-        if cur.is_null() {
-            return None;
-        }
 
         let ctxt: HtmlParserCtxtPtr = html_create_doc_parser_ctxt(cur, encoding);
         if ctxt.is_null() {
@@ -3946,7 +3935,7 @@ pub unsafe fn html_sax_parse_doc(
 ///
 /// Returns the resulting document tree
 #[doc(alias = "htmlParseDoc")]
-pub unsafe fn html_parse_doc(cur: *const XmlChar, encoding: Option<&str>) -> Option<HtmlDocPtr> {
+pub unsafe fn html_parse_doc(cur: Vec<u8>, encoding: Option<&str>) -> Option<HtmlDocPtr> {
     unsafe { html_sax_parse_doc(cur, encoding, None, None) }
 }
 
@@ -5455,16 +5444,12 @@ unsafe fn html_do_read(
 /// Returns the resulting document tree
 #[doc(alias = "htmlReadDoc")]
 pub unsafe fn html_read_doc(
-    cur: *const XmlChar,
+    cur: Vec<u8>,
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
 ) -> Option<HtmlDocPtr> {
     unsafe {
-        if cur.is_null() {
-            return None;
-        }
-
         xml_init_parser();
         let ctxt: HtmlParserCtxtPtr = html_create_doc_parser_ctxt(cur, None);
         if ctxt.is_null() {
@@ -5547,20 +5532,12 @@ pub unsafe fn html_read_io(
 #[doc(alias = "htmlCtxtReadDoc")]
 pub unsafe fn html_ctxt_read_doc(
     ctxt: &mut XmlParserCtxt,
-    cur: *const XmlChar,
+    cur: Vec<u8>,
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
 ) -> Option<HtmlDocPtr> {
-    unsafe {
-        html_ctxt_read_memory(
-            ctxt,
-            CStr::from_ptr(cur as *const i8).to_bytes().to_vec(),
-            url,
-            encoding,
-            options,
-        )
-    }
+    unsafe { html_ctxt_read_memory(ctxt, cur, url, encoding, options) }
 }
 
 /// Parse an XML file from the filesystem or the network.
@@ -5569,21 +5546,18 @@ pub unsafe fn html_ctxt_read_doc(
 /// Returns the resulting document tree
 #[doc(alias = "htmlCtxtReadFile")]
 pub unsafe fn html_ctxt_read_file(
-    ctxt: XmlParserCtxtPtr,
+    ctxt: &mut XmlParserCtxt,
     filename: &str,
     encoding: Option<&str>,
     options: i32,
 ) -> Option<HtmlDocPtr> {
     unsafe {
-        if ctxt.is_null() {
-            return None;
-        }
         xml_init_parser();
 
         html_ctxt_reset(ctxt);
 
         let stream = xml_load_external_entity(Some(filename), None, ctxt)?;
-        (*ctxt).input_push(stream);
+        ctxt.input_push(stream);
         html_do_read(ctxt, None, encoding, options, 1)
     }
 }

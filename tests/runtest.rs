@@ -1444,7 +1444,7 @@ unsafe fn sax_parse_test(
             let mut sax = XmlSAXHandler::default();
             std::ptr::copy(&EMPTY_SAXHANDLER_STRUCT, &mut sax, 1);
             let ctxt: HtmlParserCtxtPtr = html_new_sax_parser_ctxt(Some(Box::new(sax)), None);
-            html_ctxt_read_file(ctxt, filename, None, options);
+            html_ctxt_read_file(&mut *ctxt, filename, None, options);
             html_free_parser_ctxt(ctxt);
             ret = 0;
         } else {
@@ -1495,7 +1495,7 @@ unsafe fn sax_parse_test(
                 let mut sax = XmlSAXHandler::default();
                 std::ptr::copy(&DEBUG_HTMLSAXHANDLER_STRUCT, &mut sax, 1);
                 let ctxt: HtmlParserCtxtPtr = html_new_sax_parser_ctxt(Some(Box::new(sax)), None);
-                html_ctxt_read_file(ctxt, filename, None, options);
+                html_ctxt_read_file(&mut *ctxt, filename, None, options);
                 html_free_parser_ctxt(ctxt);
                 ret = 0;
             } else {
