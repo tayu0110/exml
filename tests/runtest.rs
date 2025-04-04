@@ -82,7 +82,7 @@ use exml::{
 };
 #[cfg(feature = "catalog")]
 use libc::pthread_t;
-use libc::{free, malloc, memcpy, size_t, snprintf, strlen};
+use libc::{free, malloc, memcpy, size_t, strlen};
 
 /// pseudo flag for the unification of HTML and XML tests
 const XML_PARSE_HTML: i32 = 1 << 24;
@@ -4197,17 +4197,8 @@ unsafe fn load_xpath_expr(parent_doc: XmlDocPtr, filename: &str) -> XmlXPathObje
 }
 
 #[cfg(feature = "c14n")]
-unsafe fn parse_list(s: *mut XmlChar) -> Option<Vec<String>> {
-    unsafe {
-        if s.is_null() {
-            return None;
-        }
-
-        let s = CStr::from_ptr(s as *const i8)
-            .to_string_lossy()
-            .into_owned();
-        Some(s.split(',').map(|s| s.to_owned()).collect())
-    }
+fn parse_list(s: &str) -> Option<Vec<String>> {
+    Some(s.split(',').map(|s| s.to_owned()).collect())
 }
 
 #[cfg(feature = "c14n")]
@@ -4216,8 +4207,8 @@ unsafe fn c14n_run_test(
     with_comments: bool,
     mode: XmlC14NMode,
     xpath_filename: Option<&str>,
-    ns_filename: *const c_char,
-    result_file: *const c_char,
+    ns_filename: Option<&str>,
+    result_file: &str,
 ) -> i32 {
     unsafe {
         use exml::{
@@ -4266,13 +4257,8 @@ unsafe fn c14n_run_test(
             }
         }
 
-        if !ns_filename.is_null() {
-            if load_mem(
-                CStr::from_ptr(ns_filename).to_string_lossy().as_ref(),
-                addr_of_mut!(nslist),
-                addr_of_mut!(nssize),
-            ) != 0
-            {
+        if let Some(ns_filename) = ns_filename {
+            if load_mem(ns_filename, addr_of_mut!(nslist), addr_of_mut!(nssize)) != 0 {
                 eprintln!("Error: unable to evaluate xpath expression");
                 if !xpath.is_null() {
                     xml_xpath_free_object(xpath);
@@ -4280,7 +4266,7 @@ unsafe fn c14n_run_test(
                 xml_free_doc(doc);
                 return -1;
             }
-            inclusive_namespaces = parse_list(nslist as *mut XmlChar);
+            inclusive_namespaces = parse_list(&CStr::from_ptr(nslist).to_string_lossy());
         }
 
         // Canonical form
@@ -4299,11 +4285,7 @@ unsafe fn c14n_run_test(
             &mut result,
         );
         if ret >= 0 {
-            if compare_file_mem(
-                CStr::from_ptr(result_file).to_string_lossy().as_ref(),
-                result.as_bytes(),
-            ) != 0
-            {
+            if compare_file_mem(result_file, result.as_bytes()) != 0 {
                 eprintln!("Result mismatch for {xml_filename}");
                 eprintln!("RESULT:\n{result}");
                 ret = -1;
@@ -4334,87 +4316,33 @@ unsafe fn c14n_common_test(
     filename: &str,
     with_comments: bool,
     mode: XmlC14NMode,
-    subdir: *const c_char,
+    subdir: &str,
 ) -> i32 {
     unsafe {
-        use libc::strdup;
-
-        let mut buf: [c_char; 500] = [0; 500];
-        let mut prefix: [c_char; 500] = [0; 500];
-        let mut len: usize;
-        let mut xpath: *mut c_char = null_mut();
-        let mut ns: *mut c_char = null_mut();
         let mut ret: i32 = 0;
 
-        let base = CString::new(base_filename(filename)).unwrap();
-        let base = base.as_ptr();
-        len = strlen(base);
-        len -= 4;
-        memcpy(prefix.as_mut_ptr() as _, base as _, len);
-        prefix[len] = 0;
+        let base = base_filename(filename);
+        let prefix = base.strip_suffix(".xml").unwrap();
 
-        if snprintf(
-            buf.as_mut_ptr(),
-            499,
-            c"./result/c14n/%s/%s".as_ptr(),
-            subdir,
-            prefix.as_ptr(),
-        ) >= 499
-        {
-            buf[499] = 0;
-        }
-        let result: *mut c_char = strdup(buf.as_ptr());
-        if snprintf(
-            buf.as_mut_ptr(),
-            499,
-            c"./test/c14n/%s/%s.xpath".as_ptr(),
-            subdir,
-            prefix.as_ptr(),
-        ) >= 499
-        {
-            buf[499] = 0;
-        }
-        if check_test_file(CStr::from_ptr(buf.as_ptr()).to_string_lossy().as_ref()) {
-            xpath = strdup(buf.as_ptr());
-        }
-        if snprintf(
-            buf.as_mut_ptr(),
-            499,
-            c"./test/c14n/%s/%s.ns".as_ptr(),
-            subdir,
-            prefix.as_ptr(),
-        ) >= 499
-        {
-            buf[499] = 0;
-        }
-        if check_test_file(CStr::from_ptr(buf.as_ptr()).to_string_lossy().as_ref()) {
-            ns = strdup(buf.as_ptr());
-        }
+        let result = format!("./result/c14n/{subdir}/{prefix}");
+        let buf = format!("./test/c14n/{subdir}/{prefix}.xpath");
+        let xpath = check_test_file(buf.as_str()).then_some(buf);
+        let buf = format!("./test/c14n/{subdir}/{prefix}.ns");
+        let ns = check_test_file(buf.as_str()).then_some(buf);
 
         NB_TESTS.set(NB_TESTS.get() + 1);
         if c14n_run_test(
             filename,
             with_comments,
             mode,
-            (!xpath.is_null())
-                .then(|| CStr::from_ptr(xpath as *const i8).to_string_lossy())
-                .as_deref(),
-            ns,
-            result,
+            xpath.as_deref(),
+            ns.as_deref(),
+            &result,
         ) < 0
         {
             ret = 1;
         }
 
-        if !result.is_null() {
-            free(result as _);
-        }
-        if !xpath.is_null() {
-            free(xpath as _);
-        }
-        if !ns.is_null() {
-            free(ns as _);
-        }
         ret
     }
 }
@@ -4429,12 +4357,7 @@ unsafe fn c14n_with_comment_test(
     unsafe {
         use exml::c14n::XmlC14NMode;
 
-        c14n_common_test(
-            filename,
-            true,
-            XmlC14NMode::XmlC14N1_0,
-            c"with-comments".as_ptr(),
-        )
+        c14n_common_test(filename, true, XmlC14NMode::XmlC14N1_0, "with-comments")
     }
 }
 
@@ -4448,12 +4371,7 @@ unsafe fn c14n_without_comment_test(
     unsafe {
         use exml::c14n::XmlC14NMode;
 
-        c14n_common_test(
-            filename,
-            false,
-            XmlC14NMode::XmlC14N1_0,
-            c"without-comments".as_ptr(),
-        )
+        c14n_common_test(filename, false, XmlC14NMode::XmlC14N1_0, "without-comments")
     }
 }
 
@@ -4471,7 +4389,7 @@ unsafe fn c14n_exc_without_comment_test(
             filename,
             false,
             XmlC14NMode::XmlC14NExclusive1_0,
-            c"exc-without-comments".as_ptr(),
+            "exc-without-comments",
         )
     }
 }
@@ -4490,7 +4408,7 @@ unsafe fn c14n11_without_comment_test(
             filename,
             false,
             XmlC14NMode::XmlC14N1_1,
-            c"1-1-without-comments".as_ptr(),
+            "1-1-without-comments",
         )
     }
 }
