@@ -20,68 +20,66 @@ impl XmlParserCtxt {
     ///
     /// Returns 1 if ignorable 0 otherwise.
     #[doc(alias = "areBlanks")]
-    unsafe fn are_blanks(&mut self, s: &str, blank_chars: bool) -> bool {
-        unsafe {
-            // Don't spend time trying to differentiate them, the same callback is used !
-            if self.sax.as_deref().is_none_or(|sax| {
-                (sax.ignorable_whitespace.is_none() && sax.characters.is_none())
-                    || sax
-                        .ignorable_whitespace
-                        .zip(sax.characters)
-                        .is_some_and(|(l, r)| fn_addr_eq(l, r))
-            }) {
-                return false;
-            }
+    fn are_blanks(&mut self, s: &str, blank_chars: bool) -> bool {
+        // Don't spend time trying to differentiate them, the same callback is used !
+        if self.sax.as_deref().is_none_or(|sax| {
+            (sax.ignorable_whitespace.is_none() && sax.characters.is_none())
+                || sax
+                    .ignorable_whitespace
+                    .zip(sax.characters)
+                    .is_some_and(|(l, r)| fn_addr_eq(l, r))
+        }) {
+            return false;
+        }
 
-            // Check for xml:space value.
-            if self.space() == 1 || self.space() == -2 {
-                return false;
-            }
+        // Check for xml:space value.
+        if self.space() == 1 || self.space() == -2 {
+            return false;
+        }
 
-            // Check that the string is made of blanks
-            if !blank_chars && s.chars().any(|c| !xml_is_blank_char(c as u32)) {
-                return false;
-            }
+        // Check that the string is made of blanks
+        if !blank_chars && s.chars().any(|c| !xml_is_blank_char(c as u32)) {
+            return false;
+        }
 
-            // Look if the element is mixed content in the DTD if available
-            let Some(context_node) = self.node else {
-                return false;
-            };
-            if let Some(my_doc) = self.my_doc {
-                let ret = xml_is_mixed_element(my_doc, &context_node.name().unwrap());
-                if ret == 0 {
-                    return true;
-                }
-                if ret == 1 {
-                    return false;
-                }
+        // Look if the element is mixed content in the DTD if available
+        let Some(context_node) = self.node else {
+            return false;
+        };
+        if let Some(my_doc) = self.my_doc {
+            let ret = xml_is_mixed_element(my_doc, &context_node.name().unwrap());
+            if ret == 0 {
+                return true;
             }
+            if ret == 1 {
+                return false;
+            }
+        }
 
-            // Otherwise, heuristic :-\
-            if !matches!(self.current_byte(), b'<' | 0xD) {
-                return false;
-            }
-            if context_node.children().is_none() && self.content_bytes().starts_with(b"</") {
-                // index out of bound may occur at this `nth_byte` ??? It may be necessary to fix.
-                return false;
-            }
+        // Otherwise, heuristic :-\
+        if !matches!(self.current_byte(), b'<' | 0xD) {
+            return false;
+        }
+        if context_node.children().is_none() && self.content_bytes().starts_with(b"</") {
+            // index out of bound may occur at this `nth_byte` ??? It may be necessary to fix.
+            return false;
+        }
 
-            if let Some(last_child) = context_node.get_last_child() {
-                if last_child.is_text_node()
-                    || context_node
-                        .children()
-                        .filter(|c| c.is_text_node())
-                        .is_some()
-                {
-                    return false;
-                }
-            } else if context_node.element_type() != XmlElementType::XmlElementNode
-                && context_node.content.is_some()
+        if let Some(last_child) = context_node.get_last_child() {
+            if last_child.is_text_node()
+                || context_node
+                    .children()
+                    .filter(|c| c.is_text_node())
+                    .is_some()
             {
                 return false;
             }
-            true
+        } else if context_node.element_type() != XmlElementType::XmlElementNode
+            && context_node.content.is_some()
+        {
+            return false;
         }
+        true
     }
 
     /// Always makes progress if the first char isn't '<' or '&'.
@@ -274,7 +272,7 @@ impl XmlParserCtxt {
                         buf.push_str(from_utf8_unchecked(&self.content_bytes()[..len]));
 
                         // commit consumed bytes for SAX interface
-                        self.input_mut().unwrap().cur = self.input().unwrap().cur.add(len);
+                        self.input_mut().unwrap().cur += len;
                         self.input_mut().unwrap().line = line;
                         self.input_mut().unwrap().col = col;
 
@@ -334,13 +332,12 @@ impl XmlParserCtxt {
                             let diff = self.content_bytes().len() - input.len();
                             self.input_mut().unwrap().line = line;
                             self.input_mut().unwrap().col = col;
-                            self.input_mut().unwrap().cur = self.input().unwrap().cur.add(diff);
+                            self.input_mut().unwrap().cur += diff;
                             xml_fatal_err(self, XmlParserErrors::XmlErrMisplacedCDATAEnd, None);
                             if !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
                                 // if the parser input state is not EOF,
                                 // consume the head of ']'.
-                                self.input_mut().unwrap().cur =
-                                    self.input_mut().unwrap().cur.add(1);
+                                self.input_mut().unwrap().cur += 1;
                             }
                             return;
                         }
@@ -358,7 +355,7 @@ impl XmlParserCtxt {
                     buf.push_str(from_utf8_unchecked(&self.content_bytes()[..len]));
 
                     // commit consumed bytes for SAX interface
-                    self.input_mut().unwrap().cur = self.input().unwrap().cur.add(len);
+                    self.input_mut().unwrap().cur += len;
                     self.input_mut().unwrap().line = line;
                     self.input_mut().unwrap().col = col;
 
@@ -400,7 +397,7 @@ impl XmlParserCtxt {
                     // To skip '\r', `+1` is needed.
                     let diff = self.content_bytes().len() - input.len() + 1;
                     // At this point, `content_bytes` will start with '\n' ('\r' is skipped)
-                    self.input_mut().unwrap().cur = self.input().unwrap().cur.add(diff);
+                    self.input_mut().unwrap().cur += diff;
                     // and skip '\n' at the head of `content_bytes`.
                     input = &self.content_bytes()[1..];
                     continue;
@@ -426,7 +423,7 @@ impl XmlParserCtxt {
             }
 
             let len = self.content_bytes().len() - input.len();
-            self.input_mut().unwrap().cur = self.input_mut().unwrap().cur.add(len);
+            self.input_mut().unwrap().cur += len;
             self.input_mut().unwrap().line = line;
             self.input_mut().unwrap().col = col;
             self.parse_char_data_complex(partial);

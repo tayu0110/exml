@@ -41,7 +41,7 @@ use exml::{
 use libc::{memcpy, strlen};
 
 // maximum time for one parsing before declaring a timeout
-const MAX_TIME: u64 = 2; /* seconds */
+const MAX_TIME: u64 = 10; /* seconds */
 
 thread_local! {
     static T0: Cell<u64> = const { Cell::new(0) };

@@ -321,44 +321,42 @@ impl XmlParserCtxt {
     ///
     /// Returns 1 on error, 0 on success.
     #[doc(alias = "xmlParserEntityCheck")]
-    pub(crate) unsafe fn parser_entity_check(&mut self, extra: u64) -> i32 {
-        unsafe {
-            let input = self.input().unwrap();
-            let entity = input.entity;
+    pub(crate) fn parser_entity_check(&mut self, extra: u64) -> i32 {
+        let input = self.input().unwrap();
+        let entity = input.entity;
 
-            // Compute total consumed bytes so far, including input streams of external entities.
-            let mut consumed = input.parent_consumed;
-            if entity.is_none_or(|entity| {
-                matches!(entity.etype, XmlEntityType::XmlExternalParameterEntity)
-                    && entity.flags & XML_ENT_PARSED as i32 == 0
-            }) {
-                consumed = consumed.saturating_add(input.consumed);
-                consumed = consumed.saturating_add(input.offset_from_base() as u64);
-            }
-            consumed = consumed.saturating_add(self.sizeentities);
-
-            // Add extra cost and some fixed cost.
-            self.sizeentcopy = self.sizeentcopy.saturating_add(extra);
-            self.sizeentcopy = self.sizeentcopy.saturating_add(XML_ENT_FIXED_COST as _);
-
-            // It's important to always use saturation arithmetic when tracking
-            // entity sizes to make the size checks reliable. If "sizeentcopy"
-            // overflows, we have to abort.
-            if self.sizeentcopy > XML_PARSER_ALLOWED_EXPANSION as u64
-                && (self.sizeentcopy == u64::MAX
-                    || self.sizeentcopy / XML_PARSER_NON_LINEAR as u64 > consumed)
-            {
-                xml_fatal_err_msg(
-                    self,
-                    XmlParserErrors::XmlErrEntityLoop,
-                    "Maximum entity amplification factor exceeded",
-                );
-                self.halt();
-                return 1;
-            }
-
-            0
+        // Compute total consumed bytes so far, including input streams of external entities.
+        let mut consumed = input.parent_consumed;
+        if entity.is_none_or(|entity| {
+            matches!(entity.etype, XmlEntityType::XmlExternalParameterEntity)
+                && entity.flags & XML_ENT_PARSED as i32 == 0
+        }) {
+            consumed = consumed.saturating_add(input.consumed);
+            consumed = consumed.saturating_add(input.offset_from_base() as u64);
         }
+        consumed = consumed.saturating_add(self.sizeentities);
+
+        // Add extra cost and some fixed cost.
+        self.sizeentcopy = self.sizeentcopy.saturating_add(extra);
+        self.sizeentcopy = self.sizeentcopy.saturating_add(XML_ENT_FIXED_COST as _);
+
+        // It's important to always use saturation arithmetic when tracking
+        // entity sizes to make the size checks reliable. If "sizeentcopy"
+        // overflows, we have to abort.
+        if self.sizeentcopy > XML_PARSER_ALLOWED_EXPANSION as u64
+            && (self.sizeentcopy == u64::MAX
+                || self.sizeentcopy / XML_PARSER_NON_LINEAR as u64 > consumed)
+        {
+            xml_fatal_err_msg(
+                self,
+                XmlParserErrors::XmlErrEntityLoop,
+                "Maximum entity amplification factor exceeded",
+            );
+            self.halt();
+            return 1;
+        }
+
+        0
     }
 
     /// Parse a value for ENTITY declarations

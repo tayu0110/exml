@@ -1,7 +1,5 @@
 use std::{cell::RefCell, ptr::null_mut, rc::Rc, str::from_utf8_unchecked};
 
-use libc::strncmp;
-
 use crate::{
     encoding::{XmlCharEncoding, detect_encoding},
     error::XmlParserErrors,
@@ -63,38 +61,34 @@ pub(crate) fn check_cdata_push(utf: &[u8], complete: bool) -> Result<usize, usiz
 impl XmlParserCtxt {
     /// Check whether the input buffer contains a character.
     #[doc(alias = "xmlParseLookupChar")]
-    unsafe fn lookup_char(&mut self, c: u8) -> i32 {
-        unsafe {
-            let cur = &self.content_bytes()[self.check_index.max(1) as usize..];
+    fn lookup_char(&mut self, c: u8) -> i32 {
+        let cur = &self.content_bytes()[self.check_index.max(1) as usize..];
 
-            if !cur.contains(&c) {
-                if cur.len() > i64::MAX as usize {
-                    self.check_index = 0;
-                    1
-                } else {
-                    self.check_index = cur.len() as i64;
-                    0
-                }
-            } else {
-                self.check_index = 0;
-                1
-            }
-        }
-    }
-
-    /// Check whether the input buffer contains terminated char data.
-    #[doc(alias = "xmlParseLookupCharData")]
-    unsafe fn lookup_char_data(&mut self) -> i32 {
-        unsafe {
-            let cur = &self.content_bytes()[self.check_index as usize..];
-
-            if cur.contains(&b'<') || cur.contains(&b'&') || cur.len() > i64::MAX as usize {
+        if !cur.contains(&c) {
+            if cur.len() > i64::MAX as usize {
                 self.check_index = 0;
                 1
             } else {
                 self.check_index = cur.len() as i64;
                 0
             }
+        } else {
+            self.check_index = 0;
+            1
+        }
+    }
+
+    /// Check whether the input buffer contains terminated char data.
+    #[doc(alias = "xmlParseLookupCharData")]
+    fn lookup_char_data(&mut self) -> i32 {
+        let cur = &self.content_bytes()[self.check_index as usize..];
+
+        if cur.contains(&b'<') || cur.contains(&b'&') || cur.len() > i64::MAX as usize {
+            self.check_index = 0;
+            1
+        } else {
+            self.check_index = cur.len() as i64;
+            0
         }
     }
 
@@ -103,164 +97,158 @@ impl XmlParserCtxt {
     /// If found, return buffer which start with `s` wrapped `Some`,
     /// otherwise return `None`.
     #[doc(alias = "xmlParseLookupString")]
-    unsafe fn lookup_string<'a>(&'a mut self, start_delta: usize, s: &str) -> Option<&'a [u8]> {
-        unsafe {
-            let cur = if self.check_index == 0 {
-                &self.content_bytes()[start_delta..]
-            } else {
-                &self.content_bytes()[self.check_index as usize..]
-            };
-            let len = cur.len();
+    fn lookup_string<'a>(&'a mut self, start_delta: usize, s: &str) -> Option<&'a [u8]> {
+        let cur = if self.check_index == 0 {
+            &self.content_bytes()[start_delta..]
+        } else {
+            &self.content_bytes()[self.check_index as usize..]
+        };
+        let len = cur.len();
 
-            if let Some(term) = cur.windows(s.len()).position(|chunk| chunk == s.as_bytes()) {
-                self.check_index = 0;
-                let cur = self.content_bytes().windows(len).next_back().unwrap();
-                Some(&cur[term..])
+        if let Some(term) = cur.windows(s.len()).position(|chunk| chunk == s.as_bytes()) {
+            self.check_index = 0;
+            let cur = self.content_bytes().windows(len).next_back().unwrap();
+            Some(&cur[term..])
+        } else {
+            // Rescan (strLen - 1) characters.
+            let end = if cur.len() < s.len() {
+                cur
             } else {
-                // Rescan (strLen - 1) characters.
-                let end = if cur.len() < s.len() {
-                    cur
-                } else {
-                    cur.windows(s.len() - 1).next_back().unwrap()
-                };
-                let index = self.content_bytes().len() - end.len();
-                if index > i64::MAX as usize {
-                    self.check_index = 0;
-                    return self.content_bytes().windows(s.len()).next_back();
-                }
-                self.check_index = index as _;
-                None
+                cur.windows(s.len() - 1).next_back().unwrap()
+            };
+            let index = self.content_bytes().len() - end.len();
+            if index > i64::MAX as usize {
+                self.check_index = 0;
+                return self.content_bytes().windows(s.len()).next_back();
             }
+            self.check_index = index as _;
+            None
         }
     }
 
     /// Check whether there's enough data in the input buffer to finish parsing
     /// a start tag. This has to take quotes into account.
     #[doc(alias = "xmlParseLookupGt")]
-    unsafe fn lookup_gt(&mut self) -> i32 {
-        unsafe {
-            let mut cur = if self.check_index == 0 {
-                &self.content_bytes()[1..]
-            } else {
-                &self.content_bytes()[self.check_index as usize..]
-            };
+    fn lookup_gt(&mut self) -> i32 {
+        let mut cur = if self.check_index == 0 {
+            &self.content_bytes()[1..]
+        } else {
+            &self.content_bytes()[self.check_index as usize..]
+        };
 
-            let mut state = self.end_check_state as u8;
-            while !cur.is_empty() {
-                if state != 0 {
-                    if cur[0] == state {
-                        state = 0;
-                    }
-                } else if matches!(cur[0], b'\'' | b'"') {
-                    state = cur[0];
-                } else if cur[0] == b'>' {
-                    self.check_index = 0;
-                    self.end_check_state = 0;
-                    return 1;
+        let mut state = self.end_check_state as u8;
+        while !cur.is_empty() {
+            if state != 0 {
+                if cur[0] == state {
+                    state = 0;
                 }
-                cur = &cur[1..];
-            }
-
-            let index = self.content_bytes().len() - cur.len();
-            if index > i64::MAX as usize {
+            } else if matches!(cur[0], b'\'' | b'"') {
+                state = cur[0];
+            } else if cur[0] == b'>' {
                 self.check_index = 0;
                 self.end_check_state = 0;
                 return 1;
             }
-            self.check_index = index as i64;
-            self.end_check_state = state as i32;
-            0
+            cur = &cur[1..];
         }
+
+        let index = self.content_bytes().len() - cur.len();
+        if index > i64::MAX as usize {
+            self.check_index = 0;
+            self.end_check_state = 0;
+            return 1;
+        }
+        self.check_index = index as i64;
+        self.end_check_state = state as i32;
+        0
     }
 
     /// Check whether there's enough data in the input buffer to finish parsing the internal subset.
     #[doc(alias = "xmlParseLookupInternalSubset")]
-    unsafe fn lookup_internal_subset(&mut self) -> i32 {
-        unsafe {
-            // Sorry, but progressive parsing of the internal subset is not
-            // supported. We first check that the full content of the internal
-            // subset is available and parsing is launched only at that point.
-            // Internal subset ends with "']' S? '>'" in an unescaped section and
-            // not in a ']]>' sequence which are conditional sections.
+    fn lookup_internal_subset(&mut self) -> i32 {
+        // Sorry, but progressive parsing of the internal subset is not
+        // supported. We first check that the full content of the internal
+        // subset is available and parsing is launched only at that point.
+        // Internal subset ends with "']' S? '>'" in an unescaped section and
+        // not in a ']]>' sequence which are conditional sections.
 
-            let mut cur = if self.check_index == 0 {
-                &self.content_bytes()[1..]
-            } else {
-                &self.content_bytes()[self.check_index as usize..]
-            };
+        let mut cur = if self.check_index == 0 {
+            &self.content_bytes()[1..]
+        } else {
+            &self.content_bytes()[self.check_index as usize..]
+        };
 
-            let mut start = cur;
-            let mut state = self.end_check_state as u8;
-            while !cur.is_empty() {
-                if state == b'-' {
-                    if let Some(rem) = cur.strip_prefix(b"-->") {
-                        state = 0;
-                        cur = rem;
-                        start = rem;
-                        continue;
-                    }
-                } else if state == b']' {
-                    if cur[0] == b'>' {
-                        self.check_index = 0;
-                        self.end_check_state = 0;
-                        return 1;
-                    }
-                    if xml_is_blank_char(cur[0] as u32) {
-                        state = b' ';
-                    } else if cur[0] != b']' {
-                        state = 0;
-                        start = cur;
-                        continue;
-                    }
-                } else if state == b' ' {
-                    if cur[0] == b'>' {
-                        self.check_index = 0;
-                        self.end_check_state = 0;
-                        return 1;
-                    }
-                    if !xml_is_blank_char(cur[0] as u32) {
-                        state = 0;
-                        start = cur;
-                        continue;
-                    }
-                } else if state != 0 {
-                    if cur[0] == state {
-                        state = 0;
-                        start = &cur[1..];
-                    }
-                } else if let Some(rem) = cur.strip_prefix(b"<!--") {
-                    state = b'-';
+        let mut start = cur;
+        let mut state = self.end_check_state as u8;
+        while !cur.is_empty() {
+            if state == b'-' {
+                if let Some(rem) = cur.strip_prefix(b"-->") {
+                    state = 0;
                     cur = rem;
-                    // Don't treat <!--> as comment
                     start = rem;
                     continue;
-                } else if matches!(cur[0], b'"' | b'\'' | b']') {
-                    state = cur[0];
                 }
-
-                cur = &cur[1..];
-            }
-
-            // Rescan the three last characters to detect "<!--" and "-->"
-            // split across chunks.
-            if state == 0 || state == b'-' {
-                let diff = start.len() - cur.len();
-                if diff < 3 {
-                    cur = start;
-                } else {
-                    cur = &start[diff - 3..];
+            } else if state == b']' {
+                if cur[0] == b'>' {
+                    self.check_index = 0;
+                    self.end_check_state = 0;
+                    return 1;
                 }
+                if xml_is_blank_char(cur[0] as u32) {
+                    state = b' ';
+                } else if cur[0] != b']' {
+                    state = 0;
+                    start = cur;
+                    continue;
+                }
+            } else if state == b' ' {
+                if cur[0] == b'>' {
+                    self.check_index = 0;
+                    self.end_check_state = 0;
+                    return 1;
+                }
+                if !xml_is_blank_char(cur[0] as u32) {
+                    state = 0;
+                    start = cur;
+                    continue;
+                }
+            } else if state != 0 {
+                if cur[0] == state {
+                    state = 0;
+                    start = &cur[1..];
+                }
+            } else if let Some(rem) = cur.strip_prefix(b"<!--") {
+                state = b'-';
+                cur = rem;
+                // Don't treat <!--> as comment
+                start = rem;
+                continue;
+            } else if matches!(cur[0], b'"' | b'\'' | b']') {
+                state = cur[0];
             }
-            let index = self.content_bytes().len() - cur.len();
-            if index > i64::MAX as usize {
-                self.check_index = 0;
-                self.end_check_state = 0;
-                return 1;
-            }
-            self.check_index = index as _;
-            self.end_check_state = state as i32;
-            0
+
+            cur = &cur[1..];
         }
+
+        // Rescan the three last characters to detect "<!--" and "-->"
+        // split across chunks.
+        if state == 0 || state == b'-' {
+            let diff = start.len() - cur.len();
+            if diff < 3 {
+                cur = start;
+            } else {
+                cur = &start[diff - 3..];
+            }
+        }
+        let index = self.content_bytes().len() - cur.len();
+        if index > i64::MAX as usize {
+            self.check_index = 0;
+            self.end_check_state = 0;
+            return 1;
+        }
+        self.check_index = index as _;
+        self.end_check_state = state as i32;
+        0
     }
 
     /// Try to progress on parsing
@@ -712,8 +700,7 @@ impl XmlParserCtxt {
                                 match check_cdata_push(&self.content_bytes()[..base], true) {
                                     Ok(tmp) if tmp == base => {}
                                     Ok(tmp) | Err(tmp) => {
-                                        self.input_mut().unwrap().cur =
-                                            self.input().unwrap().cur.add(tmp);
+                                        self.input_mut().unwrap().cur += tmp;
                                         break 'encoding_error;
                                     }
                                 }
@@ -726,13 +713,9 @@ impl XmlParserCtxt {
                                     {
                                         // Special case to provide identical behaviour
                                         // between pull and push parsers on enpty CDATA sections
-                                        if self.input().unwrap().offset_from_base() >= 9
-                                            && strncmp(
-                                                self.input().unwrap().cur.sub(9) as _,
-                                                c"<![CDATA[".as_ptr() as _,
-                                                9,
-                                            ) == 0
-                                        {
+                                        if self.input().is_some_and(|input| {
+                                            input.base[..input.cur].ends_with(b"<![CDATA[")
+                                        }) {
                                             cdata_block(self.user_data.clone(), "");
                                         }
                                     } else if let Some(sax) =
@@ -778,8 +761,7 @@ impl XmlParserCtxt {
                                     match check_cdata_push(&self.content_bytes()[..size], false) {
                                         Ok(tmp) => tmp,
                                         Err(tmp) => {
-                                            self.input_mut().unwrap().cur =
-                                                self.input().unwrap().cur.add(tmp);
+                                            self.input_mut().unwrap().cur += tmp;
                                             break 'encoding_error;
                                         }
                                     };

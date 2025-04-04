@@ -599,7 +599,6 @@ pub(crate) unsafe fn xml_sax_parse_dtd(
             (*ctxt).switch_encoding(enc);
         }
 
-        let cur = (*ctxt).input().unwrap().cur;
         if let Some(input) = (*ctxt).input_mut() {
             if input.filename.is_none() {
                 if let Some(canonic) = system_id_canonic {
@@ -608,8 +607,8 @@ pub(crate) unsafe fn xml_sax_parse_dtd(
             }
             input.line = 1;
             input.col = 1;
-            input.base = cur;
-            input.cur = cur;
+            input.base.drain(..input.cur);
+            input.cur = 0;
             input.free = None;
         }
 

@@ -222,7 +222,7 @@ unsafe fn html_skip_blank_chars(ctxt: &mut XmlParserCtxt) -> i32 {
                 res += len;
                 // commit input buffer
                 let input = ctxt.input_mut().unwrap();
-                input.cur = input.cur.add(len);
+                input.cur += len;
                 input.line = line;
                 input.col = col;
                 ctxt.force_grow();
@@ -234,7 +234,7 @@ unsafe fn html_skip_blank_chars(ctxt: &mut XmlParserCtxt) -> i32 {
         res += diff;
 
         let input = ctxt.input_mut().unwrap();
-        input.cur = input.cur.add(diff);
+        input.cur += diff;
         input.line = line;
         input.col = col;
 
@@ -550,7 +550,7 @@ unsafe fn html_parse_name_complex(ctxt: &mut XmlParserCtxt) -> Option<String> {
         } else {
             XML_MAX_NAME_LENGTH
         };
-        let base: *const XmlChar = ctxt.input().unwrap().base;
+        let charset = ctxt.charset;
 
         // Handler for more complex cases
         c = html_current_char(ctxt, &mut l);
@@ -589,7 +589,7 @@ unsafe fn html_parse_name_complex(ctxt: &mut XmlParserCtxt) -> Option<String> {
             ctxt.advance_with_line_handling(l as usize);
             ctxt.token = 0;
             c = html_current_char(ctxt, &mut l);
-            if ctxt.input().unwrap().base != base {
+            if ctxt.charset != charset {
                 // I think this process is buggy, but I'll hold off on the original code...
                 // The pointer that has been advanced is not rewound and begins reading again,
                 // so the text read before reaching this point is ignored.
@@ -638,7 +638,7 @@ unsafe fn html_parse_name(ctxt: &mut HtmlParserCtxt) -> Option<String> {
                 // `ctxt.content_bytes()[..count]` only contains ASCII alphanumeric, '_', '-', ':' or '.'.
                 // Therefore, UTF-8 validation won't fail.
                 let ret = String::from_utf8_unchecked(ctxt.content_bytes()[..count].to_vec());
-                ctxt.input_mut().unwrap().cur = ctxt.input_mut().unwrap().cur.add(count);
+                ctxt.input_mut().unwrap().cur += count;
                 ctxt.input_mut().unwrap().col += count as i32;
                 return Some(ret);
             }
@@ -2135,7 +2135,8 @@ unsafe fn html_parse_system_literal(ctxt: HtmlParserCtxtPtr) -> *mut XmlChar {
             );
         } else {
             if err == 0 {
-                ret = xml_strndup((*ctxt).input().unwrap().base.add(start_position), len as _);
+                let content = &(*ctxt).input().unwrap().base[start_position..start_position + len];
+                ret = xml_strndup(content.as_ptr(), content.len() as i32);
             }
             (*ctxt).skip_char();
         }
@@ -2200,7 +2201,8 @@ unsafe fn html_parse_pubid_literal(ctxt: HtmlParserCtxtPtr) -> *mut XmlChar {
             );
         } else {
             if err == 0 {
-                ret = xml_strndup((*ctxt).input().unwrap().base.add(start_position), len as _);
+                let content = &(*ctxt).input().unwrap().base[start_position..start_position + len];
+                ret = xml_strndup(content.as_ptr(), content.len() as i32);
             }
             (*ctxt).skip_char();
         }
@@ -4309,18 +4311,20 @@ pub unsafe fn html_handle_omitted_elem(val: i32) -> i32 {
 #[cfg(feature = "libxml_push")]
 unsafe fn html_new_input_stream(ctxt: HtmlParserCtxtPtr) -> HtmlParserInput {
     unsafe {
-        let mut input = HtmlParserInput::default();
-        input.filename = None;
-        input.directory = None;
-        input.base = null_mut();
-        input.cur = null_mut();
-        input.buf = None;
-        input.line = 1;
-        input.col = 1;
-        input.free = None;
-        input.version = None;
-        input.consumed = 0;
-        input.length = 0;
+        let mut input = HtmlParserInput {
+            filename: None,
+            directory: None,
+            base: vec![],
+            cur: 0,
+            buf: None,
+            line: 1,
+            col: 1,
+            free: None,
+            version: None,
+            consumed: 0,
+            length: 0,
+            ..Default::default()
+        };
         if !ctxt.is_null() {
             input.id = (*ctxt).input_id;
             (*ctxt).input_id += 1;
@@ -4869,7 +4873,7 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
                             }
                             (*ctxt).token = 0;
                             (*ctxt).check_index = 0;
-                            (*ctxt).input_mut().unwrap().cur = (*ctxt).input().unwrap().cur.add(1);
+                            (*ctxt).input_mut().unwrap().cur += 1;
                             break 'to_break;
                         }
                     }

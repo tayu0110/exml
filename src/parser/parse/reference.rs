@@ -71,7 +71,7 @@ impl XmlParserCtxt {
                 if self.current_byte() == b';' {
                     // on purpose to avoid reentrancy problems with NEXT and SKIP
                     self.input_mut().unwrap().col += 1;
-                    self.input_mut().unwrap().cur = self.input().unwrap().cur.add(1);
+                    self.input_mut().unwrap().cur += 1;
                 }
             } else if self.current_byte() == b'&' && self.nth_byte(1) == b'#' {
                 self.advance(2);
@@ -102,7 +102,7 @@ impl XmlParserCtxt {
                 if self.current_byte() == b';' {
                     // on purpose to avoid reentrancy problems with NEXT and SKIP
                     self.input_mut().unwrap().col += 1;
-                    self.input_mut().unwrap().cur = self.input().unwrap().cur.add(1);
+                    self.input_mut().unwrap().cur += 1;
                 }
             } else {
                 if self.current_byte() == b'&' {

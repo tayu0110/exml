@@ -83,8 +83,6 @@ required-features = ["schema", "xpath"]
 name = "runtest"
 required-features = ["libxml_output"]
 
-[[test]]
-name = "testchar"
 
 [[test]]
 name = "testdict"

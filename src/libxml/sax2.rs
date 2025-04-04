@@ -350,7 +350,6 @@ pub unsafe fn xml_sax2_external_subset(
                 (*ctxt).switch_encoding(enc);
             }
 
-            let cur = (*ctxt).input().unwrap().cur;
             if let Some(input) = (*ctxt).input_mut() {
                 if input.filename.is_none() {
                     if let Some(system_id) = system_id {
@@ -360,8 +359,8 @@ pub unsafe fn xml_sax2_external_subset(
                 }
                 input.line = 1;
                 input.col = 1;
-                input.base = cur;
-                input.cur = cur;
+                input.base.drain(..input.cur);
+                input.cur = 0;
                 input.free = None;
             }
 

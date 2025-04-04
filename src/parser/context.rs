@@ -5,7 +5,6 @@ use std::{
     ffi::{CStr, c_void},
     ptr::{drop_in_place, null_mut},
     rc::Rc,
-    slice::from_raw_parts,
     str::{from_utf8, from_utf8_unchecked},
     sync::atomic::AtomicPtr,
 };
@@ -304,12 +303,12 @@ impl XmlParserCtxt {
         self.encoding.as_deref()
     }
 
-    pub(crate) unsafe fn current_byte(&self) -> u8 {
-        unsafe { *self.content_bytes().first().unwrap_or(&0) }
+    pub(crate) fn current_byte(&self) -> u8 {
+        *self.content_bytes().first().unwrap_or(&0)
     }
 
-    pub(crate) unsafe fn nth_byte(&self, nth: usize) -> u8 {
-        unsafe { *self.content_bytes().get(nth).unwrap_or(&0) }
+    pub(crate) fn nth_byte(&self, nth: usize) -> u8 {
+        *self.content_bytes().get(nth).unwrap_or(&0)
     }
 
     pub fn input(&self) -> Option<&XmlParserInput> {
@@ -330,43 +329,41 @@ impl XmlParserCtxt {
     /// Returns the index in bytes from the beginning of the entity or -1
     /// in case the index could not be computed.
     #[doc(alias = "xmlByteConsumed")]
-    pub unsafe fn byte_consumed(&self) -> i64 {
-        unsafe {
-            let Some(input) = self.input() else {
-                return -1;
-            };
-            if input.buf.is_some() && input.buf.as_ref().unwrap().borrow().encoder.is_some() {
-                let mut unused = 0;
-                let mut buf = input.buf.as_ref().unwrap().borrow_mut();
-                let handler = buf.encoder.as_mut().unwrap();
-                // Encoding conversion, compute the number of unused original
-                // bytes from the input not consumed and subtract that from
-                // the raw consumed value, this is not a cheap operation
-                if input.remainder_len() > 0 {
-                    // The original code seems to continue processing as long as the write succeeds,
-                    // even if encoding errors occur.
-                    // However, the new API stops processing when an error occurs,
-                    // so it is not possible to reproduce such a process ...
-                    let mut out = [0u8; 32000];
-                    let Ok(input) = from_utf8(self.content_bytes()) else {
+    pub fn byte_consumed(&self) -> i64 {
+        let Some(input) = self.input() else {
+            return -1;
+        };
+        if input.buf.is_some() && input.buf.as_ref().unwrap().borrow().encoder.is_some() {
+            let mut unused = 0;
+            let mut buf = input.buf.as_ref().unwrap().borrow_mut();
+            let handler = buf.encoder.as_mut().unwrap();
+            // Encoding conversion, compute the number of unused original
+            // bytes from the input not consumed and subtract that from
+            // the raw consumed value, this is not a cheap operation
+            if input.remainder_len() > 0 {
+                // The original code seems to continue processing as long as the write succeeds,
+                // even if encoding errors occur.
+                // However, the new API stops processing when an error occurs,
+                // so it is not possible to reproduce such a process ...
+                let mut out = [0u8; 32000];
+                let Ok(input) = from_utf8(self.content_bytes()) else {
+                    return -1;
+                };
+                let mut read = 0;
+                while read < input.len() {
+                    let Ok((r, w)) = handler.encode(&input[read..], &mut out) else {
                         return -1;
                     };
-                    let mut read = 0;
-                    while read < input.len() {
-                        let Ok((r, w)) = handler.encode(&input[read..], &mut out) else {
-                            return -1;
-                        };
-                        unused += w;
-                        read += r;
-                    }
+                    unused += w;
+                    read += r;
                 }
-                if input.buf.as_ref().unwrap().borrow().rawconsumed < unused as u64 {
-                    return -1;
-                }
-                return (input.buf.as_ref().unwrap().borrow().rawconsumed - unused as u64) as i64;
             }
-            input.consumed as i64 + input.offset_from_base() as i64
+            if input.buf.as_ref().unwrap().borrow().rawconsumed < unused as u64 {
+                return -1;
+            }
+            return (input.buf.as_ref().unwrap().borrow().rawconsumed - unused as u64) as i64;
         }
+        input.consumed as i64 + input.offset_from_base() as i64
     }
 
     #[doc(alias = "xmlParserGrow")]
@@ -432,86 +429,74 @@ impl XmlParserCtxt {
     }
 
     #[doc(alias = "xmlParserShrink")]
-    pub(crate) unsafe fn force_shrink(&mut self) {
-        unsafe {
-            let progressive = self.progressive;
+    pub(crate) fn force_shrink(&mut self) {
+        let progressive = self.progressive;
 
-            let input = self.input_mut().unwrap();
+        let input = self.input_mut().unwrap();
 
-            // Don't shrink pull parser memory buffers.
-            let mut used = input.offset_from_base();
-            let Some(buf) = input.buf.as_mut() else {
-                return;
-            };
-            if progressive == 0 && buf.borrow().encoder.is_none() && buf.borrow().context.is_none()
-            {
-                return;
-            }
+        // Don't shrink pull parser memory buffers.
+        let mut used = input.offset_from_base();
+        let Some(buf) = input.buf.as_mut() else {
+            return;
+        };
+        if progressive == 0 && buf.borrow().encoder.is_none() && buf.borrow().context.is_none() {
+            return;
+        }
 
-            // Do not shrink on large buffers whose only a tiny fraction was consumed
-            if used > INPUT_CHUNK {
-                let res = buf
-                    .borrow()
-                    .buffer
-                    .map_or(0, |mut buf| buf.trim_head(used - LINE_LEN));
+        // Do not shrink on large buffers whose only a tiny fraction was consumed
+        if used > INPUT_CHUNK {
+            let res = buf
+                .borrow()
+                .buffer
+                .map_or(0, |mut buf| buf.trim_head(used - LINE_LEN));
 
-                if res > 0 {
-                    used -= res;
-                    if res > u64::MAX as usize || input.consumed > u64::MAX - res as u64 {
-                        input.consumed = u64::MAX;
-                    } else {
-                        input.consumed += res as u64;
-                    }
+            if res > 0 {
+                used -= res;
+                if res > u64::MAX as usize || input.consumed > u64::MAX - res as u64 {
+                    input.consumed = u64::MAX;
+                } else {
+                    input.consumed += res as u64;
                 }
             }
-
-            input.set_base_and_cursor(0, used);
         }
+
+        input.set_base_and_cursor(0, used);
     }
 
-    pub(crate) unsafe fn shrink(&mut self) {
-        unsafe {
-            if self.progressive == 0
-                && self.input().unwrap().offset_from_base() > 2 * INPUT_CHUNK
-                && self.input().unwrap().remainder_len() < 2 * INPUT_CHUNK
-            {
-                self.force_shrink();
-            }
+    pub(crate) fn shrink(&mut self) {
+        if self.progressive == 0
+            && self.input().unwrap().offset_from_base() > 2 * INPUT_CHUNK
+            && self.input().unwrap().remainder_len() < 2 * INPUT_CHUNK
+        {
+            self.force_shrink();
         }
     }
 
     /// Blocks further parser processing don't override error.
     #[doc(alias = "xmlHaltParser")]
-    pub(crate) unsafe fn halt(&mut self) {
-        unsafe {
-            self.instate = XmlParserInputState::XmlParserEOF;
-            self.disable_sax = 1;
-            while self.input_tab.len() > 1 {
-                self.input_pop();
+    pub(crate) fn halt(&mut self) {
+        self.instate = XmlParserInputState::XmlParserEOF;
+        self.disable_sax = 1;
+        while self.input_tab.len() > 1 {
+            self.input_pop();
+        }
+        if let Some(input) = self.input_mut() {
+            // in case there was a specific allocation deallocate before overriding base
+            if input.buf.is_some() {
+                let _ = input.buf.take();
             }
-            if let Some(input) = self.input_mut() {
-                // in case there was a specific allocation deallocate before overriding base
-                if let Some(free) = input.free.take() {
-                    free(input.base as *mut u8);
-                }
-                if input.buf.is_some() {
-                    let _ = input.buf.take();
-                }
-                input.cur = c"".as_ptr() as _;
-                input.length = 0;
-                input.base = input.cur;
-                input.end = input.cur;
-            }
+            input.cur = 0;
+            input.length = 0;
+            input.base = vec![];
+            // input.end = input.cur;
         }
     }
 
     /// Blocks further parser processing
     #[doc(alias = "xmlStopParser")]
-    pub unsafe fn stop(&mut self) {
-        unsafe {
-            self.halt();
-            self.err_no = XmlParserErrors::XmlErrUserStop as i32;
-        }
+    pub fn stop(&mut self) {
+        self.halt();
+        self.err_no = XmlParserErrors::XmlErrUserStop as i32;
     }
 
     /// Reset a parser context
@@ -589,9 +574,9 @@ impl XmlParserCtxt {
                 self.force_grow();
             }
             let input = self.input_mut().unwrap();
-            input.cur = input.cur.add(nth);
+            input.cur += nth;
             input.col += nth as i32;
-            assert!(input.cur <= input.end);
+            assert!(input.cur <= input.base.len());
         }
     }
 
@@ -604,22 +589,20 @@ impl XmlParserCtxt {
             }
             let input = self.input_mut().unwrap();
             for _ in 0..nth {
-                if *input.cur == b'\n' {
+                if input.base[input.cur] == b'\n' {
                     input.line += 1;
                     input.col = 1;
                 } else {
                     input.col += 1;
                 }
-                input.cur = input.cur.add(1);
+                input.cur += 1;
             }
         }
     }
 
-    pub unsafe fn content_bytes(&self) -> &[u8] {
-        unsafe {
-            let len = self.input().unwrap().remainder_len();
-            from_raw_parts(self.input().unwrap().cur, len)
-        }
+    pub fn content_bytes(&self) -> &[u8] {
+        let input = self.input().unwrap();
+        &input.base[input.cur..]
     }
 
     /// Skip to the next character.
@@ -631,7 +614,7 @@ impl XmlParserCtxt {
             }
 
             let input = self.input().unwrap();
-            if input.cur > input.end {
+            if input.cur > input.base.len() {
                 xml_err_internal!(self, "Parser input data memory error\n");
 
                 self.err_no = XmlParserErrors::XmlErrInternalError as i32;
@@ -655,13 +638,13 @@ impl XmlParserCtxt {
                 // XML constructs only use < 128 chars
 
                 let input = self.input_mut().unwrap();
-                if *input.cur == b'\n' {
+                if input.base[input.cur] == b'\n' {
                     input.line += 1;
                     input.col = 1;
                 } else {
                     input.col += 1;
                 }
-                input.cur = input.cur.add(1);
+                input.cur += 1;
                 return;
             }
 
@@ -670,7 +653,7 @@ impl XmlParserCtxt {
             //   literal #xD, an XML processor must pass to the application
             //   the single character #xA.
             let input = self.input_mut().unwrap();
-            if *input.cur == b'\n' {
+            if input.base[input.cur] == b'\n' {
                 input.line += 1;
                 input.col = 1;
             } else {
@@ -683,14 +666,14 @@ impl XmlParserCtxt {
                 Ok(s) => {
                     let c = s.chars().next().unwrap();
                     let input = self.input_mut().unwrap();
-                    input.cur = input.cur.add(c.len_utf8());
+                    input.cur += c.len_utf8();
                     return;
                 }
                 Err(e) if e.valid_up_to() > 0 => {
                     let s = from_utf8_unchecked(&bytes[..e.valid_up_to()]);
                     let c = s.chars().next().unwrap();
                     let input = self.input_mut().unwrap();
-                    input.cur = input.cur.add(c.len_utf8());
+                    input.cur += c.len_utf8();
                     return;
                 }
                 Err(_) => {}
@@ -721,7 +704,7 @@ impl XmlParserCtxt {
             }
             self.charset = XmlCharEncoding::ISO8859_1;
             let input = self.input_mut().unwrap();
-            input.cur = input.cur.add(1);
+            input.cur += 1;
         }
     }
 
@@ -760,7 +743,7 @@ impl XmlParserCtxt {
                     if content.is_empty() {
                         let len = self.content_bytes().len();
                         let input = self.input_mut().unwrap();
-                        input.cur = input.cur.add(len);
+                        input.cur += len;
                         input.line = line;
                         input.col = col;
                         self.force_grow();
@@ -771,7 +754,7 @@ impl XmlParserCtxt {
                 let diff = self.content_bytes().len() - content.len();
                 if diff > 0 {
                     let input = self.input_mut().unwrap();
-                    input.cur = input.cur.add(diff);
+                    input.cur += diff;
                     input.line = line;
                     input.col = col;
                 }
@@ -872,7 +855,7 @@ impl XmlParserCtxt {
                 if self.current_byte() == 0xD {
                     if self.nth_byte(1) == 0xA {
                         let input = self.input_mut()?;
-                        input.cur = input.cur.add(1);
+                        input.cur += 1;
                     }
                     return Some('\u{A}');
                 }
@@ -945,7 +928,7 @@ impl XmlParserCtxt {
             if c == '\r' {
                 if self.content_bytes().get(1) == Some(&b'\n') {
                     let input = self.input_mut().unwrap();
-                    input.cur = input.cur.add(1);
+                    input.cur += 1;
                 }
                 return Some('\n');
             }
@@ -968,7 +951,7 @@ impl XmlParserCtxt {
                 } else {
                     input.col += 1;
                 }
-                input.cur = input.cur.add(c.len_utf8());
+                input.cur += c.len_utf8();
                 c
             })
         }
@@ -1494,25 +1477,25 @@ impl XmlParserCtxt {
             if matches!(
                 input_buf.borrow().encoder.as_ref().unwrap().name(),
                 "UTF-16LE" | "UTF-16"
-            ) && *input.cur.add(0) == 0xFF
-                && *input.cur.add(1) == 0xFE
+            ) && input.base[input.cur] == 0xFF
+                && input.base[input.cur + 1] == 0xFE
             {
-                input.cur = input.cur.add(2);
+                input.cur += 2;
             }
             if input_buf.borrow().encoder.as_ref().unwrap().name() == "UTF-16BE"
-                && *input.cur.add(0) == 0xFE
-                && *input.cur.add(1) == 0xFF
+                && input.base[input.cur] == 0xFE
+                && input.base[input.cur + 1] == 0xFF
             {
-                input.cur = input.cur.add(2);
+                input.cur += 2;
             }
             // Errata on XML-1.0 June 20 2001
             // Specific handling of the Byte Order Mark for UTF-8
             if input_buf.borrow().encoder.as_ref().unwrap().name() == "UTF-8"
-                && *input.cur.add(0) == 0xEF
-                && *input.cur.add(1) == 0xBB
-                && *input.cur.add(2) == 0xBF
+                && input.base[input.cur] == 0xEF
+                && input.base[input.cur + 1] == 0xBB
+                && input.base[input.cur + 2] == 0xBF
             {
-                input.cur = input.cur.add(3);
+                input.cur += 3;
             }
 
             // Shrink the current input buffer.
@@ -1590,7 +1573,7 @@ impl XmlParserCtxt {
                 // Errata on XML-1.0 June 20 2001
                 // Specific handling of the Byte Order Mark for UTF-8
                 if self.content_bytes().starts_with(&[0xEF, 0xBB, 0xBF]) {
-                    self.input_mut().unwrap().cur = self.input().unwrap().cur.add(3);
+                    self.input_mut().unwrap().cur += 3;
                 }
             }
 

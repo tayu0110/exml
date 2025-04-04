@@ -18,7 +18,6 @@ use std::{
     ffi::c_void,
     io::{Stderr, Stdout, Write, stderr},
     ptr::{NonNull, null_mut},
-    slice::from_raw_parts,
     sync::atomic::{AtomicBool, Ordering},
 };
 
@@ -975,87 +974,85 @@ macro_rules! generic_error {
 }
 
 #[doc(hidden)]
-pub unsafe fn parser_print_file_context_internal(
+pub fn parser_print_file_context_internal(
     input: Option<&XmlParserInput>,
     channel: GenericError,
     data: Option<GenericErrorContext>,
 ) {
-    unsafe {
-        const SIZE: usize = 80;
+    const SIZE: usize = 80;
 
-        let Some(input) = input.filter(|input| !input.cur.is_null()) else {
-            return;
-        };
+    let Some(input) = input else {
+        return;
+    };
 
-        let mut cur: *const u8 = input.cur;
-        let base: *const u8 = input.base;
-        // skip backwards over any end-of-lines
-        while cur > base && (*cur == b'\n' || *cur == b'\r') {
-            cur = cur.sub(1);
-        }
-        let mut n = 0;
-        // search backwards for beginning-of-line (to max buff size)
-        while n < SIZE && cur > base && *cur != b'\n' && *cur != b'\r' {
-            cur = cur.sub(1);
-            n += 1;
-        }
-        if n > 0 && (*cur == b'\n' || *cur == b'\r') {
-            cur = cur.add(1);
-        } else {
-            // skip over continuation bytes
-            while cur < input.cur && *cur & 0xC0 == 0x80 {
-                cur = cur.add(1);
-            }
-        }
-        let col = input.cur.offset_from(cur) as usize;
-        let mut content = String::with_capacity(SIZE);
-
-        // search forward for end-of-line (to max buff size)
-        let mut n = 0;
-        let chunk = {
-            let mut i = 0;
-            let mut now = *cur;
-            while now != 0 && now != b'\n' && now != b'\r' && i < SIZE {
-                i += 1;
-                now = *cur.add(i);
-            }
-            from_raw_parts(cur, i)
-        };
-        if let Some(chunk) = chunk.utf8_chunks().next() {
-            for c in chunk
-                .valid()
-                .chars()
-                .take_while(|&c| c != '\n' && c != '\r')
-            {
-                n += c.len_utf8();
-                if n > SIZE {
-                    break;
-                }
-                content.push(c);
-            }
-        }
-        // print out the selected text
-        channel(data.clone(), format!("{content}\n").as_str());
-        // create blank line with problem pointer
-        let mut ptr = content
-            .bytes()
-            .take(col)
-            .map(|c| if c == b'\t' { '\t' } else { ' ' })
-            .collect::<String>();
-        if ptr.len() == SIZE {
-            ptr.pop();
-        }
-        ptr.push_str("^\n");
-        channel(data.clone(), ptr.as_str());
+    let mut cur = input.cur;
+    // skip backwards over any end-of-lines
+    while 0 < cur && cur < input.base.len() && matches!(input.base[cur], b'\n' | b'\r') {
+        cur -= 1;
     }
+    let mut n = 0;
+    if cur == input.base.len() {
+        cur -= 1;
+        n += 1;
+    }
+    // search backwards for beginning-of-line (to max buff size)
+    while n < SIZE && cur > 0 && !matches!(input.base[cur], b'\n' | b'\r') {
+        cur -= 1;
+        n += 1;
+    }
+    let mut cur = &input.base[cur..];
+    if n > 0 && matches!(cur.first(), Some(&(b'\n' | b'\r'))) {
+        cur = &cur[1..];
+    } else {
+        // skip over continuation bytes
+        while cur.len() > input.base.len() - input.cur && cur[0] & 0xC0 == 0x80 {
+            cur = &cur[1..];
+        }
+    }
+    let col = input.cur - (input.base.len() - cur.len());
+    let mut content = String::with_capacity(SIZE);
+
+    // search forward for end-of-line (to max buff size)
+    let mut n = 0;
+    let chunk = {
+        let mut i = 0;
+        while i < SIZE.min(cur.len()) && cur[i] != b'\n' && cur[i] != b'\r' {
+            i += 1;
+        }
+        &cur[..i]
+    };
+    if let Some(chunk) = chunk.utf8_chunks().next() {
+        for c in chunk
+            .valid()
+            .chars()
+            .take_while(|&c| c != '\n' && c != '\r')
+        {
+            n += c.len_utf8();
+            if n > SIZE {
+                break;
+            }
+            content.push(c);
+        }
+    }
+    // print out the selected text
+    channel(data.clone(), format!("{content}\n").as_str());
+    // create blank line with problem pointer
+    let mut ptr = content
+        .bytes()
+        .take(col)
+        .map(|c| if c == b'\t' { '\t' } else { ' ' })
+        .collect::<String>();
+    if ptr.len() == SIZE {
+        ptr.pop();
+    }
+    ptr.push_str("^\n");
+    channel(data.clone(), ptr.as_str());
 }
 
-pub unsafe fn parser_print_file_context(input: Option<&XmlParserInput>) {
-    unsafe {
-        let (channel, data) = GLOBAL_STATE
-            .with_borrow(|state| (state.generic_error, state.generic_error_context.clone()));
-        parser_print_file_context_internal(input, channel, data);
-    }
+pub fn parser_print_file_context(input: Option<&XmlParserInput>) {
+    let (channel, data) = GLOBAL_STATE
+        .with_borrow(|state| (state.generic_error, state.generic_error_context.clone()));
+    parser_print_file_context_internal(input, channel, data);
 }
 
 pub fn parser_print_file_info(input: Option<&XmlParserInput>) {
@@ -1342,9 +1339,7 @@ pub(crate) fn parser_validity_warning(ctx: Option<GenericErrorContext>, msg: &st
 
         generic_error!("validity warning: {msg}");
 
-        unsafe {
-            parser_print_file_context(input);
-        }
+        parser_print_file_context(input);
     } else {
         generic_error!("validity warning: {msg}");
     }

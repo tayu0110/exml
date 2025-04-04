@@ -2088,12 +2088,7 @@ unsafe fn push_boundary_test(
                 }
             }
 
-            old_consumed = (*ctxt).input().unwrap().consumed
-                + (*ctxt)
-                    .input()
-                    .unwrap()
-                    .cur
-                    .offset_from((*ctxt).input().unwrap().base) as u64;
+            old_consumed = (*ctxt).input().unwrap().consumed + (*ctxt).input().unwrap().cur as u64;
 
             PUSH_BOUNDARY_COUNT.set(0);
             PUSH_BOUNDARY_REF_COUNT.set(0);
@@ -2137,23 +2132,14 @@ unsafe fn push_boundary_test(
 
             // Buffer check: If input was consumed, check that the input
             // buffer is (almost) empty.
-            consumed = (*ctxt).input().unwrap().consumed
-                + (*ctxt)
-                    .input()
-                    .unwrap()
-                    .cur
-                    .offset_from((*ctxt).input().unwrap().base) as u64;
+            consumed = (*ctxt).input().unwrap().consumed + (*ctxt).input().unwrap().cur as u64;
             if (*ctxt).instate != XmlParserInputState::XmlParserDTD
                 && consumed >= 4
                 && consumed != old_consumed
             {
                 let mut max: size_t = 0;
 
-                avail = (*ctxt)
-                    .input()
-                    .unwrap()
-                    .end
-                    .offset_from((*ctxt).input().unwrap().cur) as _;
+                avail = (*ctxt).content_bytes().len() as u64;
 
                 if options & XML_PARSE_HTML != 0
                     && ((*ctxt).instate == XmlParserInputState::XmlParserEndTag)
@@ -2161,7 +2147,7 @@ unsafe fn push_boundary_test(
                     // Something related to script parsing.
                     max = 3;
                 } else if is_text != 0 {
-                    let c: i32 = *(*ctxt).input().unwrap().cur as i32;
+                    let c: i32 = *(*ctxt).content_bytes().first().unwrap_or(&0) as i32;
 
                     // 3 bytes for partial UTF-8
                     max = if c == b'<' as i32 || c == b'&' as i32 {

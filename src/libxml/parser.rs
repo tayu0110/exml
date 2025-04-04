@@ -661,7 +661,6 @@ pub unsafe fn xml_io_parse_dtd(
             (*ctxt).switch_encoding(enc);
         }
 
-        let cur = (*ctxt).input().unwrap().cur;
         if let Some(pinput) = (*ctxt)
             .input_tab
             .iter_mut()
@@ -670,8 +669,8 @@ pub unsafe fn xml_io_parse_dtd(
             pinput.filename = None;
             pinput.line = 1;
             pinput.col = 1;
-            pinput.base = cur;
-            pinput.cur = cur;
+            pinput.base.drain(..pinput.cur);
+            pinput.cur = 0;
             pinput.free = None;
         }
 
