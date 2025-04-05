@@ -21,7 +21,6 @@
 use std::{
     any::type_name,
     borrow::Cow,
-    ffi::CStr,
     ops::{Deref, DerefMut},
     os::raw::c_void,
     ptr::{NonNull, null_mut},
@@ -29,9 +28,8 @@ use std::{
 };
 
 use crate::libxml::{
-    globals::{xml_deregister_node_default_value, xml_free, xml_register_node_default_value},
+    globals::{xml_deregister_node_default_value, xml_register_node_default_value},
     valid::{xml_add_id, xml_is_id, xml_remove_id},
-    xmlstring::XmlChar,
 };
 
 use super::{
@@ -554,27 +552,6 @@ pub unsafe fn xml_new_ns_prop(
     value: Option<&str>,
 ) -> Option<XmlAttrPtr> {
     unsafe { xml_new_prop_internal(node, ns, name, value) }
-}
-
-/// Create a new property tagged with a namespace and carried by a node.  
-/// Returns a pointer to the attribute
-#[doc(alias = "xmlNewNsPropEatName")]
-pub unsafe fn xml_new_ns_prop_eat_name(
-    node: Option<XmlNodePtr>,
-    ns: Option<XmlNsPtr>,
-    name: *mut XmlChar,
-    value: Option<&str>,
-) -> Option<XmlAttrPtr> {
-    unsafe {
-        if name.is_null() {
-            return None;
-        }
-
-        let n = CStr::from_ptr(name as *const i8).to_string_lossy();
-        let res = xml_new_prop_internal(node, ns, &n, value);
-        xml_free(name as _);
-        res
-    }
 }
 
 pub(super) unsafe fn xml_copy_prop_internal(

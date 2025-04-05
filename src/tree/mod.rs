@@ -36,7 +36,6 @@ mod namespace;
 mod node;
 
 use std::{
-    any::type_name,
     borrow::Cow,
     fmt::Display,
     ptr::null_mut,
@@ -91,7 +90,7 @@ pub(crate) static __XML_REGISTER_CALLBACKS: AtomicI32 = AtomicI32::new(0);
 pub const XML_XML_NAMESPACE: &str = "http://www.w3.org/XML/1998/namespace";
 
 /// This is the name for the special xml:id attribute
-pub const XML_XML_ID: *const XmlChar = c"xml:id".as_ptr() as _;
+pub const XML_XML_ID: &str = "xml:id";
 
 /// The different element types carried by an XML tree.
 ///
@@ -128,58 +127,6 @@ pub enum XmlElementType {
     XmlXIncludeEnd = 20,
 }
 
-impl TryFrom<i32> for XmlElementType {
-    type Error = anyhow::Error;
-    fn try_from(value: i32) -> Result<Self, Self::Error> {
-        if value == Self::XmlElementNode as i32 {
-            Ok(Self::XmlElementNode)
-        } else if value == Self::XmlAttributeNode as i32 {
-            Ok(Self::XmlAttributeNode)
-        } else if value == Self::XmlTextNode as i32 {
-            Ok(Self::XmlTextNode)
-        } else if value == Self::XmlCDATASectionNode as i32 {
-            Ok(Self::XmlCDATASectionNode)
-        } else if value == Self::XmlEntityRefNode as i32 {
-            Ok(Self::XmlEntityRefNode)
-        } else if value == Self::XmlEntityNode as i32 {
-            Ok(Self::XmlEntityNode)
-        } else if value == Self::XmlPINode as i32 {
-            Ok(Self::XmlPINode)
-        } else if value == Self::XmlCommentNode as i32 {
-            Ok(Self::XmlCommentNode)
-        } else if value == Self::XmlDocumentNode as i32 {
-            Ok(Self::XmlDocumentNode)
-        } else if value == Self::XmlDocumentTypeNode as i32 {
-            Ok(Self::XmlDocumentTypeNode)
-        } else if value == Self::XmlDocumentFragNode as i32 {
-            Ok(Self::XmlDocumentFragNode)
-        } else if value == Self::XmlNotationNode as i32 {
-            Ok(Self::XmlNotationNode)
-        } else if value == Self::XmlHTMLDocumentNode as i32 {
-            Ok(Self::XmlHTMLDocumentNode)
-        } else if value == Self::XmlDTDNode as i32 {
-            Ok(Self::XmlDTDNode)
-        } else if value == Self::XmlElementDecl as i32 {
-            Ok(Self::XmlElementDecl)
-        } else if value == Self::XmlAttributeDecl as i32 {
-            Ok(Self::XmlAttributeDecl)
-        } else if value == Self::XmlEntityDecl as i32 {
-            Ok(Self::XmlEntityDecl)
-        } else if value == Self::XmlNamespaceDecl as i32 {
-            Ok(Self::XmlNamespaceDecl)
-        } else if value == Self::XmlXIncludeStart as i32 {
-            Ok(Self::XmlXIncludeStart)
-        } else if value == Self::XmlXIncludeEnd as i32 {
-            Ok(Self::XmlXIncludeEnd)
-        } else {
-            Err(anyhow::anyhow!(
-                "Invalid convert from value '{value}' to {}",
-                type_name::<Self>()
-            ))
-        }
-    }
-}
-
 /// A DTD Attribute type definition.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -196,38 +143,6 @@ pub enum XmlAttributeType {
     XmlAttributeNotation,
 }
 
-impl TryFrom<i32> for XmlAttributeType {
-    type Error = anyhow::Error;
-    fn try_from(value: i32) -> Result<Self, Self::Error> {
-        if value == Self::XmlAttributeCDATA as i32 {
-            Ok(Self::XmlAttributeCDATA)
-        } else if value == Self::XmlAttributeID as i32 {
-            Ok(Self::XmlAttributeID)
-        } else if value == Self::XmlAttributeIDREF as i32 {
-            Ok(Self::XmlAttributeIDREF)
-        } else if value == Self::XmlAttributeIDREFS as i32 {
-            Ok(Self::XmlAttributeIDREFS)
-        } else if value == Self::XmlAttributeEntity as i32 {
-            Ok(Self::XmlAttributeEntity)
-        } else if value == Self::XmlAttributeEntities as i32 {
-            Ok(Self::XmlAttributeEntities)
-        } else if value == Self::XmlAttributeNmtoken as i32 {
-            Ok(Self::XmlAttributeNmtoken)
-        } else if value == Self::XmlAttributeNmtokens as i32 {
-            Ok(Self::XmlAttributeNmtokens)
-        } else if value == Self::XmlAttributeEnumeration as i32 {
-            Ok(Self::XmlAttributeEnumeration)
-        } else if value == Self::XmlAttributeNotation as i32 {
-            Ok(Self::XmlAttributeNotation)
-        } else {
-            Err(anyhow::anyhow!(
-                "Invalid convert from value '{value}' to {}",
-                type_name::<Self>()
-            ))
-        }
-    }
-}
-
 /// A DTD Attribute default definition.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -236,26 +151,6 @@ pub enum XmlAttributeDefault {
     XmlAttributeRequired,
     XmlAttributeImplied,
     XmlAttributeFixed,
-}
-
-impl TryFrom<i32> for XmlAttributeDefault {
-    type Error = anyhow::Error;
-    fn try_from(value: i32) -> Result<Self, Self::Error> {
-        if value == Self::XmlAttributeNone as i32 {
-            Ok(Self::XmlAttributeNone)
-        } else if value == Self::XmlAttributeRequired as i32 {
-            Ok(Self::XmlAttributeRequired)
-        } else if value == Self::XmlAttributeImplied as i32 {
-            Ok(Self::XmlAttributeImplied)
-        } else if value == Self::XmlAttributeFixed as i32 {
-            Ok(Self::XmlAttributeFixed)
-        } else {
-            Err(anyhow::anyhow!(
-                "Invalid convert from value '{value}' to {}",
-                type_name::<Self>()
-            ))
-        }
-    }
 }
 
 /// Possible definitions of element content types.
@@ -300,28 +195,6 @@ pub enum XmlElementTypeVal {
     XmlElementTypeAny,
     XmlElementTypeMixed,
     XmlElementTypeElement,
-}
-
-impl TryFrom<i32> for XmlElementTypeVal {
-    type Error = anyhow::Error;
-    fn try_from(value: i32) -> Result<Self, Self::Error> {
-        if value == Self::XmlElementTypeUndefined as i32 {
-            Ok(Self::XmlElementTypeUndefined)
-        } else if value == Self::XmlElementTypeEmpty as i32 {
-            Ok(Self::XmlElementTypeEmpty)
-        } else if value == Self::XmlElementTypeAny as i32 {
-            Ok(Self::XmlElementTypeAny)
-        } else if value == Self::XmlElementTypeMixed as i32 {
-            Ok(Self::XmlElementTypeMixed)
-        } else if value == Self::XmlElementTypeElement as i32 {
-            Ok(Self::XmlElementTypeElement)
-        } else {
-            Err(anyhow::anyhow!(
-                "Invalid convert from value '{value}' to {}",
-                type_name::<Self>()
-            ))
-        }
-    }
 }
 
 /// A namespace declaration node.
@@ -810,9 +683,6 @@ pub(crate) unsafe fn xml_static_copy_node(
     extended: i32,
 ) -> Option<XmlGenericNodePtr> {
     unsafe {
-        // if node.is_null() {
-        //     return null_mut();
-        // }
         match node.element_type() {
             XmlElementType::XmlTextNode
             | XmlElementType::XmlCDATASectionNode
@@ -1078,9 +948,6 @@ pub(crate) unsafe fn xml_static_copy_node_list(
             node = cur_node.next();
         }
         ret
-        // error:
-        //     xmlFreeNodeList(ret);
-        //     return null_mut();
     }
 }
 
@@ -1225,45 +1092,6 @@ pub unsafe fn xml_new_doc_node(
     }
 }
 
-/// Creation of a new node element within a document. @ns and @content
-/// are optional (null_mut()).
-/// NOTE: @content is supposed to be a piece of XML CDATA, so it allow entities
-///       references, but XML special chars need to be escaped first by using
-///       xmlEncodeEntitiesReentrant(). Use xmlNewDocRawNode() if you don't
-///       need entities support.
-///
-/// Returns a pointer to the new node object.
-#[doc(alias = "xmlNewDocNodeEatName")]
-pub unsafe fn xml_new_doc_node_eat_name(
-    doc: Option<XmlDocPtr>,
-    ns: Option<XmlNsPtr>,
-    name: &str,
-    content: Option<&str>,
-) -> Option<XmlNodePtr> {
-    unsafe {
-        let cur = xml_new_node_eat_name(ns, name);
-        if let Some(mut cur) = cur {
-            cur.doc = doc;
-            if let Some(content) = content {
-                cur.set_children(
-                    doc.and_then(|doc| doc.get_node_list(content).map(|node| node.into())),
-                );
-                if let Some(mut ulccur) = cur.children() {
-                    while let Some(next) = ulccur.next() {
-                        ulccur.set_parent(Some(cur.into()));
-                        ulccur = next;
-                    }
-                    (*ulccur).set_parent(Some(cur.into()));
-                    cur.set_last(Some(ulccur));
-                } else {
-                    cur.set_last(None);
-                }
-            }
-        }
-        cur
-    }
-}
-
 /// Creation of a new node element. @ns is optional (null_mut()).
 ///
 /// Use of this function is DISCOURAGED in favor of xmlNewDocNode.
@@ -1280,37 +1108,6 @@ pub unsafe fn xml_new_node(ns: Option<XmlNsPtr>, name: &str) -> Option<XmlNodePt
             ..Default::default()
         }) else {
             xml_tree_err_memory("building node");
-            return None;
-        };
-
-        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-        //  && xmlRegisterNodeDefaultValue.is_some()
-        {
-            xml_register_node_default_value(cur.into());
-        }
-        Some(cur)
-    }
-}
-
-/// Creation of a new node element. @ns is optional (null_mut()).
-///
-/// Use of this function is DISCOURAGED in favor of xmlNewDocNodeEatName.
-///
-/// Returns a pointer to the new node object, with pointer @name as
-/// new node's name. Use xmlNewNode() if a copy of @name string is
-/// is needed as new node's name.
-#[doc(alias = "xmlNewNodeEatName")]
-pub unsafe fn xml_new_node_eat_name(ns: Option<XmlNsPtr>, name: &str) -> Option<XmlNodePtr> {
-    unsafe {
-        // Allocate a new node and fill the fields.
-        let Some(cur) = XmlNodePtr::new(XmlNode {
-            typ: XmlElementType::XmlElementNode,
-            name: name.to_owned().into(),
-            ns,
-            ..Default::default()
-        }) else {
-            xml_tree_err_memory("building node");
-            // we can't check here that name comes from the doc dictionary
             return None;
         };
 
