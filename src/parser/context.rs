@@ -2090,7 +2090,7 @@ pub unsafe fn xml_create_url_parser_ctxt(filename: Option<&str>, options: i32) -
         }
         (*ctxt).linenumbers = 1;
 
-        let Some(input_stream) = xml_load_external_entity(filename, None, ctxt) else {
+        let Some(input_stream) = xml_load_external_entity(filename, None, &mut *ctxt) else {
             xml_free_parser_ctxt(ctxt);
             return null_mut();
         };
@@ -2174,7 +2174,7 @@ pub(crate) unsafe fn xml_create_entity_parser_ctxt_internal(
         }
 
         if let Some(uri) = url.zip(base).and_then(|(url, base)| build_uri(url, base)) {
-            let Some(input_stream) = xml_load_external_entity(Some(&uri), id, ctxt as _) else {
+            let Some(input_stream) = xml_load_external_entity(Some(&uri), id, &mut *ctxt) else {
                 let sax = (*ctxt).sax.take();
                 xml_free_parser_ctxt(ctxt);
                 return Err(sax);
@@ -2189,7 +2189,7 @@ pub(crate) unsafe fn xml_create_entity_parser_ctxt_internal(
                 }
             }
         } else {
-            let Some(input_stream) = xml_load_external_entity(url, id, ctxt) else {
+            let Some(input_stream) = xml_load_external_entity(url, id, &mut *ctxt) else {
                 let sax = (*ctxt).sax.take();
                 xml_free_parser_ctxt(ctxt);
                 return Err(sax);

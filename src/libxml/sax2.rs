@@ -553,7 +553,7 @@ pub unsafe fn xml_sax2_resolve_entity(
         };
 
         let uri = system_id.zip(base).and_then(|(s, b)| build_uri(s, &b));
-        xml_load_external_entity(uri.as_deref(), public_id, ctxt)
+        xml_load_external_entity(uri.as_deref(), public_id, &mut *ctxt)
     }
 }
 

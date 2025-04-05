@@ -216,81 +216,79 @@ impl XmlParserCtxt {
     ///
     /// Returns 0 in case of success and -1 in case of failure
     #[doc(alias = "xmlLoadEntityContent")]
-    unsafe fn load_entity_content(&mut self, mut entity: XmlEntityPtr) -> i32 {
-        unsafe {
-            let mut l: i32 = 0;
+    fn load_entity_content(&mut self, mut entity: XmlEntityPtr) -> i32 {
+        let mut l: i32 = 0;
 
-            if !matches!(
-                entity.etype,
-                XmlEntityType::XmlExternalParameterEntity
-                    | XmlEntityType::XmlExternalGeneralParsedEntity
-            ) || entity.content.is_some()
-            {
-                xml_fatal_err(
-                    self,
-                    XmlParserErrors::XmlErrInternalError,
-                    Some("xmlLoadEntityContent parameter error"),
-                );
-                return -1;
-            }
-
-            if get_parser_debug_entities() != 0 {
-                generic_error!("Reading {} entity content input\n", entity.name);
-            }
-
-            let Some(input) = XmlParserInput::from_entity(self, entity) else {
-                xml_fatal_err(
-                    self,
-                    XmlParserErrors::XmlErrInternalError,
-                    Some("xmlLoadEntityContent input error"),
-                );
-                return -1;
-            };
-            let input_id = input.id;
-
-            // Push the entity as the current input, read c_char by c_char
-            // saving to the buffer until the end of the entity or an error
-            if self.push_input(input) < 0 {
-                return -1;
-            }
-
-            self.grow();
-            let mut buf = String::new();
-            let mut c = self.current_char(&mut l).unwrap_or('\0');
-            while self.input().unwrap().id == input_id
-                && !self.content_bytes().is_empty()
-                && xml_is_char(c as u32)
-            {
-                buf.push(c);
-                self.advance_with_line_handling(c.len_utf8());
-                c = self.current_char(&mut l).unwrap_or('\0');
-            }
-            if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                return -1;
-            }
-
-            if self
-                .input()
-                .is_some_and(|_| self.content_bytes().is_empty())
-            {
-                self.sizeentities = self
-                    .sizeentities
-                    .saturating_add(self.input().unwrap().consumed);
-                self.pop_input();
-            } else if !xml_is_char(c as u32) {
-                xml_fatal_err_msg_int!(
-                    self,
-                    XmlParserErrors::XmlErrInvalidChar,
-                    format!("xmlLoadEntityContent: invalid char value {}\n", c as i32).as_str(),
-                    c as i32
-                );
-                return -1;
-            }
-            entity.length = buf.len() as i32;
-            entity.content = Some(Cow::Owned(buf));
-
-            0
+        if !matches!(
+            entity.etype,
+            XmlEntityType::XmlExternalParameterEntity
+                | XmlEntityType::XmlExternalGeneralParsedEntity
+        ) || entity.content.is_some()
+        {
+            xml_fatal_err(
+                self,
+                XmlParserErrors::XmlErrInternalError,
+                Some("xmlLoadEntityContent parameter error"),
+            );
+            return -1;
         }
+
+        if get_parser_debug_entities() != 0 {
+            generic_error!("Reading {} entity content input\n", entity.name);
+        }
+
+        let Some(input) = XmlParserInput::from_entity(self, entity) else {
+            xml_fatal_err(
+                self,
+                XmlParserErrors::XmlErrInternalError,
+                Some("xmlLoadEntityContent input error"),
+            );
+            return -1;
+        };
+        let input_id = input.id;
+
+        // Push the entity as the current input, read c_char by c_char
+        // saving to the buffer until the end of the entity or an error
+        if self.push_input(input) < 0 {
+            return -1;
+        }
+
+        self.grow();
+        let mut buf = String::new();
+        let mut c = self.current_char(&mut l).unwrap_or('\0');
+        while self.input().unwrap().id == input_id
+            && !self.content_bytes().is_empty()
+            && xml_is_char(c as u32)
+        {
+            buf.push(c);
+            self.advance_with_line_handling(c.len_utf8());
+            c = self.current_char(&mut l).unwrap_or('\0');
+        }
+        if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+            return -1;
+        }
+
+        if self
+            .input()
+            .is_some_and(|_| self.content_bytes().is_empty())
+        {
+            self.sizeentities = self
+                .sizeentities
+                .saturating_add(self.input().unwrap().consumed);
+            self.pop_input();
+        } else if !xml_is_char(c as u32) {
+            xml_fatal_err_msg_int!(
+                self,
+                XmlParserErrors::XmlErrInvalidChar,
+                format!("xmlLoadEntityContent: invalid char value {}\n", c as i32).as_str(),
+                c as i32
+            );
+            return -1;
+        }
+        entity.length = buf.len() as i32;
+        entity.content = Some(Cow::Owned(buf));
+
+        0
     }
 
     /// Check for non-linear entity expansion behaviour.

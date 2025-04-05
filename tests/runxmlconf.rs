@@ -26,7 +26,7 @@ use exml::{
         },
     },
     parser::{
-        XmlParserCtxtPtr, XmlParserInput, XmlParserOption, xml_ctxt_read_file,
+        XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput, XmlParserOption, xml_ctxt_read_file,
         xml_free_parser_ctxt, xml_new_parser_ctxt, xml_read_file, xml_set_external_entity_loader,
     },
     tree::{NodeCommon, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr, xml_free_doc},
@@ -69,12 +69,12 @@ static NB_LEAKS: AtomicI32 = AtomicI32::new(0);
 
 // We need to trap calls to the resolver to not account memory for the catalog
 // and not rely on any external resources.
-unsafe fn test_external_entity_loader(
+fn test_external_entity_loader(
     url: Option<&str>,
     _id: Option<&str>,
-    ctxt: XmlParserCtxtPtr,
+    ctxt: &mut XmlParserCtxt,
 ) -> Option<XmlParserInput> {
-    unsafe { XmlParserInput::from_filename(&mut *ctxt, url.unwrap()) }
+    XmlParserInput::from_filename(&mut *ctxt, url.unwrap())
 }
 
 // Trapping the error messages at the generic level to grab the equivalent of

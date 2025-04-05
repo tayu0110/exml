@@ -276,9 +276,7 @@ impl XmlParserInputBuffer {
             // convert as much as possible to the parser reading buffer.
             let using = buf.map_or(0, |buf| buf.len());
             let Ok(written) = self.decode(true) else {
-                unsafe {
-                    xml_ioerr(XmlParserErrors::XmlIOEncoder, None);
-                }
+                xml_ioerr(XmlParserErrors::XmlIOEncoder, None);
                 self.error = XmlParserErrors::XmlIOEncoder;
                 return -1;
             };
@@ -311,9 +309,7 @@ impl XmlParserInputBuffer {
             // convert as much as possible to the parser reading buffer.
             let using = self.raw.map_or(0, |raw| raw.len());
             let Ok(written) = self.decode(true) else {
-                unsafe {
-                    xml_ioerr(XmlParserErrors::XmlIOEncoder, None);
-                }
+                xml_ioerr(XmlParserErrors::XmlIOEncoder, None);
                 self.error = XmlParserErrors::XmlIOEncoder;
                 return -1;
             };

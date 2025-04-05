@@ -244,69 +244,67 @@ impl XmlParserInput {
     ///
     /// Returns the new input stream or NULL
     #[doc(alias = "xmlNewEntityInputStream")]
-    pub(crate) unsafe fn from_entity(
+    pub(crate) fn from_entity(
         ctxt: &mut XmlParserCtxt,
         mut entity: XmlEntityPtr,
     ) -> Option<XmlParserInput> {
-        unsafe {
-            if get_parser_debug_entities() != 0 {
-                generic_error!("new input from entity: {}\n", entity.name);
-            }
-            let Some(content) = entity.content.as_deref() else {
-                match entity.etype {
-                    XmlEntityType::XmlExternalGeneralUnparsedEntity => {
-                        xml_err_internal!(ctxt, "Cannot parse entity {}\n", entity.name.clone());
-                    }
-                    XmlEntityType::XmlExternalGeneralParsedEntity
-                    | XmlEntityType::XmlExternalParameterEntity => {
-                        let mut input = xml_load_external_entity(
-                            entity.uri.as_deref(),
-                            entity.external_id.as_deref(),
-                            ctxt,
-                        );
-                        if let Some(input) = input.as_mut() {
-                            input.entity = Some(entity);
-                        }
-                        return input;
-                    }
-                    XmlEntityType::XmlInternalGeneralEntity => {
-                        xml_err_internal!(
-                            ctxt,
-                            "Internal entity {} without content !\n",
-                            entity.name.clone()
-                        );
-                    }
-                    XmlEntityType::XmlInternalParameterEntity => {
-                        xml_err_internal!(
-                            ctxt,
-                            "Internal parameter entity {} without content !\n",
-                            entity.name.clone()
-                        );
-                    }
-                    XmlEntityType::XmlInternalPredefinedEntity => {
-                        xml_err_internal!(
-                            ctxt,
-                            "Predefined entity {} without content !\n",
-                            entity.name.clone()
-                        );
-                    }
-                }
-                return None;
-            };
-            let mut input = XmlParserInput::new(Some(ctxt))?;
-
-            if let Some(uri) = entity.uri.as_deref() {
-                input.filename = Some(uri.to_owned());
-            }
-            input.base = 0;
-            if entity.length == 0 {
-                entity.length = content.len() as i32;
-            }
-            input.cur = 0;
-            input.length = entity.length;
-            input.entity = Some(entity);
-            Some(input)
+        if get_parser_debug_entities() != 0 {
+            generic_error!("new input from entity: {}\n", entity.name);
         }
+        let Some(content) = entity.content.as_deref() else {
+            match entity.etype {
+                XmlEntityType::XmlExternalGeneralUnparsedEntity => {
+                    xml_err_internal!(ctxt, "Cannot parse entity {}\n", entity.name.clone());
+                }
+                XmlEntityType::XmlExternalGeneralParsedEntity
+                | XmlEntityType::XmlExternalParameterEntity => {
+                    let mut input = xml_load_external_entity(
+                        entity.uri.as_deref(),
+                        entity.external_id.as_deref(),
+                        ctxt,
+                    );
+                    if let Some(input) = input.as_mut() {
+                        input.entity = Some(entity);
+                    }
+                    return input;
+                }
+                XmlEntityType::XmlInternalGeneralEntity => {
+                    xml_err_internal!(
+                        ctxt,
+                        "Internal entity {} without content !\n",
+                        entity.name.clone()
+                    );
+                }
+                XmlEntityType::XmlInternalParameterEntity => {
+                    xml_err_internal!(
+                        ctxt,
+                        "Internal parameter entity {} without content !\n",
+                        entity.name.clone()
+                    );
+                }
+                XmlEntityType::XmlInternalPredefinedEntity => {
+                    xml_err_internal!(
+                        ctxt,
+                        "Predefined entity {} without content !\n",
+                        entity.name.clone()
+                    );
+                }
+            }
+            return None;
+        };
+        let mut input = XmlParserInput::new(Some(ctxt))?;
+
+        if let Some(uri) = entity.uri.as_deref() {
+            input.filename = Some(uri.to_owned());
+        }
+        input.base = 0;
+        if entity.length == 0 {
+            entity.length = content.len() as i32;
+        }
+        input.cur = 0;
+        input.length = entity.length;
+        input.entity = Some(entity);
+        Some(input)
     }
 
     pub(crate) fn base_contents(&self) -> &[u8] {

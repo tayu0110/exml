@@ -1584,7 +1584,8 @@ impl XmlXIncludeCtxt {
 
             // Load it.
             let pctxt = xml_new_parser_ctxt();
-            let Some(mut input_stream) = xml_load_external_entity(Some(&url), None, pctxt) else {
+            let Some(mut input_stream) = xml_load_external_entity(Some(&url), None, &mut *pctxt)
+            else {
                 xml_free_parser_ctxt(pctxt);
                 return ret;
             };
@@ -1804,7 +1805,7 @@ impl XmlXIncludeCtxt {
                 url = "./-";
             }
 
-            let Some(input_stream) = xml_load_external_entity(Some(url), None, pctxt) else {
+            let Some(input_stream) = xml_load_external_entity(Some(url), None, &mut *pctxt) else {
                 xml_free_parser_ctxt(pctxt);
                 return None;
             };

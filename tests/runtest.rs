@@ -63,7 +63,7 @@ use exml::{
         xmlstring::XmlChar,
     },
     parser::{
-        XML_SAX2_MAGIC, XmlParserCtxtPtr, XmlParserInput, XmlParserOption,
+        XML_SAX2_MAGIC, XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput, XmlParserOption,
         xml_create_file_parser_ctxt, xml_free_parser_ctxt, xml_no_net_external_entity_loader,
         xml_parse_file, xml_read_file, xml_read_memory, xml_set_external_entity_loader,
     },
@@ -106,10 +106,10 @@ thread_local! {
 // We need to trap calls to the resolver to not account memory for the catalog
 // which is shared to the current running test. We also don't want to have
 // network downloads modifying tests.
-unsafe fn test_external_entity_loader(
+fn test_external_entity_loader(
     url: Option<&str>,
     id: Option<&str>,
-    ctxt: XmlParserCtxtPtr,
+    ctxt: &mut XmlParserCtxt,
 ) -> Option<XmlParserInput> {
     unsafe {
         if check_test_file(url.unwrap()) {

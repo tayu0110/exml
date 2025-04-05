@@ -3958,7 +3958,8 @@ pub unsafe fn html_create_file_parser_ctxt(
         }
 
         let canonic_filename = canonic_path(filename);
-        let Some(input_stream) = xml_load_external_entity(Some(&canonic_filename), None, ctxt)
+        let Some(input_stream) =
+            xml_load_external_entity(Some(&canonic_filename), None, &mut *ctxt)
         else {
             xml_free_parser_ctxt(ctxt);
             return null_mut();

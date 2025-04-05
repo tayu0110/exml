@@ -34,7 +34,7 @@ use exml::{
         xmlstring::{XmlChar, xml_strndup},
     },
     parser::{
-        XmlParserCtxtPtr, XmlParserInput, XmlParserOption, xml_no_net_external_entity_loader,
+        XmlParserCtxt, XmlParserInput, XmlParserOption, xml_no_net_external_entity_loader,
         xml_read_file, xml_read_memory, xml_set_external_entity_loader,
     },
     relaxng::{
@@ -115,16 +115,16 @@ unsafe fn add_entity(name: &str, content: *mut c_char) -> c_int {
 // We need to trap calls to the resolver to not account memory for the catalog
 // which is shared to the current running test. We also don't want to have
 // network downloads modifying tests.
-unsafe fn test_external_entity_loader(
+fn test_external_entity_loader(
     url: Option<&str>,
     id: Option<&str>,
-    ctxt: XmlParserCtxtPtr,
+    ctxt: &mut XmlParserCtxt,
 ) -> Option<XmlParserInput> {
     unsafe {
         for i in 0..NB_ENTITIES {
             if TEST_ENTITIES_NAME[i].as_deref() == url {
                 let mut ret = XmlParserInput::from_str(
-                    (!ctxt.is_null()).then(|| &mut *ctxt),
+                    Some(ctxt),
                     &CStr::from_ptr(TEST_ENTITIES_VALUE[i]).to_string_lossy(),
                 );
                 if let Some(ret) = ret.as_mut() {

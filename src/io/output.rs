@@ -327,9 +327,7 @@ impl<'a> XmlOutputBuffer<'a> {
                     Ok(len) => Ok(len),
                     Err(EncodingError::BufferTooShort) => Err(EncodingError::BufferTooShort),
                     _ => {
-                        unsafe {
-                            xml_ioerr(XmlParserErrors::XmlIOEncoder, None);
-                        }
+                        xml_ioerr(XmlParserErrors::XmlIOEncoder, None);
                         self.error = XmlParserErrors::XmlIOEncoder;
                         return Err(io::Error::other("Failed to encode the content."));
                     }
@@ -371,9 +369,7 @@ impl<'a> XmlOutputBuffer<'a> {
                         self.written = self.written.saturating_add(ret as i32);
                     }
                     e => {
-                        unsafe {
-                            xml_ioerr(XmlParserErrors::XmlIOWrite, None);
-                        }
+                        xml_ioerr(XmlParserErrors::XmlIOWrite, None);
                         self.error = XmlParserErrors::XmlIOWrite;
                         return e
                             .unwrap_or(Err(io::Error::other("Internal buffer is not allocated.")));
@@ -453,9 +449,7 @@ impl<'a> XmlOutputBuffer<'a> {
                     Ok(len) => Ok(len),
                     Err(EncodingError::BufferTooShort) => Err(EncodingError::BufferTooShort),
                     _ => {
-                        unsafe {
-                            xml_ioerr(XmlParserErrors::XmlIOEncoder, None);
-                        }
+                        xml_ioerr(XmlParserErrors::XmlIOEncoder, None);
                         self.error = XmlParserErrors::XmlIOEncoder;
                         return Err(io::Error::other("Failed to encode content."));
                     }
@@ -498,9 +492,7 @@ impl<'a> XmlOutputBuffer<'a> {
                         self.written = self.written.saturating_add(ret as i32);
                     }
                     e => {
-                        unsafe {
-                            xml_ioerr(XmlParserErrors::XmlIOWrite, None);
-                        }
+                        xml_ioerr(XmlParserErrors::XmlIOWrite, None);
                         self.error = XmlParserErrors::XmlIOWrite;
 
                         return e
@@ -532,9 +524,7 @@ impl<'a> XmlOutputBuffer<'a> {
             // convert as much as possible to the parser output buffer.
             while {
                 let Ok(nbchars) = self.encode(false) else {
-                    unsafe {
-                        xml_ioerr(XmlParserErrors::XmlIOEncoder, None);
-                    }
+                    xml_ioerr(XmlParserErrors::XmlIOEncoder, None);
                     self.error = XmlParserErrors::XmlIOEncoder;
                     return -1;
                 };
@@ -560,9 +550,7 @@ impl<'a> XmlOutputBuffer<'a> {
                 ret as i32
             }
             _ => {
-                unsafe {
-                    xml_ioerr(XmlParserErrors::XmlIOFlush, None);
-                }
+                xml_ioerr(XmlParserErrors::XmlIOFlush, None);
                 self.error = XmlParserErrors::XmlIOFlush;
                 -1
             }
@@ -756,7 +744,7 @@ impl XmlOutputCallback for DefaultFileIOCallbacks {
             .truncate(true)
             .create(true)
             .open(filename.as_ref())
-            .inspect_err(|_| unsafe {
+            .inspect_err(|_| {
                 xml_ioerr(
                     XmlParserErrors::XmlErrOK,
                     Some(filename.to_string_lossy().as_ref()),
@@ -809,9 +797,7 @@ impl Write for XmlIOHTTPWriteCtxt {
                         "Error sending document to URI",
                         self.uri
                     );
-                    unsafe {
-                        xml_ioerr(XmlParserErrors::XmlIOWrite, Some(msg.as_str()));
-                    }
+                    xml_ioerr(XmlParserErrors::XmlIOWrite, Some(msg.as_str()));
                     return Err(e);
                 }
             }
@@ -858,9 +844,7 @@ impl Drop for XmlIOHTTPWriteCtxt {
                         "failed.  HTTP return code:",
                         return_code
                     );
-                    unsafe {
-                        xml_ioerr(XmlParserErrors::XmlIOWrite, Some(msg.as_str()));
-                    }
+                    xml_ioerr(XmlParserErrors::XmlIOWrite, Some(msg.as_str()));
                 }
             }
         } else {
@@ -868,9 +852,7 @@ impl Drop for XmlIOHTTPWriteCtxt {
                 "xmlIOHTTPCloseWrite:  {} '{}' {} '{}'.\n",
                 "Error retrieving content.\nUnable to", self.method, "data to URI", self.uri
             );
-            unsafe {
-                xml_ioerr(XmlParserErrors::XmlIOWrite, Some(msg.as_str()));
-            }
+            xml_ioerr(XmlParserErrors::XmlIOWrite, Some(msg.as_str()));
         }
     }
 }

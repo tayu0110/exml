@@ -27,9 +27,9 @@ use exml::{
         },
     },
     parser::{
-        XML_SAX2_MAGIC, XmlParserCtxtPtr, XmlParserInput, XmlParserOption, xml_ctxt_read_file,
-        xml_free_parser_ctxt, xml_new_sax_parser_ctxt, xml_no_net_external_entity_loader,
-        xml_set_external_entity_loader,
+        XML_SAX2_MAGIC, XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput, XmlParserOption,
+        xml_ctxt_read_file, xml_free_parser_ctxt, xml_new_sax_parser_ctxt,
+        xml_no_net_external_entity_loader, xml_set_external_entity_loader,
     },
     tree::{
         XmlAttributeDefault, XmlAttributeType, XmlElementContentPtr, XmlElementType,
@@ -372,10 +372,10 @@ thread_local! {
 // We need to trap calls to the resolver to not account memory for the catalog
 // which is shared to the current running test. We also don't want to have
 // network downloads modifying tests.
-unsafe fn test_external_entity_loader(
+fn test_external_entity_loader(
     url: Option<&str>,
     id: Option<&str>,
-    ctxt: XmlParserCtxtPtr,
+    ctxt: &mut XmlParserCtxt,
 ) -> Option<XmlParserInput> {
     unsafe {
         let memused: i32 = xml_mem_used();

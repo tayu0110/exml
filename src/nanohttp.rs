@@ -177,13 +177,11 @@ pub fn xml_nanohttp_scan_proxy(url: &str) {
         .ok()
         .filter(|uri| uri.scheme() == "http" && uri.host_str().is_some())
     else {
-        unsafe {
-            __xml_ioerr(
-                XmlErrorDomain::XmlFromHTTP,
-                XmlParserErrors::XmlHTTPUrlSyntax,
-                Some("Syntax Error\n"),
-            );
-        }
+        __xml_ioerr(
+            XmlErrorDomain::XmlFromHTTP,
+            XmlParserErrors::XmlHTTPUrlSyntax,
+            Some("Syntax Error\n"),
+        );
         return;
     };
 
@@ -243,14 +241,14 @@ fn xml_nanohttp_recv(ctxt: &mut XmlNanoHTTPCtxt) -> io::Result<usize> {
                     ErrorKind::ConnectionReset | ErrorKind::ConnectionAborted => {
                         return Ok(0);
                     }
-                    _ => unsafe {
+                    _ => {
                         __xml_ioerr(
                             XmlErrorDomain::XmlFromHTTP,
                             XmlParserErrors::default(),
                             Some("recv failed\n"),
                         );
                         return Err(e);
-                    },
+                    }
                 }
             }
         }
@@ -478,13 +476,11 @@ fn xml_nanohttp_send(ctxt: &mut XmlNanoHTTPCtxt, mut buf: &[u8]) -> i32 {
 
     if ctxt.state & XML_NANO_HTTP_WRITE as i32 != 0 {
         let Some(socket) = ctxt.socket.as_mut() else {
-            unsafe {
-                __xml_ioerr(
-                    XmlErrorDomain::XmlFromHTTP,
-                    XmlParserErrors::default(),
-                    Some("send failed\n"),
-                );
-            }
+            __xml_ioerr(
+                XmlErrorDomain::XmlFromHTTP,
+                XmlParserErrors::default(),
+                Some("send failed\n"),
+            );
             if total_sent == 0 {
                 total_sent = -1;
             }
@@ -500,7 +496,7 @@ fn xml_nanohttp_send(ctxt: &mut XmlNanoHTTPCtxt, mut buf: &[u8]) -> i32 {
                     ErrorKind::WouldBlock | ErrorKind::TimedOut => {
                         continue;
                     }
-                    _ => unsafe {
+                    _ => {
                         __xml_ioerr(
                             XmlErrorDomain::XmlFromHTTP,
                             XmlParserErrors::default(),
@@ -510,7 +506,7 @@ fn xml_nanohttp_send(ctxt: &mut XmlNanoHTTPCtxt, mut buf: &[u8]) -> i32 {
                             total_sent = -1;
                         }
                         break;
-                    },
+                    }
                 },
             }
         }
@@ -683,26 +679,22 @@ pub fn xml_nanohttp_method_redir(
         }
 
         if ctxt.protocol != Some("http".into()) {
-            unsafe {
-                __xml_ioerr(
-                    XmlErrorDomain::XmlFromHTTP,
-                    XmlParserErrors::XmlHTTPUrlSyntax,
-                    Some("Not a valid HTTP URI"),
-                );
-                return Err(io::Error::new(
-                    ErrorKind::InvalidInput,
-                    "Not a valid HTTP URI",
-                ));
-            }
+            __xml_ioerr(
+                XmlErrorDomain::XmlFromHTTP,
+                XmlParserErrors::XmlHTTPUrlSyntax,
+                Some("Not a valid HTTP URI"),
+            );
+            return Err(io::Error::new(
+                ErrorKind::InvalidInput,
+                "Not a valid HTTP URI",
+            ));
         }
         let Some(hostname) = ctxt.hostname.as_ref() else {
-            unsafe {
-                __xml_ioerr(
-                    XmlErrorDomain::XmlFromHTTP,
-                    XmlParserErrors::XmlHTTPUnknownHost,
-                    Some("Failed to identify host in URI"),
-                );
-            }
+            __xml_ioerr(
+                XmlErrorDomain::XmlFromHTTP,
+                XmlParserErrors::XmlHTTPUnknownHost,
+                Some("Failed to identify host in URI"),
+            );
             return Err(io::Error::new(
                 ErrorKind::AddrNotAvailable,
                 "Failed to identify host in URI",

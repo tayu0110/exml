@@ -80,7 +80,7 @@ use exml::{
         xmlstring::XmlChar,
     },
     parser::{
-        XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SAX2_MAGIC, XmlExternalEntityLoader,
+        XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SAX2_MAGIC, XmlExternalEntityLoader, XmlParserCtxt,
         XmlParserCtxtPtr, XmlParserInput, XmlParserOption, xml_create_push_parser_ctxt,
         xml_ctxt_read_file, xml_ctxt_read_io, xml_ctxt_read_memory, xml_free_parser_ctxt,
         xml_get_external_entity_loader, xml_new_parser_ctxt, xml_new_sax_parser_ctxt,
@@ -796,10 +796,10 @@ fn parse_path(mut path: &str) {
 
 static mut DEFAULT_ENTITY_LOADER: Option<XmlExternalEntityLoader> = None;
 
-unsafe fn xmllint_external_entity_loader(
+fn xmllint_external_entity_loader(
     url: Option<&str>,
     id: Option<&str>,
-    ctxt: XmlParserCtxtPtr,
+    ctxt: &mut XmlParserCtxt,
 ) -> Option<XmlParserInput> {
     unsafe {
         let mut warning: Option<GenericError> = None;
@@ -817,18 +817,16 @@ unsafe fn xmllint_external_entity_loader(
             }
         }
 
-        if !ctxt.is_null() {
-            if let Some(sax) = (*ctxt).sax.as_deref_mut() {
-                warning = sax.warning.take();
-                err = sax.error.take();
-            }
+        if let Some(sax) = ctxt.sax.as_deref_mut() {
+            warning = sax.warning.take();
+            err = sax.error.take();
         }
 
         let mut ret = None;
         if let Some(loader) = DEFAULT_ENTITY_LOADER {
-            ret = loader(url, id, ctxt);
+            ret = loader(url, id, &mut *ctxt);
             if ret.is_some() {
-                if let Some(sax) = (*ctxt).sax.as_deref_mut() {
+                if let Some(sax) = ctxt.sax.as_deref_mut() {
                     if warning.is_some() {
                         sax.warning = warning;
                     }
@@ -852,7 +850,7 @@ unsafe fn xmllint_external_entity_loader(
                 new_url.push_str(lastsegment.unwrap());
                 ret = loader(Some(&new_url), id, ctxt);
                 if ret.is_some() {
-                    if let Some(sax) = (*ctxt).sax.as_deref_mut() {
+                    if let Some(sax) = ctxt.sax.as_deref_mut() {
                         if warning.is_some() {
                             sax.warning = warning;
                         }
@@ -872,12 +870,12 @@ unsafe fn xmllint_external_entity_loader(
             }
         }
         if err.is_some() {
-            if let Some(sax) = (*ctxt).sax.as_deref_mut() {
+            if let Some(sax) = ctxt.sax.as_deref_mut() {
                 sax.error = err;
             }
         }
         if let Some(warning) = warning {
-            if let Some(sax) = (*ctxt).sax.as_deref_mut() {
+            if let Some(sax) = ctxt.sax.as_deref_mut() {
                 sax.warning = Some(warning);
             }
             if url.is_some() {
