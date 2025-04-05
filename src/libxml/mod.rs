@@ -4,7 +4,6 @@ pub mod chvalid;
 pub mod dict;
 pub mod globals;
 pub mod hash;
-pub mod parser;
 #[cfg(feature = "schema")]
 pub mod relaxng;
 pub mod sax2;

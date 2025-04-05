@@ -52,7 +52,6 @@ use exml::{
     io::{XmlInputCallback, pop_input_callbacks, register_input_callbacks},
     libxml::{
         globals::{set_xml_free, set_xml_malloc, set_xml_mem_strdup, set_xml_realloc, xml_free},
-        parser::{XmlSAXHandler, XmlSAXLocatorPtr, xml_cleanup_parser, xml_init_parser},
         relaxng::XmlRelaxNGPtr,
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
@@ -64,8 +63,9 @@ use exml::{
     },
     parser::{
         XML_SAX2_MAGIC, XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput, XmlParserOption,
-        xml_create_file_parser_ctxt, xml_free_parser_ctxt, xml_no_net_external_entity_loader,
-        xml_parse_file, xml_read_file, xml_read_memory, xml_set_external_entity_loader,
+        XmlSAXHandler, XmlSAXLocatorPtr, xml_cleanup_parser, xml_create_file_parser_ctxt,
+        xml_free_parser_ctxt, xml_init_parser, xml_no_net_external_entity_loader, xml_parse_file,
+        xml_read_file, xml_read_memory, xml_set_external_entity_loader,
     },
     relaxng::xml_relaxng_init_types,
     tree::{
@@ -1988,11 +1988,8 @@ unsafe fn push_boundary_test(
                 parser::{html_create_push_parser_ctxt, html_parse_chunk},
                 tree::html_doc_dump_memory,
             },
-            libxml::{
-                parser::XmlSAXHandler,
-                sax2::{xml_sax_version, xml_sax2_init_html_default_sax_handler},
-            },
-            parser::XmlParserInputState,
+            libxml::sax2::{xml_sax_version, xml_sax2_init_html_default_sax_handler},
+            parser::{XmlParserInputState, XmlSAXHandler},
         };
 
         let mut bnd_sax = XmlSAXHandler::default();

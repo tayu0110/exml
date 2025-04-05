@@ -266,8 +266,7 @@ mod tests {
 
     use crate::{
         globals::GenericErrorContext,
-        libxml::parser::XmlSAXHandler,
-        parser::{XmlParserCtxt, xml_ctxt_read_memory, xml_new_sax_parser_ctxt},
+        parser::{XmlParserCtxt, XmlSAXHandler, xml_ctxt_read_memory, xml_new_sax_parser_ctxt},
     };
 
     thread_local! {

@@ -14,11 +14,8 @@ use exml::{
         GenericErrorContext, get_do_validity_checking_default_value,
         set_do_validity_checking_default_value, set_generic_error,
     },
-    libxml::{
-        catalog::{xml_catalog_cleanup, xml_load_catalog},
-        parser::{xml_cleanup_parser, xml_init_parser},
-    },
-    parser::xml_parse_file,
+    libxml::catalog::{xml_catalog_cleanup, xml_load_catalog},
+    parser::{xml_cleanup_parser, xml_init_parser, xml_parse_file},
     tree::xml_free_doc,
 };
 use libc::{pthread_create, pthread_join, pthread_t};

@@ -31,10 +31,8 @@ use crate::{
     error::XmlParserErrors,
     html::tree::html_node_dump_output,
     io::XmlOutputBuffer,
-    libxml::{
-        parser::xml_init_parser,
-        xmlstring::{XmlChar, xml_strndup},
-    },
+    libxml::xmlstring::{XmlChar, xml_strndup},
+    parser::xml_init_parser,
     save::{
         XmlSaveCtxt, XmlSaveOption, xhtml_node_dump_output, xml_node_dump_output_internal,
         xml_save_err, xml_save_err_memory,

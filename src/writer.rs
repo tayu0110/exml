@@ -41,14 +41,13 @@ use crate::{
     globals::GenericErrorContext,
     html::tree::html_new_doc_no_dtd,
     io::XmlOutputBuffer,
-    libxml::{
-        parser::XmlSAXHandler,
-        sax2::{xml_sax2_end_element, xml_sax2_init_default_sax_handler, xml_sax2_start_element},
+    libxml::sax2::{
+        xml_sax2_end_element, xml_sax2_init_default_sax_handler, xml_sax2_start_element,
     },
     list::XmlList,
     parser::{
-        XML_DEFAULT_VERSION, XmlParserCtxtPtr, XmlParserInputState, xml_create_push_parser_ctxt,
-        xml_free_parser_ctxt,
+        XML_DEFAULT_VERSION, XmlParserCtxtPtr, XmlParserInputState, XmlSAXHandler,
+        xml_create_push_parser_ctxt, xml_free_parser_ctxt,
     },
     save::attr_serialize_text_content,
     tree::{XmlDocPtr, XmlNodePtr, xml_encode_special_chars, xml_free_doc, xml_new_doc},

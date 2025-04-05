@@ -42,10 +42,9 @@ use crate::{
     io::XmlOutputBuffer,
     libxml::{
         chvalid::xml_is_char,
-        parser::xml_init_parser,
         valid::{xml_dump_attribute_decl, xml_dump_element_decl, xml_dump_notation_table},
     },
-    parser::XML_STRING_TEXT_NOENC,
+    parser::{XML_STRING_TEXT_NOENC, xml_init_parser},
     tree::{
         NodeCommon, XML_LOCAL_NAMESPACE, XmlAttrPtr, XmlAttributePtr, XmlDocPtr, XmlDtdPtr,
         XmlElementPtr, XmlElementType, XmlEntityPtr, XmlGenericNodePtr, XmlNodePtr, XmlNotation,

@@ -66,8 +66,7 @@ use crate::{
     globals::GenericErrorContext,
     html::parser::{__html_parse_content, HtmlParserOption, html_create_memory_parser_ctxt},
     libxml::{
-        chvalid::xml_is_blank_char, globals::xml_default_sax_locator, parser::xml_init_parser,
-        valid::xml_validate_element,
+        chvalid::xml_is_blank_char, globals::xml_default_sax_locator, valid::xml_validate_element,
     },
     parser::XmlParserOption,
     tree::{
@@ -80,6 +79,7 @@ use crate::{
 use super::{
     XML_SKIP_IDS, XmlParserCtxt, XmlParserCtxtPtr, XmlParserInputState,
     xml_create_memory_parser_ctxt, xml_fatal_err, xml_fatal_err_msg, xml_free_parser_ctxt,
+    xml_init_parser,
 };
 
 /// The default version of XML used: 1.0

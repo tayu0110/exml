@@ -42,39 +42,16 @@
 //
 // daniel@veillard.com
 
-use std::{
-    ffi::c_void,
-    sync::atomic::{AtomicBool, AtomicPtr, Ordering},
-};
+use std::{ffi::c_void, sync::atomic::AtomicPtr};
 
-#[cfg(feature = "catalog")]
-use crate::libxml::catalog::xml_catalog_cleanup;
-#[cfg(feature = "schema")]
-use crate::relaxng::xml_relaxng_cleanup_types;
 use crate::{
     globals::{GenericErrorContext, StructuredError},
-    io::{
-        cleanup_input_callbacks, cleanup_output_callbacks, register_default_input_callbacks,
-        register_default_output_callbacks,
-    },
-    libxml::{
-        dict::{__xml_initialize_dict, xml_cleanup_dict_internal},
-        globals::{xml_cleanup_globals_internal, xml_init_globals_internal},
-        xmlmemory::{xml_cleanup_memory_internal, xml_init_memory_internal},
-        xmlschemastypes::xml_schema_cleanup_types,
-        xmlstring::XmlChar,
-    },
+    libxml::xmlstring::XmlChar,
     parser::XmlParserInput,
     tree::{
         XmlAttributeDefault, XmlAttributeType, XmlElementContentPtr, XmlElementTypeVal,
         XmlEntityPtr, XmlEntityType, XmlEnumeration,
     },
-    xpath::xml_init_xpath_internal,
-};
-
-use super::threads::{
-    __xml_global_init_mutex_lock, __xml_global_init_mutex_unlock, xml_cleanup_threads_internal,
-    xml_init_threads_internal,
 };
 
 #[repr(C)]
@@ -345,86 +322,4 @@ pub struct XmlSAXHandler {
     pub start_element_ns: Option<StartElementNsSAX2Func>,
     pub end_element_ns: Option<EndElementNsSAX2Func>,
     pub serror: Option<StructuredError>,
-}
-
-static XML_PARSER_INITIALIZED: AtomicBool = AtomicBool::new(false);
-
-/// Initialization function for the XML parser.
-/// This is not reentrant. Call once before processing in case of
-/// use in multithreaded programs.
-#[doc(alias = "xmlInitParser")]
-pub unsafe fn xml_init_parser() {
-    unsafe {
-        // Note that the initialization code must not make memory allocations.
-        if XML_PARSER_INITIALIZED.load(Ordering::Acquire) {
-            return;
-        }
-
-        __xml_global_init_mutex_lock();
-        if !XML_PARSER_INITIALIZED.load(Ordering::Acquire) {
-            xml_init_threads_internal();
-            xml_init_globals_internal();
-            xml_init_memory_internal();
-            __xml_initialize_dict();
-            register_default_input_callbacks();
-            #[cfg(feature = "libxml_output")]
-            {
-                register_default_output_callbacks();
-            }
-            #[cfg(any(feature = "xpath", feature = "schema"))]
-            {
-                xml_init_xpath_internal();
-            }
-            XML_PARSER_INITIALIZED.store(true, Ordering::Release);
-        }
-
-        __xml_global_init_mutex_unlock();
-    }
-}
-
-/// This function name is somewhat misleading. It does not clean up
-/// parser state, it cleans up memory allocated by the library itself.
-/// It is a cleanup function for the XML library. It tries to reclaim all
-/// related global memory allocated for the library processing.
-/// It doesn't deallocate any document related memory. One should
-/// call xmlCleanupParser() only when the process has finished using
-/// the library and all XML/HTML documents built with it.
-/// See also xmlInitParser() which has the opposite function of preparing
-/// the library for operations.
-///
-/// # Warning
-/// if your application is multithreaded or has plugin support
-/// calling this may crash the application if another thread or
-/// a plugin is still using libxml2. It's sometimes very hard to
-/// guess if libxml2 is in use in the application, some libraries
-/// or plugins may use it without notice. In case of doubt abstain
-/// from calling this function or do it just before calling exit()
-/// to avoid leak reports from valgrind !
-#[doc(alias = "xmlCleanupParser")]
-pub unsafe fn xml_cleanup_parser() {
-    unsafe {
-        if !XML_PARSER_INITIALIZED.load(Ordering::Acquire) {
-            return;
-        }
-
-        #[cfg(feature = "catalog")]
-        {
-            xml_catalog_cleanup();
-        }
-        xml_cleanup_dict_internal();
-        cleanup_input_callbacks();
-        #[cfg(feature = "libxml_output")]
-        {
-            cleanup_output_callbacks();
-        }
-        #[cfg(feature = "schema")]
-        {
-            xml_schema_cleanup_types();
-            xml_relaxng_cleanup_types();
-        }
-        xml_cleanup_globals_internal();
-        xml_cleanup_threads_internal();
-        xml_cleanup_memory_internal();
-        XML_PARSER_INITIALIZED.store(false, Ordering::Release);
-    }
 }

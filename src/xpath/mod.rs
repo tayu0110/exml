@@ -66,9 +66,9 @@ use crate::{
     generic_error,
     libxml::{
         globals::{xml_free, xml_malloc},
-        parser::xml_init_parser,
         xmlstring::XmlChar,
     },
+    parser::xml_init_parser,
     tree::{XmlDocPtr, XmlElementType, XmlGenericNodePtr},
 };
 

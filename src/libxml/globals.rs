@@ -38,17 +38,14 @@ use libc::{free, malloc, memset, realloc};
 use crate::{
     error::XmlError,
     globals::reset_last_error,
-    libxml::{
-        parser::XmlSAXLocator,
-        xmlmemory::{XmlFreeFunc, XmlMallocFunc, XmlReallocFunc, XmlStrdupFunc},
-    },
+    libxml::xmlmemory::{XmlFreeFunc, XmlMallocFunc, XmlReallocFunc, XmlStrdupFunc},
+    parser::{XmlSAXLocator, xml_init_parser},
     tree::{
         __XML_REGISTER_CALLBACKS, BASE_BUFFER_SIZE, XmlBufferAllocationScheme, XmlGenericNodePtr,
     },
 };
 
 use super::{
-    parser::xml_init_parser,
     sax2::{
         xml_sax2_get_column_number, xml_sax2_get_line_number, xml_sax2_get_public_id,
         xml_sax2_get_system_id,

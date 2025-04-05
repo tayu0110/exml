@@ -439,7 +439,8 @@ pub unsafe fn html_doc_dump_memory_format(
 
         use crate::{
             encoding::{XmlCharEncoding, find_encoding_handler},
-            libxml::{parser::xml_init_parser, xmlstring::xml_strndup},
+            libxml::xmlstring::xml_strndup,
+            parser::xml_init_parser,
         };
 
         xml_init_parser();
@@ -512,7 +513,7 @@ pub unsafe fn html_doc_dump<'a>(f: &mut (impl Write + 'a), cur: XmlDocPtr) -> i3
     unsafe {
         use crate::{
             encoding::{XmlCharEncoding, find_encoding_handler},
-            libxml::parser::xml_init_parser,
+            parser::xml_init_parser,
         };
 
         xml_init_parser();
@@ -559,7 +560,7 @@ pub unsafe fn html_save_file(filename: &str, cur: XmlDocPtr) -> i32 {
 
         use crate::{
             encoding::{XmlCharEncoding, find_encoding_handler},
-            libxml::parser::xml_init_parser,
+            parser::xml_init_parser,
         };
 
         xml_init_parser();
@@ -636,7 +637,7 @@ pub unsafe fn html_node_dump<'a>(
     cur: HtmlNodePtr,
 ) -> i32 {
     unsafe {
-        use crate::libxml::parser::xml_init_parser;
+        use crate::parser::xml_init_parser;
 
         xml_init_parser();
 
@@ -676,7 +677,7 @@ pub unsafe fn html_node_dump_file_format<'a>(
 
         use crate::{
             encoding::{XmlCharEncoding, find_encoding_handler},
-            libxml::parser::xml_init_parser,
+            parser::xml_init_parser,
         };
 
         xml_init_parser();
@@ -741,7 +742,7 @@ pub unsafe fn html_save_file_format(
 
         use crate::{
             encoding::{XmlCharEncoding, find_encoding_handler},
-            libxml::parser::xml_init_parser,
+            parser::xml_init_parser,
         };
 
         xml_init_parser();
@@ -904,7 +905,7 @@ pub unsafe fn html_node_dump_format_output(
     unsafe {
         use crate::{
             html::parser::html_tag_lookup,
-            libxml::parser::xml_init_parser,
+            parser::xml_init_parser,
             save::xml_ns_list_dump_output,
             tree::{XmlNodePtr, xml_encode_entities_reentrant},
         };

@@ -26,7 +26,7 @@ use std::ptr::{addr_of_mut, null_mut};
 use libc::{free, getenv, malloc, memset, realloc, sscanf, strcpy, strlen};
 
 use crate::generic_error;
-use crate::libxml::parser::xml_init_parser;
+use crate::parser::xml_init_parser;
 
 use super::globals::{_XML_FREE, _XML_MALLOC, _XML_MALLOC_ATOMIC, _XML_MEM_STRDUP, _XML_REALLOC};
 use super::threads::{

@@ -39,9 +39,9 @@ use std::{
 
 use anyhow::{Context, ensure};
 
-use crate::libxml::{
+use crate::{
+    libxml::xmlstring::{XmlChar, xml_str_qequal, xml_strncmp},
     parser::xml_init_parser,
-    xmlstring::{XmlChar, xml_str_qequal, xml_strncmp},
 };
 
 pub use libxml_api::*;
@@ -1132,7 +1132,7 @@ pub(crate) mod libxml_api {
         slice::from_raw_parts,
     };
 
-    use crate::libxml::{parser::xml_init_parser, xmlstring::XmlChar};
+    use crate::{libxml::xmlstring::XmlChar, parser::xml_init_parser};
 
     use super::{XmlDict, XmlDictRef};
 

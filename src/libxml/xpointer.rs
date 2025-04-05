@@ -58,9 +58,9 @@ use crate::{
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     libxml::{
         globals::{xml_free, xml_malloc},
-        parser::xml_init_parser,
         xmlstring::{XmlChar, xml_str_equal},
     },
+    parser::xml_init_parser,
     tree::{NodeCommon, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNode},
     xpath::{
         XmlXPathContextPtr, XmlXPathError, XmlXPathObjectPtr, XmlXPathObjectType,

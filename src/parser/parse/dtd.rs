@@ -25,7 +25,7 @@ use crate::{
     uri::XmlURI,
 };
 #[cfg(feature = "libxml_valid")]
-use crate::{io::XmlParserInputBuffer, libxml::parser::XmlSAXHandler, tree::XmlDtdPtr};
+use crate::{io::XmlParserInputBuffer, parser::XmlSAXHandler, tree::XmlDtdPtr};
 
 use super::{SAX_COMPAT_MODE, attr_normalize_space};
 

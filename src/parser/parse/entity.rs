@@ -9,12 +9,11 @@ use crate::{
     libxml::{
         chvalid::{xml_is_blank_char, xml_is_char},
         globals::xml_default_sax_locator,
-        parser::XmlSAXHandler,
     },
     parser::{
         XML_ENT_FIXED_COST, XML_MAX_HUGE_LENGTH, XML_MAX_TEXT_LENGTH, XML_PARSER_ALLOWED_EXPANSION,
         XML_PARSER_NON_LINEAR, XML_SUBSTITUTE_PEREF, XML_SUBSTITUTE_REF, XmlParserCtxt,
-        XmlParserInput, XmlParserInputState, XmlParserOption,
+        XmlParserInput, XmlParserInputState, XmlParserOption, XmlSAXHandler,
         xml_create_entity_parser_ctxt_internal, xml_fatal_err, xml_fatal_err_msg,
         xml_fatal_err_msg_int, xml_free_parser_ctxt, xml_warning_msg,
     },

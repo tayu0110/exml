@@ -6,14 +6,16 @@ use std::{
     ptr::{addr_of_mut, null, null_mut},
 };
 
-use exml::libxml::{
-    dict::{
-        XmlDictPtr, xml_dict_create, xml_dict_create_sub, xml_dict_free, xml_dict_lookup,
-        xml_dict_owns, xml_dict_qlookup,
+use exml::{
+    libxml::{
+        dict::{
+            XmlDictPtr, xml_dict_create, xml_dict_create_sub, xml_dict_free, xml_dict_lookup,
+            xml_dict_owns, xml_dict_qlookup,
+        },
+        globals::xml_free,
+        xmlstring::{XmlChar, xml_strdup, xml_strlen, xml_strncat_new},
     },
-    globals::xml_free,
     parser::xml_cleanup_parser,
-    xmlstring::{XmlChar, xml_strdup, xml_strlen, xml_strncat_new},
 };
 use libc::memset;
 

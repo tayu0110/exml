@@ -9,12 +9,11 @@ use crate::{
     libxml::{
         chvalid::{xml_is_blank_char, xml_is_char},
         globals::xml_default_sax_locator,
-        parser::XmlSAXHandler,
         valid::xml_validate_root,
     },
     parser::{
-        __xml_err_encoding, XML_MAX_LOOKUP_LIMIT, XML_PARSER_BIG_BUFFER_SIZE, xml_err_memory,
-        xml_fatal_err_msg_str,
+        __xml_err_encoding, XML_MAX_LOOKUP_LIMIT, XML_PARSER_BIG_BUFFER_SIZE, XmlSAXHandler,
+        xml_err_memory, xml_fatal_err_msg_str,
     },
     uri::canonic_path,
 };

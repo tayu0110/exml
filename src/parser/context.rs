@@ -31,7 +31,6 @@ use crate::{
         catalog::XmlCatalogEntry,
         chvalid::{xml_is_blank_char, xml_is_char},
         globals::{xml_free, xml_malloc},
-        parser::{XmlSAXHandler, XmlStartTag, xml_init_parser},
         sax2::{
             xml_sax_version, xml_sax2_end_element, xml_sax2_ignorable_whitespace,
             xml_sax2_start_element,
@@ -41,8 +40,8 @@ use crate::{
     parser::{
         __xml_err_encoding, INPUT_CHUNK, LINE_LEN, XML_COMPLETE_ATTRS, XML_DETECT_IDS,
         XML_MAX_DICTIONARY_LIMIT, XML_MAX_LOOKUP_LIMIT, XML_PARSER_MAX_DEPTH, XML_VCTXT_USE_PCTXT,
-        XmlParserInputState, xml_err_encoding_int, xml_err_internal, xml_fatal_err_msg_int,
-        xml_fatal_err_msg_str,
+        XmlParserInputState, XmlSAXHandler, XmlStartTag, xml_err_encoding_int, xml_err_internal,
+        xml_fatal_err_msg_int, xml_fatal_err_msg_str, xml_init_parser,
     },
     tree::{
         XML_ENT_EXPANDING, XML_ENT_PARSED, XML_XML_NAMESPACE, XmlAttrPtr, XmlAttributeType,

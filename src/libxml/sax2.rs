@@ -35,7 +35,6 @@ use crate::{
     globals::{GenericErrorContext, StructuredError},
     html::tree::html_new_doc_no_dtd,
     libxml::{
-        parser::XmlSAXLocatorPtr,
         valid::{
             xml_validate_attribute_decl, xml_validate_document_final, xml_validate_one_element,
         },
@@ -44,8 +43,8 @@ use crate::{
     parser::{
         XML_COMPLETE_ATTRS, XML_MAX_TEXT_LENGTH, XML_SAX2_MAGIC, XML_SKIP_IDS, XML_STRING_TEXT,
         XML_SUBSTITUTE_REF, XML_VCTXT_DTD_VALIDATED, XmlParserCtxtPtr, XmlParserInput,
-        XmlParserInputState, XmlParserOption, build_qname, split_qname, xml_err_memory,
-        xml_load_external_entity,
+        XmlParserInputState, XmlParserOption, XmlSAXHandler, XmlSAXLocatorPtr, build_qname,
+        split_qname, xml_err_memory, xml_load_external_entity,
     },
     tree::{
         __XML_REGISTER_CALLBACKS, NodeCommon, XmlAttr, XmlAttributeDefault, XmlAttributeType,
@@ -62,7 +61,6 @@ use crate::{
 
 use super::{
     globals::{xml_free, xml_register_node_default_value},
-    parser::XmlSAXHandler,
     valid::{
         xml_add_element_decl, xml_add_id, xml_add_notation_decl, xml_add_ref,
         xml_get_dtd_qelement_desc, xml_is_id, xml_is_ref, xml_valid_ctxt_normalize_attribute_value,

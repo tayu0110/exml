@@ -38,7 +38,6 @@ use crate::{
     io::{XmlOutputBuffer, XmlParserInputBuffer},
     libxml::{
         globals::{XmlDeregisterNodeFunc, XmlRegisterNodeFunc},
-        parser::XmlSAXLocator,
         sax2::{
             xml_sax2_get_column_number, xml_sax2_get_line_number, xml_sax2_get_public_id,
             xml_sax2_get_system_id,
@@ -46,6 +45,7 @@ use crate::{
         xmlmemory::{XmlFreeFunc, XmlMallocFunc, XmlReallocFunc, XmlStrdupFunc},
         xmlstring::xml_strdup,
     },
+    parser::XmlSAXLocator,
     tree::{BASE_BUFFER_SIZE, XmlBufferAllocationScheme},
 };
 

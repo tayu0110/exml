@@ -33,7 +33,7 @@ use std::{
 
 use anyhow::{Context, anyhow, bail, ensure};
 
-use crate::libxml::parser::xml_init_parser;
+use crate::parser::xml_init_parser;
 
 pub use libxml_api::*;
 

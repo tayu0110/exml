@@ -20,7 +20,6 @@ use exml::{
     },
     libxml::{
         globals::xml_free,
-        parser::{xml_cleanup_parser, xml_init_parser},
         relaxng::{
             XmlRelaxNGPtr, xml_relaxng_free, xml_relaxng_parse, xml_relaxng_set_valid_errors,
             xml_relaxng_validate_doc,
@@ -34,8 +33,9 @@ use exml::{
         xmlstring::{XmlChar, xml_strndup},
     },
     parser::{
-        XmlParserCtxt, XmlParserInput, XmlParserOption, xml_no_net_external_entity_loader,
-        xml_read_file, xml_read_memory, xml_set_external_entity_loader,
+        XmlParserCtxt, XmlParserInput, XmlParserOption, xml_cleanup_parser, xml_init_parser,
+        xml_no_net_external_entity_loader, xml_read_file, xml_read_memory,
+        xml_set_external_entity_loader,
     },
     relaxng::{
         XmlRelaxNGValidCtxtPtr, xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt,

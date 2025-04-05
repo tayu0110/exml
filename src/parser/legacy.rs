@@ -7,8 +7,7 @@ use crate::{
         set_indent_tree_output, set_keep_blanks_default_value, set_line_numbers_default_value,
         set_pedantic_parser_default_value, set_substitute_entities_default_value,
     },
-    libxml::parser::{XmlSAXHandler, xml_init_parser},
-    parser::{XmlParserCtxtPtr, xml_free_parser_ctxt},
+    parser::{XmlParserCtxtPtr, XmlSAXHandler, xml_free_parser_ctxt, xml_init_parser},
     tree::{XmlDocPtr, XmlDtdPtr, XmlGenericNodePtr, xml_free_doc},
 };
 

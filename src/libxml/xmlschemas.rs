@@ -49,7 +49,6 @@ use crate::{
             XmlHashTablePtr, xml_hash_add_entry, xml_hash_add_entry2, xml_hash_create,
             xml_hash_free, xml_hash_lookup, xml_hash_lookup2,
         },
-        parser::{XmlSAXHandler, XmlSAXHandlerPtr, XmlSAXLocatorPtr},
         sax2::xml_sax2_get_line_number,
         schemas_internals::{
             XML_SCHEMAS_ANY_LAX, XML_SCHEMAS_ANY_SKIP, XML_SCHEMAS_ANY_STRICT,
@@ -103,9 +102,9 @@ use crate::{
         },
     },
     parser::{
-        XML_SAX2_MAGIC, XmlParserCtxtPtr, XmlParserInput, XmlParserOption, split_qname2,
-        xml_ctxt_read_file, xml_ctxt_read_memory, xml_free_parser_ctxt, xml_new_parser_ctxt,
-        xml_new_sax_parser_ctxt,
+        XML_SAX2_MAGIC, XmlParserCtxtPtr, XmlParserInput, XmlParserOption, XmlSAXHandler,
+        XmlSAXHandlerPtr, XmlSAXLocatorPtr, split_qname2, xml_ctxt_read_file, xml_ctxt_read_memory,
+        xml_free_parser_ctxt, xml_new_parser_ctxt, xml_new_sax_parser_ctxt,
     },
     tree::{
         NodeCommon, XmlAttrPtr, XmlAttributeDefault, XmlAttributeType, XmlDocPtr,
@@ -18884,7 +18883,6 @@ pub struct XmlSchemaSAXPlugStruct {
     ctxt: XmlSchemaValidCtxtPtr,
 }
 
-// #[allow(clippy::too_many_arguments)]
 unsafe fn xml_schema_sax_handle_start_element_ns(
     ctx: Option<GenericErrorContext>,
     localname: &str,

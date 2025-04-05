@@ -1,6 +1,8 @@
 use crate::{
-    libxml::parser::{XmlSAXHandler, XmlSAXHandlerPtr},
-    parser::{XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput, XmlParserNodeInfo},
+    parser::{
+        XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput, XmlParserNodeInfo, XmlSAXHandler,
+        XmlSAXHandlerPtr,
+    },
     tree::{XmlDocPtr, XmlNodePtr},
 };
 

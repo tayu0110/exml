@@ -34,9 +34,9 @@ use libc::{
     pthread_setspecific, pthread_t,
 };
 
-use crate::libxml::globals::XmlGlobalStatePtr;
+use crate::{libxml::globals::XmlGlobalStatePtr, parser::xml_init_parser};
 
-use super::{globals::XmlGlobalState, parser::xml_init_parser};
+use super::globals::XmlGlobalState;
 
 unsafe extern "C" {
     // Does it work ???
