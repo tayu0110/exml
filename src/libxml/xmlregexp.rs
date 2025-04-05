@@ -59,12 +59,10 @@ use crate::{
             xml_ucs_is_cat_z, xml_ucs_is_cat_zl, xml_ucs_is_cat_zp, xml_ucs_is_cat_zs,
         },
     },
+    parser::xml_is_letter,
 };
 
-use super::{
-    chvalid::{xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender},
-    parser_internals::xml_is_letter,
-};
+use super::chvalid::{xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender};
 
 macro_rules! CUR {
     ( $ctxt:expr ) => {

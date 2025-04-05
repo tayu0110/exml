@@ -54,9 +54,9 @@ use crate::{
             xml_deregister_node_default_value, xml_free, xml_malloc_atomic,
             xml_register_node_default_value,
         },
-        parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT},
         xmlstring::{XmlChar, xml_strdup, xml_strndup},
     },
+    parser::{XML_STRING_COMMENT, XML_STRING_TEXT},
 };
 
 pub use attribute::*;
@@ -395,9 +395,9 @@ impl Display for InvalidNodePointerCastError {
     feature = "libxml_writer",
 ))]
 pub fn validate_ncname<const ALLOW_SPACE: bool>(value: &str) -> Result<(), &'static str> {
-    use crate::libxml::{
-        chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
-        parser_internals::xml_is_letter,
+    use crate::{
+        libxml::chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
+        parser::xml_is_letter,
     };
 
     let mut cur = value;
@@ -454,9 +454,9 @@ pub fn validate_ncname<const ALLOW_SPACE: bool>(value: &str) -> Result<(), &'sta
 #[doc(alias = "xmlValidateQName")]
 #[cfg(any(feature = "libxml_tree", feature = "schema"))]
 pub fn validate_qname<const ALLOW_SPACE: bool>(value: &str) -> Result<(), &'static str> {
-    use crate::libxml::{
-        chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
-        parser_internals::xml_is_letter,
+    use crate::{
+        libxml::chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
+        parser::xml_is_letter,
     };
 
     let mut cur = value;
@@ -538,9 +538,9 @@ pub fn validate_qname<const ALLOW_SPACE: bool>(value: &str) -> Result<(), &'stat
 #[doc(alias = "xmlValidateName")]
 #[cfg(any(feature = "libxml_tree", feature = "schema"))]
 pub fn validate_name<const ALLOW_SPACE: bool>(value: &str) -> Result<(), &'static str> {
-    use crate::libxml::{
-        chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
-        parser_internals::xml_is_letter,
+    use crate::{
+        libxml::chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
+        parser::xml_is_letter,
     };
 
     let mut cur = value;
@@ -597,9 +597,9 @@ pub fn validate_name<const ALLOW_SPACE: bool>(value: &str) -> Result<(), &'stati
 #[doc(alias = "xmlValidateNMToken")]
 #[cfg(any(feature = "libxml_tree", feature = "schema"))]
 pub fn validate_nmtoken<const ALLOW_SPACE: bool>(value: &str) -> Result<(), &'static str> {
-    use crate::libxml::{
-        chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
-        parser_internals::xml_is_letter,
+    use crate::{
+        libxml::chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
+        parser::xml_is_letter,
     };
 
     let mut cur = value;

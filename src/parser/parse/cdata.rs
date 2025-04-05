@@ -4,12 +4,11 @@ use crate::{
     error::XmlParserErrors,
     libxml::{
         chvalid::{xml_is_blank_char, xml_is_char},
-        parser::XML_PARSER_BIG_BUFFER_SIZE,
-        parser_internals::{XML_MAX_HUGE_LENGTH, XML_MAX_TEXT_LENGTH},
         valid::xml_is_mixed_element,
     },
     parser::{
-        XmlParserCtxt, XmlParserInputState, XmlParserOption, xml_fatal_err, xml_fatal_err_msg,
+        XML_MAX_HUGE_LENGTH, XML_MAX_TEXT_LENGTH, XML_PARSER_BIG_BUFFER_SIZE, XmlParserCtxt,
+        XmlParserInputState, XmlParserOption, xml_fatal_err, xml_fatal_err_msg,
         xml_fatal_err_msg_int, xml_fatal_err_msg_str,
     },
     tree::{NodeCommon, XmlElementType},

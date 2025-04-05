@@ -899,13 +899,12 @@ pub unsafe fn html_node_dump_format_output(
     _encoding: Option<&str>,
     format: i32,
 ) {
+    use crate::parser::{XML_STRING_TEXT, XML_STRING_TEXT_NOENC};
+
     unsafe {
         use crate::{
             html::parser::html_tag_lookup,
-            libxml::{
-                parser::xml_init_parser,
-                parser_internals::{XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
-            },
+            libxml::parser::xml_init_parser,
             save::xml_ns_list_dump_output,
             tree::{XmlNodePtr, xml_encode_entities_reentrant},
         };

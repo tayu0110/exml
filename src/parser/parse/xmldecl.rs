@@ -1,13 +1,11 @@
 use crate::{
     encoding::find_encoding_handler,
     error::XmlParserErrors,
-    libxml::{
-        chvalid::xml_is_blank_char,
-        parser_internals::{XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH},
-    },
+    libxml::chvalid::xml_is_blank_char,
     parser::{
-        XML_DEFAULT_VERSION, XmlParserCtxt, XmlParserInputState, XmlParserOption, xml_fatal_err,
-        xml_fatal_err_msg, xml_fatal_err_msg_str, xml_warning_msg,
+        XML_DEFAULT_VERSION, XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH, XmlParserCtxt,
+        XmlParserInputState, XmlParserOption, xml_fatal_err, xml_fatal_err_msg,
+        xml_fatal_err_msg_str, xml_warning_msg,
     },
 };
 

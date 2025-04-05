@@ -29,12 +29,7 @@ use std::{
 use crate::{
     error::XmlParserErrors,
     globals::GenericErrorContext,
-    libxml::{
-        chvalid::{xml_is_base_char, xml_is_ideographic},
-        dict::xml_dict_free,
-        valid::xml_validate_element,
-        xmlstring::XmlChar,
-    },
+    libxml::{dict::xml_dict_free, valid::xml_validate_element, xmlstring::XmlChar},
     parser::{
         XML_SKIP_IDS, XmlParserCtxtPtr, XmlParserInputState, XmlParserOption,
         xml_create_memory_parser_ctxt, xml_fatal_err, xml_fatal_err_msg, xml_free_parser_ctxt,
@@ -44,72 +39,6 @@ use crate::{
         XmlNodePtr, xml_free_doc, xml_free_node, xml_new_doc, xml_new_doc_node,
     },
 };
-
-/// Arbitrary depth limit for the XML documents that we allow to
-/// process. This is not a limitation of the parser but a safety
-/// boundary feature, use XML_PARSE_HUGE option to override it.
-#[doc(alias = "xmlParserMaxDepth")]
-pub const XML_PARSER_MAX_DEPTH: u32 = 256;
-
-/// Maximum size allowed for a single text node when building a tree.
-/// This is not a limitation of the parser but a safety boundary feature,
-/// use XML_PARSE_HUGE option to override it.
-/// Introduced in 2.9.0
-pub const XML_MAX_TEXT_LENGTH: usize = 10000000;
-
-/// Maximum size allowed when XML_PARSE_HUGE is set.
-pub const XML_MAX_HUGE_LENGTH: usize = 1000000000;
-
-/// Maximum size allowed for a markup identifier.
-/// This is not a limitation of the parser but a safety boundary feature,
-/// use XML_PARSE_HUGE option to override it.
-/// Note that with the use of parsing dictionaries overriding the limit
-/// may result in more runtime memory usage in face of "unfriendly' content
-/// Introduced in 2.9.0
-pub const XML_MAX_NAME_LENGTH: usize = 50000;
-
-/// Maximum size allowed by the parser for a dictionary by default
-/// This is not a limitation of the parser but a safety boundary feature,
-/// use XML_PARSE_HUGE option to override it.
-/// Introduced in 2.9.0
-pub const XML_MAX_DICTIONARY_LIMIT: usize = 10000000;
-
-/// Maximum size allowed by the parser for ahead lookup
-/// This is an upper boundary enforced by the parser to avoid bad
-/// behaviour on "unfriendly' content
-/// Introduced in 2.9.0
-pub const XML_MAX_LOOKUP_LIMIT: usize = 10000000;
-
-/// Identifiers can be longer, but this will be more costly at runtime.
-pub const XML_MAX_NAMELEN: usize = 100;
-
-/// The parser tries to always have that amount of input ready.
-/// One of the point is providing context when reporting errors.
-pub const INPUT_CHUNK: usize = 250;
-
-/// Global variables used for predefined strings.
-pub static XML_STRING_TEXT: &str = "text";
-pub static XML_STRING_TEXT_NOENC: &str = "textnoenc";
-pub static XML_STRING_COMMENT: &str = "comment";
-
-/// Check whether the character is allowed by the production
-/// `[84] Letter ::= BaseChar | Ideographic`
-#[doc(alias = "xmlIsLetter")]
-pub fn xml_is_letter(c: u32) -> bool {
-    xml_is_base_char(c) || xml_is_ideographic(c)
-}
-
-/// Set after xmlValidateDtdFinal was called.
-pub(crate) const XML_VCTXT_DTD_VALIDATED: usize = 1usize << 0;
-/// Set if the validation context is part of a parser context.
-pub(crate) const XML_VCTXT_USE_PCTXT: usize = 1usize << 1;
-
-// #[doc(alias = "xmlParseCharData")]
-// pub(crate) unsafe fn xml_parse_char_data(ctxt: XmlParserCtxtPtr, _cdata: i32) {
-//     unsafe {
-//         parse_char_data_internal(&mut *ctxt, 0);
-//     }
-// }
 
 /// Parse a well-balanced chunk of an XML document called by the parser
 /// The allowed sequence for the Well Balanced Chunk is the one defined by
@@ -376,9 +305,6 @@ pub unsafe fn xml_copy_char(_len: i32, out: *mut XmlChar, val: i32) -> i32 {
         1
     }
 }
-
-// we need to keep enough input to show errors in context
-pub(crate) const LINE_LEN: usize = 80;
 
 #[cfg(test)]
 mod tests {

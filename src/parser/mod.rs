@@ -59,9 +59,11 @@ use crate::{
     encoding::XmlCharEncoding,
     io::XmlParserInputBuffer,
     libxml::{
-        chvalid::{xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender},
-        parser::{xml_create_doc_parser_ctxt, xml_init_parser},
-        parser_internals::xml_is_letter,
+        chvalid::{
+            xml_is_base_char, xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender,
+            xml_is_ideographic,
+        },
+        parser::xml_init_parser,
     },
     tree::XmlDocPtr,
 };
@@ -98,6 +100,78 @@ pub const XML_COMPLETE_ATTRS: usize = 4;
 /// Bit in the loadsubset context field to tell to not do ID/REFs registration.
 /// Used to initialize xmlLoadExtDtdDefaultValue in some special cases.
 pub const XML_SKIP_IDS: usize = 8;
+
+/// Arbitrary depth limit for the XML documents that we allow to
+/// process. This is not a limitation of the parser but a safety
+/// boundary feature, use XML_PARSE_HUGE option to override it.
+#[doc(alias = "xmlParserMaxDepth")]
+pub const XML_PARSER_MAX_DEPTH: u32 = 256;
+
+/// Maximum size allowed for a single text node when building a tree.
+/// This is not a limitation of the parser but a safety boundary feature,
+/// use XML_PARSE_HUGE option to override it.
+/// Introduced in 2.9.0
+pub const XML_MAX_TEXT_LENGTH: usize = 10000000;
+
+/// Maximum size allowed when XML_PARSE_HUGE is set.
+pub const XML_MAX_HUGE_LENGTH: usize = 1000000000;
+
+/// Maximum size allowed for a markup identifier.
+/// This is not a limitation of the parser but a safety boundary feature,
+/// use XML_PARSE_HUGE option to override it.
+/// Note that with the use of parsing dictionaries overriding the limit
+/// may result in more runtime memory usage in face of "unfriendly' content
+/// Introduced in 2.9.0
+pub const XML_MAX_NAME_LENGTH: usize = 50000;
+
+/// Maximum size allowed by the parser for a dictionary by default
+/// This is not a limitation of the parser but a safety boundary feature,
+/// use XML_PARSE_HUGE option to override it.
+/// Introduced in 2.9.0
+pub const XML_MAX_DICTIONARY_LIMIT: usize = 10000000;
+
+/// Maximum size allowed by the parser for ahead lookup
+/// This is an upper boundary enforced by the parser to avoid bad
+/// behaviour on "unfriendly' content
+/// Introduced in 2.9.0
+pub const XML_MAX_LOOKUP_LIMIT: usize = 10000000;
+
+/// Identifiers can be longer, but this will be more costly at runtime.
+pub const XML_MAX_NAMELEN: usize = 100;
+
+/// The parser tries to always have that amount of input ready.
+/// One of the point is providing context when reporting errors.
+pub const INPUT_CHUNK: usize = 250;
+
+// we need to keep enough input to show errors in context
+pub(crate) const LINE_LEN: usize = 80;
+
+/// Global variables used for predefined strings.
+pub static XML_STRING_TEXT: &str = "text";
+pub static XML_STRING_TEXT_NOENC: &str = "textnoenc";
+pub static XML_STRING_COMMENT: &str = "comment";
+
+/// Set after xmlValidateDtdFinal was called.
+pub(crate) const XML_VCTXT_DTD_VALIDATED: usize = 1usize << 0;
+/// Set if the validation context is part of a parser context.
+pub(crate) const XML_VCTXT_USE_PCTXT: usize = 1usize << 1;
+
+pub(crate) const XML_PARSER_BIG_BUFFER_SIZE: usize = 300;
+
+// const XML_PARSER_BIG_ENTITY: usize = 1000;
+// const XML_PARSER_LOT_ENTITY: usize = 5000;
+
+// XML_PARSER_NON_LINEAR is roughly the maximum allowed amplification factor
+// of serialized output after entity expansion.
+pub(crate) const XML_PARSER_NON_LINEAR: usize = 5;
+
+// A certain amount is always allowed.
+pub(crate) const XML_PARSER_ALLOWED_EXPANSION: usize = 1000000;
+
+// Fixed cost for each entity reference. This crudely models processing time
+// as well to protect, for example, against exponential expansion of empty
+// or very short entities.
+pub(crate) const XML_ENT_FIXED_COST: usize = 20;
 
 pub(crate) trait XmlParserCharValid {
     fn is_name_char(&self, ctxt: &XmlParserCtxt) -> bool;
@@ -246,6 +320,16 @@ impl XmlParserCharValid for char {
     fn is_name_start_char(&self, ctxt: &XmlParserCtxt) -> bool {
         (*self as u32).is_name_start_char(ctxt)
     }
+}
+
+/// Check whether the character is allowed by the production
+///
+/// ```text
+/// [84] Letter ::= BaseChar | Ideographic
+/// ```
+#[doc(alias = "xmlIsLetter")]
+pub fn xml_is_letter(c: u32) -> bool {
+    xml_is_base_char(c) || xml_is_ideographic(c)
 }
 
 /// Checks that the value conforms to the LanguageID production:

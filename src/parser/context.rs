@@ -32,10 +32,6 @@ use crate::{
         chvalid::{xml_is_blank_char, xml_is_char},
         globals::{xml_free, xml_malloc},
         parser::{XmlSAXHandler, XmlStartTag, xml_init_parser},
-        parser_internals::{
-            INPUT_CHUNK, LINE_LEN, XML_MAX_DICTIONARY_LIMIT, XML_MAX_LOOKUP_LIMIT,
-            XML_PARSER_MAX_DEPTH, XML_VCTXT_USE_PCTXT,
-        },
         sax2::{
             xml_sax_version, xml_sax2_end_element, xml_sax2_ignorable_whitespace,
             xml_sax2_start_element,
@@ -43,8 +39,10 @@ use crate::{
         valid::XmlValidCtxt,
     },
     parser::{
-        __xml_err_encoding, XML_COMPLETE_ATTRS, XML_DETECT_IDS, XmlParserInputState,
-        xml_err_encoding_int, xml_err_internal, xml_fatal_err_msg_int, xml_fatal_err_msg_str,
+        __xml_err_encoding, INPUT_CHUNK, LINE_LEN, XML_COMPLETE_ATTRS, XML_DETECT_IDS,
+        XML_MAX_DICTIONARY_LIMIT, XML_MAX_LOOKUP_LIMIT, XML_PARSER_MAX_DEPTH, XML_VCTXT_USE_PCTXT,
+        XmlParserInputState, xml_err_encoding_int, xml_err_internal, xml_fatal_err_msg_int,
+        xml_fatal_err_msg_str,
     },
     tree::{
         XML_ENT_EXPANDING, XML_ENT_PARSED, XML_XML_NAMESPACE, XmlAttrPtr, XmlAttributeType,
@@ -2139,6 +2137,14 @@ pub unsafe fn xml_create_memory_parser_ctxt(buffer: Vec<u8>) -> XmlParserCtxtPtr
         (*ctxt).input_push(input);
         ctxt
     }
+}
+
+/// Creates a parser context for an XML in-memory document.
+///
+/// Returns the new parser context or NULL
+#[doc(alias = "xmlCreateDocParserCtxt")]
+pub unsafe fn xml_create_doc_parser_ctxt(cur: Vec<u8>) -> XmlParserCtxtPtr {
+    unsafe { xml_create_memory_parser_ctxt(cur) }
 }
 
 /// Create a parser context for an external entity

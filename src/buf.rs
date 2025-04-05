@@ -24,7 +24,7 @@ use anyhow::{bail, ensure};
 use crate::{
     error::{__xml_simple_error, __xml_simple_oom_error, XmlErrorDomain, XmlParserErrors},
     globals::GLOBAL_STATE,
-    libxml::parser_internals::XML_MAX_TEXT_LENGTH,
+    parser::XML_MAX_TEXT_LENGTH,
     tree::{BASE_BUFFER_SIZE, XmlBufferAllocationScheme},
 };
 

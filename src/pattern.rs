@@ -26,12 +26,10 @@
 
 use std::{os::raw::c_void, ptr::null_mut, rc::Rc};
 
+use crate::parser::xml_is_letter;
 use crate::tree::{NodeCommon, XmlAttrPtr};
 use crate::{
-    libxml::{
-        chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
-        parser_internals::xml_is_letter,
-    },
+    libxml::chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
     tree::{XML_XML_NAMESPACE, XmlElementType, XmlGenericNodePtr, XmlNodePtr},
 };
 

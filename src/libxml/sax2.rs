@@ -42,9 +42,10 @@ use crate::{
         xmlstring::XmlChar,
     },
     parser::{
-        XML_COMPLETE_ATTRS, XML_SAX2_MAGIC, XML_SKIP_IDS, XML_SUBSTITUTE_REF, XmlParserCtxtPtr,
-        XmlParserInput, XmlParserInputState, XmlParserOption, build_qname, split_qname,
-        xml_err_memory, xml_load_external_entity,
+        XML_COMPLETE_ATTRS, XML_MAX_TEXT_LENGTH, XML_SAX2_MAGIC, XML_SKIP_IDS, XML_STRING_TEXT,
+        XML_SUBSTITUTE_REF, XML_VCTXT_DTD_VALIDATED, XmlParserCtxtPtr, XmlParserInput,
+        XmlParserInputState, XmlParserOption, build_qname, split_qname, xml_err_memory,
+        xml_load_external_entity,
     },
     tree::{
         __XML_REGISTER_CALLBACKS, NodeCommon, XmlAttr, XmlAttributeDefault, XmlAttributeType,
@@ -62,7 +63,6 @@ use crate::{
 use super::{
     globals::{xml_free, xml_register_node_default_value},
     parser::XmlSAXHandler,
-    parser_internals::{XML_MAX_TEXT_LENGTH, XML_STRING_TEXT, XML_VCTXT_DTD_VALIDATED},
     valid::{
         xml_add_element_decl, xml_add_id, xml_add_notation_decl, xml_add_ref,
         xml_get_dtd_qelement_desc, xml_is_id, xml_is_ref, xml_valid_ctxt_normalize_attribute_value,
@@ -1865,8 +1865,10 @@ pub unsafe fn xml_sax2_start_element(
     fullname: &str,
     atts: &[(String, Option<String>)],
 ) {
+    use crate::parser::XML_VCTXT_DTD_VALIDATED;
+
     unsafe {
-        use crate::{libxml::parser_internals::XML_VCTXT_DTD_VALIDATED, tree::XmlGenericNodePtr};
+        use crate::tree::XmlGenericNodePtr;
 
         if ctx.is_none() {
             return;

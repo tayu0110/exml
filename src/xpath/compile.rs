@@ -10,9 +10,9 @@ use crate::{
             xml_is_blank_char, xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender,
         },
         globals::xml_free,
-        parser_internals::{XML_MAX_NAME_LENGTH, xml_is_letter},
         xmlstring::xml_strndup,
     },
+    parser::{XML_MAX_NAME_LENGTH, xml_is_letter},
     xpath::{
         XML_XPATH_CHECKNS, XPATH_MAX_RECURSION_DEPTH, XmlXPathAxisVal, XmlXPathContextPtr,
         XmlXPathError, XmlXPathObjectPtr, XmlXPathOp, xml_xpath_cache_new_float, xml_xpath_err,

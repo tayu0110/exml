@@ -50,7 +50,7 @@ use crate::{
         xmlstring::{XmlChar, xml_str_equal, xml_strdup, xml_strlen, xml_strndup},
     },
     list::XmlList,
-    parser::{XmlParserCtxtPtr, XmlParserMode, build_qname, split_qname2},
+    parser::{XML_VCTXT_USE_PCTXT, XmlParserCtxtPtr, XmlParserMode, build_qname, split_qname2},
     tree::{
         NodeCommon, XmlAttrPtr, XmlAttribute, XmlAttributeDefault, XmlAttributePtr,
         XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElement,
@@ -61,7 +61,7 @@ use crate::{
     },
 };
 
-use super::{chvalid::xml_is_blank_char, parser_internals::XML_VCTXT_USE_PCTXT};
+use super::chvalid::xml_is_blank_char;
 
 /// Handle a validation error
 #[doc(alias = "xmlErrValid")]
@@ -1305,7 +1305,7 @@ fn xml_err_valid_node(
     str2: Option<&str>,
     str3: Option<&str>,
 ) {
-    use crate::globals::StructuredError;
+    use crate::{globals::StructuredError, parser::XML_VCTXT_USE_PCTXT};
 
     let schannel: Option<StructuredError> = None;
     let mut channel: Option<GenericError> = None;
@@ -1710,7 +1710,7 @@ pub unsafe fn xml_dump_element_decl<'a>(buf: &mut (impl Write + 'a), elem: XmlEl
 
 #[cfg(feature = "libxml_valid")]
 fn xml_is_doc_name_start_char(doc: Option<XmlDocPtr>, c: i32) -> i32 {
-    use super::parser_internals::xml_is_letter;
+    use crate::parser::xml_is_letter;
 
     if doc.is_none_or(|doc| doc.properties & XmlDocProperties::XmlDocOld10 as i32 == 0) {
         // Use the new checks of production [4] [4a] amd [5] of the
@@ -1742,9 +1742,9 @@ fn xml_is_doc_name_start_char(doc: Option<XmlDocPtr>, c: i32) -> i32 {
 
 #[cfg(feature = "libxml_valid")]
 fn xml_is_doc_name_char(doc: Option<XmlDocPtr>, c: i32) -> i32 {
-    use crate::libxml::{
-        chvalid::{xml_is_digit, xml_is_extender},
-        parser_internals::xml_is_letter,
+    use crate::{
+        libxml::chvalid::{xml_is_digit, xml_is_extender},
+        parser::xml_is_letter,
     };
 
     use super::chvalid::xml_is_combining;

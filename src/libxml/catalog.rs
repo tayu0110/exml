@@ -59,11 +59,10 @@ use crate::{
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     generic_error,
     io::{XmlParserInputBuffer, xml_parser_get_directory},
-    libxml::{
-        chvalid::xml_is_blank_char, globals::xml_free, parser_internals::XML_MAX_NAMELEN,
-        threads::xml_get_thread_id,
+    libxml::{chvalid::xml_is_blank_char, globals::xml_free, threads::xml_get_thread_id},
+    parser::{
+        XML_MAX_NAMELEN, XmlParserInput, xml_free_parser_ctxt, xml_is_letter, xml_new_parser_ctxt,
     },
-    parser::{XmlParserInput, xml_free_parser_ctxt, xml_new_parser_ctxt},
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlDocPtr, XmlGenericNodePtr, XmlNodePtr, xml_free_doc,
         xml_free_ns, xml_new_doc, xml_new_doc_node, xml_new_dtd, xml_new_ns,
@@ -71,7 +70,7 @@ use crate::{
     uri::{build_uri, canonic_path},
 };
 
-use super::{chvalid::xml_is_pubid_char, parser_internals::xml_is_letter};
+use super::chvalid::xml_is_pubid_char;
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlCatalogErrMemory")]

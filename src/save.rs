@@ -43,9 +43,9 @@ use crate::{
     libxml::{
         chvalid::xml_is_char,
         parser::xml_init_parser,
-        parser_internals::XML_STRING_TEXT_NOENC,
         valid::{xml_dump_attribute_decl, xml_dump_element_decl, xml_dump_notation_table},
     },
+    parser::XML_STRING_TEXT_NOENC,
     tree::{
         NodeCommon, XML_LOCAL_NAMESPACE, XmlAttrPtr, XmlAttributePtr, XmlDocPtr, XmlDtdPtr,
         XmlElementPtr, XmlElementType, XmlEntityPtr, XmlGenericNodePtr, XmlNodePtr, XmlNotation,
@@ -1250,11 +1250,10 @@ fn xhtml_is_empty(node: &XmlNode) -> bool {
 #[doc(alias = "xhtmlNodeDumpOutput")]
 #[cfg(feature = "html")]
 pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: XmlGenericNodePtr) {
+    use crate::parser::XML_STRING_TEXT;
+
     unsafe {
-        use crate::{
-            libxml::parser_internals::XML_STRING_TEXT,
-            tree::{XmlEntityPtr, XmlNodePtr},
-        };
+        use crate::tree::{XmlEntityPtr, XmlNodePtr};
 
         let format: i32 = ctxt.format;
         let mut unformatted_node = None;

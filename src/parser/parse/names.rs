@@ -1,9 +1,9 @@
 use crate::{
     error::XmlParserErrors,
-    libxml::parser_internals::{XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH, xml_is_letter},
     parser::{
-        XmlParserCharValid, XmlParserCtxt, XmlParserInputState, XmlParserOption, build_qname,
-        xml_fatal_err, xml_is_combining, xml_is_digit, xml_is_extender, xml_ns_err,
+        XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH, XmlParserCharValid, XmlParserCtxt,
+        XmlParserInputState, XmlParserOption, build_qname, xml_fatal_err, xml_is_combining,
+        xml_is_digit, xml_is_extender, xml_is_letter, xml_ns_err,
     },
 };
 

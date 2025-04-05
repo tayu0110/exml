@@ -2,10 +2,10 @@
 use crate::libxml::catalog::{XML_CATALOG_PI, XmlCatalogAllow, xml_catalog_get_defaults};
 use crate::{
     error::XmlParserErrors,
-    libxml::parser_internals::{XML_MAX_HUGE_LENGTH, XML_MAX_TEXT_LENGTH},
     parser::{
-        XmlParserCtxt, XmlParserInputState, XmlParserOption, xml_fatal_err, xml_fatal_err_msg,
-        xml_fatal_err_msg_str, xml_is_char, xml_ns_err, xml_warning_msg,
+        XML_MAX_HUGE_LENGTH, XML_MAX_TEXT_LENGTH, XmlParserCtxt, XmlParserInputState,
+        XmlParserOption, xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_str, xml_is_char,
+        xml_ns_err, xml_warning_msg,
     },
 };
 

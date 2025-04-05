@@ -31,12 +31,11 @@ use crate::{
     dict::{XmlDictPtr, xml_dict_lookup, xml_dict_owns},
     error::{__xml_raise_error, XmlParserErrors},
     generic_error,
-    libxml::{
-        chvalid::xml_is_blank_char,
-        parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
-        valid::xml_snprintf_element_content,
+    libxml::{chvalid::xml_is_blank_char, valid::xml_snprintf_element_content},
+    parser::{
+        XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC, XmlParserOption,
+        xml_parse_in_node_context,
     },
-    parser::{XmlParserOption, xml_parse_in_node_context},
     tree::{
         NodeCommon, XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDocPtr,
         XmlDtdPtr, XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEntity, XmlEntityPtr,

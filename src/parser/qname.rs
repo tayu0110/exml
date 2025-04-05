@@ -1,10 +1,8 @@
 use std::borrow::Cow;
 
-use crate::{
-    error::XmlParserErrors, libxml::parser_internals::xml_is_letter, parser::xml_fatal_err_msg_str,
-};
+use crate::{error::XmlParserErrors, parser::xml_fatal_err_msg_str};
 
-use super::XmlParserCtxt;
+use super::{XmlParserCtxt, xml_is_letter};
 
 /// parse an UTF8 encoded XML qualified name string
 ///

@@ -2,13 +2,11 @@ use std::borrow::Cow;
 
 use crate::{
     error::XmlParserErrors,
-    libxml::{
-        chvalid::xml_is_char,
-        parser_internals::{XML_MAX_HUGE_LENGTH, XML_MAX_TEXT_LENGTH},
-    },
+    libxml::chvalid::xml_is_char,
     parser::{
-        XML_SUBSTITUTE_REF, XmlParserCtxt, XmlParserInputState, XmlParserOption, check_language_id,
-        xml_err_memory, xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_str, xml_warning_msg,
+        XML_MAX_HUGE_LENGTH, XML_MAX_TEXT_LENGTH, XML_SUBSTITUTE_REF, XmlParserCtxt,
+        XmlParserInputState, XmlParserOption, check_language_id, xml_err_memory, xml_fatal_err,
+        xml_fatal_err_msg, xml_fatal_err_msg_str, xml_warning_msg,
     },
     tree::{NodeCommon, XML_ENT_CHECKED, XmlEntityType},
 };

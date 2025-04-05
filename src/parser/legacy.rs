@@ -7,9 +7,9 @@ use crate::{
         set_indent_tree_output, set_keep_blanks_default_value, set_line_numbers_default_value,
         set_pedantic_parser_default_value, set_substitute_entities_default_value,
     },
-    libxml::parser::{XmlSAXHandler, xml_create_doc_parser_ctxt, xml_init_parser},
+    libxml::parser::{XmlSAXHandler, xml_init_parser},
     parser::{XmlParserCtxtPtr, xml_free_parser_ctxt},
-    tree::{XmlDocPtr, XmlDtdPtr, xml_free_doc},
+    tree::{XmlDocPtr, XmlDtdPtr, XmlGenericNodePtr, xml_free_doc},
 };
 
 use super::xml_create_memory_parser_ctxt;
@@ -258,6 +258,8 @@ pub unsafe fn xml_sax_parse_doc(
     cur: Vec<u8>,
     recovery: i32,
 ) -> Option<XmlDocPtr> {
+    use super::xml_create_doc_parser_ctxt;
+
     unsafe {
         let replaced = sax.is_some();
         let mut oldsax = None;
@@ -623,6 +625,187 @@ pub(crate) unsafe fn xml_sax_parse_dtd(
             xml_free_doc(my_doc);
         }
         xml_free_parser_ctxt(ctxt);
+
+        ret
+    }
+}
+
+/// Parse a well-balanced chunk of an XML document
+/// called by the parser
+/// The allowed sequence for the Well Balanced Chunk is the one defined by
+/// the content production in the XML grammar:
+///
+/// `[43] content ::= (element | CharData | Reference | CDSect | PI | Comment)*`
+///
+/// Returns 0 if the chunk is well balanced, -1 in case of args problem and
+/// the parser error code otherwise
+#[doc(alias = "xmlParseBalancedChunkMemory")]
+#[cfg(feature = "sax1")]
+pub unsafe fn xml_parse_balanced_chunk_memory(
+    doc: Option<XmlDocPtr>,
+    sax: Option<Box<XmlSAXHandler>>,
+    user_data: Option<GenericErrorContext>,
+    depth: i32,
+    string: *const u8,
+    lst: Option<&mut Option<XmlGenericNodePtr>>,
+) -> i32 {
+    unsafe { xml_parse_balanced_chunk_memory_recover(doc, sax, user_data, depth, string, lst, 0) }
+}
+
+/// Parse a well-balanced chunk of an XML document
+/// called by the parser
+/// The allowed sequence for the Well Balanced Chunk is the one defined by
+/// the content production in the XML grammar:
+///
+/// `[43] content ::= (element | CharData | Reference | CDSect | PI | Comment)*`
+///
+/// Returns 0 if the chunk is well balanced, -1 in case of args problem and
+///    the parser error code otherwise
+///
+/// In case recover is set to 1, the nodelist will not be empty even if
+/// the parsed chunk is not well balanced, assuming the parsing succeeded to
+/// some extent.
+#[doc(alias = "xmlParseBalancedChunkMemoryRecover")]
+#[cfg(feature = "sax1")]
+pub unsafe fn xml_parse_balanced_chunk_memory_recover(
+    doc: Option<XmlDocPtr>,
+    sax: Option<Box<XmlSAXHandler>>,
+    user_data: Option<GenericErrorContext>,
+    depth: i32,
+    string: *const u8,
+    mut lst: Option<&mut Option<XmlGenericNodePtr>>,
+    recover: i32,
+) -> i32 {
+    use std::ffi::CStr;
+
+    use crate::{
+        error::{XmlError, XmlParserErrors},
+        parser::{XmlParserInputState, XmlParserOption, xml_fatal_err},
+        tree::{NodeCommon, XML_XML_NAMESPACE, XmlDocProperties, xml_new_doc, xml_new_doc_node},
+    };
+
+    unsafe {
+        let replaced = sax.is_some();
+        let mut oldsax = None;
+        let ret: i32;
+
+        if depth > 40 {
+            return XmlParserErrors::XmlErrEntityLoop as i32;
+        }
+
+        if let Some(lst) = lst.as_mut() {
+            **lst = None;
+        }
+        if string.is_null() {
+            return -1;
+        }
+
+        let ctxt: XmlParserCtxtPtr =
+            xml_create_memory_parser_ctxt(CStr::from_ptr(string as *const i8).to_bytes().to_vec());
+        std::ptr::write(&mut (*ctxt).last_error, XmlError::default());
+        if ctxt.is_null() {
+            return -1;
+        }
+        (*ctxt).user_data = Some(GenericErrorContext::new(ctxt));
+        if let Some(sax) = sax {
+            oldsax = (*ctxt).sax.replace(sax);
+            if user_data.is_some() {
+                (*ctxt).user_data = user_data;
+            }
+        }
+        let Some(mut new_doc) = xml_new_doc(Some("1.0")) else {
+            xml_free_parser_ctxt(ctxt);
+            return -1;
+        };
+        new_doc.properties = XmlDocProperties::XmlDocInternal as i32;
+        (*ctxt).use_options_internal(XmlParserOption::XmlParseNoDict as i32, None);
+        // doc.is_null() is only supported for historic reasons
+        if let Some(doc) = doc {
+            new_doc.int_subset = doc.int_subset;
+            new_doc.ext_subset = doc.ext_subset;
+        }
+        let Some(new_root) = xml_new_doc_node(Some(new_doc), None, "pseudoroot", None) else {
+            if replaced {
+                (*ctxt).sax = oldsax;
+            }
+            xml_free_parser_ctxt(ctxt);
+            new_doc.int_subset = None;
+            new_doc.ext_subset = None;
+            xml_free_doc(new_doc);
+            return -1;
+        };
+        new_doc.add_child(new_root.into());
+        (*ctxt).node_push(new_root);
+        // doc.is_null() is only supported for historic reasons
+        if let Some(mut doc) = doc {
+            (*ctxt).my_doc = Some(new_doc);
+            new_doc.children().unwrap().set_document(Some(doc));
+            // Ensure that doc has XML spec namespace
+            let d = doc;
+            doc.search_ns_by_href(Some(d), XML_XML_NAMESPACE.to_str().unwrap());
+            new_doc.old_ns = doc.old_ns;
+        } else {
+            (*ctxt).my_doc = Some(new_doc);
+        }
+        (*ctxt).instate = XmlParserInputState::XmlParserContent;
+        (*ctxt).input_id = 2;
+        (*ctxt).depth = depth;
+
+        // Doing validity checking on chunk doesn't make sense
+        (*ctxt).validate = 0;
+        (*ctxt).loadsubset = 0;
+        (*ctxt).detect_sax2();
+
+        if let Some(mut doc) = doc {
+            let content = doc.children.take();
+            (*ctxt).parse_content();
+            doc.children = content;
+        } else {
+            (*ctxt).parse_content();
+        }
+        if (*ctxt).current_byte() == b'<' && (*ctxt).nth_byte(1) == b'/' {
+            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrNotWellBalanced, None);
+        } else if (*ctxt).current_byte() != 0 {
+            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrExtraContent, None);
+        }
+        if new_doc.children != (*ctxt).node.map(|node| node.into()) {
+            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrNotWellBalanced, None);
+        }
+
+        if (*ctxt).well_formed == 0 {
+            if (*ctxt).err_no == 0 {
+                ret = 1;
+            } else {
+                ret = (*ctxt).err_no;
+            }
+        } else {
+            ret = 0;
+        }
+
+        if let Some(lst) = lst {
+            if ret == 0 || recover == 1 {
+                // Return the newly created nodeset after unlinking it from
+                // they pseudo parent.
+                let mut cur = new_doc.children().unwrap().children();
+                *lst = cur;
+                while let Some(mut now) = cur {
+                    now.set_doc(doc);
+                    now.set_parent(None);
+                    cur = now.next();
+                }
+                new_doc.children().unwrap().set_children(None);
+            }
+        }
+
+        if replaced {
+            (*ctxt).sax = oldsax;
+        }
+        xml_free_parser_ctxt(ctxt);
+        new_doc.int_subset = None;
+        new_doc.ext_subset = None;
+        // This leaks the namespace list if doc.is_null()
+        new_doc.old_ns = None;
+        xml_free_doc(new_doc);
 
         ret
     }
