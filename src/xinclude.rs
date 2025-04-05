@@ -1426,7 +1426,7 @@ impl XmlXIncludeCtxt {
                 let mut base = self.inc_tab[ref_index]
                     .elem
                     .unwrap()
-                    .get_ns_prop("base", XML_XML_NAMESPACE.to_str().ok());
+                    .get_ns_prop("base", Some(XML_XML_NAMESPACE));
                 if base.is_none() {
                     // No xml:base on the xinclude node, so we check whether the
                     // URI base is different than (relative to) the context base
@@ -1464,8 +1464,8 @@ impl XmlXIncludeCtxt {
                                     // If the element already has an xml:base set,
                                     // then relativise it if necessary
 
-                                    if let Some(xml_base) = cur_node
-                                        .get_ns_prop("base", XML_XML_NAMESPACE.to_str().ok())
+                                    if let Some(xml_base) =
+                                        cur_node.get_ns_prop("base", Some(XML_XML_NAMESPACE))
                                     {
                                         let rel_base = build_uri(&xml_base, &base);
                                         if let Some(rel_base) = rel_base {

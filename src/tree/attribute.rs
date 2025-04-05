@@ -64,7 +64,7 @@ impl XmlAttr {
     /// Returns the namespace pointer or NULL.
     #[doc(alias = "xmlSearchNsByHref")]
     pub fn search_ns_by_href(&mut self, doc: Option<XmlDocPtr>, href: &str) -> Option<XmlNsPtr> {
-        if href == XML_XML_NAMESPACE.to_str().unwrap() {
+        if href == XML_XML_NAMESPACE {
             let mut doc = doc.or(self.document())?;
             // Return the XML namespace declaration held by the doc.
             if doc.old_ns.is_none() {
@@ -171,7 +171,7 @@ impl XmlAttr {
     pub fn set_base(&mut self, _uri: Option<&str>) {
         use crate::tree::XML_XML_NAMESPACE;
 
-        self.search_ns_by_href(self.document(), XML_XML_NAMESPACE.to_str().unwrap());
+        self.search_ns_by_href(self.document(), XML_XML_NAMESPACE);
     }
 
     /// update all nodes under the tree to point to the right document

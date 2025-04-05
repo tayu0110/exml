@@ -1578,9 +1578,7 @@ impl CatalogEntryListNode {
                             let mut node = xml_new_doc_node(doc, ns, "group", None).unwrap();
                             node.set_prop("id", n.name.as_deref());
                             if let Some(value) = n.value.as_deref() {
-                                if let Some(xns) =
-                                    node.search_ns_by_href(doc, XML_XML_NAMESPACE.to_str().unwrap())
-                                {
+                                if let Some(xns) = node.search_ns_by_href(doc, XML_XML_NAMESPACE) {
                                     node.set_ns_prop(Some(xns), "base", Some(value));
                                 }
                             }
@@ -2452,7 +2450,7 @@ unsafe fn xml_parse_xml_catalog_node(
                 pref = prefer;
             }
             let prop = cur.get_prop("id");
-            let base = cur.get_ns_prop("base", XML_XML_NAMESPACE.to_str().ok());
+            let base = cur.get_ns_prop("base", Some(XML_XML_NAMESPACE));
             Some(xml_new_catalog_entry(
                 XmlCatalogEntryType::XmlCataGroup,
                 prop.as_deref(),

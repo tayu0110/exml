@@ -283,7 +283,7 @@ pub fn xml_new_ns(
 
     if prefix == Some("xml") {
         // xml namespace is predefined, no need to add it
-        if href == Some(XML_XML_NAMESPACE.to_str().unwrap()) {
+        if href == Some(XML_XML_NAMESPACE) {
             return None;
         }
 

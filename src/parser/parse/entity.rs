@@ -750,7 +750,7 @@ pub(crate) unsafe fn parse_external_entity_private(
         (*ctxt).dict = oldctxt.dict;
         (*ctxt).str_xml = Some(Cow::Borrowed("xml"));
         (*ctxt).str_xmlns = Some(Cow::Borrowed("xmlns"));
-        (*ctxt).str_xml_ns = Some(Cow::Borrowed(XML_XML_NAMESPACE.to_str().unwrap()));
+        (*ctxt).str_xml_ns = Some(Cow::Borrowed(XML_XML_NAMESPACE));
         (*ctxt).dict_names = oldctxt.dict_names;
         (*ctxt).atts_default = take(&mut oldctxt.atts_default);
         (*ctxt).atts_special = oldctxt.atts_special;

@@ -629,7 +629,7 @@ impl XmlNode {
                     };
                     let mut attr_decl = None;
                     if let Some(ns_name) = ns_name {
-                        if ns_name == XML_XML_NAMESPACE.to_string_lossy() {
+                        if ns_name == XML_XML_NAMESPACE {
                             // The XML namespace must be bound to prefix 'xml'.
                             attr_decl = int_subset.get_qattr_desc(&elem_qname, name, Some("xml"));
                             if attr_decl.is_none() {
@@ -794,12 +794,12 @@ impl XmlNode {
             if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
                 return None;
             }
-            if let Some(lang) = self.get_ns_prop("lang", XML_XML_NAMESPACE.to_str().ok()) {
+            if let Some(lang) = self.get_ns_prop("lang", Some(XML_XML_NAMESPACE)) {
                 return Some(lang);
             }
             let mut cur = self.parent;
             while let Some(now) = cur {
-                let lang = now.get_ns_prop("lang", XML_XML_NAMESPACE.to_str().ok());
+                let lang = now.get_ns_prop("lang", Some(XML_XML_NAMESPACE));
                 if lang.is_some() {
                     return lang;
                 }
@@ -821,7 +821,7 @@ impl XmlNode {
             }
             let mut cur = XmlGenericNodePtr::from_raw(self as *const Self as *mut Self);
             while let Some(now) = cur {
-                if let Some(space) = now.get_ns_prop("space", XML_XML_NAMESPACE.to_str().ok()) {
+                if let Some(space) = now.get_ns_prop("space", Some(XML_XML_NAMESPACE)) {
                     if space == "preserve" {
                         return 1;
                     }
@@ -1180,9 +1180,7 @@ impl XmlNode {
                 _ => unreachable!(),
             }
 
-            let Some(ns) =
-                self.search_ns_by_href(self.document(), XML_XML_NAMESPACE.to_str().unwrap())
-            else {
+            let Some(ns) = self.search_ns_by_href(self.document(), XML_XML_NAMESPACE) else {
                 return;
             };
             if let Some(uri) = uri {
@@ -1224,8 +1222,7 @@ impl XmlNode {
                 XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {}
                 _ => unreachable!(),
             }
-            let Some(ns) = self.search_ns_by_href(self.doc, XML_XML_NAMESPACE.to_str().unwrap())
-            else {
+            let Some(ns) = self.search_ns_by_href(self.doc, XML_XML_NAMESPACE) else {
                 return;
             };
             self.set_ns_prop(Some(ns), "lang", lang);
@@ -1262,8 +1259,7 @@ impl XmlNode {
                 XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {}
                 _ => unreachable!(),
             }
-            let Some(ns) = self.search_ns_by_href(self.doc, XML_XML_NAMESPACE.to_str().unwrap())
-            else {
+            let Some(ns) = self.search_ns_by_href(self.doc, XML_XML_NAMESPACE) else {
                 return;
             };
             match val {
@@ -1813,7 +1809,7 @@ impl XmlNode {
                 // In this case exceptionally create it on the node element.
                 let Some(cur) = XmlNsPtr::new(XmlNs {
                     typ: XML_LOCAL_NAMESPACE,
-                    href: Some(XML_XML_NAMESPACE.to_str().unwrap().into()),
+                    href: Some(XML_XML_NAMESPACE.into()),
                     prefix: Some("xml".into()),
                     next: self.ns_def,
                     ..Default::default()
@@ -1889,14 +1885,14 @@ impl XmlNode {
         if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
             return None;
         }
-        if href == XML_XML_NAMESPACE.to_str().unwrap() {
+        if href == XML_XML_NAMESPACE {
             // Only the document can hold the XML spec namespace.
             if doc.is_none() && matches!(self.element_type(), XmlElementType::XmlElementNode) {
                 // The XML-1.0 namespace is normally held on the root element.
                 // In this case exceptionally create it on the node element.
                 let Some(cur) = XmlNsPtr::new(XmlNs {
                     typ: XML_LOCAL_NAMESPACE,
-                    href: Some(XML_XML_NAMESPACE.to_str().unwrap().into()),
+                    href: Some(XML_XML_NAMESPACE.into()),
                     prefix: Some("xml".into()),
                     next: self.ns_def,
                     ..Default::default()

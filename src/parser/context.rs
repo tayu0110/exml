@@ -1311,7 +1311,7 @@ impl XmlParserCtxt {
 
         self.str_xml = Some(Cow::Borrowed("xml"));
         self.str_xmlns = Some(Cow::Borrowed("xmlns"));
-        self.str_xml_ns = Some(Cow::Borrowed(XML_XML_NAMESPACE.to_str().unwrap()));
+        self.str_xml_ns = Some(Cow::Borrowed(XML_XML_NAMESPACE));
     }
 
     /// Applies the options to the parser context

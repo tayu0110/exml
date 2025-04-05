@@ -741,7 +741,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
             new_doc.children().unwrap().set_document(Some(doc));
             // Ensure that doc has XML spec namespace
             let d = doc;
-            doc.search_ns_by_href(Some(d), XML_XML_NAMESPACE.to_str().unwrap());
+            doc.search_ns_by_href(Some(d), XML_XML_NAMESPACE);
             new_doc.old_ns = doc.old_ns;
         } else {
             (*ctxt).my_doc = Some(new_doc);

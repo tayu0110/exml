@@ -1050,7 +1050,7 @@ impl XmlPatParserContext {
                 let token = self.scan_name();
                 let mut url = None;
                 if prefix == "xml" {
-                    url = Some(XML_XML_NAMESPACE.to_str().unwrap().to_owned());
+                    url = Some(XML_XML_NAMESPACE.to_owned());
                 } else if let Some(namespaces) = self.namespaces.as_deref() {
                     if let Some((href, _)) = namespaces
                         .iter()
@@ -1100,7 +1100,7 @@ impl XmlPatParserContext {
                         let token = self.scan_name();
                         let mut url = None;
                         if prefix == "xml" {
-                            url = Some(XML_XML_NAMESPACE.to_str().unwrap().to_owned());
+                            url = Some(XML_XML_NAMESPACE.to_owned());
                         } else if let Some(namespaces) = self.namespaces.as_deref() {
                             if let Some((href, _)) = namespaces
                                 .iter()
@@ -1174,7 +1174,7 @@ impl XmlPatParserContext {
             let token = self.scan_name();
             let mut url = None;
             if prefix == "xml" {
-                url = Some(XML_XML_NAMESPACE.to_str().unwrap().to_owned());
+                url = Some(XML_XML_NAMESPACE.to_owned());
             } else if let Some(namespaces) = self.namespaces.as_deref() {
                 if let Some((href, _)) = namespaces
                     .iter()

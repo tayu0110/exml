@@ -89,7 +89,7 @@ pub trait NodeCommon {
                     return ent.uri.as_deref().map(|uri| uri.to_owned());
                 }
                 if matches!(now.element_type(), XmlElementType::XmlElementNode) {
-                    let base = now.get_ns_prop("base", XML_XML_NAMESPACE.to_str().ok());
+                    let base = now.get_ns_prop("base", Some(XML_XML_NAMESPACE));
                     if let Some(base) = base {
                         if base.starts_with("http://")
                             || base.starts_with("ftp://")
@@ -704,7 +704,7 @@ impl XmlGenericNodePtr {
                 // In this case exceptionally create it on the node element.
                 let Some(cur) = XmlNsPtr::new(XmlNs {
                     typ: XML_LOCAL_NAMESPACE,
-                    href: Some(XML_XML_NAMESPACE.to_str().unwrap().into()),
+                    href: Some(XML_XML_NAMESPACE.into()),
                     prefix: Some("xml".into()),
                     next: node.ns_def,
                     ..Default::default()
@@ -905,7 +905,7 @@ impl XmlGenericNodePtr {
                     .ok()
                     .filter(|node| node.element_type() == XmlElementType::XmlElementNode)
                 {
-                    let lang = now.get_ns_prop("lang", XML_XML_NAMESPACE.to_str().ok());
+                    let lang = now.get_ns_prop("lang", Some(XML_XML_NAMESPACE));
                     if lang.is_some() {
                         return lang;
                     }

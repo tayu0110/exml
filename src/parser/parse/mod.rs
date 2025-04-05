@@ -545,7 +545,7 @@ pub(crate) unsafe fn xml_parse_balanced_chunk_memory_internal(
         (*ctxt).input_id = oldctxt.input_id;
         (*ctxt).str_xml = Some(Cow::Borrowed("xml"));
         (*ctxt).str_xmlns = Some(Cow::Borrowed("xmlns"));
-        (*ctxt).str_xml_ns = Some(Cow::Borrowed(XML_XML_NAMESPACE.to_str().unwrap()));
+        (*ctxt).str_xml_ns = Some(Cow::Borrowed(XML_XML_NAMESPACE));
 
         // propagate namespaces down the entity
         for (pre, loc) in &oldctxt.ns_tab {

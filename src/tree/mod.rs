@@ -38,7 +38,6 @@ mod node;
 use std::{
     any::type_name,
     borrow::Cow,
-    ffi::CStr,
     fmt::Display,
     ptr::null_mut,
     sync::atomic::{AtomicBool, AtomicI32, Ordering},
@@ -85,35 +84,11 @@ pub enum XmlBufferAllocationScheme {
     XmlBufferAllocBounded,   /* limit the upper size of the buffer */
 }
 
-impl TryFrom<i32> for XmlBufferAllocationScheme {
-    type Error = anyhow::Error;
-    fn try_from(value: i32) -> Result<Self, Self::Error> {
-        if value == Self::XmlBufferAllocDoubleit as i32 {
-            Ok(Self::XmlBufferAllocDoubleit)
-        } else if value == Self::XmlBufferAllocExact as i32 {
-            Ok(Self::XmlBufferAllocExact)
-        } else if value == Self::XmlBufferAllocImmutable as i32 {
-            Ok(Self::XmlBufferAllocImmutable)
-        } else if value == Self::XmlBufferAllocIo as i32 {
-            Ok(Self::XmlBufferAllocIo)
-        } else if value == Self::XmlBufferAllocHybrid as i32 {
-            Ok(Self::XmlBufferAllocHybrid)
-        } else if value == Self::XmlBufferAllocBounded as i32 {
-            Ok(Self::XmlBufferAllocBounded)
-        } else {
-            Err(anyhow::anyhow!(
-                "Invalid convert from value '{value}' to {}",
-                type_name::<Self>()
-            ))
-        }
-    }
-}
-
 pub(crate) static __XML_REGISTER_CALLBACKS: AtomicI32 = AtomicI32::new(0);
 
 /// This is the namespace for the special xml: prefix predefined in the
 /// XML Namespace specification.
-pub const XML_XML_NAMESPACE: &CStr = c"http://www.w3.org/XML/1998/namespace";
+pub const XML_XML_NAMESPACE: &str = "http://www.w3.org/XML/1998/namespace";
 
 /// This is the name for the special xml:id attribute
 pub const XML_XML_ID: *const XmlChar = c"xml:id".as_ptr() as _;
@@ -1490,53 +1465,6 @@ pub unsafe fn xml_new_pi(name: &str, content: Option<&str>) -> Option<XmlNodePtr
     unsafe { xml_new_doc_pi(None, name, content) }
 }
 
-// /// Creation of a new text node with an extra content length parameter. The
-// /// text node pertain to a given document.
-// /// Returns a pointer to the new node object.
-// #[doc(alias = "xmlNewDocTextLen")]
-// pub unsafe fn xml_new_doc_text_len(
-//     doc: Option<XmlDocPtr>,
-//     content: *const XmlChar,
-//     len: i32,
-// ) -> Option<XmlNodePtr> {
-//     unsafe {
-//         let cur = xml_new_text_len(content, len);
-//         if let Some(mut cur) = cur {
-//             cur.doc = doc;
-//         }
-//         cur
-//     }
-// }
-
-// /// Use of this function is DISCOURAGED in favor of xmlNewDocTextLen.
-// ///
-// /// Creation of a new text node with an extra parameter for the content's length
-// /// Returns a pointer to the new node object.
-// #[doc(alias = "xmlNewTextLen")]
-// pub unsafe fn xml_new_text_len(content: *const XmlChar, len: i32) -> Option<XmlNodePtr> {
-//     unsafe {
-//         // Allocate a new node and fill the fields.
-//         let Some(mut cur) = XmlNodePtr::new(XmlNode {
-//             typ: XmlElementType::XmlTextNode,
-//             name: XML_STRING_TEXT.as_ptr() as _,
-//             ..Default::default()
-//         }) else {
-//             xml_tree_err_memory("building text");
-//             return None;
-//         };
-//         if !content.is_null() {
-//             cur.content = xml_strndup(content, len);
-//         }
-
-//         if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-//         //  && xmlRegisterNodeDefaultValue.is_some()
-//         {
-//             xml_register_node_default_value(cur.into());
-//         }
-//         Some(cur)
-//     }
-// }
-
 /// Creation of a new node containing a comment within a document.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewDocComment")]
@@ -2334,7 +2262,7 @@ fn xml_search_ns_by_namespace_strict(
     }
 
     *ret_ns = None;
-    if ns_name == XML_XML_NAMESPACE.to_str().unwrap() {
+    if ns_name == XML_XML_NAMESPACE {
         *ret_ns = doc.ensure_xmldecl();
         if ret_ns.is_none() {
             return -1;

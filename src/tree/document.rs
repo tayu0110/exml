@@ -103,7 +103,7 @@ impl XmlDoc {
     pub fn search_ns_by_href(&mut self, doc: Option<XmlDocPtr>, href: &str) -> Option<XmlNsPtr> {
         let orig = XmlGenericNodePtr::from_raw(self).unwrap();
 
-        if href == XML_XML_NAMESPACE.to_str().unwrap() {
+        if href == XML_XML_NAMESPACE {
             let mut doc = doc.or(self.document())?;
             // Return the XML namespace declaration held by the doc.
             if doc.old_ns.is_none() {
@@ -493,7 +493,7 @@ impl XmlDoc {
         }
         let Some(ns) = XmlNsPtr::new(XmlNs {
             typ: XML_LOCAL_NAMESPACE,
-            href: Some(XML_XML_NAMESPACE.to_str().unwrap().into()),
+            href: Some(XML_XML_NAMESPACE.into()),
             prefix: Some("xml".into()),
             ..Default::default()
         }) else {

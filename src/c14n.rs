@@ -506,7 +506,7 @@ impl<T> XmlC14NCtx<'_, T> {
                             xml_lang_attr = self.find_hidden_parent_attr(
                                 cur.parent(),
                                 "lang",
-                                XML_XML_NAMESPACE.to_str().unwrap(),
+                                XML_XML_NAMESPACE,
                             );
                         }
                         if let Some(attr) = xml_lang_attr {
@@ -516,7 +516,7 @@ impl<T> XmlC14NCtx<'_, T> {
                             xml_space_attr = self.find_hidden_parent_attr(
                                 cur.parent(),
                                 "space",
-                                XML_XML_NAMESPACE.to_str().unwrap(),
+                                XML_XML_NAMESPACE,
                             );
                         }
                         if let Some(attr) = xml_space_attr {
@@ -529,7 +529,7 @@ impl<T> XmlC14NCtx<'_, T> {
                             xml_base_attr = self.find_hidden_parent_attr(
                                 cur.parent(),
                                 "base",
-                                XML_XML_NAMESPACE.to_str().unwrap(),
+                                XML_XML_NAMESPACE,
                             );
                         }
                         if let Some(attr) = xml_base_attr {
@@ -1076,7 +1076,7 @@ impl<T> XmlC14NCtx<'_, T> {
             while let Some(cur_node) = cur.filter(|&cur| !self.is_visible(Some(cur), cur.parent()))
             {
                 if let Ok(cur) = XmlNodePtr::try_from(cur_node) {
-                    if let Some(attr) = cur.has_ns_prop("base", XML_XML_NAMESPACE.to_str().ok()) {
+                    if let Some(attr) = cur.has_ns_prop("base", Some(XML_XML_NAMESPACE)) {
                         // get attr value
                         let Some(mut tmp_str) = (match attr {
                             Ok(attr) => attr.children().and_then(|c| {
@@ -1547,8 +1547,7 @@ fn xml_c14n_ns_compare(ns1: XmlNsPtr, ns2: XmlNsPtr) -> Ordering {
 /* todo: make it a define? */
 #[doc(alias = "xmlC14NIsXmlNs")]
 fn xml_c14n_is_xml_ns(ns: XmlNsPtr) -> bool {
-    ns.prefix().as_deref() == Some("xml")
-        && ns.href().as_deref() == Some(XML_XML_NAMESPACE.to_str().unwrap())
+    ns.prefix().as_deref() == Some("xml") && ns.href().as_deref() == Some(XML_XML_NAMESPACE)
 }
 
 #[doc(alias = "xmlC14NStrEqual")]

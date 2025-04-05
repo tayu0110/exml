@@ -608,7 +608,7 @@ pub unsafe fn xml_xpath_ns_lookup(
 
         let prefix = CStr::from_ptr(prefix as *const i8).to_string_lossy();
         if prefix == "xml" {
-            return Some(XML_XML_NAMESPACE.to_str().unwrap().into());
+            return Some(XML_XML_NAMESPACE.into());
         }
 
         if let Some(namespaces) = (*ctxt).namespaces.as_deref() {
@@ -4616,7 +4616,7 @@ thread_local! {
     static XML_XPATH_XMLNAMESPACE_STRUCT: XmlNs = XmlNs {
         next: None,
         typ: XmlElementType::XmlNamespaceDecl,
-        href: Some(XML_XML_NAMESPACE.to_str().unwrap().into()),
+        href: Some(XML_XML_NAMESPACE.into()),
         prefix: Some("xml".into()),
         _private: null_mut(),
         context: None,
