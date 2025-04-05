@@ -51,7 +51,7 @@ use crate::{
         },
         dict::{xml_dict_create, xml_dict_lookup},
         globals::{xml_default_sax_locator, xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
-        parser::{XmlSAXHandler, xml_init_parser, xml_load_external_entity},
+        parser::{XmlSAXHandler, xml_init_parser},
         parser_internals::{
             INPUT_CHUNK, XML_MAX_HUGE_LENGTH, XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH,
             XML_VCTXT_USE_PCTXT, xml_is_letter,
@@ -61,7 +61,7 @@ use crate::{
     },
     parser::{
         XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput, XmlParserInputState, XmlParserOption,
-        xml_free_parser_ctxt,
+        xml_free_parser_ctxt, xml_load_external_entity,
     },
     tree::{NodeCommon, XmlElementType, XmlNodePtr, xml_create_int_subset, xml_free_doc},
     uri::canonic_path,

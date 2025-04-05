@@ -19,7 +19,7 @@ use exml::{
         set_pedantic_parser_default_value, set_structured_error,
     },
     libxml::{
-        parser::{xml_cleanup_parser, xml_init_parser, xml_set_external_entity_loader},
+        parser::{xml_cleanup_parser, xml_init_parser},
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
             xml_memory_strdup,
@@ -27,7 +27,7 @@ use exml::{
     },
     parser::{
         XmlParserCtxtPtr, XmlParserInput, XmlParserOption, xml_ctxt_read_file,
-        xml_free_parser_ctxt, xml_new_parser_ctxt, xml_read_file,
+        xml_free_parser_ctxt, xml_new_parser_ctxt, xml_read_file, xml_set_external_entity_loader,
     },
     tree::{NodeCommon, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr, xml_free_doc},
     xpath::{

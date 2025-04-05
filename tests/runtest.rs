@@ -49,16 +49,10 @@ use exml::{
         },
         tree::html_doc_dump_memory,
     },
-    io::{
-        XmlInputCallback, pop_input_callbacks, register_input_callbacks,
-        xml_no_net_external_entity_loader,
-    },
+    io::{XmlInputCallback, pop_input_callbacks, register_input_callbacks},
     libxml::{
         globals::{set_xml_free, set_xml_malloc, set_xml_mem_strdup, set_xml_realloc, xml_free},
-        parser::{
-            XmlSAXHandler, XmlSAXLocatorPtr, xml_cleanup_parser, xml_init_parser,
-            xml_set_external_entity_loader,
-        },
+        parser::{XmlSAXHandler, XmlSAXLocatorPtr, xml_cleanup_parser, xml_init_parser},
         relaxng::XmlRelaxNGPtr,
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
@@ -70,8 +64,8 @@ use exml::{
     },
     parser::{
         XML_SAX2_MAGIC, XmlParserCtxtPtr, XmlParserInput, XmlParserOption,
-        xml_create_file_parser_ctxt, xml_free_parser_ctxt, xml_parse_file, xml_read_file,
-        xml_read_memory,
+        xml_create_file_parser_ctxt, xml_free_parser_ctxt, xml_no_net_external_entity_loader,
+        xml_parse_file, xml_read_file, xml_read_memory, xml_set_external_entity_loader,
     },
     relaxng::xml_relaxng_init_types,
     tree::{

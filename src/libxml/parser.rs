@@ -56,7 +56,7 @@ use crate::{
     globals::{GenericErrorContext, StructuredError},
     io::{
         cleanup_input_callbacks, cleanup_output_callbacks, register_default_input_callbacks,
-        register_default_output_callbacks, xml_default_external_entity_loader, xml_no_net_exists,
+        register_default_output_callbacks,
     },
     libxml::{
         dict::{__xml_initialize_dict, xml_cleanup_dict_internal},
@@ -74,7 +74,6 @@ use crate::{
         XmlDocPtr, XmlElementContentPtr, XmlElementTypeVal, XmlEntityPtr, XmlEntityType,
         XmlEnumeration, XmlGenericNodePtr, xml_free_doc, xml_new_doc, xml_new_doc_node,
     },
-    uri::canonic_path,
     xpath::xml_init_xpath_internal,
 };
 
@@ -352,16 +351,6 @@ pub struct XmlSAXHandler {
     pub end_element_ns: Option<EndElementNsSAX2Func>,
     pub serror: Option<StructuredError>,
 }
-
-/// External entity loaders types.
-///
-/// Returns the entity input parser.
-#[doc(alias = "xmlExternalEntityLoader")]
-pub type XmlExternalEntityLoader = unsafe fn(
-    url: Option<&str>,
-    id: Option<&str>,
-    context: XmlParserCtxtPtr,
-) -> Option<XmlParserInput>;
 
 static XML_PARSER_INITIALIZED: AtomicBool = AtomicBool::new(false);
 
@@ -642,39 +631,3 @@ pub(crate) const XML_PARSER_ALLOWED_EXPANSION: usize = 1000000;
 // as well to protect, for example, against exponential expansion of empty
 // or very short entities.
 pub(crate) const XML_ENT_FIXED_COST: usize = 20;
-
-static mut XML_CURRENT_EXTERNAL_ENTITY_LOADER: XmlExternalEntityLoader =
-    xml_default_external_entity_loader;
-
-/// Changes the defaultexternal entity resolver function for the application
-#[doc(alias = "xmlSetExternalEntityLoader")]
-pub unsafe fn xml_set_external_entity_loader(f: XmlExternalEntityLoader) {
-    unsafe {
-        XML_CURRENT_EXTERNAL_ENTITY_LOADER = f;
-    }
-}
-
-/// Returns the xmlExternalEntityLoader function pointer
-#[doc(alias = "xmlGetExternalEntityLoader")]
-pub unsafe fn xml_get_external_entity_loader() -> XmlExternalEntityLoader {
-    unsafe { XML_CURRENT_EXTERNAL_ENTITY_LOADER }
-}
-
-/// Load an external entity, note that the use of this function for
-/// unparsed entities may generate problems
-///
-/// Returns the xmlParserInputPtr or NULL
-#[doc(alias = "xmlLoadExternalEntity")]
-pub unsafe fn xml_load_external_entity(
-    url: Option<&str>,
-    id: Option<&str>,
-    ctxt: XmlParserCtxtPtr,
-) -> Option<XmlParserInput> {
-    unsafe {
-        if let Some(url) = url.filter(|_| xml_no_net_exists(url) == 0) {
-            let canonic_filename = canonic_path(url);
-            return XML_CURRENT_EXTERNAL_ENTITY_LOADER(Some(&canonic_filename), id, ctxt);
-        }
-        XML_CURRENT_EXTERNAL_ENTITY_LOADER(url, id, ctxt)
-    }
-}

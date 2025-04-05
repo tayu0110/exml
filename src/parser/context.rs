@@ -31,7 +31,7 @@ use crate::{
         catalog::XmlCatalogEntry,
         chvalid::{xml_is_blank_char, xml_is_char},
         globals::{xml_free, xml_malloc},
-        parser::{XmlSAXHandler, XmlStartTag, xml_init_parser, xml_load_external_entity},
+        parser::{XmlSAXHandler, XmlStartTag, xml_init_parser},
         parser_internals::{
             INPUT_CHUNK, LINE_LEN, XML_MAX_DICTIONARY_LIMIT, XML_MAX_LOOKUP_LIMIT,
             XML_PARSER_MAX_DEPTH, XML_VCTXT_USE_PCTXT,
@@ -55,6 +55,7 @@ use crate::{
 
 use super::{
     XmlParserInput, XmlParserNodeInfo, XmlParserNodeInfoSeq, xml_err_memory, xml_fatal_err,
+    xml_load_external_entity,
 };
 
 /// Special constant found in SAX2 blocks initialized fields

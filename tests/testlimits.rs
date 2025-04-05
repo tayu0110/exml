@@ -17,12 +17,9 @@ use exml::{
         GenericErrorContext, set_get_warnings_default_value, set_pedantic_parser_default_value,
         set_structured_error,
     },
-    io::{XmlInputCallback, register_input_callbacks, xml_no_net_external_entity_loader},
+    io::{XmlInputCallback, register_input_callbacks},
     libxml::{
-        parser::{
-            XmlSAXHandler, XmlSAXLocatorPtr, xml_cleanup_parser, xml_init_parser,
-            xml_set_external_entity_loader,
-        },
+        parser::{XmlSAXHandler, XmlSAXLocatorPtr, xml_cleanup_parser, xml_init_parser},
         parser_internals::{XML_MAX_LOOKUP_LIMIT, XML_MAX_TEXT_LENGTH},
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
@@ -31,7 +28,8 @@ use exml::{
     },
     parser::{
         XML_SAX2_MAGIC, XmlParserCtxtPtr, XmlParserInput, XmlParserOption, xml_ctxt_read_file,
-        xml_free_parser_ctxt, xml_new_sax_parser_ctxt,
+        xml_free_parser_ctxt, xml_new_sax_parser_ctxt, xml_no_net_external_entity_loader,
+        xml_set_external_entity_loader,
     },
     tree::{
         XmlAttributeDefault, XmlAttributeType, XmlElementContentPtr, XmlElementType,

@@ -46,6 +46,7 @@ mod context;
 mod error;
 mod input;
 mod legacy;
+mod loader;
 mod node_info;
 mod parse;
 mod push;
@@ -59,7 +60,7 @@ use crate::{
     io::XmlParserInputBuffer,
     libxml::{
         chvalid::{xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender},
-        parser::{xml_create_doc_parser_ctxt, xml_init_parser, xml_load_external_entity},
+        parser::{xml_create_doc_parser_ctxt, xml_init_parser},
         parser_internals::xml_is_letter,
     },
     tree::XmlDocPtr,
@@ -69,6 +70,7 @@ pub use context::*;
 pub(crate) use error::*;
 pub use input::*;
 pub use legacy::*;
+pub use loader::*;
 pub use node_info::*;
 pub use parse::*;
 pub use push::*;

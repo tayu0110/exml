@@ -39,10 +39,13 @@ use crate::{
     io::xml_parser_get_directory,
     libxml::{
         chvalid::xml_is_char,
-        parser::{xml_init_parser, xml_load_external_entity},
+        parser::xml_init_parser,
         xpointer::{xml_xptr_eval, xml_xptr_new_context},
     },
-    parser::{XML_DETECT_IDS, XmlParserOption, xml_free_parser_ctxt, xml_new_parser_ctxt},
+    parser::{
+        XML_DETECT_IDS, XmlParserOption, xml_free_parser_ctxt, xml_load_external_entity,
+        xml_new_parser_ctxt,
+    },
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlDocPtr, XmlElementType, XmlEntityPtr, XmlEntityType,
         XmlGenericNodePtr, XmlNode, XmlNodePtr, xml_add_doc_entity, xml_create_int_subset,

@@ -22,9 +22,9 @@ use exml::{
         GenericErrorContext, reset_last_error, set_get_warnings_default_value,
         set_pedantic_parser_default_value, set_structured_error,
     },
-    io::{XmlInputCallback, register_input_callbacks, xml_no_net_external_entity_loader},
+    io::{XmlInputCallback, register_input_callbacks},
     libxml::{
-        parser::{xml_cleanup_parser, xml_init_parser, xml_set_external_entity_loader},
+        parser::{xml_cleanup_parser, xml_init_parser},
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
             xml_memory_strdup,
@@ -33,7 +33,8 @@ use exml::{
     },
     parser::{
         XmlParserCtxtPtr, XmlParserInput, XmlParserOption, xml_ctxt_read_file,
-        xml_free_parser_ctxt, xml_new_parser_ctxt,
+        xml_free_parser_ctxt, xml_new_parser_ctxt, xml_no_net_external_entity_loader,
+        xml_set_external_entity_loader,
     },
     tree::{XmlElementType, XmlNodePtr, xml_free_doc, xml_get_doc_entity},
 };

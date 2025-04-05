@@ -46,13 +46,13 @@ use crate::{
     generic_error,
     globals::get_parser_debug_entities,
     io::{__xml_loader_err, XmlParserInputBuffer, xml_check_http_input, xml_parser_get_directory},
-    libxml::{chvalid::xml_is_blank_char, parser::xml_load_external_entity},
+    libxml::chvalid::xml_is_blank_char,
     parser::xml_err_internal,
     tree::{XmlEntityPtr, XmlEntityType},
     uri::canonic_path,
 };
 
-use super::{XmlParserCtxt, XmlParserCtxtPtr, xml_err_memory};
+use super::{XmlParserCtxt, XmlParserCtxtPtr, xml_err_memory, xml_load_external_entity};
 
 /// The parser is now working also as a state based parser.
 /// The recursive one use the state info for entities processing.
