@@ -160,29 +160,6 @@ pub fn html_auto_close_tag(_doc: HtmlDocPtr, name: &str, elem: HtmlNodePtr) -> i
     0
 }
 
-/*
- * Macros for accessing the content. Those should be used only by the parser,
- * and not exported.
- *
- * Clean macros, not dependent of an ASCII context, expect UTF-8 encoding
- *
- */
-
-macro_rules! COPY_BUF {
-    ($ctxt:expr, $l:expr, $b:expr, $i:expr, $v:expr) => {
-        if $l == 1 {
-            *$b.add($i as usize) = $v as _;
-            $i += 1;
-        } else {
-            $i += crate::libxml::parser_internals::xml_copy_char(
-                $l as _,
-                $b.add($i as usize) as _,
-                $v as _,
-            );
-        }
-    };
-}
-
 /// Parse a content: comment, sub-element, reference or text.
 /// This is the entry point when called from parser.c
 #[doc(alias = "htmlParseContent")]
@@ -2013,7 +1990,9 @@ unsafe fn html_parse_script(ctxt: HtmlParserCtxtPtr) {
                 }
             }
             if xml_is_char(cur as u32) {
-                COPY_BUF!(ctxt, l, buf.as_mut_ptr(), nbchar, cur);
+                let c = char::from_u32(cur as u32).unwrap();
+                let s = c.encode_utf8(&mut buf[nbchar as usize..]);
+                nbchar += s.len() as i32;
             } else {
                 html_parse_err_int!(
                     &mut *ctxt,
@@ -2356,9 +2335,6 @@ unsafe fn html_parse_doc_type_decl(ctxt: HtmlParserCtxtPtr) {
 #[doc(alias = "htmlParseComment")]
 unsafe fn html_parse_comment(ctxt: HtmlParserCtxtPtr) {
     unsafe {
-        let mut buf: *mut XmlChar;
-        let mut len: i32;
-        let mut size: i32 = HTML_PARSER_BUFFER_SIZE as i32;
         let mut q: i32;
         let mut ql: i32 = 0;
         let mut r: i32;
@@ -2367,10 +2343,10 @@ unsafe fn html_parse_comment(ctxt: HtmlParserCtxtPtr) {
         let mut l: i32 = 0;
         let mut next: i32;
         let mut nl: i32 = 0;
-        let max_length: i32 = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
-            XML_MAX_HUGE_LENGTH as i32
+        let max_length = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
+            XML_MAX_HUGE_LENGTH
         } else {
-            XML_MAX_TEXT_LENGTH as i32
+            XML_MAX_TEXT_LENGTH
         };
 
         // Check that there is a comment right here.
@@ -2381,14 +2357,7 @@ unsafe fn html_parse_comment(ctxt: HtmlParserCtxtPtr) {
         let state: XmlParserInputState = (*ctxt).instate;
         (*ctxt).instate = XmlParserInputState::XmlParserComment;
         (*ctxt).advance(4);
-        buf = xml_malloc_atomic(size as usize) as _;
-        if buf.is_null() {
-            html_err_memory(ctxt, Some("buffer allocation failed\n"));
-            (*ctxt).instate = state;
-            return;
-        }
-        len = 0;
-        *buf.add(len as usize) = 0;
+        let mut buf = String::new();
         q = html_current_char(&mut *ctxt, &mut ql);
         if q == 0 {
             // goto unfinished;
@@ -2409,15 +2378,13 @@ unsafe fn html_parse_comment(ctxt: HtmlParserCtxtPtr) {
                 r = html_current_char(&mut *ctxt, &mut rl);
                 if r == 0 {
                     // goto unfinished;
-                    let b = CStr::from_ptr(buf as *const i8).to_string_lossy();
                     html_parse_err(
                         ctxt,
                         XmlParserErrors::XmlErrCommentNotFinished,
-                        format!("Comment not terminated \n<!--{b}\n").as_str(),
-                        Some(&b),
+                        format!("Comment not terminated \n<!--{buf}\n").as_str(),
+                        Some(&buf),
                         None,
                     );
-                    xml_free(buf as _);
                     return;
                 }
                 if q == b'-' as i32 && r == b'>' as i32 {
@@ -2455,19 +2422,8 @@ unsafe fn html_parse_comment(ctxt: HtmlParserCtxtPtr) {
                             break;
                         }
 
-                        if len + 5 >= size {
-                            size *= 2;
-                            let tmp: *mut XmlChar = xml_realloc(buf as _, size as usize) as _;
-                            if tmp.is_null() {
-                                xml_free(buf as _);
-                                html_err_memory(ctxt, Some("growing buffer failed\n"));
-                                (*ctxt).instate = state;
-                                return;
-                            }
-                            buf = tmp;
-                        }
                         if xml_is_char(q as u32) {
-                            COPY_BUF!(ctxt, ql, buf, len, q);
+                            buf.push(char::from_u32(q as u32).unwrap());
                         } else {
                             html_parse_err_int!(
                                 &mut *ctxt,
@@ -2476,7 +2432,7 @@ unsafe fn html_parse_comment(ctxt: HtmlParserCtxtPtr) {
                                 q
                             );
                         }
-                        if len > max_length {
+                        if buf.len() > max_length {
                             html_parse_err(
                                 ctxt,
                                 XmlParserErrors::XmlErrCommentNotFinished,
@@ -2484,52 +2440,41 @@ unsafe fn html_parse_comment(ctxt: HtmlParserCtxtPtr) {
                                 None,
                                 None,
                             );
-                            xml_free(buf as _);
                             (*ctxt).instate = state;
                             return;
                         }
 
                         q = r;
-                        ql = rl;
                         r = cur;
-                        rl = l;
                         cur = next;
                         l = nl;
                     }
                 }
             }
             // finished:
-            *buf.add(len as usize) = 0;
             if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-                xml_free(buf as _);
                 return;
             }
             if cur == b'>' as i32 {
                 (*ctxt).skip_char();
                 if (*ctxt).disable_sax == 0 {
                     if let Some(comment) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.comment) {
-                        comment(
-                            (*ctxt).user_data.clone(),
-                            &CStr::from_ptr(buf as *const i8).to_string_lossy(),
-                        );
+                        comment((*ctxt).user_data.clone(), &buf);
                     }
                 }
-                xml_free(buf as _);
                 (*ctxt).instate = state;
                 return;
             }
         }
 
         // unfinished:
-        let b = CStr::from_ptr(buf as *const i8).to_string_lossy();
         html_parse_err(
             ctxt,
             XmlParserErrors::XmlErrCommentNotFinished,
-            format!("Comment not terminated \n<!--{b}\n").as_str(),
-            Some(&b),
+            format!("Comment not terminated \n<!--{buf}\n").as_str(),
+            Some(&buf),
             None,
         );
-        xml_free(buf as _);
     }
 }
 
@@ -2561,15 +2506,12 @@ unsafe fn html_skip_bogus_comment(ctxt: HtmlParserCtxtPtr) {
 #[doc(alias = "xmlParsePI")]
 unsafe fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
     unsafe {
-        let mut buf: *mut XmlChar;
-        let mut len: i32 = 0;
-        let mut size: i32 = HTML_PARSER_BUFFER_SIZE as i32;
         let mut cur: i32;
         let mut l: i32 = 0;
-        let max_length: i32 = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
-            XML_MAX_HUGE_LENGTH as i32
+        let max_length = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
+            XML_MAX_HUGE_LENGTH
         } else {
-            XML_MAX_TEXT_LENGTH as i32
+            XML_MAX_TEXT_LENGTH
         };
         let state: XmlParserInputState;
 
@@ -2597,12 +2539,7 @@ unsafe fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
                     (*ctxt).instate = state;
                     return;
                 }
-                buf = xml_malloc_atomic(size as usize) as _;
-                if buf.is_null() {
-                    html_err_memory(ctxt, None);
-                    (*ctxt).instate = state;
-                    return;
-                }
+                let mut buf = String::new();
                 cur = (*ctxt).current_byte() as _;
                 if !xml_is_blank_char(cur as u32) {
                     html_parse_err(
@@ -2616,19 +2553,8 @@ unsafe fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
                 html_skip_blank_chars(&mut *ctxt);
                 cur = html_current_char(&mut *ctxt, &mut l);
                 while cur != 0 && cur != b'>' as i32 {
-                    if len + 5 >= size {
-                        size *= 2;
-                        let tmp: *mut XmlChar = xml_realloc(buf as _, size as usize) as _;
-                        if tmp.is_null() {
-                            html_err_memory(ctxt, None);
-                            xml_free(buf as _);
-                            (*ctxt).instate = state;
-                            return;
-                        }
-                        buf = tmp;
-                    }
                     if xml_is_char(cur as u32) {
-                        COPY_BUF!(ctxt, l, buf, len, cur);
+                        buf.push(char::from_u32(cur as u32).unwrap());
                     } else {
                         html_parse_err_int!(
                             &mut *ctxt,
@@ -2637,7 +2563,7 @@ unsafe fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
                             cur
                         );
                     }
-                    if len > max_length {
+                    if buf.len() > max_length {
                         html_parse_err(
                             ctxt,
                             XmlParserErrors::XmlErrPINotFinished,
@@ -2645,7 +2571,6 @@ unsafe fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
                             Some(&target),
                             None,
                         );
-                        xml_free(buf as _);
                         (*ctxt).instate = state;
                         return;
                     }
@@ -2653,9 +2578,7 @@ unsafe fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
                     (*ctxt).token = 0;
                     cur = html_current_char(&mut *ctxt, &mut l);
                 }
-                *buf.add(len as usize) = 0;
                 if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-                    xml_free(buf as _);
                     return;
                 }
                 if cur != b'>' as i32 {
@@ -2676,17 +2599,10 @@ unsafe fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
                             .as_deref_mut()
                             .and_then(|sax| sax.processing_instruction)
                         {
-                            processing_instruction(
-                                (*ctxt).user_data.clone(),
-                                &target,
-                                (!buf.is_null())
-                                    .then(|| CStr::from_ptr(buf as *const i8).to_string_lossy())
-                                    .as_deref(),
-                            );
+                            processing_instruction((*ctxt).user_data.clone(), &target, Some(&buf));
                         }
                     }
                 }
-                xml_free(buf as _);
             } else {
                 html_parse_err(
                     ctxt,
@@ -2973,7 +2889,9 @@ unsafe fn html_parse_char_data_internal(ctxt: HtmlParserCtxtPtr, readahead: i32)
                     cur
                 );
             } else {
-                COPY_BUF!(ctxt, l, buf.as_mut_ptr(), nbchar, cur);
+                let c = char::from_u32(cur as u32).unwrap();
+                let s = c.encode_utf8(&mut buf[nbchar as usize..]);
+                nbchar += s.len() as i32;
             }
             (*ctxt).advance_with_line_handling(l as usize);
             (*ctxt).token = 0;
