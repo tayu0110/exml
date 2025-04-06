@@ -103,7 +103,7 @@ use crate::{
     },
     parser::{
         XML_SAX2_MAGIC, XmlParserCtxtPtr, XmlParserInput, XmlParserOption, XmlSAXHandler,
-        XmlSAXHandlerPtr, XmlSAXLocatorPtr, split_qname2, xml_ctxt_read_file, xml_ctxt_read_memory,
+        XmlSAXLocatorPtr, split_qname2, xml_ctxt_read_file, xml_ctxt_read_memory,
         xml_free_parser_ctxt, xml_new_parser_ctxt, xml_new_sax_parser_ctxt,
     },
     tree::{
@@ -18873,9 +18873,9 @@ pub struct XmlSchemaSAXPlugStruct {
     magic: u32,
 
     /* the original callbacks information */
-    user_sax_ptr: *mut XmlSAXHandlerPtr,
+    // user_sax_ptr: *mut XmlSAXHandlerPtr,
     user_sax: Option<Box<XmlSAXHandler>>,
-    user_data_ptr: *mut Option<GenericErrorContext>,
+    // user_data_ptr: *mut Option<GenericErrorContext>,
     user_data: Option<GenericErrorContext>,
 
     /* the block plugged back and validation information */
@@ -19881,7 +19881,7 @@ pub unsafe fn xml_schema_sax_plug(
             (*ret).schemas_sax.start_element_ns = Some(start_element_ns_split);
             (*ret).schemas_sax.end_element_ns = Some(end_element_ns_split);
 
-            (*ret).user_data_ptr = user_data;
+            // (*ret).user_data_ptr = user_data;
             (*ret).user_data = (*user_data).clone();
             *user_data = Some(GenericErrorContext::new(ret));
         } else {

@@ -80,12 +80,11 @@ use exml::{
     },
     parser::{
         XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SAX2_MAGIC, XmlExternalEntityLoader, XmlParserCtxt,
-        XmlParserCtxtPtr, XmlParserInput, XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr,
-        XmlSAXLocatorPtr, xml_cleanup_parser, xml_create_push_parser_ctxt, xml_ctxt_read_file,
-        xml_ctxt_read_io, xml_ctxt_read_memory, xml_free_parser_ctxt,
-        xml_get_external_entity_loader, xml_new_parser_ctxt, xml_new_sax_parser_ctxt,
-        xml_no_net_external_entity_loader, xml_parse_dtd, xml_read_file, xml_read_io,
-        xml_read_memory, xml_set_external_entity_loader,
+        XmlParserCtxtPtr, XmlParserInput, XmlParserOption, XmlSAXHandler, XmlSAXLocatorPtr,
+        xml_cleanup_parser, xml_create_push_parser_ctxt, xml_ctxt_read_file, xml_ctxt_read_io,
+        xml_ctxt_read_memory, xml_free_parser_ctxt, xml_get_external_entity_loader,
+        xml_new_parser_ctxt, xml_new_sax_parser_ctxt, xml_no_net_external_entity_loader,
+        xml_parse_dtd, xml_read_file, xml_read_io, xml_read_memory, xml_set_external_entity_loader,
     },
     relaxng::{
         xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt, xml_relaxng_new_parser_ctxt,
@@ -1858,25 +1857,24 @@ static mut DEBUG_SAX2_HANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
 
 unsafe fn test_sax(filename: &str) {
     unsafe {
-        let handler: XmlSAXHandlerPtr;
         let user_data: &CStr = c"user_data"; /* mostly for debugging */
 
         CALLBACKS.store(0, Ordering::Relaxed);
 
-        if CMD_ARGS.noout {
-            handler = addr_of_mut!(EMPTY_SAXHANDLER_STRUCT);
+        let handler = if CMD_ARGS.noout {
+            &raw mut EMPTY_SAXHANDLER_STRUCT
         } else {
             #[cfg(feature = "sax1")]
             if CMD_ARGS.sax1 {
-                handler = addr_of_mut!(DEBUG_SAXHANDLER_STRUCT);
+                &raw mut DEBUG_SAXHANDLER_STRUCT
             } else {
-                handler = addr_of_mut!(DEBUG_SAX2_HANDLER_STRUCT);
+                &raw mut DEBUG_SAX2_HANDLER_STRUCT
             }
             #[cfg(not(feature = "sax1"))]
             {
-                handler = addr_of_mut!(DEBUG_SAX2_HANDLER_STRUCT);
+                &raw mut DEBUG_SAX2_HANDLER_STRUCT
             }
-        }
+        };
 
         #[cfg(not(feature = "schema"))]
         let f = false;

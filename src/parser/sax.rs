@@ -282,7 +282,7 @@ pub type EndElementNsSAX2Func = unsafe fn(
     uri: Option<&str>,
 );
 
-pub type XmlSAXHandlerPtr = *mut XmlSAXHandler;
+// pub type XmlSAXHandlerPtr = *mut XmlSAXHandler;
 /// A SAX handler is bunch of callbacks called by the parser when processing
 /// of the input generate data or structure information.
 #[doc(alias = "xmlSAXHandler")]
