@@ -2187,11 +2187,7 @@ impl XmlParserCtxt {
                         {
                             cur = get_entity(self, &name);
                         }
-                        if cur.is_none()
-                            && self.user_data.as_ref().and_then(|d| {
-                                d.lock().downcast_ref::<*mut XmlParserCtxt>().copied()
-                            }) == Some(self)
-                        {
+                        if cur.is_none() && self.user_data.is_none() {
                             cur = xml_sax2_get_entity(self, &name);
                         }
                     }

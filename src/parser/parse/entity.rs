@@ -501,16 +501,8 @@ impl XmlParserCtxt {
             // If the user provided their own SAX callbacks, then reuse the
             // userData callback field, otherwise the expected setup in a
             // DOM builder is to have userData == ctxt
-            let user_data = if self
-                .user_data
-                .as_ref()
-                .and_then(|d| d.lock().downcast_ref::<*mut XmlParserCtxt>().copied())
-                == Some(self)
-            {
-                None
-            } else {
-                self.user_data.clone()
-            };
+            let user_data = self.user_data.clone();
+
             let has_sax = self.sax.is_some();
             let sax = self.sax.take();
             let (sax, error) = parse_external_entity_private(

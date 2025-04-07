@@ -536,7 +536,8 @@ pub(crate) unsafe fn xml_parse_balanced_chunk_memory_internal(
         if user_data.is_some() {
             (*ctxt).user_data = user_data;
         } else {
-            (*ctxt).user_data = Some(GenericErrorContext::new(ctxt));
+            // (*ctxt).user_data = Some(GenericErrorContext::new(ctxt));
+            (*ctxt).user_data = None;
         }
         if !(*ctxt).dict.is_null() {
             xml_dict_free((*ctxt).dict);

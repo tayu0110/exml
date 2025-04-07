@@ -5,7 +5,7 @@ use crate::{
     error::XmlParserErrors,
     libxml::sax2::xml_sax2_get_entity,
     parser::{
-        XmlParserCtxt, XmlParserCtxtPtr, XmlParserInputState, XmlParserMode, XmlParserOption,
+        XmlParserCtxt, XmlParserInputState, XmlParserMode, XmlParserOption,
         parse_external_entity_private, xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg,
         xml_fatal_err_msg_int, xml_fatal_err_msg_str, xml_is_char,
         xml_parse_balanced_chunk_memory_internal, xml_warning_msg,
@@ -268,14 +268,7 @@ impl XmlParserCtxt {
                 {
                     ent = xml_get_predefined_entity(&name);
                 }
-                if self.well_formed == 1
-                    && ent.is_none()
-                    && self
-                        .user_data
-                        .as_ref()
-                        .and_then(|d| d.lock().downcast_ref::<XmlParserCtxtPtr>().copied())
-                        == Some(self)
-                {
+                if self.well_formed == 1 && ent.is_none() && self.user_data.is_none() {
                     ent = xml_sax2_get_entity(self, &name);
                 }
             }
@@ -462,13 +455,7 @@ impl XmlParserCtxt {
                 if ent.is_none() && self.options & XmlParserOption::XmlParseOldSAX as i32 != 0 {
                     ent = xml_get_predefined_entity(name);
                 }
-                if ent.is_none()
-                    && self
-                        .user_data
-                        .as_ref()
-                        .and_then(|d| d.lock().downcast_ref::<XmlParserCtxtPtr>().copied())
-                        == Some(self)
-                {
+                if ent.is_none() && self.user_data.is_none() {
                     ent = xml_sax2_get_entity(self, name);
                 }
             }
@@ -809,16 +796,7 @@ impl XmlParserCtxt {
                 // This is a bit hackish but this seems the best
                 // way to make sure both SAX and DOM entity support
                 // behaves okay.
-                let user_data = if self
-                    .user_data
-                    .as_ref()
-                    .and_then(|d| d.lock().downcast_ref::<XmlParserCtxtPtr>().copied())
-                    == Some(self)
-                {
-                    None
-                } else {
-                    self.user_data.clone()
-                };
+                let user_data = self.user_data.clone();
 
                 // Avoid overflow as much as possible
                 self.sizeentcopy = 0;
@@ -950,16 +928,7 @@ impl XmlParserCtxt {
                 if was_checked != 0 {
                     // This is a bit hackish but this seems the best
                     // way to make sure both SAX and DOM entity support behaves okay.
-                    let user_data = if self
-                        .user_data
-                        .as_ref()
-                        .and_then(|d| d.lock().downcast_ref::<XmlParserCtxtPtr>().copied())
-                        == Some(self)
-                    {
-                        None
-                    } else {
-                        self.user_data.clone()
-                    };
+                    let user_data = self.user_data.clone();
 
                     if matches!(ent.etype, XmlEntityType::XmlInternalGeneralEntity) {
                         self.depth += 1;
