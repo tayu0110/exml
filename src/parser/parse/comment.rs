@@ -121,7 +121,7 @@ impl XmlParserCtxt {
                 self.skip_char();
                 if self.disable_sax == 0 {
                     if let Some(comment) = self.sax.as_deref_mut().and_then(|sax| sax.comment) {
-                        comment(self.user_data.clone(), buf);
+                        comment(self, buf);
                     }
                 }
             }
@@ -218,7 +218,7 @@ impl XmlParserCtxt {
                                 if let Some(comment) =
                                     self.sax.as_deref_mut().and_then(|sax| sax.comment)
                                 {
-                                    comment(self.user_data.clone(), &buf);
+                                    comment(self, &buf);
                                 }
                             }
                             if !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
@@ -264,9 +264,8 @@ impl XmlParserCtxt {
 mod tests {
     use std::cell::RefCell;
 
-    use crate::{
-        globals::GenericErrorContext,
-        parser::{XmlParserCtxt, XmlSAXHandler, xml_ctxt_read_memory, xml_new_sax_parser_ctxt},
+    use crate::parser::{
+        XmlParserCtxt, XmlSAXHandler, xml_ctxt_read_memory, xml_new_sax_parser_ctxt,
     };
 
     thread_local! {
@@ -276,7 +275,7 @@ mod tests {
     }
 
     fn make_sax_handler_only_comment() -> XmlSAXHandler {
-        fn test_comment(_context: Option<GenericErrorContext>, comment: &str) {
+        fn test_comment(_context: &mut XmlParserCtxt, comment: &str) {
             RESULT.with_borrow_mut(|result| {
                 result.push_str(comment);
             });

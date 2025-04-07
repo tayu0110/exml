@@ -155,7 +155,7 @@ impl XmlParserCtxt {
                                 .as_deref_mut()
                                 .and_then(|sax| sax.processing_instruction)
                             {
-                                processing_instruction(self.user_data.clone(), &target, None);
+                                processing_instruction(self, &target, None);
                             }
                         }
                         if !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
@@ -227,7 +227,7 @@ impl XmlParserCtxt {
                                 .as_deref_mut()
                                 .and_then(|sax| sax.processing_instruction)
                             {
-                                processing_instruction(self.user_data.clone(), &target, Some(&buf));
+                                processing_instruction(self, &target, Some(&buf));
                             }
                         }
                     }

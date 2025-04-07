@@ -66,7 +66,8 @@ use crate::{
     parser::{
         CDATABlockSAXFunc, CharactersSAXFunc, EndElementNsSAX2Func, EndElementSAXFunc,
         StartElementNsSAX2Func, StartElementSAXFunc, XML_COMPLETE_ATTRS, XML_DETECT_IDS,
-        XML_SAX2_MAGIC, XmlParserCtxtPtr, XmlParserMode, XmlParserOption, XmlSAXHandler,
+        XML_SAX2_MAGIC, XmlParserCtxt, XmlParserCtxtPtr, XmlParserMode, XmlParserOption,
+        XmlSAXHandler,
     },
     tree::{
         __XML_REGISTER_CALLBACKS, XmlElementType, XmlGenericNodePtr, XmlNodePtr, xml_copy_dtd,
@@ -3779,24 +3780,20 @@ const NODE_IS_SPRESERVED: i32 = 0x4;
 /// called when an opening tag has been processed.
 #[doc(alias = "xmlTextReaderStartElement")]
 unsafe fn xml_text_reader_start_element(
-    ctx: Option<GenericErrorContext>,
+    ctxt: &mut XmlParserCtxt,
     fullname: &str,
     atts: &[(String, Option<String>)],
 ) {
     unsafe {
-        let ctxt = {
-            let ctx = ctx.as_ref().unwrap();
-            let lock = ctx.lock();
-            *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
-        };
-        let reader: XmlTextReaderPtr = (*ctxt)._private as _;
+        let reader: XmlTextReaderPtr = ctxt._private as _;
 
         if !reader.is_null() {
             if let Some(start_element) = (*reader).start_element {
-                start_element(ctx, fullname, atts);
-                if let Some(mut node) = (*ctxt).node.filter(|_| {
-                    (*ctxt).input().is_some() && (*ctxt).content_bytes().starts_with(b"/>")
-                }) {
+                start_element(ctxt, fullname, atts);
+                if let Some(mut node) = ctxt
+                    .node
+                    .filter(|_| ctxt.input().is_some() && ctxt.content_bytes().starts_with(b"/>"))
+                {
                     node.extra = NODE_IS_EMPTY as _;
                 }
             }
@@ -3809,18 +3806,13 @@ unsafe fn xml_text_reader_start_element(
 
 /// called when an ending tag has been processed.
 #[doc(alias = "xmlTextReaderEndElement")]
-unsafe fn xml_text_reader_end_element(ctx: Option<GenericErrorContext>, fullname: &str) {
+unsafe fn xml_text_reader_end_element(ctxt: &mut XmlParserCtxt, fullname: &str) {
     unsafe {
-        let ctxt = {
-            let ctx = ctx.as_ref().unwrap();
-            let lock = ctx.lock();
-            *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
-        };
-        let reader: XmlTextReaderPtr = (*ctxt)._private as _;
+        let reader: XmlTextReaderPtr = ctxt._private as _;
 
         if !reader.is_null() {
             if let Some(end_element) = (*reader).end_element {
-                end_element(ctx, fullname);
+                end_element(ctxt, fullname);
             }
         }
     }
@@ -3829,9 +3821,8 @@ unsafe fn xml_text_reader_end_element(ctx: Option<GenericErrorContext>, fullname
 /// Called when an opening tag has been processed.
 #[doc(alias = "xmlTextReaderStartElementNs")]
 #[allow(clippy::too_many_arguments)]
-// #[allow(clippy::type_complexity)]
 unsafe fn xml_text_reader_start_element_ns(
-    ctx: Option<GenericErrorContext>,
+    ctxt: &mut XmlParserCtxt,
     localname: &str,
     prefix: Option<&str>,
     uri: Option<&str>,
@@ -3840,17 +3831,12 @@ unsafe fn xml_text_reader_start_element_ns(
     attributes: &[(String, Option<String>, Option<String>, String)],
 ) {
     unsafe {
-        let ctxt = {
-            let ctx = ctx.as_ref().unwrap();
-            let lock = ctx.lock();
-            *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
-        };
-        let reader: XmlTextReaderPtr = (*ctxt)._private as _;
+        let reader: XmlTextReaderPtr = ctxt._private as _;
 
         if !reader.is_null() {
             if let Some(start_element_ns) = (*reader).start_element_ns {
                 start_element_ns(
-                    ctx,
+                    ctxt,
                     localname,
                     prefix,
                     uri,
@@ -3858,9 +3844,10 @@ unsafe fn xml_text_reader_start_element_ns(
                     nb_defaulted,
                     attributes,
                 );
-                if let Some(mut node) = (*ctxt).node.filter(|_| {
-                    (*ctxt).input().is_some() && (*ctxt).content_bytes().starts_with(b"/>")
-                }) {
+                if let Some(mut node) = ctxt
+                    .node
+                    .filter(|_| ctxt.input().is_some() && ctxt.content_bytes().starts_with(b"/>"))
+                {
                     node.extra = NODE_IS_EMPTY as _;
                 }
             }
@@ -3874,22 +3861,17 @@ unsafe fn xml_text_reader_start_element_ns(
 /// Called when an ending tag has been processed.
 #[doc(alias = "xmlTextReaderEndElementNs")]
 unsafe fn xml_text_reader_end_element_ns(
-    ctx: Option<GenericErrorContext>,
+    ctxt: &mut XmlParserCtxt,
     localname: &str,
     prefix: Option<&str>,
     uri: Option<&str>,
 ) {
     unsafe {
-        let ctxt = {
-            let ctx = ctx.as_ref().unwrap();
-            let lock = ctx.lock();
-            *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
-        };
-        let reader: XmlTextReaderPtr = (*ctxt)._private as _;
+        let reader: XmlTextReaderPtr = ctxt._private as _;
 
         if !reader.is_null() {
             if let Some(end_element_ns) = (*reader).end_element_ns {
-                end_element_ns(ctx, localname, prefix, uri);
+                end_element_ns(ctxt, localname, prefix, uri);
             }
         }
     }
@@ -3897,18 +3879,13 @@ unsafe fn xml_text_reader_end_element_ns(
 
 /// Receiving some chars from the parser.
 #[doc(alias = "xmlTextReaderCharacters")]
-unsafe fn xml_text_reader_characters(ctx: Option<GenericErrorContext>, ch: &str) {
+unsafe fn xml_text_reader_characters(ctxt: &mut XmlParserCtxt, ch: &str) {
     unsafe {
-        let ctxt = {
-            let ctx = ctx.as_ref().unwrap();
-            let lock = ctx.lock();
-            *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
-        };
-        let reader: XmlTextReaderPtr = (*ctxt)._private as _;
+        let reader: XmlTextReaderPtr = ctxt._private as _;
 
         if !reader.is_null() {
             if let Some(characters) = (*reader).characters {
-                characters(ctx, ch);
+                characters(ctxt, ch);
             }
         }
     }
@@ -3916,18 +3893,13 @@ unsafe fn xml_text_reader_characters(ctx: Option<GenericErrorContext>, ch: &str)
 
 /// Called when a pcdata block has been parsed
 #[doc(alias = "xmlTextReaderCDataBlock")]
-unsafe fn xml_text_reader_cdata_block(ctx: Option<GenericErrorContext>, ch: &str) {
+unsafe fn xml_text_reader_cdata_block(ctxt: &mut XmlParserCtxt, ch: &str) {
     unsafe {
-        let ctxt = {
-            let ctx = ctx.as_ref().unwrap();
-            let lock = ctx.lock();
-            *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
-        };
-        let reader: XmlTextReaderPtr = (*ctxt)._private as _;
+        let reader: XmlTextReaderPtr = ctxt._private as _;
 
         if !reader.is_null() {
             if let Some(cdata_block) = (*reader).cdata_block {
-                cdata_block(ctx, ch);
+                cdata_block(ctxt, ch);
             }
         }
     }

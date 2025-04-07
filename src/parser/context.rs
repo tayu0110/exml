@@ -181,9 +181,9 @@ pub struct XmlParserCtxt {
 
     // Node name stack
     // Current parsed Node
-    pub(crate) name: Option<String>,
+    pub(crate) name: Option<Rc<str>>,
     // array of nodes
-    pub(crate) name_tab: Vec<String>,
+    pub(crate) name_tab: Vec<Rc<str>>,
 
     // unused
     nb_chars: i64,
@@ -196,11 +196,11 @@ pub struct XmlParserCtxt {
     // Parsing is in int 1/ext 2 subset
     pub in_subset: i32,
     // name of subset
-    pub(crate) int_sub_name: Option<String>,
+    pub(crate) int_sub_name: Option<Rc<str>>,
     // URI of external subset
-    pub(crate) ext_sub_uri: Option<String>,
+    pub(crate) ext_sub_uri: Option<Rc<str>>,
     // SYSTEM ID of external subset
-    pub(crate) ext_sub_system: Option<String>,
+    pub(crate) ext_sub_system: Option<Rc<str>>,
 
     // xml:space values
     // array of space infos
@@ -1108,7 +1108,7 @@ impl XmlParserCtxt {
     ///
     /// Returns the name just removed
     #[doc(alias = "namePop")]
-    pub(crate) fn name_pop(&mut self) -> Option<String> {
+    pub(crate) fn name_pop(&mut self) -> Option<Rc<str>> {
         let res = self.name_tab.pop();
         let name = self.name_tab.last().cloned();
         self.name = name;
@@ -1146,13 +1146,14 @@ impl XmlParserCtxt {
         line: i32,
         ns_nr: i32,
     ) -> i32 {
-        self.name_tab.push(value.to_owned());
-        self.name = Some(value.to_owned());
+        let name: Rc<str> = value.into();
+        self.name = Some(name.clone());
+        self.name_tab.push(name);
         self.push_tab
             .resize(self.name_tab.len(), XmlStartTag::default());
         let res = self.name_tab.len() - 1;
-        self.push_tab[res].prefix = prefix.map(|pre| pre.to_owned());
-        self.push_tab[res].uri = uri.map(|uri| uri.to_owned());
+        self.push_tab[res].prefix = prefix.map(|pre| pre.into());
+        self.push_tab[res].uri = uri.map(|uri| uri.into());
         self.push_tab[res].line = line;
         self.push_tab[res].ns_nr = ns_nr;
         res as i32
@@ -1163,7 +1164,7 @@ impl XmlParserCtxt {
     /// Returns the name just removed
     #[doc(alias = "nameNsPop")]
     #[cfg(feature = "libxml_push")]
-    pub(crate) fn name_ns_pop(&mut self) -> Option<String> {
+    pub(crate) fn name_ns_pop(&mut self) -> Option<Rc<str>> {
         let res = self.name_tab.pop();
         self.name = self.name_tab.last().cloned();
         res

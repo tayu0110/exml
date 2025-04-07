@@ -102,8 +102,8 @@ use crate::{
         },
     },
     parser::{
-        XML_SAX2_MAGIC, XmlParserCtxtPtr, XmlParserInput, XmlParserOption, XmlSAXHandler,
-        XmlSAXLocatorPtr, split_qname2, xml_ctxt_read_file, xml_ctxt_read_memory,
+        XML_SAX2_MAGIC, XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput, XmlParserOption,
+        XmlSAXHandler, XmlSAXLocatorPtr, split_qname2, xml_ctxt_read_file, xml_ctxt_read_memory,
         xml_free_parser_ctxt, xml_new_parser_ctxt, xml_new_sax_parser_ctxt,
     },
     tree::{
@@ -18884,7 +18884,7 @@ pub struct XmlSchemaSAXPlugStruct {
 }
 
 unsafe fn xml_schema_sax_handle_start_element_ns(
-    ctx: Option<GenericErrorContext>,
+    ctxt: &mut XmlParserCtxt,
     localname: &str,
     _prefix: Option<&str>,
     uri: Option<&str>,
@@ -18893,9 +18893,10 @@ unsafe fn xml_schema_sax_handle_start_element_ns(
     attributes: &[(String, Option<String>, Option<String>, String)],
 ) {
     unsafe {
-        let ctx = ctx.unwrap();
-        let lock = ctx.lock();
-        let vctxt = *lock.downcast_ref::<XmlSchemaValidCtxtPtr>().unwrap();
+        let user_data = ctxt.user_data.clone().unwrap();
+        let lock = user_data.lock();
+        let plug = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
+        let vctxt = (*plug).ctxt;
         let mut ret: i32;
 
         // SAX VAL TODO: What to do with nb_defaulted?
@@ -19052,15 +19053,16 @@ unsafe fn xml_schema_sax_handle_start_element_ns(
 }
 
 unsafe fn xml_schema_sax_handle_end_element_ns(
-    ctx: Option<GenericErrorContext>,
+    ctxt: &mut XmlParserCtxt,
     localname: &str,
     _prefix: Option<&str>,
     uri: Option<&str>,
 ) {
     unsafe {
-        let ctx = ctx.unwrap();
-        let lock = ctx.lock();
-        let vctxt = *lock.downcast_ref::<XmlSchemaValidCtxtPtr>().unwrap();
+        let user_data = ctxt.user_data.clone().unwrap();
+        let lock = user_data.lock();
+        let plug = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
+        let vctxt = (*plug).ctxt;
 
         // Skip elements if inside a "skip" wildcard or if invalid.
         if (*vctxt).skip_depth != -1 {
@@ -19097,11 +19099,12 @@ unsafe fn xml_schema_sax_handle_end_element_ns(
 }
 
 // Process text content.
-unsafe fn xml_schema_sax_handle_text(ctx: Option<GenericErrorContext>, ch: &str) {
+unsafe fn xml_schema_sax_handle_text(ctxt: &mut XmlParserCtxt, ch: &str) {
     unsafe {
-        let ctx = ctx.unwrap();
-        let lock = ctx.lock();
-        let vctxt = *lock.downcast_ref::<XmlSchemaValidCtxtPtr>().unwrap();
+        let user_data = ctxt.user_data.clone().unwrap();
+        let lock = user_data.lock();
+        let plug = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
+        let vctxt = (*plug).ctxt;
 
         if (*vctxt).depth < 0 {
             return;
@@ -19132,11 +19135,12 @@ unsafe fn xml_schema_sax_handle_text(ctx: Option<GenericErrorContext>, ch: &str)
 }
 
 // Process CDATA content.
-unsafe fn xml_schema_sax_handle_cdata_section(ctx: Option<GenericErrorContext>, ch: &str) {
+unsafe fn xml_schema_sax_handle_cdata_section(ctxt: &mut XmlParserCtxt, ch: &str) {
     unsafe {
-        let ctx = ctx.unwrap();
-        let lock = ctx.lock();
-        let vctxt = *lock.downcast_ref::<XmlSchemaValidCtxtPtr>().unwrap();
+        let user_data = ctxt.user_data.clone().unwrap();
+        let lock = user_data.lock();
+        let plug = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
+        let vctxt = (*plug).ctxt;
 
         if (*vctxt).depth < 0 {
             return;
@@ -19166,12 +19170,12 @@ unsafe fn xml_schema_sax_handle_cdata_section(ctx: Option<GenericErrorContext>, 
     }
 }
 
-unsafe fn xml_schema_sax_handle_reference(ctx: Option<GenericErrorContext>, _name: &str) {
+unsafe fn xml_schema_sax_handle_reference(ctxt: &mut XmlParserCtxt, _name: &str) {
     unsafe {
-        let ctx = ctx.unwrap();
-        let lock = ctx.lock();
-        let vctxt = *lock.downcast_ref::<XmlSchemaValidCtxtPtr>().unwrap();
-
+        let user_data = ctxt.user_data.clone().unwrap();
+        let lock = user_data.lock();
+        let plug = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
+        let vctxt = (*plug).ctxt;
         if (*vctxt).depth < 0 {
             return;
         }
@@ -19185,75 +19189,75 @@ unsafe fn xml_schema_sax_handle_reference(ctx: Option<GenericErrorContext>, _nam
 
 // All those functions just bounces to the user provided SAX handlers
 unsafe fn internal_subset_split(
-    ctx: Option<GenericErrorContext>,
+    ctxt: &mut XmlParserCtxt,
     name: Option<&str>,
     external_id: Option<&str>,
     system_id: Option<&str>,
 ) {
     unsafe {
-        let ctx = ctx.unwrap();
-        let lock = ctx.lock();
-        let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-        if !ctxt.is_null() {
-            if let Some(internal_subset) = (*ctxt)
+        let user_data = ctxt.user_data.clone().unwrap();
+        let lock = user_data.lock();
+        let plug = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
+        if !plug.is_null() {
+            if let Some(internal_subset) = (*plug)
                 .user_sax
                 .as_deref_mut()
                 .and_then(|sax| sax.internal_subset)
             {
-                internal_subset((*ctxt).user_data.clone(), name, external_id, system_id);
+                internal_subset(ctxt, name, external_id, system_id);
             }
         }
     }
 }
 
-unsafe fn is_standalone_split(ctx: Option<GenericErrorContext>) -> i32 {
+unsafe fn is_standalone_split(ctxt: &mut XmlParserCtxt) -> i32 {
     unsafe {
-        let ctx = ctx.unwrap();
-        let lock = ctx.lock();
-        let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-        if !ctxt.is_null() {
-            if let Some(is_standalone) = (*ctxt)
+        let user_data = ctxt.user_data.clone().unwrap();
+        let lock = user_data.lock();
+        let plug = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
+        if !plug.is_null() {
+            if let Some(is_standalone) = (*plug)
                 .user_sax
                 .as_deref_mut()
                 .and_then(|sax| sax.is_standalone)
             {
-                return is_standalone((*ctxt).user_data.clone());
+                return is_standalone(ctxt);
             }
         }
         0
     }
 }
 
-unsafe fn has_internal_subset_split(ctx: Option<GenericErrorContext>) -> i32 {
+unsafe fn has_internal_subset_split(ctxt: &mut XmlParserCtxt) -> i32 {
     unsafe {
-        let ctx = ctx.unwrap();
-        let lock = ctx.lock();
-        let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-        if !ctxt.is_null() {
-            if let Some(has_internal_subset) = (*ctxt)
+        let user_data = ctxt.user_data.clone().unwrap();
+        let lock = user_data.lock();
+        let plug = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
+        if !plug.is_null() {
+            if let Some(has_internal_subset) = (*plug)
                 .user_sax
                 .as_deref_mut()
                 .and_then(|sax| sax.has_internal_subset)
             {
-                return has_internal_subset((*ctxt).user_data.clone());
+                return has_internal_subset(ctxt);
             }
         }
         0
     }
 }
 
-unsafe fn has_external_subset_split(ctx: Option<GenericErrorContext>) -> i32 {
+unsafe fn has_external_subset_split(ctxt: &mut XmlParserCtxt) -> i32 {
     unsafe {
-        let ctx = ctx.unwrap();
-        let lock = ctx.lock();
-        let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-        if !ctxt.is_null() {
-            if let Some(has_external_subset) = (*ctxt)
+        let user_data = ctxt.user_data.clone().unwrap();
+        let lock = user_data.lock();
+        let plug = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
+        if !plug.is_null() {
+            if let Some(has_external_subset) = (*plug)
                 .user_sax
                 .as_deref_mut()
                 .and_then(|sax| sax.has_external_subset)
             {
-                return has_external_subset((*ctxt).user_data.clone());
+                return has_external_subset(ctxt);
             }
         }
         0
@@ -19261,82 +19265,79 @@ unsafe fn has_external_subset_split(ctx: Option<GenericErrorContext>) -> i32 {
 }
 
 unsafe fn external_subset_split(
-    ctx: Option<GenericErrorContext>,
+    ctxt: &mut XmlParserCtxt,
     name: Option<&str>,
     external_id: Option<&str>,
     system_id: Option<&str>,
 ) {
     unsafe {
-        let ctx = ctx.unwrap();
-        let lock = ctx.lock();
-        let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-        if !ctxt.is_null() {
-            if let Some(external_subset) = (*ctxt)
+        let user_data = ctxt.user_data.clone().unwrap();
+        let lock = user_data.lock();
+        let plug = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
+        if !plug.is_null() {
+            if let Some(external_subset) = (*plug)
                 .user_sax
                 .as_deref_mut()
                 .and_then(|sax| sax.external_subset)
             {
-                external_subset((*ctxt).user_data.clone(), name, external_id, system_id);
+                external_subset(ctxt, name, external_id, system_id);
             }
         }
     }
 }
 
 unsafe fn resolve_entity_split(
-    ctx: Option<GenericErrorContext>,
+    ctxt: &mut XmlParserCtxt,
     public_id: Option<&str>,
     system_id: Option<&str>,
 ) -> Option<XmlParserInput> {
     unsafe {
-        let ctx = ctx.unwrap();
-        let lock = ctx.lock();
-        let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-        if !ctxt.is_null() {
-            if let Some(resolve_entity) = (*ctxt)
+        let user_data = ctxt.user_data.clone().unwrap();
+        let lock = user_data.lock();
+        let plug = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
+        if !plug.is_null() {
+            if let Some(resolve_entity) = (*plug)
                 .user_sax
                 .as_deref_mut()
                 .and_then(|sax| sax.resolve_entity)
             {
-                return resolve_entity((*ctxt).user_data.clone(), public_id, system_id);
+                return resolve_entity(ctxt, public_id, system_id);
             }
         }
         None
     }
 }
 
-unsafe fn get_entity_split(ctx: Option<GenericErrorContext>, name: &str) -> Option<XmlEntityPtr> {
+unsafe fn get_entity_split(ctxt: &mut XmlParserCtxt, name: &str) -> Option<XmlEntityPtr> {
     unsafe {
-        let ctx = ctx.unwrap();
-        let lock = ctx.lock();
-        let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-        if !ctxt.is_null() {
-            if let Some(get_entity) = (*ctxt)
+        let user_data = ctxt.user_data.clone().unwrap();
+        let lock = user_data.lock();
+        let plug = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
+        if !plug.is_null() {
+            if let Some(get_entity) = (*plug)
                 .user_sax
                 .as_deref_mut()
                 .and_then(|sax| sax.get_entity)
             {
-                return get_entity((*ctxt).user_data.clone(), name);
+                return get_entity(ctxt, name);
             }
         }
         None
     }
 }
 
-unsafe fn get_parameter_entity_split(
-    ctx: Option<GenericErrorContext>,
-    name: &str,
-) -> Option<XmlEntityPtr> {
+unsafe fn get_parameter_entity_split(ctxt: &mut XmlParserCtxt, name: &str) -> Option<XmlEntityPtr> {
     unsafe {
-        let ctx = ctx.unwrap();
-        let lock = ctx.lock();
-        let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-        if !ctxt.is_null() {
-            if let Some(get_parameter_entity) = (*ctxt)
+        let user_data = ctxt.user_data.clone().unwrap();
+        let lock = user_data.lock();
+        let plug = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
+        if !plug.is_null() {
+            if let Some(get_parameter_entity) = (*plug)
                 .user_sax
                 .as_deref_mut()
                 .and_then(|sax| sax.get_parameter_entity)
             {
-                return get_parameter_entity((*ctxt).user_data.clone(), name);
+                return get_parameter_entity(ctxt, name);
             }
         }
         None
@@ -19344,7 +19345,7 @@ unsafe fn get_parameter_entity_split(
 }
 
 unsafe fn entity_decl_split(
-    ctx: Option<GenericErrorContext>,
+    ctxt: &mut XmlParserCtxt,
     name: &str,
     typ: XmlEntityType,
     public_id: Option<&str>,
@@ -19352,30 +19353,23 @@ unsafe fn entity_decl_split(
     content: Option<&str>,
 ) {
     unsafe {
-        let ctx = ctx.unwrap();
-        let lock = ctx.lock();
-        let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-        if !ctxt.is_null() {
-            if let Some(entity_decl) = (*ctxt)
+        let user_data = ctxt.user_data.clone().unwrap();
+        let lock = user_data.lock();
+        let plug = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
+        if !plug.is_null() {
+            if let Some(entity_decl) = (*plug)
                 .user_sax
                 .as_deref_mut()
                 .and_then(|sax| sax.entity_decl)
             {
-                entity_decl(
-                    (*ctxt).user_data.clone(),
-                    name,
-                    typ,
-                    public_id,
-                    system_id,
-                    content,
-                );
+                entity_decl(ctxt, name, typ, public_id, system_id, content);
             }
         }
     }
 }
 
 unsafe fn attribute_decl_split(
-    ctx: Option<GenericErrorContext>,
+    ctxt: &mut XmlParserCtxt,
     elem: &str,
     name: &str,
     typ: XmlAttributeType,
@@ -19384,182 +19378,164 @@ unsafe fn attribute_decl_split(
     tree: Option<Box<XmlEnumeration>>,
 ) {
     unsafe {
-        let ctx = ctx.unwrap();
-        let lock = ctx.lock();
-        let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-        if !ctxt.is_null() {
-            if let Some(attribute_decl) = (*ctxt)
+        let user_data = ctxt.user_data.clone().unwrap();
+        let lock = user_data.lock();
+        let plug = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
+        if !plug.is_null() {
+            if let Some(attribute_decl) = (*plug)
                 .user_sax
                 .as_deref_mut()
                 .and_then(|sax| sax.attribute_decl)
             {
-                attribute_decl(
-                    (*ctxt).user_data.clone(),
-                    elem,
-                    name,
-                    typ,
-                    def,
-                    default_value,
-                    tree,
-                );
+                attribute_decl(ctxt, elem, name, typ, def, default_value, tree);
             }
         }
     }
 }
 
 unsafe fn element_decl_split(
-    ctx: Option<GenericErrorContext>,
+    ctxt: &mut XmlParserCtxt,
     name: &str,
     typ: Option<XmlElementTypeVal>,
     content: XmlElementContentPtr,
 ) {
     unsafe {
-        let ctx = ctx.unwrap();
-        let lock = ctx.lock();
-        let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-        if !ctxt.is_null() {
-            if let Some(element_decl) = (*ctxt)
+        let user_data = ctxt.user_data.clone().unwrap();
+        let lock = user_data.lock();
+        let plug = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
+        if !plug.is_null() {
+            if let Some(element_decl) = (*plug)
                 .user_sax
                 .as_deref_mut()
                 .and_then(|sax| sax.element_decl)
             {
-                element_decl((*ctxt).user_data.clone(), name, typ, content);
+                element_decl(ctxt, name, typ, content);
             }
         }
     }
 }
 
 unsafe fn notation_decl_split(
-    ctx: Option<GenericErrorContext>,
+    ctxt: &mut XmlParserCtxt,
     name: &str,
     public_id: Option<&str>,
     system_id: Option<&str>,
 ) {
     unsafe {
-        let ctx = ctx.unwrap();
-        let lock = ctx.lock();
-        let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-        if !ctxt.is_null() {
-            if let Some(notation_decl) = (*ctxt)
+        let user_data = ctxt.user_data.clone().unwrap();
+        let lock = user_data.lock();
+        let plug = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
+        if !plug.is_null() {
+            if let Some(notation_decl) = (*plug)
                 .user_sax
                 .as_deref_mut()
                 .and_then(|sax| sax.notation_decl)
             {
-                notation_decl((*ctxt).user_data.clone(), name, public_id, system_id);
+                notation_decl(ctxt, name, public_id, system_id);
             }
         }
     }
 }
 
 unsafe fn unparsed_entity_decl_split(
-    ctx: Option<GenericErrorContext>,
+    ctxt: &mut XmlParserCtxt,
     name: &str,
     public_id: Option<&str>,
     system_id: Option<&str>,
     notation_name: Option<&str>,
 ) {
     unsafe {
-        let ctx = ctx.unwrap();
-        let lock = ctx.lock();
-        let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-        if !ctxt.is_null() {
-            if let Some(unparsed_entity_decl) = (*ctxt)
+        let user_data = ctxt.user_data.clone().unwrap();
+        let lock = user_data.lock();
+        let plug = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
+        if !plug.is_null() {
+            if let Some(unparsed_entity_decl) = (*plug)
                 .user_sax
                 .as_deref_mut()
                 .and_then(|sax| sax.unparsed_entity_decl)
             {
-                unparsed_entity_decl(
-                    (*ctxt).user_data.clone(),
-                    name,
-                    public_id,
-                    system_id,
-                    notation_name,
-                );
+                unparsed_entity_decl(ctxt, name, public_id, system_id, notation_name);
             }
         }
     }
 }
 
-unsafe fn set_document_locator_split(ctx: Option<GenericErrorContext>, loc: XmlSAXLocatorPtr) {
+unsafe fn set_document_locator_split(ctxt: &mut XmlParserCtxt, loc: XmlSAXLocatorPtr) {
     unsafe {
-        let ctx = ctx.unwrap();
-        let lock = ctx.lock();
-        let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-        if !ctxt.is_null() {
-            if let Some(set_document_locator) = (*ctxt)
+        let user_data = ctxt.user_data.clone().unwrap();
+        let lock = user_data.lock();
+        let plug = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
+        if !plug.is_null() {
+            if let Some(set_document_locator) = (*plug)
                 .user_sax
                 .as_deref_mut()
                 .and_then(|sax| sax.set_document_locator)
             {
-                set_document_locator((*ctxt).user_data.clone(), loc);
+                set_document_locator(ctxt, loc);
             }
         }
     }
 }
 
-unsafe fn start_document_split(ctx: Option<GenericErrorContext>) {
+unsafe fn start_document_split(ctxt: &mut XmlParserCtxt) {
     unsafe {
-        let ctx = ctx.unwrap();
-        let lock = ctx.lock();
-        let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-        if !ctxt.is_null() {
-            if let Some(start_document) = (*ctxt)
+        let user_data = ctxt.user_data.clone().unwrap();
+        let lock = user_data.lock();
+        let plug = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
+        if !plug.is_null() {
+            if let Some(start_document) = (*plug)
                 .user_sax
                 .as_deref_mut()
                 .and_then(|sax| sax.start_document)
             {
-                start_document((*ctxt).user_data.clone());
+                start_document(ctxt);
             }
         }
     }
 }
 
-unsafe fn end_document_split(ctx: Option<GenericErrorContext>) {
+unsafe fn end_document_split(ctxt: &mut XmlParserCtxt) {
     unsafe {
-        let ctx = ctx.unwrap();
-        let lock = ctx.lock();
-        let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-        if !ctxt.is_null() {
-            if let Some(end_document) = (*ctxt)
+        let user_data = ctxt.user_data.clone().unwrap();
+        let lock = user_data.lock();
+        let plug = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
+        if !plug.is_null() {
+            if let Some(end_document) = (*plug)
                 .user_sax
                 .as_deref_mut()
                 .and_then(|sax| sax.end_document)
             {
-                end_document((*ctxt).user_data.clone());
+                end_document(ctxt);
             }
         }
     }
 }
 
-unsafe fn processing_instruction_split(
-    ctx: Option<GenericErrorContext>,
-    target: &str,
-    data: Option<&str>,
-) {
+unsafe fn processing_instruction_split(ctxt: &mut XmlParserCtxt, target: &str, data: Option<&str>) {
     unsafe {
-        let ctx = ctx.unwrap();
-        let lock = ctx.lock();
-        let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-        if !ctxt.is_null() {
-            if let Some(processing_instruction) = (*ctxt)
+        let user_data = ctxt.user_data.clone().unwrap();
+        let lock = user_data.lock();
+        let plug = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
+        if !plug.is_null() {
+            if let Some(processing_instruction) = (*plug)
                 .user_sax
                 .as_deref_mut()
                 .and_then(|sax| sax.processing_instruction)
             {
-                processing_instruction((*ctxt).user_data.clone(), target, data);
+                processing_instruction(ctxt, target, data);
             }
         }
     }
 }
 
-unsafe fn comment_split(ctx: Option<GenericErrorContext>, value: &str) {
+unsafe fn comment_split(ctxt: &mut XmlParserCtxt, value: &str) {
     unsafe {
-        let ctx = ctx.unwrap();
-        let lock = ctx.lock();
-        let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-        if !ctxt.is_null() {
-            if let Some(comment) = (*ctxt).user_sax.as_deref_mut().and_then(|sax| sax.comment) {
-                comment((*ctxt).user_data.clone(), value);
+        let user_data = ctxt.user_data.clone().unwrap();
+        let lock = user_data.lock();
+        let plug = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
+        if !plug.is_null() {
+            if let Some(comment) = (*plug).user_sax.as_deref_mut().and_then(|sax| sax.comment) {
+                comment(ctxt, value);
             }
         }
     }
@@ -19587,95 +19563,92 @@ fn fatal_error_split(_ctx: Option<GenericErrorContext>, _msg: &str) {
 }
 
 // Those are function where both the user handler and the schemas handler need to be called.
-unsafe fn characters_split(ctx: Option<GenericErrorContext>, ch: &str) {
+unsafe fn characters_split(ctxt: &mut XmlParserCtxt, ch: &str) {
     unsafe {
-        let ctx = ctx.unwrap();
-        let lock = ctx.lock();
-        let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-        if ctxt.is_null() {
+        let user_data = ctxt.user_data.clone().unwrap();
+        let lock = user_data.lock();
+        let plug = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
+        if plug.is_null() {
             return;
         }
-        if let Some(characters) = (*ctxt)
+        if let Some(characters) = (*plug)
             .user_sax
             .as_deref_mut()
             .and_then(|sax| sax.characters)
         {
-            characters((*ctxt).user_data.clone(), ch);
+            characters(ctxt, ch);
         }
-        if !(*ctxt).ctxt.is_null() {
-            xml_schema_sax_handle_text(Some(GenericErrorContext::new((*ctxt).ctxt)), ch);
+        if !(*plug).ctxt.is_null() {
+            xml_schema_sax_handle_text(ctxt, ch);
         }
     }
 }
 
-unsafe fn ignorable_whitespace_split(ctx: Option<GenericErrorContext>, ch: &str) {
+unsafe fn ignorable_whitespace_split(ctxt: &mut XmlParserCtxt, ch: &str) {
     unsafe {
-        let ctx = ctx.unwrap();
-        let lock = ctx.lock();
-        let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-        if ctxt.is_null() {
+        let user_data = ctxt.user_data.clone().unwrap();
+        let lock = user_data.lock();
+        let plug = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
+        if plug.is_null() {
             return;
         }
-        if let Some(ignorable_whitespace) = (*ctxt)
+        if let Some(ignorable_whitespace) = (*plug)
             .user_sax
             .as_deref_mut()
             .and_then(|sax| sax.ignorable_whitespace)
         {
-            ignorable_whitespace((*ctxt).user_data.clone(), ch);
+            ignorable_whitespace(ctxt, ch);
         }
-        if !(*ctxt).ctxt.is_null() {
-            xml_schema_sax_handle_text(Some(GenericErrorContext::new((*ctxt).ctxt)), ch);
+        if !(*plug).ctxt.is_null() {
+            xml_schema_sax_handle_text(ctxt, ch);
         }
     }
 }
 
-unsafe fn cdata_block_split(ctx: Option<GenericErrorContext>, value: &str) {
+unsafe fn cdata_block_split(ctxt: &mut XmlParserCtxt, value: &str) {
     unsafe {
-        let ctx = ctx.unwrap();
-        let lock = ctx.lock();
-        let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-        if ctxt.is_null() {
+        let user_data = ctxt.user_data.clone().unwrap();
+        let lock = user_data.lock();
+        let plug = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
+        if plug.is_null() {
             return;
         }
-        if let Some(cdata_block) = (*ctxt)
+        if let Some(cdata_block) = (*plug)
             .user_sax
             .as_deref_mut()
             .and_then(|sax| sax.cdata_block)
         {
-            cdata_block((*ctxt).user_data.clone(), value);
+            cdata_block(ctxt, value);
         }
-        if !(*ctxt).ctxt.is_null() {
-            xml_schema_sax_handle_cdata_section(
-                Some(GenericErrorContext::new((*ctxt).ctxt)),
-                value,
-            );
+        if !(*plug).ctxt.is_null() {
+            xml_schema_sax_handle_cdata_section(ctxt, value);
         }
     }
 }
 
-unsafe fn reference_split(ctx: Option<GenericErrorContext>, name: &str) {
+unsafe fn reference_split(ctxt: &mut XmlParserCtxt, name: &str) {
     unsafe {
-        let ctx = ctx.unwrap();
-        let lock = ctx.lock();
-        let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-        if ctxt.is_null() {
+        let user_data = ctxt.user_data.clone().unwrap();
+        let lock = user_data.lock();
+        let plug = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
+        if plug.is_null() {
             return;
         }
-        if let Some(reference) = (*ctxt)
+        if let Some(reference) = (*plug)
             .user_sax
             .as_deref_mut()
             .and_then(|sax| sax.reference)
         {
-            reference((*ctxt).user_data.clone(), name);
+            reference(ctxt, name);
         }
-        if !(*ctxt).ctxt.is_null() {
-            xml_schema_sax_handle_reference((*ctxt).user_data.clone(), name);
+        if !(*plug).ctxt.is_null() {
+            xml_schema_sax_handle_reference(ctxt, name);
         }
     }
 }
 
 unsafe fn start_element_ns_split(
-    ctx: Option<GenericErrorContext>,
+    ctxt: &mut XmlParserCtxt,
     localname: &str,
     prefix: Option<&str>,
     uri: Option<&str>,
@@ -19684,19 +19657,19 @@ unsafe fn start_element_ns_split(
     attributes: &[(String, Option<String>, Option<String>, String)],
 ) {
     unsafe {
-        let ctx = ctx.unwrap();
-        let lock = ctx.lock();
-        let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-        if ctxt.is_null() {
+        let user_data = ctxt.user_data.clone().unwrap();
+        let lock = user_data.lock();
+        let plug = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
+        if plug.is_null() {
             return;
         }
-        if let Some(start_element_ns) = (*ctxt)
+        if let Some(start_element_ns) = (*plug)
             .user_sax
             .as_deref_mut()
             .and_then(|sax| sax.start_element_ns)
         {
             start_element_ns(
-                (*ctxt).user_data.clone(),
+                ctxt,
                 localname,
                 prefix,
                 uri,
@@ -19705,9 +19678,9 @@ unsafe fn start_element_ns_split(
                 attributes,
             );
         }
-        if !(*ctxt).ctxt.is_null() {
+        if !(*plug).ctxt.is_null() {
             xml_schema_sax_handle_start_element_ns(
-                Some(GenericErrorContext::new((*ctxt).ctxt)),
+                ctxt,
                 localname,
                 prefix,
                 uri,
@@ -19720,32 +19693,27 @@ unsafe fn start_element_ns_split(
 }
 
 unsafe fn end_element_ns_split(
-    ctx: Option<GenericErrorContext>,
+    ctxt: &mut XmlParserCtxt,
     localname: &str,
     prefix: Option<&str>,
     uri: Option<&str>,
 ) {
     unsafe {
-        let ctx = ctx.unwrap();
-        let lock = ctx.lock();
-        let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-        if ctxt.is_null() {
+        let user_data = ctxt.user_data.clone().unwrap();
+        let lock = user_data.lock();
+        let plug = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
+        if plug.is_null() {
             return;
         }
-        if let Some(end_element_ns) = (*ctxt)
+        if let Some(end_element_ns) = (*plug)
             .user_sax
             .as_deref_mut()
             .and_then(|sax| sax.end_element_ns)
         {
-            end_element_ns((*ctxt).user_data.clone(), localname, prefix, uri);
+            end_element_ns(ctxt, localname, prefix, uri);
         }
-        if !(*ctxt).ctxt.is_null() {
-            xml_schema_sax_handle_end_element_ns(
-                Some(GenericErrorContext::new((*ctxt).ctxt)),
-                localname,
-                prefix,
-                uri,
-            );
+        if !(*plug).ctxt.is_null() {
+            xml_schema_sax_handle_end_element_ns(ctxt, localname, prefix, uri);
         }
     }
 }

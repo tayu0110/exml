@@ -637,7 +637,7 @@ thread_local! {
 ///
 /// Returns 1 if true
 #[doc(alias = "isStandaloneCallback")]
-fn is_standalone_callback(_ctx: Option<GenericErrorContext>) -> i32 {
+fn is_standalone_callback(_ctx: &mut XmlParserCtxt) -> i32 {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
     0
 }
@@ -646,7 +646,7 @@ fn is_standalone_callback(_ctx: Option<GenericErrorContext>) -> i32 {
 ///
 /// Returns 1 if true
 #[doc(alias = "hasInternalSubsetCallback")]
-fn has_internal_subset_callback(_ctx: Option<GenericErrorContext>) -> i32 {
+fn has_internal_subset_callback(_ctx: &mut XmlParserCtxt) -> i32 {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
     0
 }
@@ -655,7 +655,7 @@ fn has_internal_subset_callback(_ctx: Option<GenericErrorContext>) -> i32 {
 ///
 /// Returns 1 if true
 #[doc(alias = "hasExternalSubsetCallback")]
-fn has_external_subset_callback(_ctx: Option<GenericErrorContext>) -> i32 {
+fn has_external_subset_callback(_ctx: &mut XmlParserCtxt) -> i32 {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
     0
 }
@@ -663,7 +663,7 @@ fn has_external_subset_callback(_ctx: Option<GenericErrorContext>) -> i32 {
 /// Does this document has an internal subset
 #[doc(alias = "internalSubsetCallback")]
 fn internal_subset_callback(
-    _ctx: Option<GenericErrorContext>,
+    _ctx: &mut XmlParserCtxt,
     _name: Option<&str>,
     _external_id: Option<&str>,
     _system_id: Option<&str>,
@@ -674,7 +674,7 @@ fn internal_subset_callback(
 /// Does this document has an external subset
 #[doc(alias = "externalSubsetCallback")]
 fn external_subset_callback(
-    _ctx: Option<GenericErrorContext>,
+    _ctx: &mut XmlParserCtxt,
     _name: Option<&str>,
     _external_id: Option<&str>,
     _system_id: Option<&str>,
@@ -691,7 +691,7 @@ fn external_subset_callback(
 /// Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
 #[doc(alias = "resolveEntityCallback")]
 fn resolve_entity_callback(
-    _ctx: Option<GenericErrorContext>,
+    _ctx: &mut XmlParserCtxt,
     _public_id: Option<&str>,
     _system_id: Option<&str>,
 ) -> Option<XmlParserInput> {
@@ -703,7 +703,7 @@ fn resolve_entity_callback(
 ///
 /// Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
 #[doc(alias = "getEntityCallback")]
-fn get_entity_callback(_ctx: Option<GenericErrorContext>, _name: &str) -> Option<XmlEntityPtr> {
+fn get_entity_callback(_ctx: &mut XmlParserCtxt, _name: &str) -> Option<XmlEntityPtr> {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
     None
 }
@@ -712,10 +712,7 @@ fn get_entity_callback(_ctx: Option<GenericErrorContext>, _name: &str) -> Option
 ///
 /// Returns the xmlParserInputPtr
 #[doc(alias = "getParameterEntityCallback")]
-fn get_parameter_entity_callback(
-    _ctx: Option<GenericErrorContext>,
-    _name: &str,
-) -> Option<XmlEntityPtr> {
+fn get_parameter_entity_callback(_ctx: &mut XmlParserCtxt, _name: &str) -> Option<XmlEntityPtr> {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
     None
 }
@@ -723,7 +720,7 @@ fn get_parameter_entity_callback(
 /// An entity definition has been parsed
 #[doc(alias = "entityDeclCallback")]
 fn entity_decl_callback(
-    _ctx: Option<GenericErrorContext>,
+    _ctx: &mut XmlParserCtxt,
     _name: &str,
     _typ: XmlEntityType,
     _public_id: Option<&str>,
@@ -736,7 +733,7 @@ fn entity_decl_callback(
 /// An attribute definition has been parsed
 #[doc(alias = "attributeDeclCallback")]
 fn attribute_decl_callback(
-    _ctx: Option<GenericErrorContext>,
+    _ctx: &mut XmlParserCtxt,
     _elem: &str,
     _name: &str,
     _typ: XmlAttributeType,
@@ -750,7 +747,7 @@ fn attribute_decl_callback(
 /// An element definition has been parsed
 #[doc(alias = "elementDeclCallback")]
 fn element_decl_callback(
-    _ctx: Option<GenericErrorContext>,
+    _ctx: &mut XmlParserCtxt,
     _name: &str,
     _typ: Option<XmlElementTypeVal>,
     _content: XmlElementContentPtr,
@@ -761,7 +758,7 @@ fn element_decl_callback(
 /// What to do when a notation declaration has been parsed.
 #[doc(alias = "notationDeclCallback")]
 fn notation_decl_callback(
-    _ctx: Option<GenericErrorContext>,
+    _ctx: &mut XmlParserCtxt,
     _name: &str,
     _public_id: Option<&str>,
     _system_id: Option<&str>,
@@ -772,7 +769,7 @@ fn notation_decl_callback(
 /// What to do when an unparsed entity declaration is parsed
 #[doc(alias = "unparsedEntityDeclCallback")]
 fn unparsed_entity_decl_callback(
-    _ctx: Option<GenericErrorContext>,
+    _ctx: &mut XmlParserCtxt,
     _name: &str,
     _public_id: Option<&str>,
     _system_id: Option<&str>,
@@ -784,61 +781,57 @@ fn unparsed_entity_decl_callback(
 /// Receive the document locator at startup, actually xmlDefaultSAXLocator
 /// Everything is available on the context, so this is useless in our case.
 #[doc(alias = "setDocumentLocatorCallback")]
-fn set_document_locator_callback(_ctx: Option<GenericErrorContext>, _loc: XmlSAXLocatorPtr) {
+fn set_document_locator_callback(_ctx: &mut XmlParserCtxt, _loc: XmlSAXLocatorPtr) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
 /// called when the document start being processed.
 #[doc(alias = "startDocumentCallback")]
-fn start_document_callback(_ctx: Option<GenericErrorContext>) {
+fn start_document_callback(_ctx: &mut XmlParserCtxt) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
 /// called when the document end has been detected.
 #[doc(alias = "endDocumentCallback")]
-fn end_document_callback(_ctx: Option<GenericErrorContext>) {
+fn end_document_callback(_ctx: &mut XmlParserCtxt) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
 /// receiving some chars from the parser.
 /// Question: how much at a time ???
 #[doc(alias = "charactersCallback")]
-fn characters_callback(_ctx: Option<GenericErrorContext>, _ch: &str) {
+fn characters_callback(_ctx: &mut XmlParserCtxt, _ch: &str) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
 /// called when an entity reference is detected.
 #[doc(alias = "referenceCallback")]
-fn reference_callback(_ctx: Option<GenericErrorContext>, _name: &str) {
+fn reference_callback(_ctx: &mut XmlParserCtxt, _name: &str) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
 /// receiving some ignorable whitespaces from the parser.
 /// Question: how much at a time ???
 #[doc(alias = "ignorableWhitespaceCallback")]
-fn ignorable_whitespace_callback(_ctx: Option<GenericErrorContext>, _ch: &str) {
+fn ignorable_whitespace_callback(_ctx: &mut XmlParserCtxt, _ch: &str) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
 /// A processing instruction has been parsed.
 #[doc(alias = "processingInstructionCallback")]
-fn processing_instruction_callback(
-    _ctx: Option<GenericErrorContext>,
-    _target: &str,
-    _data: Option<&str>,
-) {
+fn processing_instruction_callback(_ctx: &mut XmlParserCtxt, _target: &str, _data: Option<&str>) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
 /// called when a pcdata block has been parsed
 #[doc(alias = "cdataBlockCallback")]
-fn cdata_block_callback(_ctx: Option<GenericErrorContext>, _value: &str) {
+fn cdata_block_callback(_ctx: &mut XmlParserCtxt, _value: &str) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
 /// A comment has been parsed.
 #[doc(alias = "commentCallback")]
-fn comment_callback(_ctx: Option<GenericErrorContext>, _value: &str) {
+fn comment_callback(_ctx: &mut XmlParserCtxt, _value: &str) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
@@ -864,7 +857,7 @@ fn fatal_error_callback(_ctx: Option<GenericErrorContext>, _msg: &str) {}
 /// called when an opening tag has been processed.
 #[doc(alias = "startElementNsCallback")]
 fn start_element_ns_callback(
-    _ctx: Option<GenericErrorContext>,
+    _ctx: &mut XmlParserCtxt,
     _localname: &str,
     _prefix: Option<&str>,
     _uri: Option<&str>,
@@ -878,7 +871,7 @@ fn start_element_ns_callback(
 /// called when the end of an element has been detected.
 #[doc(alias = "endElementCallback")]
 fn end_element_ns_callback(
-    _ctx: Option<GenericErrorContext>,
+    _ctx: &mut XmlParserCtxt,
     _localname: &str,
     _prefix: Option<&str>,
     _uri: Option<&str>,

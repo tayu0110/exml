@@ -115,7 +115,7 @@ impl XmlParserCtxt {
             // SAX: beginning of the document processing.
             if let Some(sax) = self.sax.as_deref_mut() {
                 if let Some(set_document_locator) = sax.set_document_locator {
-                    set_document_locator(self.user_data.clone(), xml_default_sax_locator());
+                    set_document_locator(self, xml_default_sax_locator());
                 }
             }
             if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
@@ -153,7 +153,7 @@ impl XmlParserCtxt {
                 if let Some(start_document) =
                     self.sax.as_deref_mut().and_then(|sax| sax.start_document)
                 {
-                    start_document(self.user_data.clone());
+                    start_document(self);
                 }
             }
             if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
@@ -192,10 +192,10 @@ impl XmlParserCtxt {
                         self.sax.as_deref_mut().and_then(|sax| sax.external_subset)
                     {
                         external_subset(
-                            self.user_data.clone(),
-                            self.int_sub_name.as_deref(),
-                            self.ext_sub_system.as_deref(),
-                            self.ext_sub_uri.as_deref(),
+                            self,
+                            self.int_sub_name.clone().as_deref(),
+                            self.ext_sub_system.clone().as_deref(),
+                            self.ext_sub_uri.clone().as_deref(),
                         );
                     }
                 }
@@ -232,7 +232,7 @@ impl XmlParserCtxt {
 
             // SAX: end of the document processing.
             if let Some(end_document) = self.sax.as_deref_mut().and_then(|sax| sax.end_document) {
-                end_document(self.user_data.clone());
+                end_document(self);
             }
 
             // Remove locally kept entity definitions if the tree was not built

@@ -562,11 +562,7 @@ pub(crate) unsafe fn xml_sax_parse_dtd(
             .as_deref_mut()
             .and_then(|sax| sax.resolve_entity)
             .and_then(|resolve_entity| {
-                resolve_entity(
-                    (*ctxt).user_data.clone(),
-                    external_id,
-                    system_id_canonic.as_deref(),
-                )
+                resolve_entity(&mut *ctxt, external_id, system_id_canonic.as_deref())
             })
         else {
             xml_free_parser_ctxt(ctxt);

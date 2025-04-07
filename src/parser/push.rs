@@ -1,4 +1,4 @@
-use std::{ptr::null_mut, str::from_utf8_unchecked};
+use std::ptr::null_mut;
 
 use crate::{
     encoding::{XmlCharEncoding, detect_encoding},
@@ -339,10 +339,7 @@ impl XmlParserCtxt {
                                     .as_deref_mut()
                                     .and_then(|sax| sax.set_document_locator)
                                 {
-                                    set_document_locator(
-                                        self.user_data.clone(),
-                                        xml_default_sax_locator(),
-                                    );
+                                    set_document_locator(self, xml_default_sax_locator());
                                 }
                                 xml_fatal_err(
                                     &mut *self,
@@ -353,7 +350,7 @@ impl XmlParserCtxt {
                                 if let Some(end_document) =
                                     self.sax.as_deref_mut().and_then(|sax| sax.end_document)
                                 {
-                                    end_document(self.user_data.clone());
+                                    end_document(self);
                                 }
                                 // goto done;
                                 return ret;
@@ -373,10 +370,7 @@ impl XmlParserCtxt {
                                     .as_deref_mut()
                                     .and_then(|sax| sax.set_document_locator)
                                 {
-                                    set_document_locator(
-                                        self.user_data.clone(),
-                                        xml_default_sax_locator(),
-                                    );
+                                    set_document_locator(self, xml_default_sax_locator());
                                 }
                                 if self.content_bytes()[2..].starts_with(b"xml")
                                     && xml_is_blank_char(self.nth_byte(5) as u32)
@@ -402,7 +396,7 @@ impl XmlParserCtxt {
                                             .as_deref_mut()
                                             .and_then(|sax| sax.start_document)
                                         {
-                                            start_document(self.user_data.clone());
+                                            start_document(self);
                                         }
                                     }
                                     self.instate = XmlParserInputState::XmlParserMisc;
@@ -414,7 +408,7 @@ impl XmlParserCtxt {
                                             .as_deref_mut()
                                             .and_then(|sax| sax.start_document)
                                         {
-                                            start_document(self.user_data.clone());
+                                            start_document(self);
                                         }
                                     }
                                     self.instate = XmlParserInputState::XmlParserMisc;
@@ -425,17 +419,14 @@ impl XmlParserCtxt {
                                     .as_deref_mut()
                                     .and_then(|sax| sax.set_document_locator)
                                 {
-                                    set_document_locator(
-                                        self.user_data.clone(),
-                                        xml_default_sax_locator(),
-                                    );
+                                    set_document_locator(self, xml_default_sax_locator());
                                 }
                                 self.version = Some(XML_DEFAULT_VERSION.to_owned());
                                 if self.disable_sax == 0 {
                                     if let Some(start_document) =
                                         self.sax.as_deref_mut().and_then(|sax| sax.start_document)
                                     {
-                                        start_document(self.user_data.clone());
+                                        start_document(self);
                                     }
                                 }
                                 self.instate = XmlParserInputState::XmlParserMisc;
@@ -456,7 +447,7 @@ impl XmlParserCtxt {
                                 if let Some(end_document) =
                                     self.sax.as_deref().and_then(|sax| sax.end_document)
                                 {
-                                    end_document(self.user_data.clone());
+                                    end_document(self);
                                 }
                                 // goto done;
                                 return ret;
@@ -488,7 +479,7 @@ impl XmlParserCtxt {
                                 if let Some(end_document) =
                                     self.sax.as_deref_mut().and_then(|sax| sax.end_document)
                                 {
-                                    end_document(self.user_data.clone());
+                                    end_document(self);
                                 }
                                 // goto done;
                                 return ret;
@@ -521,7 +512,7 @@ impl XmlParserCtxt {
                                             .and_then(|sax| sax.end_element_ns)
                                         {
                                             end_element_ns(
-                                                self.user_data.clone(),
+                                                self,
                                                 &name,
                                                 prefix.as_deref(),
                                                 uri.as_deref(),
@@ -537,7 +528,7 @@ impl XmlParserCtxt {
                                         if let Some(end_element) =
                                             self.sax.as_deref_mut().and_then(|sax| sax.end_element)
                                         {
-                                            end_element(self.user_data.clone(), &name);
+                                            end_element(self, &name);
                                         }
                                     }
                                 }
@@ -718,7 +709,7 @@ impl XmlParserCtxt {
                                             input.base_contents()[..input.cur]
                                                 .ends_with(b"<![CDATA[")
                                         }) {
-                                            cdata_block(self.user_data.clone(), "");
+                                            cdata_block(self, "");
                                         }
                                     } else if let Some(sax) =
                                         self.sax.as_deref_mut().filter(|_| base > 0)
@@ -727,16 +718,18 @@ impl XmlParserCtxt {
                                             // # Safety
                                             // The contents of `self.content_bytes()[..base]` is already checked
                                             // in `check_cdata_push`, so UTF-8 validation won't fail.
-                                            let s =
-                                                from_utf8_unchecked(&self.content_bytes()[..base]);
-                                            cdata_block(self.user_data.clone(), s);
+                                            let s = String::from_utf8_unchecked(
+                                                self.content_bytes()[..base].to_vec(),
+                                            );
+                                            cdata_block(self, &s);
                                         } else if let Some(characters) = sax.characters {
                                             // # Safety
                                             // The contents of `self.content_bytes()[..base]` is already checked
                                             // in `check_cdata_push`, so UTF-8 validation won't fail.
-                                            let s =
-                                                from_utf8_unchecked(&self.content_bytes()[..base]);
-                                            characters(self.user_data.clone(), s);
+                                            let s = String::from_utf8_unchecked(
+                                                self.content_bytes()[..base].to_vec(),
+                                            );
+                                            characters(self, &s);
                                         }
                                     }
                                 }
@@ -773,16 +766,18 @@ impl XmlParserCtxt {
                                             // # Safety
                                             // The contents of `self.content_bytes()[..tmp]` is already checked
                                             // in `check_cdata_push`, so UTF-8 validation won't fail.
-                                            let s =
-                                                from_utf8_unchecked(&self.content_bytes()[..tmp]);
-                                            cdata_block(self.user_data.clone(), s);
+                                            let s = String::from_utf8_unchecked(
+                                                self.content_bytes()[..tmp].to_vec(),
+                                            );
+                                            cdata_block(self, &s);
                                         } else if let Some(characters) = sax.characters {
                                             // # Safety
                                             // The contents of `self.content_bytes()[..tmp]` is already checked
                                             // in `check_cdata_push`, so UTF-8 validation won't fail.
-                                            let s =
-                                                from_utf8_unchecked(&self.content_bytes()[..tmp]);
-                                            characters(self.user_data.clone(), s);
+                                            let s = String::from_utf8_unchecked(
+                                                self.content_bytes()[..tmp].to_vec(),
+                                            );
+                                            characters(self, &s);
                                         }
                                     }
                                 }
@@ -851,10 +846,10 @@ impl XmlParserCtxt {
                                                 .and_then(|sax| sax.external_subset)
                                             {
                                                 external_subset(
-                                                    self.user_data.clone(),
-                                                    self.int_sub_name.as_deref(),
-                                                    self.ext_sub_system.as_deref(),
-                                                    self.ext_sub_uri.as_deref(),
+                                                    self,
+                                                    self.int_sub_name.clone().as_deref(),
+                                                    self.ext_sub_system.clone().as_deref(),
+                                                    self.ext_sub_uri.clone().as_deref(),
                                                 );
                                             }
                                         }
@@ -888,7 +883,7 @@ impl XmlParserCtxt {
                                         if let Some(end_document) =
                                             self.sax.as_deref_mut().and_then(|sax| sax.end_document)
                                         {
-                                            end_document(self.user_data.clone());
+                                            end_document(self);
                                         }
                                         // goto done;
                                         return ret;
@@ -914,10 +909,10 @@ impl XmlParserCtxt {
                                     self.sax.as_deref_mut().and_then(|sax| sax.external_subset)
                                 {
                                     external_subset(
-                                        self.user_data.clone(),
-                                        self.int_sub_name.as_deref(),
-                                        self.ext_sub_system.as_deref(),
-                                        self.ext_sub_uri.as_deref(),
+                                        self,
+                                        self.int_sub_name.clone().as_deref(),
+                                        self.ext_sub_system.clone().as_deref(),
+                                        self.ext_sub_uri.clone().as_deref(),
                                     );
                                 }
                             }
@@ -1114,7 +1109,7 @@ impl XmlParserCtxt {
                     if let Some(end_document) =
                         self.sax.as_deref_mut().and_then(|sax| sax.end_document)
                     {
-                        end_document(self.user_data.clone());
+                        end_document(self);
                     }
                 }
                 self.instate = XmlParserInputState::XmlParserEOF;

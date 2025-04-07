@@ -376,7 +376,7 @@ macro_rules! xml_fatal_err_msg_str_int_str {
             $ctxt,
             $error,
             &msg,
-            Some($str1.to_owned().into()),
+            Some($str1.to_string().into()),
             $val,
             None
         );

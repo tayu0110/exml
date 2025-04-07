@@ -145,12 +145,7 @@ impl XmlParserCtxt {
                         if let Some(end_element_ns) =
                             self.sax.as_deref_mut().and_then(|sax| sax.end_element_ns)
                         {
-                            end_element_ns(
-                                self.user_data.clone(),
-                                &name,
-                                prefix.as_deref(),
-                                uri.as_deref(),
-                            );
+                            end_element_ns(self, &name, prefix.as_deref(), uri.as_deref());
                         }
                     }
                 } else {
@@ -159,7 +154,7 @@ impl XmlParserCtxt {
                         if let Some(end_element) =
                             self.sax.as_deref_mut().and_then(|sax| sax.end_element)
                         {
-                            end_element(self.user_data.clone(), &name);
+                            end_element(self, &name);
                         }
                     }
                 }
@@ -313,9 +308,9 @@ impl XmlParserCtxt {
                     self.sax.as_deref_mut().and_then(|sax| sax.start_element)
                 {
                     if !atts.is_empty() {
-                        start_element(self.user_data.clone(), &name, atts.as_slice());
+                        start_element(self, &name, atts.as_slice());
                     } else {
-                        start_element(self.user_data.clone(), &name, &[]);
+                        start_element(self, &name, &[]);
                     }
                 }
             }
@@ -702,12 +697,13 @@ impl XmlParserCtxt {
                 if let Some(start_element_ns) =
                     self.sax.as_deref_mut().and_then(|sax| sax.start_element_ns)
                 {
+                    let ns_tab = self.ns_tab[self.ns_tab.len() - nb_ns..].to_vec();
                     start_element_ns(
-                        self.user_data.clone(),
+                        self,
                         &localname,
                         prefix.as_deref(),
                         uri.as_deref(),
-                        &self.ns_tab[self.ns_tab.len() - nb_ns..],
+                        &ns_tab,
                         nbdef,
                         &atts,
                     );
@@ -785,7 +781,7 @@ impl XmlParserCtxt {
         // failure (or end of input buffer), check with full function
         let ret = self.parse_name();
         // strings coming from the dictionary direct compare possible
-        if ret == self.name {
+        if ret.as_deref() == self.name.as_deref() {
             return Ok(());
         }
         Err(ret)
@@ -819,7 +815,7 @@ impl XmlParserCtxt {
         let (pre, ret) = self.parse_qname();
         let tag_index = self.name_tab.len() - 1;
         let prefix = self.push_tab[tag_index].prefix.as_deref().unwrap();
-        if ret == self.name && pre.as_deref() == Some(prefix) {
+        if ret.as_deref() == self.name.as_deref() && pre.as_deref() == Some(prefix) {
             return Ok(());
         }
         Err(ret)
@@ -876,7 +872,7 @@ impl XmlParserCtxt {
             // SAX: End of Tag
             if self.disable_sax == 0 {
                 if let Some(end_element) = self.sax.as_deref_mut().and_then(|sax| sax.end_element) {
-                    end_element(self.user_data.clone(), self.name.as_deref().unwrap());
+                    end_element(self, self.name.clone().as_deref().unwrap());
                 }
             }
 
@@ -942,10 +938,10 @@ impl XmlParserCtxt {
                     self.sax.as_deref_mut().and_then(|sax| sax.end_element_ns)
                 {
                     end_element_ns(
-                        self.user_data.clone(),
-                        self.name.as_deref().unwrap(),
-                        self.push_tab[tag_index].prefix.as_deref(),
-                        self.push_tab[tag_index].uri.as_deref(),
+                        self,
+                        self.name.clone().as_deref().unwrap(),
+                        self.push_tab[tag_index].prefix.clone().as_deref(),
+                        self.push_tab[tag_index].uri.clone().as_deref(),
                     );
                 }
             }

@@ -554,7 +554,7 @@ impl XmlParserCtxt {
                 .as_deref_mut()
                 .and_then(|sax| sax.set_document_locator)
             {
-                set_document_locator(self.user_data.clone(), xml_default_sax_locator());
+                set_document_locator(self, xml_default_sax_locator());
             }
 
             // Get the 4 first bytes and decode the charset
@@ -590,7 +590,7 @@ impl XmlParserCtxt {
                 if let Some(start_document) =
                     self.sax.as_deref_mut().and_then(|sax| sax.start_document)
                 {
-                    start_document(self.user_data.clone());
+                    start_document(self);
                 }
             }
             if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
@@ -616,7 +616,7 @@ impl XmlParserCtxt {
 
             // SAX: end of the document processing.
             if let Some(end_document) = self.sax.as_deref_mut().and_then(|sax| sax.end_document) {
-                end_document(self.user_data.clone());
+                end_document(self);
             }
 
             if self.well_formed == 0 {

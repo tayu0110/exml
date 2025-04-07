@@ -617,7 +617,7 @@ fn increment_callbacks_counter() {
 ///
 /// Returns 1 if true
 #[doc(alias = "isStandaloneDebug")]
-unsafe fn is_standalone_debug(_ctx: Option<GenericErrorContext>) -> i32 {
+unsafe fn is_standalone_debug(_ctx: &mut XmlParserCtxt) -> i32 {
     increment_callbacks_counter();
     sax_debugln!("SAX.isStandalone()");
     0
@@ -627,7 +627,7 @@ unsafe fn is_standalone_debug(_ctx: Option<GenericErrorContext>) -> i32 {
 ///
 /// Returns 1 if true
 #[doc(alias = "hasInternalSubsetDebug")]
-unsafe fn has_internal_subset_debug(_ctx: Option<GenericErrorContext>) -> i32 {
+unsafe fn has_internal_subset_debug(_ctx: &mut XmlParserCtxt) -> i32 {
     increment_callbacks_counter();
     sax_debugln!("SAX.hasInternalSubset()");
     0
@@ -637,7 +637,7 @@ unsafe fn has_internal_subset_debug(_ctx: Option<GenericErrorContext>) -> i32 {
 ///
 /// Returns 1 if true
 #[doc(alias = "hasExternalSubsetDebug")]
-unsafe fn has_external_subset_debug(_ctx: Option<GenericErrorContext>) -> i32 {
+unsafe fn has_external_subset_debug(_ctx: &mut XmlParserCtxt) -> i32 {
     increment_callbacks_counter();
     sax_debugln!("SAX.hasExternalSubset()");
     0
@@ -646,7 +646,7 @@ unsafe fn has_external_subset_debug(_ctx: Option<GenericErrorContext>) -> i32 {
 /// Does this document has an internal subset
 #[doc(alias = "internalSubsetDebug")]
 unsafe fn internal_subset_debug(
-    _ctx: Option<GenericErrorContext>,
+    _ctx: &mut XmlParserCtxt,
     name: Option<&str>,
     external_id: Option<&str>,
     system_id: Option<&str>,
@@ -669,7 +669,7 @@ unsafe fn internal_subset_debug(
 /// Does this document has an external subset
 #[doc(alias = "externalSubsetDebug")]
 unsafe fn external_subset_debug(
-    _ctx: Option<GenericErrorContext>,
+    _ctx: &mut XmlParserCtxt,
     name: Option<&str>,
     external_id: Option<&str>,
     system_id: Option<&str>,
@@ -696,7 +696,7 @@ unsafe fn external_subset_debug(
 /// Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
 #[doc(alias = "resolveEntityDebug")]
 unsafe fn resolve_entity_debug(
-    _ctx: Option<GenericErrorContext>,
+    _ctx: &mut XmlParserCtxt,
     public_id: Option<&str>,
     system_id: Option<&str>,
 ) -> Option<XmlParserInput> {
@@ -726,7 +726,7 @@ unsafe fn resolve_entity_debug(
 ///
 /// Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
 #[doc(alias = "getEntityDebug")]
-unsafe fn get_entity_debug(_ctx: Option<GenericErrorContext>, name: &str) -> Option<XmlEntityPtr> {
+unsafe fn get_entity_debug(_ctx: &mut XmlParserCtxt, name: &str) -> Option<XmlEntityPtr> {
     increment_callbacks_counter();
     sax_debugln!("SAX.getEntity({name})");
     None
@@ -736,10 +736,7 @@ unsafe fn get_entity_debug(_ctx: Option<GenericErrorContext>, name: &str) -> Opt
 ///
 /// Returns the xmlParserInputPtr
 #[doc(alias = "getParameterEntityDebug")]
-unsafe fn get_parameter_entity_debug(
-    _ctx: Option<GenericErrorContext>,
-    name: &str,
-) -> Option<XmlEntityPtr> {
+unsafe fn get_parameter_entity_debug(_ctx: &mut XmlParserCtxt, name: &str) -> Option<XmlEntityPtr> {
     increment_callbacks_counter();
     sax_debugln!("SAX.getParameterEntity({name})");
     None
@@ -748,7 +745,7 @@ unsafe fn get_parameter_entity_debug(
 /// An entity definition has been parsed
 #[doc(alias = "entityDeclDebug")]
 fn entity_decl_debug(
-    _ctx: Option<GenericErrorContext>,
+    _ctx: &mut XmlParserCtxt,
     name: &str,
     typ: XmlEntityType,
     public_id: Option<&str>,
@@ -768,7 +765,7 @@ fn entity_decl_debug(
 /// An attribute definition has been parsed
 #[doc(alias = "attributeDeclDebug")]
 unsafe fn attribute_decl_debug(
-    _ctx: Option<GenericErrorContext>,
+    _ctx: &mut XmlParserCtxt,
     elem: &str,
     name: &str,
     typ: XmlAttributeType,
@@ -795,7 +792,7 @@ unsafe fn attribute_decl_debug(
 /// An element definition has been parsed
 #[doc(alias = "elementDeclDebug")]
 unsafe fn element_decl_debug(
-    _ctx: Option<GenericErrorContext>,
+    _ctx: &mut XmlParserCtxt,
     name: &str,
     typ: Option<XmlElementTypeVal>,
     _content: XmlElementContentPtr,
@@ -810,7 +807,7 @@ unsafe fn element_decl_debug(
 /// What to do when a notation declaration has been parsed.
 #[doc(alias = "notationDeclDebug")]
 unsafe fn notation_decl_debug(
-    _ctx: Option<GenericErrorContext>,
+    _ctx: &mut XmlParserCtxt,
     name: &str,
     public_id: Option<&str>,
     system_id: Option<&str>,
@@ -826,7 +823,7 @@ unsafe fn notation_decl_debug(
 /// What to do when an unparsed entity declaration is parsed
 #[doc(alias = "unparsedEntityDeclDebug")]
 fn unparsed_entity_decl_debug(
-    _ctx: Option<GenericErrorContext>,
+    _ctx: &mut XmlParserCtxt,
     name: &str,
     public_id: Option<&str>,
     system_id: Option<&str>,
@@ -844,21 +841,21 @@ fn unparsed_entity_decl_debug(
 /// Receive the document locator at startup, actually xmlDefaultSAXLocator
 /// Everything is available on the context, so this is useless in our case.
 #[doc(alias = "setDocumentLocatorDebug")]
-unsafe fn set_document_locator_debug(_ctx: Option<GenericErrorContext>, _loc: XmlSAXLocatorPtr) {
+unsafe fn set_document_locator_debug(_ctx: &mut XmlParserCtxt, _loc: XmlSAXLocatorPtr) {
     increment_callbacks_counter();
     sax_debugln!("SAX.setDocumentLocator()");
 }
 
 /// called when the document start being processed.
 #[doc(alias = "startDocumentDebug")]
-fn start_document_debug(_ctx: Option<GenericErrorContext>) {
+fn start_document_debug(_ctx: &mut XmlParserCtxt) {
     increment_callbacks_counter();
     sax_debugln!("SAX.startDocument()");
 }
 
 /// called when the document end has been detected.
 #[doc(alias = "endDocumentDebug")]
-fn end_document_debug(_ctx: Option<GenericErrorContext>) {
+fn end_document_debug(_ctx: &mut XmlParserCtxt) {
     increment_callbacks_counter();
     sax_debugln!("SAX.endDocument()");
 }
@@ -866,7 +863,7 @@ fn end_document_debug(_ctx: Option<GenericErrorContext>) {
 /// called when an opening tag has been processed.
 #[doc(alias = "startElementDebug")]
 unsafe fn start_element_debug(
-    _ctx: Option<GenericErrorContext>,
+    _ctx: &mut XmlParserCtxt,
     name: &str,
     atts: &[(String, Option<String>)],
 ) {
@@ -883,7 +880,7 @@ unsafe fn start_element_debug(
 
 /// called when the end of an element has been detected.
 #[doc(alias = "endElementDebug")]
-fn end_element_debug(_ctx: Option<GenericErrorContext>, name: &str) {
+fn end_element_debug(_ctx: &mut XmlParserCtxt, name: &str) {
     increment_callbacks_counter();
     sax_debugln!("SAX.endElement({name})");
 }
@@ -891,7 +888,7 @@ fn end_element_debug(_ctx: Option<GenericErrorContext>, name: &str) {
 /// receiving some chars from the parser.
 /// Question: how much at a time ???
 #[doc(alias = "charactersDebug")]
-fn characters_debug(_ctx: Option<GenericErrorContext>, ch: &str) {
+fn characters_debug(_ctx: &mut XmlParserCtxt, ch: &str) {
     let mut output: [u8; 40] = [0; 40];
 
     increment_callbacks_counter();
@@ -906,7 +903,7 @@ fn characters_debug(_ctx: Option<GenericErrorContext>, ch: &str) {
 
 /// called when an entity reference is detected.
 #[doc(alias = "referenceDebug")]
-fn reference_debug(_ctx: Option<GenericErrorContext>, name: &str) {
+fn reference_debug(_ctx: &mut XmlParserCtxt, name: &str) {
     increment_callbacks_counter();
     sax_debugln!("SAX.reference({name})");
 }
@@ -914,7 +911,7 @@ fn reference_debug(_ctx: Option<GenericErrorContext>, name: &str) {
 /// receiving some ignorable whitespaces from the parser.
 /// Question: how much at a time ???
 #[doc(alias = "ignorableWhitespaceDebug")]
-fn ignorable_whitespace_debug(_ctx: Option<GenericErrorContext>, ch: &str) {
+fn ignorable_whitespace_debug(_ctx: &mut XmlParserCtxt, ch: &str) {
     let mut output: [u8; 40] = [0; 40];
 
     increment_callbacks_counter();
@@ -928,11 +925,7 @@ fn ignorable_whitespace_debug(_ctx: Option<GenericErrorContext>, ch: &str) {
 
 /// A processing instruction has been parsed.
 #[doc(alias = "processingInstructionDebug")]
-unsafe fn processing_instruction_debug(
-    _ctx: Option<GenericErrorContext>,
-    target: &str,
-    data: Option<&str>,
-) {
+unsafe fn processing_instruction_debug(_ctx: &mut XmlParserCtxt, target: &str, data: Option<&str>) {
     increment_callbacks_counter();
     if let Some(data) = data {
         sax_debugln!("SAX.processingInstruction({target}, {data})");
@@ -943,7 +936,7 @@ unsafe fn processing_instruction_debug(
 
 /// called when a pcdata block has been parsed
 #[doc(alias = "cdataBlockDebug")]
-fn cdata_block_debug(_ctx: Option<GenericErrorContext>, value: &str) {
+fn cdata_block_debug(_ctx: &mut XmlParserCtxt, value: &str) {
     increment_callbacks_counter();
     let len = value.len();
     let l = value.len().min(20);
@@ -955,7 +948,7 @@ fn cdata_block_debug(_ctx: Option<GenericErrorContext>, value: &str) {
 
 /// A comment has been parsed.
 #[doc(alias = "commentDebug")]
-unsafe fn comment_debug(_ctx: Option<GenericErrorContext>, value: &str) {
+unsafe fn comment_debug(_ctx: &mut XmlParserCtxt, value: &str) {
     increment_callbacks_counter();
     sax_debugln!("SAX.comment({value})");
 }
@@ -1020,7 +1013,7 @@ static DEBUG_SAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
 /// called when an opening tag has been processed.
 #[doc(alias = "startElementNsDebug")]
 unsafe fn start_element_ns_debug(
-    _ctx: Option<GenericErrorContext>,
+    _ctx: &mut XmlParserCtxt,
     localname: &str,
     prefix: Option<&str>,
     uri: Option<&str>,
@@ -1067,7 +1060,7 @@ unsafe fn start_element_ns_debug(
 /// called when the end of an element has been detected.
 #[doc(alias = "endElementDebug")]
 unsafe fn end_element_ns_debug(
-    _ctx: Option<GenericErrorContext>,
+    _ctx: &mut XmlParserCtxt,
     localname: &str,
     prefix: Option<&str>,
     uri: Option<&str>,
@@ -1125,7 +1118,7 @@ static DEBUG_SAX2_HANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
 #[doc(alias = "htmlstartElementDebug")]
 #[cfg(feature = "html")]
 unsafe fn htmlstart_element_debug(
-    _ctx: Option<GenericErrorContext>,
+    _ctx: &mut XmlParserCtxt,
     name: &str,
     atts: &[(String, Option<String>)],
 ) {
@@ -1169,7 +1162,7 @@ unsafe fn htmlstart_element_debug(
 /// Question: how much at a time ???
 #[doc(alias = "htmlcharactersDebug")]
 #[cfg(feature = "html")]
-unsafe fn htmlcharacters_debug(_ctx: Option<GenericErrorContext>, ch: &str) {
+unsafe fn htmlcharacters_debug(_ctx: &mut XmlParserCtxt, ch: &str) {
     unsafe {
         use std::ffi::c_uchar;
 
@@ -1202,7 +1195,7 @@ unsafe fn htmlcharacters_debug(_ctx: Option<GenericErrorContext>, ch: &str) {
 /// Question: how much at a time ???
 #[doc(alias = "htmlcdataDebug")]
 #[cfg(feature = "html")]
-unsafe fn htmlcdata_debug(_ctx: Option<GenericErrorContext>, ch: &str) {
+unsafe fn htmlcdata_debug(_ctx: &mut XmlParserCtxt, ch: &str) {
     unsafe {
         use std::ffi::c_uchar;
 
@@ -1823,7 +1816,7 @@ thread_local! {
 
 #[cfg(feature = "libxml_push")]
 unsafe fn internal_subset_bnd(
-    ctx: Option<GenericErrorContext>,
+    ctx: &mut XmlParserCtxt,
     name: Option<&str>,
     external_id: Option<&str>,
     system_id: Option<&str>,
@@ -1837,7 +1830,7 @@ unsafe fn internal_subset_bnd(
 }
 
 #[cfg(feature = "libxml_push")]
-unsafe fn reference_bnd(ctx: Option<GenericErrorContext>, name: &str) {
+unsafe fn reference_bnd(ctx: &mut XmlParserCtxt, name: &str) {
     unsafe {
         use exml::libxml::sax2::xml_sax2_reference;
 
@@ -1847,7 +1840,7 @@ unsafe fn reference_bnd(ctx: Option<GenericErrorContext>, name: &str) {
 }
 
 #[cfg(feature = "libxml_push")]
-unsafe fn characters_bnd(ctx: Option<GenericErrorContext>, ch: &str) {
+unsafe fn characters_bnd(ctx: &mut XmlParserCtxt, ch: &str) {
     unsafe {
         use exml::libxml::sax2::xml_sax2_characters;
 
@@ -1858,7 +1851,7 @@ unsafe fn characters_bnd(ctx: Option<GenericErrorContext>, ch: &str) {
 }
 
 #[cfg(feature = "libxml_push")]
-unsafe fn cdata_block_bnd(ctx: Option<GenericErrorContext>, ch: &str) {
+unsafe fn cdata_block_bnd(ctx: &mut XmlParserCtxt, ch: &str) {
     unsafe {
         use exml::libxml::sax2::xml_sax2_cdata_block;
 
@@ -1869,11 +1862,7 @@ unsafe fn cdata_block_bnd(ctx: Option<GenericErrorContext>, ch: &str) {
 }
 
 #[cfg(feature = "libxml_push")]
-unsafe fn processing_instruction_bnd(
-    ctx: Option<GenericErrorContext>,
-    target: &str,
-    data: Option<&str>,
-) {
+unsafe fn processing_instruction_bnd(ctx: &mut XmlParserCtxt, target: &str, data: Option<&str>) {
     unsafe {
         use exml::libxml::sax2::xml_sax2_processing_instruction;
 
@@ -1883,25 +1872,20 @@ unsafe fn processing_instruction_bnd(
 }
 
 #[cfg(feature = "libxml_push")]
-unsafe fn comment_bnd(ctx: Option<GenericErrorContext>, value: &str) {
+unsafe fn comment_bnd(ctxt: &mut XmlParserCtxt, value: &str) {
     unsafe {
         use exml::libxml::sax2::xml_sax2_comment;
 
-        let ctxt = {
-            let ctx = ctx.as_ref().unwrap();
-            let lock = ctx.lock();
-            *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
-        };
-        if (*ctxt).in_subset == 0 {
+        if ctxt.in_subset == 0 {
             PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
         }
-        xml_sax2_comment(ctx, value);
+        xml_sax2_comment(ctxt, value);
     }
 }
 
 #[cfg(feature = "libxml_push")]
 unsafe fn start_element_bnd(
-    ctx: Option<GenericErrorContext>,
+    ctxt: &mut XmlParserCtxt,
     xname: &str,
     atts: &[(String, Option<String>)],
 ) {
@@ -1912,12 +1896,12 @@ unsafe fn start_element_bnd(
         if xname != "html" && xname != "body" && xname != "head" && xname != "p" {
             PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
         }
-        xml_sax2_start_element(ctx, xname, atts);
+        xml_sax2_start_element(ctxt, xname, atts);
     }
 }
 
 #[cfg(feature = "libxml_push")]
-unsafe fn end_element_bnd(ctx: Option<GenericErrorContext>, name: &str) {
+unsafe fn end_element_bnd(ctx: &mut XmlParserCtxt, name: &str) {
     unsafe {
         /*pushBoundaryCount++;*/
 
@@ -1930,7 +1914,7 @@ unsafe fn end_element_bnd(ctx: Option<GenericErrorContext>, name: &str) {
 #[allow(clippy::too_many_arguments)]
 // #[allow(clippy::type_complexity)]
 unsafe fn start_element_ns_bnd(
-    ctx: Option<GenericErrorContext>,
+    ctx: &mut XmlParserCtxt,
     localname: &str,
     prefix: Option<&str>,
     uri: Option<&str>,
@@ -1956,7 +1940,7 @@ unsafe fn start_element_ns_bnd(
 
 #[cfg(feature = "libxml_push")]
 unsafe fn end_element_ns_bnd(
-    ctx: Option<GenericErrorContext>,
+    ctx: &mut XmlParserCtxt,
     localname: &str,
     prefix: Option<&str>,
     uri: Option<&str>,

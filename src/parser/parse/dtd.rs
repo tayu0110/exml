@@ -4,7 +4,7 @@ use crate::{
     encoding::{XmlCharEncoding, detect_encoding},
     error::XmlParserErrors,
     generic_error,
-    globals::{GenericErrorContext, get_parser_debug_entities},
+    globals::get_parser_debug_entities,
     hash::{XmlHashTable, XmlHashTableRef},
     libxml::{
         chvalid::xml_is_blank_char,
@@ -140,7 +140,7 @@ impl XmlParserCtxt {
                     "xmlParseDocTypeDecl : no DOCTYPE name !\n",
                 );
             }
-            self.int_sub_name = name.as_deref().map(|n| n.to_owned());
+            self.int_sub_name = name.as_deref().map(|n| n.into());
             self.skip_blanks();
 
             // Check for SystemID and ExternalID
@@ -149,8 +149,8 @@ impl XmlParserCtxt {
             if uri.is_some() || external_id.is_some() {
                 self.has_external_subset = 1;
             }
-            self.ext_sub_uri = uri;
-            self.ext_sub_system = external_id;
+            self.ext_sub_uri = uri.map(|uri| uri.into());
+            self.ext_sub_system = external_id.map(|id| id.into());
 
             self.skip_blanks();
 
@@ -160,10 +160,10 @@ impl XmlParserCtxt {
                     self.sax.as_deref_mut().and_then(|sax| sax.internal_subset)
                 {
                     internal_subset(
-                        self.user_data.clone(),
+                        self,
                         name.as_deref(),
-                        self.ext_sub_system.as_deref(),
-                        self.ext_sub_uri.as_deref(),
+                        self.ext_sub_system.clone().as_deref(),
+                        self.ext_sub_uri.clone().as_deref(),
                     );
                 }
             }
@@ -485,7 +485,7 @@ impl XmlParserCtxt {
                     if !content.is_null() {
                         (*content).parent = null_mut();
                     }
-                    element_decl(self.user_data.clone(), &name, ret, content);
+                    element_decl(self, &name, ret, content);
                     if !content.is_null() && (*content).parent.is_null() {
                         // this is a trick: if xmlAddElementDecl is called,
                         // instead of copying the full tree it is plugged directly
@@ -1184,7 +1184,7 @@ impl XmlParserCtxt {
                         .and_then(|sax| sax.attribute_decl)
                     {
                         attribute_decl(
-                            self.user_data.clone(),
+                            self,
                             &elem_name,
                             &attr_name,
                             typ,
@@ -1735,9 +1735,7 @@ impl XmlParserCtxt {
                 .sax
                 .as_deref_mut()
                 .and_then(|sax| sax.get_parameter_entity)
-                .and_then(|get_parameter_entity| {
-                    get_parameter_entity(self.user_data.clone(), &name)
-                });
+                .and_then(|get_parameter_entity| get_parameter_entity(self, &name));
             if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
                 return;
             }
@@ -1952,7 +1950,7 @@ impl XmlParserCtxt {
                                     self.sax.as_deref_mut().and_then(|sax| sax.entity_decl)
                                 {
                                     entity_decl(
-                                        self.user_data.clone(),
+                                        self,
                                         &name,
                                         XmlEntityType::XmlInternalParameterEntity,
                                         None,
@@ -1980,7 +1978,7 @@ impl XmlParserCtxt {
                                         self.sax.as_deref_mut().and_then(|sax| sax.entity_decl)
                                     {
                                         entity_decl(
-                                            self.user_data.clone(),
+                                            self,
                                             &name,
                                             XmlEntityType::XmlExternalParameterEntity,
                                             literal.as_deref(),
@@ -2007,7 +2005,7 @@ impl XmlParserCtxt {
                             self.sax.as_deref_mut().and_then(|sax| sax.entity_decl)
                         {
                             entity_decl(
-                                self.user_data.clone(),
+                                self,
                                 &name,
                                 XmlEntityType::XmlInternalGeneralEntity,
                                 None,
@@ -2037,7 +2035,7 @@ impl XmlParserCtxt {
                         }
 
                         xml_sax2_entity_decl(
-                            Some(GenericErrorContext::new(self as *mut XmlParserCtxt)),
+                            self,
                             &name,
                             XmlEntityType::XmlInternalGeneralEntity,
                             None,
@@ -2092,7 +2090,7 @@ impl XmlParserCtxt {
                                 .and_then(|sax| sax.unparsed_entity_decl)
                             {
                                 unparsed_ent(
-                                    self.user_data.clone(),
+                                    self,
                                     &name,
                                     literal.as_deref(),
                                     uri.as_deref(),
@@ -2106,7 +2104,7 @@ impl XmlParserCtxt {
                                 self.sax.as_deref_mut().and_then(|sax| sax.entity_decl)
                             {
                                 entity_decl(
-                                    self.user_data.clone(),
+                                    self,
                                     &name,
                                     XmlEntityType::XmlExternalGeneralParsedEntity,
                                     literal.as_deref(),
@@ -2139,7 +2137,7 @@ impl XmlParserCtxt {
                                     xml_new_dtd(self.my_doc, Some("fake"), None, None);
                             }
                             xml_sax2_entity_decl(
-                                Some(GenericErrorContext::new(self as *mut XmlParserCtxt)),
+                                self,
                                 &name,
                                 XmlEntityType::XmlExternalGeneralParsedEntity,
                                 literal.as_deref(),
@@ -2181,23 +2179,20 @@ impl XmlParserCtxt {
                             .as_deref_mut()
                             .and_then(|sax| sax.get_parameter_entity)
                         {
-                            cur = get_parameter_entity(self.user_data.clone(), &name);
+                            cur = get_parameter_entity(self, &name);
                         }
                     } else {
                         if let Some(get_entity) =
                             self.sax.as_deref_mut().and_then(|sax| sax.get_entity)
                         {
-                            cur = get_entity(self.user_data.clone(), &name);
+                            cur = get_entity(self, &name);
                         }
                         if cur.is_none()
                             && self.user_data.as_ref().and_then(|d| {
                                 d.lock().downcast_ref::<*mut XmlParserCtxt>().copied()
                             }) == Some(self)
                         {
-                            cur = xml_sax2_get_entity(
-                                Some(GenericErrorContext::new(self as *mut XmlParserCtxt)),
-                                &name,
-                            );
+                            cur = xml_sax2_get_entity(self, &name);
                         }
                     }
                     if let Some(mut cur) = cur.filter(|cur| cur.orig.is_none()) {
@@ -2278,12 +2273,7 @@ impl XmlParserCtxt {
                         if let Some(notation_decl) =
                             self.sax.as_deref_mut().and_then(|sax| sax.notation_decl)
                         {
-                            notation_decl(
-                                self.user_data.clone(),
-                                &name,
-                                pubid.as_deref(),
-                                systemid.as_deref(),
-                            );
+                            notation_decl(self, &name, pubid.as_deref(), systemid.as_deref());
                         }
                     }
                 } else {

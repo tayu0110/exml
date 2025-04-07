@@ -108,12 +108,13 @@ impl XmlParserCtxt {
                         if let Some(sax) = self.sax.as_deref_mut() {
                             if blank {
                                 if let Some(ignorable_whitespace) = sax.ignorable_whitespace {
-                                    ignorable_whitespace(self.user_data.clone(), &buf);
+                                    ignorable_whitespace(self, &buf);
                                 }
                             } else {
                                 if let Some(characters) = sax.characters {
-                                    characters(self.user_data.clone(), &buf);
+                                    characters(self, &buf);
                                 }
+                                let sax = self.sax.as_deref_mut().unwrap();
                                 if (sax.ignorable_whitespace.is_some() || sax.characters.is_some())
                                     && sax
                                         .ignorable_whitespace
@@ -145,12 +146,13 @@ impl XmlParserCtxt {
                     if let Some(sax) = self.sax.as_deref_mut() {
                         if blank {
                             if let Some(ignorable_whitespace) = sax.ignorable_whitespace {
-                                ignorable_whitespace(self.user_data.clone(), &buf);
+                                ignorable_whitespace(self, &buf);
                             }
                         } else {
                             if let Some(characters) = sax.characters {
-                                characters(self.user_data.clone(), &buf);
+                                characters(self, &buf);
                             }
+                            let sax = self.sax.as_deref_mut().unwrap();
                             if (sax.ignorable_whitespace.is_some() || sax.characters.is_some())
                                 && sax
                                     .ignorable_whitespace
@@ -286,11 +288,11 @@ impl XmlParserCtxt {
                         }) {
                             if blank {
                                 if let Some(ignorable_whitespace) = sax.ignorable_whitespace {
-                                    ignorable_whitespace(self.user_data.clone(), &buf);
+                                    ignorable_whitespace(self, &buf);
                                 }
                             } else {
                                 if let Some(characters) = sax.characters {
-                                    characters(self.user_data.clone(), &buf);
+                                    characters(self, &buf);
                                 }
                                 if self.space() == -1 {
                                     *self.space_mut() = -2;
@@ -299,7 +301,7 @@ impl XmlParserCtxt {
                         } else if let Some(characters) =
                             self.sax.as_deref_mut().and_then(|sax| sax.characters)
                         {
-                            characters(self.user_data.clone(), &buf);
+                            characters(self, &buf);
                         }
                     }
                     return;
@@ -369,11 +371,11 @@ impl XmlParserCtxt {
                     }) {
                         if blank {
                             if let Some(ignorable_whitespace) = sax.ignorable_whitespace {
-                                ignorable_whitespace(self.user_data.clone(), &buf);
+                                ignorable_whitespace(self, &buf);
                             }
                         } else {
                             if let Some(characters) = sax.characters {
-                                characters(self.user_data.clone(), &buf);
+                                characters(self, &buf);
                             }
                             if self.space() == -1 {
                                 *self.space_mut() = -2;
@@ -382,7 +384,7 @@ impl XmlParserCtxt {
                     } else if let Some(characters) =
                         self.sax.as_deref_mut().and_then(|sax| sax.characters)
                     {
-                        characters(self.user_data.clone(), &buf);
+                        characters(self, &buf);
                     }
 
                     // refresh input buffer
@@ -515,9 +517,9 @@ impl XmlParserCtxt {
             if self.disable_sax == 0 {
                 if let Some(sax) = self.sax.as_deref_mut() {
                     if let Some(cdata) = sax.cdata_block {
-                        cdata(self.user_data.clone(), &buf);
+                        cdata(self, &buf);
                     } else if let Some(characters) = sax.characters {
-                        characters(self.user_data.clone(), &buf);
+                        characters(self, &buf);
                     }
                 }
             }

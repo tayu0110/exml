@@ -3,7 +3,6 @@ use std::{borrow::Cow, str::from_utf8_unchecked};
 use crate::{
     encoding::XmlCharEncoding,
     error::XmlParserErrors,
-    globals::GenericErrorContext,
     libxml::sax2::xml_sax2_get_entity,
     parser::{
         XmlParserCtxt, XmlParserCtxtPtr, XmlParserInputState, XmlParserMode, XmlParserOption,
@@ -260,8 +259,8 @@ impl XmlParserCtxt {
             // Ask first SAX for entity resolution, otherwise try the
             // entities which may have stored in the parser context.
             if let Some(sax) = self.sax.as_deref_mut() {
-                if let Some(f) = sax.get_entity {
-                    ent = f(self.user_data.clone(), &name);
+                if let Some(get_entity) = sax.get_entity {
+                    ent = get_entity(self, &name);
                 }
                 if self.well_formed == 1
                     && ent.is_none()
@@ -277,10 +276,7 @@ impl XmlParserCtxt {
                         .and_then(|d| d.lock().downcast_ref::<XmlParserCtxtPtr>().copied())
                         == Some(self)
                 {
-                    ent = xml_sax2_get_entity(
-                        Some(GenericErrorContext::new(self as *mut XmlParserCtxt)),
-                        &name,
-                    );
+                    ent = xml_sax2_get_entity(self, &name);
                 }
             }
             if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
@@ -383,7 +379,7 @@ impl XmlParserCtxt {
                         if let Some(reference) =
                             self.sax.as_deref_mut().and_then(|sax| sax.reference)
                         {
-                            reference(self.user_data.clone(), &name);
+                            reference(self, &name);
                         }
                     }
                 }
@@ -461,7 +457,7 @@ impl XmlParserCtxt {
             // entities which may have stored in the parser context.
             if let Some(sax) = self.sax.as_deref_mut() {
                 if let Some(get_entity) = sax.get_entity {
-                    ent = get_entity(self.user_data.clone(), name);
+                    ent = get_entity(self, name);
                 }
                 if ent.is_none() && self.options & XmlParserOption::XmlParseOldSAX as i32 != 0 {
                     ent = xml_get_predefined_entity(name);
@@ -473,10 +469,7 @@ impl XmlParserCtxt {
                         .and_then(|d| d.lock().downcast_ref::<XmlParserCtxtPtr>().copied())
                         == Some(self)
                 {
-                    ent = xml_sax2_get_entity(
-                        Some(GenericErrorContext::new(self as *mut XmlParserCtxt)) as _,
-                        name,
-                    );
+                    ent = xml_sax2_get_entity(self, name);
                 }
             }
             if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
@@ -643,9 +636,7 @@ impl XmlParserCtxt {
                 .sax
                 .as_deref_mut()
                 .and_then(|sax| sax.get_parameter_entity)
-                .and_then(|get_parameter_entity| {
-                    get_parameter_entity(self.user_data.clone(), name)
-                });
+                .and_then(|get_parameter_entity| get_parameter_entity(self, name));
             if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
                 return (None, ptr);
             }
@@ -736,7 +727,7 @@ impl XmlParserCtxt {
                             if let Some(characters) =
                                 self.sax.as_deref_mut().and_then(|sax| sax.characters)
                             {
-                                characters(self.user_data.clone(), out);
+                                characters(self, out);
                             }
                         }
                     } else {
@@ -757,7 +748,7 @@ impl XmlParserCtxt {
                                 // `out` contains only '#', 'x' and ascii hex digit characters.
                                 // Therefore, UTF-8 validation won't fail.
                                 let out = from_utf8_unchecked(&out[..len]);
-                                reference(self.user_data.clone(), out);
+                                reference(self, out);
                             }
                         }
                     }
@@ -768,7 +759,7 @@ impl XmlParserCtxt {
                         if let Some(characters) =
                             self.sax.as_deref_mut().and_then(|sax| sax.characters)
                         {
-                            characters(self.user_data.clone(), out);
+                            characters(self, out);
                         }
                     }
                 }
@@ -793,7 +784,7 @@ impl XmlParserCtxt {
                 if self.disable_sax == 0 {
                     if let Some(characters) = self.sax.as_deref_mut().and_then(|sax| sax.characters)
                     {
-                        characters(self.user_data.clone(), val);
+                        characters(self, val);
                     }
                 }
                 return;
@@ -1023,7 +1014,7 @@ impl XmlParserCtxt {
                     if let Some(reference) = self.sax.as_deref_mut().and_then(|sax| sax.reference) {
                         // Entity reference callback comes second, it's somewhat
                         // superfluous but a compatibility to historical behaviour
-                        reference(self.user_data.clone(), &ent.name().unwrap());
+                        reference(self, &ent.name().unwrap());
                     }
                 }
                 return;
@@ -1039,7 +1030,7 @@ impl XmlParserCtxt {
             if self.replace_entities == 0 && self.disable_sax == 0 {
                 if let Some(reference) = self.sax.as_deref_mut().and_then(|sax| sax.reference) {
                     // Create a node.
-                    reference(self.user_data.clone(), &ent.name().unwrap());
+                    reference(self, &ent.name().unwrap());
                     return;
                 }
             }

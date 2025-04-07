@@ -42,7 +42,7 @@
 //
 // daniel@veillard.com
 
-use std::{ffi::c_void, sync::atomic::AtomicPtr};
+use std::{ffi::c_void, rc::Rc, sync::atomic::AtomicPtr};
 
 use crate::{
     globals::{GenericErrorContext, StructuredError},
@@ -54,11 +54,13 @@ use crate::{
     },
 };
 
+use super::XmlParserCtxt;
+
 #[repr(C)]
 #[derive(Clone, Default)]
 pub(crate) struct XmlStartTag {
-    pub(crate) prefix: Option<String>,
-    pub(crate) uri: Option<String>,
+    pub(crate) prefix: Option<Rc<str>>,
+    pub(crate) uri: Option<Rc<str>>,
     pub(crate) line: i32,
     pub(crate) ns_nr: i32,
 }
@@ -83,149 +85,113 @@ pub struct XmlSAXLocator {
 ///
 /// Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
 #[doc(alias = "resolveEntitySAXFunc")]
-pub type ResolveEntitySAXFunc = unsafe fn(
-    ctx: Option<GenericErrorContext>,
-    public_id: Option<&str>,
-    system_id: Option<&str>,
-) -> Option<XmlParserInput>;
+pub type ResolveEntitySAXFunc =
+    unsafe fn(&mut XmlParserCtxt, Option<&str>, Option<&str>) -> Option<XmlParserInput>;
 /// Callback on internal subset declaration.
 #[doc(alias = "internalSubsetSAXFunc")]
-pub type InternalSubsetSAXFunc = unsafe fn(
-    ctx: Option<GenericErrorContext>,
-    name: Option<&str>,
-    external_id: Option<&str>,
-    system_id: Option<&str>,
-);
+pub type InternalSubsetSAXFunc =
+    unsafe fn(&mut XmlParserCtxt, Option<&str>, Option<&str>, Option<&str>);
 
 /// Callback on external subset declaration.
 #[doc(alias = "externalSubsetSAXFunc")]
-pub type ExternalSubsetSAXFunc = unsafe fn(
-    ctx: Option<GenericErrorContext>,
-    name: Option<&str>,
-    external_id: Option<&str>,
-    system_id: Option<&str>,
-);
+pub type ExternalSubsetSAXFunc =
+    unsafe fn(&mut XmlParserCtxt, Option<&str>, Option<&str>, Option<&str>);
 
 /// Get an entity by name.
 ///
 /// Returns the xmlEntityPtr if found.
 #[doc(alias = "getEntitySAXFunc")]
-pub type GetEntitySAXFunc =
-    unsafe fn(ctx: Option<GenericErrorContext>, name: &str) -> Option<XmlEntityPtr>;
+pub type GetEntitySAXFunc = unsafe fn(&mut XmlParserCtxt, &str) -> Option<XmlEntityPtr>;
 
 /// Get a parameter entity by name.
 ///
 /// Returns the xmlEntityPtr if found.
 #[doc(alias = "getParameterEntitySAXFunc")]
-pub type GetParameterEntitySAXFunc =
-    unsafe fn(ctx: Option<GenericErrorContext>, name: &str) -> Option<XmlEntityPtr>;
+pub type GetParameterEntitySAXFunc = unsafe fn(&mut XmlParserCtxt, &str) -> Option<XmlEntityPtr>;
 
 /// An entity definition has been parsed.
 #[doc(alias = "entityDeclSAXFunc")]
-pub type EntityDeclSAXFunc = unsafe fn(
-    ctx: Option<GenericErrorContext>,
-    name: &str,
-    typ: XmlEntityType,
-    public_id: Option<&str>,
-    system_id: Option<&str>,
-    content: Option<&str>,
-);
+pub type EntityDeclSAXFunc =
+    unsafe fn(&mut XmlParserCtxt, &str, XmlEntityType, Option<&str>, Option<&str>, Option<&str>);
 
 /// What to do when a notation declaration has been parsed.
 #[doc(alias = "notationDeclSAXFunc")]
-pub type NotationDeclSAXFunc = unsafe fn(
-    ctx: Option<GenericErrorContext>,
-    name: &str,
-    public_id: Option<&str>,
-    system_id: Option<&str>,
-);
+pub type NotationDeclSAXFunc = unsafe fn(&mut XmlParserCtxt, &str, Option<&str>, Option<&str>);
 
 /// An attribute definition has been parsed.
 #[doc(alias = "attributeDeclSAXFunc")]
 pub type AttributeDeclSAXFunc = unsafe fn(
-    ctx: Option<GenericErrorContext>,
-    elem: &str,
-    fullname: &str,
-    typ: XmlAttributeType,
-    def: XmlAttributeDefault,
-    default_value: Option<&str>,
-    tree: Option<Box<XmlEnumeration>>,
+    &mut XmlParserCtxt,
+    &str,
+    &str,
+    XmlAttributeType,
+    XmlAttributeDefault,
+    Option<&str>,
+    Option<Box<XmlEnumeration>>,
 );
 
 /// An element definition has been parsed.
 #[doc(alias = "elementDeclSAXFunc")]
-pub type ElementDeclSAXFunc = unsafe fn(
-    ctx: Option<GenericErrorContext>,
-    name: &str,
-    typ: Option<XmlElementTypeVal>,
-    content: XmlElementContentPtr,
-);
+pub type ElementDeclSAXFunc =
+    unsafe fn(&mut XmlParserCtxt, &str, Option<XmlElementTypeVal>, XmlElementContentPtr);
 
 /// What to do when an unparsed entity declaration is parsed.
 #[doc(alias = "unparsedEntityDeclSAXFunc")]
-pub type UnparsedEntityDeclSAXFunc = unsafe fn(
-    ctx: Option<GenericErrorContext>,
-    name: &str,
-    public_id: Option<&str>,
-    system_id: Option<&str>,
-    notation_name: Option<&str>,
-);
+pub type UnparsedEntityDeclSAXFunc =
+    unsafe fn(&mut XmlParserCtxt, &str, Option<&str>, Option<&str>, Option<&str>);
 
 /// Receive the document locator at startup, actually xmlDefaultSAXLocator.
 /// Everything is available on the context, so this is useless in our case.
 #[doc(alias = "setDocumentLocatorSAXFunc")]
-pub type SetDocumentLocatorSAXFunc =
-    unsafe fn(ctx: Option<GenericErrorContext>, loc: XmlSAXLocatorPtr);
+pub type SetDocumentLocatorSAXFunc = unsafe fn(&mut XmlParserCtxt, XmlSAXLocatorPtr);
 
 /// Called when the document start being processed.
 #[doc(alias = "startDocumentSAXFunc")]
-pub type StartDocumentSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>);
+pub type StartDocumentSAXFunc = unsafe fn(&mut XmlParserCtxt);
 /// Called when the document end has been detected.
 #[doc(alias = "endDocumentSAXFunc")]
-pub type EndDocumentSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>);
+pub type EndDocumentSAXFunc = unsafe fn(&mut XmlParserCtxt);
 /// Called when an opening tag has been processed.
 ///
 /// The elements of `atts` are `(attribute_name, attribute_value)`.
 #[doc(alias = "startElementSAXFunc")]
-pub type StartElementSAXFunc =
-    unsafe fn(ctx: Option<GenericErrorContext>, name: &str, atts: &[(String, Option<String>)]);
+pub type StartElementSAXFunc = unsafe fn(&mut XmlParserCtxt, &str, &[(String, Option<String>)]);
 
 /// Called when the end of an element has been detected.
 #[doc(alias = "endElementSAXFunc")]
-pub type EndElementSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>, name: &str);
+pub type EndElementSAXFunc = unsafe fn(&mut XmlParserCtxt, &str);
 
 /// Handle an attribute that has been read by the parser.
 /// The default handling is to convert the attribute into an
 /// DOM subtree and past it in a new xmlAttr element added to
 /// the element.
 #[doc(alias = "attributeSAXFunc")]
-pub type AttributeSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>, name: &str, value: &str);
+pub type AttributeSAXFunc = unsafe fn(&mut XmlParserCtxt, &str, &str);
 
 /// Called when an entity reference is detected.
 #[doc(alias = "referenceSAXFunc")]
-pub type ReferenceSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>, name: &str);
+pub type ReferenceSAXFunc = unsafe fn(&mut XmlParserCtxt, &str);
 
 /// Receiving some chars from the parser.
 #[doc(alias = "charactersSAXFunc")]
-pub type CharactersSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>, ch: &str);
+pub type CharactersSAXFunc = unsafe fn(&mut XmlParserCtxt, &str);
 
 /// Receiving some ignorable whitespaces from the parser.
 /// UNUSED: by default the DOM building will use characters.
 #[doc(alias = "ignorableWhitespaceSAXFunc")]
-pub type IgnorableWhitespaceSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>, ch: &str);
+pub type IgnorableWhitespaceSAXFunc = unsafe fn(&mut XmlParserCtxt, &str);
 
 /// A processing instruction has been parsed.
 #[doc(alias = "processingInstructionSAXFunc")]
-pub type ProcessingInstructionSAXFunc =
-    unsafe fn(ctx: Option<GenericErrorContext>, target: &str, data: Option<&str>);
+pub type ProcessingInstructionSAXFunc = unsafe fn(&mut XmlParserCtxt, &str, Option<&str>);
 
 /// A comment has been parsed.
 #[doc(alias = "commentSAXFunc")]
-pub type CommentSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>, value: &str);
+pub type CommentSAXFunc = unsafe fn(&mut XmlParserCtxt, &str);
 
 /// Called when a pcdata block has been parsed.
 #[doc(alias = "cdataBlockSAXFunc")]
-pub type CDATABlockSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>, value: &str);
+pub type CDATABlockSAXFunc = unsafe fn(&mut XmlParserCtxt, &str);
 
 /// Display and format a warning messages, callback.
 #[doc(alias = "warningSAXFunc")]
@@ -245,42 +211,37 @@ pub type FatalErrorSAXFunc = fn(ctx: Option<GenericErrorContext>, msg: &str);
 ///
 /// Returns 1 if true
 #[doc(alias = "isStandaloneSAXFunc")]
-pub type IsStandaloneSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>) -> i32;
+pub type IsStandaloneSAXFunc = unsafe fn(&mut XmlParserCtxt) -> i32;
 /// Does this document has an internal subset.
 ///
 /// Returns 1 if true
 #[doc(alias = "hasInternalSubsetSAXFunc")]
-pub type HasInternalSubsetSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>) -> i32;
+pub type HasInternalSubsetSAXFunc = unsafe fn(&mut XmlParserCtxt) -> i32;
 
 /// Does this document has an external subset?
 ///
 /// Returns 1 if true
 #[doc(alias = "hasExternalSubsetSAXFunc")]
-pub type HasExternalSubsetSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>) -> i32;
+pub type HasExternalSubsetSAXFunc = unsafe fn(&mut XmlParserCtxt) -> i32;
 
 /// SAX2 callback when an element start has been detected by the parser.
 /// It provides the namespace information for the element, as well as
 /// the new namespace declarations on the element.
 #[doc(alias = "startElementNsSAX2Func")]
 pub type StartElementNsSAX2Func = unsafe fn(
-    ctx: Option<GenericErrorContext>,
-    localname: &str,
-    prefix: Option<&str>,
-    uri: Option<&str>,
-    namespaces: &[(Option<String>, String)],
-    nb_defaulted: usize,
-    attributes: &[(String, Option<String>, Option<String>, String)],
+    &mut XmlParserCtxt,
+    &str,
+    Option<&str>,
+    Option<&str>,
+    &[(Option<String>, String)],
+    usize,
+    &[(String, Option<String>, Option<String>, String)],
 );
 
 /// SAX2 callback when an element end has been detected by the parser.
 /// It provides the namespace information for the element.
 #[doc(alias = "endElementNsSAX2Func")]
-pub type EndElementNsSAX2Func = unsafe fn(
-    ctx: Option<GenericErrorContext>,
-    localname: &str,
-    prefix: Option<&str>,
-    uri: Option<&str>,
-);
+pub type EndElementNsSAX2Func = unsafe fn(&mut XmlParserCtxt, &str, Option<&str>, Option<&str>);
 
 // pub type XmlSAXHandlerPtr = *mut XmlSAXHandler;
 /// A SAX handler is bunch of callbacks called by the parser when processing
