@@ -2902,7 +2902,7 @@ unsafe fn xml_schema_val_atomic_type(
                                                 let strip: *mut XmlChar = xml_schema_strip(value);
                                                 let res = if !strip.is_null() {
                                                     let res = xml_add_id(
-                                                        null_mut(),
+                                                        None,
                                                         attr.doc.unwrap(),
                                                         CStr::from_ptr(strip as *const i8)
                                                             .to_string_lossy()
@@ -2913,7 +2913,7 @@ unsafe fn xml_schema_val_atomic_type(
                                                     res
                                                 } else {
                                                     xml_add_id(
-                                                        null_mut(),
+                                                        None,
                                                         attr.doc.unwrap(),
                                                         CStr::from_ptr(value as *const i8)
                                                             .to_string_lossy()
@@ -2954,7 +2954,7 @@ unsafe fn xml_schema_val_atomic_type(
                                             let strip: *mut XmlChar = xml_schema_strip(value);
                                             if !strip.is_null() {
                                                 xml_add_ref(
-                                                    null_mut(),
+                                                    None,
                                                     attr.doc.unwrap(),
                                                     CStr::from_ptr(strip as *const i8)
                                                         .to_string_lossy()
@@ -2964,7 +2964,7 @@ unsafe fn xml_schema_val_atomic_type(
                                                 xml_free(strip as _);
                                             } else {
                                                 xml_add_ref(
-                                                    null_mut(),
+                                                    None,
                                                     attr.doc.unwrap(),
                                                     CStr::from_ptr(value as *const i8)
                                                         .to_string_lossy()

@@ -3647,9 +3647,9 @@ pub(crate) unsafe fn xml_schema_pval_attr_node_id(
             if !matches!(attr.atype, Some(XmlAttributeType::XmlAttributeID)) {
                 // TODO: Use xmlSchemaStrip here; it's not exported at this moment.
                 let res = if let Some(strip) = xml_schema_collapse_string(&value) {
-                    unsafe { xml_add_id(null_mut(), attr.doc.unwrap(), &strip, attr) }
+                    unsafe { xml_add_id(None, attr.doc.unwrap(), &strip, attr) }
                 } else {
-                    unsafe { xml_add_id(null_mut(), attr.doc.unwrap(), &value, attr) }
+                    unsafe { xml_add_id(None, attr.doc.unwrap(), &value, attr) }
                 };
                 if res.is_none() {
                     unsafe {

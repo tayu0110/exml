@@ -308,7 +308,7 @@ impl XmlValidCtxt {
                     etype: XmlElementTypeVal::XmlElementTypeUndefined,
                     ..Default::default()
                 }) else {
-                    xml_verr_memory(self as _, Some("malloc failed"));
+                    xml_verr_memory(self, Some("malloc failed"));
                     return None;
                 };
                 cur = Some(res);
@@ -2035,15 +2035,12 @@ pub fn xml_dump_attribute_decl<'a>(buf: &mut (impl Write + 'a), attr: XmlAttribu
     writeln!(buf, ">").ok();
 }
 
-unsafe fn xml_is_streaming(ctxt: XmlValidCtxtPtr) -> i32 {
+unsafe fn xml_is_streaming(ctxt: &mut XmlValidCtxt) -> i32 {
     unsafe {
-        if ctxt.is_null() {
+        if ctxt.flags & XML_VCTXT_USE_PCTXT as u32 == 0 {
             return 0;
         }
-        if (*ctxt).flags & XML_VCTXT_USE_PCTXT as u32 == 0 {
-            return 0;
-        }
-        let pctxt = (*ctxt)
+        let pctxt = ctxt
             .user_data
             .as_ref()
             .and_then(|d| {
@@ -2060,7 +2057,7 @@ unsafe fn xml_is_streaming(ctxt: XmlValidCtxtPtr) -> i32 {
 /// Returns null_mut() if not, otherwise the new xmlIDPtr
 #[doc(alias = "xmlAddID")]
 pub unsafe fn xml_add_id(
-    ctxt: XmlValidCtxtPtr,
+    mut ctxt: Option<&mut XmlValidCtxt>,
     mut doc: XmlDocPtr,
     value: &str,
     mut attr: XmlAttrPtr,
@@ -2075,7 +2072,10 @@ pub unsafe fn xml_add_id(
             doc: Some(doc),
             ..Default::default()
         };
-        if xml_is_streaming(ctxt) != 0 {
+        if ctxt
+            .as_mut()
+            .is_some_and(|ctxt| xml_is_streaming(ctxt) != 0)
+        {
             // Operating in streaming mode, attr is gonna disappear
             ret.name = attr.name().map(|n| n.into_owned());
             ret.attr = None;
@@ -2092,9 +2092,9 @@ pub unsafe fn xml_add_id(
         if table.add_entry(value, ret).is_err() {
             // The id is already defined in this DTD.
             #[cfg(feature = "libxml_valid")]
-            if !ctxt.is_null() {
+            if let Some(ctxt) = ctxt {
                 xml_err_valid_node(
-                    Some(&mut *ctxt),
+                    Some(ctxt),
                     attr.parent(),
                     XmlParserErrors::XmlDTDIDRedefined,
                     format!("ID {value} already defined\n").as_str(),
@@ -2251,7 +2251,7 @@ pub unsafe fn xml_remove_id(mut doc: XmlDocPtr, mut attr: XmlAttrPtr) -> i32 {
 /// However, this function cannot returns `Option<&XmlRef>`.
 #[doc(alias = "xmlAddRef")]
 pub(crate) unsafe fn xml_add_ref(
-    ctxt: XmlValidCtxtPtr,
+    mut ctxt: Option<&mut XmlValidCtxt>,
     mut doc: XmlDocPtr,
     value: &str,
     attr: XmlAttrPtr,
@@ -2264,7 +2264,10 @@ pub(crate) unsafe fn xml_add_ref(
             ..Default::default()
         };
         // fill the structure.
-        if xml_is_streaming(ctxt) != 0 {
+        if ctxt
+            .as_mut()
+            .is_some_and(|ctxt| xml_is_streaming(ctxt) != 0)
+        {
             // Operating in streaming mode, attr is gonna disappear
             ret.name = attr.name().map(|n| n.into_owned());
             ret.attr = None;
@@ -3060,7 +3063,7 @@ pub unsafe fn xml_validate_notation_decl(
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateDtd")]
 #[cfg(feature = "libxml_valid")]
-pub unsafe fn xml_validate_dtd(ctxt: XmlValidCtxtPtr, mut doc: XmlDocPtr, dtd: XmlDtdPtr) -> i32 {
+pub unsafe fn xml_validate_dtd(ctxt: &mut XmlValidCtxt, mut doc: XmlDocPtr, dtd: XmlDtdPtr) -> i32 {
     unsafe {
         let old_ext = doc.ext_subset;
         let old_int = doc.int_subset;
@@ -3402,7 +3405,7 @@ pub unsafe fn xml_validate_dtd_final(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i
 /// Returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateDocument")]
 #[cfg(feature = "libxml_valid")]
-pub unsafe fn xml_validate_document(ctxt: XmlValidCtxtPtr, mut doc: XmlDocPtr) -> i32 {
+pub unsafe fn xml_validate_document(ctxt: &mut XmlValidCtxt, mut doc: XmlDocPtr) -> i32 {
     unsafe {
         use crate::{parser::xml_parse_dtd, uri::build_uri};
 
@@ -3475,7 +3478,7 @@ pub unsafe fn xml_validate_document(ctxt: XmlValidCtxtPtr, mut doc: XmlDocPtr) -
 #[doc(alias = "xmlValidateElement")]
 #[cfg(feature = "libxml_valid")]
 pub unsafe fn xml_validate_element(
-    ctxt: XmlValidCtxtPtr,
+    ctxt: &mut XmlValidCtxt,
     doc: XmlDocPtr,
     root: Option<XmlGenericNodePtr>,
 ) -> i32 {
@@ -3486,9 +3489,6 @@ pub unsafe fn xml_validate_element(
             return 0;
         };
 
-        // if doc.is_null() {
-        //     return 0;
-        // }
         if doc.int_subset.is_none() && doc.ext_subset.is_none() {
             return 0;
         };
@@ -5199,7 +5199,7 @@ pub unsafe fn xml_validate_one_element(
 #[doc(alias = "xmlValidateOneAttribute")]
 #[cfg(feature = "libxml_valid")]
 pub unsafe fn xml_validate_one_attribute(
-    ctxt: XmlValidCtxtPtr,
+    ctxt: &mut XmlValidCtxt,
     doc: XmlDocPtr,
     elem: XmlNodePtr,
     attr: Option<XmlAttrPtr>,
@@ -5330,7 +5330,7 @@ pub unsafe fn xml_validate_one_attribute(
             let elem_name = elem.name().unwrap();
             let def_value = attr_decl.default_value.as_deref().unwrap();
             xml_err_valid_node(
-                Some(&mut *ctxt),
+                Some(ctxt),
                 Some(elem.into()),
                 XmlParserErrors::XmlDTDAttributeDefault,
                 format!(
@@ -5347,7 +5347,7 @@ pub unsafe fn xml_validate_one_attribute(
 
         // Validity Constraint: ID uniqueness
         if matches!(attr_decl.atype, XmlAttributeType::XmlAttributeID)
-            && xml_add_id(ctxt, doc, value, attr).is_none()
+            && xml_add_id(Some(ctxt), doc, value, attr).is_none()
         {
             ret = 0;
         }
@@ -5355,7 +5355,7 @@ pub unsafe fn xml_validate_one_attribute(
         if matches!(
             attr_decl.atype,
             XmlAttributeType::XmlAttributeIDREF | XmlAttributeType::XmlAttributeIDREFS
-        ) && xml_add_ref(ctxt, doc, value, attr).is_none()
+        ) && xml_add_ref(Some(ctxt), doc, value, attr).is_none()
         {
             ret = 0;
         }
@@ -5398,7 +5398,7 @@ pub unsafe fn xml_validate_one_attribute(
                 let attr_name = attr.name().unwrap();
                 let elem_name = elem.name().unwrap();
                 xml_err_valid_node(
-                    Some(&mut *ctxt),
+                    Some(ctxt),
                     Some(elem.into()),
                     XmlParserErrors::XmlDTDNotationValue,
                     format!(
@@ -5428,7 +5428,7 @@ pub unsafe fn xml_validate_one_attribute(
                 let attr_name = attr.name().unwrap();
                 let elem_name = elem.name().unwrap();
                 xml_err_valid_node(
-                    Some(&mut *ctxt),
+                    Some(ctxt),
                     Some(elem.into()),
                     XmlParserErrors::XmlDTDAttributeValue,
                     format!(
@@ -5452,7 +5452,7 @@ pub unsafe fn xml_validate_one_attribute(
             let elem_name = elem.name().unwrap();
             let def_value = attr_decl.default_value.as_deref().unwrap();
             xml_err_valid_node(
-                Some(&mut *ctxt),
+                Some(ctxt),
                 Some(elem.into()),
                 XmlParserErrors::XmlDTDAttributeValue,
                 format!(

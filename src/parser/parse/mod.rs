@@ -639,8 +639,7 @@ pub(crate) unsafe fn xml_parse_balanced_chunk_memory_internal(
                     {
                         if let Some(my_doc) = oldctxt.my_doc.filter(|doc| doc.int_subset.is_some())
                         {
-                            oldctxt.valid &=
-                                xml_validate_element(&raw mut oldctxt.vctxt, my_doc, cur);
+                            oldctxt.valid &= xml_validate_element(&mut oldctxt.vctxt, my_doc, cur);
                         }
                     }
                     now.set_parent(None);

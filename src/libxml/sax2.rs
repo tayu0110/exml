@@ -1440,7 +1440,7 @@ unsafe fn xml_sax2_attribute_internal(
                         }
 
                         ctxt.valid &= xml_validate_one_attribute(
-                            &raw mut ctxt.vctxt,
+                            &mut ctxt.vctxt,
                             my_doc,
                             ctxt.node.unwrap(),
                             Some(ret),
@@ -1448,7 +1448,7 @@ unsafe fn xml_sax2_attribute_internal(
                         );
                     } else {
                         ctxt.valid &= xml_validate_one_attribute(
-                            &raw mut ctxt.vctxt,
+                            &mut ctxt.vctxt,
                             my_doc,
                             ctxt.node.unwrap(),
                             Some(ret),
@@ -1457,7 +1457,7 @@ unsafe fn xml_sax2_attribute_internal(
                     }
                 } else {
                     ctxt.valid &= xml_validate_one_attribute(
-                        &raw mut ctxt.vctxt,
+                        &mut ctxt.vctxt,
                         my_doc,
                         ctxt.node.unwrap(),
                         Some(ret),
@@ -1494,11 +1494,11 @@ unsafe fn xml_sax2_attribute_internal(
                                 content
                             );
                         }
-                        xml_add_id(&raw mut ctxt.vctxt, ctxt.my_doc.unwrap(), content, ret);
+                        xml_add_id(Some(&mut ctxt.vctxt), ctxt.my_doc.unwrap(), content, ret);
                     } else if xml_is_id(ctxt.my_doc, ctxt.node, Some(ret)) != 0 {
-                        xml_add_id(&raw mut ctxt.vctxt, ctxt.my_doc.unwrap(), content, ret);
+                        xml_add_id(Some(&mut ctxt.vctxt), ctxt.my_doc.unwrap(), content, ret);
                     } else if xml_is_ref(ctxt.my_doc, ctxt.node, Some(ret)) != 0 {
-                        xml_add_ref(&raw mut ctxt.vctxt, ctxt.my_doc.unwrap(), content, ret);
+                        xml_add_ref(Some(&mut ctxt.vctxt), ctxt.my_doc.unwrap(), content, ret);
                     }
                 }
             }
@@ -2171,7 +2171,7 @@ unsafe fn xml_sax2_attribute_ns(
                         }
 
                         ctxt.valid &= xml_validate_one_attribute(
-                            &raw mut ctxt.vctxt,
+                            &mut ctxt.vctxt,
                             ctxt.my_doc.unwrap(),
                             ctxt.node.unwrap(),
                             Some(ret),
@@ -2179,7 +2179,7 @@ unsafe fn xml_sax2_attribute_ns(
                         );
                     } else {
                         ctxt.valid &= xml_validate_one_attribute(
-                            &raw mut ctxt.vctxt,
+                            &mut ctxt.vctxt,
                             ctxt.my_doc.unwrap(),
                             ctxt.node.unwrap(),
                             Some(ret),
@@ -2190,7 +2190,7 @@ unsafe fn xml_sax2_attribute_ns(
                     // if entities already have been substituted, then
                     // the attribute as passed is already normalized
                     ctxt.valid &= xml_validate_one_attribute(
-                        &raw mut ctxt.vctxt,
+                        &mut ctxt.vctxt,
                         ctxt.my_doc.unwrap(),
                         ctxt.node.unwrap(),
                         Some(ret),
@@ -2231,11 +2231,11 @@ unsafe fn xml_sax2_attribute_ns(
                                 );
                             }
                         }
-                        xml_add_id(&raw mut ctxt.vctxt, ctxt.my_doc.unwrap(), content, ret);
+                        xml_add_id(Some(&mut ctxt.vctxt), ctxt.my_doc.unwrap(), content, ret);
                     } else if xml_is_id(ctxt.my_doc, ctxt.node, Some(ret)) != 0 {
-                        xml_add_id(&raw mut ctxt.vctxt, ctxt.my_doc.unwrap(), content, ret);
+                        xml_add_id(Some(&mut ctxt.vctxt), ctxt.my_doc.unwrap(), content, ret);
                     } else if xml_is_ref(ctxt.my_doc, ctxt.node, Some(ret)) != 0 {
-                        xml_add_ref(&raw mut ctxt.vctxt, ctxt.my_doc.unwrap(), content, ret);
+                        xml_add_ref(Some(&mut ctxt.vctxt), ctxt.my_doc.unwrap(), content, ret);
                     }
                 }
             }

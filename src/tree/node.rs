@@ -1098,7 +1098,7 @@ impl XmlNode {
                     }
                 }
                 if matches!(prop.atype, Some(XmlAttributeType::XmlAttributeID)) {
-                    xml_add_id(null_mut(), self.document().unwrap(), value.unwrap(), prop);
+                    xml_add_id(None, self.document().unwrap(), value.unwrap(), prop);
                 }
                 return Some(prop);
             }

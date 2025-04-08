@@ -2301,7 +2301,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                                 children.and_then(|c| c.get_string(cur_node.document(), 1))
                             {
                                 if xml_add_id(
-                                    null_mut(),
+                                    None,
                                     dest_doc,
                                     &id_val,
                                     XmlAttrPtr::try_from(cur_node).unwrap(),

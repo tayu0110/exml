@@ -516,7 +516,7 @@ pub(super) unsafe fn xml_new_prop_internal(
         if let Some(value) = value {
             if let Some(node) = node {
                 if xml_is_id(node.doc, Some(node), Some(cur)) == 1 {
-                    xml_add_id(null_mut(), node.doc.unwrap(), value, cur);
+                    xml_add_id(None, node.doc.unwrap(), value, cur);
                 }
             }
         }
@@ -649,7 +649,7 @@ pub(super) unsafe fn xml_copy_prop_internal(
         }) {
             let children = cur.children();
             if let Some(id) = children.and_then(|c| c.get_string(cur.doc, 1)) {
-                xml_add_id(null_mut(), target_doc, &id, ret);
+                xml_add_id(None, target_doc, &id, ret);
             }
         }
         Some(ret)

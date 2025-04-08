@@ -22,7 +22,7 @@
 use std::{
     ffi::CString,
     io::{Write, stdout},
-    ptr::{addr_of_mut, null, null_mut},
+    ptr::{null, null_mut},
 };
 
 #[cfg(feature = "xpath")]
@@ -2154,11 +2154,11 @@ impl XmlShellCtxt<'_> {
             if let Some(dtd) = dtd.filter(|dtd| !dtd.is_empty()) {
                 let subset = xml_parse_dtd(None, Some(dtd));
                 if let Some(subset) = subset {
-                    res = xml_validate_dtd(addr_of_mut!(vctxt), doc, subset);
+                    res = xml_validate_dtd(&mut vctxt, doc, subset);
                     xml_free_dtd(subset);
                 }
             } else {
-                res = xml_validate_document(addr_of_mut!(vctxt), doc);
+                res = xml_validate_document(&mut vctxt, doc);
             }
             res
         }
