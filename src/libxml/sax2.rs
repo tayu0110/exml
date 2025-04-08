@@ -19,12 +19,7 @@
 //
 // Daniel Veillard <daniel@veillard.com>
 
-use std::{
-    ffi::{CStr, CString, c_void},
-    mem::replace,
-    ptr::{null, null_mut},
-    sync::atomic::Ordering,
-};
+use std::{ffi::c_void, mem::replace, ptr::null, sync::atomic::Ordering};
 
 use crate::{
     encoding::{XmlCharEncoding, detect_encoding},
@@ -60,7 +55,7 @@ use crate::{
 };
 
 use super::{
-    globals::{xml_free, xml_register_node_default_value},
+    globals::xml_register_node_default_value,
     valid::{
         xml_add_element_decl, xml_add_id, xml_add_notation_decl, xml_add_ref,
         xml_get_dtd_qelement_desc, xml_is_id, xml_is_ref, xml_valid_ctxt_normalize_attribute_value,
@@ -68,7 +63,6 @@ use super::{
         xml_validate_notation_decl, xml_validate_one_attribute, xml_validate_one_namespace,
         xml_validate_root,
     },
-    xmlstring::xml_strndup,
 };
 
 /// Provides the public ID e.g. "-//SGMLSOURCE//DTD DEMO//EN"
@@ -1167,15 +1161,11 @@ unsafe fn xml_sax2_attribute_internal(
     use crate::{html::tree::html_is_boolean_attr, parser::XML_SKIP_IDS, uri::XmlURI};
 
     unsafe {
-        let nval: *mut XmlChar;
-        let value = value.map(|v| CString::new(v).unwrap());
-        let mut value = value.as_deref().map_or(null(), |v| v.as_ptr() as *const u8);
-
         let (ns, name) = if ctxt.html != 0 {
             (None, fullname)
         } else {
             // Split the full name into a namespace prefix and the tag name
-            let (prefix, mut local) = split_qname(&mut *ctxt, fullname);
+            let (prefix, mut local) = split_qname(ctxt, fullname);
             let mut ns = prefix;
             if let Some(prefix) = prefix.filter(|_| local.is_empty()) {
                 if prefix == "xmlns" {
@@ -1199,69 +1189,53 @@ unsafe fn xml_sax2_attribute_internal(
             (ns, local)
         };
 
-        #[cfg(not(feature = "html"))]
-        let f = false;
-        #[cfg(feature = "html")]
-        let f = ctxt.html != 0 && value.is_null() && html_is_boolean_attr(fullname);
-        if f {
-            nval = xml_strndup(fullname.as_ptr(), fullname.len() as i32);
-            value = nval;
-        } else {
+        let value = match value {
+            #[cfg(feature = "html")]
+            None if ctxt.html != 0 && html_is_boolean_attr(fullname) => Some(fullname.to_owned()),
             #[cfg(feature = "libxml_valid")]
-            if !value.is_null() {
+            Some(value) => {
                 // Do the last stage of the attribute normalization
                 // Needed for HTML too:
                 //   http://www.w3.org/TR/html4/types.html#h-6.2
                 ctxt.vctxt.valid = 1;
-                let v = CStr::from_ptr(value as *const i8).to_string_lossy();
                 let val = xml_valid_ctxt_normalize_attribute_value(
                     &raw mut ctxt.vctxt,
                     ctxt.my_doc.unwrap(),
                     ctxt.node.unwrap(),
                     fullname,
-                    &v,
+                    value,
                 );
                 if ctxt.vctxt.valid != 1 {
                     ctxt.valid = 0;
                 }
                 if let Some(val) = val {
-                    value = xml_strndup(val.as_ptr(), val.len() as i32);
-                    nval = value as *mut u8;
+                    Some(val.into_owned())
                 } else {
-                    nval = null_mut();
+                    Some(value.to_owned())
                 }
-            } else {
-                nval = null_mut();
             }
-            #[cfg(not(feature = "libxml_valid"))]
-            {
-                nval = null_mut();
-            }
-        }
+            value => value.map(|value| value.to_owned()),
+        };
 
         // Check whether it's a namespace definition
         if ctxt.html == 0 && ns.is_none() && name == "xmlns" {
-            let mut val = CStr::from_ptr(value as *const i8)
-                .to_string_lossy()
-                .into_owned();
+            let mut val = None;
 
             if ctxt.replace_entities == 0 {
                 ctxt.depth += 1;
-                let value =
-                    ctxt.string_decode_entities(&val, XML_SUBSTITUTE_REF as _, '\0', '\0', '\0');
+                let value = value.as_deref().and_then(|val| {
+                    ctxt.string_decode_entities(val, XML_SUBSTITUTE_REF as _, '\0', '\0', '\0')
+                });
                 ctxt.depth -= 1;
                 let Some(value) = value else {
                     xml_sax2_err_memory(ctxt, "xmlSAX2StartElement");
-                    if !nval.is_null() {
-                        xml_free(nval as _);
-                    }
                     return;
                 };
-                val = value;
+                val = Some(value);
             }
 
-            if !val.is_empty() {
-                if let Some(uri) = XmlURI::parse(&val) {
+            if let Some(val) = val.as_deref().filter(|val| !val.is_empty()) {
+                if let Some(uri) = XmlURI::parse(val) {
                     if uri.scheme.is_none() {
                         if let Some(warning) = ctxt.sax.as_deref_mut().and_then(|sax| sax.warning) {
                             warning(
@@ -1279,7 +1253,7 @@ unsafe fn xml_sax2_attribute_internal(
             }
 
             // a default namespace definition
-            let nsret = xml_new_ns(ctxt.node, Some(val.as_str()), None);
+            let nsret = xml_new_ns(ctxt.node, val.as_deref(), None);
 
             // Validate also for namespace decls, they are attributes from an XML-1.0 perspective
             #[cfg(feature = "libxml_valid")]
@@ -1291,36 +1265,28 @@ unsafe fn xml_sax2_attribute_internal(
                         ctxt.node.unwrap(),
                         prefix,
                         nsret.unwrap(),
-                        &val,
+                        val.as_deref().unwrap(),
                     );
                 }
-            }
-            if !nval.is_null() {
-                xml_free(nval as _);
             }
             return;
         }
         if ctxt.html != 0 && ns == Some("xmlns") {
-            let mut val = CStr::from_ptr(value as *const i8)
-                .to_string_lossy()
-                .into_owned();
-
+            let mut val = None;
             if !ctxt.replace_entities != 0 {
                 ctxt.depth += 1;
-                let value =
-                    ctxt.string_decode_entities(&val, XML_SUBSTITUTE_REF as i32, '\0', '\0', '\0');
+                let value = value.as_deref().and_then(|val| {
+                    ctxt.string_decode_entities(val, XML_SUBSTITUTE_REF as i32, '\0', '\0', '\0')
+                });
                 ctxt.depth -= 1;
                 let Some(value) = value else {
                     xml_sax2_err_memory(ctxt, "xmlSAX2StartElement");
-                    if !nval.is_null() {
-                        xml_free(nval as _);
-                    }
                     return;
                 };
-                val = value;
+                val = Some(value);
             }
 
-            if val.is_empty() {
+            if val.as_deref().is_none_or(|val| val.is_empty()) {
                 xml_ns_err_msg!(
                     ctxt,
                     XmlParserErrors::XmlNsErrEmpty,
@@ -1328,32 +1294,33 @@ unsafe fn xml_sax2_attribute_internal(
                     name
                 );
             }
-            if ctxt.pedantic != 0 && !val.is_empty() {
-                if let Some(uri) = XmlURI::parse(&val) {
+            if let Some(val) = val
+                .as_deref()
+                .filter(|val| ctxt.pedantic != 0 && !val.is_empty())
+            {
+                if let Some(uri) = XmlURI::parse(val) {
                     if uri.scheme.is_none() {
-                        let value = CStr::from_ptr(value as *const i8).to_string_lossy();
                         xml_ns_warn_msg!(
                             ctxt,
                             XmlParserErrors::XmlWarNsURIRelative,
                             "xmlns:{}: URI {} is not absolute\n",
                             name,
-                            value
+                            value.as_deref().unwrap()
                         );
                     }
                 } else {
-                    let value = CStr::from_ptr(value as *const i8).to_string_lossy();
                     xml_ns_warn_msg!(
                         ctxt,
                         XmlParserErrors::XmlWarNsURI,
                         "xmlns:{}: {} not a valid URI\n",
                         name,
-                        value
+                        value.as_deref().unwrap()
                     );
                 }
             }
 
             // a standard namespace definition
-            let nsret = xml_new_ns(ctxt.node, Some(val.as_str()), Some(name));
+            let nsret = xml_new_ns(ctxt.node, val.as_deref(), Some(name));
             #[cfg(feature = "libxml_valid")]
             // Validate also for namespace decls, they are attributes from an XML-1.0 perspective
             if nsret.is_some() && ctxt.validate != 0 && ctxt.well_formed != 0 {
@@ -1364,12 +1331,9 @@ unsafe fn xml_sax2_attribute_internal(
                         ctxt.node.unwrap(),
                         prefix,
                         nsret.unwrap(),
-                        &CStr::from_ptr(value as *const i8).to_string_lossy(),
+                        value.as_deref().unwrap(),
                     );
                 }
-            }
-            if !nval.is_null() {
-                xml_free(nval as _);
             }
             return;
         }
@@ -1396,10 +1360,7 @@ unsafe fn xml_sax2_attribute_internal(
                         if ctxt.recovery == 0 {
                             ctxt.disable_sax = 1;
                         }
-                        // goto error;
-                        if !nval.is_null() {
-                            xml_free(nval as _);
-                        }
+                        return;
                     }
                     prop = now.next;
                 }
@@ -1419,17 +1380,13 @@ unsafe fn xml_sax2_attribute_internal(
 
         // !!!!!! <a toto:arg="" xmlns:toto="http://toto.com">
         let Some(mut ret) = xml_new_ns_prop(ctxt.node, namespace, name, None) else {
-            // goto error;
-            if !nval.is_null() {
-                xml_free(nval as _);
-            }
             return;
         };
 
         if ctxt.replace_entities == 0 && ctxt.html == 0 {
-            ret.children = ctxt.my_doc.and_then(|doc| {
-                doc.get_node_list(&CStr::from_ptr(value as *const i8).to_string_lossy())
-            });
+            ret.children = ctxt
+                .my_doc
+                .and_then(|doc| doc.get_node_list(value.as_deref().unwrap()));
             let mut tmp = ret.children();
             while let Some(mut now) = tmp {
                 now.set_parent(Some(ret.into()));
@@ -1438,11 +1395,8 @@ unsafe fn xml_sax2_attribute_internal(
                 }
                 tmp = now.next();
             }
-        } else if !value.is_null() {
-            ret.children = xml_new_doc_text(
-                ctxt.my_doc,
-                Some(&CStr::from_ptr(value as *const i8).to_string_lossy()),
-            );
+        } else if let Some(value) = value.as_deref() {
+            ret.children = xml_new_doc_text(ctxt.my_doc, Some(value));
             ret.last = ret.children;
             if let Some(mut children) = ret.children() {
                 children.set_parent(Some(ret.into()));
@@ -1461,13 +1415,15 @@ unsafe fn xml_sax2_attribute_internal(
                 // done on a value with replaced entities anyway.
                 if ctxt.replace_entities == 0 {
                     ctxt.depth += 1;
-                    let val = ctxt.string_decode_entities(
-                        &CStr::from_ptr(value as *const i8).to_string_lossy(),
-                        XML_SUBSTITUTE_REF as i32,
-                        '\0',
-                        '\0',
-                        '\0',
-                    );
+                    let val = value.as_deref().and_then(|value| {
+                        ctxt.string_decode_entities(
+                            value,
+                            XML_SUBSTITUTE_REF as i32,
+                            '\0',
+                            '\0',
+                            '\0',
+                        )
+                    });
                     ctxt.depth -= 1;
 
                     if let Some(mut val) = val {
@@ -1496,7 +1452,7 @@ unsafe fn xml_sax2_attribute_internal(
                             my_doc,
                             ctxt.node.unwrap(),
                             Some(ret),
-                            &CStr::from_ptr(value as *const i8).to_string_lossy(),
+                            value.as_deref().unwrap(),
                         );
                     }
                 } else {
@@ -1505,7 +1461,7 @@ unsafe fn xml_sax2_attribute_internal(
                         my_doc,
                         ctxt.node.unwrap(),
                         Some(ret),
-                        &CStr::from_ptr(value as *const i8).to_string_lossy(),
+                        value.as_deref().unwrap(),
                     );
                 }
             }
@@ -1546,11 +1502,6 @@ unsafe fn xml_sax2_attribute_internal(
                     }
                 }
             }
-        }
-
-        // error:
-        if !nval.is_null() {
-            xml_free(nval as _);
         }
     }
 }
