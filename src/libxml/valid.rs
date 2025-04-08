@@ -91,7 +91,7 @@ macro_rules! xml_err_valid {
                         let lock = d.lock();
                         lock.downcast_ref::<XmlParserCtxtPtr>().copied()
                     })
-                    .unwrap_or(null_mut());
+                    .unwrap();
             }
         }
         __xml_raise_error!(
@@ -188,7 +188,7 @@ macro_rules! xml_err_valid_warning {
                         let lock = d.lock();
                         lock.downcast_ref::<XmlParserCtxtPtr>().copied()
                     })
-                    .unwrap_or(null_mut());
+                    .unwrap();
             }
         }
         __xml_raise_error!(
@@ -833,7 +833,7 @@ pub(crate) unsafe fn xml_verr_memory(ctxt: XmlValidCtxtPtr, extra: Option<&str>)
                         let lock = d.lock();
                         lock.downcast_ref::<XmlParserCtxtPtr>().copied()
                     })
-                    .unwrap_or(null_mut());
+                    .unwrap();
             }
         }
         if let Some(extra) = extra {
@@ -1324,7 +1324,7 @@ fn xml_err_valid_node(
                     let lock = d.lock();
                     lock.downcast_ref::<XmlParserCtxtPtr>().copied()
                 })
-                .unwrap_or(null_mut());
+                .unwrap();
         }
     }
     __xml_raise_error!(
@@ -2047,7 +2047,7 @@ unsafe fn xml_is_streaming(ctxt: &mut XmlValidCtxt) -> i32 {
                 let lock = d.lock();
                 lock.downcast_ref::<XmlParserCtxtPtr>().copied()
             })
-            .unwrap_or(null_mut());
+            .unwrap();
         matches!((*pctxt).parse_mode, XmlParserMode::XmlParseReader) as i32
     }
 }
@@ -2812,7 +2812,7 @@ macro_rules! xml_err_valid_node_nr {
                         let lock = d.lock();
                         lock.downcast_ref::<XmlParserCtxtPtr>().copied()
                     })
-                    .unwrap_or(null_mut());
+                    .unwrap();
             }
         }
         __xml_raise_error!(
