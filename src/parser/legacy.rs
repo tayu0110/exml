@@ -701,7 +701,6 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
         if ctxt.is_null() {
             return -1;
         }
-        // (*ctxt).user_data = Some(GenericErrorContext::new(ctxt));
         (*ctxt).user_data = None;
         if let Some(sax) = sax {
             oldsax = (*ctxt).sax.replace(sax);

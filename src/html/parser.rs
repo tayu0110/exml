@@ -3251,10 +3251,10 @@ unsafe fn html_init_parser_ctxt(
             let mut sax = HtmlSAXHandler::default();
             xml_sax2_init_html_default_sax_handler(&mut sax);
             (*ctxt).sax = Some(Box::new(sax));
-            (*ctxt).user_data = Some(GenericErrorContext::new(ctxt));
+            (*ctxt).user_data = None;
         } else {
             (*ctxt).sax = sax;
-            (*ctxt).user_data = user_data.or_else(|| Some(GenericErrorContext::new(ctxt)));
+            (*ctxt).user_data = user_data;
         }
 
         // Allocate the Input stack

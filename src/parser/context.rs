@@ -1877,17 +1877,11 @@ unsafe fn xml_init_sax_parser_ctxt(
                 sax.serror = None;
             }
             (*ctxt).sax = Some(sax);
-            (*ctxt).user_data = if user_data.is_some() {
-                user_data
-            } else {
-                // Some(GenericErrorContext::new(ctxt))
-                None
-            };
+            (*ctxt).user_data = user_data;
         } else {
             let mut sax = XmlSAXHandler::default();
             xml_sax_version(&mut sax, 2);
             (*ctxt).sax = Some(Box::new(sax));
-            // (*ctxt).user_data = Some(GenericErrorContext::new(ctxt));
             (*ctxt).user_data = None;
         }
 
