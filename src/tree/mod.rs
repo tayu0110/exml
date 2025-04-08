@@ -42,16 +42,11 @@ use std::{
     sync::atomic::{AtomicBool, AtomicI32, Ordering},
 };
 
-use libc::{memcpy, strlen};
-
 use crate::{
     error::{__xml_simple_error, __xml_simple_oom_error, XmlErrorDomain, XmlParserErrors},
     libxml::{
         chvalid::xml_is_blank_char,
-        globals::{
-            xml_deregister_node_default_value, xml_free, xml_malloc_atomic,
-            xml_register_node_default_value,
-        },
+        globals::{xml_deregister_node_default_value, xml_free, xml_register_node_default_value},
         xmlstring::{XmlChar, xml_strdup, xml_strndup},
     },
     parser::{XML_STRING_COMMENT, XML_STRING_TEXT},
@@ -512,49 +507,6 @@ pub fn validate_nmtoken<const ALLOW_SPACE: bool>(value: &str) -> Result<(), &'st
 #[doc(alias = "xmlTreeErrMemory")]
 fn xml_tree_err_memory(extra: &str) {
     __xml_simple_oom_error(XmlErrorDomain::XmlFromTree, None, Some(extra));
-}
-
-/// Builds the QName @prefix:@ncname in @memory if there is enough space
-/// and prefix is not NULL nor empty, otherwise allocate a new string.
-/// If prefix is NULL or empty it returns ncname.
-///
-/// Returns the new string which must be freed by the caller if different from
-/// @memory and @ncname or NULL in case of error
-#[doc(alias = "xmlBuildQName")]
-pub unsafe fn xml_build_qname(
-    ncname: *const XmlChar,
-    prefix: *const XmlChar,
-    memory: *mut XmlChar,
-    len: i32,
-) -> *mut XmlChar {
-    unsafe {
-        let ret: *mut XmlChar;
-
-        if ncname.is_null() {
-            return null_mut();
-        }
-        if prefix.is_null() {
-            return ncname as _;
-        }
-
-        let lenn: i32 = strlen(ncname as _) as _;
-        let lenp: i32 = strlen(prefix as _) as _;
-
-        if memory.is_null() || len < lenn + lenp + 2 {
-            ret = xml_malloc_atomic(lenn as usize + lenp as usize + 2) as _;
-            if ret.is_null() {
-                xml_tree_err_memory("building QName");
-                return null_mut();
-            }
-        } else {
-            ret = memory;
-        }
-        memcpy(ret.add(0) as _, prefix as _, lenp as usize);
-        *ret.add(lenp as usize) = b':';
-        memcpy(ret.add(lenp as usize + 1) as _, ncname as _, lenn as usize);
-        *ret.add(lenn as usize + lenp as usize + 1) = 0;
-        ret as _
-    }
 }
 
 /// Parse an XML qualified name string
@@ -2143,65 +2095,9 @@ fn xml_search_ns_by_namespace_strict(
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        globals::reset_last_error,
-        libxml::{xmlmemory::xml_mem_blocks, xmlstring::xml_strlen},
-        test_util::*,
-    };
+    use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
-
-    #[test]
-    fn test_xml_build_qname() {
-        unsafe {
-            let mut leaks = 0;
-            for n_ncname in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                for n_prefix in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_memory in 0..GEN_NB_XML_CHAR_PTR {
-                        for n_len in 0..GEN_NB_INT {
-                            let mem_base = xml_mem_blocks();
-                            let ncname = gen_const_xml_char_ptr(n_ncname, 0);
-                            let prefix = gen_const_xml_char_ptr(n_prefix, 1);
-                            let memory = gen_xml_char_ptr(n_memory, 2);
-                            let mut len = gen_int(n_len, 3);
-                            if !prefix.is_null() && len > xml_strlen(prefix) {
-                                len = 0;
-                            }
-
-                            let ret_val =
-                                xml_build_qname(ncname as *const XmlChar, prefix, memory, len);
-                            if !ret_val.is_null()
-                                && ret_val != ncname as _
-                                && ret_val != prefix as _
-                                && ret_val != memory
-                            {
-                                xml_free(ret_val as _);
-                            }
-                            let ret_val = null_mut();
-                            desret_xml_char_ptr(ret_val);
-                            des_const_xml_char_ptr(n_ncname, ncname, 0);
-                            des_const_xml_char_ptr(n_prefix, prefix, 1);
-                            des_xml_char_ptr(n_memory, memory, 2);
-                            des_int(n_len, len, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlBuildQName",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                assert!(leaks == 0, "{leaks} Leaks are found in xmlBuildQName()");
-                                eprint!(" {}", n_ncname);
-                                eprint!(" {}", n_prefix);
-                                eprint!(" {}", n_memory);
-                                eprintln!(" {}", n_len);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
 
     #[test]
     fn test_xml_get_compress_mode() {
