@@ -2046,20 +2046,17 @@ pub unsafe fn xml_create_io_parser_ctxt(
     user_data: Option<GenericErrorContext>,
     ioctx: impl Read + 'static,
     enc: XmlCharEncoding,
-) -> XmlParserCtxtPtr {
+) -> Option<XmlParserCtxt> {
     unsafe {
         let buf = XmlParserInputBuffer::from_reader(ioctx, enc);
-        let Ok(ctxt) = xml_new_sax_parser_ctxt(sax, user_data) else {
-            return null_mut();
-        };
+        let new = xml_new_sax_parser_ctxt(sax, user_data).ok()?;
+        let mut ctxt = XmlParserCtxt::default();
+        std::ptr::copy(new, &mut ctxt, 1);
+        xml_free(new as _);
 
-        let Some(input_stream) = XmlParserInput::from_io(&mut *ctxt, buf, enc) else {
-            xml_free_parser_ctxt(ctxt);
-            return null_mut();
-        };
-        (*ctxt).input_push(input_stream);
-
-        ctxt
+        let input_stream = XmlParserInput::from_io(&mut ctxt, buf, enc)?;
+        ctxt.input_push(input_stream);
+        Some(ctxt)
     }
 }
 
