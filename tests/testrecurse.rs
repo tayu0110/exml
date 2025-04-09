@@ -32,8 +32,8 @@ use exml::{
     },
     parser::{
         XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput, XmlParserOption, xml_cleanup_parser,
-        xml_ctxt_read_file, xml_init_parser, xml_new_parser_ctxt,
-        xml_no_net_external_entity_loader, xml_set_external_entity_loader,
+        xml_ctxt_read_file, xml_init_parser, xml_no_net_external_entity_loader,
+        xml_set_external_entity_loader,
     },
     tree::{XmlElementType, XmlNodePtr, xml_free_doc, xml_get_doc_entity},
 };
@@ -507,7 +507,7 @@ unsafe fn recursive_detect_test(
 
         NB_TESTS.fetch_add(1, Ordering::Relaxed);
 
-        let mut ctxt = xml_new_parser_ctxt().unwrap();
+        let mut ctxt = XmlParserCtxt::new().unwrap();
         if options & OPT_SAX != 0 {
             init_sax(&mut ctxt);
         }
@@ -545,7 +545,7 @@ unsafe fn not_recursive_detect_test(
 
         NB_TESTS.fetch_add(1, Ordering::Relaxed);
 
-        let mut ctxt = xml_new_parser_ctxt().unwrap();
+        let mut ctxt = XmlParserCtxt::new().unwrap();
         if options & OPT_SAX != 0 {
             init_sax(&mut ctxt);
         }
@@ -579,7 +579,7 @@ unsafe fn not_recursive_huge_test(
 
         NB_TESTS.fetch_add(1, Ordering::Relaxed);
 
-        let mut ctxt = xml_new_parser_ctxt().unwrap();
+        let mut ctxt = XmlParserCtxt::new().unwrap();
         if options & OPT_SAX != 0 {
             init_sax(&mut ctxt);
         }
@@ -681,7 +681,7 @@ unsafe fn huge_dtd_test(
 
         NB_TESTS.fetch_add(1, Ordering::Relaxed);
 
-        let mut ctxt = xml_new_parser_ctxt().unwrap();
+        let mut ctxt = XmlParserCtxt::new().unwrap();
         if options & OPT_SAX != 0 {
             init_sax(&mut ctxt);
         }

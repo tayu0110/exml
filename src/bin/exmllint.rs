@@ -81,9 +81,8 @@ use exml::{
     parser::{
         XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SAX2_MAGIC, XmlExternalEntityLoader, XmlParserCtxt,
         XmlParserCtxtPtr, XmlParserInput, XmlParserOption, XmlSAXHandler, XmlSAXLocatorPtr,
-        xml_cleanup_parser, xml_create_push_parser_ctxt, xml_ctxt_read_file, xml_ctxt_read_io,
-        xml_ctxt_read_memory, xml_free_parser_ctxt, xml_get_external_entity_loader,
-        xml_new_parser_ctxt, xml_new_sax_parser_ctxt, xml_no_net_external_entity_loader,
+        xml_cleanup_parser, xml_ctxt_read_file, xml_ctxt_read_io, xml_ctxt_read_memory,
+        xml_free_parser_ctxt, xml_get_external_entity_loader, xml_no_net_external_entity_loader,
         xml_parse_dtd, xml_read_file, xml_read_io, xml_read_memory, xml_set_external_entity_loader,
     },
     relaxng::{
@@ -1929,7 +1928,7 @@ unsafe fn test_sax(filename: &str) {
                 hdl
             };
             // Create the parser context amd hook the input
-            let Ok(mut ctxt) = xml_new_sax_parser_ctxt(
+            let Ok(mut ctxt) = XmlParserCtxt::new_sax_parser(
                 Some(Box::new(handler)),
                 Some(GenericErrorContext::new(user_data.as_ptr())),
             ) else {
@@ -2561,7 +2560,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: Option<XmlParserC
                     // if (repeat) size = 1024;
                     res = fread(chars.as_mut_ptr() as _, 1, 4, f) as _;
                     if res > 0 {
-                        let Some(mut ctxt) = xml_create_push_parser_ctxt(
+                        let Some(mut ctxt) = XmlParserCtxt::new_push_parser(
                             None,
                             None,
                             &chars[..res as usize],
@@ -2620,7 +2619,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: Option<XmlParserC
                 let mut ctxt = if let Some(rectxt) = rectxt {
                     rectxt
                 } else {
-                    let Some(ctxt) = xml_new_parser_ctxt() else {
+                    let Some(ctxt) = XmlParserCtxt::new() else {
                         PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
                         return;
                     };
@@ -2688,7 +2687,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: Option<XmlParserC
 
                 let mut ctxt = if let Some(rectxt) = rectxt {
                     rectxt
-                } else if let Some(ctxt) = xml_new_parser_ctxt() {
+                } else if let Some(ctxt) = XmlParserCtxt::new() {
                     ctxt
                 } else {
                     PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
@@ -3331,7 +3330,7 @@ fn main() {
                             } else if CMD_ARGS.sax {
                                 test_sax(arg.as_str());
                             } else {
-                                parse_and_print_file(Some(&arg), xml_new_parser_ctxt());
+                                parse_and_print_file(Some(&arg), XmlParserCtxt::new());
                             }
                         }
                         #[cfg(not(feature = "libxml_reader"))]
@@ -3341,7 +3340,10 @@ fn main() {
                             if cmd_args.sax {
                                 test_sax(carg.as_ptr() as _);
                             } else {
-                                parse_and_print_file(carg.as_ptr() as _, xml_new_parser_ctxt());
+                                parse_and_print_file(
+                                    carg.as_ptr() as _,
+                                    XmlParserCtxt::xml_new_parser_ctxt(),
+                                );
                             }
                         }
                     }

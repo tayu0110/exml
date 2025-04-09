@@ -95,7 +95,6 @@ pub use legacy::*;
 pub use loader::*;
 pub use node_info::*;
 pub use parse::*;
-pub use push::*;
 #[cfg(feature = "libxml_push")]
 pub use qname::*;
 pub use sax::*;
@@ -569,7 +568,7 @@ pub unsafe fn xml_read_doc(
     unsafe {
         xml_init_parser();
 
-        xml_create_doc_parser_ctxt(cur)?.do_read(url, encoding, options)
+        XmlParserCtxt::from_memory(cur)?.do_read(url, encoding, options)
     }
 }
 
@@ -584,7 +583,8 @@ pub unsafe fn xml_read_file(
 ) -> Option<XmlDocPtr> {
     unsafe {
         xml_init_parser();
-        xml_create_url_parser_ctxt(Some(filename), options)?.do_read(None, encoding, options)
+        XmlParserCtxt::from_filename_with_options(Some(filename), options)?
+            .do_read(None, encoding, options)
     }
 }
 
@@ -600,7 +600,7 @@ pub unsafe fn xml_read_memory(
 ) -> Option<XmlDocPtr> {
     unsafe {
         xml_init_parser();
-        xml_create_memory_parser_ctxt(buffer)?.do_read(url, encoding, options)
+        XmlParserCtxt::from_memory(buffer)?.do_read(url, encoding, options)
     }
 }
 
@@ -618,7 +618,7 @@ pub unsafe fn xml_read_io(
         xml_init_parser();
 
         let input = XmlParserInputBuffer::from_reader(ioctx, XmlCharEncoding::None);
-        let mut ctxt = xml_new_parser_ctxt()?;
+        let mut ctxt = XmlParserCtxt::new()?;
         let stream = XmlParserInput::from_io(&mut ctxt, input, XmlCharEncoding::None)?;
         ctxt.input_push(stream);
         ctxt.do_read(url, encoding, options)

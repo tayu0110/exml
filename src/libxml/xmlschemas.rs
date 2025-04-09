@@ -104,7 +104,6 @@ use crate::{
     parser::{
         XML_SAX2_MAGIC, XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput, XmlParserOption,
         XmlSAXHandler, XmlSAXLocatorPtr, split_qname2, xml_ctxt_read_file, xml_ctxt_read_memory,
-        xml_new_parser_ctxt, xml_new_sax_parser_ctxt,
     },
     tree::{
         NodeCommon, XmlAttrPtr, XmlAttributeDefault, XmlAttributeType, XmlDocPtr,
@@ -3399,7 +3398,7 @@ pub(crate) unsafe fn xml_schema_add_schema_doc(
                             schema_location = c"in_memory_buffer".as_ptr() as _;
                         }
                     } else if !schema_location.is_null() || !schema_buffer.is_null() {
-                        let Some(mut parser_ctxt) = xml_new_parser_ctxt() else {
+                        let Some(mut parser_ctxt) = XmlParserCtxt::new() else {
                             xml_schema_perr_memory(
                                 null_mut(),
                                 "xmlSchemaGetDoc, allocating a parser context",
@@ -18808,12 +18807,12 @@ pub unsafe fn xml_schema_validate_stream(
 
         // prepare the parser
         let mut pctxt = if sax.is_some() {
-            let Ok(new) = xml_new_sax_parser_ctxt(sax, user_data) else {
+            let Ok(new) = XmlParserCtxt::new_sax_parser(sax, user_data) else {
                 return -1;
             };
             new
         } else {
-            let Some(mut new) = xml_new_parser_ctxt() else {
+            let Some(mut new) = XmlParserCtxt::new() else {
                 return -1;
             };
             // We really want pctxt.sax to be NULL here.

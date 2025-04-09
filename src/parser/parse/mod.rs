@@ -75,8 +75,8 @@ use crate::{
 };
 
 use super::{
-    XML_SKIP_IDS, XmlParserCtxt, XmlParserInputState, xml_create_memory_parser_ctxt, xml_fatal_err,
-    xml_fatal_err_msg, xml_init_parser,
+    XML_SKIP_IDS, XmlParserCtxt, XmlParserInputState, xml_fatal_err, xml_fatal_err_msg,
+    xml_init_parser,
 };
 
 /// The default version of XML used: 1.0
@@ -346,7 +346,7 @@ pub unsafe fn xml_parse_in_node_context(
         // allocate a context and set-up everything not related to the
         // node position in the tree
         let ctxt = match doc.typ {
-            XmlElementType::XmlDocumentNode => xml_create_memory_parser_ctxt(data),
+            XmlElementType::XmlDocumentNode => XmlParserCtxt::from_memory(data),
             #[cfg(feature = "html")]
             XmlElementType::XmlHTMLDocumentNode => {
                 // When parsing in context, it makes no sense to add implied
@@ -518,7 +518,7 @@ pub(crate) unsafe fn xml_parse_balanced_chunk_memory_internal(
             **lst = None;
         }
 
-        let Some(mut ctxt) = xml_create_memory_parser_ctxt(string.as_bytes().to_vec()) else {
+        let Some(mut ctxt) = XmlParserCtxt::from_memory(string.as_bytes().to_vec()) else {
             return XmlParserErrors::XmlWarUndeclaredEntity;
         };
         ctxt.nb_errors = oldctxt.nb_errors;

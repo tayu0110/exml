@@ -11,8 +11,6 @@ use crate::{
     tree::{XmlDocPtr, XmlDtdPtr, XmlGenericNodePtr, xml_free_doc},
 };
 
-use super::xml_create_memory_parser_ctxt;
-
 /// Parse an XML in-memory document and build a tree.
 ///
 /// Returns the resulting document tree
@@ -166,12 +164,12 @@ pub unsafe fn xml_sax_user_parse_file(
     user_data: Option<GenericErrorContext>,
     filename: Option<&str>,
 ) -> i32 {
-    unsafe {
-        use crate::parser::xml_create_file_parser_ctxt;
+    use super::XmlParserCtxt;
 
+    unsafe {
         let ret: i32;
 
-        let Some(mut ctxt) = xml_create_file_parser_ctxt(filename) else {
+        let Some(mut ctxt) = XmlParserCtxt::from_filename(filename) else {
             return -1;
         };
         ctxt.sax = sax;
@@ -208,14 +206,14 @@ pub unsafe fn xml_sax_user_parse_memory(
     user_data: Option<GenericErrorContext>,
     buffer: Vec<u8>,
 ) -> i32 {
-    unsafe {
-        use crate::parser::xml_create_memory_parser_ctxt;
+    use super::XmlParserCtxt;
 
+    unsafe {
         let ret: i32;
 
         xml_init_parser();
 
-        let Some(mut ctxt) = xml_create_memory_parser_ctxt(buffer) else {
+        let Some(mut ctxt) = XmlParserCtxt::from_memory(buffer) else {
             return -1;
         };
         ctxt.sax = sax;
@@ -253,13 +251,13 @@ pub unsafe fn xml_sax_parse_doc(
     cur: Vec<u8>,
     recovery: i32,
 ) -> Option<XmlDocPtr> {
-    use super::xml_create_doc_parser_ctxt;
+    use super::XmlParserCtxt;
 
     unsafe {
         let replaced = sax.is_some();
         let mut oldsax = None;
 
-        let mut ctxt = xml_create_doc_parser_ctxt(cur)?;
+        let mut ctxt = XmlParserCtxt::from_memory(cur)?;
         if let Some(sax) = sax {
             oldsax = ctxt.sax.replace(sax);
             ctxt.user_data = None;
@@ -315,12 +313,14 @@ pub unsafe fn xml_sax_parse_memory_with_data(
     recovery: i32,
     data: *mut c_void,
 ) -> Option<XmlDocPtr> {
+    use super::XmlParserCtxt;
+
     unsafe {
         let replaced = sax.is_some();
 
         xml_init_parser();
 
-        let mut ctxt = xml_create_memory_parser_ctxt(buffer)?;
+        let mut ctxt = XmlParserCtxt::from_memory(buffer)?;
         if let Some(sax) = sax {
             ctxt.sax = Some(sax);
         }
@@ -383,14 +383,16 @@ pub unsafe fn xml_sax_parse_file_with_data(
     recovery: i32,
     data: *mut c_void,
 ) -> Option<XmlDocPtr> {
+    use crate::parser::XmlParserCtxt;
+
     unsafe {
-        use crate::{io::xml_parser_get_directory, parser::xml_create_file_parser_ctxt};
+        use crate::io::xml_parser_get_directory;
 
         let replaced = sax.is_some();
 
         xml_init_parser();
 
-        let mut ctxt = xml_create_file_parser_ctxt(filename)?;
+        let mut ctxt = XmlParserCtxt::from_filename(filename)?;
         if let Some(sax) = sax {
             ctxt.sax = Some(sax);
         }
@@ -454,12 +456,12 @@ pub(crate) unsafe fn xml_sax_parse_entity(
     sax: Option<Box<XmlSAXHandler>>,
     filename: Option<&str>,
 ) -> Option<XmlDocPtr> {
-    unsafe {
-        use crate::parser::xml_create_file_parser_ctxt;
+    use super::XmlParserCtxt;
 
+    unsafe {
         let replaced = sax.is_some();
 
-        let mut ctxt = xml_create_file_parser_ctxt(filename)?;
+        let mut ctxt = XmlParserCtxt::from_filename(filename)?;
         if let Some(sax) = sax {
             ctxt.sax = Some(sax);
             ctxt.user_data = None;
@@ -512,19 +514,17 @@ pub(crate) unsafe fn xml_sax_parse_dtd(
 ) -> Option<XmlDtdPtr> {
     use crate::{
         encoding::detect_encoding,
-        parser::{XmlParserOption, xml_err_memory},
+        parser::{XmlParserCtxt, XmlParserOption, xml_err_memory},
         tree::{XmlDocProperties, xml_new_doc, xml_new_dtd},
         uri::canonic_path,
     };
 
     unsafe {
-        use crate::parser::xml_new_sax_parser_ctxt;
-
         if external_id.is_none() && system_id.is_none() {
             return None;
         }
 
-        let Ok(mut ctxt) = xml_new_sax_parser_ctxt(sax, None) else {
+        let Ok(mut ctxt) = XmlParserCtxt::new_sax_parser(sax, None) else {
             return None;
         };
 
@@ -647,7 +647,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
 
     use crate::{
         error::XmlParserErrors,
-        parser::{XmlParserInputState, XmlParserOption, xml_fatal_err},
+        parser::{XmlParserCtxt, XmlParserInputState, XmlParserOption, xml_fatal_err},
         tree::{NodeCommon, XML_XML_NAMESPACE, XmlDocProperties, xml_new_doc, xml_new_doc_node},
     };
 
@@ -668,7 +668,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
         }
 
         let Some(mut ctxt) =
-            xml_create_memory_parser_ctxt(CStr::from_ptr(string as *const i8).to_bytes().to_vec())
+            XmlParserCtxt::from_memory(CStr::from_ptr(string as *const i8).to_bytes().to_vec())
         else {
             return -1;
         };

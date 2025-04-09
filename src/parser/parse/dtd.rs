@@ -2308,9 +2308,7 @@ pub unsafe fn xml_io_parse_dtd(
     use crate::{parser::XmlParserOption, tree::xml_free_doc};
 
     unsafe {
-        use crate::parser::xml_new_sax_parser_ctxt;
-
-        let mut ctxt = xml_new_sax_parser_ctxt(sax, None).ok()?;
+        let mut ctxt = XmlParserCtxt::new_sax_parser(sax, None).ok()?;
 
         // We are loading a DTD
         ctxt.options |= XmlParserOption::XmlParseDTDLoad as i32;

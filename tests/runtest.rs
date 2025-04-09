@@ -60,9 +60,9 @@ use exml::{
     },
     parser::{
         XML_SAX2_MAGIC, XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput, XmlParserOption,
-        XmlSAXHandler, XmlSAXLocatorPtr, xml_cleanup_parser, xml_create_file_parser_ctxt,
-        xml_init_parser, xml_no_net_external_entity_loader, xml_parse_file, xml_read_file,
-        xml_read_memory, xml_set_external_entity_loader,
+        XmlSAXHandler, XmlSAXLocatorPtr, xml_cleanup_parser, xml_init_parser,
+        xml_no_net_external_entity_loader, xml_parse_file, xml_read_file, xml_read_memory,
+        xml_set_external_entity_loader,
     },
     relaxng::xml_relaxng_init_types,
     tree::{
@@ -1435,7 +1435,7 @@ unsafe fn sax_parse_test(
             html_ctxt_read_file(&mut ctxt, filename, None, options);
             ret = 0;
         } else {
-            let mut ctxt = xml_create_file_parser_ctxt(Some(filename)).unwrap();
+            let mut ctxt = XmlParserCtxt::from_filename(Some(filename)).unwrap();
             let mut sax = XmlSAXHandler::default();
             std::ptr::copy(&EMPTY_SAXHANDLER_STRUCT, &mut sax, 1);
             ctxt.sax = Some(Box::new(sax));
@@ -1453,7 +1453,7 @@ unsafe fn sax_parse_test(
 
         #[cfg(not(feature = "html"))]
         {
-            let ctxt: XmlParserCtxtPtr = xml_create_file_parser_ctxt(filename);
+            let ctxt = XmlParserCtxt::xml_create_file_parser_ctxt(filename);
             memcpy(
                 (*ctxt).sax,
                 addr_of_mut!(EMPTY_SAXHANDLER_STRUCT),
@@ -1484,7 +1484,7 @@ unsafe fn sax_parse_test(
                 html_ctxt_read_file(&mut ctxt, filename, None, options);
                 ret = 0;
             } else {
-                let mut ctxt = xml_create_file_parser_ctxt(Some(filename)).unwrap();
+                let mut ctxt = XmlParserCtxt::from_filename(Some(filename)).unwrap();
                 let mut sax = XmlSAXHandler::default();
                 if options & XmlParserOption::XmlParseSAX1 as i32 != 0 {
                     std::ptr::copy(&DEBUG_SAXHANDLER_STRUCT, &mut sax, 1);
@@ -1506,7 +1506,7 @@ unsafe fn sax_parse_test(
             }
             #[cfg(not(feature = "html"))]
             {
-                let ctxt: XmlParserCtxtPtr = xml_create_file_parser_ctxt(filename);
+                let ctxt = XmlParserCtxt::xml_create_file_parser_ctxt(filename);
                 if options & XmlParserOption::XmlParseSAX1 as i32 != 0 {
                     memcpy(
                         (*ctxt).sax as _,
@@ -1631,7 +1631,6 @@ unsafe fn push_parse_test(
         use exml::{
             encoding::XmlCharEncoding,
             html::parser::{html_create_push_parser_ctxt, html_parse_chunk},
-            parser::xml_create_push_parser_ctxt,
         };
 
         let mut base: *const c_char = null();
@@ -1665,12 +1664,12 @@ unsafe fn push_parse_test(
             .unwrap()
         } else {
             let chunk = from_raw_parts(base.add(cur as usize) as *const u8, chunk_size as usize);
-            xml_create_push_parser_ctxt(None, None, chunk, Some(filename)).unwrap()
+            XmlParserCtxt::new_push_parser(None, None, chunk, Some(filename)).unwrap()
         };
         #[cfg(not(feature = "html"))]
         let ctxt = {
             let chunk = from_raw_parts(base.add(cur as usize) as *const u8, chunk_size as usize);
-            xml_create_push_parser_ctxt(None, None, chunk, filename)
+            XmlParserCtxt::xml_create_push_parser_ctxt(None, None, chunk, filename)
         };
         ctxt.use_options(options);
         cur += chunk_size;
@@ -1956,8 +1955,6 @@ unsafe fn push_boundary_test(
     err: Option<String>,
     options: i32,
 ) -> i32 {
-    use exml::parser::xml_create_push_parser_ctxt;
-
     unsafe {
         use exml::{
             encoding::XmlCharEncoding,
@@ -2028,7 +2025,7 @@ unsafe fn push_boundary_test(
             )
             .unwrap()
         } else {
-            xml_create_push_parser_ctxt(
+            XmlParserCtxt::new_push_parser(
                 Some(Box::new(bnd_sax)),
                 None,
                 &[*base as u8],
@@ -2037,9 +2034,14 @@ unsafe fn push_boundary_test(
             .unwrap()
         };
         #[cfg(not(feature = "html"))]
-        let mut ctxt =
-            xml_create_push_parser_ctxt(Some(Box::new(bnd_sax)), null_mut(), base, 1, filename)
-                .unwrap();
+        let mut ctxt = XmlParserCtxt::xml_create_push_parser_ctxt(
+            Some(Box::new(bnd_sax)),
+            null_mut(),
+            base,
+            1,
+            filename,
+        )
+        .unwrap();
         ctxt.use_options(options);
         cur = 1;
         consumed = 0;

@@ -42,8 +42,7 @@ use crate::{
         xpointer::{xml_xptr_eval, xml_xptr_new_context},
     },
     parser::{
-        XML_DETECT_IDS, XmlParserOption, xml_init_parser, xml_load_external_entity,
-        xml_new_parser_ctxt,
+        XML_DETECT_IDS, XmlParserCtxt, XmlParserOption, xml_init_parser, xml_load_external_entity,
     },
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlDocPtr, XmlElementType, XmlEntityPtr, XmlEntityType,
@@ -1582,7 +1581,7 @@ impl XmlXIncludeCtxt {
             }
 
             // Load it.
-            let mut pctxt = xml_new_parser_ctxt().unwrap();
+            let mut pctxt = XmlParserCtxt::new().unwrap();
             let Some(mut input_stream) = xml_load_external_entity(Some(&url), None, &mut pctxt)
             else {
                 return ret;
@@ -1780,7 +1779,7 @@ impl XmlXIncludeCtxt {
         unsafe {
             xml_init_parser();
 
-            let Some(mut pctxt) = xml_new_parser_ctxt() else {
+            let Some(mut pctxt) = XmlParserCtxt::new() else {
                 xml_xinclude_err_memory(Some(self), None, Some("cannot allocate parser context"));
                 return None;
             };

@@ -264,9 +264,7 @@ impl XmlParserCtxt {
 mod tests {
     use std::cell::RefCell;
 
-    use crate::parser::{
-        XmlParserCtxt, XmlSAXHandler, xml_ctxt_read_memory, xml_new_sax_parser_ctxt,
-    };
+    use crate::parser::{XmlParserCtxt, XmlSAXHandler, xml_ctxt_read_memory};
 
     thread_local! {
         static RESULT: RefCell<String> = const {
@@ -288,9 +286,8 @@ mod tests {
     }
 
     fn make_parser_context() -> XmlParserCtxt {
-        unsafe {
-            xml_new_sax_parser_ctxt(Some(Box::new(make_sax_handler_only_comment())), None).unwrap()
-        }
+        XmlParserCtxt::new_sax_parser(Some(Box::new(make_sax_handler_only_comment())), None)
+            .unwrap()
     }
 
     fn do_test(docs: &[(&str, &str)]) {

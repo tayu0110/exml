@@ -3887,8 +3887,6 @@ pub unsafe fn xml_new_text_reader(
     input: XmlParserInputBuffer,
     uri: Option<&str>,
 ) -> XmlTextReaderPtr {
-    use crate::parser::xml_create_push_parser_ctxt;
-
     unsafe {
         use std::ptr::drop_in_place;
 
@@ -3954,7 +3952,7 @@ pub unsafe fn xml_new_text_reader(
             .map_or(0, |buf| buf.len())
             >= 4
         {
-            (*ret).ctxt = xml_create_push_parser_ctxt(
+            (*ret).ctxt = XmlParserCtxt::new_push_parser(
                 Some(Box::new(sax)),
                 None,
                 &(*ret)
@@ -3971,7 +3969,7 @@ pub unsafe fn xml_new_text_reader(
             (*ret).cur = 4;
         } else {
             (*ret).ctxt =
-                xml_create_push_parser_ctxt(Some(Box::new(sax)), None, b"", uri).map(Box::new);
+                XmlParserCtxt::new_push_parser(Some(Box::new(sax)), None, b"", uri).map(Box::new);
             (*ret).base = 0;
             (*ret).cur = 0;
         }

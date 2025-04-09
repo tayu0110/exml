@@ -311,6 +311,315 @@ pub struct XmlParserCtxt {
 }
 
 impl XmlParserCtxt {
+    /// Allocate and initialize a new parser context.
+    ///
+    /// Returns the xmlParserCtxtPtr or NULL
+    #[doc(alias = "xmlNewParserCtxt")]
+    pub fn new() -> Option<XmlParserCtxt> {
+        Self::new_sax_parser(None, None).ok()
+    }
+
+    /// Allocate and initialize a new SAX parser context.   
+    /// If userData is NULL, the parser context will be passed as user data.
+    ///
+    /// Returns the xmlParserCtxtPtr or NULL if memory allocation failed.
+    #[doc(alias = "xmlNewSAXParserCtxt")]
+    pub fn new_sax_parser(
+        sax: Option<Box<XmlSAXHandler>>,
+        user_data: Option<GenericErrorContext>,
+    ) -> Result<XmlParserCtxt, Option<Box<XmlSAXHandler>>> {
+        let mut ctxt = XmlParserCtxt::default();
+        ctxt.init_sax_parser(sax, user_data).map(|_| ctxt)
+    }
+
+    /// Create a parser context for a file content.
+    ///
+    /// In original libxml2, automatic support for ZLIB/Compress compressed document is provided
+    /// by default if found at compile-time.  
+    /// However, this crate does not support currently.
+    ///
+    /// Returns the new parser context or NULL
+    #[doc(alias = "xmlCreateFileParserCtxt")]
+    pub fn from_filename(filename: Option<&str>) -> Option<XmlParserCtxt> {
+        Self::from_filename_with_options(filename, 0)
+    }
+
+    /// Create a parser context for a file or URL content.
+    ///
+    /// In original libxml2, automatic support for ZLIB/Compress compressed document is provided
+    /// by default if found at compile-time.  
+    /// However, this crate does not support currently.
+    ///
+    /// Returns the new parser context or NULL
+    #[doc(alias = "xmlCreateURLParserCtxt")]
+    pub fn from_filename_with_options(
+        filename: Option<&str>,
+        options: i32,
+    ) -> Option<XmlParserCtxt> {
+        let Some(mut ctxt) = XmlParserCtxt::new() else {
+            xml_err_memory(None, Some("cannot allocate parser context"));
+            return None;
+        };
+
+        if options != 0 {
+            ctxt.use_options_internal(options, None);
+        }
+        ctxt.linenumbers = 1;
+
+        let input_stream = xml_load_external_entity(filename, None, &mut ctxt)?;
+
+        ctxt.input_push(input_stream);
+        if ctxt.directory.is_none() {
+            if let Some(filename) = filename {
+                if let Some(directory) = xml_parser_get_directory(filename) {
+                    ctxt.directory = Some(directory.to_string_lossy().into_owned());
+                }
+            }
+        }
+
+        Some(ctxt)
+    }
+
+    /// Create a parser context for using the XML parser with an existing I/O stream
+    ///
+    /// Returns the new parser context or NULL
+    #[doc(alias = "xmlCreateIOParserCtxt")]
+    pub fn from_io(
+        sax: Option<Box<XmlSAXHandler>>,
+        user_data: Option<GenericErrorContext>,
+        ioctx: impl Read + 'static,
+        enc: XmlCharEncoding,
+    ) -> Option<XmlParserCtxt> {
+        let buf = XmlParserInputBuffer::from_reader(ioctx, enc);
+        let mut ctxt = XmlParserCtxt::new_sax_parser(sax, user_data).ok()?;
+
+        let input_stream = XmlParserInput::from_io(&mut ctxt, buf, enc)?;
+        ctxt.input_push(input_stream);
+        Some(ctxt)
+    }
+
+    /// Create a parser context for an XML in-memory document.
+    ///
+    /// Returns the new parser context or NULL
+    #[doc(alias = "xmlCreateMemoryParserCtxt", alias = "xmlCreateDocParserCtxt")]
+    pub fn from_memory(buffer: Vec<u8>) -> Option<XmlParserCtxt> {
+        if buffer.is_empty() {
+            return None;
+        }
+
+        let mut ctxt = XmlParserCtxt::new()?;
+
+        let buf = XmlParserInputBuffer::from_memory(buffer, XmlCharEncoding::None)?;
+        let mut input = XmlParserInput::new(Some(&mut ctxt))?;
+        input.filename = None;
+        input.buf = Some(buf);
+        input.reset_base();
+
+        ctxt.input_push(input);
+        Some(ctxt)
+    }
+
+    /// Create a parser context for an external entity
+    ///
+    /// In original libxml2, automatic support for ZLIB/Compress compressed document is provided
+    /// by default if found at compile-time.  
+    /// However, this crate does not support currently.
+    ///
+    /// If create new context successfully, return new context wrapped `Ok`.  
+    /// Otherwise, return received SAX handler wrapped `Err`.
+    /// Returns the new parser context or NULL
+    #[doc(alias = "xmlCreateEntityParserCtxtInternal")]
+    pub(crate) fn new_entity_parser_internal(
+        sax: Option<Box<XmlSAXHandler>>,
+        user_data: Option<GenericErrorContext>,
+        mut url: Option<&str>,
+        id: Option<&str>,
+        base: Option<&str>,
+        pctxt: Option<&XmlParserCtxt>,
+    ) -> Result<XmlParserCtxt, Option<Box<XmlSAXHandler>>> {
+        let mut ctxt = XmlParserCtxt::new_sax_parser(sax, user_data)?;
+
+        if let Some(pctxt) = pctxt {
+            ctxt.options = pctxt.options;
+            ctxt._private = pctxt._private;
+            ctxt.input_id = pctxt.input_id;
+        }
+
+        // Don't read from stdin.
+        if url == Some("-") {
+            url = Some("./-");
+        }
+
+        if let Some(uri) = url.zip(base).and_then(|(url, base)| build_uri(url, base)) {
+            let Some(input_stream) = xml_load_external_entity(Some(&uri), id, &mut ctxt) else {
+                let sax = ctxt.sax.take();
+                return Err(sax);
+            };
+            ctxt.input_push(input_stream);
+
+            if ctxt.directory.is_none() {
+                if let Some(url) = url {
+                    if let Some(directory) = xml_parser_get_directory(url) {
+                        ctxt.directory = Some(directory.to_string_lossy().into_owned());
+                    }
+                }
+            }
+        } else {
+            let Some(input_stream) = xml_load_external_entity(url, id, &mut ctxt) else {
+                let sax = ctxt.sax.take();
+                return Err(sax);
+            };
+            ctxt.input_push(input_stream);
+
+            if ctxt.directory.is_none() {
+                if let Some(url) = url {
+                    if let Some(directory) = xml_parser_get_directory(url) {
+                        ctxt.directory = Some(directory.to_string_lossy().into_owned());
+                    }
+                }
+            }
+        }
+        Ok(ctxt)
+    }
+
+    /// Create a parser context for an external entity
+    ///
+    /// In original libxml2, automatic support for ZLIB/Compress compressed document is provided
+    /// by default if found at compile-time.  
+    /// However, this crate does not support currently.
+    ///
+    /// Returns the new parser context or NULL
+    #[doc(alias = "xmlCreateEntityParserCtxt")]
+    pub fn new_entity_parser(
+        url: Option<&str>,
+        id: Option<&str>,
+        base: Option<&str>,
+    ) -> Result<XmlParserCtxt, Option<Box<XmlSAXHandler>>> {
+        Self::new_entity_parser_internal(None, None, url, id, base, None)
+    }
+
+    /// Initialize a SAX parser context
+    ///
+    /// Returns 0 in case of success and -1 in case of error
+    #[doc(alias = "xmlInitSAXParserCtxt")]
+    fn init_sax_parser(
+        &mut self,
+        sax: Option<Box<XmlSAXHandler>>,
+        user_data: Option<GenericErrorContext>,
+    ) -> Result<(), Option<Box<XmlSAXHandler>>> {
+        unsafe {
+            xml_init_parser();
+
+            if self.dict.is_null() {
+                self.dict = xml_dict_create();
+            }
+            if self.dict.is_null() {
+                xml_err_memory(None, Some("cannot initialize parser context\n"));
+                return Err(sax);
+            }
+            xml_dict_set_limit(self.dict, XML_MAX_DICTIONARY_LIMIT);
+
+            if let Some(mut sax) = sax {
+                if sax.initialized != XML_SAX2_MAGIC as u32 {
+                    // These fields won't used in SAX1 handling.
+                    sax._private = AtomicPtr::new(null_mut());
+                    sax.start_element_ns = None;
+                    sax.end_element_ns = None;
+                    sax.serror = None;
+                }
+                self.sax = Some(sax);
+                self.user_data = user_data;
+            } else {
+                let mut sax = XmlSAXHandler::default();
+                xml_sax_version(&mut sax, 2);
+                self.sax = Some(Box::new(sax));
+                self.user_data = None;
+            }
+
+            self.maxatts = 0;
+            self.atts = vec![];
+            // Allocate the Input stack
+            self.input_tab.clear();
+            self.version = None;
+            self.encoding = None;
+            self.standalone = -1;
+            self.has_external_subset = 0;
+            self.has_perefs = 0;
+            self.html = 0;
+            self.external = 0;
+            self.instate = XmlParserInputState::XmlParserStart;
+            self.token = 0;
+            self.directory = None;
+
+            // Allocate the Node stack
+            self.node_tab.clear();
+            self.node = None;
+
+            // Allocate the Name stack
+            self.name_tab.clear();
+            self.name = None;
+
+            // Allocate the space stack
+            self.space_tab.clear();
+            self.space_tab.push(-1);
+
+            self.my_doc = None;
+            self.well_formed = 1;
+            self.ns_well_formed = 1;
+            self.valid = 1;
+            self.loadsubset = get_load_ext_dtd_default_value();
+            if self.loadsubset != 0 {
+                self.options |= XmlParserOption::XmlParseDTDLoad as i32;
+            }
+            self.validate = get_do_validity_checking_default_value();
+            self.pedantic = get_pedantic_parser_default_value();
+            if self.pedantic != 0 {
+                self.options |= XmlParserOption::XmlParsePedantic as i32;
+            }
+            self.linenumbers = get_line_numbers_default_value();
+            self.keep_blanks = get_keep_blanks_default_value();
+            if self.keep_blanks == 0 {
+                if let Some(sax) = self.sax.as_deref_mut() {
+                    sax.ignorable_whitespace = Some(xml_sax2_ignorable_whitespace);
+                }
+                self.options |= XmlParserOption::XmlParseNoBlanks as i32;
+            }
+
+            self.vctxt.flags = XML_VCTXT_USE_PCTXT as _;
+            self.vctxt.user_data = None;
+            self.vctxt.error = Some(parser_validity_error);
+            self.vctxt.warning = Some(parser_validity_warning);
+            if self.validate != 0 {
+                if get_get_warnings_default_value() == 0 {
+                    self.vctxt.warning = None;
+                } else {
+                    self.vctxt.warning = Some(parser_validity_warning);
+                }
+                self.vctxt.node_tab.clear();
+                self.options |= XmlParserOption::XmlParseDTDValid as i32;
+            }
+            self.replace_entities = get_substitute_entities_default_value();
+            if self.replace_entities != 0 {
+                self.options |= XmlParserOption::XmlParseNoEnt as i32;
+            }
+            self.record_info = 0;
+            self.check_index = 0;
+            self.in_subset = 0;
+            self.err_no = XmlParserErrors::XmlErrOK as i32;
+            self.depth = 0;
+            self.charset = XmlCharEncoding::UTF8;
+            #[cfg(feature = "catalog")]
+            {
+                self.catalogs = None;
+            }
+            self.sizeentities = 0;
+            self.sizeentcopy = 0;
+            self.input_id = 1;
+            self.node_seq.clear();
+            Ok(())
+        }
+    }
+
     pub fn encoding(&self) -> Option<&str> {
         self.encoding.as_deref()
     }
@@ -1683,8 +1992,7 @@ impl XmlParserCtxt {
                 XmlCharEncoding::ISO8859_1 => {
                     if self.input_tab.len() == 1
                         && self.encoding.is_none()
-                        && self.input().is_some()
-                        && self.input().unwrap().encoding.is_some()
+                        && self.input().is_some_and(|input| input.encoding.is_some())
                     {
                         self.encoding = self.input().unwrap().encoding.clone();
                     }
@@ -1834,163 +2142,6 @@ impl Drop for XmlParserCtxt {
     }
 }
 
-/// Allocate and initialize a new parser context.
-///
-/// Returns the xmlParserCtxtPtr or NULL
-#[doc(alias = "xmlNewParserCtxt")]
-pub unsafe fn xml_new_parser_ctxt() -> Option<XmlParserCtxt> {
-    unsafe { xml_new_sax_parser_ctxt(None, None).ok() }
-}
-
-/// Initialize a SAX parser context
-///
-/// Returns 0 in case of success and -1 in case of error
-#[doc(alias = "xmlInitSAXParserCtxt")]
-unsafe fn xml_init_sax_parser_ctxt(
-    ctxt: XmlParserCtxtPtr,
-    sax: Option<Box<XmlSAXHandler>>,
-    user_data: Option<GenericErrorContext>,
-) -> Result<(), Option<Box<XmlSAXHandler>>> {
-    unsafe {
-        // if ctxt.is_null() {
-        //     xml_err_internal!(null_mut(), "Got NULL parser context\n");
-        //     return Err(sax);
-        // }
-
-        xml_init_parser();
-
-        if (*ctxt).dict.is_null() {
-            (*ctxt).dict = xml_dict_create();
-        }
-        if (*ctxt).dict.is_null() {
-            xml_err_memory(None, Some("cannot initialize parser context\n"));
-            return Err(sax);
-        }
-        xml_dict_set_limit((*ctxt).dict, XML_MAX_DICTIONARY_LIMIT);
-
-        if let Some(mut sax) = sax {
-            if sax.initialized != XML_SAX2_MAGIC as u32 {
-                // These fields won't used in SAX1 handling.
-                sax._private = AtomicPtr::new(null_mut());
-                sax.start_element_ns = None;
-                sax.end_element_ns = None;
-                sax.serror = None;
-            }
-            (*ctxt).sax = Some(sax);
-            (*ctxt).user_data = user_data;
-        } else {
-            let mut sax = XmlSAXHandler::default();
-            xml_sax_version(&mut sax, 2);
-            (*ctxt).sax = Some(Box::new(sax));
-            (*ctxt).user_data = None;
-        }
-
-        (*ctxt).maxatts = 0;
-        (*ctxt).atts = vec![];
-        // Allocate the Input stack
-        (*ctxt).input_tab.shrink_to(5);
-        while (*ctxt).input_pop().is_some() {
-            // drop input
-        }
-        (*ctxt).version = None;
-        (*ctxt).encoding = None;
-        (*ctxt).standalone = -1;
-        (*ctxt).has_external_subset = 0;
-        (*ctxt).has_perefs = 0;
-        (*ctxt).html = 0;
-        (*ctxt).external = 0;
-        (*ctxt).instate = XmlParserInputState::XmlParserStart;
-        (*ctxt).token = 0;
-        (*ctxt).directory = None;
-
-        // Allocate the Node stack
-        (*ctxt).node_tab.clear();
-        (*ctxt).node_tab.shrink_to(10);
-        (*ctxt).node = None;
-
-        // Allocate the Name stack
-        (*ctxt).name_tab.clear();
-        (*ctxt).name_tab.shrink_to(10);
-        (*ctxt).name = None;
-
-        // Allocate the space stack
-        (*ctxt).space_tab.clear();
-        (*ctxt).space_tab.shrink_to(10);
-        (*ctxt).space_tab.push(-1);
-
-        (*ctxt).my_doc = None;
-        (*ctxt).well_formed = 1;
-        (*ctxt).ns_well_formed = 1;
-        (*ctxt).valid = 1;
-        (*ctxt).loadsubset = get_load_ext_dtd_default_value();
-        if (*ctxt).loadsubset != 0 {
-            (*ctxt).options |= XmlParserOption::XmlParseDTDLoad as i32;
-        }
-        (*ctxt).validate = get_do_validity_checking_default_value();
-        (*ctxt).pedantic = get_pedantic_parser_default_value();
-        if (*ctxt).pedantic != 0 {
-            (*ctxt).options |= XmlParserOption::XmlParsePedantic as i32;
-        }
-        (*ctxt).linenumbers = get_line_numbers_default_value();
-        (*ctxt).keep_blanks = get_keep_blanks_default_value();
-        if (*ctxt).keep_blanks == 0 {
-            if let Some(sax) = (*ctxt).sax.as_deref_mut() {
-                sax.ignorable_whitespace = Some(xml_sax2_ignorable_whitespace);
-            }
-            (*ctxt).options |= XmlParserOption::XmlParseNoBlanks as i32;
-        }
-
-        (*ctxt).vctxt.flags = XML_VCTXT_USE_PCTXT as _;
-        (*ctxt).vctxt.user_data = None;
-        (*ctxt).vctxt.error = Some(parser_validity_error);
-        (*ctxt).vctxt.warning = Some(parser_validity_warning);
-        if (*ctxt).validate != 0 {
-            if get_get_warnings_default_value() == 0 {
-                (*ctxt).vctxt.warning = None;
-            } else {
-                (*ctxt).vctxt.warning = Some(parser_validity_warning);
-            }
-            // (*ctxt).vctxt.node_max = 0;
-            (*ctxt).vctxt.node_tab.clear();
-            (*ctxt).options |= XmlParserOption::XmlParseDTDValid as i32;
-        }
-        (*ctxt).replace_entities = get_substitute_entities_default_value();
-        if (*ctxt).replace_entities != 0 {
-            (*ctxt).options |= XmlParserOption::XmlParseNoEnt as i32;
-        }
-        (*ctxt).record_info = 0;
-        (*ctxt).check_index = 0;
-        (*ctxt).in_subset = 0;
-        (*ctxt).err_no = XmlParserErrors::XmlErrOK as i32;
-        (*ctxt).depth = 0;
-        (*ctxt).charset = XmlCharEncoding::UTF8;
-        #[cfg(feature = "catalog")]
-        {
-            (*ctxt).catalogs = None;
-        }
-        (*ctxt).sizeentities = 0;
-        (*ctxt).sizeentcopy = 0;
-        (*ctxt).input_id = 1;
-        (*ctxt).node_seq.clear();
-        Ok(())
-    }
-}
-
-/// Allocate and initialize a new SAX parser context.   
-/// If userData is NULL, the parser context will be passed as user data.
-///
-/// Returns the xmlParserCtxtPtr or NULL if memory allocation failed.
-#[doc(alias = "xmlNewSAXParserCtxt")]
-pub unsafe fn xml_new_sax_parser_ctxt(
-    sax: Option<Box<XmlSAXHandler>>,
-    user_data: Option<GenericErrorContext>,
-) -> Result<XmlParserCtxt, Option<Box<XmlSAXHandler>>> {
-    unsafe {
-        let mut ctxt = XmlParserCtxt::default();
-        xml_init_sax_parser_ctxt(&raw mut ctxt, sax, user_data).map(|_| ctxt)
-    }
-}
-
 /// Clear (release owned resources) and reinitialize a parser context
 #[doc(alias = "xmlClearParserCtxt")]
 pub unsafe fn xml_clear_parser_ctxt(ctxt: XmlParserCtxtPtr) {
@@ -2014,186 +2165,4 @@ pub unsafe fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
         drop_in_place(ctxt);
         xml_free(ctxt as _);
     }
-}
-
-/// Create a parser context for a file content.
-///
-/// In original libxml2, automatic support for ZLIB/Compress compressed document is provided
-/// by default if found at compile-time.  
-/// However, this crate does not support currently.
-///
-/// Returns the new parser context or NULL
-#[doc(alias = "xmlCreateFileParserCtxt")]
-pub unsafe fn xml_create_file_parser_ctxt(filename: Option<&str>) -> Option<XmlParserCtxt> {
-    unsafe { xml_create_url_parser_ctxt(filename, 0) }
-}
-
-/// Create a parser context for using the XML parser with an existing I/O stream
-///
-/// Returns the new parser context or NULL
-#[doc(alias = "xmlCreateIOParserCtxt")]
-pub unsafe fn xml_create_io_parser_ctxt(
-    sax: Option<Box<XmlSAXHandler>>,
-    user_data: Option<GenericErrorContext>,
-    ioctx: impl Read + 'static,
-    enc: XmlCharEncoding,
-) -> Option<XmlParserCtxt> {
-    unsafe {
-        let buf = XmlParserInputBuffer::from_reader(ioctx, enc);
-        let mut ctxt = xml_new_sax_parser_ctxt(sax, user_data).ok()?;
-
-        let input_stream = XmlParserInput::from_io(&mut ctxt, buf, enc)?;
-        ctxt.input_push(input_stream);
-        Some(ctxt)
-    }
-}
-
-/// Create a parser context for a file or URL content.
-///
-/// In original libxml2, automatic support for ZLIB/Compress compressed document is provided
-/// by default if found at compile-time.  
-/// However, this crate does not support currently.
-///
-/// Returns the new parser context or NULL
-#[doc(alias = "xmlCreateURLParserCtxt")]
-pub unsafe fn xml_create_url_parser_ctxt(
-    filename: Option<&str>,
-    options: i32,
-) -> Option<XmlParserCtxt> {
-    unsafe {
-        let Some(mut ctxt) = xml_new_parser_ctxt() else {
-            xml_err_memory(None, Some("cannot allocate parser context"));
-            return None;
-        };
-
-        if options != 0 {
-            ctxt.use_options_internal(options, None);
-        }
-        ctxt.linenumbers = 1;
-
-        let input_stream = xml_load_external_entity(filename, None, &mut ctxt)?;
-
-        ctxt.input_push(input_stream);
-        if ctxt.directory.is_none() {
-            if let Some(filename) = filename {
-                if let Some(directory) = xml_parser_get_directory(filename) {
-                    ctxt.directory = Some(directory.to_string_lossy().into_owned());
-                }
-            }
-        }
-
-        Some(ctxt)
-    }
-}
-
-/// Create a parser context for an XML in-memory document.
-///
-/// Returns the new parser context or NULL
-#[doc(alias = "xmlCreateMemoryParserCtxt")]
-pub unsafe fn xml_create_memory_parser_ctxt(buffer: Vec<u8>) -> Option<XmlParserCtxt> {
-    unsafe {
-        if buffer.is_empty() {
-            return None;
-        }
-
-        let mut ctxt = xml_new_parser_ctxt()?;
-
-        let buf = XmlParserInputBuffer::from_memory(buffer, XmlCharEncoding::None)?;
-        let mut input = XmlParserInput::new(Some(&mut ctxt))?;
-        input.filename = None;
-        input.buf = Some(buf);
-        input.reset_base();
-
-        ctxt.input_push(input);
-        Some(ctxt)
-    }
-}
-
-/// Creates a parser context for an XML in-memory document.
-///
-/// Returns the new parser context or NULL
-#[doc(alias = "xmlCreateDocParserCtxt")]
-pub unsafe fn xml_create_doc_parser_ctxt(cur: Vec<u8>) -> Option<XmlParserCtxt> {
-    unsafe { xml_create_memory_parser_ctxt(cur) }
-}
-
-/// Create a parser context for an external entity
-///
-/// In original libxml2, automatic support for ZLIB/Compress compressed document is provided
-/// by default if found at compile-time.  
-/// However, this crate does not support currently.
-///
-/// If create new context successfully, return new context wrapped `Ok`.  
-/// Otherwise, return received SAX handler wrapped `Err`.
-/// Returns the new parser context or NULL
-#[doc(alias = "xmlCreateEntityParserCtxtInternal")]
-pub(crate) unsafe fn xml_create_entity_parser_ctxt_internal(
-    sax: Option<Box<XmlSAXHandler>>,
-    user_data: Option<GenericErrorContext>,
-    mut url: Option<&str>,
-    id: Option<&str>,
-    base: Option<&str>,
-    pctxt: Option<&XmlParserCtxt>,
-) -> Result<XmlParserCtxt, Option<Box<XmlSAXHandler>>> {
-    unsafe {
-        let mut ctxt = xml_new_sax_parser_ctxt(sax, user_data)?;
-
-        if let Some(pctxt) = pctxt {
-            ctxt.options = pctxt.options;
-            ctxt._private = pctxt._private;
-            ctxt.input_id = pctxt.input_id;
-        }
-
-        // Don't read from stdin.
-        if url == Some("-") {
-            url = Some("./-");
-        }
-
-        if let Some(uri) = url.zip(base).and_then(|(url, base)| build_uri(url, base)) {
-            let Some(input_stream) = xml_load_external_entity(Some(&uri), id, &mut ctxt) else {
-                let sax = ctxt.sax.take();
-                return Err(sax);
-            };
-            ctxt.input_push(input_stream);
-
-            if ctxt.directory.is_none() {
-                if let Some(url) = url {
-                    if let Some(directory) = xml_parser_get_directory(url) {
-                        ctxt.directory = Some(directory.to_string_lossy().into_owned());
-                    }
-                }
-            }
-        } else {
-            let Some(input_stream) = xml_load_external_entity(url, id, &mut ctxt) else {
-                let sax = ctxt.sax.take();
-                return Err(sax);
-            };
-            ctxt.input_push(input_stream);
-
-            if ctxt.directory.is_none() {
-                if let Some(url) = url {
-                    if let Some(directory) = xml_parser_get_directory(url) {
-                        ctxt.directory = Some(directory.to_string_lossy().into_owned());
-                    }
-                }
-            }
-        }
-        Ok(ctxt)
-    }
-}
-
-/// Create a parser context for an external entity
-///
-/// In original libxml2, automatic support for ZLIB/Compress compressed document is provided
-/// by default if found at compile-time.  
-/// However, this crate does not support currently.
-///
-/// Returns the new parser context or NULL
-#[doc(alias = "xmlCreateEntityParserCtxt")]
-pub unsafe fn xml_create_entity_parser_ctxt(
-    url: Option<&str>,
-    id: Option<&str>,
-    base: Option<&str>,
-) -> Result<XmlParserCtxt, Option<Box<XmlSAXHandler>>> {
-    unsafe { xml_create_entity_parser_ctxt_internal(None, None, url, id, base, None) }
 }

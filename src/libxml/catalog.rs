@@ -60,7 +60,7 @@ use crate::{
     generic_error,
     io::{XmlParserInputBuffer, xml_parser_get_directory},
     libxml::{chvalid::xml_is_blank_char, globals::xml_free, threads::xml_get_thread_id},
-    parser::{XML_MAX_NAMELEN, XmlParserInput, xml_is_letter, xml_new_parser_ctxt},
+    parser::{XML_MAX_NAMELEN, XmlParserCtxt, XmlParserInput, xml_is_letter},
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlDocPtr, XmlGenericNodePtr, XmlNodePtr, xml_free_doc,
         xml_free_ns, xml_new_doc, xml_new_doc_node, xml_new_dtd, xml_new_ns,
@@ -3135,7 +3135,7 @@ pub unsafe fn xml_catalog_remove(value: &str) -> i32 {
 #[doc(alias = "xmlParseCatalogFile")]
 pub unsafe fn xml_parse_catalog_file(filename: &str) -> Option<XmlDocPtr> {
     unsafe {
-        let Some(mut ctxt) = xml_new_parser_ctxt() else {
+        let Some(mut ctxt) = XmlParserCtxt::new() else {
             xml_catalog_err_memory("allocating parser context");
             return None;
         };

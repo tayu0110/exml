@@ -46,7 +46,7 @@ use crate::{
     list::XmlList,
     parser::{
         XML_DEFAULT_VERSION, XmlParserCtxt, XmlParserCtxtPtr, XmlParserInputState, XmlSAXHandler,
-        xml_create_push_parser_ctxt, xml_free_parser_ctxt,
+        xml_free_parser_ctxt,
     },
     save::attr_serialize_text_content,
     tree::{XmlDocPtr, XmlNodePtr, xml_encode_special_chars, xml_free_doc, xml_new_doc},
@@ -227,9 +227,12 @@ impl<'a> XmlTextWriter<'a> {
             sax_handler.start_element = Some(xml_sax2_start_element);
             sax_handler.end_element = Some(xml_sax2_end_element);
 
-            let Some(mut ctxt) =
-                xml_create_push_parser_ctxt(Some(Box::new(sax_handler)), None, b"", None)
-            else {
+            let Some(mut ctxt) = XmlParserCtxt::new_push_parser(
+                Some(Box::new(sax_handler)),
+                None,
+                b"",
+                None,
+            ) else {
                 xml_writer_err_msg(
                     None,
                     XmlParserErrors::XmlErrInternalError,
@@ -287,9 +290,12 @@ impl<'a> XmlTextWriter<'a> {
             sax_handler.start_element = Some(xml_sax2_start_element);
             sax_handler.end_element = Some(xml_sax2_end_element);
 
-            let Some(mut ctxt) =
-                xml_create_push_parser_ctxt(Some(Box::new(sax_handler)), None, b"", None)
-            else {
+            let Some(mut ctxt) = XmlParserCtxt::new_push_parser(
+                Some(Box::new(sax_handler)),
+                None,
+                b"",
+                None,
+            ) else {
                 xml_writer_err_msg(
                     None,
                     XmlParserErrors::XmlErrInternalError,

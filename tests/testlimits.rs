@@ -25,8 +25,8 @@ use exml::{
     parser::{
         XML_MAX_LOOKUP_LIMIT, XML_MAX_TEXT_LENGTH, XML_SAX2_MAGIC, XmlParserCtxt, XmlParserCtxtPtr,
         XmlParserInput, XmlParserOption, XmlSAXHandler, XmlSAXLocatorPtr, xml_cleanup_parser,
-        xml_ctxt_read_file, xml_init_parser, xml_new_sax_parser_ctxt,
-        xml_no_net_external_entity_loader, xml_set_external_entity_loader,
+        xml_ctxt_read_file, xml_init_parser, xml_no_net_external_entity_loader,
+        xml_set_external_entity_loader,
     },
     tree::{
         XmlAttributeDefault, XmlAttributeType, XmlElementContentPtr, XmlElementType,
@@ -925,7 +925,7 @@ unsafe fn sax_test(filename: &str, limit: usize, options: i32, fail: i32) -> i32
         DOCUMENT_CONTEXT.with_borrow_mut(|context| context.maxlen = limit);
         let mut sax = XmlSAXHandler::default();
         std::ptr::copy(&CALLBACK_SAX2_HANDLER_STRUCT, &mut sax, 1);
-        let Ok(mut ctxt) = xml_new_sax_parser_ctxt(Some(Box::new(sax)), None) else {
+        let Ok(mut ctxt) = XmlParserCtxt::new_sax_parser(Some(Box::new(sax)), None) else {
             eprintln!("Failed to create parser context");
             return 1;
         };

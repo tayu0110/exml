@@ -58,6 +58,70 @@ pub(crate) fn check_cdata_push(utf: &[u8], complete: bool) -> Result<usize, usiz
 }
 
 impl XmlParserCtxt {
+    /// Create a parser context for using the XML parser in push mode.
+    /// If @buffer and @size are non-NULL, the data is used to detect
+    /// the encoding.  The remaining characters will be parsed so they
+    /// don't need to be fed in again through xmlParseChunk.
+    /// To allow content encoding detection, @size should be >= 4
+    /// The value of @filename is used for fetching external entities
+    /// and error/warning reports.
+    ///
+    /// Returns the new parser context or NULL
+    #[doc(alias = "xmlCreatePushParserCtxt")]
+    pub fn new_push_parser(
+        sax: Option<Box<XmlSAXHandler>>,
+        user_data: Option<GenericErrorContext>,
+        chunk: &[u8],
+        filename: Option<&str>,
+    ) -> Option<XmlParserCtxt> {
+        use crate::{io::xml_parser_get_directory, parser::XmlParserInput};
+
+        let buf = XmlParserInputBuffer::new(XmlCharEncoding::None);
+
+        let Ok(mut ctxt) = XmlParserCtxt::new_sax_parser(sax, user_data) else {
+            xml_err_memory(None, Some("creating parser: out of memory\n"));
+            return None;
+        };
+        ctxt.dict_names = 1;
+        if filename.is_none() {
+            ctxt.directory = None;
+        } else if let Some(dir) = filename.and_then(xml_parser_get_directory) {
+            ctxt.directory = Some(dir.to_string_lossy().into_owned());
+        }
+
+        let mut input_stream = XmlParserInput::new(Some(&mut ctxt))?;
+
+        if let Some(filename) = filename {
+            let canonic = canonic_path(filename);
+            input_stream.filename = Some(canonic.into_owned());
+        } else {
+            input_stream.filename = None;
+        }
+        input_stream.buf = Some(buf);
+        input_stream.reset_base();
+        ctxt.input_push(input_stream);
+
+        // If the caller didn't provide an initial 'chunk' for determining
+        // the encoding, we set the context to xmlCharEncoding::XML_CHAR_ENCODING_NONE so
+        // that it can be automatically determined later
+        ctxt.charset = XmlCharEncoding::None;
+
+        if !chunk.is_empty() && ctxt.input().is_some_and(|input| input.buf.is_some()) {
+            let base: usize = ctxt.input().unwrap().get_base();
+            let cur = ctxt.input().unwrap().offset_from_base();
+
+            ctxt.input_mut()
+                .unwrap()
+                .buf
+                .as_mut()
+                .unwrap()
+                .push_bytes(chunk);
+            ctxt.input_mut().unwrap().set_base_and_cursor(base, cur);
+        }
+
+        Some(ctxt)
+    }
+
     /// Check whether the input buffer contains a character.
     #[doc(alias = "xmlParseLookupChar")]
     fn lookup_char(&mut self, c: u8) -> i32 {
@@ -1118,73 +1182,5 @@ impl XmlParserCtxt {
                 0
             }
         }
-    }
-}
-
-/// Create a parser context for using the XML parser in push mode.
-/// If @buffer and @size are non-NULL, the data is used to detect
-/// the encoding.  The remaining characters will be parsed so they
-/// don't need to be fed in again through xmlParseChunk.
-/// To allow content encoding detection, @size should be >= 4
-/// The value of @filename is used for fetching external entities
-/// and error/warning reports.
-///
-/// Returns the new parser context or NULL
-#[doc(alias = "xmlCreatePushParserCtxt")]
-pub unsafe fn xml_create_push_parser_ctxt(
-    sax: Option<Box<XmlSAXHandler>>,
-    user_data: Option<GenericErrorContext>,
-    chunk: &[u8],
-    filename: Option<&str>,
-) -> Option<XmlParserCtxt> {
-    use crate::parser::XmlParserInput;
-
-    unsafe {
-        use crate::{io::xml_parser_get_directory, parser::xml_new_sax_parser_ctxt};
-
-        let buf = XmlParserInputBuffer::new(XmlCharEncoding::None);
-
-        let Ok(mut ctxt) = xml_new_sax_parser_ctxt(sax, user_data) else {
-            xml_err_memory(None, Some("creating parser: out of memory\n"));
-            return None;
-        };
-        ctxt.dict_names = 1;
-        if filename.is_none() {
-            ctxt.directory = None;
-        } else if let Some(dir) = filename.and_then(xml_parser_get_directory) {
-            ctxt.directory = Some(dir.to_string_lossy().into_owned());
-        }
-
-        let mut input_stream = XmlParserInput::new(Some(&mut ctxt))?;
-
-        if let Some(filename) = filename {
-            let canonic = canonic_path(filename);
-            input_stream.filename = Some(canonic.into_owned());
-        } else {
-            input_stream.filename = None;
-        }
-        input_stream.buf = Some(buf);
-        input_stream.reset_base();
-        ctxt.input_push(input_stream);
-
-        // If the caller didn't provide an initial 'chunk' for determining
-        // the encoding, we set the context to xmlCharEncoding::XML_CHAR_ENCODING_NONE so
-        // that it can be automatically determined later
-        ctxt.charset = XmlCharEncoding::None;
-
-        if !chunk.is_empty() && ctxt.input().is_some_and(|input| input.buf.is_some()) {
-            let base: usize = ctxt.input().unwrap().get_base();
-            let cur = ctxt.input().unwrap().offset_from_base();
-
-            ctxt.input_mut()
-                .unwrap()
-                .buf
-                .as_mut()
-                .unwrap()
-                .push_bytes(chunk);
-            ctxt.input_mut().unwrap().set_base_and_cursor(base, cur);
-        }
-
-        Some(ctxt)
     }
 }

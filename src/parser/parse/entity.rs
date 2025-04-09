@@ -13,9 +13,8 @@ use crate::{
     parser::{
         XML_ENT_FIXED_COST, XML_MAX_HUGE_LENGTH, XML_MAX_TEXT_LENGTH, XML_PARSER_ALLOWED_EXPANSION,
         XML_PARSER_NON_LINEAR, XML_SUBSTITUTE_PEREF, XML_SUBSTITUTE_REF, XmlParserCtxt,
-        XmlParserInput, XmlParserInputState, XmlParserOption, XmlSAXHandler,
-        xml_create_entity_parser_ctxt_internal, xml_fatal_err, xml_fatal_err_msg,
-        xml_fatal_err_msg_int, xml_warning_msg,
+        XmlParserInput, XmlParserInputState, XmlParserOption, XmlSAXHandler, xml_fatal_err,
+        xml_fatal_err_msg, xml_fatal_err_msg_int, xml_warning_msg,
     },
     tree::{
         NodeCommon, XML_ENT_EXPANDING, XML_ENT_PARSED, XML_XML_NAMESPACE, XmlDocProperties,
@@ -28,7 +27,7 @@ use super::XML_DEFAULT_VERSION;
 
 impl XmlParserCtxt {
     #[doc(alias = "xmlStringDecodeEntitiesInt")]
-    pub(super) unsafe fn string_decode_entities_int(
+    pub(super) fn string_decode_entities_int(
         &mut self,
         mut s: &str,
         what: i32,
@@ -196,7 +195,7 @@ impl XmlParserCtxt {
     ///
     /// Returns A newly allocated string with the substitution done. The caller must deallocate it !
     #[doc(alias = "xmlStringDecodeEntities")]
-    pub(crate) unsafe fn string_decode_entities(
+    pub(crate) fn string_decode_entities(
         &mut self,
         s: &str,
         what: i32,
@@ -204,7 +203,7 @@ impl XmlParserCtxt {
         end2: char,
         end3: char,
     ) -> Option<String> {
-        unsafe { self.string_decode_entities_int(s, what, end, end2, end3, 0) }
+        self.string_decode_entities_int(s, what, end, end2, end3, 0)
     }
 
     /// Load the original content of the given system entity from the
@@ -354,130 +353,122 @@ impl XmlParserCtxt {
     /// If successfully parsed, return (substituted EntityValue, EntityValue without substituted),
     /// otherwise return `(None, None)`.
     #[doc(alias = "xmlParseEntityValue")]
-    pub(crate) unsafe fn parse_entity_value(&mut self) -> (Option<String>, Option<String>) {
-        unsafe {
-            let mut l: i32 = 0;
-            let max_length = if self.options & XmlParserOption::XmlParseHuge as i32 != 0 {
-                XML_MAX_HUGE_LENGTH
-            } else {
-                XML_MAX_TEXT_LENGTH
-            };
+    pub(crate) fn parse_entity_value(&mut self) -> (Option<String>, Option<String>) {
+        let mut l: i32 = 0;
+        let max_length = if self.options & XmlParserOption::XmlParseHuge as i32 != 0 {
+            XML_MAX_HUGE_LENGTH
+        } else {
+            XML_MAX_TEXT_LENGTH
+        };
 
-            if !matches!(self.current_byte(), b'"' | b'\'') {
-                xml_fatal_err(self, XmlParserErrors::XmlErrEntityNotStarted, None);
-                return (None, None);
-            }
+        if !matches!(self.current_byte(), b'"' | b'\'') {
+            xml_fatal_err(self, XmlParserErrors::XmlErrEntityNotStarted, None);
+            return (None, None);
+        }
 
-            let stop = self.current_byte();
+        let stop = self.current_byte();
 
-            // The content of the entity definition is copied in a buffer.
-            let mut buf = String::new();
+        // The content of the entity definition is copied in a buffer.
+        let mut buf = String::new();
 
-            self.instate = XmlParserInputState::XmlParserEntityValue;
-            let inputid = self.input().unwrap().id;
+        self.instate = XmlParserInputState::XmlParserEntityValue;
+        let inputid = self.input().unwrap().id;
+        self.grow();
+        if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+            return (None, None);
+        }
+        self.skip_char();
+        let mut c = self.current_char(&mut l).unwrap_or('\0');
+        // NOTE: 4.4.5 Included in Literal
+        // When a parameter entity reference appears in a literal entity
+        // value, ... a single or double quote character in the replacement
+        // text is always treated as a normal data character and will not
+        // terminate the literal.
+        // In practice it means we stop the loop only when back at parsing
+        // the initial entity and the quote is found
+        while xml_is_char(c as u32)
+            && (c as i32 != stop as i32 || self.input().unwrap().id != inputid)
+            && !matches!(self.instate, XmlParserInputState::XmlParserEOF)
+        {
+            buf.push(c);
+            self.advance_with_line_handling(c.len_utf8());
             self.grow();
-            if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                return (None, None);
-            }
-            self.skip_char();
-            let mut c = self.current_char(&mut l).unwrap_or('\0');
-            // NOTE: 4.4.5 Included in Literal
-            // When a parameter entity reference appears in a literal entity
-            // value, ... a single or double quote character in the replacement
-            // text is always treated as a normal data character and will not
-            // terminate the literal.
-            // In practice it means we stop the loop only when back at parsing
-            // the initial entity and the quote is found
-            while xml_is_char(c as u32)
-                && (c as i32 != stop as i32 || self.input().unwrap().id != inputid)
-                && !matches!(self.instate, XmlParserInputState::XmlParserEOF)
-            {
-                buf.push(c);
-                self.advance_with_line_handling(c.len_utf8());
+            c = self.current_char(&mut l).unwrap_or('\0');
+            if c == '\0' {
                 self.grow();
                 c = self.current_char(&mut l).unwrap_or('\0');
-                if c == '\0' {
-                    self.grow();
-                    c = self.current_char(&mut l).unwrap_or('\0');
-                }
-
-                if buf.len() > max_length {
-                    xml_fatal_err_msg(
-                        self,
-                        XmlParserErrors::XmlErrEntityNotFinished,
-                        "entity value too long\n",
-                    );
-                    return (None, None);
-                }
             }
-            if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+
+            if buf.len() > max_length {
+                xml_fatal_err_msg(
+                    self,
+                    XmlParserErrors::XmlErrEntityNotFinished,
+                    "entity value too long\n",
+                );
                 return (None, None);
             }
-            if c as i32 != stop as i32 {
-                xml_fatal_err(self, XmlParserErrors::XmlErrEntityNotFinished, None);
-                return (None, None);
-            }
-            self.skip_char();
-
-            // Raise problem w.r.t. '&' and '%' being used in non-entities
-            // reference constructs. Note Charref will be handled in
-            // xmlStringDecodeEntities()
-            let mut cur = buf.as_str();
-            while let Some(pos) = cur.find(['&', '%']) {
-                cur = &cur[pos..];
-                if cur.starts_with("&#") {
-                    cur = &cur[1..];
-                    continue;
-                }
-
-                let tmp = cur.as_bytes()[0];
-                // trim the head of '&' or '%'
-                cur = &cur[1..];
-                let (name, rem) = self.parse_string_name(cur);
-                cur = rem;
-
-                if name.is_none() || !cur.starts_with(';') {
-                    xml_fatal_err_msg_int!(
-                        self,
-                        XmlParserErrors::XmlErrEntityCharError,
-                        format!(
-                            "EntityValue: '{}' forbidden except for entities references\n",
-                            tmp as char
-                        )
-                        .as_str(),
-                        tmp as i32
-                    );
-                    return (None, None);
-                }
-
-                if tmp == b'%' && self.in_subset == 1 && self.input_tab.len() == 1 {
-                    xml_fatal_err(self, XmlParserErrors::XmlErrEntityPEInternal, None);
-                    return (None, None);
-                }
-
-                // trim the head of ';'
-                cur = &cur[1..];
-            }
-
-            // Then PEReference entities are substituted.
-            //
-            // NOTE: 4.4.7 Bypassed
-            // When a general entity reference appears in the EntityValue in
-            // an entity declaration, it is bypassed and left as is.
-            // so XML_SUBSTITUTE_REF is not set here.
-            self.depth += 1;
-            let ret = self.string_decode_entities_int(
-                &buf,
-                XML_SUBSTITUTE_PEREF as i32,
-                '\0',
-                '\0',
-                '\0',
-                1,
-            );
-            self.depth -= 1;
-
-            (ret, Some(buf))
         }
+        if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+            return (None, None);
+        }
+        if c as i32 != stop as i32 {
+            xml_fatal_err(self, XmlParserErrors::XmlErrEntityNotFinished, None);
+            return (None, None);
+        }
+        self.skip_char();
+
+        // Raise problem w.r.t. '&' and '%' being used in non-entities
+        // reference constructs. Note Charref will be handled in
+        // xmlStringDecodeEntities()
+        let mut cur = buf.as_str();
+        while let Some(pos) = cur.find(['&', '%']) {
+            cur = &cur[pos..];
+            if cur.starts_with("&#") {
+                cur = &cur[1..];
+                continue;
+            }
+
+            let tmp = cur.as_bytes()[0];
+            // trim the head of '&' or '%'
+            cur = &cur[1..];
+            let (name, rem) = self.parse_string_name(cur);
+            cur = rem;
+
+            if name.is_none() || !cur.starts_with(';') {
+                xml_fatal_err_msg_int!(
+                    self,
+                    XmlParserErrors::XmlErrEntityCharError,
+                    format!(
+                        "EntityValue: '{}' forbidden except for entities references\n",
+                        tmp as char
+                    )
+                    .as_str(),
+                    tmp as i32
+                );
+                return (None, None);
+            }
+
+            if tmp == b'%' && self.in_subset == 1 && self.input_tab.len() == 1 {
+                xml_fatal_err(self, XmlParserErrors::XmlErrEntityPEInternal, None);
+                return (None, None);
+            }
+
+            // trim the head of ';'
+            cur = &cur[1..];
+        }
+
+        // Then PEReference entities are substituted.
+        //
+        // NOTE: 4.4.7 Bypassed
+        // When a general entity reference appears in the EntityValue in
+        // an entity declaration, it is bypassed and left as is.
+        // so XML_SUBSTITUTE_REF is not set here.
+        self.depth += 1;
+        let ret =
+            self.string_decode_entities_int(&buf, XML_SUBSTITUTE_PEREF as i32, '\0', '\0', '\0', 1);
+        self.depth -= 1;
+
+        (ret, Some(buf))
     }
 
     /// Parse an external general entity within an existing parsing context
@@ -654,7 +645,7 @@ pub(crate) unsafe fn parse_external_entity_private(
             return (sax, XmlParserErrors::XmlErrInternalError);
         }
 
-        let mut ctxt = match xml_create_entity_parser_ctxt_internal(
+        let mut ctxt = match XmlParserCtxt::new_entity_parser_internal(
             sax,
             user_data,
             url,

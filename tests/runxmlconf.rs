@@ -24,7 +24,7 @@ use exml::{
     },
     parser::{
         XmlParserCtxt, XmlParserInput, XmlParserOption, xml_cleanup_parser, xml_ctxt_read_file,
-        xml_init_parser, xml_new_parser_ctxt, xml_read_file, xml_set_external_entity_loader,
+        xml_init_parser, xml_read_file, xml_set_external_entity_loader,
     },
     tree::{NodeCommon, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr, xml_free_doc},
     xpath::{
@@ -171,7 +171,7 @@ unsafe fn xmlconf_test_invalid(
     unsafe {
         let mut ret: i32 = 1;
 
-        let Some(mut ctxt) = xml_new_parser_ctxt() else {
+        let Some(mut ctxt) = XmlParserCtxt::new() else {
             test_log!(logfile, "test {id} : {filename} out of memory\n",);
             return 0;
         };
@@ -206,7 +206,7 @@ unsafe fn xmlconf_test_valid(
     unsafe {
         let mut ret: c_int = 1;
 
-        let Some(mut ctxt) = xml_new_parser_ctxt() else {
+        let Some(mut ctxt) = XmlParserCtxt::new() else {
             test_log!(logfile, "test {id} : {filename} out of memory\n",);
             return 0;
         };

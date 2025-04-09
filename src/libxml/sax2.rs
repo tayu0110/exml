@@ -2018,15 +2018,13 @@ unsafe fn xml_sax2_text_node(ctxt: &mut XmlParserCtxt, s: &str) -> Option<XmlNod
 /// Returns the newly allocated string or NULL if not needed or error
 #[doc(alias = "xmlSAX2DecodeAttrEntities")]
 #[cfg(feature = "libxml_valid")]
-unsafe fn xml_sax2_decode_attr_entities(ctxt: &mut XmlParserCtxt, s: &str) -> Option<String> {
-    unsafe {
-        let pos = s.find('&')?;
-        let s = &s[pos..];
-        ctxt.depth += 1;
-        let ret = ctxt.string_decode_entities(s, XML_SUBSTITUTE_REF as i32, '\0', '\0', '\0');
-        ctxt.depth -= 1;
-        ret
-    }
+fn xml_sax2_decode_attr_entities(ctxt: &mut XmlParserCtxt, s: &str) -> Option<String> {
+    let pos = s.find('&')?;
+    let s = &s[pos..];
+    ctxt.depth += 1;
+    let ret = ctxt.string_decode_entities(s, XML_SUBSTITUTE_REF as i32, '\0', '\0', '\0');
+    ctxt.depth -= 1;
+    ret
 }
 
 /// Handle an attribute that has been read by the parser.
