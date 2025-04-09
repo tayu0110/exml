@@ -42,8 +42,8 @@ use crate::{
         xpointer::{xml_xptr_eval, xml_xptr_new_context},
     },
     parser::{
-        XML_DETECT_IDS, XmlParserOption, xml_free_parser_ctxt, xml_init_parser,
-        xml_load_external_entity, xml_new_parser_ctxt,
+        XML_DETECT_IDS, XmlParserOption, xml_init_parser, xml_load_external_entity,
+        xml_new_parser_ctxt,
     },
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlDocPtr, XmlElementType, XmlEntityPtr, XmlEntityType,
@@ -1505,7 +1505,7 @@ impl XmlXIncludeCtxt {
     #[doc(alias = "xmlXIncludeLoadTxt")]
     unsafe fn load_txt(&mut self, mut url: &str, ref_index: usize) -> i32 {
         unsafe {
-            let mut ret: i32 = -1;
+            let ret: i32 = -1;
             let mut enc = XmlCharEncoding::None;
 
             // Don't read from stdin.
@@ -1582,21 +1582,18 @@ impl XmlXIncludeCtxt {
             }
 
             // Load it.
-            let pctxt = xml_new_parser_ctxt();
-            let Some(mut input_stream) = xml_load_external_entity(Some(&url), None, &mut *pctxt)
+            let mut pctxt = xml_new_parser_ctxt().unwrap();
+            let Some(mut input_stream) = xml_load_external_entity(Some(&url), None, &mut pctxt)
             else {
-                xml_free_parser_ctxt(pctxt);
                 return ret;
             };
             let Some(buf) = input_stream.buf.as_mut() else {
-                xml_free_parser_ctxt(pctxt);
                 return ret;
             };
             buf.encoder = get_encoding_handler(enc);
             let Some(mut node) = xml_new_doc_text(Some(self.doc), None) else {
                 let node = self.inc_tab[ref_index].elem.map(|node| node.into());
                 xml_xinclude_err_memory(Some(self), node, None);
-                xml_free_parser_ctxt(pctxt);
                 return ret;
             };
 
@@ -1619,7 +1616,6 @@ impl XmlXIncludeCtxt {
                     );
                     // goto error;
                     xml_free_node(node);
-                    xml_free_parser_ctxt(pctxt);
                     return ret;
                 }
             }
@@ -1632,11 +1628,7 @@ impl XmlXIncludeCtxt {
             // loaded:
             // Add the element as the replacement copy.
             self.inc_tab[ref_index].inc = Some(node);
-            ret = 0;
-
-            // error:
-            xml_free_parser_ctxt(pctxt);
-            ret
+            0
         }
     }
 
@@ -1788,48 +1780,41 @@ impl XmlXIncludeCtxt {
         unsafe {
             xml_init_parser();
 
-            let pctxt = xml_new_parser_ctxt();
-            if pctxt.is_null() {
+            let Some(mut pctxt) = xml_new_parser_ctxt() else {
                 xml_xinclude_err_memory(Some(self), None, Some("cannot allocate parser context"));
                 return None;
-            }
+            };
 
             // pass in the application data to the parser context.
-            (*pctxt)._private = self._private;
+            pctxt._private = self._private;
 
-            (*pctxt).use_options(self.parse_flags | XmlParserOption::XmlParseDTDLoad as i32);
+            pctxt.use_options(self.parse_flags | XmlParserOption::XmlParseDTDLoad as i32);
 
             // Don't read from stdin.
             if url == "-" {
                 url = "./-";
             }
 
-            let Some(input_stream) = xml_load_external_entity(Some(url), None, &mut *pctxt) else {
-                xml_free_parser_ctxt(pctxt);
-                return None;
-            };
+            let input_stream = xml_load_external_entity(Some(url), None, &mut pctxt)?;
+            pctxt.input_push(input_stream);
 
-            (*pctxt).input_push(input_stream);
-
-            if (*pctxt).directory.is_none() {
+            if pctxt.directory.is_none() {
                 if let Some(dir) = xml_parser_get_directory(url) {
-                    (*pctxt).directory = Some(dir.to_string_lossy().into_owned());
+                    pctxt.directory = Some(dir.to_string_lossy().into_owned());
                 }
             }
 
-            (*pctxt).loadsubset |= XML_DETECT_IDS as i32;
-            (*pctxt).parse_document();
+            pctxt.loadsubset |= XML_DETECT_IDS as i32;
+            pctxt.parse_document();
 
-            let ret = if (*pctxt).well_formed != 0 {
-                (*pctxt).my_doc
+            if pctxt.well_formed != 0 {
+                pctxt.my_doc
             } else {
-                if let Some(my_doc) = (*pctxt).my_doc.take() {
+                if let Some(my_doc) = pctxt.my_doc.take() {
                     xml_free_doc(my_doc);
                 }
                 None
-            };
-            xml_free_parser_ctxt(pctxt);
-            ret
+            }
         }
     }
 

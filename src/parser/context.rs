@@ -30,7 +30,7 @@ use crate::{
     libxml::{
         catalog::XmlCatalogEntry,
         chvalid::{xml_is_blank_char, xml_is_char},
-        globals::{xml_free, xml_malloc},
+        globals::xml_free,
         sax2::{
             xml_sax_version, xml_sax2_end_element, xml_sax2_ignorable_whitespace,
             xml_sax2_start_element,
@@ -1838,8 +1838,8 @@ impl Drop for XmlParserCtxt {
 ///
 /// Returns the xmlParserCtxtPtr or NULL
 #[doc(alias = "xmlNewParserCtxt")]
-pub unsafe fn xml_new_parser_ctxt() -> XmlParserCtxtPtr {
-    unsafe { xml_new_sax_parser_ctxt(None, None).unwrap_or(null_mut()) }
+pub unsafe fn xml_new_parser_ctxt() -> Option<XmlParserCtxt> {
+    unsafe { xml_new_sax_parser_ctxt(None, None).ok() }
 }
 
 /// Initialize a SAX parser context
@@ -1984,19 +1984,10 @@ unsafe fn xml_init_sax_parser_ctxt(
 pub unsafe fn xml_new_sax_parser_ctxt(
     sax: Option<Box<XmlSAXHandler>>,
     user_data: Option<GenericErrorContext>,
-) -> Result<XmlParserCtxtPtr, Option<Box<XmlSAXHandler>>> {
+) -> Result<XmlParserCtxt, Option<Box<XmlSAXHandler>>> {
     unsafe {
-        let ctxt: XmlParserCtxtPtr = xml_malloc(size_of::<XmlParserCtxt>()) as XmlParserCtxtPtr;
-        if ctxt.is_null() {
-            xml_err_memory(None, Some("cannot allocate parser context\n"));
-            return Err(sax);
-        }
-        std::ptr::write(&mut *ctxt, XmlParserCtxt::default());
-        if let Err(sax) = xml_init_sax_parser_ctxt(ctxt, sax, user_data) {
-            xml_free_parser_ctxt(ctxt);
-            return Err(sax);
-        }
-        Ok(ctxt)
+        let mut ctxt = XmlParserCtxt::default();
+        xml_init_sax_parser_ctxt(&raw mut ctxt, sax, user_data).map(|_| ctxt)
     }
 }
 
@@ -2049,10 +2040,7 @@ pub unsafe fn xml_create_io_parser_ctxt(
 ) -> Option<XmlParserCtxt> {
     unsafe {
         let buf = XmlParserInputBuffer::from_reader(ioctx, enc);
-        let new = xml_new_sax_parser_ctxt(sax, user_data).ok()?;
-        let mut ctxt = XmlParserCtxt::default();
-        std::ptr::copy(new, &mut ctxt, 1);
-        xml_free(new as _);
+        let mut ctxt = xml_new_sax_parser_ctxt(sax, user_data).ok()?;
 
         let input_stream = XmlParserInput::from_io(&mut ctxt, buf, enc)?;
         ctxt.input_push(input_stream);
@@ -2073,14 +2061,10 @@ pub unsafe fn xml_create_url_parser_ctxt(
     options: i32,
 ) -> Option<XmlParserCtxt> {
     unsafe {
-        let new: XmlParserCtxtPtr = xml_new_parser_ctxt();
-        if new.is_null() {
+        let Some(mut ctxt) = xml_new_parser_ctxt() else {
             xml_err_memory(None, Some("cannot allocate parser context"));
             return None;
-        }
-        let mut ctxt = XmlParserCtxt::default();
-        std::ptr::copy(new, &mut ctxt, 1);
-        xml_free(new as _);
+        };
 
         if options != 0 {
             ctxt.use_options_internal(options, None);
@@ -2112,13 +2096,7 @@ pub unsafe fn xml_create_memory_parser_ctxt(buffer: Vec<u8>) -> Option<XmlParser
             return None;
         }
 
-        let new = xml_new_parser_ctxt();
-        if new.is_null() {
-            return None;
-        }
-        let mut ctxt = XmlParserCtxt::default();
-        std::ptr::copy(new, &mut ctxt, 1);
-        xml_free(new as _);
+        let mut ctxt = xml_new_parser_ctxt()?;
 
         let buf = XmlParserInputBuffer::from_memory(buffer, XmlCharEncoding::None)?;
         let mut input = XmlParserInput::new(Some(&mut ctxt))?;
@@ -2158,10 +2136,7 @@ pub(crate) unsafe fn xml_create_entity_parser_ctxt_internal(
     pctxt: Option<&XmlParserCtxt>,
 ) -> Result<XmlParserCtxt, Option<Box<XmlSAXHandler>>> {
     unsafe {
-        let new = xml_new_sax_parser_ctxt(sax, user_data)?;
-        let mut ctxt = XmlParserCtxt::default();
-        std::ptr::copy(new, &mut ctxt, 1);
-        xml_free(new as _);
+        let mut ctxt = xml_new_sax_parser_ctxt(sax, user_data)?;
 
         if let Some(pctxt) = pctxt {
             ctxt.options = pctxt.options;

@@ -227,22 +227,21 @@ impl<'a> XmlTextWriter<'a> {
             sax_handler.start_element = Some(xml_sax2_start_element);
             sax_handler.end_element = Some(xml_sax2_end_element);
 
-            let ctxt: XmlParserCtxtPtr =
-                xml_create_push_parser_ctxt(Some(Box::new(sax_handler)), None, b"", None);
-            if ctxt.is_null() {
+            let Some(mut ctxt) =
+                xml_create_push_parser_ctxt(Some(Box::new(sax_handler)), None, b"", None)
+            else {
                 xml_writer_err_msg(
                     None,
                     XmlParserErrors::XmlErrInternalError,
                     "xmlNewTextWriterDoc : error at xmlCreatePushParserCtxt!\n",
                 );
                 return None;
-            }
+            };
             // For some reason this seems to completely break if node names are interned.
-            (*ctxt).dict_names = 0;
+            ctxt.dict_names = 0;
 
-            (*ctxt).my_doc = xml_new_doc(Some(XML_DEFAULT_VERSION));
-            let Some(mut my_doc) = (*ctxt).my_doc else {
-                xml_free_parser_ctxt(ctxt);
+            ctxt.my_doc = xml_new_doc(Some(XML_DEFAULT_VERSION));
+            let Some(mut my_doc) = ctxt.my_doc else {
                 xml_writer_err_msg(
                     None,
                     XmlParserErrors::XmlErrInternalError,
@@ -251,9 +250,8 @@ impl<'a> XmlTextWriter<'a> {
                 return None;
             };
 
-            let Some(mut ret) = XmlTextWriter::from_push_parser(ctxt, compression) else {
+            let Some(mut ret) = XmlTextWriter::from_push_parser(&mut ctxt, compression) else {
                 xml_free_doc(my_doc);
-                xml_free_parser_ctxt(ctxt);
                 xml_writer_err_msg(
                     None,
                     XmlParserErrors::XmlErrInternalError,
@@ -289,21 +287,20 @@ impl<'a> XmlTextWriter<'a> {
             sax_handler.start_element = Some(xml_sax2_start_element);
             sax_handler.end_element = Some(xml_sax2_end_element);
 
-            let ctxt: XmlParserCtxtPtr =
-                xml_create_push_parser_ctxt(Some(Box::new(sax_handler)), None, b"", None);
-            if ctxt.is_null() {
+            let Some(mut ctxt) =
+                xml_create_push_parser_ctxt(Some(Box::new(sax_handler)), None, b"", None)
+            else {
                 xml_writer_err_msg(
                     None,
                     XmlParserErrors::XmlErrInternalError,
                     "xmlNewTextWriterDoc : error at xmlCreatePushParserCtxt!\n",
                 );
                 return None;
-            }
+            };
             // For some reason this seems to completely break if node names are interned.
-            (*ctxt).dict_names = 0;
+            ctxt.dict_names = 0;
 
-            let Some(mut ret) = XmlTextWriter::from_push_parser(ctxt, compression) else {
-                xml_free_parser_ctxt(ctxt);
+            let Some(mut ret) = XmlTextWriter::from_push_parser(&mut ctxt, compression) else {
                 xml_writer_err_msg(
                     None,
                     XmlParserErrors::XmlErrInternalError,
@@ -312,8 +309,8 @@ impl<'a> XmlTextWriter<'a> {
                 return None;
             };
 
-            (*ctxt).my_doc = Some(doc);
-            (*ctxt).node = Some(node);
+            ctxt.my_doc = Some(doc);
+            ctxt.node = Some(node);
             ret.no_doc_free = 1;
 
             doc.set_compress_mode(compression);

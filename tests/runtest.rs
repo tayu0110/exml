@@ -43,10 +43,7 @@ use exml::{
         set_pedantic_parser_default_value, set_structured_error,
     },
     html::{
-        HtmlParserCtxtPtr,
-        parser::{
-            html_ctxt_read_file, html_free_parser_ctxt, html_new_sax_parser_ctxt, html_read_file,
-        },
+        parser::{html_ctxt_read_file, html_new_sax_parser_ctxt, html_read_file},
         tree::html_doc_dump_memory,
     },
     io::{XmlInputCallback, pop_input_callbacks, register_input_callbacks},
@@ -64,8 +61,8 @@ use exml::{
     parser::{
         XML_SAX2_MAGIC, XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput, XmlParserOption,
         XmlSAXHandler, XmlSAXLocatorPtr, xml_cleanup_parser, xml_create_file_parser_ctxt,
-        xml_free_parser_ctxt, xml_init_parser, xml_no_net_external_entity_loader, xml_parse_file,
-        xml_read_file, xml_read_memory, xml_set_external_entity_loader,
+        xml_init_parser, xml_no_net_external_entity_loader, xml_parse_file, xml_read_file,
+        xml_read_memory, xml_set_external_entity_loader,
     },
     relaxng::xml_relaxng_init_types,
     tree::{
@@ -1434,9 +1431,8 @@ unsafe fn sax_parse_test(
         if options & XML_PARSE_HTML != 0 {
             let mut sax = XmlSAXHandler::default();
             std::ptr::copy(&EMPTY_SAXHANDLER_STRUCT, &mut sax, 1);
-            let ctxt: HtmlParserCtxtPtr = html_new_sax_parser_ctxt(Some(Box::new(sax)), None);
-            html_ctxt_read_file(&mut *ctxt, filename, None, options);
-            html_free_parser_ctxt(ctxt);
+            let mut ctxt = html_new_sax_parser_ctxt(Some(Box::new(sax)), None).unwrap();
+            html_ctxt_read_file(&mut ctxt, filename, None, options);
             ret = 0;
         } else {
             let mut ctxt = xml_create_file_parser_ctxt(Some(filename)).unwrap();
@@ -1484,9 +1480,8 @@ unsafe fn sax_parse_test(
             if options & XML_PARSE_HTML != 0 {
                 let mut sax = XmlSAXHandler::default();
                 std::ptr::copy(&DEBUG_HTMLSAXHANDLER_STRUCT, &mut sax, 1);
-                let ctxt: HtmlParserCtxtPtr = html_new_sax_parser_ctxt(Some(Box::new(sax)), None);
-                html_ctxt_read_file(&mut *ctxt, filename, None, options);
-                html_free_parser_ctxt(ctxt);
+                let mut ctxt = html_new_sax_parser_ctxt(Some(Box::new(sax)), None).unwrap();
+                html_ctxt_read_file(&mut ctxt, filename, None, options);
                 ret = 0;
             } else {
                 let mut ctxt = xml_create_file_parser_ctxt(Some(filename)).unwrap();
@@ -1658,7 +1653,7 @@ unsafe fn push_parse_test(
         }
 
         #[cfg(feature = "html")]
-        let ctxt = if options & XML_PARSE_HTML != 0 {
+        let mut ctxt = if options & XML_PARSE_HTML != 0 {
             html_create_push_parser_ctxt(
                 None,
                 None,
@@ -1667,29 +1662,30 @@ unsafe fn push_parse_test(
                 Some(filename),
                 XmlCharEncoding::None,
             )
+            .unwrap()
         } else {
             let chunk = from_raw_parts(base.add(cur as usize) as *const u8, chunk_size as usize);
-            xml_create_push_parser_ctxt(None, None, chunk, Some(filename))
+            xml_create_push_parser_ctxt(None, None, chunk, Some(filename)).unwrap()
         };
         #[cfg(not(feature = "html"))]
         let ctxt = {
             let chunk = from_raw_parts(base.add(cur as usize) as *const u8, chunk_size as usize);
             xml_create_push_parser_ctxt(None, None, chunk, filename)
         };
-        (*ctxt).use_options(options);
+        ctxt.use_options(options);
         cur += chunk_size;
         chunk_size = 1024;
         'b: while {
             if cur + chunk_size >= size {
                 #[cfg(feature = "html")]
                 if options & XML_PARSE_HTML != 0 {
-                    html_parse_chunk(ctxt, base.add(cur as _), size - cur, 1);
+                    html_parse_chunk(&raw mut ctxt, base.add(cur as _), size - cur, 1);
                 } else {
                     let chunk = from_raw_parts(
                         base.add(cur as usize) as *const u8,
                         size as usize - cur as usize,
                     );
-                    (*ctxt).parse_chunk(chunk, 1);
+                    ctxt.parse_chunk(chunk, 1);
                 }
                 #[cfg(not(feature = "html"))]
                 {
@@ -1697,40 +1693,39 @@ unsafe fn push_parse_test(
                         base.add(cur as usize) as *const u8,
                         size as usize - cur as usize,
                     );
-                    (*ctxt).parse_chunk(chunk, 1);
+                    ctxt.parse_chunk(chunk, 1);
                 }
                 break 'b;
             } else {
                 #[cfg(feature = "html")]
                 if options & XML_PARSE_HTML != 0 {
-                    html_parse_chunk(ctxt, base.add(cur as _), chunk_size, 0);
+                    html_parse_chunk(&raw mut ctxt, base.add(cur as _), chunk_size, 0);
                 } else {
                     let chunk =
                         from_raw_parts(base.add(cur as usize) as *const u8, chunk_size as usize);
-                    (*ctxt).parse_chunk(chunk, 0);
+                    ctxt.parse_chunk(chunk, 0);
                 }
                 #[cfg(not(feature = "html"))]
                 {
                     let chunk =
                         from_raw_parts(base.add(cur as usize) as *const u8, chunk_size as usize);
-                    (*ctxt).parse_chunk(chunk, 0);
+                    ctxt.parse_chunk(chunk, 0);
                 }
                 cur += chunk_size;
             }
             cur < size
         } {}
-        let doc = (*ctxt).my_doc;
+        let doc = ctxt.my_doc;
         #[cfg(feature = "html")]
         if options & XML_PARSE_HTML != 0 {
             res = 1;
         } else {
-            res = (*ctxt).well_formed;
+            res = ctxt.well_formed;
         }
         #[cfg(not(feature = "html"))]
         {
-            res = (*ctxt).wellFormed;
+            res = ctxt.well_formed;
         }
-        xml_free_parser_ctxt(ctxt);
         free(base as _);
         if res == 0 {
             if let Some(doc) = doc {
@@ -2022,7 +2017,7 @@ unsafe fn push_boundary_test(
         }
 
         #[cfg(feature = "html")]
-        let ctxt = if options & XML_PARSE_HTML != 0 {
+        let mut ctxt = if options & XML_PARSE_HTML != 0 {
             html_create_push_parser_ctxt(
                 Some(Box::new(bnd_sax)),
                 None,
@@ -2031,6 +2026,7 @@ unsafe fn push_boundary_test(
                 Some(filename),
                 XmlCharEncoding::None,
             )
+            .unwrap()
         } else {
             xml_create_push_parser_ctxt(
                 Some(Box::new(bnd_sax)),
@@ -2038,11 +2034,13 @@ unsafe fn push_boundary_test(
                 &[*base as u8],
                 Some(filename),
             )
+            .unwrap()
         };
         #[cfg(not(feature = "html"))]
-        let ctxt =
-            xml_create_push_parser_ctxt(Some(Box::new(bnd_sax)), null_mut(), base, 1, filename);
-        (*ctxt).use_options(options);
+        let mut ctxt =
+            xml_create_push_parser_ctxt(Some(Box::new(bnd_sax)), null_mut(), base, 1, filename)
+                .unwrap();
+        ctxt.use_options(options);
         cur = 1;
         consumed = 0;
         num_callbacks = 0;
@@ -2051,9 +2049,9 @@ unsafe fn push_boundary_test(
             let terminate = (cur + 1 >= size) as i32;
             let mut is_text: i32 = 0;
 
-            if (*ctxt).instate == XmlParserInputState::XmlParserContent {
-                let first_char: i32 = if !(*ctxt).content_bytes().is_empty() {
-                    (*ctxt).content_bytes()[0] as i32
+            if ctxt.instate == XmlParserInputState::XmlParserContent {
+                let first_char: i32 = if !ctxt.content_bytes().is_empty() {
+                    ctxt.content_bytes()[0] as i32
                 } else {
                     *base.add(cur as usize) as i32
                 };
@@ -2065,7 +2063,7 @@ unsafe fn push_boundary_test(
                 }
             }
 
-            old_consumed = (*ctxt).input().unwrap().consumed + (*ctxt).input().unwrap().cur as u64;
+            old_consumed = ctxt.input().unwrap().consumed + ctxt.input().unwrap().cur as u64;
 
             PUSH_BOUNDARY_COUNT.set(0);
             PUSH_BOUNDARY_REF_COUNT.set(0);
@@ -2074,13 +2072,13 @@ unsafe fn push_boundary_test(
 
             #[cfg(feature = "html")]
             if options & XML_PARSE_HTML != 0 {
-                html_parse_chunk(ctxt, base.add(cur as _), 1, terminate);
+                html_parse_chunk(&raw mut ctxt, base.add(cur as _), 1, terminate);
             } else {
-                (*ctxt).parse_chunk(&[*base.add(cur as _) as u8], terminate);
+                ctxt.parse_chunk(&[*base.add(cur as _) as u8], terminate);
             }
             #[cfg(not(feature = "html"))]
             {
-                (*ctxt).parse_chunk(&[*base.add(cur as _) as u8], terminate);
+                ctxt.parse_chunk(&[*base.add(cur as _) as u8], terminate);
             }
             cur += 1;
 
@@ -2109,22 +2107,22 @@ unsafe fn push_boundary_test(
 
             // Buffer check: If input was consumed, check that the input
             // buffer is (almost) empty.
-            consumed = (*ctxt).input().unwrap().consumed + (*ctxt).input().unwrap().cur as u64;
-            if (*ctxt).instate != XmlParserInputState::XmlParserDTD
+            consumed = ctxt.input().unwrap().consumed + ctxt.input().unwrap().cur as u64;
+            if ctxt.instate != XmlParserInputState::XmlParserDTD
                 && consumed >= 4
                 && consumed != old_consumed
             {
                 let mut max: size_t = 0;
 
-                avail = (*ctxt).content_bytes().len() as u64;
+                avail = ctxt.content_bytes().len() as u64;
 
                 if options & XML_PARSE_HTML != 0
-                    && ((*ctxt).instate == XmlParserInputState::XmlParserEndTag)
+                    && (ctxt.instate == XmlParserInputState::XmlParserEndTag)
                 {
                     // Something related to script parsing.
                     max = 3;
                 } else if is_text != 0 {
-                    let c: i32 = *(*ctxt).content_bytes().first().unwrap_or(&0) as i32;
+                    let c: i32 = *ctxt.content_bytes().first().unwrap_or(&0) as i32;
 
                     // 3 bytes for partial UTF-8
                     max = if c == b'<' as i32 || c == b'&' as i32 {
@@ -2132,7 +2130,7 @@ unsafe fn push_boundary_test(
                     } else {
                         3
                     };
-                } else if (*ctxt).instate == XmlParserInputState::XmlParserCDATASection {
+                } else if ctxt.instate == XmlParserInputState::XmlParserCDATASection {
                     // 2 bytes for terminator, 3 bytes for UTF-8
                     max = 5;
                 }
@@ -2142,18 +2140,17 @@ unsafe fn push_boundary_test(
                 }
             }
         }
-        let doc = (*ctxt).my_doc;
+        let doc = ctxt.my_doc;
         #[cfg(feature = "html")]
         if options & XML_PARSE_HTML != 0 {
             res = 1;
         } else {
-            res = (*ctxt).well_formed;
+            res = ctxt.well_formed;
         }
         #[cfg(not(feature = "html"))]
         {
-            res = (*ctxt).wellFormed;
+            res = ctxt.wellFormed;
         }
-        xml_free_parser_ctxt(ctxt);
         free(base as _);
         if num_callbacks > 1 {
             if let Some(doc) = doc {

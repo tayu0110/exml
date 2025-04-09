@@ -25,7 +25,7 @@ use exml::{
     parser::{
         XML_MAX_LOOKUP_LIMIT, XML_MAX_TEXT_LENGTH, XML_SAX2_MAGIC, XmlParserCtxt, XmlParserCtxtPtr,
         XmlParserInput, XmlParserOption, XmlSAXHandler, XmlSAXLocatorPtr, xml_cleanup_parser,
-        xml_ctxt_read_file, xml_free_parser_ctxt, xml_init_parser, xml_new_sax_parser_ctxt,
+        xml_ctxt_read_file, xml_init_parser, xml_new_sax_parser_ctxt,
         xml_no_net_external_entity_loader, xml_set_external_entity_loader,
     },
     tree::{
@@ -36,7 +36,7 @@ use exml::{
 use libc::{memcpy, strlen};
 
 // maximum time for one parsing before declaring a timeout
-const MAX_TIME: u64 = 10; /* seconds */
+const MAX_TIME: u64 = 2; /* seconds */
 
 thread_local! {
     static T0: Cell<u64> = const { Cell::new(0) };
@@ -920,24 +920,22 @@ static CALLBACK_SAX2_HANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
 #[doc(alias = "readerTest")]
 unsafe fn sax_test(filename: &str, limit: usize, options: i32, fail: i32) -> i32 {
     unsafe {
-        let res: i32;
-
         NB_TESTS.set(NB_TESTS.get() + 1);
 
         DOCUMENT_CONTEXT.with_borrow_mut(|context| context.maxlen = limit);
         let mut sax = XmlSAXHandler::default();
         std::ptr::copy(&CALLBACK_SAX2_HANDLER_STRUCT, &mut sax, 1);
-        let Ok(ctxt) = xml_new_sax_parser_ctxt(Some(Box::new(sax)), None) else {
+        let Ok(mut ctxt) = xml_new_sax_parser_ctxt(Some(Box::new(sax)), None) else {
             eprintln!("Failed to create parser context");
             return 1;
         };
-        if let Some(doc) = xml_ctxt_read_file(&mut *ctxt, filename, None, options) {
+        if let Some(doc) = xml_ctxt_read_file(&mut ctxt, filename, None, options) {
             eprintln!("SAX parsing generated a document !");
             xml_free_doc(doc);
-            res = 0;
-        } else if (*ctxt).well_formed == 0 {
+            0
+        } else if ctxt.well_formed == 0 {
             if fail != 0 {
-                res = 0;
+                0
             } else {
                 eprintln!("Failed to parse '{filename}' {limit}");
                 TEST_ERRORS.with_borrow(|errors| {
@@ -946,17 +944,14 @@ unsafe fn sax_test(filename: &str, limit: usize, options: i32, fail: i32) -> i32
                         eprintln!("{}", std::str::from_utf8(&errors[..size]).unwrap());
                     }
                 });
-                res = 1;
+                1
             }
         } else if fail != 0 {
             eprintln!("Failed to get failure for '{filename}' {limit}");
-            res = 1;
+            1
         } else {
-            res = 0;
+            0
         }
-        xml_free_parser_ctxt(ctxt);
-
-        res
     }
 }
 

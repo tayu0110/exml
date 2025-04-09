@@ -23,9 +23,8 @@ use exml::{
         xml_memory_strdup,
     },
     parser::{
-        XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput, XmlParserOption, xml_cleanup_parser,
-        xml_ctxt_read_file, xml_free_parser_ctxt, xml_init_parser, xml_new_parser_ctxt,
-        xml_read_file, xml_set_external_entity_loader,
+        XmlParserCtxt, XmlParserInput, XmlParserOption, xml_cleanup_parser, xml_ctxt_read_file,
+        xml_init_parser, xml_new_parser_ctxt, xml_read_file, xml_set_external_entity_loader,
     },
     tree::{NodeCommon, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr, xml_free_doc},
     xpath::{
@@ -172,14 +171,14 @@ unsafe fn xmlconf_test_invalid(
     unsafe {
         let mut ret: i32 = 1;
 
-        let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
-        if ctxt.is_null() {
+        let Some(mut ctxt) = xml_new_parser_ctxt() else {
             test_log!(logfile, "test {id} : {filename} out of memory\n",);
             return 0;
-        }
-        if let Some(doc) = xml_ctxt_read_file(&mut *ctxt, filename, None, options) {
+        };
+
+        if let Some(doc) = xml_ctxt_read_file(&mut ctxt, filename, None, options) {
             // invalidity should be reported both in the context and in the document
-            if (*ctxt).valid != 0 || doc.properties & XmlDocProperties::XmlDocDTDValid as i32 != 0 {
+            if ctxt.valid != 0 || doc.properties & XmlDocProperties::XmlDocDTDValid as i32 != 0 {
                 test_log!(
                     logfile,
                     "test {id} : {filename} failed to detect invalid document\n",
@@ -194,7 +193,6 @@ unsafe fn xmlconf_test_invalid(
                 "test {id} : {filename} invalid document turned not well-formed too\n",
             );
         }
-        xml_free_parser_ctxt(ctxt);
         ret
     }
 }
@@ -208,14 +206,14 @@ unsafe fn xmlconf_test_valid(
     unsafe {
         let mut ret: c_int = 1;
 
-        let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
-        if ctxt.is_null() {
+        let Some(mut ctxt) = xml_new_parser_ctxt() else {
             test_log!(logfile, "test {id} : {filename} out of memory\n",);
             return 0;
-        }
-        if let Some(doc) = xml_ctxt_read_file(&mut *ctxt, filename, None, options) {
+        };
+
+        if let Some(doc) = xml_ctxt_read_file(&mut ctxt, filename, None, options) {
             // validity should be reported both in the context and in the document
-            if (*ctxt).valid == 0 || doc.properties & XmlDocProperties::XmlDocDTDValid as i32 == 0 {
+            if ctxt.valid == 0 || doc.properties & XmlDocProperties::XmlDocDTDValid as i32 == 0 {
                 test_log!(
                     logfile,
                     "test {id} : {filename} failed to validate a valid document\n",
@@ -232,7 +230,6 @@ unsafe fn xmlconf_test_valid(
             NB_ERRORS.fetch_add(1, Ordering::Relaxed);
             ret = 0;
         }
-        xml_free_parser_ctxt(ctxt);
         ret
     }
 }

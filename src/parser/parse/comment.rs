@@ -287,7 +287,7 @@ mod tests {
         }
     }
 
-    fn make_parser_context() -> *mut XmlParserCtxt {
+    fn make_parser_context() -> XmlParserCtxt {
         unsafe {
             xml_new_sax_parser_ctxt(Some(Box::new(make_sax_handler_only_comment())), None).unwrap()
         }
@@ -296,8 +296,8 @@ mod tests {
     fn do_test(docs: &[(&str, &str)]) {
         for &(doc, res) in docs {
             unsafe {
-                let ctxt = make_parser_context();
-                xml_ctxt_read_memory(&mut *ctxt, doc.as_bytes().to_vec(), None, None, 0);
+                let mut ctxt = make_parser_context();
+                xml_ctxt_read_memory(&mut ctxt, doc.as_bytes().to_vec(), None, None, 0);
             }
             let result = RESULT.with_borrow(|result| result.clone());
             assert_eq!(result, res);

@@ -9,6 +9,7 @@
 /xmlconf
 
 libxml2-*
+callgrind.out.*
 *.xml
 *.html
 *.tar.gz

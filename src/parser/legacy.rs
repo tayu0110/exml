@@ -518,45 +518,41 @@ pub(crate) unsafe fn xml_sax_parse_dtd(
     };
 
     unsafe {
-        use crate::parser::{xml_free_parser_ctxt, xml_new_sax_parser_ctxt};
+        use crate::parser::xml_new_sax_parser_ctxt;
 
         if external_id.is_none() && system_id.is_none() {
             return None;
         }
 
-        let Ok(ctxt) = xml_new_sax_parser_ctxt(sax, None) else {
+        let Ok(mut ctxt) = xml_new_sax_parser_ctxt(sax, None) else {
             return None;
         };
 
         // We are loading a DTD
-        (*ctxt).options |= XmlParserOption::XmlParseDTDLoad as i32;
+        ctxt.options |= XmlParserOption::XmlParseDTDLoad as i32;
 
         // Canonicalise the system ID
         let system_id_canonic = system_id.map(|s| canonic_path(s));
 
         // Ask the Entity resolver to load the damn thing
-        let Some(input) = (*ctxt)
+        let input = ctxt
             .sax
             .as_deref_mut()
             .and_then(|sax| sax.resolve_entity)
             .and_then(|resolve_entity| {
-                resolve_entity(&mut *ctxt, external_id, system_id_canonic.as_deref())
-            })
-        else {
-            xml_free_parser_ctxt(ctxt);
-            return None;
-        };
+                resolve_entity(&mut ctxt, external_id, system_id_canonic.as_deref())
+            })?;
 
         // plug some encoding conversion routines here.
-        if (*ctxt).push_input(input) < 0 {
+        if ctxt.push_input(input) < 0 {
             return None;
         }
-        if (*ctxt).input().unwrap().remainder_len() >= 4 {
-            let enc = detect_encoding(&(*ctxt).content_bytes()[..4]);
-            (*ctxt).switch_encoding(enc);
+        if ctxt.input().unwrap().remainder_len() >= 4 {
+            let enc = detect_encoding(&ctxt.content_bytes()[..4]);
+            ctxt.switch_encoding(enc);
         }
 
-        if let Some(input) = (*ctxt).input_mut() {
+        if let Some(input) = ctxt.input_mut() {
             if input.filename.is_none() {
                 if let Some(canonic) = system_id_canonic {
                     input.filename = Some(canonic.into_owned());
@@ -569,20 +565,19 @@ pub(crate) unsafe fn xml_sax_parse_dtd(
         }
 
         // let's parse that entity knowing it's an external subset.
-        (*ctxt).in_subset = 2;
-        (*ctxt).my_doc = xml_new_doc(Some("1.0"));
-        let Some(mut my_doc) = (*ctxt).my_doc else {
-            xml_err_memory(Some(&mut *ctxt), Some("New Doc failed"));
-            xml_free_parser_ctxt(ctxt);
+        ctxt.in_subset = 2;
+        ctxt.my_doc = xml_new_doc(Some("1.0"));
+        let Some(mut my_doc) = ctxt.my_doc else {
+            xml_err_memory(Some(&mut ctxt), Some("New Doc failed"));
             return None;
         };
         my_doc.properties = XmlDocProperties::XmlDocInternal as i32;
-        my_doc.ext_subset = xml_new_dtd((*ctxt).my_doc, Some("none"), external_id, system_id);
-        (*ctxt).parse_external_subset(external_id, system_id);
+        my_doc.ext_subset = xml_new_dtd(ctxt.my_doc, Some("none"), external_id, system_id);
+        ctxt.parse_external_subset(external_id, system_id);
 
         let mut ret = None;
-        if let Some(mut my_doc) = (*ctxt).my_doc.take() {
-            if (*ctxt).well_formed != 0 {
+        if let Some(mut my_doc) = ctxt.my_doc.take() {
+            if ctxt.well_formed != 0 {
                 ret = my_doc.ext_subset.take();
                 if let Some(mut ret) = ret {
                     ret.doc = None;
@@ -597,7 +592,6 @@ pub(crate) unsafe fn xml_sax_parse_dtd(
             }
             xml_free_doc(my_doc);
         }
-        xml_free_parser_ctxt(ctxt);
 
         ret
     }

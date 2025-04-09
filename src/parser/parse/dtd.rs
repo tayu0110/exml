@@ -2305,44 +2305,31 @@ pub unsafe fn xml_io_parse_dtd(
     input: XmlParserInputBuffer,
     mut enc: XmlCharEncoding,
 ) -> Option<XmlDtdPtr> {
-    use crate::{
-        parser::{XmlParserOption, xml_free_parser_ctxt},
-        tree::xml_free_doc,
-    };
+    use crate::{parser::XmlParserOption, tree::xml_free_doc};
 
     unsafe {
         use crate::parser::xml_new_sax_parser_ctxt;
 
-        let Ok(ctxt) = xml_new_sax_parser_ctxt(sax, None) else {
-            return None;
-        };
+        let mut ctxt = xml_new_sax_parser_ctxt(sax, None).ok()?;
 
         // We are loading a DTD
-        (*ctxt).options |= XmlParserOption::XmlParseDTDLoad as i32;
+        ctxt.options |= XmlParserOption::XmlParseDTDLoad as i32;
 
-        (*ctxt).detect_sax2();
+        ctxt.detect_sax2();
 
         // generate a parser input from the I/O handler
-        let Some(pinput) = XmlParserInput::from_io(&mut *ctxt, input, XmlCharEncoding::None) else {
-            xml_free_parser_ctxt(ctxt);
-            return None;
-        };
+        let pinput = XmlParserInput::from_io(&mut ctxt, input, XmlCharEncoding::None)?;
         let input_id = pinput.id;
 
         // plug some encoding conversion routines here.
-        if (*ctxt).push_input(pinput) < 0 {
-            xml_free_parser_ctxt(ctxt);
+        if ctxt.push_input(pinput) < 0 {
             return None;
         }
         if !matches!(enc, XmlCharEncoding::None) {
-            (*ctxt).switch_encoding(enc);
+            ctxt.switch_encoding(enc);
         }
 
-        if let Some(pinput) = (*ctxt)
-            .input_tab
-            .iter_mut()
-            .find(|input| input.id == input_id)
-        {
+        if let Some(pinput) = ctxt.input_tab.iter_mut().find(|input| input.id == input_id) {
             pinput.filename = None;
             pinput.line = 1;
             pinput.col = 1;
@@ -2351,30 +2338,30 @@ pub unsafe fn xml_io_parse_dtd(
         }
 
         // let's parse that entity knowing it's an external subset.
-        (*ctxt).in_subset = 2;
-        (*ctxt).my_doc = xml_new_doc(Some("1.0"));
-        let Some(mut my_doc) = (*ctxt).my_doc else {
-            xml_err_memory(Some(&mut *ctxt), Some("New Doc failed"));
+        ctxt.in_subset = 2;
+        ctxt.my_doc = xml_new_doc(Some("1.0"));
+        let Some(mut my_doc) = ctxt.my_doc else {
+            xml_err_memory(Some(&mut ctxt), Some("New Doc failed"));
             return None;
         };
         my_doc.properties = XmlDocProperties::XmlDocInternal as i32;
-        my_doc.ext_subset = xml_new_dtd((*ctxt).my_doc, Some("none"), Some("none"), Some("none"));
+        my_doc.ext_subset = xml_new_dtd(ctxt.my_doc, Some("none"), Some("none"), Some("none"));
 
-        if matches!(enc, XmlCharEncoding::None) && (*ctxt).input().unwrap().remainder_len() >= 4 {
+        if matches!(enc, XmlCharEncoding::None) && ctxt.input().unwrap().remainder_len() >= 4 {
             // Get the 4 first bytes and decode the charset
             // if enc != xmlCharEncoding::XML_CHAR_ENCODING_NONE
             // plug some encoding conversion routines.
-            enc = detect_encoding(&(*ctxt).content_bytes()[..4]);
+            enc = detect_encoding(&ctxt.content_bytes()[..4]);
             if !matches!(enc, XmlCharEncoding::None) {
-                (*ctxt).switch_encoding(enc);
+                ctxt.switch_encoding(enc);
             }
         }
 
-        (*ctxt).parse_external_subset(Some("none"), Some("none"));
+        ctxt.parse_external_subset(Some("none"), Some("none"));
 
         let mut ret = None;
-        if let Some(mut my_doc) = (*ctxt).my_doc.take() {
-            if (*ctxt).well_formed != 0 {
+        if let Some(mut my_doc) = ctxt.my_doc.take() {
+            if ctxt.well_formed != 0 {
                 ret = my_doc.ext_subset.take();
                 if let Some(mut ret) = ret {
                     ret.doc = None;
@@ -2387,7 +2374,6 @@ pub unsafe fn xml_io_parse_dtd(
             }
             xml_free_doc(my_doc);
         }
-        xml_free_parser_ctxt(ctxt);
 
         ret
     }

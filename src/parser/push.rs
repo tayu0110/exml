@@ -1,5 +1,3 @@
-use std::ptr::null_mut;
-
 use crate::{
     encoding::{XmlCharEncoding, detect_encoding},
     error::XmlParserErrors,
@@ -1138,7 +1136,7 @@ pub unsafe fn xml_create_push_parser_ctxt(
     user_data: Option<GenericErrorContext>,
     chunk: &[u8],
     filename: Option<&str>,
-) -> XmlParserCtxtPtr {
+) -> Option<XmlParserCtxt> {
     use crate::parser::XmlParserInput;
 
     unsafe {
@@ -1146,21 +1144,18 @@ pub unsafe fn xml_create_push_parser_ctxt(
 
         let buf = XmlParserInputBuffer::new(XmlCharEncoding::None);
 
-        let Ok(ctxt) = xml_new_sax_parser_ctxt(sax, user_data) else {
+        let Ok(mut ctxt) = xml_new_sax_parser_ctxt(sax, user_data) else {
             xml_err_memory(None, Some("creating parser: out of memory\n"));
-            return null_mut();
+            return None;
         };
-        (*ctxt).dict_names = 1;
+        ctxt.dict_names = 1;
         if filename.is_none() {
-            (*ctxt).directory = None;
+            ctxt.directory = None;
         } else if let Some(dir) = filename.and_then(xml_parser_get_directory) {
-            (*ctxt).directory = Some(dir.to_string_lossy().into_owned());
+            ctxt.directory = Some(dir.to_string_lossy().into_owned());
         }
 
-        let Some(mut input_stream) = XmlParserInput::new((!ctxt.is_null()).then(|| &mut *ctxt))
-        else {
-            return null_mut();
-        };
+        let mut input_stream = XmlParserInput::new(Some(&mut ctxt))?;
 
         if let Some(filename) = filename {
             let canonic = canonic_path(filename);
@@ -1170,27 +1165,26 @@ pub unsafe fn xml_create_push_parser_ctxt(
         }
         input_stream.buf = Some(buf);
         input_stream.reset_base();
-        (*ctxt).input_push(input_stream);
+        ctxt.input_push(input_stream);
 
         // If the caller didn't provide an initial 'chunk' for determining
         // the encoding, we set the context to xmlCharEncoding::XML_CHAR_ENCODING_NONE so
         // that it can be automatically determined later
-        (*ctxt).charset = XmlCharEncoding::None;
+        ctxt.charset = XmlCharEncoding::None;
 
-        if !chunk.is_empty() && (*ctxt).input().is_some_and(|input| input.buf.is_some()) {
-            let base: usize = (*ctxt).input().unwrap().get_base();
-            let cur = (*ctxt).input().unwrap().offset_from_base();
+        if !chunk.is_empty() && ctxt.input().is_some_and(|input| input.buf.is_some()) {
+            let base: usize = ctxt.input().unwrap().get_base();
+            let cur = ctxt.input().unwrap().offset_from_base();
 
-            (*ctxt)
-                .input_mut()
+            ctxt.input_mut()
                 .unwrap()
                 .buf
                 .as_mut()
                 .unwrap()
                 .push_bytes(chunk);
-            (*ctxt).input_mut().unwrap().set_base_and_cursor(base, cur);
+            ctxt.input_mut().unwrap().set_base_and_cursor(base, cur);
         }
 
-        ctxt
+        Some(ctxt)
     }
 }

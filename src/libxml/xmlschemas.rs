@@ -104,7 +104,7 @@ use crate::{
     parser::{
         XML_SAX2_MAGIC, XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput, XmlParserOption,
         XmlSAXHandler, XmlSAXLocatorPtr, split_qname2, xml_ctxt_read_file, xml_ctxt_read_memory,
-        xml_free_parser_ctxt, xml_new_parser_ctxt, xml_new_sax_parser_ctxt,
+        xml_new_parser_ctxt, xml_new_sax_parser_ctxt,
     },
     tree::{
         NodeCommon, XmlAttrPtr, XmlAttributeDefault, XmlAttributeType, XmlDocPtr,
@@ -3399,26 +3399,25 @@ pub(crate) unsafe fn xml_schema_add_schema_doc(
                             schema_location = c"in_memory_buffer".as_ptr() as _;
                         }
                     } else if !schema_location.is_null() || !schema_buffer.is_null() {
-                        let parser_ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
-                        if parser_ctxt.is_null() {
+                        let Some(mut parser_ctxt) = xml_new_parser_ctxt() else {
                             xml_schema_perr_memory(
                                 null_mut(),
                                 "xmlSchemaGetDoc, allocating a parser context",
                                 None,
                             );
                             break 'exit_failure;
-                        }
-                        if !(*pctxt).dict.is_null() && !(*parser_ctxt).dict.is_null() {
+                        };
+                        if !(*pctxt).dict.is_null() && !parser_ctxt.dict.is_null() {
                             // TODO: Do we have to burden the schema parser dict with all
                             // the content of the schema doc?
-                            xml_dict_free((*parser_ctxt).dict);
-                            (*parser_ctxt).dict = (*pctxt).dict;
-                            xml_dict_reference((*parser_ctxt).dict);
+                            xml_dict_free(parser_ctxt.dict);
+                            parser_ctxt.dict = (*pctxt).dict;
+                            xml_dict_reference(parser_ctxt.dict);
                         }
                         if !schema_location.is_null() {
                             // Parse from file.
                             doc = xml_ctxt_read_file(
-                                &mut *parser_ctxt,
+                                &mut parser_ctxt,
                                 CStr::from_ptr(schema_location as *const i8)
                                     .to_string_lossy()
                                     .as_ref(),
@@ -3433,7 +3432,7 @@ pub(crate) unsafe fn xml_schema_add_schema_doc(
                             .to_vec();
                             // Parse from memory buffer.
                             doc = xml_ctxt_read_memory(
-                                &mut *parser_ctxt,
+                                &mut parser_ctxt,
                                 mem,
                                 None,
                                 None,
@@ -3486,7 +3485,6 @@ pub(crate) unsafe fn xml_schema_add_schema_doc(
                                 );
                             }
                         }
-                        xml_free_parser_ctxt(parser_ctxt);
                         if doc.is_none() && located != 0 {
                             break 'exit_error;
                         }
@@ -18676,9 +18674,13 @@ unsafe fn xml_schema_vstart(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
             // #ifdef XML_SCHEMA_READER_ENABLED
             //     ret = xmlSchemaVReaderWalk(vctxt);
             // #endif
-        } else if !(*vctxt).parser_ctxt.is_null() && (*(*vctxt).parser_ctxt).sax.is_some() {
+        } else if let Some(ctxt) = (*vctxt)
+            .parser_ctxt
+            .as_deref_mut()
+            .filter(|ctxt| ctxt.sax.is_some())
+        {
             // SAX validation.
-            ret = (*(*vctxt).parser_ctxt).parse_document();
+            ret = ctxt.parse_document();
         } else {
             VERROR_INT!(vctxt, "xmlSchemaVStart", "no instance to validate");
             ret = -1;
@@ -18798,8 +18800,6 @@ pub unsafe fn xml_schema_validate_stream(
 ) -> i32 {
     unsafe {
         let mut plug: XmlSchemaSAXPlugPtr = null_mut();
-        let pctxt: XmlParserCtxtPtr;
-
         let mut ret: i32;
 
         if ctxt.is_null() {
@@ -18807,40 +18807,42 @@ pub unsafe fn xml_schema_validate_stream(
         }
 
         // prepare the parser
-        if sax.is_some() {
+        let mut pctxt = if sax.is_some() {
             let Ok(new) = xml_new_sax_parser_ctxt(sax, user_data) else {
                 return -1;
             };
-            pctxt = new;
+            new
         } else {
-            pctxt = xml_new_parser_ctxt();
-            if pctxt.is_null() {
+            let Some(mut new) = xml_new_parser_ctxt() else {
                 return -1;
-            }
-            // We really want (*pctxt).sax to be NULL here.
-            (*pctxt).sax = None;
-        }
-        (*pctxt).linenumbers = 1;
-        xml_schema_validate_set_locator(ctxt, Some(xml_schema_validate_stream_locator), pctxt as _);
+            };
+            // We really want pctxt.sax to be NULL here.
+            new.sax = None;
+            new
+        };
+        pctxt.linenumbers = 1;
 
-        if let Some(input_stream) = XmlParserInput::from_io(&mut *pctxt, input, enc) {
-            (*pctxt).input_push(input_stream);
-            (*ctxt).parser_ctxt = pctxt;
-
+        if let Some(input_stream) = XmlParserInput::from_io(&mut pctxt, input, enc) {
+            pctxt.input_push(input_stream);
             // Plug the validation and launch the parsing
-            plug = xml_schema_sax_plug(ctxt, &mut (*pctxt).sax, &raw mut (*pctxt).user_data);
+            plug = xml_schema_sax_plug(ctxt, &mut pctxt.sax, &raw mut pctxt.user_data);
+            (*ctxt).parser_ctxt = Some(Box::new(pctxt));
+            xml_schema_validate_set_locator(
+                ctxt,
+                Some(xml_schema_validate_stream_locator),
+                (*ctxt).parser_ctxt.as_deref_mut().unwrap() as XmlParserCtxtPtr as _,
+            );
             if plug.is_null() {
                 ret = -1;
                 // goto done;
             } else {
-                // (*ctxt).input = Some(input);
                 (*ctxt).enc = enc;
-                // (*ctxt).sax = (*pctxt).sax;
                 (*ctxt).flags |= XML_SCHEMA_VALID_CTXT_FLAG_STREAM;
                 ret = xml_schema_vstart(ctxt);
 
-                if ret == 0 && (*(*ctxt).parser_ctxt).well_formed == 0 {
-                    ret = (*(*ctxt).parser_ctxt).err_no;
+                let ctxt = (*ctxt).parser_ctxt.take().unwrap();
+                if ret == 0 && ctxt.well_formed == 0 {
+                    ret = ctxt.err_no;
                     if ret == 0 {
                         ret = 1;
                     }
@@ -18851,15 +18853,8 @@ pub unsafe fn xml_schema_validate_stream(
         }
 
         // done:
-        (*ctxt).parser_ctxt = null_mut();
-        // (*ctxt).sax = null_mut();
-        // (*ctxt).input = None;
         if !plug.is_null() {
             xml_schema_sax_unplug(plug).ok();
-        }
-        // cleanup
-        if !pctxt.is_null() {
-            xml_free_parser_ctxt(pctxt);
         }
         ret
     }
@@ -18914,12 +18909,12 @@ unsafe fn xml_schema_sax_handle_start_element_ns(
             );
             // goto internal_error;
             (*vctxt).err = -1;
-            (*(*vctxt).parser_ctxt).stop();
+            ctxt.stop();
             return;
         }
         let ielem: XmlSchemaNodeInfoPtr = (*vctxt).inode;
         // TODO: Is this OK?
-        (*ielem).node_line = xml_sax2_get_line_number((*vctxt).parser_ctxt as _);
+        (*ielem).node_line = xml_sax2_get_line_number(ctxt as XmlParserCtxtPtr as _);
         (*ielem).local_name = Some(localname.to_owned());
         (*ielem).ns_name = uri.map(|uri| uri.to_owned());
         (*ielem).flags |= XML_SCHEMA_ELEM_INFO_EMPTY;
@@ -18946,7 +18941,7 @@ unsafe fn xml_schema_sax_handle_start_element_ns(
                     );
                     // goto internal_error;
                     (*vctxt).err = -1;
-                    (*(*vctxt).parser_ctxt).stop();
+                    ctxt.stop();
                     return;
                 }
                 (*ielem).nb_ns_bindings = 0;
@@ -18965,7 +18960,7 @@ unsafe fn xml_schema_sax_handle_start_element_ns(
                     );
                     // goto internal_error;
                     (*vctxt).err = -1;
-                    (*(*vctxt).parser_ctxt).stop();
+                    ctxt.stop();
                     return;
                 }
             }
@@ -19022,7 +19017,7 @@ unsafe fn xml_schema_sax_handle_start_element_ns(
                 );
                 // goto internal_error;
                 (*vctxt).err = -1;
-                (*(*vctxt).parser_ctxt).stop();
+                ctxt.stop();
                 return;
             }
         }
@@ -19036,7 +19031,7 @@ unsafe fn xml_schema_sax_handle_start_element_ns(
             );
             // goto internal_error;
             (*vctxt).err = -1;
-            (*(*vctxt).parser_ctxt).stop();
+            ctxt.stop();
         }
 
         // `namespaces` must live until this point at least.
@@ -19080,7 +19075,7 @@ unsafe fn xml_schema_sax_handle_end_element_ns(
             VERROR_INT!(vctxt, "xmlSchemaSAXHandleEndElementNs", "elem pop mismatch");
         }
         let res: i32 = xml_schema_validator_pop_elem(vctxt);
-        if res != 0 && res < 0 {
+        if res < 0 {
             VERROR_INT!(
                 vctxt,
                 "xmlSchemaSAXHandleEndElementNs",
@@ -19088,13 +19083,8 @@ unsafe fn xml_schema_sax_handle_end_element_ns(
             );
             // goto internal_error;
             (*vctxt).err = -1;
-            (*(*vctxt).parser_ctxt).stop();
+            ctxt.stop();
         }
-        // exit:
-        // internal_error:
-        //     (*vctxt).err = -1;
-        //     xmlStopParser((*vctxt).parserCtxt);
-        //     return;
     }
 }
 
@@ -19129,7 +19119,7 @@ unsafe fn xml_schema_sax_handle_text(ctxt: &mut XmlParserCtxt, ch: &str) {
                 "calling xmlSchemaVPushText()"
             );
             (*vctxt).err = -1;
-            (*(*vctxt).parser_ctxt).stop();
+            ctxt.stop();
         }
     }
 }
@@ -19165,7 +19155,7 @@ unsafe fn xml_schema_sax_handle_cdata_section(ctxt: &mut XmlParserCtxt, ch: &str
                 "calling xmlSchemaVPushText()"
             );
             (*vctxt).err = -1;
-            (*(*vctxt).parser_ctxt).stop();
+            ctxt.stop();
         }
     }
 }

@@ -26,7 +26,6 @@ use std::{
     cell::RefCell,
     ffi::{CStr, c_char},
     io::Read,
-    mem::size_of,
     os::raw::c_void,
     ptr::{addr_of_mut, null_mut},
     rc::Rc,
@@ -34,7 +33,7 @@ use std::{
     sync::atomic::{AtomicI32, Ordering},
 };
 
-use libc::{INT_MAX, memcpy, memset, size_t};
+use libc::{INT_MAX, memcpy, size_t};
 
 use crate::{
     encoding::{XmlCharEncoding, detect_encoding, find_encoding_handler},
@@ -50,7 +49,7 @@ use crate::{
             xml_is_pubid_char,
         },
         dict::{xml_dict_create, xml_dict_lookup},
-        globals::{xml_default_sax_locator, xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
+        globals::{xml_default_sax_locator, xml_free, xml_malloc_atomic, xml_realloc},
         sax2::{xml_sax2_ignorable_whitespace, xml_sax2_init_html_default_sax_handler},
         xmlstring::{XmlChar, xml_str_equal, xml_strndup},
     },
@@ -3222,7 +3221,7 @@ unsafe fn html_parse_char_data(ctxt: HtmlParserCtxtPtr) {
 ///
 /// Returns the `htmlParserCtxtPtr` or NULL in case of allocation error
 #[doc(alias = "htmlNewParserCtxt")]
-pub unsafe fn html_new_parser_ctxt() -> HtmlParserCtxtPtr {
+pub unsafe fn html_new_parser_ctxt() -> Option<XmlParserCtxt> {
     unsafe { html_new_sax_parser_ctxt(None, None) }
 }
 
@@ -3307,20 +3306,13 @@ unsafe fn html_init_parser_ctxt(
 pub unsafe fn html_new_sax_parser_ctxt(
     sax: Option<Box<XmlSAXHandler>>,
     user_data: Option<GenericErrorContext>,
-) -> HtmlParserCtxtPtr {
+) -> Option<HtmlParserCtxt> {
     unsafe {
-        let ctxt: XmlParserCtxtPtr = xml_malloc(size_of::<XmlParserCtxt>()) as XmlParserCtxtPtr;
-        if ctxt.is_null() {
-            html_err_memory(null_mut(), Some("NewParserCtxt: out of memory\n"));
-            return null_mut();
+        let mut ctxt = XmlParserCtxt::default();
+        if html_init_parser_ctxt(&raw mut ctxt, sax, user_data) < 0 {
+            return None;
         }
-        memset(ctxt as _, 0, size_of::<XmlParserCtxt>());
-        std::ptr::write(&mut *ctxt, XmlParserCtxt::default());
-        if html_init_parser_ctxt(ctxt, sax, user_data) < 0 {
-            html_free_parser_ctxt(ctxt);
-            return null_mut();
-        }
-        ctxt
+        Some(ctxt)
     }
 }
 
@@ -3334,16 +3326,8 @@ pub unsafe fn html_create_memory_parser_ctxt(buffer: Vec<u8>) -> Option<HtmlPars
             return None;
         }
 
-        let new: XmlParserCtxtPtr = html_new_parser_ctxt();
-        if new.is_null() {
-            return None;
-        }
-        let mut ctxt = HtmlParserCtxt::default();
-        std::ptr::copy(new, &mut ctxt, 1);
-        xml_free(new as _);
-
+        let mut ctxt = html_new_parser_ctxt()?;
         let buf = XmlParserInputBuffer::from_memory(buffer, XmlCharEncoding::None)?;
-
         let mut input = XmlParserInput::new(Some(&mut ctxt))?;
 
         input.filename = None;
@@ -3859,22 +3843,13 @@ pub unsafe fn html_parse_doc(cur: Vec<u8>, encoding: Option<&str>) -> Option<Htm
 pub unsafe fn html_create_file_parser_ctxt(
     filename: &str,
     encoding: Option<&str>,
-) -> HtmlParserCtxtPtr {
+) -> Option<HtmlParserCtxt> {
     unsafe {
-        let ctxt: HtmlParserCtxtPtr = html_new_parser_ctxt();
-        if ctxt.is_null() {
-            return null_mut();
-        }
-
+        let mut ctxt = html_new_parser_ctxt()?;
         let canonic_filename = canonic_path(filename);
-        let Some(input_stream) =
-            xml_load_external_entity(Some(&canonic_filename), None, &mut *ctxt)
-        else {
-            xml_free_parser_ctxt(ctxt);
-            return null_mut();
-        };
+        let input_stream = xml_load_external_entity(Some(&canonic_filename), None, &mut ctxt)?;
 
-        (*ctxt).input_push(input_stream);
+        ctxt.input_push(input_stream);
 
         // set encoding
         if let Some(encoding) = encoding {
@@ -3882,11 +3857,11 @@ pub unsafe fn html_create_file_parser_ctxt(
 
             if l < 1000 {
                 let content = format!("charset={encoding}");
-                html_check_encoding(ctxt, &content);
+                html_check_encoding(&raw mut ctxt, &content);
             }
         }
 
-        ctxt
+        Some(ctxt)
     }
 }
 
@@ -3909,24 +3884,20 @@ pub unsafe fn html_sax_parse_file(
 
         xml_init_parser();
 
-        let ctxt: HtmlParserCtxtPtr = html_create_file_parser_ctxt(filename, encoding);
-        if ctxt.is_null() {
-            return None;
-        }
+        let mut ctxt = html_create_file_parser_ctxt(filename, encoding)?;
         let replaced = sax.is_some();
         if let Some(sax) = sax {
-            oldsax = (*ctxt).sax.replace(sax);
-            (*ctxt).user_data = user_data;
+            oldsax = ctxt.sax.replace(sax);
+            ctxt.user_data = user_data;
         }
 
-        html_parse_document(ctxt);
+        html_parse_document(&raw mut ctxt);
 
-        let ret = (*ctxt).my_doc;
+        let ret = ctxt.my_doc;
         if replaced {
-            (*ctxt).sax = oldsax;
-            (*ctxt).user_data = None;
+            ctxt.sax = oldsax;
+            ctxt.user_data = None;
         }
-        html_free_parser_ctxt(ctxt);
 
         ret
     }
@@ -4230,7 +4201,7 @@ pub unsafe fn html_create_push_parser_ctxt(
     size: i32,
     filename: Option<&str>,
     enc: XmlCharEncoding,
-) -> HtmlParserCtxtPtr {
+) -> Option<HtmlParserCtxt> {
     unsafe {
         use std::slice::from_raw_parts;
 
@@ -4239,21 +4210,17 @@ pub unsafe fn html_create_push_parser_ctxt(
         xml_init_parser();
 
         let buf = XmlParserInputBuffer::new(enc);
-
-        let ctxt: HtmlParserCtxtPtr = html_new_sax_parser_ctxt(sax, user_data);
-        if ctxt.is_null() {
-            return null_mut();
-        }
+        let mut ctxt = html_new_sax_parser_ctxt(sax, user_data)?;
         if matches!(enc, XmlCharEncoding::UTF8) || buf.encoder.is_some() {
-            (*ctxt).charset = XmlCharEncoding::UTF8;
+            ctxt.charset = XmlCharEncoding::UTF8;
         }
         if filename.is_none() {
-            (*ctxt).directory = None;
+            ctxt.directory = None;
         } else if let Some(dir) = filename.and_then(xml_parser_get_directory) {
-            (*ctxt).directory = Some(dir.to_string_lossy().into_owned());
+            ctxt.directory = Some(dir.to_string_lossy().into_owned());
         }
 
-        let mut input_stream = html_new_input_stream(ctxt);
+        let mut input_stream = html_new_input_stream(&raw mut ctxt);
 
         if let Some(filename) = filename {
             let canonic = canonic_path(filename);
@@ -4264,28 +4231,26 @@ pub unsafe fn html_create_push_parser_ctxt(
         input_stream.buf = Some(buf);
         input_stream.reset_base();
 
-        (*ctxt).input_push(input_stream);
+        ctxt.input_push(input_stream);
 
         if size > 0
             && !chunk.is_null()
-            && (*ctxt).input().is_some()
-            && (*ctxt).input().unwrap().buf.is_some()
+            && ctxt.input().is_some()
+            && ctxt.input().unwrap().buf.is_some()
         {
-            let base: size_t = (*ctxt).input().unwrap().get_base();
-            let cur = (*ctxt).input().unwrap().offset_from_base();
+            let base: size_t = ctxt.input().unwrap().get_base();
+            let cur = ctxt.input().unwrap().offset_from_base();
 
-            (*ctxt)
-                .input_mut()
+            ctxt.input_mut()
                 .unwrap()
                 .buf
                 .as_mut()
                 .unwrap()
                 .push_bytes(from_raw_parts(chunk as *const u8, size as usize));
-            (*ctxt).input_mut().unwrap().set_base_and_cursor(base, cur);
+            ctxt.input_mut().unwrap().set_base_and_cursor(base, cur);
         }
-        (*ctxt).progressive = 1;
-
-        ctxt
+        ctxt.progressive = 1;
+        Some(ctxt)
     }
 }
 
@@ -5324,7 +5289,6 @@ unsafe fn html_do_read(
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
-    reuse: i32,
 ) -> Option<HtmlDocPtr> {
     unsafe {
         html_ctxt_use_options(ctxt, options);
@@ -5341,11 +5305,7 @@ unsafe fn html_do_read(
             }
         }
         html_parse_document(ctxt);
-        let ret = (*ctxt).my_doc.take();
-        if reuse == 0 {
-            xml_free_parser_ctxt(ctxt);
-        }
-        ret
+        (*ctxt).my_doc.take()
     }
 }
 
@@ -5362,7 +5322,7 @@ pub unsafe fn html_read_doc(
     unsafe {
         xml_init_parser();
         let mut ctxt = html_create_doc_parser_ctxt(cur, None)?;
-        html_do_read(&raw mut ctxt, url, encoding, options, 0)
+        html_do_read(&raw mut ctxt, url, encoding, options)
     }
 }
 
@@ -5377,11 +5337,8 @@ pub unsafe fn html_read_file(
 ) -> Option<HtmlDocPtr> {
     unsafe {
         xml_init_parser();
-        let ctxt: HtmlParserCtxtPtr = html_create_file_parser_ctxt(filename, encoding);
-        if ctxt.is_null() {
-            return None;
-        }
-        html_do_read(ctxt, None, None, options, 0)
+        let mut ctxt = html_create_file_parser_ctxt(filename, encoding)?;
+        html_do_read(&raw mut ctxt, None, None, options)
     }
 }
 
@@ -5398,7 +5355,7 @@ pub unsafe fn html_read_memory(
     unsafe {
         xml_init_parser();
         let mut ctxt = html_create_memory_parser_ctxt(buffer)?;
-        html_do_read(&raw mut ctxt, url, encoding, options, 0)
+        html_do_read(&raw mut ctxt, url, encoding, options)
     }
 }
 
@@ -5416,16 +5373,10 @@ pub unsafe fn html_read_io(
         xml_init_parser();
 
         let input = XmlParserInputBuffer::from_reader(ioctx, XmlCharEncoding::None);
-        let ctxt: HtmlParserCtxtPtr = html_new_parser_ctxt();
-        if ctxt.is_null() {
-            return None;
-        }
-        let Some(stream) = XmlParserInput::from_io(&mut *ctxt, input, XmlCharEncoding::None) else {
-            xml_free_parser_ctxt(ctxt);
-            return None;
-        };
-        (*ctxt).input_push(stream);
-        html_do_read(ctxt, url, encoding, options, 0)
+        let mut ctxt = html_new_parser_ctxt()?;
+        let stream = XmlParserInput::from_io(&mut ctxt, input, XmlCharEncoding::None)?;
+        ctxt.input_push(stream);
+        html_do_read(&raw mut ctxt, url, encoding, options)
     }
 }
 
@@ -5462,7 +5413,7 @@ pub unsafe fn html_ctxt_read_file(
 
         let stream = xml_load_external_entity(Some(filename), None, ctxt)?;
         ctxt.input_push(stream);
-        html_do_read(ctxt, None, encoding, options, 1)
+        html_do_read(ctxt, None, encoding, options)
     }
 }
 
@@ -5487,7 +5438,7 @@ pub unsafe fn html_ctxt_read_memory(
 
         let stream = XmlParserInput::from_io(ctxt, input, XmlCharEncoding::None)?;
         (*ctxt).input_push(stream);
-        html_do_read(ctxt, url, encoding, options, 1)
+        html_do_read(ctxt, url, encoding, options)
     }
 }
 
@@ -5511,7 +5462,7 @@ pub unsafe fn html_ctxt_read_io(
         let input = XmlParserInputBuffer::from_reader(ioctx, XmlCharEncoding::None);
         let stream = XmlParserInput::from_io(ctxt, input, XmlCharEncoding::None)?;
         (*ctxt).input_push(stream);
-        html_do_read(ctxt, url, encoding, options, 1)
+        html_do_read(ctxt, url, encoding, options)
     }
 }
 
@@ -5717,28 +5668,6 @@ mod tests {
                 );
             }
             assert!(leaks == 0, "{leaks} Leaks are found in htmlInitAutoClose()");
-        }
-    }
-
-    #[test]
-    fn test_html_new_parser_ctxt() {
-        #[cfg(feature = "html")]
-        unsafe {
-            let mut leaks = 0;
-
-            let mem_base = xml_mem_blocks();
-
-            let ret_val = html_new_parser_ctxt();
-            desret_html_parser_ctxt_ptr(ret_val);
-            reset_last_error();
-            if mem_base != xml_mem_blocks() {
-                leaks += 1;
-                eprintln!(
-                    "Leak of {} blocks found in htmlNewParserCtxt",
-                    xml_mem_blocks() - mem_base
-                );
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in htmlNewParserCtxt()");
         }
     }
 }

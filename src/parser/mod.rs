@@ -618,18 +618,10 @@ pub unsafe fn xml_read_io(
         xml_init_parser();
 
         let input = XmlParserInputBuffer::from_reader(ioctx, XmlCharEncoding::None);
-        let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
-        if ctxt.is_null() {
-            return None;
-        }
-        let Some(stream) = XmlParserInput::from_io(&mut *ctxt, input, XmlCharEncoding::None) else {
-            xml_free_parser_ctxt(ctxt);
-            return None;
-        };
-        (*ctxt).input_push(stream);
-        let res = (*ctxt).do_read(url, encoding, options);
-        xml_free_parser_ctxt(ctxt);
-        res
+        let mut ctxt = xml_new_parser_ctxt()?;
+        let stream = XmlParserInput::from_io(&mut ctxt, input, XmlCharEncoding::None)?;
+        ctxt.input_push(stream);
+        ctxt.do_read(url, encoding, options)
     }
 }
 

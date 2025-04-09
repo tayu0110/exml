@@ -42,7 +42,7 @@ use crate::{
         },
         xmlschemastypes::{XmlSchemaValPtr, xml_schema_free_value},
     },
-    parser::XmlParserCtxtPtr,
+    parser::XmlParserCtxt,
     tree::{XmlDocPtr, XmlGenericNodePtr, XmlNodePtr, xml_free_doc},
     xmlschemas::item_list::xml_schema_item_list_free,
 };
@@ -359,7 +359,7 @@ pub struct XmlSchemaValidCtxt {
     // pub(crate) input: Option<Rc<RefCell<XmlParserInputBuffer>>>,
     pub(crate) enc: XmlCharEncoding,
     // sax: XmlSAXHandlerPtr,
-    pub(crate) parser_ctxt: XmlParserCtxtPtr,
+    pub(crate) parser_ctxt: Option<Box<XmlParserCtxt>>,
     user_data: *mut c_void, /* TODO: What is this for? */
     pub(crate) filename: Option<String>,
 
@@ -424,7 +424,11 @@ impl XmlSchemaValidCtxt {
     pub(crate) unsafe fn lookup_namespace(&self, prefix: Option<&str>) -> Option<String> {
         unsafe {
             match () {
-                _ if !self.parser_ctxt.is_null() && (*self.parser_ctxt).sax.is_some() => {
+                _ if self
+                    .parser_ctxt
+                    .as_deref()
+                    .is_some_and(|ctxt| ctxt.sax.is_some()) =>
+                {
                     for i in (0..=self.depth).rev() {
                         if (*(*self.elem_infos.add(i as usize))).nb_ns_bindings != 0 {
                             let inode: XmlSchemaNodeInfoPtr = *self.elem_infos.add(i as usize);
@@ -532,8 +536,8 @@ impl XmlSchemaValidCtxt {
     ///
     /// Returns the parser context of the schema validation context or NULL in case of error.
     #[doc(alias = "xmlSchemaValidCtxtGetParserCtxt")]
-    pub fn get_parser_context(&self) -> XmlParserCtxtPtr {
-        self.parser_ctxt
+    pub fn get_parser_context(&self) -> Option<&XmlParserCtxt> {
+        self.parser_ctxt.as_deref()
     }
 
     /// Sets the options to be used during the validation.
@@ -778,9 +782,8 @@ impl Default for XmlSchemaValidCtxt {
             serror: None,
             schema: null_mut(),
             doc: None,
-            // input: None,
             enc: XmlCharEncoding::None,
-            parser_ctxt: null_mut(),
+            parser_ctxt: None,
             user_data: null_mut(),
             filename: None,
             err: 0,
@@ -921,6 +924,7 @@ pub unsafe fn xml_schema_free_valid_ctxt(ctxt: XmlSchemaValidCtxtPtr) {
         if !(*ctxt).dict.is_null() {
             xml_dict_free((*ctxt).dict);
         }
+        (*ctxt).parser_ctxt.take();
 
         let _ = Box::from_raw(ctxt);
     }

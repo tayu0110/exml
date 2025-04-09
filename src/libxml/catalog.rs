@@ -60,9 +60,7 @@ use crate::{
     generic_error,
     io::{XmlParserInputBuffer, xml_parser_get_directory},
     libxml::{chvalid::xml_is_blank_char, globals::xml_free, threads::xml_get_thread_id},
-    parser::{
-        XML_MAX_NAMELEN, XmlParserInput, xml_free_parser_ctxt, xml_is_letter, xml_new_parser_ctxt,
-    },
+    parser::{XML_MAX_NAMELEN, XmlParserInput, xml_is_letter, xml_new_parser_ctxt},
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlDocPtr, XmlGenericNodePtr, XmlNodePtr, xml_free_doc,
         xml_free_ns, xml_new_doc, xml_new_doc_node, xml_new_dtd, xml_new_ns,
@@ -3137,21 +3135,13 @@ pub unsafe fn xml_catalog_remove(value: &str) -> i32 {
 #[doc(alias = "xmlParseCatalogFile")]
 pub unsafe fn xml_parse_catalog_file(filename: &str) -> Option<XmlDocPtr> {
     unsafe {
-        let ctxt = xml_new_parser_ctxt();
-        if ctxt.is_null() {
+        let Some(mut ctxt) = xml_new_parser_ctxt() else {
             xml_catalog_err_memory("allocating parser context");
             return None;
-        }
-
-        let Some(buf) = XmlParserInputBuffer::from_uri(filename, XmlCharEncoding::None) else {
-            xml_free_parser_ctxt(ctxt);
-            return None;
         };
 
-        let Some(mut input_stream) = XmlParserInput::new(Some(&mut *ctxt)) else {
-            xml_free_parser_ctxt(ctxt);
-            return None;
-        };
+        let buf = XmlParserInputBuffer::from_uri(filename, XmlCharEncoding::None)?;
+        let mut input_stream = XmlParserInput::new(Some(&mut ctxt))?;
 
         {
             let canonic = canonic_path(filename);
@@ -3160,31 +3150,28 @@ pub unsafe fn xml_parse_catalog_file(filename: &str) -> Option<XmlDocPtr> {
         input_stream.buf = Some(buf);
         input_stream.reset_base();
 
-        (*ctxt).input_push(input_stream);
-        if (*ctxt).directory.is_none() {
+        ctxt.input_push(input_stream);
+        if ctxt.directory.is_none() {
             if let Some(directory) = xml_parser_get_directory(filename) {
-                (*ctxt).directory = Some(directory.to_string_lossy().into_owned());
+                ctxt.directory = Some(directory.to_string_lossy().into_owned());
             }
         }
-        (*ctxt).valid = 0;
-        (*ctxt).validate = 0;
-        (*ctxt).loadsubset = 0;
-        (*ctxt).pedantic = 0;
-        (*ctxt).dict_names = 1;
+        ctxt.valid = 0;
+        ctxt.validate = 0;
+        ctxt.loadsubset = 0;
+        ctxt.pedantic = 0;
+        ctxt.dict_names = 1;
 
-        (*ctxt).parse_document();
+        ctxt.parse_document();
 
-        let ret = if (*ctxt).well_formed != 0 {
-            (*ctxt).my_doc
+        if ctxt.well_formed != 0 {
+            ctxt.my_doc
         } else {
-            if let Some(my_doc) = (*ctxt).my_doc.take() {
+            if let Some(my_doc) = ctxt.my_doc.take() {
                 xml_free_doc(my_doc);
             }
             None
-        };
-        xml_free_parser_ctxt(ctxt);
-
-        ret
+        }
     }
 }
 

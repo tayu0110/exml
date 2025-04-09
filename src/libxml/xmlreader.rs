@@ -23,12 +23,7 @@
 // daniel@veillard.com
 
 use std::{
-    any::type_name,
-    ffi::c_char,
-    io::Read,
-    mem::size_of,
-    os::raw::c_void,
-    ptr::{addr_of_mut, null_mut},
+    any::type_name, ffi::c_char, io::Read, mem::size_of, os::raw::c_void, ptr::null_mut,
     sync::atomic::Ordering,
 };
 
@@ -213,7 +208,7 @@ pub struct XmlTextReader {
     allocs: i32,
     state: XmlTextReaderState,
     // the parser context
-    ctxt: XmlParserCtxtPtr,
+    ctxt: Option<Box<XmlParserCtxt>>,
     // the input
     input: Option<XmlParserInputBuffer>,
     // initial SAX callbacks
@@ -328,8 +323,8 @@ impl XmlTextReader {
             if self.input.is_some() {
                 let _ = self.input.take();
             }
-            if !self.ctxt.is_null() {
-                (*self.ctxt).reset();
+            if let Some(ctxt) = self.ctxt.as_deref_mut() {
+                ctxt.reset();
             }
 
             self.ent_tab.clear();
@@ -343,8 +338,8 @@ impl XmlTextReader {
             self.doc = Some(doc);
             self.state = XmlTextReaderState::Start;
             if self.dict.is_null() {
-                if !self.ctxt.is_null() && !(*self.ctxt).dict.is_null() {
-                    self.dict = (*self.ctxt).dict;
+                if let Some(ctxt) = self.ctxt.as_deref().filter(|ctxt| !ctxt.dict.is_null()) {
+                    self.dict = ctxt.dict;
                 } else {
                     self.dict = xml_dict_create();
                 }
@@ -365,12 +360,11 @@ impl XmlTextReader {
         encoding: Option<&str>,
         mut options: i32,
     ) -> i32 {
-        use crate::parser::{XmlParserInput, xml_create_push_parser_ctxt};
+        use crate::parser::XmlParserInput;
 
         unsafe {
             use crate::{
                 encoding::{XmlCharEncoding, find_encoding_handler},
-                generic_error,
                 uri::canonic_path,
                 xinclude::XINCLUDE_NODE,
             };
@@ -394,7 +388,13 @@ impl XmlTextReader {
             }
             self.buffer.clear();
             self.buffer.reserve(100);
-            let mut sax = (*self.ctxt).sax.take().unwrap_or_default();
+            let mut sax = self
+                .ctxt
+                .as_deref_mut()
+                .unwrap()
+                .sax
+                .take()
+                .unwrap_or_default();
             xml_sax_version(&mut sax, 2);
             self.start_element = sax.start_element;
             sax.start_element = Some(xml_text_reader_start_element);
@@ -424,7 +424,7 @@ impl XmlTextReader {
             sax.ignorable_whitespace = Some(xml_text_reader_characters);
             self.cdata_block = sax.cdata_block;
             sax.cdata_block = Some(xml_text_reader_cdata_block);
-            (*self.ctxt).sax = Some(sax);
+            self.ctxt.as_deref_mut().unwrap().sax = Some(sax);
 
             self.mode = XmlTextReaderMode::XmlTextreaderModeInitial as _;
             self.node = None;
@@ -440,82 +440,47 @@ impl XmlTextReader {
                 {
                     self.input.as_mut().unwrap().read(4);
                 }
-                if self.ctxt.is_null() {
-                    if self
-                        .input
-                        .as_mut()
-                        .unwrap()
-                        .buffer
-                        .map_or(0, |buf| buf.len())
-                        >= 4
-                    {
-                        self.ctxt = xml_create_push_parser_ctxt(
-                            (*self.ctxt).sax.take(),
-                            None,
-                            &self
-                                .input
-                                .as_mut()
-                                .unwrap()
-                                .buffer
-                                .expect("Internal Error")
-                                .as_ref()[..4],
-                            url,
-                        );
-                        self.base = 0;
-                        self.cur = 4;
-                    } else {
-                        self.ctxt =
-                            xml_create_push_parser_ctxt((*self.ctxt).sax.take(), None, b"", url);
-                        self.base = 0;
-                        self.cur = 0;
-                    }
-                } else {
-                    let enc = XmlCharEncoding::None;
+                let enc = XmlCharEncoding::None;
 
-                    (*self.ctxt).reset();
-                    let buf = XmlParserInputBuffer::new(enc);
-                    let Some(mut input_stream) = XmlParserInput::new(Some(&mut *self.ctxt)) else {
-                        return -1;
-                    };
-
-                    if let Some(url) = url {
-                        let canonic = canonic_path(url);
-                        input_stream.filename = Some(canonic.into_owned());
-                    } else {
-                        input_stream.filename = None;
-                    }
-                    input_stream.buf = Some(buf);
-                    input_stream.reset_base();
-
-                    (*self.ctxt).input_push(input_stream);
-                    self.cur = 0;
-                }
-                if self.ctxt.is_null() {
-                    generic_error!("xmlTextReaderSetup : malloc failed\n");
+                self.ctxt.as_deref_mut().unwrap().reset();
+                let buf = XmlParserInputBuffer::new(enc);
+                let Some(mut input_stream) = XmlParserInput::new(self.ctxt.as_deref_mut()) else {
                     return -1;
+                };
+
+                if let Some(url) = url {
+                    let canonic = canonic_path(url);
+                    input_stream.filename = Some(canonic.into_owned());
+                } else {
+                    input_stream.filename = None;
                 }
+                input_stream.buf = Some(buf);
+                input_stream.reset_base();
+
+                self.ctxt.as_deref_mut().unwrap().input_push(input_stream);
+                self.cur = 0;
             }
             if !self.dict.is_null() {
-                if !(*self.ctxt).dict.is_null() {
-                    if self.dict != (*self.ctxt).dict {
+                if !self.ctxt.as_deref_mut().unwrap().dict.is_null() {
+                    if self.dict != self.ctxt.as_deref_mut().unwrap().dict {
                         xml_dict_free(self.dict);
-                        self.dict = (*self.ctxt).dict;
+                        self.dict = self.ctxt.as_deref_mut().unwrap().dict;
                     }
                 } else {
-                    (*self.ctxt).dict = self.dict;
+                    self.ctxt.as_deref_mut().unwrap().dict = self.dict;
                 }
             } else {
-                if (*self.ctxt).dict.is_null() {
-                    (*self.ctxt).dict = xml_dict_create();
+                if self.ctxt.as_deref_mut().unwrap().dict.is_null() {
+                    self.ctxt.as_deref_mut().unwrap().dict = xml_dict_create();
                 }
-                self.dict = (*self.ctxt).dict;
+                self.dict = self.ctxt.as_deref_mut().unwrap().dict;
             }
-            (*self.ctxt)._private = self as *mut Self as _;
-            (*self.ctxt).linenumbers = 1;
-            (*self.ctxt).dict_names = 1;
+            self.ctxt.as_deref_mut().unwrap()._private = self as *mut Self as _;
+            self.ctxt.as_deref_mut().unwrap().linenumbers = 1;
+            self.ctxt.as_deref_mut().unwrap().dict_names = 1;
             // use the parser dictionary to allocate all elements and attributes names
-            (*self.ctxt).docdict = 1;
-            (*self.ctxt).parse_mode = XmlParserMode::XmlParseReader;
+            self.ctxt.as_deref_mut().unwrap().docdict = 1;
+            self.ctxt.as_deref_mut().unwrap().parse_mode = XmlParserMode::XmlParseReader;
 
             #[cfg(feature = "xinclude")]
             {
@@ -536,13 +501,19 @@ impl XmlTextReader {
                 self.validate = XmlTextReaderValidate::ValidateDtd;
             }
 
-            (*self.ctxt).use_options(options);
+            self.ctxt.as_deref_mut().unwrap().use_options(options);
             if let Some(encoding) = encoding {
                 if let Some(handler) = find_encoding_handler(encoding) {
-                    (*self.ctxt).switch_to_encoding(handler);
+                    self.ctxt
+                        .as_deref_mut()
+                        .unwrap()
+                        .switch_to_encoding(handler);
                 }
             }
-            if let Some(input) = (*self.ctxt)
+            if let Some(input) = self
+                .ctxt
+                .as_deref_mut()
+                .unwrap()
                 .input_mut()
                 .filter(|input| input.filename.is_none())
             {
@@ -582,7 +553,7 @@ impl XmlTextReader {
             if self.doc.is_some() {
                 return self.read_tree();
             }
-            if self.ctxt.is_null() {
+            if self.ctxt.is_none() {
                 return -1;
             }
 
@@ -597,12 +568,12 @@ impl XmlTextReader {
                         self.state = XmlTextReaderState::Error;
                         return -1;
                     }
-                    (*self.ctxt).node.is_none()
+                    self.ctxt.as_deref_mut().unwrap().node.is_none()
                         && (self.mode != XmlTextReaderMode::XmlTextreaderModeEof
                             && self.state != XmlTextReaderState::Done)
                 } {}
-                if (*self.ctxt).node.is_none() {
-                    if let Some(my_doc) = (*self.ctxt).my_doc {
+                if self.ctxt.as_deref_mut().unwrap().node.is_none() {
+                    if let Some(my_doc) = self.ctxt.as_deref_mut().unwrap().my_doc {
                         self.node = my_doc.children;
                     }
                     if self.node.is_none() {
@@ -612,21 +583,21 @@ impl XmlTextReader {
                     }
                     self.state = XmlTextReaderState::Element;
                 } else {
-                    if let Some(my_doc) = (*self.ctxt).my_doc {
+                    if let Some(my_doc) = self.ctxt.as_deref_mut().unwrap().my_doc {
                         self.node = my_doc.children;
                     }
                     if self.node.is_none() {
-                        self.node = Some((*self.ctxt).node_tab[0].into());
+                        self.node = Some(self.ctxt.as_deref_mut().unwrap().node_tab[0].into());
                     }
                     self.state = XmlTextReaderState::Element;
                 }
                 self.depth = 0;
-                (*self.ctxt).parse_mode = XmlParserMode::XmlParseReader;
+                self.ctxt.as_deref_mut().unwrap().parse_mode = XmlParserMode::XmlParseReader;
                 // goto node_found;
                 node_found = true;
             } else {
                 oldstate = self.state;
-                olddepth = (*self.ctxt).node_tab.len();
+                olddepth = self.ctxt.as_deref_mut().unwrap().node_tab.len();
                 oldnode = self.node;
             }
 
@@ -649,7 +620,7 @@ impl XmlTextReader {
                             .node
                             .filter(|&cur_node| {
                                 cur_node.next().is_none()
-                                    && (*self.ctxt).node_tab.len() == olddepth
+                                    && self.ctxt.as_deref_mut().unwrap().node_tab.len() == olddepth
                                     && (oldstate == XmlTextReaderState::Backtrack
                                         || cur_node.children().is_none()
                                         || cur_node.element_type()
@@ -668,12 +639,12 @@ impl XmlTextReader {
                                                 | XmlElementType::XmlDocumentNode
                                                 | XmlElementType::XmlHTMLDocumentNode
                                         ))
-                                    && (*self.ctxt).node.is_none_or(|node| {
+                                    && self.ctxt.as_deref_mut().unwrap().node.is_none_or(|node| {
                                         cur_node == node.into()
                                             || cur_node.parent() == Some(node.into())
                                     })
                                     && !matches!(
-                                        (*self.ctxt).instate,
+                                        self.ctxt.as_deref_mut().unwrap().instate,
                                         XmlParserInputState::XmlParserEOF
                                     )
                             })
@@ -800,7 +771,7 @@ impl XmlTextReader {
                             )
                         {
                             if self.mode != XmlTextReaderMode::XmlTextreaderModeEof {
-                                val = (*self.ctxt).parse_chunk(b"", 1);
+                                val = self.ctxt.as_deref_mut().unwrap().parse_chunk(b"", 1);
                                 self.state = XmlTextReaderState::Done;
                                 if val != 0 {
                                     return -1;
@@ -889,7 +860,9 @@ impl XmlTextReader {
                             })
                     {
                         if self.xincctxt.is_none() {
-                            let mut ctxt = XmlXIncludeCtxt::new((*self.ctxt).my_doc.unwrap());
+                            let mut ctxt = XmlXIncludeCtxt::new(
+                                self.ctxt.as_deref_mut().unwrap().my_doc.unwrap(),
+                            );
                             ctxt.set_flags(
                                 self.parser_flags & !(XmlParserOption::XmlParseNoXIncnode as i32),
                             );
@@ -927,7 +900,10 @@ impl XmlTextReader {
                     .node
                     .and_then(|node| XmlNodePtr::try_from(node).ok())
                     .filter(|node| node.element_type() == XmlElementType::XmlEntityRefNode)
-                    .filter(|_| !self.ctxt.is_null() && (*self.ctxt).replace_entities == 1)
+                    .filter(|_| {
+                        self.ctxt.is_some()
+                            && self.ctxt.as_deref_mut().unwrap().replace_entities == 1
+                    })
                 {
                     if let Some(children) = node.children().filter(|children| {
                         children.element_type() == XmlElementType::XmlEntityDecl
@@ -943,7 +919,7 @@ impl XmlTextReader {
                     #[cfg(feature = "libxml_regexp")]
                     if self.node.is_some()
                         && self.node.unwrap().element_type() == XmlElementType::XmlEntityRefNode
-                        && !self.ctxt.is_null()
+                        && self.ctxt.is_some()
                         && self.validate as i32 != 0
                     {
                         self.validate_entity();
@@ -1251,18 +1227,21 @@ impl XmlTextReader {
         unsafe {
             let mut val: i32;
 
-            if self.node.is_none() || self.ctxt.is_null() {
+            if self.node.is_none() || self.ctxt.is_none() {
                 return -1;
             }
             while {
-                if matches!((*self.ctxt).instate, XmlParserInputState::XmlParserEOF) {
+                if matches!(
+                    self.ctxt.as_deref_mut().unwrap().instate,
+                    XmlParserInputState::XmlParserEOF
+                ) {
                     return 1;
                 }
 
                 if xml_text_reader_get_successor(self.node.unwrap()).is_some() {
                     return 1;
                 }
-                if ((*self.ctxt).node_tab.len() as i32) < self.depth {
+                if (self.ctxt.as_deref_mut().unwrap().node_tab.len() as i32) < self.depth {
                     return 1;
                 }
                 if self.mode == XmlTextReaderMode::XmlTextreaderModeEof {
@@ -1292,9 +1271,7 @@ impl XmlTextReader {
             if self.doc.is_some() {
                 return self.node;
             }
-            if self.ctxt.is_null() {
-                return None;
-            }
+            self.ctxt.as_ref()?;
             if self.do_expand() < 0 {
                 return None;
             }
@@ -1333,7 +1310,7 @@ impl XmlTextReader {
                             self.mode = XmlTextReaderMode::XmlTextreaderModeEof;
                             self.state = oldstate;
                             if oldstate != XmlTextReaderState::Start
-                                || (*self.ctxt).my_doc.is_some()
+                                || self.ctxt.as_deref_mut().unwrap().my_doc.is_some()
                             {
                                 return val;
                             }
@@ -1349,23 +1326,27 @@ impl XmlTextReader {
                 // parse by block of CHUNK_SIZE bytes, various tests show that
                 // it's the best tradeoff at least on a 1.2GH Duron
                 if inbuf.len() >= self.cur as usize + CHUNK_SIZE {
-                    val = (*self.ctxt).parse_chunk(
+                    val = self.ctxt.as_deref_mut().unwrap().parse_chunk(
                         &inbuf.as_ref()[self.cur as usize..self.cur as usize + CHUNK_SIZE],
                         0,
                     );
                     self.cur += CHUNK_SIZE as u32;
                     if val != 0 {
-                        (*self.ctxt).well_formed = 0;
+                        self.ctxt.as_deref_mut().unwrap().well_formed = 0;
                     }
-                    if (*self.ctxt).well_formed == 0 {
+                    if self.ctxt.as_deref_mut().unwrap().well_formed == 0 {
                         break;
                     }
                 } else {
                     let s = inbuf.len() as i32 - self.cur as i32;
-                    val = (*self.ctxt).parse_chunk(&inbuf.as_ref()[self.cur as usize..], 0);
+                    val = self
+                        .ctxt
+                        .as_deref_mut()
+                        .unwrap()
+                        .parse_chunk(&inbuf.as_ref()[self.cur as usize..], 0);
                     self.cur += s as u32;
                     if val != 0 {
-                        (*self.ctxt).well_formed = 0;
+                        self.ctxt.as_deref_mut().unwrap().well_formed = 0;
                     }
                     break;
                 }
@@ -1385,19 +1366,23 @@ impl XmlTextReader {
                 && self.state != XmlTextReaderState::Done
             {
                 // At the end of the stream signal that the work is done to the Push parser.
-                val = (*self.ctxt).parse_chunk(&inbuf.as_ref()[self.cur as usize..], 1);
+                val = self
+                    .ctxt
+                    .as_deref_mut()
+                    .unwrap()
+                    .parse_chunk(&inbuf.as_ref()[self.cur as usize..], 1);
                 self.cur = inbuf.len() as _;
                 self.state = XmlTextReaderState::Done;
                 if val != 0 {
-                    if (*self.ctxt).well_formed != 0 {
-                        (*self.ctxt).well_formed = 0;
+                    if self.ctxt.as_deref_mut().unwrap().well_formed != 0 {
+                        self.ctxt.as_deref_mut().unwrap().well_formed = 0;
                     } else {
                         return -1;
                     }
                 }
             }
             self.state = oldstate;
-            if (*self.ctxt).well_formed == 0 {
+            if self.ctxt.as_deref_mut().unwrap().well_formed == 0 {
                 self.mode = XmlTextReaderMode::XmlTextreaderModeEof;
                 return -1;
             }
@@ -1444,20 +1429,24 @@ impl XmlTextReader {
 
             #[cfg(feature = "libxml_valid")]
             if self.validate == XmlTextReaderValidate::ValidateDtd
-                && !self.ctxt.is_null()
-                && (*self.ctxt).validate == 1
+                && self.ctxt.is_some()
+                && self.ctxt.as_deref_mut().unwrap().validate == 1
             {
+                let my_doc = self.ctxt.as_deref().unwrap().my_doc.unwrap();
                 if let Some(prefix) = node.ns.as_deref().and_then(|ns| ns.prefix()) {
                     // TODO use the BuildQName interface
                     let qname = format!("{prefix}:{}", node.name().unwrap());
-                    (*self.ctxt).valid &=
-                        (*self.ctxt).vpush_element((*self.ctxt).my_doc.unwrap(), node, &qname);
+                    self.ctxt.as_deref_mut().unwrap().valid &= self
+                        .ctxt
+                        .as_deref_mut()
+                        .unwrap()
+                        .vpush_element(my_doc, node, &qname);
                 } else {
-                    (*self.ctxt).valid &= (*self.ctxt).vpush_element(
-                        (*self.ctxt).my_doc.unwrap(),
-                        node,
-                        &node.name().unwrap(),
-                    );
+                    self.ctxt.as_deref_mut().unwrap().valid &= self
+                        .ctxt
+                        .as_deref_mut()
+                        .unwrap()
+                        .vpush_element(my_doc, node, &node.name().unwrap());
                 }
             }
             #[cfg(feature = "schema")]
@@ -1468,13 +1457,14 @@ impl XmlTextReader {
                 if self.rng_full_node.is_some() {
                     return;
                 }
-                ret = (*self.rng_valid_ctxt).push_element((*self.ctxt).my_doc, node);
+                ret = (*self.rng_valid_ctxt)
+                    .push_element(self.ctxt.as_deref_mut().unwrap().my_doc, node);
                 if ret == 0 {
                     // this element requires a full tree
                     if let Some(node) = self.expand() {
                         ret = xml_relaxng_validate_full_element(
                             self.rng_valid_ctxt,
-                            (*self.ctxt).my_doc,
+                            self.ctxt.as_deref_mut().unwrap().my_doc,
                             XmlNodePtr::try_from(node).unwrap(),
                         );
                         self.rng_full_node = Some(XmlNodePtr::try_from(node).unwrap());
@@ -1505,20 +1495,24 @@ impl XmlTextReader {
 
             #[cfg(feature = "libxml_valid")]
             if self.validate == XmlTextReaderValidate::ValidateDtd
-                && !self.ctxt.is_null()
-                && (*self.ctxt).validate == 1
+                && self.ctxt.is_some()
+                && self.ctxt.as_deref_mut().unwrap().validate == 1
             {
+                let my_doc = self.ctxt.as_deref().unwrap().my_doc;
                 if let Some(prefix) = node.ns.as_deref().and_then(|ns| ns.prefix()) {
                     // TODO use the BuildQName interface
                     let qname = format!("{prefix}:{}", node.name().unwrap());
-                    (*self.ctxt).valid &=
-                        (*self.ctxt).vpop_element((*self.ctxt).my_doc, Some(node), &qname);
+                    self.ctxt.as_deref_mut().unwrap().valid &= self
+                        .ctxt
+                        .as_deref_mut()
+                        .unwrap()
+                        .vpop_element(my_doc, Some(node), &qname);
                 } else {
-                    (*self.ctxt).valid &= (*self.ctxt).vpop_element(
-                        (*self.ctxt).my_doc,
-                        Some(node),
-                        &node.name().unwrap(),
-                    );
+                    self.ctxt.as_deref_mut().unwrap().valid &= self
+                        .ctxt
+                        .as_deref_mut()
+                        .unwrap()
+                        .vpop_element(my_doc, Some(node), &node.name().unwrap());
                 }
             }
             #[cfg(feature = "schema")]
@@ -1530,7 +1524,8 @@ impl XmlTextReader {
                     }
                     return;
                 }
-                let ret: i32 = (*self.rng_valid_ctxt).pop_element((*self.ctxt).my_doc, node);
+                let ret: i32 = (*self.rng_valid_ctxt)
+                    .pop_element(self.ctxt.as_deref_mut().unwrap().my_doc, node);
                 if ret != 1 {
                     self.rng_valid_errors += 1;
                 }
@@ -1663,10 +1658,11 @@ impl XmlTextReader {
         unsafe {
             #[cfg(feature = "libxml_valid")]
             if self.validate == XmlTextReaderValidate::ValidateDtd
-                && !self.ctxt.is_null()
-                && (*self.ctxt).validate == 1
+                && self.ctxt.is_some()
+                && self.ctxt.as_deref_mut().unwrap().validate == 1
             {
-                (*self.ctxt).valid &= (*self.ctxt).vpush_cdata(data);
+                self.ctxt.as_deref_mut().unwrap().valid &=
+                    self.ctxt.as_deref_mut().unwrap().vpush_cdata(data);
             }
             #[cfg(feature = "schema")]
             if self.validate == XmlTextReaderValidate::ValidateRng && !self.rng_valid_ctxt.is_null()
@@ -1709,7 +1705,7 @@ impl XmlTextReader {
             }
 
             if (xsd.is_some() || !ctxt.is_null())
-                && (self.mode != XmlTextReaderMode::XmlTextreaderModeInitial || self.ctxt.is_null())
+                && (self.mode != XmlTextReaderMode::XmlTextreaderModeInitial || self.ctxt.is_none())
             {
                 return -1;
             }
@@ -1758,10 +1754,11 @@ impl XmlTextReader {
                     self.xsd_schemas = null_mut();
                     return -1;
                 }
+                let user_data = &raw mut self.ctxt.as_deref_mut().unwrap().user_data;
                 self.xsd_plug = xml_schema_sax_plug(
                     self.xsd_valid_ctxt,
-                    &mut (*self.ctxt).sax,
-                    addr_of_mut!((*self.ctxt).user_data),
+                    &mut self.ctxt.as_deref_mut().unwrap().sax,
+                    user_data,
                 );
                 if self.xsd_plug.is_null() {
                     xml_schema_free(self.xsd_schemas);
@@ -1774,10 +1771,11 @@ impl XmlTextReader {
                 // Use the given validation context.
                 self.xsd_valid_ctxt = ctxt;
                 self.xsd_preserve_ctxt = 1;
+                let user_data = &raw mut self.ctxt.as_deref_mut().unwrap().user_data;
                 self.xsd_plug = xml_schema_sax_plug(
                     self.xsd_valid_ctxt,
-                    &mut (*self.ctxt).sax,
-                    addr_of_mut!((*self.ctxt).user_data),
+                    &mut self.ctxt.as_deref_mut().unwrap().sax,
+                    user_data,
                 );
                 if self.xsd_plug.is_null() {
                     self.xsd_valid_ctxt = null_mut();
@@ -1863,7 +1861,7 @@ impl XmlTextReader {
             }
 
             if (rng.is_some() || !ctxt.is_null())
-                && (self.mode != XmlTextReaderMode::XmlTextreaderModeInitial || self.ctxt.is_null())
+                && (self.mode != XmlTextReaderMode::XmlTextreaderModeInitial || self.ctxt.is_none())
             {
                 return -1;
             }
@@ -1979,26 +1977,24 @@ impl XmlTextReader {
     /// Returns the flag value `Some(true)` if valid, `Some(false)` if no, and `None` in case of error
     #[doc(alias = "xmlTextReaderIsValid")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn is_valid(&self) -> Option<bool> {
-        unsafe {
-            #[cfg(feature = "schema")]
-            {
-                if self.validate == XmlTextReaderValidate::ValidateRng {
-                    return Some(self.rng_valid_errors == 0);
-                }
-                if self.validate == XmlTextReaderValidate::ValidateXsd {
-                    return Some(self.xsd_valid_errors == 0);
-                }
+    pub fn is_valid(&self) -> Option<bool> {
+        #[cfg(feature = "schema")]
+        {
+            if self.validate == XmlTextReaderValidate::ValidateRng {
+                return Some(self.rng_valid_errors == 0);
             }
-            if !self.ctxt.is_null() && (*self.ctxt).validate == 1 {
-                return if (*self.ctxt).valid < 0 {
-                    None
-                } else {
-                    Some((*self.ctxt).valid != 0)
-                };
+            if self.validate == XmlTextReaderValidate::ValidateXsd {
+                return Some(self.xsd_valid_errors == 0);
             }
-            Some(false)
         }
+        if self.ctxt.is_some() && self.ctxt.as_deref().unwrap().validate == 1 {
+            return if self.ctxt.as_deref().unwrap().valid < 0 {
+                None
+            } else {
+                Some(self.ctxt.as_deref().unwrap().valid != 0)
+            };
+        }
+        Some(false)
     }
 
     /// Whether an Attribute  node was generated from the default value defined in the DTD or schema.
@@ -2239,29 +2235,26 @@ impl XmlTextReader {
     /// Returns the value, usually 0 or 1, or -1 in case of error.
     #[doc(alias = "xmlTextReaderGetParserProp")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn get_parser_prop(&mut self, prop: XmlParserProperties) -> i32 {
-        unsafe {
-            if self.ctxt.is_null() {
-                return -1;
-            }
-            let ctxt = self.ctxt;
+    pub fn get_parser_prop(&mut self, prop: XmlParserProperties) -> i32 {
+        let Some(ctxt) = self.ctxt.as_deref() else {
+            return -1;
+        };
 
-            match prop {
-                XmlParserProperties::XmlParserLoadDTD => {
-                    if (*ctxt).loadsubset != 0 || (*ctxt).validate != 0 {
-                        return 1;
-                    }
-                    0
+        match prop {
+            XmlParserProperties::XmlParserLoadDTD => {
+                if ctxt.loadsubset != 0 || ctxt.validate != 0 {
+                    return 1;
                 }
-                XmlParserProperties::XmlParserDefaultAttrs => {
-                    if (*ctxt).loadsubset & XML_COMPLETE_ATTRS as i32 != 0 {
-                        return 1;
-                    }
-                    0
-                }
-                XmlParserProperties::XmlParserValidate => self.validate as i32,
-                XmlParserProperties::XmlParserSubstEntities => (*ctxt).replace_entities,
+                0
             }
+            XmlParserProperties::XmlParserDefaultAttrs => {
+                if ctxt.loadsubset & XML_COMPLETE_ATTRS as i32 != 0 {
+                    return 1;
+                }
+                0
+            }
+            XmlParserProperties::XmlParserValidate => self.validate as i32,
+            XmlParserProperties::XmlParserSubstEntities => ctxt.replace_entities,
         }
     }
 
@@ -2270,13 +2263,11 @@ impl XmlTextReader {
     /// Returns an int or 0 if not available
     #[doc(alias = "xmlTextReaderGetParserLineNumber")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn get_parser_line_number(&mut self) -> i32 {
-        unsafe {
-            if self.ctxt.is_null() || (*self.ctxt).input().is_none() {
-                return 0;
-            }
-            (*self.ctxt).input().unwrap().line
+    pub fn get_parser_line_number(&self) -> i32 {
+        if self.ctxt.is_none() || self.ctxt.as_deref().unwrap().input().is_none() {
+            return 0;
         }
+        self.ctxt.as_deref().unwrap().input().unwrap().line
     }
 
     /// Provide the column number of the current parsing point.
@@ -2284,13 +2275,11 @@ impl XmlTextReader {
     /// Returns an int or 0 if not available
     #[doc(alias = "xmlTextReaderGetParserColumnNumber")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn get_parser_column_number(&mut self) -> i32 {
-        unsafe {
-            if self.ctxt.is_null() || (*self.ctxt).input().is_none() {
-                return 0;
-            }
-            (*self.ctxt).input().unwrap().col
+    pub fn get_parser_column_number(&self) -> i32 {
+        if self.ctxt.is_none() || self.ctxt.as_deref().unwrap().input().is_none() {
+            return 0;
         }
+        self.ctxt.as_deref().unwrap().input().unwrap().col
     }
 
     /// Method to get the remainder of the buffered XML. this method stops the
@@ -2311,9 +2300,9 @@ impl XmlTextReader {
             self.node = None;
             self.curnode = None;
             self.mode = XmlTextReaderMode::XmlTextreaderModeEof;
-            if !self.ctxt.is_null() {
-                (*self.ctxt).stop();
-                if let Some(my_doc) = (*self.ctxt).my_doc.take() {
+            if self.ctxt.is_some() {
+                self.ctxt.as_deref_mut().unwrap().stop();
+                if let Some(my_doc) = self.ctxt.as_deref_mut().unwrap().my_doc.take() {
                     if self.preserve == 0 {
                         xml_text_reader_free_doc(self, my_doc);
                     }
@@ -2351,56 +2340,53 @@ impl XmlTextReader {
     /// Returns 0 if the call was successful, or -1 in case of error
     #[doc(alias = "xmlTextReaderSetParserProp")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn set_parser_prop(&mut self, prop: XmlParserProperties, value: i32) -> i32 {
-        unsafe {
-            if self.ctxt.is_null() {
-                return -1;
-            }
-            let ctxt: XmlParserCtxtPtr = self.ctxt;
+    pub fn set_parser_prop(&mut self, prop: XmlParserProperties, value: i32) -> i32 {
+        let Some(ctxt) = self.ctxt.as_deref_mut() else {
+            return -1;
+        };
 
-            match prop {
-                XmlParserProperties::XmlParserLoadDTD => {
-                    if value != 0 {
-                        if (*ctxt).loadsubset == 0 {
-                            if self.mode != XmlTextReaderMode::XmlTextreaderModeInitial {
-                                return -1;
-                            }
-                            (*ctxt).loadsubset = XML_DETECT_IDS as i32;
+        match prop {
+            XmlParserProperties::XmlParserLoadDTD => {
+                if value != 0 {
+                    if ctxt.loadsubset == 0 {
+                        if self.mode != XmlTextReaderMode::XmlTextreaderModeInitial {
+                            return -1;
                         }
-                    } else {
-                        (*ctxt).loadsubset = 0;
+                        ctxt.loadsubset = XML_DETECT_IDS as i32;
                     }
-                    0
+                } else {
+                    ctxt.loadsubset = 0;
                 }
-                XmlParserProperties::XmlParserDefaultAttrs => {
-                    if value != 0 {
-                        (*ctxt).loadsubset |= XML_COMPLETE_ATTRS as i32;
-                    } else if (*ctxt).loadsubset & XML_COMPLETE_ATTRS as i32 != 0 {
-                        (*ctxt).loadsubset -= XML_COMPLETE_ATTRS as i32;
-                    }
-                    0
+                0
+            }
+            XmlParserProperties::XmlParserDefaultAttrs => {
+                if value != 0 {
+                    ctxt.loadsubset |= XML_COMPLETE_ATTRS as i32;
+                } else if ctxt.loadsubset & XML_COMPLETE_ATTRS as i32 != 0 {
+                    ctxt.loadsubset -= XML_COMPLETE_ATTRS as i32;
                 }
-                XmlParserProperties::XmlParserValidate => {
-                    if value != 0 {
-                        (*ctxt).options |= XmlParserOption::XmlParseDTDValid as i32;
-                        (*ctxt).validate = 1;
-                        self.validate = XmlTextReaderValidate::ValidateDtd;
-                    } else {
-                        (*ctxt).options &= !(XmlParserOption::XmlParseDTDValid as i32);
-                        (*ctxt).validate = 0;
-                    }
-                    0
+                0
+            }
+            XmlParserProperties::XmlParserValidate => {
+                if value != 0 {
+                    ctxt.options |= XmlParserOption::XmlParseDTDValid as i32;
+                    ctxt.validate = 1;
+                    self.validate = XmlTextReaderValidate::ValidateDtd;
+                } else {
+                    ctxt.options &= !(XmlParserOption::XmlParseDTDValid as i32);
+                    ctxt.validate = 0;
                 }
-                XmlParserProperties::XmlParserSubstEntities => {
-                    if value != 0 {
-                        (*ctxt).options |= XmlParserOption::XmlParseNoEnt as i32;
-                        (*ctxt).replace_entities = 1;
-                    } else {
-                        (*ctxt).options &= !(XmlParserOption::XmlParseNoEnt as i32);
-                        (*ctxt).replace_entities = 0;
-                    }
-                    0
+                0
+            }
+            XmlParserProperties::XmlParserSubstEntities => {
+                if value != 0 {
+                    ctxt.options |= XmlParserOption::XmlParseNoEnt as i32;
+                    ctxt.replace_entities = 1;
+                } else {
+                    ctxt.options &= !(XmlParserOption::XmlParseNoEnt as i32);
+                    ctxt.replace_entities = 0;
                 }
+                0
             }
         }
     }
@@ -2417,13 +2403,15 @@ impl XmlTextReader {
     ) {
         unsafe {
             if f.is_some() {
-                if let Some(sax) = (*self.ctxt).sax.as_deref_mut() {
+                if let Some(sax) = self.ctxt.as_deref_mut().unwrap().sax.as_deref_mut() {
                     sax.error = Some(xml_text_reader_error);
                     sax.serror = None;
                     sax.warning = Some(xml_text_reader_warning);
                 }
-                (*self.ctxt).vctxt.error = Some(xml_text_reader_validity_error);
-                (*self.ctxt).vctxt.warning = Some(xml_text_reader_validity_warning);
+                self.ctxt.as_deref_mut().unwrap().vctxt.error =
+                    Some(xml_text_reader_validity_error);
+                self.ctxt.as_deref_mut().unwrap().vctxt.warning =
+                    Some(xml_text_reader_validity_warning);
                 self.error_func = f;
                 self.serror_func = None;
                 self.error_func_arg = arg;
@@ -2454,12 +2442,12 @@ impl XmlTextReader {
                 }
             } else {
                 // restore defaults
-                if let Some(sax) = (*self.ctxt).sax.as_deref_mut() {
+                if let Some(sax) = self.ctxt.as_deref_mut().unwrap().sax.as_deref_mut() {
                     sax.error = Some(parser_error);
                     sax.warning = Some(parser_warning);
                 }
-                (*self.ctxt).vctxt.error = Some(parser_validity_error);
-                (*self.ctxt).vctxt.warning = Some(parser_validity_warning);
+                self.ctxt.as_deref_mut().unwrap().vctxt.error = Some(parser_validity_error);
+                self.ctxt.as_deref_mut().unwrap().vctxt.warning = Some(parser_validity_warning);
                 self.error_func = None;
                 self.serror_func = None;
                 self.error_func_arg = None;
@@ -2502,13 +2490,15 @@ impl XmlTextReader {
             use crate::error::parser_validity_warning;
 
             if f.is_some() {
-                if let Some(sax) = (*self.ctxt).sax.as_deref_mut() {
+                if let Some(sax) = self.ctxt.as_deref_mut().unwrap().sax.as_deref_mut() {
                     sax.error = None;
                     sax.serror = Some(xml_text_reader_structured_error);
                     sax.warning = Some(xml_text_reader_warning);
                 }
-                (*self.ctxt).vctxt.error = Some(xml_text_reader_validity_error);
-                (*self.ctxt).vctxt.warning = Some(xml_text_reader_validity_warning);
+                self.ctxt.as_deref_mut().unwrap().vctxt.error =
+                    Some(xml_text_reader_validity_error);
+                self.ctxt.as_deref_mut().unwrap().vctxt.warning =
+                    Some(xml_text_reader_validity_warning);
                 self.serror_func = f;
                 self.error_func = None;
                 self.error_func_arg = arg;
@@ -2538,13 +2528,13 @@ impl XmlTextReader {
                 }
             } else {
                 // restore defaults
-                if let Some(sax) = (*self.ctxt).sax.as_deref_mut() {
+                if let Some(sax) = self.ctxt.as_deref_mut().unwrap().sax.as_deref_mut() {
                     sax.error = Some(parser_error);
                     sax.serror = None;
                     sax.warning = Some(parser_warning);
                 }
-                (*self.ctxt).vctxt.error = Some(parser_validity_error);
-                (*self.ctxt).vctxt.warning = Some(parser_validity_warning);
+                self.ctxt.as_deref_mut().unwrap().vctxt.error = Some(parser_validity_error);
+                self.ctxt.as_deref_mut().unwrap().vctxt.warning = Some(parser_validity_warning);
                 self.error_func = None;
                 self.serror_func = None;
                 self.error_func_arg = None;
@@ -2631,10 +2621,11 @@ impl XmlTextReader {
                 self.xsd_schemas = null_mut();
                 return -1;
             }
+            let user_data = &raw mut self.ctxt.as_deref_mut().unwrap().user_data;
             self.xsd_plug = xml_schema_sax_plug(
                 self.xsd_valid_ctxt,
-                &mut (*self.ctxt).sax,
-                addr_of_mut!((*self.ctxt).user_data),
+                &mut self.ctxt.as_deref_mut().unwrap().sax,
+                user_data,
             );
             if self.xsd_plug.is_null() {
                 xml_schema_free(self.xsd_schemas);
@@ -3062,13 +3053,10 @@ impl XmlTextReader {
     /// in case the index could not be computed.
     #[doc(alias = "xmlTextReaderByteConsumed")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn byte_consumed(&self) -> i64 {
-        unsafe {
-            if self.ctxt.is_null() {
-                return -1;
-            }
-            (*self.ctxt).byte_consumed()
-        }
+    pub fn byte_consumed(&mut self) -> i64 {
+        self.ctxt
+            .as_deref_mut()
+            .map_or(-1, |ctxt| ctxt.byte_consumed())
     }
 
     /// Hacking interface allowing to get the xmlDocPtr corresponding to the
@@ -3082,19 +3070,14 @@ impl XmlTextReader {
     /// Returns the xmlDocPtr or NULL in case of error.
     #[doc(alias = "xmlTextReaderCurrentDoc")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn current_doc(&mut self) -> Option<XmlDocPtr> {
-        unsafe {
-            if self.doc.is_some() {
-                return self.doc;
-            }
-            if self.ctxt.is_null() {
-                return None;
-            }
-            let my_doc = (*self.ctxt).my_doc?;
-
-            self.preserve = 1;
-            Some(my_doc)
+    pub fn current_doc(&mut self) -> Option<XmlDocPtr> {
+        if self.doc.is_some() {
+            return self.doc;
         }
+        let my_doc = self.ctxt.as_deref_mut()?.my_doc?;
+
+        self.preserve = 1;
+        Some(my_doc)
     }
 
     /// Hacking interface allowing to get the xmlNodePtr corresponding to the
@@ -3351,16 +3334,14 @@ impl XmlTextReader {
     /// The string is deallocated with the reader.
     #[doc(alias = "xmlTextReaderConstXmlVersion")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn xml_version(&mut self) -> Option<&str> {
-        unsafe {
-            let doc = self.doc.as_deref().or_else(|| {
-                (!self.ctxt.is_null())
-                    .then(|| (*self.ctxt).my_doc.as_deref())
-                    .flatten()
-            })?;
+    pub fn xml_version(&mut self) -> Option<&str> {
+        let doc = self.doc.as_deref().or_else(|| {
+            (self.ctxt.is_some())
+                .then(|| self.ctxt.as_deref_mut().unwrap().my_doc.as_deref())
+                .flatten()
+        })?;
 
-            doc.version.as_deref()
-        }
+        doc.version.as_deref()
     }
 
     /// Determine the encoding of the document being read.
@@ -3369,16 +3350,14 @@ impl XmlTextReader {
     /// The string is deallocated with the reader.
     #[doc(alias = "xmlTextReaderConstEncoding")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn encoding(&self) -> Option<&str> {
-        unsafe {
-            let doc = self.doc.as_deref().or_else(|| {
-                (!self.ctxt.is_null())
-                    .then(|| (*self.ctxt).my_doc.as_deref())
-                    .flatten()
-            })?;
+    pub fn encoding(&self) -> Option<&str> {
+        let doc = self.doc.as_deref().or_else(|| {
+            (self.ctxt.is_some())
+                .then(|| self.ctxt.as_deref().unwrap().my_doc.as_deref())
+                .flatten()
+        })?;
 
-            doc.encoding.as_deref()
-        }
+        doc.encoding.as_deref()
     }
 
     /// The base URI of the node.
@@ -3545,19 +3524,17 @@ impl XmlTextReader {
     /// or `None` if the document did not specify its standalone status or in case of error.
     #[doc(alias = "xmlTextReaderStandalone")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn standalone(&self) -> Option<bool> {
-        unsafe {
-            let doc = self.doc.or_else(|| {
-                (!self.ctxt.is_null())
-                    .then(|| (*self.ctxt).my_doc)
-                    .flatten()
-            })?;
+    pub fn standalone(&self) -> Option<bool> {
+        let doc = self.doc.or_else(|| {
+            (self.ctxt.is_some())
+                .then(|| self.ctxt.as_deref().unwrap().my_doc)
+                .flatten()
+        })?;
 
-            match doc.standalone {
-                1 => Some(true),
-                0 => Some(false),
-                _ => None,
-            }
+        match doc.standalone {
+            1 => Some(true),
+            0 => Some(false),
+            _ => None,
         }
     }
 
@@ -3711,7 +3688,7 @@ impl Default for XmlTextReader {
             validate: XmlTextReaderValidate::default(),
             allocs: 0,
             state: XmlTextReaderState::default(),
-            ctxt: null_mut(),
+            ctxt: None,
             input: None,
             start_element: None,
             end_element: None,
@@ -3988,29 +3965,33 @@ pub unsafe fn xml_new_text_reader(
                     .expect("Internal Error")
                     .as_ref()[..4],
                 uri,
-            );
+            )
+            .map(Box::new);
             (*ret).base = 0;
             (*ret).cur = 4;
         } else {
-            (*ret).ctxt = xml_create_push_parser_ctxt(Some(Box::new(sax)), None, b"", uri);
+            (*ret).ctxt =
+                xml_create_push_parser_ctxt(Some(Box::new(sax)), None, b"", uri).map(Box::new);
             (*ret).base = 0;
             (*ret).cur = 0;
         }
 
-        if (*ret).ctxt.is_null() {
+        if (*ret).ctxt.is_none() {
             generic_error!("xmlNewTextReader : malloc failed\n");
             drop_in_place(ret);
             xml_free(ret as _);
             return null_mut();
         }
-        (*(*ret).ctxt).parse_mode = XmlParserMode::XmlParseReader;
-        (*(*ret).ctxt)._private = ret as _;
-        (*(*ret).ctxt).linenumbers = 1;
-        (*(*ret).ctxt).dict_names = 1;
+        let mut ctxt = (*ret).ctxt.take().unwrap();
+        ctxt.parse_mode = XmlParserMode::XmlParseReader;
+        ctxt._private = ret as _;
+        ctxt.linenumbers = 1;
+        ctxt.dict_names = 1;
         (*ret).allocs = XML_TEXTREADER_CTXT;
         // use the parser dictionary to allocate all elements and attributes names
-        (*(*ret).ctxt).docdict = 1;
-        (*ret).dict = (*(*ret).ctxt).dict;
+        ctxt.docdict = 1;
+        (*ret).dict = ctxt.dict;
+        (*ret).ctxt = Some(ctxt);
         #[cfg(feature = "xinclude")]
         {
             (*ret).xinclude = 0;
@@ -4040,9 +4021,10 @@ pub unsafe fn xml_new_text_reader_filename(uri: &str) -> XmlTextReaderPtr {
             return null_mut();
         }
         (*ret).allocs |= XML_TEXTREADER_INPUT;
-        if (*(*ret).ctxt).directory.is_none() {
+        if (*ret).ctxt.as_deref_mut().unwrap().directory.is_none() {
             if let Some(directory) = xml_parser_get_directory(uri) {
-                (*(*ret).ctxt).directory = Some(directory.to_string_lossy().into_owned());
+                (*ret).ctxt.as_deref_mut().unwrap().directory =
+                    Some(directory.to_string_lossy().into_owned());
             }
         }
         ret
@@ -4058,7 +4040,6 @@ pub unsafe fn xml_free_text_reader(reader: XmlTextReaderPtr) {
     unsafe {
         use std::ptr::drop_in_place;
 
-        use crate::parser::xml_free_parser_ctxt;
         #[cfg(feature = "schema")]
         use crate::relaxng::xml_relaxng_free_valid_ctxt;
 
@@ -4101,12 +4082,12 @@ pub unsafe fn xml_free_text_reader(reader: XmlTextReaderPtr) {
         if (*reader).mode != XmlTextReaderMode::XmlTextreaderModeClosed {
             xml_text_reader_close(&mut *reader);
         }
-        if !(*reader).ctxt.is_null() {
-            if (*reader).dict == (*(*reader).ctxt).dict {
+        if let Some(ctxt) = (*reader).ctxt.as_deref() {
+            if (*reader).dict == ctxt.dict {
                 (*reader).dict = null_mut();
             }
             if (*reader).allocs & XML_TEXTREADER_CTXT != 0 {
-                xml_free_parser_ctxt((*reader).ctxt);
+                (*reader).ctxt.take();
             }
         }
         if !(*reader).dict.is_null() {
@@ -4201,12 +4182,17 @@ unsafe fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mut cur: XmlG
                     cur.element_type(),
                     XmlElementType::XmlElementNode | XmlElementType::XmlTextNode
                 ) && !reader.is_null()
-                    && !(*reader).ctxt.is_null()
-                    && (*(*reader).ctxt).free_elems_nr < MAX_FREE_NODES
+                    && (*reader).ctxt.is_some()
+                    && (*reader).ctxt.as_deref_mut().unwrap().free_elems_nr < MAX_FREE_NODES
                 {
-                    cur.next = (*(*reader).ctxt).free_elems.map(|node| node.into());
-                    (*(*reader).ctxt).free_elems = Some(cur);
-                    (*(*reader).ctxt).free_elems_nr += 1;
+                    cur.next = (*reader)
+                        .ctxt
+                        .as_deref_mut()
+                        .unwrap()
+                        .free_elems
+                        .map(|node| node.into());
+                    (*reader).ctxt.as_deref_mut().unwrap().free_elems = Some(cur);
+                    (*reader).ctxt.as_deref_mut().unwrap().free_elems_nr += 1;
                 } else {
                     cur.free();
                 }
@@ -4246,12 +4232,12 @@ unsafe fn xml_text_reader_free_prop(reader: XmlTextReaderPtr, mut cur: XmlAttrPt
         }
 
         if !reader.is_null()
-            && !(*reader).ctxt.is_null()
-            && (*(*reader).ctxt).free_attrs_nr < MAX_FREE_NODES
+            && (*reader).ctxt.is_some()
+            && (*reader).ctxt.as_deref_mut().unwrap().free_attrs_nr < MAX_FREE_NODES
         {
-            cur.next = (*(*reader).ctxt).free_attrs;
-            (*(*reader).ctxt).free_attrs = Some(cur);
-            (*(*reader).ctxt).free_attrs_nr += 1;
+            cur.next = (*reader).ctxt.as_deref_mut().unwrap().free_attrs;
+            (*reader).ctxt.as_deref_mut().unwrap().free_attrs = Some(cur);
+            (*reader).ctxt.as_deref_mut().unwrap().free_attrs_nr += 1;
         } else {
             cur.free();
         }
@@ -4322,12 +4308,17 @@ unsafe fn xml_text_reader_free_node(reader: XmlTextReaderPtr, mut cur: XmlGeneri
             cur.element_type(),
             XmlElementType::XmlElementNode | XmlElementType::XmlTextNode
         ) && !reader.is_null()
-            && !(*reader).ctxt.is_null()
-            && (*(*reader).ctxt).free_elems_nr < MAX_FREE_NODES
+            && (*reader).ctxt.is_some()
+            && (*reader).ctxt.as_deref_mut().unwrap().free_elems_nr < MAX_FREE_NODES
         {
-            cur.next = (*(*reader).ctxt).free_elems.map(|node| node.into());
-            (*(*reader).ctxt).free_elems = Some(cur);
-            (*(*reader).ctxt).free_elems_nr += 1;
+            cur.next = (*reader)
+                .ctxt
+                .as_deref_mut()
+                .unwrap()
+                .free_elems
+                .map(|node| node.into());
+            (*reader).ctxt.as_deref_mut().unwrap().free_elems = Some(cur);
+            (*reader).ctxt.as_deref_mut().unwrap().free_elems_nr += 1;
         } else {
             cur.free();
         }
@@ -4443,14 +4434,14 @@ pub unsafe fn xml_text_reader_close(reader: &mut XmlTextReader) -> i32 {
         if let Some(faketext) = reader.faketext.take() {
             xml_free_node(faketext);
         }
-        if !reader.ctxt.is_null() {
+        if let Some(ctxt) = reader.ctxt.as_deref_mut() {
             #[cfg(all(feature = "libxml_regexp", feature = "libxml_valid"))]
-            while !(*reader.ctxt).vctxt.vstate_tab.is_empty() {
-                (*reader.ctxt).vctxt.pop_element(None, None, "");
+            while !ctxt.vctxt.vstate_tab.is_empty() {
+                ctxt.vctxt.pop_element(None, None, "");
             }
-            (*reader.ctxt).vctxt.vstate_tab.clear();
-            (*reader.ctxt).stop();
-            if let Some(my_doc) = (*reader.ctxt).my_doc.take() {
+            ctxt.vctxt.vstate_tab.clear();
+            ctxt.stop();
+            if let Some(my_doc) = ctxt.my_doc.take() {
                 if reader.preserve == 0 {
                     xml_text_reader_free_doc(reader, my_doc);
                 }
@@ -4641,8 +4632,8 @@ unsafe fn xml_text_reader_locator(
         }
 
         let reader: XmlTextReaderPtr = ctx as XmlTextReaderPtr;
-        if !(*reader).ctxt.is_null() {
-            if let Some(input) = (*(*reader).ctxt).input() {
+        if (*reader).ctxt.is_some() {
+            if let Some(input) = (*reader).ctxt.as_deref_mut().unwrap().input() {
                 if !file.is_null() {
                     *file = input.filename.clone();
                 }

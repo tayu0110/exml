@@ -32,7 +32,7 @@ use exml::{
     },
     parser::{
         XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput, XmlParserOption, xml_cleanup_parser,
-        xml_ctxt_read_file, xml_free_parser_ctxt, xml_init_parser, xml_new_parser_ctxt,
+        xml_ctxt_read_file, xml_init_parser, xml_new_parser_ctxt,
         xml_no_net_external_entity_loader, xml_set_external_entity_loader,
     },
     tree::{XmlElementType, XmlNodePtr, xml_free_doc, xml_get_doc_entity},
@@ -412,17 +412,15 @@ unsafe fn initialize_libxml2() {
     }
 }
 
-unsafe fn init_sax(ctxt: XmlParserCtxtPtr) {
-    unsafe {
-        if let Some(sax) = (*ctxt).sax.as_deref_mut() {
-            sax.start_element_ns = None;
-            sax.end_element_ns = None;
-            sax.characters = None;
-            sax.cdata_block = None;
-            sax.ignorable_whitespace = None;
-            sax.processing_instruction = None;
-            sax.comment = None;
-        }
+fn init_sax(ctxt: &mut XmlParserCtxt) {
+    if let Some(sax) = ctxt.sax.as_deref_mut() {
+        sax.start_element_ns = None;
+        sax.end_element_ns = None;
+        sax.characters = None;
+        sax.cdata_block = None;
+        sax.ignorable_whitespace = None;
+        sax.processing_instruction = None;
+        sax.comment = None;
     }
 }
 
@@ -509,24 +507,22 @@ unsafe fn recursive_detect_test(
 
         NB_TESTS.fetch_add(1, Ordering::Relaxed);
 
-        let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
+        let mut ctxt = xml_new_parser_ctxt().unwrap();
         if options & OPT_SAX != 0 {
-            init_sax(ctxt);
+            init_sax(&mut ctxt);
         }
         if options & OPT_NO_SUBST == 0 {
             parser_options |= XmlParserOption::XmlParseNoEnt as i32;
         }
         // base of the test, parse with the old API
-        let doc = xml_ctxt_read_file(&mut *ctxt, filename, None, parser_options);
-        if doc.is_some() || (*ctxt).last_error.code() != XmlParserErrors::XmlErrEntityLoop {
+        let doc = xml_ctxt_read_file(&mut ctxt, filename, None, parser_options);
+        if doc.is_some() || ctxt.last_error.code() != XmlParserErrors::XmlErrEntityLoop {
             eprintln!("Failed to detect recursion in {filename}");
-            xml_free_parser_ctxt(ctxt);
             if let Some(doc) = doc {
                 xml_free_doc(doc);
             }
             return 1;
         }
-        xml_free_parser_ctxt(ctxt);
 
         res
     }
@@ -549,21 +545,19 @@ unsafe fn not_recursive_detect_test(
 
         NB_TESTS.fetch_add(1, Ordering::Relaxed);
 
-        let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
+        let mut ctxt = xml_new_parser_ctxt().unwrap();
         if options & OPT_SAX != 0 {
-            init_sax(ctxt);
+            init_sax(&mut ctxt);
         }
         if options & OPT_NO_SUBST == 0 {
             parser_options |= XmlParserOption::XmlParseNoEnt as i32;
         }
         // base of the test, parse with the old API
-        let Some(doc) = xml_ctxt_read_file(&mut *ctxt, filename, None, parser_options) else {
+        let Some(doc) = xml_ctxt_read_file(&mut ctxt, filename, None, parser_options) else {
             eprintln!("Failed to parse correct file {filename}");
-            xml_free_parser_ctxt(ctxt);
             return 1;
         };
         xml_free_doc(doc);
-        xml_free_parser_ctxt(ctxt);
 
         res
     }
@@ -585,15 +579,15 @@ unsafe fn not_recursive_huge_test(
 
         NB_TESTS.fetch_add(1, Ordering::Relaxed);
 
-        let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
+        let mut ctxt = xml_new_parser_ctxt().unwrap();
         if options & OPT_SAX != 0 {
-            init_sax(ctxt);
+            init_sax(&mut ctxt);
         }
         if options & OPT_NO_SUBST == 0 {
             parser_options |= XmlParserOption::XmlParseNoEnt as i32;
         }
         if let Some(doc) =
-            xml_ctxt_read_file(&mut *ctxt, "test/recurse/huge.xml", None, parser_options)
+            xml_ctxt_read_file(&mut ctxt, "test/recurse/huge.xml", None, parser_options)
         {
             let fixed_cost: c_ulong = 20;
             let allowed_expansion: c_ulong = 1000000;
@@ -639,27 +633,25 @@ unsafe fn not_recursive_huge_test(
                 res = 1;
             }
 
-            if (*ctxt).sizeentcopy < allowed_expansion {
-                eprintln!("Total entity size too small: {}", (*ctxt).sizeentcopy);
+            if ctxt.sizeentcopy < allowed_expansion {
+                eprintln!("Total entity size too small: {}", ctxt.sizeentcopy);
                 res = 1;
             }
 
             let total_size: c_ulong =
                 (f_size + e_size + d_size + 3 * fixed_cost) * (MAX_NODES as u64 - 1) * 3;
-            if (*ctxt).sizeentcopy != total_size {
+            if ctxt.sizeentcopy != total_size {
                 eprintln!(
                     "Wrong total entity size: {} (expected {})",
-                    (*ctxt).sizeentcopy,
-                    total_size
+                    ctxt.sizeentcopy, total_size
                 );
                 res = 1;
             }
 
-            if (*ctxt).sizeentities != 30 {
+            if ctxt.sizeentities != 30 {
                 eprintln!(
                     "Wrong parsed entity size: {} (expected {})",
-                    (*ctxt).sizeentities,
-                    30
+                    ctxt.sizeentities, 30
                 );
                 res = 1;
             }
@@ -668,8 +660,6 @@ unsafe fn not_recursive_huge_test(
             eprintln!("Failed to parse huge.xml");
             res = 1;
         }
-
-        xml_free_parser_ctxt(ctxt);
 
         res
     }
@@ -691,26 +681,23 @@ unsafe fn huge_dtd_test(
 
         NB_TESTS.fetch_add(1, Ordering::Relaxed);
 
-        let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
+        let mut ctxt = xml_new_parser_ctxt().unwrap();
         if options & OPT_SAX != 0 {
-            init_sax(ctxt);
+            init_sax(&mut ctxt);
         }
         if options & OPT_NO_SUBST == 0 {
             parser_options |= XmlParserOption::XmlParseNoEnt as i32;
         }
-        if let Some(doc) = xml_ctxt_read_file(
-            &mut *ctxt,
-            "test/recurse/huge_dtd.xml",
-            None,
-            parser_options,
-        ) {
+        if let Some(doc) =
+            xml_ctxt_read_file(&mut ctxt, "test/recurse/huge_dtd.xml", None, parser_options)
+        {
             let fixed_cost: usize = 20;
             let allowed_expansion: usize = 1000000;
             let a_size: usize = xml_strlen(c"<!-- comment -->".as_ptr() as _) as usize;
             let mut total_size: usize;
 
-            if (*ctxt).sizeentcopy < allowed_expansion as u64 {
-                eprintln!("Total entity size too small: {}", (*ctxt).sizeentcopy);
+            if ctxt.sizeentcopy < allowed_expansion as u64 {
+                eprintln!("Total entity size too small: {}", ctxt.sizeentcopy);
                 res = 1;
             }
 
@@ -723,11 +710,10 @@ unsafe fn huge_dtd_test(
             total_size = e_size + f_size + fixed_cost * 4 + (a_size + e_size + f_size + fixed_cost * 3) * (MAX_NODES - 1) * 2 + // internal
                          (a_size + b_size + c_size + fixed_cost * 3) * (MAX_NODES - 1) * 2 // external
                          + c"success".to_bytes().len() + fixed_cost; // final reference in main doc
-            if (*ctxt).sizeentcopy != total_size as u64 {
+            if ctxt.sizeentcopy != total_size as u64 {
                 eprintln!(
                     "Wrong total entity size: {} (expected {})",
-                    (*ctxt).sizeentcopy,
-                    total_size
+                    ctxt.sizeentcopy, total_size
                 );
                 res = 1;
             }
@@ -736,11 +722,10 @@ unsafe fn huge_dtd_test(
                 + HUGE_DOC_PARTS.get().segment.to_bytes().len() * (MAX_NODES - 1)
                 + HUGE_DOC_PARTS.get().finish.to_bytes().len()
                 + 28;
-            if (*ctxt).sizeentities != total_size as u64 {
+            if ctxt.sizeentities != total_size as u64 {
                 eprintln!(
                     "Wrong parsed entity size: {} (expected {})",
-                    (*ctxt).sizeentities,
-                    total_size
+                    ctxt.sizeentities, total_size
                 );
                 res = 1;
             }
@@ -749,8 +734,6 @@ unsafe fn huge_dtd_test(
             eprintln!("Failed to parse huge_dtd.xml");
             res = 1;
         }
-
-        xml_free_parser_ctxt(ctxt);
 
         res
     }
