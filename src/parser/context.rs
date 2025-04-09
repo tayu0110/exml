@@ -2159,15 +2159,18 @@ pub(crate) unsafe fn xml_create_entity_parser_ctxt_internal(
     mut url: Option<&str>,
     id: Option<&str>,
     base: Option<&str>,
-    pctx: XmlParserCtxtPtr,
-) -> Result<XmlParserCtxtPtr, Option<Box<XmlSAXHandler>>> {
+    pctxt: Option<&XmlParserCtxt>,
+) -> Result<XmlParserCtxt, Option<Box<XmlSAXHandler>>> {
     unsafe {
-        let ctxt = xml_new_sax_parser_ctxt(sax, user_data)?;
+        let new = xml_new_sax_parser_ctxt(sax, user_data)?;
+        let mut ctxt = XmlParserCtxt::default();
+        std::ptr::copy(new, &mut ctxt, 1);
+        xml_free(new as _);
 
-        if !pctx.is_null() {
-            (*ctxt).options = (*pctx).options;
-            (*ctxt)._private = (*pctx)._private;
-            (*ctxt).input_id = (*pctx).input_id;
+        if let Some(pctxt) = pctxt {
+            ctxt.options = pctxt.options;
+            ctxt._private = pctxt._private;
+            ctxt.input_id = pctxt.input_id;
         }
 
         // Don't read from stdin.
@@ -2176,32 +2179,30 @@ pub(crate) unsafe fn xml_create_entity_parser_ctxt_internal(
         }
 
         if let Some(uri) = url.zip(base).and_then(|(url, base)| build_uri(url, base)) {
-            let Some(input_stream) = xml_load_external_entity(Some(&uri), id, &mut *ctxt) else {
-                let sax = (*ctxt).sax.take();
-                xml_free_parser_ctxt(ctxt);
+            let Some(input_stream) = xml_load_external_entity(Some(&uri), id, &mut ctxt) else {
+                let sax = ctxt.sax.take();
                 return Err(sax);
             };
-            (*ctxt).input_push(input_stream);
+            ctxt.input_push(input_stream);
 
-            if (*ctxt).directory.is_none() {
+            if ctxt.directory.is_none() {
                 if let Some(url) = url {
                     if let Some(directory) = xml_parser_get_directory(url) {
-                        (*ctxt).directory = Some(directory.to_string_lossy().into_owned());
+                        ctxt.directory = Some(directory.to_string_lossy().into_owned());
                     }
                 }
             }
         } else {
-            let Some(input_stream) = xml_load_external_entity(url, id, &mut *ctxt) else {
-                let sax = (*ctxt).sax.take();
-                xml_free_parser_ctxt(ctxt);
+            let Some(input_stream) = xml_load_external_entity(url, id, &mut ctxt) else {
+                let sax = ctxt.sax.take();
                 return Err(sax);
             };
-            (*ctxt).input_push(input_stream);
+            ctxt.input_push(input_stream);
 
-            if (*ctxt).directory.is_none() {
+            if ctxt.directory.is_none() {
                 if let Some(url) = url {
                     if let Some(directory) = xml_parser_get_directory(url) {
-                        (*ctxt).directory = Some(directory.to_string_lossy().into_owned());
+                        ctxt.directory = Some(directory.to_string_lossy().into_owned());
                     }
                 }
             }
@@ -2222,9 +2223,6 @@ pub unsafe fn xml_create_entity_parser_ctxt(
     url: Option<&str>,
     id: Option<&str>,
     base: Option<&str>,
-) -> XmlParserCtxtPtr {
-    unsafe {
-        xml_create_entity_parser_ctxt_internal(None, None, url, id, base, null_mut())
-            .unwrap_or(null_mut())
-    }
+) -> Result<XmlParserCtxt, Option<Box<XmlSAXHandler>>> {
+    unsafe { xml_create_entity_parser_ctxt_internal(None, None, url, id, base, None) }
 }
