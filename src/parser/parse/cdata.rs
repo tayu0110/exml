@@ -87,59 +87,20 @@ impl XmlParserCtxt {
     /// of xmlParseCharData() when the parsing requires handling
     /// of non-ASCII characters.
     #[doc(alias = "xmlParseCharDataComplex")]
-    unsafe fn parse_char_data_complex(self: &mut XmlParserCtxt, partial: i32) {
-        unsafe {
-            let mut l: i32 = 0;
+    fn parse_char_data_complex(self: &mut XmlParserCtxt, partial: i32) {
+        let mut l: i32 = 0;
 
-            let mut buf = String::with_capacity(XML_PARSER_BIG_BUFFER_SIZE + 5);
-            let mut cur = self.current_char(&mut l).unwrap_or('\0');
-            // test also done in xmlCurrentChar()
-            while cur != '<' && cur != '&' && xml_is_char(cur as u32) {
-                if cur == ']' && self.nth_byte(1) == b']' && self.nth_byte(2) == b'>' {
-                    xml_fatal_err(self, XmlParserErrors::XmlErrMisplacedCDATAEnd, None);
-                }
-                buf.push(cur);
-                // move current position before possible calling of (*self.sax).characters
-                self.advance_with_line_handling(l as usize);
-                if buf.len() >= XML_PARSER_BIG_BUFFER_SIZE {
-                    // OK the segment is to be consumed as chars.
-                    if self.disable_sax == 0 {
-                        let blank = self.are_blanks(&buf, false);
-                        if let Some(sax) = self.sax.as_deref_mut() {
-                            if blank {
-                                if let Some(ignorable_whitespace) = sax.ignorable_whitespace {
-                                    ignorable_whitespace(self, &buf);
-                                }
-                            } else {
-                                if let Some(characters) = sax.characters {
-                                    characters(self, &buf);
-                                }
-                                let sax = self.sax.as_deref_mut().unwrap();
-                                if (sax.ignorable_whitespace.is_some() || sax.characters.is_some())
-                                    && sax
-                                        .ignorable_whitespace
-                                        .zip(sax.characters)
-                                        .is_none_or(|(l, r)| !fn_addr_eq(l, r))
-                                    && self.space() == -1
-                                {
-                                    *self.space_mut() = -2;
-                                }
-                            }
-                        }
-                    }
-                    buf.clear();
-                    // something really bad happened in the SAX callback
-                    if !matches!(self.instate, XmlParserInputState::XmlParserContent) {
-                        return;
-                    }
-                    self.shrink();
-                }
-                cur = self.current_char(&mut l).unwrap_or('\0');
+        let mut buf = String::with_capacity(XML_PARSER_BIG_BUFFER_SIZE + 5);
+        let mut cur = self.current_char(&mut l).unwrap_or('\0');
+        // test also done in xmlCurrentChar()
+        while cur != '<' && cur != '&' && xml_is_char(cur as u32) {
+            if cur == ']' && self.nth_byte(1) == b']' && self.nth_byte(2) == b'>' {
+                xml_fatal_err(self, XmlParserErrors::XmlErrMisplacedCDATAEnd, None);
             }
-            if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                return;
-            }
-            if !buf.is_empty() {
+            buf.push(cur);
+            // move current position before possible calling of (*self.sax).characters
+            self.advance_with_line_handling(l as usize);
+            if buf.len() >= XML_PARSER_BIG_BUFFER_SIZE {
                 // OK the segment is to be consumed as chars.
                 if self.disable_sax == 0 {
                     let blank = self.are_blanks(&buf, false);
@@ -165,38 +126,75 @@ impl XmlParserCtxt {
                         }
                     }
                 }
+                buf.clear();
+                // something really bad happened in the SAX callback
+                if !matches!(self.instate, XmlParserInputState::XmlParserContent) {
+                    return;
+                }
+                self.shrink();
             }
-            // cur == 0 can mean
-            //
-            // - xmlParserInputState::XmlParserEOF or memory error. This is checked above.
-            // - An actual 0 character.
-            // - End of buffer.
-            // - An incomplete UTF-8 sequence. This is allowed if partial is set.
-            if !self.content_bytes().is_empty() {
-                if cur == '\0' && self.current_byte() != 0 {
-                    if partial == 0 {
-                        xml_fatal_err_msg_int!(
-                            self,
-                            XmlParserErrors::XmlErrInvalidChar,
-                            format!(
-                                "Incomplete UTF-8 sequence starting with {:02X}\n",
-                                self.current_byte()
-                            )
-                            .as_str(),
-                            self.current_byte() as i32
-                        );
-                        self.advance_with_line_handling(1);
+            cur = self.current_char(&mut l).unwrap_or('\0');
+        }
+        if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+            return;
+        }
+        if !buf.is_empty() {
+            // OK the segment is to be consumed as chars.
+            if self.disable_sax == 0 {
+                let blank = self.are_blanks(&buf, false);
+                if let Some(sax) = self.sax.as_deref_mut() {
+                    if blank {
+                        if let Some(ignorable_whitespace) = sax.ignorable_whitespace {
+                            ignorable_whitespace(self, &buf);
+                        }
+                    } else {
+                        if let Some(characters) = sax.characters {
+                            characters(self, &buf);
+                        }
+                        let sax = self.sax.as_deref_mut().unwrap();
+                        if (sax.ignorable_whitespace.is_some() || sax.characters.is_some())
+                            && sax
+                                .ignorable_whitespace
+                                .zip(sax.characters)
+                                .is_none_or(|(l, r)| !fn_addr_eq(l, r))
+                            && self.space() == -1
+                        {
+                            *self.space_mut() = -2;
+                        }
                     }
-                } else if cur != '<' && cur != '&' {
-                    // Generate the error and skip the offending character
+                }
+            }
+        }
+        // cur == 0 can mean
+        //
+        // - xmlParserInputState::XmlParserEOF or memory error. This is checked above.
+        // - An actual 0 character.
+        // - End of buffer.
+        // - An incomplete UTF-8 sequence. This is allowed if partial is set.
+        if !self.content_bytes().is_empty() {
+            if cur == '\0' && self.current_byte() != 0 {
+                if partial == 0 {
                     xml_fatal_err_msg_int!(
                         self,
                         XmlParserErrors::XmlErrInvalidChar,
-                        format!("PCDATA invalid Char value {}\n", cur as i32).as_str(),
-                        cur as i32
+                        format!(
+                            "Incomplete UTF-8 sequence starting with {:02X}\n",
+                            self.current_byte()
+                        )
+                        .as_str(),
+                        self.current_byte() as i32
                     );
-                    self.advance_with_line_handling(l as usize);
+                    self.advance_with_line_handling(1);
                 }
+            } else if cur != '<' && cur != '&' {
+                // Generate the error and skip the offending character
+                xml_fatal_err_msg_int!(
+                    self,
+                    XmlParserErrors::XmlErrInvalidChar,
+                    format!("PCDATA invalid Char value {}\n", cur as i32).as_str(),
+                    cur as i32
+                );
+                self.advance_with_line_handling(l as usize);
             }
         }
     }
@@ -212,7 +210,7 @@ impl XmlParserCtxt {
     /// [14] CharData ::= [^<&]* - ([^<&]* ']]>' [^<&]*)
     /// ```
     #[doc(alias = "xmlParseCharDataInternal")]
-    pub(crate) unsafe fn parse_char_data_internal(&mut self, partial: i32) {
+    pub(crate) fn parse_char_data_internal(&mut self, partial: i32) {
         // used for the test in the inner loop of the char data testing
         // &    : start reference
         // <    : start tag
@@ -239,128 +237,46 @@ impl XmlParserCtxt {
             0x00, 0x00, 0x00, 0x00,
         ];
 
-        unsafe {
-            self.grow();
-            // Accelerated common case where input don't need to be
-            // modified before passing it to the handler.
-            let mut input = self.content_bytes();
-            let mut line = self.input().unwrap().line;
-            let mut col = self.input().unwrap().col;
-            let mut buf = String::new();
-            while matches!(input.first(), Some(&b'\n' | &b'\t' | &(0x20..=0x7F))) {
-                while matches!(input.first(), Some(&b' ' | &b'\n')) {
-                    let spaces = input.iter().position(|&b| b != b' ').unwrap_or(input.len());
-                    col += spaces as i32;
-                    input = &input[spaces..];
-                    let lines = input
-                        .iter()
-                        .position(|&b| b != b'\n')
-                        .unwrap_or(input.len());
-                    if lines != 0 {
-                        line += lines as i32;
-                        col = 1;
-                        input = &input[lines..];
-                    }
+        self.grow();
+        // Accelerated common case where input don't need to be
+        // modified before passing it to the handler.
+        let mut input = self.content_bytes();
+        let mut line = self.input().unwrap().line;
+        let mut col = self.input().unwrap().col;
+        let mut buf = String::new();
+        while matches!(input.first(), Some(&b'\n' | &b'\t' | &(0x20..=0x7F))) {
+            while matches!(input.first(), Some(&b' ' | &b'\n')) {
+                let spaces = input.iter().position(|&b| b != b' ').unwrap_or(input.len());
+                col += spaces as i32;
+                input = &input[spaces..];
+                let lines = input
+                    .iter()
+                    .position(|&b| b != b'\n')
+                    .unwrap_or(input.len());
+                if lines != 0 {
+                    line += lines as i32;
+                    col = 1;
+                    input = &input[lines..];
                 }
+            }
 
-                if input.first() == Some(&b'<') {
-                    let len = self.content_bytes().len() - input.len();
-                    if len > 0 {
-                        buf.clear();
+            if input.first() == Some(&b'<') {
+                let len = self.content_bytes().len() - input.len();
+                if len > 0 {
+                    buf.clear();
+                    unsafe {
                         // # Safety
                         // `self.content_bytes()[..len]` contains only ASCII characters.
                         // Therefore, UTF-8 validation won't be failed.
                         buf.push_str(from_utf8_unchecked(&self.content_bytes()[..len]));
-
-                        // commit consumed bytes for SAX interface
-                        self.input_mut().unwrap().cur += len;
-                        self.input_mut().unwrap().line = line;
-                        self.input_mut().unwrap().col = col;
-
-                        let blank = self.are_blanks(&buf, true);
-
-                        if let Some(sax) = self.sax.as_deref_mut().filter(|sax| {
-                            (sax.ignorable_whitespace.is_some() || sax.characters.is_some())
-                                && sax
-                                    .ignorable_whitespace
-                                    .zip(sax.characters)
-                                    .is_none_or(|(l, r)| !fn_addr_eq(l, r))
-                        }) {
-                            if blank {
-                                if let Some(ignorable_whitespace) = sax.ignorable_whitespace {
-                                    ignorable_whitespace(self, &buf);
-                                }
-                            } else {
-                                if let Some(characters) = sax.characters {
-                                    characters(self, &buf);
-                                }
-                                if self.space() == -1 {
-                                    *self.space_mut() = -2;
-                                }
-                            }
-                        } else if let Some(characters) =
-                            self.sax.as_deref_mut().and_then(|sax| sax.characters)
-                        {
-                            characters(self, &buf);
-                        }
                     }
-                    return;
-                }
-
-                while input
-                    .first()
-                    .filter(|&&b| TEST_CHAR_DATA[b as usize] != 0 || matches!(b, 0xA | b']'))
-                    .is_some()
-                {
-                    let chars = input
-                        .iter()
-                        .position(|&b| TEST_CHAR_DATA[b as usize] == 0)
-                        .unwrap_or(input.len());
-                    col += chars as i32;
-                    input = &input[chars..];
-
-                    let lines = input.iter().position(|&b| b != 0xA).unwrap_or(input.len());
-                    if lines != 0 {
-                        line += lines as i32;
-                        col = 1;
-                        input = &input[lines..];
-                    }
-
-                    if let Some(rem) = input.strip_prefix(b"]") {
-                        // "]]>" must not be contained in CharData
-                        if rem.starts_with(b"]>") {
-                            // commit consumed bytes before raise an error
-                            let diff = self.content_bytes().len() - input.len();
-                            self.input_mut().unwrap().line = line;
-                            self.input_mut().unwrap().col = col;
-                            self.input_mut().unwrap().cur += diff;
-                            xml_fatal_err(self, XmlParserErrors::XmlErrMisplacedCDATAEnd, None);
-                            if !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                                // if the parser input state is not EOF,
-                                // consume the head of ']'.
-                                self.input_mut().unwrap().cur += 1;
-                            }
-                            return;
-                        }
-                        col += 1;
-                        input = rem;
-                    }
-                }
-
-                let len = self.content_bytes().len() - input.len();
-                if len > 0 {
-                    buf.clear();
-                    // # Safety
-                    // `self.content_bytes()[..len]` contains only ASCII characters.
-                    // Therefore, UTF-8 validation won't be failed.
-                    buf.push_str(from_utf8_unchecked(&self.content_bytes()[..len]));
 
                     // commit consumed bytes for SAX interface
                     self.input_mut().unwrap().cur += len;
                     self.input_mut().unwrap().line = line;
                     self.input_mut().unwrap().col = col;
 
-                    let blank = self.are_blanks(&buf, false);
+                    let blank = self.are_blanks(&buf, true);
 
                     if let Some(sax) = self.sax.as_deref_mut().filter(|sax| {
                         (sax.ignorable_whitespace.is_some() || sax.characters.is_some())
@@ -386,49 +302,133 @@ impl XmlParserCtxt {
                     {
                         characters(self, &buf);
                     }
-
-                    // refresh input buffer
-                    input = self.content_bytes();
                 }
+                return;
+            }
 
-                // Replace "\r\n" to "\n" and skip
-                if input.starts_with(b"\r\n") {
-                    line += 1;
+            while input
+                .first()
+                .filter(|&&b| TEST_CHAR_DATA[b as usize] != 0 || matches!(b, 0xA | b']'))
+                .is_some()
+            {
+                let chars = input
+                    .iter()
+                    .position(|&b| TEST_CHAR_DATA[b as usize] == 0)
+                    .unwrap_or(input.len());
+                col += chars as i32;
+                input = &input[chars..];
+
+                let lines = input.iter().position(|&b| b != 0xA).unwrap_or(input.len());
+                if lines != 0 {
+                    line += lines as i32;
                     col = 1;
-                    // To skip '\r', `+1` is needed.
-                    let diff = self.content_bytes().len() - input.len() + 1;
-                    // At this point, `content_bytes` will start with '\n' ('\r' is skipped)
-                    self.input_mut().unwrap().cur += diff;
-                    // and skip '\n' at the head of `content_bytes`.
-                    input = &self.content_bytes()[1..];
-                    continue;
+                    input = &input[lines..];
                 }
 
-                // At this point, the buffer is already committed,
-                // so commit only line and col
+                if let Some(rem) = input.strip_prefix(b"]") {
+                    // "]]>" must not be contained in CharData
+                    if rem.starts_with(b"]>") {
+                        // commit consumed bytes before raise an error
+                        let diff = self.content_bytes().len() - input.len();
+                        self.input_mut().unwrap().line = line;
+                        self.input_mut().unwrap().col = col;
+                        self.input_mut().unwrap().cur += diff;
+                        xml_fatal_err(self, XmlParserErrors::XmlErrMisplacedCDATAEnd, None);
+                        if !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+                            // if the parser input state is not EOF,
+                            // consume the head of ']'.
+                            self.input_mut().unwrap().cur += 1;
+                        }
+                        return;
+                    }
+                    col += 1;
+                    input = rem;
+                }
+            }
+
+            let len = self.content_bytes().len() - input.len();
+            if len > 0 {
+                buf.clear();
+                unsafe {
+                    // # Safety
+                    // `self.content_bytes()[..len]` contains only ASCII characters.
+                    // Therefore, UTF-8 validation won't be failed.
+                    buf.push_str(from_utf8_unchecked(&self.content_bytes()[..len]));
+                }
+
+                // commit consumed bytes for SAX interface
+                self.input_mut().unwrap().cur += len;
                 self.input_mut().unwrap().line = line;
                 self.input_mut().unwrap().col = col;
 
-                if matches!(self.content_bytes().first(), Some(&(b'<' | b'&'))) {
-                    return;
-                }
+                let blank = self.are_blanks(&buf, false);
 
-                self.shrink();
-                self.grow();
-                if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                    return;
+                if let Some(sax) = self.sax.as_deref_mut().filter(|sax| {
+                    (sax.ignorable_whitespace.is_some() || sax.characters.is_some())
+                        && sax
+                            .ignorable_whitespace
+                            .zip(sax.characters)
+                            .is_none_or(|(l, r)| !fn_addr_eq(l, r))
+                }) {
+                    if blank {
+                        if let Some(ignorable_whitespace) = sax.ignorable_whitespace {
+                            ignorable_whitespace(self, &buf);
+                        }
+                    } else {
+                        if let Some(characters) = sax.characters {
+                            characters(self, &buf);
+                        }
+                        if self.space() == -1 {
+                            *self.space_mut() = -2;
+                        }
+                    }
+                } else if let Some(characters) =
+                    self.sax.as_deref_mut().and_then(|sax| sax.characters)
+                {
+                    characters(self, &buf);
                 }
 
                 // refresh input buffer
                 input = self.content_bytes();
             }
 
-            let len = self.content_bytes().len() - input.len();
-            self.input_mut().unwrap().cur += len;
+            // Replace "\r\n" to "\n" and skip
+            if input.starts_with(b"\r\n") {
+                line += 1;
+                col = 1;
+                // To skip '\r', `+1` is needed.
+                let diff = self.content_bytes().len() - input.len() + 1;
+                // At this point, `content_bytes` will start with '\n' ('\r' is skipped)
+                self.input_mut().unwrap().cur += diff;
+                // and skip '\n' at the head of `content_bytes`.
+                input = &self.content_bytes()[1..];
+                continue;
+            }
+
+            // At this point, the buffer is already committed,
+            // so commit only line and col
             self.input_mut().unwrap().line = line;
             self.input_mut().unwrap().col = col;
-            self.parse_char_data_complex(partial);
+
+            if matches!(self.content_bytes().first(), Some(&(b'<' | b'&'))) {
+                return;
+            }
+
+            self.shrink();
+            self.grow();
+            if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+                return;
+            }
+
+            // refresh input buffer
+            input = self.content_bytes();
         }
+
+        let len = self.content_bytes().len() - input.len();
+        self.input_mut().unwrap().cur += len;
+        self.input_mut().unwrap().line = line;
+        self.input_mut().unwrap().col = col;
+        self.parse_char_data_complex(partial);
     }
 
     /// Parse escaped pure raw content. Always consumes '<!['.
@@ -440,94 +440,92 @@ impl XmlParserCtxt {
     /// [21] CDEnd ::= ']]>'
     /// ```
     #[doc(alias = "xmlParseCDSect")]
-    pub(crate) unsafe fn parse_cdsect(&mut self) {
-        unsafe {
-            let mut rl: i32 = 0;
-            let mut sl: i32 = 0;
-            let mut l: i32 = 0;
-            let max_length = if self.options & XmlParserOption::XmlParseHuge as i32 != 0 {
-                XML_MAX_HUGE_LENGTH
-            } else {
-                XML_MAX_TEXT_LENGTH
-            };
+    pub(crate) fn parse_cdsect(&mut self) {
+        let mut rl: i32 = 0;
+        let mut sl: i32 = 0;
+        let mut l: i32 = 0;
+        let max_length = if self.options & XmlParserOption::XmlParseHuge as i32 != 0 {
+            XML_MAX_HUGE_LENGTH
+        } else {
+            XML_MAX_TEXT_LENGTH
+        };
 
-            if !self.content_bytes().starts_with(b"<![CDATA[") {
-                return;
-            }
-            self.advance(9);
+        if !self.content_bytes().starts_with(b"<![CDATA[") {
+            return;
+        }
+        self.advance(9);
 
-            self.instate = XmlParserInputState::XmlParserCDATASection;
-            let mut r = self.current_char(&mut rl).unwrap_or('\0');
-            if !xml_is_char(r as u32) {
-                xml_fatal_err(self, XmlParserErrors::XmlErrCDATANotFinished, None);
-                if !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                    self.instate = XmlParserInputState::XmlParserContent;
-                }
-                return;
-            }
-            self.advance_with_line_handling(rl as usize);
-            let mut s = self.current_char(&mut sl).unwrap_or('\0');
-            if !xml_is_char(s as u32) {
-                xml_fatal_err(self, XmlParserErrors::XmlErrCDATANotFinished, None);
-                if !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                    self.instate = XmlParserInputState::XmlParserContent;
-                }
-                return;
-            }
-            self.advance_with_line_handling(sl as usize);
-            let mut cur = self.current_char(&mut l).unwrap_or('\0');
-            let mut buf = String::new();
-            while xml_is_char(cur as u32) && (r != ']' || s != ']' || cur != '>') {
-                buf.push(r);
-                if buf.len() > max_length {
-                    xml_fatal_err_msg(
-                        self,
-                        XmlParserErrors::XmlErrCDATANotFinished,
-                        "CData section too big found\n",
-                    );
-                    if !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                        self.instate = XmlParserInputState::XmlParserContent;
-                    }
-                    return;
-                }
-                r = s;
-                s = cur;
-                self.advance_with_line_handling(l as usize);
-                cur = self.current_char(&mut l).unwrap_or('\0');
-            }
-            if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                return;
-            }
-            if cur != '>' {
-                xml_fatal_err_msg_str!(
-                    self,
-                    XmlParserErrors::XmlErrCDATANotFinished,
-                    "CData section not finished\n{}\n",
-                    buf
-                );
-                // goto out;
-                if !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                    self.instate = XmlParserInputState::XmlParserContent;
-                }
-                return;
-            }
-            self.advance_with_line_handling(l as usize);
-
-            // OK the buffer is to be consumed as cdata.
-            if self.disable_sax == 0 {
-                if let Some(sax) = self.sax.as_deref_mut() {
-                    if let Some(cdata) = sax.cdata_block {
-                        cdata(self, &buf);
-                    } else if let Some(characters) = sax.characters {
-                        characters(self, &buf);
-                    }
-                }
-            }
-
-            // out:
+        self.instate = XmlParserInputState::XmlParserCDATASection;
+        let mut r = self.current_char(&mut rl).unwrap_or('\0');
+        if !xml_is_char(r as u32) {
+            xml_fatal_err(self, XmlParserErrors::XmlErrCDATANotFinished, None);
             if !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
                 self.instate = XmlParserInputState::XmlParserContent;
             }
+            return;
+        }
+        self.advance_with_line_handling(rl as usize);
+        let mut s = self.current_char(&mut sl).unwrap_or('\0');
+        if !xml_is_char(s as u32) {
+            xml_fatal_err(self, XmlParserErrors::XmlErrCDATANotFinished, None);
+            if !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+                self.instate = XmlParserInputState::XmlParserContent;
+            }
+            return;
+        }
+        self.advance_with_line_handling(sl as usize);
+        let mut cur = self.current_char(&mut l).unwrap_or('\0');
+        let mut buf = String::new();
+        while xml_is_char(cur as u32) && (r != ']' || s != ']' || cur != '>') {
+            buf.push(r);
+            if buf.len() > max_length {
+                xml_fatal_err_msg(
+                    self,
+                    XmlParserErrors::XmlErrCDATANotFinished,
+                    "CData section too big found\n",
+                );
+                if !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+                    self.instate = XmlParserInputState::XmlParserContent;
+                }
+                return;
+            }
+            r = s;
+            s = cur;
+            self.advance_with_line_handling(l as usize);
+            cur = self.current_char(&mut l).unwrap_or('\0');
+        }
+        if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+            return;
+        }
+        if cur != '>' {
+            xml_fatal_err_msg_str!(
+                self,
+                XmlParserErrors::XmlErrCDATANotFinished,
+                "CData section not finished\n{}\n",
+                buf
+            );
+            // goto out;
+            if !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+                self.instate = XmlParserInputState::XmlParserContent;
+            }
+            return;
+        }
+        self.advance_with_line_handling(l as usize);
+
+        // OK the buffer is to be consumed as cdata.
+        if self.disable_sax == 0 {
+            if let Some(sax) = self.sax.as_deref_mut() {
+                if let Some(cdata) = sax.cdata_block {
+                    cdata(self, &buf);
+                } else if let Some(characters) = sax.characters {
+                    characters(self, &buf);
+                }
+            }
+        }
+
+        // out:
+        if !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+            self.instate = XmlParserInputState::XmlParserContent;
         }
     }
 }

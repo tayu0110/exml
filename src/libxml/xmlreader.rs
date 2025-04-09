@@ -3752,7 +3752,7 @@ const NODE_IS_SPRESERVED: i32 = 0x4;
 
 /// called when an opening tag has been processed.
 #[doc(alias = "xmlTextReaderStartElement")]
-unsafe fn xml_text_reader_start_element(
+fn xml_text_reader_start_element(
     ctxt: &mut XmlParserCtxt,
     fullname: &str,
     atts: &[(String, Option<String>)],
@@ -3779,7 +3779,7 @@ unsafe fn xml_text_reader_start_element(
 
 /// called when an ending tag has been processed.
 #[doc(alias = "xmlTextReaderEndElement")]
-unsafe fn xml_text_reader_end_element(ctxt: &mut XmlParserCtxt, fullname: &str) {
+fn xml_text_reader_end_element(ctxt: &mut XmlParserCtxt, fullname: &str) {
     unsafe {
         let reader: XmlTextReaderPtr = ctxt._private as _;
 
@@ -3794,7 +3794,7 @@ unsafe fn xml_text_reader_end_element(ctxt: &mut XmlParserCtxt, fullname: &str) 
 /// Called when an opening tag has been processed.
 #[doc(alias = "xmlTextReaderStartElementNs")]
 #[allow(clippy::too_many_arguments)]
-unsafe fn xml_text_reader_start_element_ns(
+fn xml_text_reader_start_element_ns(
     ctxt: &mut XmlParserCtxt,
     localname: &str,
     prefix: Option<&str>,
@@ -3833,7 +3833,7 @@ unsafe fn xml_text_reader_start_element_ns(
 
 /// Called when an ending tag has been processed.
 #[doc(alias = "xmlTextReaderEndElementNs")]
-unsafe fn xml_text_reader_end_element_ns(
+fn xml_text_reader_end_element_ns(
     ctxt: &mut XmlParserCtxt,
     localname: &str,
     prefix: Option<&str>,
@@ -3852,7 +3852,7 @@ unsafe fn xml_text_reader_end_element_ns(
 
 /// Receiving some chars from the parser.
 #[doc(alias = "xmlTextReaderCharacters")]
-unsafe fn xml_text_reader_characters(ctxt: &mut XmlParserCtxt, ch: &str) {
+fn xml_text_reader_characters(ctxt: &mut XmlParserCtxt, ch: &str) {
     unsafe {
         let reader: XmlTextReaderPtr = ctxt._private as _;
 
@@ -3866,7 +3866,7 @@ unsafe fn xml_text_reader_characters(ctxt: &mut XmlParserCtxt, ch: &str) {
 
 /// Called when a pcdata block has been parsed
 #[doc(alias = "xmlTextReaderCDataBlock")]
-unsafe fn xml_text_reader_cdata_block(ctxt: &mut XmlParserCtxt, ch: &str) {
+fn xml_text_reader_cdata_block(ctxt: &mut XmlParserCtxt, ch: &str) {
     unsafe {
         let reader: XmlTextReaderPtr = ctxt._private as _;
 

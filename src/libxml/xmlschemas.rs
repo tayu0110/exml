@@ -18877,7 +18877,7 @@ pub struct XmlSchemaSAXPlugStruct {
     ctxt: XmlSchemaValidCtxtPtr,
 }
 
-unsafe fn xml_schema_sax_handle_start_element_ns(
+fn xml_schema_sax_handle_start_element_ns(
     ctxt: &mut XmlParserCtxt,
     localname: &str,
     _prefix: Option<&str>,
@@ -19046,7 +19046,7 @@ unsafe fn xml_schema_sax_handle_start_element_ns(
     }
 }
 
-unsafe fn xml_schema_sax_handle_end_element_ns(
+fn xml_schema_sax_handle_end_element_ns(
     ctxt: &mut XmlParserCtxt,
     localname: &str,
     _prefix: Option<&str>,
@@ -19088,7 +19088,7 @@ unsafe fn xml_schema_sax_handle_end_element_ns(
 }
 
 // Process text content.
-unsafe fn xml_schema_sax_handle_text(ctxt: &mut XmlParserCtxt, ch: &str) {
+fn xml_schema_sax_handle_text(ctxt: &mut XmlParserCtxt, ch: &str) {
     unsafe {
         let user_data = ctxt.user_data.clone().unwrap();
         let lock = user_data.lock();
@@ -19124,7 +19124,7 @@ unsafe fn xml_schema_sax_handle_text(ctxt: &mut XmlParserCtxt, ch: &str) {
 }
 
 // Process CDATA content.
-unsafe fn xml_schema_sax_handle_cdata_section(ctxt: &mut XmlParserCtxt, ch: &str) {
+fn xml_schema_sax_handle_cdata_section(ctxt: &mut XmlParserCtxt, ch: &str) {
     unsafe {
         let user_data = ctxt.user_data.clone().unwrap();
         let lock = user_data.lock();
@@ -19159,7 +19159,7 @@ unsafe fn xml_schema_sax_handle_cdata_section(ctxt: &mut XmlParserCtxt, ch: &str
     }
 }
 
-unsafe fn xml_schema_sax_handle_reference(ctxt: &mut XmlParserCtxt, _name: &str) {
+fn xml_schema_sax_handle_reference(ctxt: &mut XmlParserCtxt, _name: &str) {
     unsafe {
         let user_data = ctxt.user_data.clone().unwrap();
         let lock = user_data.lock();
@@ -19177,7 +19177,7 @@ unsafe fn xml_schema_sax_handle_reference(ctxt: &mut XmlParserCtxt, _name: &str)
 }
 
 // All those functions just bounces to the user provided SAX handlers
-unsafe fn internal_subset_split(
+fn internal_subset_split(
     ctxt: &mut XmlParserCtxt,
     name: Option<&str>,
     external_id: Option<&str>,
@@ -19199,7 +19199,7 @@ unsafe fn internal_subset_split(
     }
 }
 
-unsafe fn is_standalone_split(ctxt: &mut XmlParserCtxt) -> i32 {
+fn is_standalone_split(ctxt: &mut XmlParserCtxt) -> i32 {
     unsafe {
         let user_data = ctxt.user_data.clone().unwrap();
         let lock = user_data.lock();
@@ -19217,7 +19217,7 @@ unsafe fn is_standalone_split(ctxt: &mut XmlParserCtxt) -> i32 {
     }
 }
 
-unsafe fn has_internal_subset_split(ctxt: &mut XmlParserCtxt) -> i32 {
+fn has_internal_subset_split(ctxt: &mut XmlParserCtxt) -> i32 {
     unsafe {
         let user_data = ctxt.user_data.clone().unwrap();
         let lock = user_data.lock();
@@ -19235,7 +19235,7 @@ unsafe fn has_internal_subset_split(ctxt: &mut XmlParserCtxt) -> i32 {
     }
 }
 
-unsafe fn has_external_subset_split(ctxt: &mut XmlParserCtxt) -> i32 {
+fn has_external_subset_split(ctxt: &mut XmlParserCtxt) -> i32 {
     unsafe {
         let user_data = ctxt.user_data.clone().unwrap();
         let lock = user_data.lock();
@@ -19253,7 +19253,7 @@ unsafe fn has_external_subset_split(ctxt: &mut XmlParserCtxt) -> i32 {
     }
 }
 
-unsafe fn external_subset_split(
+fn external_subset_split(
     ctxt: &mut XmlParserCtxt,
     name: Option<&str>,
     external_id: Option<&str>,
@@ -19275,7 +19275,7 @@ unsafe fn external_subset_split(
     }
 }
 
-unsafe fn resolve_entity_split(
+fn resolve_entity_split(
     ctxt: &mut XmlParserCtxt,
     public_id: Option<&str>,
     system_id: Option<&str>,
@@ -19297,7 +19297,7 @@ unsafe fn resolve_entity_split(
     }
 }
 
-unsafe fn get_entity_split(ctxt: &mut XmlParserCtxt, name: &str) -> Option<XmlEntityPtr> {
+fn get_entity_split(ctxt: &mut XmlParserCtxt, name: &str) -> Option<XmlEntityPtr> {
     unsafe {
         let user_data = ctxt.user_data.clone().unwrap();
         let lock = user_data.lock();
@@ -19315,7 +19315,7 @@ unsafe fn get_entity_split(ctxt: &mut XmlParserCtxt, name: &str) -> Option<XmlEn
     }
 }
 
-unsafe fn get_parameter_entity_split(ctxt: &mut XmlParserCtxt, name: &str) -> Option<XmlEntityPtr> {
+fn get_parameter_entity_split(ctxt: &mut XmlParserCtxt, name: &str) -> Option<XmlEntityPtr> {
     unsafe {
         let user_data = ctxt.user_data.clone().unwrap();
         let lock = user_data.lock();
@@ -19333,7 +19333,7 @@ unsafe fn get_parameter_entity_split(ctxt: &mut XmlParserCtxt, name: &str) -> Op
     }
 }
 
-unsafe fn entity_decl_split(
+fn entity_decl_split(
     ctxt: &mut XmlParserCtxt,
     name: &str,
     typ: XmlEntityType,
@@ -19357,7 +19357,7 @@ unsafe fn entity_decl_split(
     }
 }
 
-unsafe fn attribute_decl_split(
+fn attribute_decl_split(
     ctxt: &mut XmlParserCtxt,
     elem: &str,
     name: &str,
@@ -19382,7 +19382,7 @@ unsafe fn attribute_decl_split(
     }
 }
 
-unsafe fn element_decl_split(
+fn element_decl_split(
     ctxt: &mut XmlParserCtxt,
     name: &str,
     typ: Option<XmlElementTypeVal>,
@@ -19404,7 +19404,7 @@ unsafe fn element_decl_split(
     }
 }
 
-unsafe fn notation_decl_split(
+fn notation_decl_split(
     ctxt: &mut XmlParserCtxt,
     name: &str,
     public_id: Option<&str>,
@@ -19426,7 +19426,7 @@ unsafe fn notation_decl_split(
     }
 }
 
-unsafe fn unparsed_entity_decl_split(
+fn unparsed_entity_decl_split(
     ctxt: &mut XmlParserCtxt,
     name: &str,
     public_id: Option<&str>,
@@ -19449,7 +19449,7 @@ unsafe fn unparsed_entity_decl_split(
     }
 }
 
-unsafe fn set_document_locator_split(ctxt: &mut XmlParserCtxt, loc: XmlSAXLocatorPtr) {
+fn set_document_locator_split(ctxt: &mut XmlParserCtxt, loc: XmlSAXLocatorPtr) {
     unsafe {
         let user_data = ctxt.user_data.clone().unwrap();
         let lock = user_data.lock();
@@ -19466,7 +19466,7 @@ unsafe fn set_document_locator_split(ctxt: &mut XmlParserCtxt, loc: XmlSAXLocato
     }
 }
 
-unsafe fn start_document_split(ctxt: &mut XmlParserCtxt) {
+fn start_document_split(ctxt: &mut XmlParserCtxt) {
     unsafe {
         let user_data = ctxt.user_data.clone().unwrap();
         let lock = user_data.lock();
@@ -19483,7 +19483,7 @@ unsafe fn start_document_split(ctxt: &mut XmlParserCtxt) {
     }
 }
 
-unsafe fn end_document_split(ctxt: &mut XmlParserCtxt) {
+fn end_document_split(ctxt: &mut XmlParserCtxt) {
     unsafe {
         let user_data = ctxt.user_data.clone().unwrap();
         let lock = user_data.lock();
@@ -19500,7 +19500,7 @@ unsafe fn end_document_split(ctxt: &mut XmlParserCtxt) {
     }
 }
 
-unsafe fn processing_instruction_split(ctxt: &mut XmlParserCtxt, target: &str, data: Option<&str>) {
+fn processing_instruction_split(ctxt: &mut XmlParserCtxt, target: &str, data: Option<&str>) {
     unsafe {
         let user_data = ctxt.user_data.clone().unwrap();
         let lock = user_data.lock();
@@ -19517,7 +19517,7 @@ unsafe fn processing_instruction_split(ctxt: &mut XmlParserCtxt, target: &str, d
     }
 }
 
-unsafe fn comment_split(ctxt: &mut XmlParserCtxt, value: &str) {
+fn comment_split(ctxt: &mut XmlParserCtxt, value: &str) {
     unsafe {
         let user_data = ctxt.user_data.clone().unwrap();
         let lock = user_data.lock();
@@ -19552,7 +19552,7 @@ fn fatal_error_split(_ctx: Option<GenericErrorContext>, _msg: &str) {
 }
 
 // Those are function where both the user handler and the schemas handler need to be called.
-unsafe fn characters_split(ctxt: &mut XmlParserCtxt, ch: &str) {
+fn characters_split(ctxt: &mut XmlParserCtxt, ch: &str) {
     unsafe {
         let user_data = ctxt.user_data.clone().unwrap();
         let lock = user_data.lock();
@@ -19573,7 +19573,7 @@ unsafe fn characters_split(ctxt: &mut XmlParserCtxt, ch: &str) {
     }
 }
 
-unsafe fn ignorable_whitespace_split(ctxt: &mut XmlParserCtxt, ch: &str) {
+fn ignorable_whitespace_split(ctxt: &mut XmlParserCtxt, ch: &str) {
     unsafe {
         let user_data = ctxt.user_data.clone().unwrap();
         let lock = user_data.lock();
@@ -19594,7 +19594,7 @@ unsafe fn ignorable_whitespace_split(ctxt: &mut XmlParserCtxt, ch: &str) {
     }
 }
 
-unsafe fn cdata_block_split(ctxt: &mut XmlParserCtxt, value: &str) {
+fn cdata_block_split(ctxt: &mut XmlParserCtxt, value: &str) {
     unsafe {
         let user_data = ctxt.user_data.clone().unwrap();
         let lock = user_data.lock();
@@ -19615,7 +19615,7 @@ unsafe fn cdata_block_split(ctxt: &mut XmlParserCtxt, value: &str) {
     }
 }
 
-unsafe fn reference_split(ctxt: &mut XmlParserCtxt, name: &str) {
+fn reference_split(ctxt: &mut XmlParserCtxt, name: &str) {
     unsafe {
         let user_data = ctxt.user_data.clone().unwrap();
         let lock = user_data.lock();
@@ -19636,7 +19636,7 @@ unsafe fn reference_split(ctxt: &mut XmlParserCtxt, name: &str) {
     }
 }
 
-unsafe fn start_element_ns_split(
+fn start_element_ns_split(
     ctxt: &mut XmlParserCtxt,
     localname: &str,
     prefix: Option<&str>,
@@ -19681,7 +19681,7 @@ unsafe fn start_element_ns_split(
     }
 }
 
-unsafe fn end_element_ns_split(
+fn end_element_ns_split(
     ctxt: &mut XmlParserCtxt,
     localname: &str,
     prefix: Option<&str>,

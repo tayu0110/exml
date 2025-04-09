@@ -614,7 +614,7 @@ fn increment_callbacks_counter() {
 ///
 /// Returns 1 if true
 #[doc(alias = "isStandaloneDebug")]
-unsafe fn is_standalone_debug(_ctx: &mut XmlParserCtxt) -> i32 {
+fn is_standalone_debug(_ctx: &mut XmlParserCtxt) -> i32 {
     increment_callbacks_counter();
     sax_debugln!("SAX.isStandalone()");
     0
@@ -624,7 +624,7 @@ unsafe fn is_standalone_debug(_ctx: &mut XmlParserCtxt) -> i32 {
 ///
 /// Returns 1 if true
 #[doc(alias = "hasInternalSubsetDebug")]
-unsafe fn has_internal_subset_debug(_ctx: &mut XmlParserCtxt) -> i32 {
+fn has_internal_subset_debug(_ctx: &mut XmlParserCtxt) -> i32 {
     increment_callbacks_counter();
     sax_debugln!("SAX.hasInternalSubset()");
     0
@@ -634,7 +634,7 @@ unsafe fn has_internal_subset_debug(_ctx: &mut XmlParserCtxt) -> i32 {
 ///
 /// Returns 1 if true
 #[doc(alias = "hasExternalSubsetDebug")]
-unsafe fn has_external_subset_debug(_ctx: &mut XmlParserCtxt) -> i32 {
+fn has_external_subset_debug(_ctx: &mut XmlParserCtxt) -> i32 {
     increment_callbacks_counter();
     sax_debugln!("SAX.hasExternalSubset()");
     0
@@ -642,7 +642,7 @@ unsafe fn has_external_subset_debug(_ctx: &mut XmlParserCtxt) -> i32 {
 
 /// Does this document has an internal subset
 #[doc(alias = "internalSubsetDebug")]
-unsafe fn internal_subset_debug(
+fn internal_subset_debug(
     _ctx: &mut XmlParserCtxt,
     name: Option<&str>,
     external_id: Option<&str>,
@@ -665,7 +665,7 @@ unsafe fn internal_subset_debug(
 
 /// Does this document has an external subset
 #[doc(alias = "externalSubsetDebug")]
-unsafe fn external_subset_debug(
+fn external_subset_debug(
     _ctx: &mut XmlParserCtxt,
     name: Option<&str>,
     external_id: Option<&str>,
@@ -692,7 +692,7 @@ unsafe fn external_subset_debug(
 ///
 /// Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
 #[doc(alias = "resolveEntityDebug")]
-unsafe fn resolve_entity_debug(
+fn resolve_entity_debug(
     _ctx: &mut XmlParserCtxt,
     public_id: Option<&str>,
     system_id: Option<&str>,
@@ -723,7 +723,7 @@ unsafe fn resolve_entity_debug(
 ///
 /// Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
 #[doc(alias = "getEntityDebug")]
-unsafe fn get_entity_debug(_ctx: &mut XmlParserCtxt, name: &str) -> Option<XmlEntityPtr> {
+fn get_entity_debug(_ctx: &mut XmlParserCtxt, name: &str) -> Option<XmlEntityPtr> {
     increment_callbacks_counter();
     sax_debugln!("SAX.getEntity({name})");
     None
@@ -733,7 +733,7 @@ unsafe fn get_entity_debug(_ctx: &mut XmlParserCtxt, name: &str) -> Option<XmlEn
 ///
 /// Returns the xmlParserInputPtr
 #[doc(alias = "getParameterEntityDebug")]
-unsafe fn get_parameter_entity_debug(_ctx: &mut XmlParserCtxt, name: &str) -> Option<XmlEntityPtr> {
+fn get_parameter_entity_debug(_ctx: &mut XmlParserCtxt, name: &str) -> Option<XmlEntityPtr> {
     increment_callbacks_counter();
     sax_debugln!("SAX.getParameterEntity({name})");
     None
@@ -761,7 +761,7 @@ fn entity_decl_debug(
 
 /// An attribute definition has been parsed
 #[doc(alias = "attributeDeclDebug")]
-unsafe fn attribute_decl_debug(
+fn attribute_decl_debug(
     _ctx: &mut XmlParserCtxt,
     elem: &str,
     name: &str,
@@ -788,7 +788,7 @@ unsafe fn attribute_decl_debug(
 
 /// An element definition has been parsed
 #[doc(alias = "elementDeclDebug")]
-unsafe fn element_decl_debug(
+fn element_decl_debug(
     _ctx: &mut XmlParserCtxt,
     name: &str,
     typ: Option<XmlElementTypeVal>,
@@ -803,7 +803,7 @@ unsafe fn element_decl_debug(
 
 /// What to do when a notation declaration has been parsed.
 #[doc(alias = "notationDeclDebug")]
-unsafe fn notation_decl_debug(
+fn notation_decl_debug(
     _ctx: &mut XmlParserCtxt,
     name: &str,
     public_id: Option<&str>,
@@ -838,7 +838,7 @@ fn unparsed_entity_decl_debug(
 /// Receive the document locator at startup, actually xmlDefaultSAXLocator
 /// Everything is available on the context, so this is useless in our case.
 #[doc(alias = "setDocumentLocatorDebug")]
-unsafe fn set_document_locator_debug(_ctx: &mut XmlParserCtxt, _loc: XmlSAXLocatorPtr) {
+fn set_document_locator_debug(_ctx: &mut XmlParserCtxt, _loc: XmlSAXLocatorPtr) {
     increment_callbacks_counter();
     sax_debugln!("SAX.setDocumentLocator()");
 }
@@ -859,11 +859,7 @@ fn end_document_debug(_ctx: &mut XmlParserCtxt) {
 
 /// called when an opening tag has been processed.
 #[doc(alias = "startElementDebug")]
-unsafe fn start_element_debug(
-    _ctx: &mut XmlParserCtxt,
-    name: &str,
-    atts: &[(String, Option<String>)],
-) {
+fn start_element_debug(_ctx: &mut XmlParserCtxt, name: &str, atts: &[(String, Option<String>)]) {
     increment_callbacks_counter();
     sax_debug!("SAX.startElement({name}");
     for (key, value) in atts {
@@ -922,7 +918,7 @@ fn ignorable_whitespace_debug(_ctx: &mut XmlParserCtxt, ch: &str) {
 
 /// A processing instruction has been parsed.
 #[doc(alias = "processingInstructionDebug")]
-unsafe fn processing_instruction_debug(_ctx: &mut XmlParserCtxt, target: &str, data: Option<&str>) {
+fn processing_instruction_debug(_ctx: &mut XmlParserCtxt, target: &str, data: Option<&str>) {
     increment_callbacks_counter();
     if let Some(data) = data {
         sax_debugln!("SAX.processingInstruction({target}, {data})");
@@ -945,7 +941,7 @@ fn cdata_block_debug(_ctx: &mut XmlParserCtxt, value: &str) {
 
 /// A comment has been parsed.
 #[doc(alias = "commentDebug")]
-unsafe fn comment_debug(_ctx: &mut XmlParserCtxt, value: &str) {
+fn comment_debug(_ctx: &mut XmlParserCtxt, value: &str) {
     increment_callbacks_counter();
     sax_debugln!("SAX.comment({value})");
 }
@@ -1009,7 +1005,7 @@ static DEBUG_SAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
 
 /// called when an opening tag has been processed.
 #[doc(alias = "startElementNsDebug")]
-unsafe fn start_element_ns_debug(
+fn start_element_ns_debug(
     _ctx: &mut XmlParserCtxt,
     localname: &str,
     prefix: Option<&str>,
@@ -1056,7 +1052,7 @@ unsafe fn start_element_ns_debug(
 
 /// called when the end of an element has been detected.
 #[doc(alias = "endElementDebug")]
-unsafe fn end_element_ns_debug(
+fn end_element_ns_debug(
     _ctx: &mut XmlParserCtxt,
     localname: &str,
     prefix: Option<&str>,
@@ -1114,7 +1110,7 @@ static DEBUG_SAX2_HANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
 /// called when an opening tag has been processed.
 #[doc(alias = "htmlstartElementDebug")]
 #[cfg(feature = "html")]
-unsafe fn htmlstart_element_debug(
+fn htmlstart_element_debug(
     _ctx: &mut XmlParserCtxt,
     name: &str,
     atts: &[(String, Option<String>)],
@@ -1159,7 +1155,7 @@ unsafe fn htmlstart_element_debug(
 /// Question: how much at a time ???
 #[doc(alias = "htmlcharactersDebug")]
 #[cfg(feature = "html")]
-unsafe fn htmlcharacters_debug(_ctx: &mut XmlParserCtxt, ch: &str) {
+fn htmlcharacters_debug(_ctx: &mut XmlParserCtxt, ch: &str) {
     unsafe {
         use std::ffi::c_uchar;
 
@@ -1192,7 +1188,7 @@ unsafe fn htmlcharacters_debug(_ctx: &mut XmlParserCtxt, ch: &str) {
 /// Question: how much at a time ???
 #[doc(alias = "htmlcdataDebug")]
 #[cfg(feature = "html")]
-unsafe fn htmlcdata_debug(_ctx: &mut XmlParserCtxt, ch: &str) {
+fn htmlcdata_debug(_ctx: &mut XmlParserCtxt, ch: &str) {
     unsafe {
         use std::ffi::c_uchar;
 
@@ -1807,105 +1803,84 @@ thread_local! {
 }
 
 #[cfg(feature = "libxml_push")]
-unsafe fn internal_subset_bnd(
+fn internal_subset_bnd(
     ctx: &mut XmlParserCtxt,
     name: Option<&str>,
     external_id: Option<&str>,
     system_id: Option<&str>,
 ) {
-    unsafe {
-        use exml::libxml::sax2::xml_sax2_internal_subset;
+    use exml::libxml::sax2::xml_sax2_internal_subset;
 
+    PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
+    xml_sax2_internal_subset(ctx, name, external_id, system_id);
+}
+
+#[cfg(feature = "libxml_push")]
+fn reference_bnd(ctx: &mut XmlParserCtxt, name: &str) {
+    use exml::libxml::sax2::xml_sax2_reference;
+
+    PUSH_BOUNDARY_REF_COUNT.set(PUSH_BOUNDARY_REF_COUNT.get() + 1);
+    xml_sax2_reference(ctx, name);
+}
+
+#[cfg(feature = "libxml_push")]
+fn characters_bnd(ctx: &mut XmlParserCtxt, ch: &str) {
+    use exml::libxml::sax2::xml_sax2_characters;
+
+    PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
+    PUSH_BOUNDARY_CHARS_COUNT.set(PUSH_BOUNDARY_CHARS_COUNT.get() + 1);
+    xml_sax2_characters(ctx, ch);
+}
+
+#[cfg(feature = "libxml_push")]
+fn cdata_block_bnd(ctx: &mut XmlParserCtxt, ch: &str) {
+    use exml::libxml::sax2::xml_sax2_cdata_block;
+
+    PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
+    PUSH_BOUNDARY_CDATA_COUNT.set(PUSH_BOUNDARY_CDATA_COUNT.get() + 1);
+    xml_sax2_cdata_block(ctx, ch);
+}
+
+#[cfg(feature = "libxml_push")]
+fn processing_instruction_bnd(ctx: &mut XmlParserCtxt, target: &str, data: Option<&str>) {
+    use exml::libxml::sax2::xml_sax2_processing_instruction;
+
+    PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
+    xml_sax2_processing_instruction(ctx, target, data);
+}
+
+#[cfg(feature = "libxml_push")]
+fn comment_bnd(ctxt: &mut XmlParserCtxt, value: &str) {
+    use exml::libxml::sax2::xml_sax2_comment;
+
+    if ctxt.in_subset == 0 {
         PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
-        xml_sax2_internal_subset(ctx, name, external_id, system_id);
     }
+    xml_sax2_comment(ctxt, value);
 }
 
 #[cfg(feature = "libxml_push")]
-unsafe fn reference_bnd(ctx: &mut XmlParserCtxt, name: &str) {
-    unsafe {
-        use exml::libxml::sax2::xml_sax2_reference;
+fn start_element_bnd(ctxt: &mut XmlParserCtxt, xname: &str, atts: &[(String, Option<String>)]) {
+    use exml::libxml::sax2::xml_sax2_start_element;
 
-        PUSH_BOUNDARY_REF_COUNT.set(PUSH_BOUNDARY_REF_COUNT.get() + 1);
-        xml_sax2_reference(ctx, name);
-    }
-}
-
-#[cfg(feature = "libxml_push")]
-unsafe fn characters_bnd(ctx: &mut XmlParserCtxt, ch: &str) {
-    unsafe {
-        use exml::libxml::sax2::xml_sax2_characters;
-
+    // Some elements might be created automatically.
+    if xname != "html" && xname != "body" && xname != "head" && xname != "p" {
         PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
-        PUSH_BOUNDARY_CHARS_COUNT.set(PUSH_BOUNDARY_CHARS_COUNT.get() + 1);
-        xml_sax2_characters(ctx, ch);
     }
+    xml_sax2_start_element(ctxt, xname, atts);
 }
 
 #[cfg(feature = "libxml_push")]
-unsafe fn cdata_block_bnd(ctx: &mut XmlParserCtxt, ch: &str) {
-    unsafe {
-        use exml::libxml::sax2::xml_sax2_cdata_block;
+fn end_element_bnd(ctx: &mut XmlParserCtxt, name: &str) {
+    /*pushBoundaryCount++;*/
 
-        PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
-        PUSH_BOUNDARY_CDATA_COUNT.set(PUSH_BOUNDARY_CDATA_COUNT.get() + 1);
-        xml_sax2_cdata_block(ctx, ch);
-    }
-}
-
-#[cfg(feature = "libxml_push")]
-unsafe fn processing_instruction_bnd(ctx: &mut XmlParserCtxt, target: &str, data: Option<&str>) {
-    unsafe {
-        use exml::libxml::sax2::xml_sax2_processing_instruction;
-
-        PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
-        xml_sax2_processing_instruction(ctx, target, data);
-    }
-}
-
-#[cfg(feature = "libxml_push")]
-unsafe fn comment_bnd(ctxt: &mut XmlParserCtxt, value: &str) {
-    unsafe {
-        use exml::libxml::sax2::xml_sax2_comment;
-
-        if ctxt.in_subset == 0 {
-            PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
-        }
-        xml_sax2_comment(ctxt, value);
-    }
-}
-
-#[cfg(feature = "libxml_push")]
-unsafe fn start_element_bnd(
-    ctxt: &mut XmlParserCtxt,
-    xname: &str,
-    atts: &[(String, Option<String>)],
-) {
-    unsafe {
-        use exml::libxml::sax2::xml_sax2_start_element;
-
-        // Some elements might be created automatically.
-        if xname != "html" && xname != "body" && xname != "head" && xname != "p" {
-            PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
-        }
-        xml_sax2_start_element(ctxt, xname, atts);
-    }
-}
-
-#[cfg(feature = "libxml_push")]
-unsafe fn end_element_bnd(ctx: &mut XmlParserCtxt, name: &str) {
-    unsafe {
-        /*pushBoundaryCount++;*/
-
-        use exml::libxml::sax2::xml_sax2_end_element;
-        xml_sax2_end_element(ctx, name);
-    }
+    use exml::libxml::sax2::xml_sax2_end_element;
+    xml_sax2_end_element(ctx, name);
 }
 
 #[cfg(feature = "libxml_push")]
 #[allow(clippy::too_many_arguments)]
-// #[allow(clippy::type_complexity)]
-unsafe fn start_element_ns_bnd(
+fn start_element_ns_bnd(
     ctx: &mut XmlParserCtxt,
     localname: &str,
     prefix: Option<&str>,
@@ -1914,33 +1889,29 @@ unsafe fn start_element_ns_bnd(
     nb_defaulted: usize,
     attributes: &[(String, Option<String>, Option<String>, String)],
 ) {
-    unsafe {
-        use exml::libxml::sax2::xml_sax2_start_element_ns;
+    use exml::libxml::sax2::xml_sax2_start_element_ns;
 
-        PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
-        xml_sax2_start_element_ns(
-            ctx,
-            localname,
-            prefix,
-            uri,
-            namespaces,
-            nb_defaulted,
-            attributes,
-        );
-    }
+    PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
+    xml_sax2_start_element_ns(
+        ctx,
+        localname,
+        prefix,
+        uri,
+        namespaces,
+        nb_defaulted,
+        attributes,
+    );
 }
 
 #[cfg(feature = "libxml_push")]
-unsafe fn end_element_ns_bnd(
+fn end_element_ns_bnd(
     ctx: &mut XmlParserCtxt,
     localname: &str,
     prefix: Option<&str>,
     uri: Option<&str>,
 ) {
-    unsafe {
-        use exml::libxml::sax2::xml_sax2_end_element_ns;
-        xml_sax2_end_element_ns(ctx, localname, prefix, uri);
-    }
+    use exml::libxml::sax2::xml_sax2_end_element_ns;
+    xml_sax2_end_element_ns(ctx, localname, prefix, uri);
 }
 
 /// Test whether the push parser detects boundaries between syntactical

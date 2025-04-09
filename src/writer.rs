@@ -227,12 +227,9 @@ impl<'a> XmlTextWriter<'a> {
             sax_handler.start_element = Some(xml_sax2_start_element);
             sax_handler.end_element = Some(xml_sax2_end_element);
 
-            let Some(mut ctxt) = XmlParserCtxt::new_push_parser(
-                Some(Box::new(sax_handler)),
-                None,
-                b"",
-                None,
-            ) else {
+            let Some(mut ctxt) =
+                XmlParserCtxt::new_push_parser(Some(Box::new(sax_handler)), None, b"", None)
+            else {
                 xml_writer_err_msg(
                     None,
                     XmlParserErrors::XmlErrInternalError,
@@ -290,12 +287,9 @@ impl<'a> XmlTextWriter<'a> {
             sax_handler.start_element = Some(xml_sax2_start_element);
             sax_handler.end_element = Some(xml_sax2_end_element);
 
-            let Some(mut ctxt) = XmlParserCtxt::new_push_parser(
-                Some(Box::new(sax_handler)),
-                None,
-                b"",
-                None,
-            ) else {
+            let Some(mut ctxt) =
+                XmlParserCtxt::new_push_parser(Some(Box::new(sax_handler)), None, b"", None)
+            else {
                 xml_writer_err_msg(
                     None,
                     XmlParserErrors::XmlErrInternalError,
@@ -2183,7 +2177,7 @@ impl Drop for TextWriterPushContext {
 
 /// called at the start of document processing.
 #[doc(alias = "xmlTextWriterStartDocumentCallback")]
-unsafe fn xml_text_writer_start_document_callback(ctxt: &mut XmlParserCtxt) {
+fn xml_text_writer_start_document_callback(ctxt: &mut XmlParserCtxt) {
     unsafe {
         if ctxt.html != 0 {
             #[cfg(feature = "html")]

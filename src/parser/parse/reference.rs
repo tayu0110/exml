@@ -597,82 +597,80 @@ impl XmlParserCtxt {
     /// Returns the string of the entity content.
     /// str is updated to the current value of the index
     #[doc(alias = "xmlParseStringPEReference")]
-    pub(super) unsafe fn parse_string_pereference<'a>(
+    pub(super) fn parse_string_pereference<'a>(
         &mut self,
         s: &'a str,
     ) -> (Option<XmlEntityPtr>, &'a str) {
-        unsafe {
-            let Some(ptr) = s.strip_prefix('%') else {
-                return (None, s);
-            };
-            let (Some(name), rem) = self.parse_string_name(ptr) else {
-                xml_fatal_err_msg(
-                    self,
-                    XmlParserErrors::XmlErrNameRequired,
-                    "xmlParseStringPEReference: no name\n",
-                );
-                return (None, ptr);
-            };
-            let Some(ptr) = rem.strip_prefix(';') else {
-                xml_fatal_err(self, XmlParserErrors::XmlErrEntityRefSemicolMissing, None);
-                return (None, rem);
-            };
+        let Some(ptr) = s.strip_prefix('%') else {
+            return (None, s);
+        };
+        let (Some(name), rem) = self.parse_string_name(ptr) else {
+            xml_fatal_err_msg(
+                self,
+                XmlParserErrors::XmlErrNameRequired,
+                "xmlParseStringPEReference: no name\n",
+            );
+            return (None, ptr);
+        };
+        let Some(ptr) = rem.strip_prefix(';') else {
+            xml_fatal_err(self, XmlParserErrors::XmlErrEntityRefSemicolMissing, None);
+            return (None, rem);
+        };
 
-            // Request the entity from SAX
-            let entity = self
-                .sax
-                .as_deref_mut()
-                .and_then(|sax| sax.get_parameter_entity)
-                .and_then(|get_parameter_entity| get_parameter_entity(self, name));
-            if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                return (None, ptr);
-            }
-            if let Some(entity) = entity {
-                // Internal checking in case the entity quest barfed
-                if !matches!(
-                    entity.etype,
-                    XmlEntityType::XmlInternalParameterEntity
-                        | XmlEntityType::XmlExternalParameterEntity
-                ) {
-                    xml_warning_msg!(
-                        self,
-                        XmlParserErrors::XmlWarUndeclaredEntity,
-                        "%{}; is not a parameter entity\n",
-                        name
-                    );
-                }
-            } else {
-                // [ WFC: Entity Declared ]
-                // In a document without any DTD, a document with only an
-                // internal DTD subset which contains no parameter entity
-                // references, or a document with "standalone='yes'", ...
-                // ... The declaration of a parameter entity must precede
-                // any reference to it...
-                if self.standalone == 1 || (self.has_external_subset == 0 && self.has_perefs == 0) {
-                    xml_fatal_err_msg_str!(
-                        self,
-                        XmlParserErrors::XmlErrUndeclaredEntity,
-                        "PEReference: %{}; not found\n",
-                        name
-                    );
-                } else {
-                    // [ VC: Entity Declared ]
-                    // In a document with an external subset or external
-                    // parameter entities with "standalone='no'", ...
-                    // ... The declaration of a parameter entity must
-                    // precede any reference to it...
-                    xml_warning_msg!(
-                        self,
-                        XmlParserErrors::XmlWarUndeclaredEntity,
-                        "PEReference: %{}; not found\n",
-                        name
-                    );
-                    self.valid = 0;
-                }
-            }
-            self.has_perefs = 1;
-            (entity, ptr)
+        // Request the entity from SAX
+        let entity = self
+            .sax
+            .as_deref_mut()
+            .and_then(|sax| sax.get_parameter_entity)
+            .and_then(|get_parameter_entity| get_parameter_entity(self, name));
+        if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+            return (None, ptr);
         }
+        if let Some(entity) = entity {
+            // Internal checking in case the entity quest barfed
+            if !matches!(
+                entity.etype,
+                XmlEntityType::XmlInternalParameterEntity
+                    | XmlEntityType::XmlExternalParameterEntity
+            ) {
+                xml_warning_msg!(
+                    self,
+                    XmlParserErrors::XmlWarUndeclaredEntity,
+                    "%{}; is not a parameter entity\n",
+                    name
+                );
+            }
+        } else {
+            // [ WFC: Entity Declared ]
+            // In a document without any DTD, a document with only an
+            // internal DTD subset which contains no parameter entity
+            // references, or a document with "standalone='yes'", ...
+            // ... The declaration of a parameter entity must precede
+            // any reference to it...
+            if self.standalone == 1 || (self.has_external_subset == 0 && self.has_perefs == 0) {
+                xml_fatal_err_msg_str!(
+                    self,
+                    XmlParserErrors::XmlErrUndeclaredEntity,
+                    "PEReference: %{}; not found\n",
+                    name
+                );
+            } else {
+                // [ VC: Entity Declared ]
+                // In a document with an external subset or external
+                // parameter entities with "standalone='no'", ...
+                // ... The declaration of a parameter entity must
+                // precede any reference to it...
+                xml_warning_msg!(
+                    self,
+                    XmlParserErrors::XmlWarUndeclaredEntity,
+                    "PEReference: %{}; not found\n",
+                    name
+                );
+                self.valid = 0;
+            }
+        }
+        self.has_perefs = 1;
+        (entity, ptr)
     }
 
     /// Parse and handle entity references in content, depending on the SAX interface,

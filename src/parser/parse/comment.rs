@@ -20,109 +20,107 @@ impl XmlParserCtxt {
     /// [15] Comment ::= '<!--' ((Char - '-') | ('-' (Char - '-')))* '-->'
     /// ```
     #[doc(alias = "xmlParseCommentComplex")]
-    unsafe fn parse_comment_complex(&mut self, buf: &mut String) {
-        unsafe {
-            let mut ql = 0;
-            let mut rl = 0;
-            let mut l = 0;
-            let max_length = if self.options & XmlParserOption::XmlParseHuge as i32 != 0 {
-                XML_MAX_HUGE_LENGTH
-            } else {
-                XML_MAX_TEXT_LENGTH
-            };
+    fn parse_comment_complex(&mut self, buf: &mut String) {
+        let mut ql = 0;
+        let mut rl = 0;
+        let mut l = 0;
+        let max_length = if self.options & XmlParserOption::XmlParseHuge as i32 != 0 {
+            XML_MAX_HUGE_LENGTH
+        } else {
+            XML_MAX_TEXT_LENGTH
+        };
 
-            let inputid = self.input().unwrap().id;
+        let inputid = self.input().unwrap().id;
 
-            macro_rules! not_terminated {
-                () => {
-                    xml_fatal_err_msg_str!(
-                        self,
-                        XmlParserErrors::XmlErrCommentNotFinished,
-                        "Comment not terminated\n"
-                    );
-                    return;
-                };
-            }
-
-            let Some(mut q) = self.current_char(&mut ql) else {
-                not_terminated!();
-            };
-            if !xml_is_char(q as u32) {
-                xml_fatal_err_msg_int!(
-                    self,
-                    XmlParserErrors::XmlErrInvalidChar,
-                    format!("xmlParseComment: invalid xmlChar value {}\n", q as i32).as_str(),
-                    q as i32
-                );
-                return;
-            }
-            self.consume_char_if(|_, _| true);
-            let Some(mut r) = self.current_char(&mut rl) else {
-                not_terminated!();
-            };
-            if !xml_is_char(r as u32) {
-                xml_fatal_err_msg_int!(
-                    self,
-                    XmlParserErrors::XmlErrInvalidChar,
-                    format!("xmlParseComment: invalid xmlChar value {}\n", r as i32).as_str(),
-                    r as i32
-                );
-                return;
-            }
-            self.consume_char_if(|_, _| true);
-            let Some(mut cur) = self.current_char(&mut l) else {
-                not_terminated!();
-            };
-            while xml_is_char(cur as u32) && (cur != '>' || r != '-' || q != '-') {
-                if r == '-' && q == '-' {
-                    xml_fatal_err(self, XmlParserErrors::XmlErrHyphenInComment, None);
-                }
-                buf.push(q);
-                if buf.len() > max_length {
-                    xml_fatal_err_msg_str!(
-                        self,
-                        XmlParserErrors::XmlErrCommentNotFinished,
-                        "Comment too big found"
-                    );
-                    return;
-                }
-
-                q = r;
-                r = cur;
-
-                self.consume_char_if(|_, _| true);
-                cur = self.current_char(&mut l).unwrap_or('\0');
-            }
-            if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                return;
-            }
-            if cur == '\0' {
+        macro_rules! not_terminated {
+            () => {
                 xml_fatal_err_msg_str!(
                     self,
                     XmlParserErrors::XmlErrCommentNotFinished,
-                    "Comment not terminated \n<!--{}\n",
-                    buf
+                    "Comment not terminated\n"
                 );
-            } else if !xml_is_char(cur as u32) {
-                xml_fatal_err_msg_int!(
+                return;
+            };
+        }
+
+        let Some(mut q) = self.current_char(&mut ql) else {
+            not_terminated!();
+        };
+        if !xml_is_char(q as u32) {
+            xml_fatal_err_msg_int!(
+                self,
+                XmlParserErrors::XmlErrInvalidChar,
+                format!("xmlParseComment: invalid xmlChar value {}\n", q as i32).as_str(),
+                q as i32
+            );
+            return;
+        }
+        self.consume_char_if(|_, _| true);
+        let Some(mut r) = self.current_char(&mut rl) else {
+            not_terminated!();
+        };
+        if !xml_is_char(r as u32) {
+            xml_fatal_err_msg_int!(
+                self,
+                XmlParserErrors::XmlErrInvalidChar,
+                format!("xmlParseComment: invalid xmlChar value {}\n", r as i32).as_str(),
+                r as i32
+            );
+            return;
+        }
+        self.consume_char_if(|_, _| true);
+        let Some(mut cur) = self.current_char(&mut l) else {
+            not_terminated!();
+        };
+        while xml_is_char(cur as u32) && (cur != '>' || r != '-' || q != '-') {
+            if r == '-' && q == '-' {
+                xml_fatal_err(self, XmlParserErrors::XmlErrHyphenInComment, None);
+            }
+            buf.push(q);
+            if buf.len() > max_length {
+                xml_fatal_err_msg_str!(
                     self,
-                    XmlParserErrors::XmlErrInvalidChar,
-                    format!("xmlParseComment: invalid xmlChar value {}\n", cur as i32).as_str(),
-                    cur as i32
+                    XmlParserErrors::XmlErrCommentNotFinished,
+                    "Comment too big found"
                 );
-            } else {
-                if inputid != self.input().unwrap().id {
-                    xml_fatal_err_msg(
-                        self,
-                        XmlParserErrors::XmlErrEntityBoundary,
-                        "Comment doesn't start and stop in the same entity\n",
-                    );
-                }
-                self.skip_char();
-                if self.disable_sax == 0 {
-                    if let Some(comment) = self.sax.as_deref_mut().and_then(|sax| sax.comment) {
-                        comment(self, buf);
-                    }
+                return;
+            }
+
+            q = r;
+            r = cur;
+
+            self.consume_char_if(|_, _| true);
+            cur = self.current_char(&mut l).unwrap_or('\0');
+        }
+        if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+            return;
+        }
+        if cur == '\0' {
+            xml_fatal_err_msg_str!(
+                self,
+                XmlParserErrors::XmlErrCommentNotFinished,
+                "Comment not terminated \n<!--{}\n",
+                buf
+            );
+        } else if !xml_is_char(cur as u32) {
+            xml_fatal_err_msg_int!(
+                self,
+                XmlParserErrors::XmlErrInvalidChar,
+                format!("xmlParseComment: invalid xmlChar value {}\n", cur as i32).as_str(),
+                cur as i32
+            );
+        } else {
+            if inputid != self.input().unwrap().id {
+                xml_fatal_err_msg(
+                    self,
+                    XmlParserErrors::XmlErrEntityBoundary,
+                    "Comment doesn't start and stop in the same entity\n",
+                );
+            }
+            self.skip_char();
+            if self.disable_sax == 0 {
+                if let Some(comment) = self.sax.as_deref_mut().and_then(|sax| sax.comment) {
+                    comment(self, buf);
                 }
             }
         }
@@ -137,126 +135,126 @@ impl XmlParserCtxt {
     /// [15] Comment ::= '<!--' ((Char - '-') | ('-' (Char - '-')))* '-->'
     /// ```
     #[doc(alias = "xmlParseComment")]
-    pub(crate) unsafe fn parse_comment(&mut self) {
-        unsafe {
-            let max_length = if self.options & XmlParserOption::XmlParseHuge as i32 != 0 {
-                XML_MAX_HUGE_LENGTH
-            } else {
-                XML_MAX_TEXT_LENGTH
-            };
+    pub(crate) fn parse_comment(&mut self) {
+        let max_length = if self.options & XmlParserOption::XmlParseHuge as i32 != 0 {
+            XML_MAX_HUGE_LENGTH
+        } else {
+            XML_MAX_TEXT_LENGTH
+        };
 
-            // Check that there is a comment right here.
-            if !self.content_bytes().starts_with(b"<!") {
-                return;
-            }
-            self.advance(2);
-            if !self.content_bytes().starts_with(b"--") {
-                return;
-            }
-            let state = self.instate;
-            self.instate = XmlParserInputState::XmlParserComment;
-            let inputid = self.input().unwrap().id;
-            self.advance(2);
-            self.grow();
+        // Check that there is a comment right here.
+        if !self.content_bytes().starts_with(b"<!") {
+            return;
+        }
+        self.advance(2);
+        if !self.content_bytes().starts_with(b"--") {
+            return;
+        }
+        let state = self.instate;
+        self.instate = XmlParserInputState::XmlParserComment;
+        let inputid = self.input().unwrap().id;
+        self.advance(2);
+        self.grow();
 
-            // Accelerated common case where input don't need to be
-            // modified before passing it to the handler.
-            let mut buf = String::new();
-            let has_sax_comment = self.sax.as_deref().is_some_and(|sax| sax.comment.is_some());
-            let mut input = self.content_bytes();
-            while !input.is_empty() {
-                let mut len = input
-                    .iter()
-                    .take_while(|&&b| {
-                        b != b'-'
-                            && b != b'\r'
-                            && (b == b'\t' || b == b'\n' || (0x20..0x80).contains(&b))
-                    })
-                    .count();
-                if has_sax_comment {
+        // Accelerated common case where input don't need to be
+        // modified before passing it to the handler.
+        let mut buf = String::new();
+        let has_sax_comment = self.sax.as_deref().is_some_and(|sax| sax.comment.is_some());
+        let mut input = self.content_bytes();
+        while !input.is_empty() {
+            let mut len = input
+                .iter()
+                .take_while(|&&b| {
+                    b != b'-'
+                        && b != b'\r'
+                        && (b == b'\t' || b == b'\n' || (0x20..0x80).contains(&b))
+                })
+                .count();
+            if has_sax_comment {
+                unsafe {
                     // # Safety
                     // `input[..len]` contains only ASCII characters.
                     // Therefore, UTF-8 validation won't fail.
                     buf.push_str(from_utf8_unchecked(&input[..len]));
-                    if buf.len() > max_length {
-                        xml_fatal_err_msg_str!(
-                            self,
-                            XmlParserErrors::XmlErrCommentNotFinished,
-                            "Comment too big found"
-                        );
-                        return;
-                    }
                 }
-
-                if len < input.len() && input[len] == b'\r' {
-                    if len + 1 < input.len() && input[len + 1] == b'\n' {
-                        len += 1;
-                    } else {
-                        self.advance_with_line_handling(len);
-                        break;
-                    }
-                }
-                self.advance_with_line_handling(len);
-                self.shrink();
-                self.grow();
-                if self.instate == XmlParserInputState::XmlParserEOF {
+                if buf.len() > max_length {
+                    xml_fatal_err_msg_str!(
+                        self,
+                        XmlParserErrors::XmlErrCommentNotFinished,
+                        "Comment too big found"
+                    );
                     return;
                 }
-                input = self.content_bytes();
-                if !input.is_empty() && input[0] == b'-' {
-                    if input.len() >= 2 && input[1] == b'-' {
-                        if input.len() >= 3 && input[2] == b'>' {
-                            if self.input().unwrap().id != inputid {
-                                xml_fatal_err_msg(
-                                    self,
-                                    XmlParserErrors::XmlErrEntityBoundary,
-                                    "comment doesn't start and stop input the same entity\n",
-                                );
-                            }
-                            self.advance(3);
-                            if self.disable_sax == 0 {
-                                if let Some(comment) =
-                                    self.sax.as_deref_mut().and_then(|sax| sax.comment)
-                                {
-                                    comment(self, &buf);
-                                }
-                            }
-                            if !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                                self.instate = state;
-                            }
-                            return;
-                        }
-                        if !buf.is_empty() {
-                            xml_fatal_err_msg_str!(
-                                self,
-                                XmlParserErrors::XmlErrHyphenInComment,
-                                "Double hyphen within comment: <!--{}\n",
-                                buf
-                            );
-                        } else {
-                            xml_fatal_err_msg_str!(
-                                self,
-                                XmlParserErrors::XmlErrHyphenInComment,
-                                "Double hyphen within comment\n"
-                            );
-                        }
-                        if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                            return;
-                        }
-                        buf.push_str("--");
-                        self.advance(2);
-                    } else {
-                        buf.push('-');
-                        self.advance(1);
-                    }
+            }
+
+            if len < input.len() && input[len] == b'\r' {
+                if len + 1 < input.len() && input[len + 1] == b'\n' {
+                    len += 1;
                 } else {
+                    self.advance_with_line_handling(len);
                     break;
                 }
-                input = self.content_bytes();
             }
-            self.parse_comment_complex(&mut buf);
-            self.instate = state;
+            self.advance_with_line_handling(len);
+            self.shrink();
+            self.grow();
+            if self.instate == XmlParserInputState::XmlParserEOF {
+                return;
+            }
+            input = self.content_bytes();
+            if !input.is_empty() && input[0] == b'-' {
+                if input.len() >= 2 && input[1] == b'-' {
+                    if input.len() >= 3 && input[2] == b'>' {
+                        if self.input().unwrap().id != inputid {
+                            xml_fatal_err_msg(
+                                self,
+                                XmlParserErrors::XmlErrEntityBoundary,
+                                "comment doesn't start and stop input the same entity\n",
+                            );
+                        }
+                        self.advance(3);
+                        if self.disable_sax == 0 {
+                            if let Some(comment) =
+                                self.sax.as_deref_mut().and_then(|sax| sax.comment)
+                            {
+                                comment(self, &buf);
+                            }
+                        }
+                        if !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+                            self.instate = state;
+                        }
+                        return;
+                    }
+                    if !buf.is_empty() {
+                        xml_fatal_err_msg_str!(
+                            self,
+                            XmlParserErrors::XmlErrHyphenInComment,
+                            "Double hyphen within comment: <!--{}\n",
+                            buf
+                        );
+                    } else {
+                        xml_fatal_err_msg_str!(
+                            self,
+                            XmlParserErrors::XmlErrHyphenInComment,
+                            "Double hyphen within comment\n"
+                        );
+                    }
+                    if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+                        return;
+                    }
+                    buf.push_str("--");
+                    self.advance(2);
+                } else {
+                    buf.push('-');
+                    self.advance(1);
+                }
+            } else {
+                break;
+            }
+            input = self.content_bytes();
         }
+        self.parse_comment_complex(&mut buf);
+        self.instate = state;
     }
 }
 

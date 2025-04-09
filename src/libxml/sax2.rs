@@ -211,7 +211,7 @@ unsafe fn xml_sax2_err_memory(ctxt: XmlParserCtxtPtr, msg: &str) {
 
 /// Callback on internal subset declaration.
 #[doc(alias = "xmlSAX2InternalSubset")]
-pub unsafe fn xml_sax2_internal_subset(
+pub fn xml_sax2_internal_subset(
     ctxt: &mut XmlParserCtxt,
     name: Option<&str>,
     external_id: Option<&str>,
@@ -239,7 +239,7 @@ pub unsafe fn xml_sax2_internal_subset(
 
 /// Callback on external subset declaration.
 #[doc(alias = "xmlSAX2ExternalSubset")]
-pub unsafe fn xml_sax2_external_subset(
+pub fn xml_sax2_external_subset(
     ctxt: &mut XmlParserCtxt,
     name: Option<&str>,
     external_id: Option<&str>,
@@ -391,7 +391,7 @@ macro_rules! xml_fatal_err_msg {
 ///
 /// Returns the xmlEntityPtr if found.
 #[doc(alias = "xmlSAX2GetEntity")]
-pub unsafe fn xml_sax2_get_entity(ctxt: &mut XmlParserCtxt, name: &str) -> Option<XmlEntityPtr> {
+pub fn xml_sax2_get_entity(ctxt: &mut XmlParserCtxt, name: &str) -> Option<XmlEntityPtr> {
     unsafe {
         if ctxt.in_subset == 0 {
             let ret = xml_get_predefined_entity(name);
@@ -499,7 +499,7 @@ macro_rules! xml_warn_msg {
 
 /// An entity definition has been parsed
 #[doc(alias = "xmlSAX2EntityDecl")]
-pub unsafe fn xml_sax2_entity_decl(
+pub fn xml_sax2_entity_decl(
     ctxt: &mut XmlParserCtxt,
     name: &str,
     typ: XmlEntityType,
@@ -660,7 +660,7 @@ macro_rules! xml_err_valid {
 
 /// An attribute definition has been parsed
 #[doc(alias = "xmlSAX2AttributeDecl")]
-pub unsafe fn xml_sax2_attribute_decl(
+pub fn xml_sax2_attribute_decl(
     ctxt: &mut XmlParserCtxt,
     elem: &str,
     fullname: &str,
@@ -734,7 +734,8 @@ pub unsafe fn xml_sax2_attribute_decl(
 
 /// An element definition has been parsed
 #[doc(alias = "xmlSAX2ElementDecl")]
-pub unsafe fn xml_sax2_element_decl(
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub fn xml_sax2_element_decl(
     ctxt: &mut XmlParserCtxt,
     name: &str,
     typ: Option<XmlElementTypeVal>,
@@ -772,7 +773,7 @@ pub unsafe fn xml_sax2_element_decl(
 
 /// What to do when a notation declaration has been parsed.
 #[doc(alias = "xmlSAX2NotationDecl")]
-pub unsafe fn xml_sax2_notation_decl(
+pub fn xml_sax2_notation_decl(
     ctxt: &mut XmlParserCtxt,
     name: &str,
     public_id: Option<&str>,
@@ -830,7 +831,7 @@ pub unsafe fn xml_sax2_notation_decl(
 
 /// What to do when an unparsed entity declaration is parsed
 #[doc(alias = "xmlSAX2UnparsedEntityDecl")]
-pub unsafe fn xml_sax2_unparsed_entity_decl(
+pub fn xml_sax2_unparsed_entity_decl(
     ctxt: &mut XmlParserCtxt,
     name: &str,
     public_id: Option<&str>,
@@ -916,7 +917,7 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
 
 /// called when the document start being processed.
 #[doc(alias = "xmlSAX2StartDocument")]
-pub unsafe fn xml_sax2_start_document(ctxt: &mut XmlParserCtxt) {
+pub fn xml_sax2_start_document(ctxt: &mut XmlParserCtxt) {
     unsafe {
         if ctxt.html != 0 {
             #[cfg(feature = "html")]
@@ -971,7 +972,7 @@ pub unsafe fn xml_sax2_start_document(ctxt: &mut XmlParserCtxt) {
 
 /// called when the document end has been detected.
 #[doc(alias = "xmlSAX2EndDocument")]
-pub unsafe fn xml_sax2_end_document(ctxt: &mut XmlParserCtxt) {
+pub fn xml_sax2_end_document(ctxt: &mut XmlParserCtxt) {
     unsafe {
         let Some(mut my_doc) = ctxt.my_doc else {
             return;
@@ -1601,7 +1602,7 @@ unsafe fn xml_check_defaulted_attributes(
 /// called when an opening tag has been processed.
 #[doc(alias = "xmlSAX2StartElement")]
 #[cfg(any(feature = "sax1", feature = "html", feature = "libxml_writer",))]
-pub unsafe fn xml_sax2_start_element(
+pub fn xml_sax2_start_element(
     ctxt: &mut XmlParserCtxt,
     fullname: &str,
     atts: &[(String, Option<String>)],
@@ -1755,7 +1756,7 @@ pub unsafe fn xml_sax2_start_element(
 /// called when the end of an element has been detected.
 #[doc(alias = "xmlSAX2EndElement")]
 #[cfg(any(feature = "sax1", feature = "html", feature = "libxml_writer",))]
-pub unsafe fn xml_sax2_end_element(ctxt: &mut XmlParserCtxt, _name: &str) {
+pub fn xml_sax2_end_element(ctxt: &mut XmlParserCtxt, _name: &str) {
     unsafe {
         let cur = ctxt.node;
 
@@ -1777,7 +1778,7 @@ pub unsafe fn xml_sax2_end_element(ctxt: &mut XmlParserCtxt, _name: &str) {
 /// It provides the namespace information for the element, as well as
 /// the new namespace declarations on the element.
 #[doc(alias = "xmlSAX2StartElementNs")]
-pub unsafe fn xml_sax2_start_element_ns(
+pub fn xml_sax2_start_element_ns(
     ctxt: &mut XmlParserCtxt,
     localname: &str,
     prefix: Option<&str>,
@@ -1973,7 +1974,7 @@ pub unsafe fn xml_sax2_start_element_ns(
 
 /// Returns the newly allocated string or NULL if not needed or error
 #[doc(alias = "xmlSAX2TextNode")]
-unsafe fn xml_sax2_text_node(ctxt: &mut XmlParserCtxt, s: &str) -> Option<XmlNodePtr> {
+fn xml_sax2_text_node(ctxt: &mut XmlParserCtxt, s: &str) -> Option<XmlNodePtr> {
     unsafe {
         // Allocate
         let ret = if let Some(mut ret) = ctxt.free_elems {
@@ -2213,7 +2214,7 @@ unsafe fn xml_sax2_attribute_ns(
 /// SAX2 callback when an element end has been detected by the parser.
 /// It provides the namespace information for the element.
 #[doc(alias = "xmlSAX2EndElementNs")]
-pub unsafe fn xml_sax2_end_element_ns(
+pub fn xml_sax2_end_element_ns(
     ctxt: &mut XmlParserCtxt,
     _localname: &str,
     _prefix: Option<&str>,
@@ -2236,7 +2237,7 @@ pub unsafe fn xml_sax2_end_element_ns(
 
 /// Called when an entity xmlSAX2Reference is detected.
 #[doc(alias = "xmlSAX2Reference")]
-pub unsafe fn xml_sax2_reference(ctxt: &mut XmlParserCtxt, name: &str) {
+pub fn xml_sax2_reference(ctxt: &mut XmlParserCtxt, name: &str) {
     unsafe {
         let ret = if name.starts_with('#') {
             xml_new_char_ref(ctxt.my_doc, name)
@@ -2345,7 +2346,7 @@ unsafe fn xml_sax2_text(ctxt: &mut XmlParserCtxt, ch: &str, typ: XmlElementType)
 
 /// Receiving some chars from the parser.
 #[doc(alias = "xmlSAX2Characters")]
-pub unsafe fn xml_sax2_characters(ctxt: &mut XmlParserCtxt, ch: &str) {
+pub fn xml_sax2_characters(ctxt: &mut XmlParserCtxt, ch: &str) {
     unsafe {
         xml_sax2_text(ctxt, ch, XmlElementType::XmlTextNode);
     }
@@ -2354,17 +2355,13 @@ pub unsafe fn xml_sax2_characters(ctxt: &mut XmlParserCtxt, ch: &str) {
 /// Receiving some ignorable whitespaces from the parser.
 /// UNUSED: by default the DOM building will use xmlSAX2Characters
 #[doc(alias = "xmlSAX2IgnorableWhitespace")]
-pub unsafe fn xml_sax2_ignorable_whitespace(_ctx: &mut XmlParserCtxt, _ch: &str) {
+pub fn xml_sax2_ignorable_whitespace(_ctx: &mut XmlParserCtxt, _ch: &str) {
     /* let ctxt: xmlParserCtxtPtr = ctx as xmlParserCtxtPtr; */
 }
 
 /// A processing instruction has been parsed.
 #[doc(alias = "xmlSAX2ProcessingInstruction")]
-pub unsafe fn xml_sax2_processing_instruction(
-    ctxt: &mut XmlParserCtxt,
-    target: &str,
-    data: Option<&str>,
-) {
+pub fn xml_sax2_processing_instruction(ctxt: &mut XmlParserCtxt, target: &str, data: Option<&str>) {
     unsafe {
         let parent = ctxt.node;
 
@@ -2401,7 +2398,7 @@ pub unsafe fn xml_sax2_processing_instruction(
 
 /// A xmlSAX2Comment has been parsed.
 #[doc(alias = "xmlSAX2Comment")]
-pub unsafe fn xml_sax2_comment(ctxt: &mut XmlParserCtxt, value: &str) {
+pub fn xml_sax2_comment(ctxt: &mut XmlParserCtxt, value: &str) {
     unsafe {
         let parent = ctxt.node;
         let Some(mut ret) = xml_new_doc_comment(ctxt.my_doc, value) else {
@@ -2437,7 +2434,7 @@ pub unsafe fn xml_sax2_comment(ctxt: &mut XmlParserCtxt, value: &str) {
 
 /// Called when a pcdata block has been parsed
 #[doc(alias = "xmlSAX2CDataBlock")]
-pub unsafe fn xml_sax2_cdata_block(ctxt: &mut XmlParserCtxt, value: &str) {
+pub fn xml_sax2_cdata_block(ctxt: &mut XmlParserCtxt, value: &str) {
     unsafe {
         xml_sax2_text(ctxt, value, XmlElementType::XmlCDATASectionNode);
     }

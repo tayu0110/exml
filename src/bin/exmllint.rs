@@ -1446,7 +1446,7 @@ fn entity_decl_debug(
 
 /// An attribute definition has been parsed
 #[doc(alias = "attributeDeclDebug")]
-unsafe fn attribute_decl_debug(
+fn attribute_decl_debug(
     _ctx: &mut XmlParserCtxt,
     elem: &str,
     name: &str,
