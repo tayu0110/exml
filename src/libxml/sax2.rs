@@ -29,12 +29,7 @@ use crate::{
     },
     globals::StructuredError,
     html::tree::html_new_doc_no_dtd,
-    libxml::{
-        valid::{
-            xml_validate_attribute_decl, xml_validate_document_final, xml_validate_one_element,
-        },
-        xmlstring::XmlChar,
-    },
+    libxml::{valid::xml_validate_document_final, xmlstring::XmlChar},
     parser::{
         XML_COMPLETE_ATTRS, XML_MAX_TEXT_LENGTH, XML_SAX2_MAGIC, XML_SKIP_IDS, XML_STRING_TEXT,
         XML_SUBSTITUTE_REF, XML_VCTXT_DTD_VALIDATED, XmlParserCtxt, XmlParserCtxtPtr,
@@ -57,11 +52,9 @@ use crate::{
 use super::{
     globals::xml_register_node_default_value,
     valid::{
-        xml_add_element_decl, xml_add_id, xml_add_notation_decl, xml_add_ref,
-        xml_get_dtd_qelement_desc, xml_is_id, xml_is_ref, xml_valid_ctxt_normalize_attribute_value,
-        xml_valid_normalize_attribute_value, xml_validate_dtd_final, xml_validate_element_decl,
-        xml_validate_notation_decl, xml_validate_one_attribute, xml_validate_one_namespace,
-        xml_validate_root,
+        xml_add_notation_decl, xml_get_dtd_qelement_desc, xml_is_id, xml_is_ref,
+        xml_valid_ctxt_normalize_attribute_value, xml_valid_normalize_attribute_value,
+        xml_validate_notation_decl,
     },
 };
 
@@ -695,7 +688,7 @@ pub unsafe fn xml_sax2_attribute_decl(
         let (prefix, name) = split_qname(&mut *ctxt, fullname);
         ctxt.vctxt.valid = 1;
         let attr = if ctxt.in_subset == 1 {
-            ctxt.vctxt.add_attribute_decl(
+            ctxt.add_attribute_decl(
                 my_doc.int_subset,
                 elem,
                 name,
@@ -706,7 +699,7 @@ pub unsafe fn xml_sax2_attribute_decl(
                 tree,
             )
         } else if ctxt.in_subset == 2 {
-            ctxt.vctxt.add_attribute_decl(
+            ctxt.add_attribute_decl(
                 my_doc.ext_subset,
                 elem,
                 name,
@@ -732,11 +725,7 @@ pub unsafe fn xml_sax2_attribute_decl(
             }
             if ctxt.validate != 0 && ctxt.well_formed != 0 && my_doc.int_subset.is_some() {
                 if let Some(attr) = attr {
-                    ctxt.valid &= xml_validate_attribute_decl(
-                        &raw mut ctxt.vctxt,
-                        ctxt.my_doc.unwrap(),
-                        attr,
-                    );
+                    ctxt.valid &= ctxt.validate_attribute_decl(ctxt.my_doc.unwrap(), attr);
                 }
             }
         }
@@ -757,9 +746,9 @@ pub unsafe fn xml_sax2_element_decl(
         };
 
         let elem = if ctxt.in_subset == 1 {
-            xml_add_element_decl(&raw mut ctxt.vctxt, my_doc.int_subset, name, typ, content)
+            ctxt.add_element_decl(my_doc.int_subset, name, typ, content)
         } else if ctxt.in_subset == 2 {
-            xml_add_element_decl(&raw mut ctxt.vctxt, my_doc.ext_subset, name, typ, content)
+            ctxt.add_element_decl(my_doc.ext_subset, name, typ, content)
         } else {
             xml_fatal_err_msg!(
                 ctxt,
@@ -775,8 +764,7 @@ pub unsafe fn xml_sax2_element_decl(
                 ctxt.valid = 0;
             }
             if ctxt.validate != 0 && ctxt.well_formed != 0 && my_doc.int_subset.is_some() {
-                ctxt.valid &=
-                    xml_validate_element_decl(&raw mut ctxt.vctxt, ctxt.my_doc.unwrap(), elem);
+                ctxt.valid &= ctxt.validate_element_decl(ctxt.my_doc.unwrap(), elem);
             }
         }
     }
@@ -1259,8 +1247,7 @@ unsafe fn xml_sax2_attribute_internal(
             #[cfg(feature = "libxml_valid")]
             if nsret.is_some() && ctxt.validate != 0 && ctxt.well_formed != 0 {
                 if let Some(my_doc) = ctxt.my_doc.filter(|doc| doc.int_subset.is_some()) {
-                    ctxt.valid &= xml_validate_one_namespace(
-                        &raw mut ctxt.vctxt,
+                    ctxt.valid &= ctxt.validate_one_namespace(
                         my_doc,
                         ctxt.node.unwrap(),
                         prefix,
@@ -1325,8 +1312,7 @@ unsafe fn xml_sax2_attribute_internal(
             // Validate also for namespace decls, they are attributes from an XML-1.0 perspective
             if nsret.is_some() && ctxt.validate != 0 && ctxt.well_formed != 0 {
                 if let Some(my_doc) = ctxt.my_doc.filter(|doc| doc.int_subset.is_some()) {
-                    ctxt.valid &= xml_validate_one_namespace(
-                        &raw mut ctxt.vctxt,
+                    ctxt.valid &= ctxt.validate_one_namespace(
                         my_doc,
                         ctxt.node.unwrap(),
                         prefix,
@@ -1439,16 +1425,14 @@ unsafe fn xml_sax2_attribute_internal(
                             val = nvalnorm.into_owned();
                         }
 
-                        ctxt.valid &= xml_validate_one_attribute(
-                            &mut ctxt.vctxt,
+                        ctxt.valid &= ctxt.validate_one_attribute(
                             my_doc,
                             ctxt.node.unwrap(),
                             Some(ret),
                             &val,
                         );
                     } else {
-                        ctxt.valid &= xml_validate_one_attribute(
-                            &mut ctxt.vctxt,
+                        ctxt.valid &= ctxt.validate_one_attribute(
                             my_doc,
                             ctxt.node.unwrap(),
                             Some(ret),
@@ -1456,8 +1440,7 @@ unsafe fn xml_sax2_attribute_internal(
                         );
                     }
                 } else {
-                    ctxt.valid &= xml_validate_one_attribute(
-                        &mut ctxt.vctxt,
+                    ctxt.valid &= ctxt.validate_one_attribute(
                         my_doc,
                         ctxt.node.unwrap(),
                         Some(ret),
@@ -1494,11 +1477,11 @@ unsafe fn xml_sax2_attribute_internal(
                                 content
                             );
                         }
-                        xml_add_id(Some(&mut ctxt.vctxt), ctxt.my_doc.unwrap(), content, ret);
+                        ctxt.add_id(ctxt.my_doc.unwrap(), content, ret);
                     } else if xml_is_id(ctxt.my_doc, ctxt.node, Some(ret)) != 0 {
-                        xml_add_id(Some(&mut ctxt.vctxt), ctxt.my_doc.unwrap(), content, ret);
+                        ctxt.add_id(ctxt.my_doc.unwrap(), content, ret);
                     } else if xml_is_ref(ctxt.my_doc, ctxt.node, Some(ret)) != 0 {
-                        xml_add_ref(Some(&mut ctxt.vctxt), ctxt.my_doc.unwrap(), content, ret);
+                        ctxt.add_ref(ctxt.my_doc.unwrap(), content, ret);
                     }
                 }
             }
@@ -1755,14 +1738,14 @@ pub unsafe fn xml_sax2_start_element(
             // If it's the Document root, finish the DTD validation and
             // check the document root element for validity
             if ctxt.validate != 0 && ctxt.vctxt.flags & XML_VCTXT_DTD_VALIDATED as u32 == 0 {
-                let chk: i32 = xml_validate_dtd_final(&raw mut ctxt.vctxt, ctxt.my_doc.unwrap());
+                let chk: i32 = ctxt.validate_dtd_final(ctxt.my_doc.unwrap());
                 if chk <= 0 {
                     ctxt.valid = 0;
                 }
                 if chk < 0 {
                     ctxt.well_formed = 0;
                 }
-                ctxt.valid &= xml_validate_root(&raw mut ctxt.vctxt, ctxt.my_doc.unwrap());
+                ctxt.valid &= ctxt.validate_root(ctxt.my_doc.unwrap());
                 ctxt.vctxt.flags |= XML_VCTXT_DTD_VALIDATED as u32;
             }
         }
@@ -1781,11 +1764,7 @@ pub unsafe fn xml_sax2_end_element(ctxt: &mut XmlParserCtxt, _name: &str) {
         #[cfg(feature = "libxml_valid")]
         if ctxt.validate != 0 && ctxt.well_formed != 0 {
             if let Some(my_doc) = ctxt.my_doc.filter(|doc| doc.int_subset.is_some()) {
-                ctxt.valid &= xml_validate_one_element(
-                    &raw mut ctxt.vctxt,
-                    my_doc,
-                    cur.map(|cur| cur.into()),
-                );
+                ctxt.valid &= ctxt.validate_one_element(my_doc, cur.map(|cur| cur.into()));
             }
         }
 
@@ -1904,14 +1883,7 @@ pub unsafe fn xml_sax2_start_element_ns(
                     && ctxt.well_formed != 0
                     && my_doc.int_subset.is_some()
                 {
-                    ctxt.valid &= xml_validate_one_namespace(
-                        &raw mut ctxt.vctxt,
-                        my_doc,
-                        ret,
-                        prefix,
-                        ns,
-                        uri,
-                    );
+                    ctxt.valid &= ctxt.validate_one_namespace(my_doc, ret, prefix, ns, uri);
                 }
             }
         }
@@ -1985,14 +1957,14 @@ pub unsafe fn xml_sax2_start_element_ns(
             // If it's the Document root, finish the DTD validation and
             // check the document root element for validity
             if ctxt.validate != 0 && ctxt.vctxt.flags & XML_VCTXT_DTD_VALIDATED as u32 == 0 {
-                let chk: i32 = xml_validate_dtd_final(&raw mut ctxt.vctxt, ctxt.my_doc.unwrap());
+                let chk: i32 = ctxt.validate_dtd_final(ctxt.my_doc.unwrap());
                 if chk <= 0 {
                     ctxt.valid = 0;
                 }
                 if chk < 0 {
                     ctxt.well_formed = 0;
                 }
-                ctxt.valid &= xml_validate_root(&raw mut ctxt.vctxt, ctxt.my_doc.unwrap());
+                ctxt.valid &= ctxt.validate_root(ctxt.my_doc.unwrap());
                 ctxt.vctxt.flags |= XML_VCTXT_DTD_VALIDATED as u32;
             }
         }
@@ -2170,16 +2142,14 @@ unsafe fn xml_sax2_attribute_ns(
                             }
                         }
 
-                        ctxt.valid &= xml_validate_one_attribute(
-                            &mut ctxt.vctxt,
+                        ctxt.valid &= ctxt.validate_one_attribute(
                             ctxt.my_doc.unwrap(),
                             ctxt.node.unwrap(),
                             Some(ret),
                             &dup,
                         );
                     } else {
-                        ctxt.valid &= xml_validate_one_attribute(
-                            &mut ctxt.vctxt,
+                        ctxt.valid &= ctxt.validate_one_attribute(
                             ctxt.my_doc.unwrap(),
                             ctxt.node.unwrap(),
                             Some(ret),
@@ -2189,8 +2159,7 @@ unsafe fn xml_sax2_attribute_ns(
                 } else {
                     // if entities already have been substituted, then
                     // the attribute as passed is already normalized
-                    ctxt.valid &= xml_validate_one_attribute(
-                        &mut ctxt.vctxt,
+                    ctxt.valid &= ctxt.validate_one_attribute(
                         ctxt.my_doc.unwrap(),
                         ctxt.node.unwrap(),
                         Some(ret),
@@ -2231,11 +2200,11 @@ unsafe fn xml_sax2_attribute_ns(
                                 );
                             }
                         }
-                        xml_add_id(Some(&mut ctxt.vctxt), ctxt.my_doc.unwrap(), content, ret);
+                        ctxt.add_id(ctxt.my_doc.unwrap(), content, ret);
                     } else if xml_is_id(ctxt.my_doc, ctxt.node, Some(ret)) != 0 {
-                        xml_add_id(Some(&mut ctxt.vctxt), ctxt.my_doc.unwrap(), content, ret);
+                        ctxt.add_id(ctxt.my_doc.unwrap(), content, ret);
                     } else if xml_is_ref(ctxt.my_doc, ctxt.node, Some(ret)) != 0 {
-                        xml_add_ref(Some(&mut ctxt.vctxt), ctxt.my_doc.unwrap(), content, ret);
+                        ctxt.add_ref(ctxt.my_doc.unwrap(), content, ret);
                     }
                 }
             }
@@ -2258,11 +2227,7 @@ pub unsafe fn xml_sax2_end_element_ns(
         #[cfg(feature = "libxml_valid")]
         if ctxt.validate != 0 && ctxt.well_formed != 0 {
             if let Some(my_doc) = ctxt.my_doc.filter(|doc| doc.int_subset.is_some()) {
-                ctxt.valid &= xml_validate_one_element(
-                    &raw mut ctxt.vctxt,
-                    my_doc,
-                    ctxt.node.map(|node| node.into()),
-                );
+                ctxt.valid &= ctxt.validate_one_element(my_doc, ctxt.node.map(|node| node.into()));
             }
         }
 

@@ -222,9 +222,9 @@ pub type XmlValidStatePtr = *mut XmlValidState;
 #[cfg(feature = "libxml_regexp")]
 #[repr(C)]
 pub struct XmlValidState {
-    elem_decl: Option<XmlElementPtr>,  /* pointer to the content model */
-    node: XmlNodePtr,                  /* pointer to the current node */
-    exec: Option<Box<XmlRegExecCtxt>>, /* regexp runtime */
+    pub(crate) elem_decl: Option<XmlElementPtr>, /* pointer to the content model */
+    pub(crate) node: XmlNodePtr,                 /* pointer to the current node */
+    pub(crate) exec: Option<Box<XmlRegExecCtxt>>, /* regexp runtime */
 }
 #[cfg(not(feature = "libxml_regexp"))]
 #[repr(C)]
@@ -1880,7 +1880,7 @@ fn xml_validate_nmtoken_value_internal(doc: Option<XmlDocPtr>, value: &str) -> i
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateAttributeValueInternal")]
 #[cfg(feature = "libxml_valid")]
-fn xml_validate_attribute_value_internal(
+pub(crate) fn xml_validate_attribute_value_internal(
     doc: Option<XmlDocPtr>,
     typ: XmlAttributeType,
     value: &str,
@@ -1912,7 +1912,11 @@ fn xml_validate_attribute_value_internal(
 /// Returns the number of ID attributes found.
 #[doc(alias = "xmlScanIDAttributeDecl")]
 #[cfg(feature = "libxml_valid")]
-unsafe fn xml_scan_id_attribute_decl(ctxt: XmlValidCtxtPtr, elem: XmlElementPtr, err: i32) -> i32 {
+pub(crate) unsafe fn xml_scan_id_attribute_decl(
+    ctxt: XmlValidCtxtPtr,
+    elem: XmlElementPtr,
+    err: i32,
+) -> i32 {
     unsafe {
         let mut ret: i32 = 0;
 
@@ -3703,7 +3707,7 @@ macro_rules! DEBUG_VALID_MSG {
 /// This will dump the list of elements to the buffer
 /// Intended just for the debug routine
 #[doc(alias = "xmlSnprintfElements")]
-unsafe fn xml_snprintf_elements(
+pub(crate) unsafe fn xml_snprintf_elements(
     buf: *mut c_char,
     size: i32,
     node: Option<XmlGenericNodePtr>,

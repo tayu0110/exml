@@ -1451,11 +1451,9 @@ impl XmlTextReader {
                     // TODO use the BuildQName interface
                     let qname = format!("{prefix}:{}", node.name().unwrap());
                     (*self.ctxt).valid &=
-                        (*self.ctxt)
-                            .vctxt
-                            .push_element((*self.ctxt).my_doc.unwrap(), node, &qname);
+                        (*self.ctxt).vpush_element((*self.ctxt).my_doc.unwrap(), node, &qname);
                 } else {
-                    (*self.ctxt).valid &= (*self.ctxt).vctxt.push_element(
+                    (*self.ctxt).valid &= (*self.ctxt).vpush_element(
                         (*self.ctxt).my_doc.unwrap(),
                         node,
                         &node.name().unwrap(),
@@ -1514,11 +1512,9 @@ impl XmlTextReader {
                     // TODO use the BuildQName interface
                     let qname = format!("{prefix}:{}", node.name().unwrap());
                     (*self.ctxt).valid &=
-                        (*self.ctxt)
-                            .vctxt
-                            .pop_element((*self.ctxt).my_doc, Some(node), &qname);
+                        (*self.ctxt).vpop_element((*self.ctxt).my_doc, Some(node), &qname);
                 } else {
-                    (*self.ctxt).valid &= (*self.ctxt).vctxt.pop_element(
+                    (*self.ctxt).valid &= (*self.ctxt).vpop_element(
                         (*self.ctxt).my_doc,
                         Some(node),
                         &node.name().unwrap(),
@@ -1670,7 +1666,7 @@ impl XmlTextReader {
                 && !self.ctxt.is_null()
                 && (*self.ctxt).validate == 1
             {
-                (*self.ctxt).valid &= (*self.ctxt).vctxt.push_cdata(data);
+                (*self.ctxt).valid &= (*self.ctxt).vpush_cdata(data);
             }
             #[cfg(feature = "schema")]
             if self.validate == XmlTextReaderValidate::ValidateRng && !self.rng_valid_ctxt.is_null()

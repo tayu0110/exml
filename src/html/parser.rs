@@ -3284,7 +3284,7 @@ unsafe fn html_init_parser_ctxt(
         (*ctxt).keep_blanks = get_keep_blanks_default_value();
         (*ctxt).html = 1;
         (*ctxt).vctxt.flags = XML_VCTXT_USE_PCTXT as _;
-        (*ctxt).vctxt.user_data = Some(GenericErrorContext::new(ctxt));
+        (*ctxt).vctxt.user_data = None;
         (*ctxt).vctxt.error = Some(parser_validity_error);
         (*ctxt).vctxt.warning = Some(parser_validity_warning);
         (*ctxt).record_info = 0;
@@ -5217,7 +5217,7 @@ pub unsafe fn html_ctxt_reset(ctxt: HtmlParserCtxtPtr) {
         (*ctxt).ns_well_formed = 1;
         (*ctxt).disable_sax = 0;
         (*ctxt).valid = 1;
-        (*ctxt).vctxt.user_data = Some(GenericErrorContext::new(ctxt));
+        (*ctxt).vctxt.user_data = None;
         (*ctxt).vctxt.flags = XML_VCTXT_USE_PCTXT as _;
         (*ctxt).vctxt.error = Some(parser_validity_error);
         (*ctxt).vctxt.warning = Some(parser_validity_warning);

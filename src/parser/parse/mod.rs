@@ -65,9 +65,7 @@ use crate::{
     error::XmlParserErrors,
     globals::GenericErrorContext,
     html::parser::{__html_parse_content, HtmlParserOption, html_create_memory_parser_ctxt},
-    libxml::{
-        chvalid::xml_is_blank_char, globals::xml_default_sax_locator, valid::xml_validate_element,
-    },
+    libxml::{chvalid::xml_is_blank_char, globals::xml_default_sax_locator},
     parser::XmlParserOption,
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlDocProperties, XmlDocPtr, XmlElementType,
@@ -639,7 +637,7 @@ pub(crate) unsafe fn xml_parse_balanced_chunk_memory_internal(
                     {
                         if let Some(my_doc) = oldctxt.my_doc.filter(|doc| doc.int_subset.is_some())
                         {
-                            oldctxt.valid &= xml_validate_element(&mut oldctxt.vctxt, my_doc, cur);
+                            oldctxt.valid &= oldctxt.validate_element(my_doc, cur);
                         }
                     }
                     now.set_parent(None);

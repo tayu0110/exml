@@ -1941,7 +1941,7 @@ unsafe fn xml_init_sax_parser_ctxt(
         }
 
         (*ctxt).vctxt.flags = XML_VCTXT_USE_PCTXT as _;
-        (*ctxt).vctxt.user_data = Some(GenericErrorContext::new(ctxt));
+        (*ctxt).vctxt.user_data = None;
         (*ctxt).vctxt.error = Some(parser_validity_error);
         (*ctxt).vctxt.warning = Some(parser_validity_warning);
         if (*ctxt).validate != 0 {

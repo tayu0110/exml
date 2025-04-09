@@ -54,6 +54,7 @@ mod push;
 #[cfg(feature = "libxml_push")]
 mod qname;
 mod sax;
+mod valid;
 
 use std::{
     ffi::CStr,
