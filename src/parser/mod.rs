@@ -584,13 +584,7 @@ pub unsafe fn xml_read_file(
 ) -> Option<XmlDocPtr> {
     unsafe {
         xml_init_parser();
-        let ctxt: XmlParserCtxtPtr = xml_create_url_parser_ctxt(Some(filename), options);
-        if ctxt.is_null() {
-            return None;
-        }
-        let res = (*ctxt).do_read(None, encoding, options);
-        xml_free_parser_ctxt(ctxt);
-        res
+        xml_create_url_parser_ctxt(Some(filename), options)?.do_read(None, encoding, options)
     }
 }
 

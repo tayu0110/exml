@@ -7,7 +7,7 @@ use crate::{
         set_indent_tree_output, set_keep_blanks_default_value, set_line_numbers_default_value,
         set_pedantic_parser_default_value, set_substitute_entities_default_value,
     },
-    parser::{XmlParserCtxtPtr, XmlSAXHandler, xml_free_parser_ctxt, xml_init_parser},
+    parser::{XmlSAXHandler, xml_init_parser},
     tree::{XmlDocPtr, XmlDtdPtr, XmlGenericNodePtr, xml_free_doc},
 };
 
@@ -167,33 +167,31 @@ pub unsafe fn xml_sax_user_parse_file(
     filename: Option<&str>,
 ) -> i32 {
     unsafe {
-        use crate::parser::{xml_create_file_parser_ctxt, xml_free_parser_ctxt};
+        use crate::parser::xml_create_file_parser_ctxt;
 
         let ret: i32;
 
-        let ctxt: XmlParserCtxtPtr = xml_create_file_parser_ctxt(filename);
-        if ctxt.is_null() {
+        let Some(mut ctxt) = xml_create_file_parser_ctxt(filename) else {
             return -1;
-        }
-        (*ctxt).sax = sax;
-        (*ctxt).detect_sax2();
+        };
+        ctxt.sax = sax;
+        ctxt.detect_sax2();
 
-        (*ctxt).user_data = user_data;
+        ctxt.user_data = user_data;
 
-        (*ctxt).parse_document();
+        ctxt.parse_document();
 
-        if (*ctxt).well_formed != 0 {
+        if ctxt.well_formed != 0 {
             ret = 0;
-        } else if (*ctxt).err_no != 0 {
-            ret = (*ctxt).err_no;
+        } else if ctxt.err_no != 0 {
+            ret = ctxt.err_no;
         } else {
             ret = -1;
         }
-        (*ctxt).sax = None;
-        if let Some(my_doc) = (*ctxt).my_doc.take() {
+        ctxt.sax = None;
+        if let Some(my_doc) = ctxt.my_doc.take() {
             xml_free_doc(my_doc);
         }
-        xml_free_parser_ctxt(ctxt);
 
         ret
     }
@@ -392,52 +390,47 @@ pub unsafe fn xml_sax_parse_file_with_data(
 
         xml_init_parser();
 
-        let ctxt: XmlParserCtxtPtr = xml_create_file_parser_ctxt(filename);
-        if ctxt.is_null() {
-            return None;
-        }
+        let mut ctxt = xml_create_file_parser_ctxt(filename)?;
         if let Some(sax) = sax {
-            (*ctxt).sax = Some(sax);
+            ctxt.sax = Some(sax);
         }
-        (*ctxt).detect_sax2();
+        ctxt.detect_sax2();
         if !data.is_null() {
-            (*ctxt)._private = data;
+            ctxt._private = data;
         }
 
-        if (*ctxt).directory.is_none() {
+        if ctxt.directory.is_none() {
             if let Some(filename) = filename {
                 if let Some(dir) = xml_parser_get_directory(filename) {
-                    (*ctxt).directory = Some(dir.to_string_lossy().into_owned());
+                    ctxt.directory = Some(dir.to_string_lossy().into_owned());
                 }
             }
         }
 
-        (*ctxt).recovery = recovery;
+        ctxt.recovery = recovery;
+        ctxt.parse_document();
 
-        (*ctxt).parse_document();
-
-        let ret = if (*ctxt).well_formed != 0 || recovery != 0 {
-            let ret = (*ctxt).my_doc;
-            if (*ctxt).input().unwrap().buf.is_some() {
+        let ret = if ctxt.well_formed != 0 || recovery != 0 {
+            let ret = ctxt.my_doc;
+            if ctxt.input().unwrap().buf.is_some() {
                 if let Some(mut ret) = ret {
-                    if (*ctxt).input().unwrap().buf.as_ref().unwrap().compressed > 0 {
+                    if ctxt.input().unwrap().buf.as_ref().unwrap().compressed > 0 {
                         ret.compression = 9;
                     } else {
-                        ret.compression = (*ctxt).input().unwrap().buf.as_ref().unwrap().compressed;
+                        ret.compression = ctxt.input().unwrap().buf.as_ref().unwrap().compressed;
                     }
                 }
             }
             ret
         } else {
-            if let Some(my_doc) = (*ctxt).my_doc.take() {
+            if let Some(my_doc) = ctxt.my_doc.take() {
                 xml_free_doc(my_doc);
             }
             None
         };
         if replaced {
-            (*ctxt).sax = None;
+            ctxt.sax = None;
         }
-        xml_free_parser_ctxt(ctxt);
 
         ret
     }
@@ -466,29 +459,25 @@ pub(crate) unsafe fn xml_sax_parse_entity(
 
         let replaced = sax.is_some();
 
-        let ctxt: XmlParserCtxtPtr = xml_create_file_parser_ctxt(filename);
-        if ctxt.is_null() {
-            return None;
-        }
+        let mut ctxt = xml_create_file_parser_ctxt(filename)?;
         if let Some(sax) = sax {
-            (*ctxt).sax = Some(sax);
-            (*ctxt).user_data = None;
+            ctxt.sax = Some(sax);
+            ctxt.user_data = None;
         }
 
-        (*ctxt).parse_ext_parsed_ent();
+        ctxt.parse_ext_parsed_ent();
 
-        let ret = if (*ctxt).well_formed != 0 {
-            (*ctxt).my_doc
+        let ret = if ctxt.well_formed != 0 {
+            ctxt.my_doc
         } else {
-            if let Some(my_doc) = (*ctxt).my_doc.take() {
+            if let Some(my_doc) = ctxt.my_doc.take() {
                 xml_free_doc(my_doc);
             }
             None
         };
         if replaced {
-            (*ctxt).sax = None;
+            ctxt.sax = None;
         }
-        xml_free_parser_ctxt(ctxt);
 
         ret
     }

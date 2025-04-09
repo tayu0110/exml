@@ -1439,21 +1439,20 @@ unsafe fn sax_parse_test(
             html_free_parser_ctxt(ctxt);
             ret = 0;
         } else {
-            let ctxt: XmlParserCtxtPtr = xml_create_file_parser_ctxt(Some(filename));
+            let mut ctxt = xml_create_file_parser_ctxt(Some(filename)).unwrap();
             let mut sax = XmlSAXHandler::default();
             std::ptr::copy(&EMPTY_SAXHANDLER_STRUCT, &mut sax, 1);
-            (*ctxt).sax = Some(Box::new(sax));
-            (*ctxt).use_options(options);
-            (*ctxt).parse_document();
-            ret = if (*ctxt).well_formed != 0 {
+            ctxt.sax = Some(Box::new(sax));
+            ctxt.use_options(options);
+            ctxt.parse_document();
+            ret = if ctxt.well_formed != 0 {
                 0
             } else {
-                (*ctxt).err_no
+                ctxt.err_no
             };
-            if let Some(my_doc) = (*ctxt).my_doc {
+            if let Some(my_doc) = ctxt.my_doc {
                 xml_free_doc(my_doc);
             }
-            xml_free_parser_ctxt(ctxt);
         }
 
         #[cfg(not(feature = "html"))]
@@ -1490,7 +1489,7 @@ unsafe fn sax_parse_test(
                 html_free_parser_ctxt(ctxt);
                 ret = 0;
             } else {
-                let ctxt: XmlParserCtxtPtr = xml_create_file_parser_ctxt(Some(filename));
+                let mut ctxt = xml_create_file_parser_ctxt(Some(filename)).unwrap();
                 let mut sax = XmlSAXHandler::default();
                 if options & XmlParserOption::XmlParseSAX1 as i32 != 0 {
                     std::ptr::copy(&DEBUG_SAXHANDLER_STRUCT, &mut sax, 1);
@@ -1498,18 +1497,17 @@ unsafe fn sax_parse_test(
                 } else {
                     std::ptr::copy(&DEBUG_SAX2_HANDLER_STRUCT, &mut sax, 1);
                 }
-                (*ctxt).sax = Some(Box::new(sax));
-                (*ctxt).use_options(options);
-                (*ctxt).parse_document();
-                ret = if (*ctxt).well_formed != 0 {
+                ctxt.sax = Some(Box::new(sax));
+                ctxt.use_options(options);
+                ctxt.parse_document();
+                ret = if ctxt.well_formed != 0 {
                     0
                 } else {
-                    (*ctxt).err_no
+                    ctxt.err_no
                 };
-                if let Some(my_doc) = (*ctxt).my_doc {
+                if let Some(my_doc) = ctxt.my_doc {
                     xml_free_doc(my_doc);
                 }
-                xml_free_parser_ctxt(ctxt);
             }
             #[cfg(not(feature = "html"))]
             {

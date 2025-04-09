@@ -2033,7 +2033,7 @@ pub unsafe fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
 ///
 /// Returns the new parser context or NULL
 #[doc(alias = "xmlCreateFileParserCtxt")]
-pub unsafe fn xml_create_file_parser_ctxt(filename: Option<&str>) -> XmlParserCtxtPtr {
+pub unsafe fn xml_create_file_parser_ctxt(filename: Option<&str>) -> Option<XmlParserCtxt> {
     unsafe { xml_create_url_parser_ctxt(filename, 0) }
 }
 
@@ -2071,34 +2071,37 @@ pub unsafe fn xml_create_io_parser_ctxt(
 ///
 /// Returns the new parser context or NULL
 #[doc(alias = "xmlCreateURLParserCtxt")]
-pub unsafe fn xml_create_url_parser_ctxt(filename: Option<&str>, options: i32) -> XmlParserCtxtPtr {
+pub unsafe fn xml_create_url_parser_ctxt(
+    filename: Option<&str>,
+    options: i32,
+) -> Option<XmlParserCtxt> {
     unsafe {
-        let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
-        if ctxt.is_null() {
+        let new: XmlParserCtxtPtr = xml_new_parser_ctxt();
+        if new.is_null() {
             xml_err_memory(None, Some("cannot allocate parser context"));
-            return null_mut();
+            return None;
         }
+        let mut ctxt = XmlParserCtxt::default();
+        std::ptr::copy(new, &mut ctxt, 1);
+        xml_free(new as _);
 
         if options != 0 {
-            (*ctxt).use_options_internal(options, None);
+            ctxt.use_options_internal(options, None);
         }
-        (*ctxt).linenumbers = 1;
+        ctxt.linenumbers = 1;
 
-        let Some(input_stream) = xml_load_external_entity(filename, None, &mut *ctxt) else {
-            xml_free_parser_ctxt(ctxt);
-            return null_mut();
-        };
+        let input_stream = xml_load_external_entity(filename, None, &mut ctxt)?;
 
-        (*ctxt).input_push(input_stream);
-        if (*ctxt).directory.is_none() {
+        ctxt.input_push(input_stream);
+        if ctxt.directory.is_none() {
             if let Some(filename) = filename {
                 if let Some(directory) = xml_parser_get_directory(filename) {
-                    (*ctxt).directory = Some(directory.to_string_lossy().into_owned());
+                    ctxt.directory = Some(directory.to_string_lossy().into_owned());
                 }
             }
         }
 
-        ctxt
+        Some(ctxt)
     }
 }
 
