@@ -217,28 +217,26 @@ pub unsafe fn xml_sax_user_parse_memory(
 
         xml_init_parser();
 
-        let ctxt: XmlParserCtxtPtr = xml_create_memory_parser_ctxt(buffer);
-        if ctxt.is_null() {
+        let Some(mut ctxt) = xml_create_memory_parser_ctxt(buffer) else {
             return -1;
-        }
-        (*ctxt).sax = sax;
-        (*ctxt).detect_sax2();
-        (*ctxt).user_data = user_data;
+        };
+        ctxt.sax = sax;
+        ctxt.detect_sax2();
+        ctxt.user_data = user_data;
 
-        (*ctxt).parse_document();
+        ctxt.parse_document();
 
-        if (*ctxt).well_formed != 0 {
+        if ctxt.well_formed != 0 {
             ret = 0;
-        } else if (*ctxt).err_no != 0 {
-            ret = (*ctxt).err_no;
+        } else if ctxt.err_no != 0 {
+            ret = ctxt.err_no;
         } else {
             ret = -1;
         }
-        (*ctxt).sax = None;
-        if let Some(my_doc) = (*ctxt).my_doc.take() {
+        ctxt.sax = None;
+        if let Some(my_doc) = ctxt.my_doc.take() {
             xml_free_doc(my_doc);
         }
-        xml_free_parser_ctxt(ctxt);
 
         ret
     }
@@ -263,28 +261,24 @@ pub unsafe fn xml_sax_parse_doc(
         let replaced = sax.is_some();
         let mut oldsax = None;
 
-        let ctxt: XmlParserCtxtPtr = xml_create_doc_parser_ctxt(cur);
-        if ctxt.is_null() {
-            return None;
-        }
+        let mut ctxt = xml_create_doc_parser_ctxt(cur)?;
         if let Some(sax) = sax {
-            oldsax = (*ctxt).sax.replace(sax);
-            (*ctxt).user_data = None;
+            oldsax = ctxt.sax.replace(sax);
+            ctxt.user_data = None;
         }
-        (*ctxt).detect_sax2();
-        (*ctxt).parse_document();
-        let ret = if (*ctxt).well_formed != 0 || recovery != 0 {
-            (*ctxt).my_doc
+        ctxt.detect_sax2();
+        ctxt.parse_document();
+        let ret = if ctxt.well_formed != 0 || recovery != 0 {
+            ctxt.my_doc
         } else {
-            if let Some(my_doc) = (*ctxt).my_doc.take() {
+            if let Some(my_doc) = ctxt.my_doc.take() {
                 xml_free_doc(my_doc);
             }
             None
         };
         if replaced {
-            (*ctxt).sax = oldsax;
+            ctxt.sax = oldsax;
         }
-        xml_free_parser_ctxt(ctxt);
 
         ret
     }
@@ -328,34 +322,29 @@ pub unsafe fn xml_sax_parse_memory_with_data(
 
         xml_init_parser();
 
-        let ctxt: XmlParserCtxtPtr = xml_create_memory_parser_ctxt(buffer);
-        if ctxt.is_null() {
-            return None;
-        }
+        let mut ctxt = xml_create_memory_parser_ctxt(buffer)?;
         if let Some(sax) = sax {
-            (*ctxt).sax = Some(sax);
+            ctxt.sax = Some(sax);
         }
-        (*ctxt).detect_sax2();
+        ctxt.detect_sax2();
         if !data.is_null() {
-            (*ctxt)._private = data;
+            ctxt._private = data;
         }
 
-        (*ctxt).recovery = recovery;
+        ctxt.recovery = recovery;
+        ctxt.parse_document();
 
-        (*ctxt).parse_document();
-
-        let ret = if (*ctxt).well_formed != 0 || recovery != 0 {
-            (*ctxt).my_doc
+        let ret = if ctxt.well_formed != 0 || recovery != 0 {
+            ctxt.my_doc
         } else {
-            if let Some(my_doc) = (*ctxt).my_doc.take() {
+            if let Some(my_doc) = ctxt.my_doc.take() {
                 xml_free_doc(my_doc);
             }
             None
         };
         if replaced {
-            (*ctxt).sax = None;
+            ctxt.sax = None;
         }
-        xml_free_parser_ctxt(ctxt);
 
         ret
     }
@@ -674,7 +663,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
     use std::ffi::CStr;
 
     use crate::{
-        error::{XmlError, XmlParserErrors},
+        error::XmlParserErrors,
         parser::{XmlParserInputState, XmlParserOption, xml_fatal_err},
         tree::{NodeCommon, XML_XML_NAMESPACE, XmlDocProperties, xml_new_doc, xml_new_doc_node},
     };
@@ -695,25 +684,23 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
             return -1;
         }
 
-        let ctxt: XmlParserCtxtPtr =
-            xml_create_memory_parser_ctxt(CStr::from_ptr(string as *const i8).to_bytes().to_vec());
-        std::ptr::write(&mut (*ctxt).last_error, XmlError::default());
-        if ctxt.is_null() {
+        let Some(mut ctxt) =
+            xml_create_memory_parser_ctxt(CStr::from_ptr(string as *const i8).to_bytes().to_vec())
+        else {
             return -1;
-        }
-        (*ctxt).user_data = None;
+        };
+        ctxt.user_data = None;
         if let Some(sax) = sax {
-            oldsax = (*ctxt).sax.replace(sax);
+            oldsax = ctxt.sax.replace(sax);
             if user_data.is_some() {
-                (*ctxt).user_data = user_data;
+                ctxt.user_data = user_data;
             }
         }
         let Some(mut new_doc) = xml_new_doc(Some("1.0")) else {
-            xml_free_parser_ctxt(ctxt);
             return -1;
         };
         new_doc.properties = XmlDocProperties::XmlDocInternal as i32;
-        (*ctxt).use_options_internal(XmlParserOption::XmlParseNoDict as i32, None);
+        ctxt.use_options_internal(XmlParserOption::XmlParseNoDict as i32, None);
         // doc.is_null() is only supported for historic reasons
         if let Some(doc) = doc {
             new_doc.int_subset = doc.int_subset;
@@ -721,57 +708,56 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
         }
         let Some(new_root) = xml_new_doc_node(Some(new_doc), None, "pseudoroot", None) else {
             if replaced {
-                (*ctxt).sax = oldsax;
+                ctxt.sax = oldsax;
             }
-            xml_free_parser_ctxt(ctxt);
             new_doc.int_subset = None;
             new_doc.ext_subset = None;
             xml_free_doc(new_doc);
             return -1;
         };
         new_doc.add_child(new_root.into());
-        (*ctxt).node_push(new_root);
+        ctxt.node_push(new_root);
         // doc.is_null() is only supported for historic reasons
         if let Some(mut doc) = doc {
-            (*ctxt).my_doc = Some(new_doc);
+            ctxt.my_doc = Some(new_doc);
             new_doc.children().unwrap().set_document(Some(doc));
             // Ensure that doc has XML spec namespace
             let d = doc;
             doc.search_ns_by_href(Some(d), XML_XML_NAMESPACE);
             new_doc.old_ns = doc.old_ns;
         } else {
-            (*ctxt).my_doc = Some(new_doc);
+            ctxt.my_doc = Some(new_doc);
         }
-        (*ctxt).instate = XmlParserInputState::XmlParserContent;
-        (*ctxt).input_id = 2;
-        (*ctxt).depth = depth;
+        ctxt.instate = XmlParserInputState::XmlParserContent;
+        ctxt.input_id = 2;
+        ctxt.depth = depth;
 
         // Doing validity checking on chunk doesn't make sense
-        (*ctxt).validate = 0;
-        (*ctxt).loadsubset = 0;
-        (*ctxt).detect_sax2();
+        ctxt.validate = 0;
+        ctxt.loadsubset = 0;
+        ctxt.detect_sax2();
 
         if let Some(mut doc) = doc {
             let content = doc.children.take();
-            (*ctxt).parse_content();
+            ctxt.parse_content();
             doc.children = content;
         } else {
-            (*ctxt).parse_content();
+            ctxt.parse_content();
         }
-        if (*ctxt).current_byte() == b'<' && (*ctxt).nth_byte(1) == b'/' {
-            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrNotWellBalanced, None);
-        } else if (*ctxt).current_byte() != 0 {
-            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrExtraContent, None);
+        if ctxt.current_byte() == b'<' && ctxt.nth_byte(1) == b'/' {
+            xml_fatal_err(&mut ctxt, XmlParserErrors::XmlErrNotWellBalanced, None);
+        } else if ctxt.current_byte() != 0 {
+            xml_fatal_err(&mut ctxt, XmlParserErrors::XmlErrExtraContent, None);
         }
-        if new_doc.children != (*ctxt).node.map(|node| node.into()) {
-            xml_fatal_err(&mut *ctxt, XmlParserErrors::XmlErrNotWellBalanced, None);
+        if new_doc.children != ctxt.node.map(|node| node.into()) {
+            xml_fatal_err(&mut ctxt, XmlParserErrors::XmlErrNotWellBalanced, None);
         }
 
-        if (*ctxt).well_formed == 0 {
-            if (*ctxt).err_no == 0 {
+        if ctxt.well_formed == 0 {
+            if ctxt.err_no == 0 {
                 ret = 1;
             } else {
-                ret = (*ctxt).err_no;
+                ret = ctxt.err_no;
             }
         } else {
             ret = 0;
@@ -793,9 +779,8 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
         }
 
         if replaced {
-            (*ctxt).sax = oldsax;
+            ctxt.sax = oldsax;
         }
-        xml_free_parser_ctxt(ctxt);
         new_doc.int_subset = None;
         new_doc.ext_subset = None;
         // This leaks the namespace list if doc.is_null()

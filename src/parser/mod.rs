@@ -569,13 +569,7 @@ pub unsafe fn xml_read_doc(
     unsafe {
         xml_init_parser();
 
-        let ctxt: XmlParserCtxtPtr = xml_create_doc_parser_ctxt(cur);
-        if ctxt.is_null() {
-            return None;
-        }
-        let res = (*ctxt).do_read(url, encoding, options);
-        xml_free_parser_ctxt(ctxt);
-        res
+        xml_create_doc_parser_ctxt(cur)?.do_read(url, encoding, options)
     }
 }
 
@@ -612,14 +606,7 @@ pub unsafe fn xml_read_memory(
 ) -> Option<XmlDocPtr> {
     unsafe {
         xml_init_parser();
-        let ctxt: XmlParserCtxtPtr = xml_create_memory_parser_ctxt(buffer);
-
-        if ctxt.is_null() {
-            return None;
-        }
-        let res = (*ctxt).do_read(url, encoding, options);
-        xml_free_parser_ctxt(ctxt);
-        res
+        xml_create_memory_parser_ctxt(buffer)?.do_read(url, encoding, options)
     }
 }
 

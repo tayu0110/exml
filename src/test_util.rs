@@ -29,7 +29,7 @@ use crate::{
         xmlschemastypes::{XmlSchemaValPtr, XmlSchemaWhitespaceValueType},
         xmlstring::XmlChar,
     },
-    parser::{XmlParserCtxtPtr, xml_free_parser_ctxt, xml_new_parser_ctxt},
+    parser::{XmlParserCtxtPtr, xml_free_parser_ctxt},
     tree::{XmlAttr, XmlDoc, XmlDtd, XmlElementContentPtr, XmlNode, XmlNs},
     xpath::{
         XmlNodeSet, XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathObjectPtr,
@@ -537,30 +537,6 @@ pub(crate) unsafe fn desret_html_parser_ctxt_ptr(val: HtmlParserCtxtPtr) {
 #[cfg(feature = "html")]
 pub(crate) fn gen_const_xml_char_ptr_ptr(_no: i32, _nr: i32) -> *mut *mut XmlChar {
     null_mut()
-}
-
-#[cfg(feature = "html")]
-pub(crate) unsafe fn gen_html_parser_ctxt_ptr(no: i32, _nr: i32) -> HtmlParserCtxtPtr {
-    unsafe {
-        use crate::html::parser::html_create_memory_parser_ctxt;
-
-        if no == 0 {
-            return xml_new_parser_ctxt();
-        }
-        if no == 1 {
-            return html_create_memory_parser_ctxt("<html/>".as_bytes().to_vec());
-        }
-        null_mut()
-    }
-}
-
-#[cfg(feature = "html")]
-pub(crate) unsafe fn des_html_parser_ctxt_ptr(_no: i32, val: HtmlParserCtxtPtr, _nr: i32) {
-    unsafe {
-        if !val.is_null() {
-            html_free_parser_ctxt(val);
-        }
-    }
 }
 
 pub(crate) fn gen_const_xml_char_ptr(no: i32, _nr: i32) -> *const XmlChar {

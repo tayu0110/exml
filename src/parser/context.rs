@@ -2106,32 +2106,28 @@ pub unsafe fn xml_create_url_parser_ctxt(filename: Option<&str>, options: i32) -
 ///
 /// Returns the new parser context or NULL
 #[doc(alias = "xmlCreateMemoryParserCtxt")]
-pub unsafe fn xml_create_memory_parser_ctxt(buffer: Vec<u8>) -> XmlParserCtxtPtr {
+pub unsafe fn xml_create_memory_parser_ctxt(buffer: Vec<u8>) -> Option<XmlParserCtxt> {
     unsafe {
         if buffer.is_empty() {
-            return null_mut();
+            return None;
         }
 
-        let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
-        if ctxt.is_null() {
-            return null_mut();
+        let new = xml_new_parser_ctxt();
+        if new.is_null() {
+            return None;
         }
+        let mut ctxt = XmlParserCtxt::default();
+        std::ptr::copy(new, &mut ctxt, 1);
+        xml_free(new as _);
 
-        let Some(buf) = XmlParserInputBuffer::from_memory(buffer, XmlCharEncoding::None) else {
-            xml_free_parser_ctxt(ctxt);
-            return null_mut();
-        };
-
-        let Some(mut input) = XmlParserInput::new(Some(&mut *ctxt)) else {
-            xml_free_parser_ctxt(ctxt);
-            return null_mut();
-        };
+        let buf = XmlParserInputBuffer::from_memory(buffer, XmlCharEncoding::None)?;
+        let mut input = XmlParserInput::new(Some(&mut ctxt))?;
         input.filename = None;
         input.buf = Some(buf);
         input.reset_base();
 
-        (*ctxt).input_push(input);
-        ctxt
+        ctxt.input_push(input);
+        Some(ctxt)
     }
 }
 
@@ -2139,7 +2135,7 @@ pub unsafe fn xml_create_memory_parser_ctxt(buffer: Vec<u8>) -> XmlParserCtxtPtr
 ///
 /// Returns the new parser context or NULL
 #[doc(alias = "xmlCreateDocParserCtxt")]
-pub unsafe fn xml_create_doc_parser_ctxt(cur: Vec<u8>) -> XmlParserCtxtPtr {
+pub unsafe fn xml_create_doc_parser_ctxt(cur: Vec<u8>) -> Option<XmlParserCtxt> {
     unsafe { xml_create_memory_parser_ctxt(cur) }
 }
 
