@@ -2418,160 +2418,158 @@ fn xml_parse_xml_catalog_one_node(
 /// Examines an XML tree node of a catalog and build a Catalog entry from it adding it to its parent.
 /// The examination can be recursive.
 #[doc(alias = "xmlParseXMLCatalogNode")]
-unsafe fn xml_parse_xml_catalog_node(
+fn xml_parse_xml_catalog_node(
     cur: XmlNodePtr,
     mut prefer: XmlCatalogPrefer,
     parent: Option<XmlCatalogEntry>,
     cgroup: Option<XmlCatalogEntry>,
 ) {
-    unsafe {
-        let entry = if cur.name().as_deref() == Some("group") {
-            let mut pref: XmlCatalogPrefer = XmlCatalogPrefer::None;
+    let entry = if cur.name().as_deref() == Some("group") {
+        let mut pref: XmlCatalogPrefer = XmlCatalogPrefer::None;
 
-            if let Some(prop) = cur.get_prop("prefer") {
-                if prop == "system" {
-                    prefer = XmlCatalogPrefer::System;
-                } else if prop == "public" {
-                    prefer = XmlCatalogPrefer::Public;
-                } else {
-                    xml_catalog_err!(
-                        parent.as_ref().map_or(null(), |p| Arc::as_ptr(&p.node))
-                            as *mut RwLock<CatalogEntryListNode>,
-                        Some(cur.into()),
-                        XmlParserErrors::XmlCatalogPreferValue,
-                        "Invalid value for prefer: '{}'\n",
-                        prop,
-                    );
-                }
-                pref = prefer;
-            }
-            let prop = cur.get_prop("id");
-            let base = cur.get_ns_prop("base", Some(XML_XML_NAMESPACE));
-            Some(xml_new_catalog_entry(
-                XmlCatalogEntryType::XmlCataGroup,
-                prop.as_deref(),
-                base.as_deref(),
-                None,
-                pref,
-                cgroup,
-            ))
-        } else if cur.name().as_deref() == Some("public") {
-            xml_parse_xml_catalog_one_node(
-                cur,
-                XmlCatalogEntryType::XmlCataPublic,
-                "public",
-                Some("publicId"),
-                "uri",
-                prefer,
-                cgroup,
-            )
-        } else if cur.name().as_deref() == Some("system") {
-            xml_parse_xml_catalog_one_node(
-                cur,
-                XmlCatalogEntryType::XmlCataSystem,
-                "system",
-                Some("systemId"),
-                "uri",
-                prefer,
-                cgroup,
-            )
-        } else if cur.name().as_deref() == Some("rewriteSystem") {
-            xml_parse_xml_catalog_one_node(
-                cur,
-                XmlCatalogEntryType::XmlCataRewriteSystem,
-                "rewriteSystem",
-                Some("systemIdStartString"),
-                "rewritePrefix",
-                prefer,
-                cgroup,
-            )
-        } else if cur.name().as_deref() == Some("delegatePublic") {
-            xml_parse_xml_catalog_one_node(
-                cur,
-                XmlCatalogEntryType::XmlCataDelegatePublic,
-                "delegatePublic",
-                Some("publicIdStartString"),
-                "catalog",
-                prefer,
-                cgroup,
-            )
-        } else if cur.name().as_deref() == Some("delegateSystem") {
-            xml_parse_xml_catalog_one_node(
-                cur,
-                XmlCatalogEntryType::XmlCataDelegateSystem,
-                "delegateSystem",
-                Some("systemIdStartString"),
-                "catalog",
-                prefer,
-                cgroup,
-            )
-        } else if cur.name().as_deref() == Some("uri") {
-            xml_parse_xml_catalog_one_node(
-                cur,
-                XmlCatalogEntryType::XmlCataURI,
-                "uri",
-                Some("name"),
-                "uri",
-                prefer,
-                cgroup,
-            )
-        } else if cur.name().as_deref() == Some("rewriteURI") {
-            xml_parse_xml_catalog_one_node(
-                cur,
-                XmlCatalogEntryType::XmlCataRewriteURI,
-                "rewriteURI",
-                Some("uriStartString"),
-                "rewritePrefix",
-                prefer,
-                cgroup,
-            )
-        } else if cur.name().as_deref() == Some("delegateURI") {
-            xml_parse_xml_catalog_one_node(
-                cur,
-                XmlCatalogEntryType::XmlCataDelegateURI,
-                "delegateURI",
-                Some("uriStartString"),
-                "catalog",
-                prefer,
-                cgroup,
-            )
-        } else if cur.name().as_deref() == Some("nextCatalog") {
-            xml_parse_xml_catalog_one_node(
-                cur,
-                XmlCatalogEntryType::XmlCataNextCatalog,
-                "nextCatalog",
-                None,
-                "catalog",
-                prefer,
-                cgroup,
-            )
-        } else {
-            None
-        };
-        if let Some(entry) = entry {
-            if let Some(parent) = parent.as_ref() {
-                entry.node.write().unwrap().parent = Some(Arc::downgrade(&parent.node));
-                if parent.node.read().unwrap().children.is_none() {
-                    parent.node.write().unwrap().children = Some(entry.node.clone());
-                } else {
-                    let mut prev = None;
-                    let mut cur = parent.node.write().unwrap().children.clone();
-                    while let Some(now) = cur.clone() {
-                        (prev, cur) = (cur, now.read().unwrap().next.clone());
-                    }
-                    prev.unwrap().write().unwrap().next = Some(entry.node.clone());
-                }
-            }
-            if entry.node.read().unwrap().typ == XmlCatalogEntryType::XmlCataGroup {
-                // Recurse to propagate prefer to the subtree
-                // (xml:base handling is automated)
-                xml_parse_xml_catalog_node_list(
-                    cur.children.map(|c| XmlNodePtr::try_from(c).unwrap()),
-                    prefer,
-                    parent,
-                    Some(entry),
+        if let Some(prop) = cur.get_prop("prefer") {
+            if prop == "system" {
+                prefer = XmlCatalogPrefer::System;
+            } else if prop == "public" {
+                prefer = XmlCatalogPrefer::Public;
+            } else {
+                xml_catalog_err!(
+                    parent.as_ref().map_or(null(), |p| Arc::as_ptr(&p.node))
+                        as *mut RwLock<CatalogEntryListNode>,
+                    Some(cur.into()),
+                    XmlParserErrors::XmlCatalogPreferValue,
+                    "Invalid value for prefer: '{}'\n",
+                    prop,
                 );
             }
+            pref = prefer;
+        }
+        let prop = cur.get_prop("id");
+        let base = cur.get_ns_prop("base", Some(XML_XML_NAMESPACE));
+        Some(xml_new_catalog_entry(
+            XmlCatalogEntryType::XmlCataGroup,
+            prop.as_deref(),
+            base.as_deref(),
+            None,
+            pref,
+            cgroup,
+        ))
+    } else if cur.name().as_deref() == Some("public") {
+        xml_parse_xml_catalog_one_node(
+            cur,
+            XmlCatalogEntryType::XmlCataPublic,
+            "public",
+            Some("publicId"),
+            "uri",
+            prefer,
+            cgroup,
+        )
+    } else if cur.name().as_deref() == Some("system") {
+        xml_parse_xml_catalog_one_node(
+            cur,
+            XmlCatalogEntryType::XmlCataSystem,
+            "system",
+            Some("systemId"),
+            "uri",
+            prefer,
+            cgroup,
+        )
+    } else if cur.name().as_deref() == Some("rewriteSystem") {
+        xml_parse_xml_catalog_one_node(
+            cur,
+            XmlCatalogEntryType::XmlCataRewriteSystem,
+            "rewriteSystem",
+            Some("systemIdStartString"),
+            "rewritePrefix",
+            prefer,
+            cgroup,
+        )
+    } else if cur.name().as_deref() == Some("delegatePublic") {
+        xml_parse_xml_catalog_one_node(
+            cur,
+            XmlCatalogEntryType::XmlCataDelegatePublic,
+            "delegatePublic",
+            Some("publicIdStartString"),
+            "catalog",
+            prefer,
+            cgroup,
+        )
+    } else if cur.name().as_deref() == Some("delegateSystem") {
+        xml_parse_xml_catalog_one_node(
+            cur,
+            XmlCatalogEntryType::XmlCataDelegateSystem,
+            "delegateSystem",
+            Some("systemIdStartString"),
+            "catalog",
+            prefer,
+            cgroup,
+        )
+    } else if cur.name().as_deref() == Some("uri") {
+        xml_parse_xml_catalog_one_node(
+            cur,
+            XmlCatalogEntryType::XmlCataURI,
+            "uri",
+            Some("name"),
+            "uri",
+            prefer,
+            cgroup,
+        )
+    } else if cur.name().as_deref() == Some("rewriteURI") {
+        xml_parse_xml_catalog_one_node(
+            cur,
+            XmlCatalogEntryType::XmlCataRewriteURI,
+            "rewriteURI",
+            Some("uriStartString"),
+            "rewritePrefix",
+            prefer,
+            cgroup,
+        )
+    } else if cur.name().as_deref() == Some("delegateURI") {
+        xml_parse_xml_catalog_one_node(
+            cur,
+            XmlCatalogEntryType::XmlCataDelegateURI,
+            "delegateURI",
+            Some("uriStartString"),
+            "catalog",
+            prefer,
+            cgroup,
+        )
+    } else if cur.name().as_deref() == Some("nextCatalog") {
+        xml_parse_xml_catalog_one_node(
+            cur,
+            XmlCatalogEntryType::XmlCataNextCatalog,
+            "nextCatalog",
+            None,
+            "catalog",
+            prefer,
+            cgroup,
+        )
+    } else {
+        None
+    };
+    if let Some(entry) = entry {
+        if let Some(parent) = parent.as_ref() {
+            entry.node.write().unwrap().parent = Some(Arc::downgrade(&parent.node));
+            if parent.node.read().unwrap().children.is_none() {
+                parent.node.write().unwrap().children = Some(entry.node.clone());
+            } else {
+                let mut prev = None;
+                let mut cur = parent.node.write().unwrap().children.clone();
+                while let Some(now) = cur.clone() {
+                    (prev, cur) = (cur, now.read().unwrap().next.clone());
+                }
+                prev.unwrap().write().unwrap().next = Some(entry.node.clone());
+            }
+        }
+        if entry.node.read().unwrap().typ == XmlCatalogEntryType::XmlCataGroup {
+            // Recurse to propagate prefer to the subtree
+            // (xml:base handling is automated)
+            xml_parse_xml_catalog_node_list(
+                cur.children.map(|c| XmlNodePtr::try_from(c).unwrap()),
+                prefer,
+                parent,
+                Some(entry),
+            );
         }
     }
 }
@@ -2580,26 +2578,24 @@ unsafe fn xml_parse_xml_catalog_node(
 /// a list of Catalog entry from it adding it to the parent.
 /// The examination will recurse to examine node subtrees.
 #[doc(alias = "xmlParseXMLCatalogNodeList")]
-unsafe fn xml_parse_xml_catalog_node_list(
+fn xml_parse_xml_catalog_node_list(
     mut cur: Option<XmlNodePtr>,
     prefer: XmlCatalogPrefer,
     parent: Option<XmlCatalogEntry>,
     cgroup: Option<XmlCatalogEntry>,
 ) {
-    unsafe {
-        while let Some(cur_node) = cur {
-            if cur_node.ns.is_some_and(|ns| {
-                ns.href()
-                    .is_some_and(|href| href == XML_CATALOGS_NAMESPACE.to_str().unwrap())
-            }) {
-                xml_parse_xml_catalog_node(cur_node, prefer, parent.clone(), cgroup.clone());
-            }
-            cur = cur_node
-                .next()
-                .map(|node| XmlNodePtr::try_from(node).unwrap());
+    while let Some(cur_node) = cur {
+        if cur_node.ns.is_some_and(|ns| {
+            ns.href()
+                .is_some_and(|href| href == XML_CATALOGS_NAMESPACE.to_str().unwrap())
+        }) {
+            xml_parse_xml_catalog_node(cur_node, prefer, parent.clone(), cgroup.clone());
         }
-        /* TODO: sort the list according to REWRITE lengths and prefer value */
+        cur = cur_node
+            .next()
+            .map(|node| XmlNodePtr::try_from(node).unwrap());
     }
+    /* TODO: sort the list according to REWRITE lengths and prefer value */
 }
 
 /// Parses the catalog file to extract the XML tree and then analyze the
