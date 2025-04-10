@@ -1601,7 +1601,7 @@ impl XmlXIncludeCtxt {
             let content = content.as_ref();
             match std::str::from_utf8(content) {
                 Ok(content) if content.chars().all(|c| xml_is_char(c as u32)) => {
-                    node.add_content_len(content.as_ptr(), content.len() as i32);
+                    node.add_content(content);
                 }
                 _ => {
                     xml_xinclude_err!(

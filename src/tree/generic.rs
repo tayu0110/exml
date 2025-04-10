@@ -4,13 +4,7 @@ use std::{
     ptr::NonNull,
 };
 
-use crate::{
-    libxml::{
-        valid::xml_remove_id,
-        xmlstring::{XmlChar, xml_strlen},
-    },
-    uri::build_uri,
-};
+use crate::{libxml::valid::xml_remove_id, uri::build_uri};
 
 use super::{
     XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE, XmlAttr, XmlAttrPtr, XmlAttribute, XmlAttributePtr,
@@ -134,32 +128,14 @@ pub trait NodeCommon {
     /// Append the extra substring to the node content.
     ///
     /// # Note
-    /// In contrast to xmlNodeSetContent(), @content is supposed to be raw text,
-    /// so unescaped XML special chars are allowed, entity references are not supported.
-    #[doc(alias = "xmlNodeAddContent")]
-    unsafe fn add_content(&mut self, content: *const XmlChar) {
-        unsafe {
-            if content.is_null() {
-                return;
-            }
-            let len: i32 = xml_strlen(content);
-            self.add_content_len(content, len);
-        }
-    }
-
-    /// Append the extra substring to the node content.
-    ///
-    /// # Note
     /// In contrast to xmlNodeSetContentLen(), `content` is supposed to be raw text,
     /// so unescaped XML special chars are allowed, entity references are not supported.
-    #[doc(alias = "xmlNodeAddContentLen")]
-    unsafe fn add_content_len(&mut self, content: *const XmlChar, len: i32) {
+    #[doc(alias = "xmlNodeAddContent", alias = "xmlNodeAddContentLen")]
+    unsafe fn add_content(&mut self, content: &str) {
         unsafe {
-            if len <= 0 {
+            if content.is_empty() {
                 return;
             }
-            let content =
-                std::str::from_utf8(std::slice::from_raw_parts(content, len as usize)).unwrap();
             match self.element_type() {
                 XmlElementType::XmlDocumentFragNode | XmlElementType::XmlElementNode => {
                     let last = self.last();
@@ -243,7 +219,7 @@ pub trait NodeCommon {
                         && self.name() == cur.name()
                 }) {
                     let content = cur.content.as_deref().unwrap();
-                    cur_node.add_content_len(content.as_ptr(), content.len() as i32);
+                    cur_node.add_content(content);
                     xml_free_node(cur);
                     return Some(cur_node.into());
                 }
@@ -253,7 +229,7 @@ pub trait NodeCommon {
                         && self.last() != Some(cur.into())
                 }) {
                     let content = cur.content.as_deref().unwrap();
-                    last.add_content_len(content.as_ptr(), content.len() as i32);
+                    last.add_content(content);
                     xml_free_node(cur);
                     return self.last();
                 }
@@ -279,7 +255,7 @@ pub trait NodeCommon {
             }) {
                 let node = XmlNodePtr::try_from(cur).unwrap();
                 let content = node.content.as_deref().unwrap();
-                cur_node.add_content_len(content.as_ptr(), content.len() as i32);
+                cur_node.add_content(content);
                 xml_free_node(cur);
                 return Some(cur_node.into());
             }
@@ -301,7 +277,7 @@ pub trait NodeCommon {
                         .filter(|&attr| attr != cur)
                     {
                         // different instance, destroy it (attributes must be unique)
-                        (*lastattr).unlink();
+                        lastattr.unlink();
                         xml_free_prop(lastattr);
                     }
                     match lastattr {
@@ -1382,15 +1358,13 @@ impl XmlGenericNodePtr {
     /// Set (or reset) the base URI of a node, i.e. the value of the xml:base attribute.
     #[doc(alias = "xmlNodeSetBase")]
     #[cfg(any(feature = "libxml_tree", feature = "xinclude"))]
-    pub unsafe fn set_base(self, uri: Option<&str>) {
-        unsafe {
-            if let Ok(mut node) = XmlNodePtr::try_from(self) {
-                node.set_base(uri);
-            } else if let Ok(mut attr) = XmlAttrPtr::try_from(self) {
-                attr.set_base(uri);
-            } else if let Ok(mut doc) = XmlDocPtr::try_from(self) {
-                doc.set_base(uri);
-            }
+    pub fn set_base(self, uri: Option<&str>) {
+        if let Ok(mut node) = XmlNodePtr::try_from(self) {
+            node.set_base(uri);
+        } else if let Ok(mut attr) = XmlAttrPtr::try_from(self) {
+            attr.set_base(uri);
+        } else if let Ok(mut doc) = XmlDocPtr::try_from(self) {
+            doc.set_base(uri);
         }
     }
 
@@ -1428,9 +1402,7 @@ impl XmlGenericNodePtr {
                         && cur.name() == self.last().unwrap().name()
                 }) {
                     let content = node.content.as_deref().unwrap();
-                    self.last()
-                        .unwrap()
-                        .add_content_len(content.as_ptr(), content.len() as i32);
+                    self.last().unwrap().add_content(content);
                     // if it's the only child, nothing more to be done.
                     let Some(next) = node.next() else {
                         xml_free_node(node);
@@ -1515,7 +1487,7 @@ impl XmlGenericNodePtr {
                 .filter(|(cur, elem)| cur.name() == elem.name())
             {
                 let content = elem.content.as_deref().unwrap();
-                cur.add_content_len(content.as_ptr(), content.len() as i32);
+                cur.add_content(content);
                 xml_free_node(elem);
                 return Some(cur.into());
             }
@@ -1596,7 +1568,7 @@ impl XmlGenericNodePtr {
                         && self.name() == p.name()
                 }) {
                     let content = elem.content.as_deref().unwrap();
-                    prev.add_content_len(content.as_ptr(), content.len() as i32);
+                    prev.add_content(content);
                     xml_free_node(elem);
                     return Some(prev);
                 }
@@ -1661,7 +1633,7 @@ impl XmlGenericNodePtr {
                 let mut elem = XmlNodePtr::try_from(elem).unwrap();
                 if matches!(self.element_type(), XmlElementType::XmlTextNode) {
                     let content = elem.content.as_deref().unwrap();
-                    self.add_content_len(content.as_ptr(), content.len() as i32);
+                    self.add_content(content);
                     xml_free_node(elem);
                     return Some(self);
                 }

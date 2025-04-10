@@ -1608,7 +1608,7 @@ impl XmlNodePtr {
                 let mut cur = XmlNodePtr::try_from(cur).unwrap();
                 let elem = XmlNodePtr::try_from(elem).unwrap();
                 let content = elem.content.as_deref().unwrap();
-                cur.add_content_len(content.as_ptr(), content.len() as i32);
+                cur.add_content(content);
                 xml_free_node(elem);
                 return Some(cur.into());
             } else if matches!(elem.element_type(), XmlElementType::XmlAttributeNode) {
@@ -1682,7 +1682,7 @@ impl XmlNodePtr {
                         && self.name() == p.name()
                 }) {
                     let content = elem.content.as_deref().unwrap();
-                    prev.add_content_len(content.as_ptr(), content.len() as i32);
+                    prev.add_content(content);
                     xml_free_node(elem);
                     return Some(prev);
                 }
@@ -1742,7 +1742,7 @@ impl XmlNodePtr {
                 let elem = XmlNodePtr::try_from(elem).unwrap();
                 if matches!(self.element_type(), XmlElementType::XmlTextNode) {
                     let content = elem.content.as_deref().unwrap();
-                    self.add_content_len(content.as_ptr(), content.len() as i32);
+                    self.add_content(content);
                     xml_free_node(elem);
                     return Some(XmlGenericNodePtr::from(*self));
                 }
@@ -1815,9 +1815,7 @@ impl XmlNodePtr {
                 {
                     let node = XmlNodePtr::try_from(cur).unwrap();
                     let content = node.content.as_deref().unwrap();
-                    self.last()
-                        .unwrap()
-                        .add_content_len(content.as_ptr(), content.len() as i32);
+                    self.last().unwrap().add_content(content);
                     // if it's the only child, nothing more to be done.
                     let Some(next) = node.next else {
                         xml_free_node(node);
@@ -1986,53 +1984,51 @@ impl XmlNodePtr {
     /// Set (or reset) the base URI of a node, i.e. the value of the xml:base attribute.
     #[doc(alias = "xmlNodeSetBase")]
     #[cfg(any(feature = "libxml_tree", feature = "xinclude"))]
-    pub unsafe fn set_base(&mut self, uri: Option<&str>) {
-        unsafe {
-            use crate::uri::path_to_uri;
+    pub fn set_base(&mut self, uri: Option<&str>) {
+        use crate::uri::path_to_uri;
 
-            match self.element_type() {
-                XmlElementType::XmlTextNode
-                | XmlElementType::XmlCDATASectionNode
-                | XmlElementType::XmlCommentNode
-                | XmlElementType::XmlDocumentTypeNode
-                | XmlElementType::XmlDocumentFragNode
-                | XmlElementType::XmlNotationNode
-                | XmlElementType::XmlDTDNode
-                | XmlElementType::XmlElementDecl
-                | XmlElementType::XmlAttributeDecl
-                | XmlElementType::XmlEntityDecl
-                | XmlElementType::XmlPINode
-                | XmlElementType::XmlEntityRefNode
-                | XmlElementType::XmlEntityNode
-                | XmlElementType::XmlNamespaceDecl
-                | XmlElementType::XmlXIncludeStart
-                | XmlElementType::XmlXIncludeEnd => {
-                    return;
-                }
-                XmlElementType::XmlAttributeNode => {
-                    let mut attr = XmlAttrPtr::try_from(XmlGenericNodePtr::from(*self)).unwrap();
-                    attr.set_base(uri);
-                    return;
-                }
-                XmlElementType::XmlElementNode => {}
-                XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
-                    let mut doc = XmlDocPtr::try_from(XmlGenericNodePtr::from(*self)).unwrap();
-                    doc.set_base(uri);
-                    return;
-                }
-                _ => unreachable!(),
-            }
-
-            let doc = self.doc;
-            let Some(ns) = self.search_ns_by_href(doc, XML_XML_NAMESPACE) else {
+        match self.element_type() {
+            XmlElementType::XmlTextNode
+            | XmlElementType::XmlCDATASectionNode
+            | XmlElementType::XmlCommentNode
+            | XmlElementType::XmlDocumentTypeNode
+            | XmlElementType::XmlDocumentFragNode
+            | XmlElementType::XmlNotationNode
+            | XmlElementType::XmlDTDNode
+            | XmlElementType::XmlElementDecl
+            | XmlElementType::XmlAttributeDecl
+            | XmlElementType::XmlEntityDecl
+            | XmlElementType::XmlPINode
+            | XmlElementType::XmlEntityRefNode
+            | XmlElementType::XmlEntityNode
+            | XmlElementType::XmlNamespaceDecl
+            | XmlElementType::XmlXIncludeStart
+            | XmlElementType::XmlXIncludeEnd => {
                 return;
-            };
-            if let Some(uri) = uri {
-                let fixed = path_to_uri(uri);
-                self.set_ns_prop(Some(ns), "base", Some(&fixed));
-            } else {
-                self.set_ns_prop(Some(ns), "base", None);
             }
+            XmlElementType::XmlAttributeNode => {
+                let mut attr = XmlAttrPtr::try_from(XmlGenericNodePtr::from(*self)).unwrap();
+                attr.set_base(uri);
+                return;
+            }
+            XmlElementType::XmlElementNode => {}
+            XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
+                let mut doc = XmlDocPtr::try_from(XmlGenericNodePtr::from(*self)).unwrap();
+                doc.set_base(uri);
+                return;
+            }
+            _ => unreachable!(),
+        }
+
+        let doc = self.doc;
+        let Some(ns) = self.search_ns_by_href(doc, XML_XML_NAMESPACE) else {
+            return;
+        };
+        if let Some(uri) = uri {
+            let fixed = path_to_uri(uri);
+            self.set_ns_prop(Some(ns), "base", Some(&fixed));
+        } else {
+            self.set_ns_prop(Some(ns), "base", None);
         }
     }
 

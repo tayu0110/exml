@@ -2522,16 +2522,14 @@ impl XmlShellCtxt<'_> {
     /// Returns 0
     #[doc(alias = "xmlShellSetBase")]
     #[cfg(feature = "libxml_tree")]
-    unsafe fn xml_shell_set_base(
+    fn xml_shell_set_base(
         &mut self,
         arg: Option<&str>,
         node: XmlGenericNodePtr,
         _node2: Option<XmlGenericNodePtr>,
     ) -> i32 {
-        unsafe {
-            node.set_base(arg);
-            0
-        }
+        node.set_base(arg);
+        0
     }
 }
 

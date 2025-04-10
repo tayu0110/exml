@@ -1564,7 +1564,7 @@ pub unsafe fn xml_text_merge(
                     return Some(first);
                 }
                 let content = second.content.as_deref().unwrap();
-                first.add_content_len(content.as_ptr(), content.len() as i32);
+                first.add_content(content);
                 second.unlink();
                 xml_free_node(second);
                 Some(first)

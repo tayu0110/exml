@@ -237,7 +237,7 @@ impl XmlDoc {
     /// Set (or reset) the base URI of a node, i.e. the value of the xml:base attribute.
     #[doc(alias = "xmlNodeSetBase")]
     #[cfg(any(feature = "libxml_tree", feature = "xinclude"))]
-    pub unsafe fn set_base(&mut self, uri: Option<&str>) {
+    pub fn set_base(&mut self, uri: Option<&str>) {
         use crate::uri::path_to_uri;
 
         let url = uri.map(path_to_uri);
