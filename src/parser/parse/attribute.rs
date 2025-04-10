@@ -528,39 +528,127 @@ impl XmlParserCtxt {
     /// Returns (Name, AttValue).
     #[doc(alias = "xmlParseAttribute")]
     #[cfg(feature = "sax1")]
-    pub(crate) unsafe fn parse_attribute(&mut self) -> (Option<String>, Option<String>) {
-        unsafe {
-            self.grow();
-            let Some(name) = self.parse_name() else {
-                xml_fatal_err_msg(
-                    self,
-                    XmlParserErrors::XmlErrNameRequired,
-                    "error parsing attribute name\n",
-                );
-                return (None, None);
-            };
+    pub(crate) fn parse_attribute(&mut self) -> (Option<String>, Option<String>) {
+        self.grow();
+        let Some(name) = self.parse_name() else {
+            xml_fatal_err_msg(
+                self,
+                XmlParserErrors::XmlErrNameRequired,
+                "error parsing attribute name\n",
+            );
+            return (None, None);
+        };
 
-            // read the value
-            self.skip_blanks();
-            if self.current_byte() != b'=' {
-                xml_fatal_err_msg_str!(
+        // read the value
+        self.skip_blanks();
+        if self.current_byte() != b'=' {
+            xml_fatal_err_msg_str!(
+                self,
+                XmlParserErrors::XmlErrAttributeWithoutValue,
+                "Specification mandates value for attribute {}\n",
+                name
+            );
+            return (Some(name), None);
+        }
+
+        self.skip_char();
+        self.skip_blanks();
+        let val = self.parse_att_value().unwrap();
+        self.instate = XmlParserInputState::XmlParserContent;
+
+        // Check that xml:lang conforms to the specification
+        // No more registered as an error, just generate a warning now
+        // since this was deprecated in XML second edition
+        if self.pedantic != 0 && name == "xml:lang" && !check_language_id(&val) {
+            xml_warning_msg!(
+                self,
+                XmlParserErrors::XmlWarLangValue,
+                "Malformed value for xml:lang : {}\n",
+                val
+            );
+        }
+
+        // Check that xml:space conforms to the specification
+        if name == "xml:space" {
+            if val == "default" {
+                *self.space_mut() = 0;
+            } else if val == "preserve" {
+                *self.space_mut() = 1;
+            } else {
+                xml_warning_msg!(
                     self,
-                    XmlParserErrors::XmlErrAttributeWithoutValue,
-                    "Specification mandates value for attribute {}\n",
-                    name
+                    XmlParserErrors::XmlWarSpaceValue,
+                    "Invalid value \"{}\" for xml:space : \"default\" or \"preserve\" expected\n",
+                    val
                 );
-                return (Some(name), None);
             }
+        }
 
-            self.skip_char();
-            self.skip_blanks();
-            let val = self.parse_att_value().unwrap();
-            self.instate = XmlParserInputState::XmlParserContent;
+        (Some(name), Some(val))
+    }
 
+    /// Returns (Prefix, LocalPart, AttValue).
+    #[doc(alias = "xmlParseAttribute2")]
+    pub(crate) fn parse_attribute2(
+        &mut self,
+        pref: Option<&str>,
+        elem: &str,
+    ) -> Option<(Option<String>, String, Option<String>)> {
+        let mut normalize = false;
+
+        self.grow();
+
+        let (prefix, Some(name)) = self.parse_qname() else {
+            xml_fatal_err_msg(
+                self,
+                XmlParserErrors::XmlErrNameRequired,
+                "error parsing attribute name\n",
+            );
+            return None;
+        };
+
+        // get the type if needed
+        if let Some(atts) = self.atts_special {
+            if atts
+                .qlookup2(pref, elem, prefix.as_deref(), Some(&name))
+                .is_some()
+            {
+                normalize = true;
+            }
+        }
+
+        // read the value
+        self.skip_blanks();
+
+        if self.current_byte() != b'=' {
+            xml_fatal_err_msg_str!(
+                self,
+                XmlParserErrors::XmlErrAttributeWithoutValue,
+                "Specification mandates value for attribute {}\n",
+                name
+            );
+            return Some((None, name, None));
+        }
+        self.skip_char();
+        self.skip_blanks();
+        let mut val = self.parse_att_value_internal(normalize)?;
+        if normalize {
+            // Sometimes a second normalisation pass for spaces is needed
+            // but that only happens if charrefs or entities references
+            // have been used in the attribute value, i.e. the attribute
+            // value have been extracted in an allocated string already.
+            let val2 = attr_normalize_space(&val);
+            if val != val2 {
+                val = val2.into_owned();
+            }
+        }
+        self.instate = XmlParserInputState::XmlParserContent;
+
+        if prefix.as_deref() == self.str_xml.as_deref() {
             // Check that xml:lang conforms to the specification
             // No more registered as an error, just generate a warning now
             // since this was deprecated in XML second edition
-            if self.pedantic != 0 && name == "xml:lang" && !check_language_id(&val) {
+            if self.pedantic != 0 && name == "lang" && !check_language_id(&val) {
                 xml_warning_msg!(
                     self,
                     XmlParserErrors::XmlWarLangValue,
@@ -570,7 +658,7 @@ impl XmlParserCtxt {
             }
 
             // Check that xml:space conforms to the specification
-            if name == "xml:space" {
+            if name == "space" {
                 if val == "default" {
                     *self.space_mut() = 0;
                 } else if val == "preserve" {
@@ -584,100 +672,8 @@ impl XmlParserCtxt {
                     );
                 }
             }
-
-            (Some(name), Some(val))
         }
-    }
 
-    /// Returns (Prefix, LocalPart, AttValue).
-    #[doc(alias = "xmlParseAttribute2")]
-    pub(crate) unsafe fn parse_attribute2(
-        &mut self,
-        pref: Option<&str>,
-        elem: &str,
-    ) -> Option<(Option<String>, String, Option<String>)> {
-        unsafe {
-            let mut normalize = false;
-
-            self.grow();
-
-            let (prefix, Some(name)) = self.parse_qname() else {
-                xml_fatal_err_msg(
-                    self,
-                    XmlParserErrors::XmlErrNameRequired,
-                    "error parsing attribute name\n",
-                );
-                return None;
-            };
-
-            // get the type if needed
-            if let Some(atts) = self.atts_special {
-                if atts
-                    .qlookup2(pref, elem, prefix.as_deref(), Some(&name))
-                    .is_some()
-                {
-                    normalize = true;
-                }
-            }
-
-            // read the value
-            self.skip_blanks();
-
-            if self.current_byte() != b'=' {
-                xml_fatal_err_msg_str!(
-                    self,
-                    XmlParserErrors::XmlErrAttributeWithoutValue,
-                    "Specification mandates value for attribute {}\n",
-                    name
-                );
-                return Some((None, name, None));
-            }
-            self.skip_char();
-            self.skip_blanks();
-            let mut val = self.parse_att_value_internal(normalize)?;
-            if normalize {
-                // Sometimes a second normalisation pass for spaces is needed
-                // but that only happens if charrefs or entities references
-                // have been used in the attribute value, i.e. the attribute
-                // value have been extracted in an allocated string already.
-                let val2 = attr_normalize_space(&val);
-                if val != val2 {
-                    val = val2.into_owned();
-                }
-            }
-            self.instate = XmlParserInputState::XmlParserContent;
-
-            if prefix.as_deref() == self.str_xml.as_deref() {
-                // Check that xml:lang conforms to the specification
-                // No more registered as an error, just generate a warning now
-                // since this was deprecated in XML second edition
-                if self.pedantic != 0 && name == "lang" && !check_language_id(&val) {
-                    xml_warning_msg!(
-                        self,
-                        XmlParserErrors::XmlWarLangValue,
-                        "Malformed value for xml:lang : {}\n",
-                        val
-                    );
-                }
-
-                // Check that xml:space conforms to the specification
-                if name == "space" {
-                    if val == "default" {
-                        *self.space_mut() = 0;
-                    } else if val == "preserve" {
-                        *self.space_mut() = 1;
-                    } else {
-                        xml_warning_msg!(
-                            self,
-                            XmlParserErrors::XmlWarSpaceValue,
-                            "Invalid value \"{}\" for xml:space : \"default\" or \"preserve\" expected\n",
-                            val
-                        );
-                    }
-                }
-            }
-
-            Some((prefix, name, Some(val)))
-        }
+        Some((prefix, name, Some(val)))
     }
 }

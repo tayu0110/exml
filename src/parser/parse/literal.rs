@@ -127,67 +127,62 @@ impl XmlParserCtxt {
     /// if PublicID is parsed, return `(PubidLiteral, None)`,
     /// otherwise, return `(None, None)`.
     #[doc(alias = "xmlParseExternalID")]
-    pub(crate) unsafe fn parse_external_id(
-        &mut self,
-        strict: bool,
-    ) -> (Option<String>, Option<String>) {
-        unsafe {
-            let mut uri = None;
-            let mut public_id = None;
+    pub(crate) fn parse_external_id(&mut self, strict: bool) -> (Option<String>, Option<String>) {
+        let mut uri = None;
+        let mut public_id = None;
 
-            if self.content_bytes().starts_with(b"SYSTEM") {
-                self.advance(6);
+        if self.content_bytes().starts_with(b"SYSTEM") {
+            self.advance(6);
+            if self.skip_blanks() == 0 {
+                xml_fatal_err_msg(
+                    self,
+                    XmlParserErrors::XmlErrSpaceRequired,
+                    "Space required after b'SYSTEM'\n",
+                );
+            }
+            uri = self.parse_system_literal();
+            if uri.is_none() {
+                xml_fatal_err(self, XmlParserErrors::XmlErrURIRequired, None);
+            }
+        } else if self.content_bytes().starts_with(b"PUBLIC") {
+            self.advance(6);
+            if self.skip_blanks() == 0 {
+                xml_fatal_err_msg(
+                    self,
+                    XmlParserErrors::XmlErrSpaceRequired,
+                    "Space required after 'PUBLIC'\n",
+                );
+            }
+            public_id = self.parse_pubid_literal();
+            if public_id.is_none() {
+                xml_fatal_err(self, XmlParserErrors::XmlErrPubidRequired, None);
+            }
+            if strict {
+                // We don't handle [83] so "S SystemLiteral" is required.
                 if self.skip_blanks() == 0 {
                     xml_fatal_err_msg(
                         self,
                         XmlParserErrors::XmlErrSpaceRequired,
-                        "Space required after b'SYSTEM'\n",
+                        "Space required after the Public Identifier\n",
                     );
                 }
-                uri = self.parse_system_literal();
-                if uri.is_none() {
-                    xml_fatal_err(self, XmlParserErrors::XmlErrURIRequired, None);
-                }
-            } else if self.content_bytes().starts_with(b"PUBLIC") {
-                self.advance(6);
+            } else {
+                // We handle [83] so we return immediately, if
+                // "S SystemLiteral" is not detected. We skip blanks if no
+                // system literal was found, but this is harmless since we must
+                // be at the end of a NotationDecl.
                 if self.skip_blanks() == 0 {
-                    xml_fatal_err_msg(
-                        self,
-                        XmlParserErrors::XmlErrSpaceRequired,
-                        "Space required after 'PUBLIC'\n",
-                    );
+                    return (public_id, None);
                 }
-                public_id = self.parse_pubid_literal();
-                if public_id.is_none() {
-                    xml_fatal_err(self, XmlParserErrors::XmlErrPubidRequired, None);
-                }
-                if strict {
-                    // We don't handle [83] so "S SystemLiteral" is required.
-                    if self.skip_blanks() == 0 {
-                        xml_fatal_err_msg(
-                            self,
-                            XmlParserErrors::XmlErrSpaceRequired,
-                            "Space required after the Public Identifier\n",
-                        );
-                    }
-                } else {
-                    // We handle [83] so we return immediately, if
-                    // "S SystemLiteral" is not detected. We skip blanks if no
-                    // system literal was found, but this is harmless since we must
-                    // be at the end of a NotationDecl.
-                    if self.skip_blanks() == 0 {
-                        return (public_id, None);
-                    }
-                    if self.current_byte() != b'\'' && self.current_byte() != b'"' {
-                        return (public_id, None);
-                    }
-                }
-                uri = self.parse_system_literal();
-                if uri.is_none() {
-                    xml_fatal_err(self, XmlParserErrors::XmlErrURIRequired, None);
+                if self.current_byte() != b'\'' && self.current_byte() != b'"' {
+                    return (public_id, None);
                 }
             }
-            (public_id, uri)
+            uri = self.parse_system_literal();
+            if uri.is_none() {
+                xml_fatal_err(self, XmlParserErrors::XmlErrURIRequired, None);
+            }
         }
+        (public_id, uri)
     }
 }

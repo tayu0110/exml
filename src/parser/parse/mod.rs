@@ -157,8 +157,12 @@ impl XmlParserCtxt {
                 return -1;
             }
             if self.input().is_some()
-                && self.input().unwrap().buf.is_some()
-                && self.input().unwrap().buf.as_ref().unwrap().compressed >= 0
+                && self
+                    .input()
+                    .unwrap()
+                    .buf
+                    .as_ref()
+                    .is_some_and(|buf| buf.compressed >= 0)
             {
                 if let Some(mut my_doc) = self.my_doc {
                     my_doc.compression = self.input().unwrap().buf.as_ref().unwrap().compressed;
@@ -268,18 +272,16 @@ impl XmlParserCtxt {
     /// [27] Misc ::= Comment | PI |  S
     /// ```
     #[doc(alias = "xmlParseMisc")]
-    pub(crate) unsafe fn parse_misc(&mut self) {
-        unsafe {
-            while !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                self.skip_blanks();
-                self.grow();
-                if self.content_bytes().starts_with(b"<?") {
-                    self.parse_pi();
-                } else if self.content_bytes().starts_with(b"<!--") {
-                    self.parse_comment();
-                } else {
-                    break;
-                }
+    pub(crate) fn parse_misc(&mut self) {
+        while !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+            self.skip_blanks();
+            self.grow();
+            if self.content_bytes().starts_with(b"<?") {
+                self.parse_pi();
+            } else if self.content_bytes().starts_with(b"<!--") {
+                self.parse_comment();
+            } else {
+                break;
             }
         }
     }

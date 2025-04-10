@@ -1003,7 +1003,7 @@ impl XmlXIncludeCtxt {
 
                         let tmp = if let Some(mut content) = cur_node.content.as_deref() {
                             let mut len = index2 as usize;
-                            if start == cur_node.into() && index1 > 1 {
+                            if start == XmlGenericNodePtr::from(cur_node) && index1 > 1 {
                                 content = &content[index1 as usize - 1..];
                                 len -= index1 as usize - 1;
                             }

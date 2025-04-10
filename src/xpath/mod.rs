@@ -340,7 +340,7 @@ pub unsafe fn xml_xpath_cmp_nodes(
             if let Some((attr1, attr2)) = attr_node1.zip(attr_node2) {
                 let mut cur = attr2.prev.map(XmlGenericNodePtr::from);
                 while let Some(now) = cur {
-                    if now == attr1.into() {
+                    if now == XmlGenericNodePtr::from(attr1) {
                         return 1;
                     }
                     cur = now.prev();
@@ -825,7 +825,7 @@ pub unsafe fn xml_xpath_order_doc_elems(doc: XmlDocPtr) -> i64 {
             let Some(cur) = now.parent() else {
                 break None;
             };
-            if cur == doc.into() {
+            if cur == XmlGenericNodePtr::from(doc) {
                 break None;
             }
             if let Some(next) = cur.next() {

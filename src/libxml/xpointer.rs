@@ -748,7 +748,7 @@ unsafe fn xml_xptr_covering_range(
                 } else {
                     let mut node =
                         XmlGenericNodePtr::from_raw((*loc).user as *mut XmlNode).unwrap();
-                    if node == doc.into() {
+                    if node == XmlGenericNodePtr::from(doc) {
                         return xml_xptr_new_range(node, 0, node, xml_xptr_get_arity(node));
                     } else {
                         match node.element_type() {

@@ -146,6 +146,58 @@ impl NodeCommon for XmlEntity {
     fn set_parent(&mut self, parent: Option<XmlGenericNodePtr>) {
         self.parent = parent.map(|p| XmlDtdPtr::try_from(p).unwrap());
     }
+
+    fn unlink(&mut self) {
+        if let Some(doc) = self.document() {
+            let entity = unsafe {
+                // # Safety
+                // Please see the document of `XmlEntityPtr::from_raw`.
+                // In addition, this pointer is not leaked to the out of this function.
+                XmlEntityPtr::from_raw(self).unwrap()
+            };
+            if let Some(int_subset) = doc.int_subset {
+                if let Some(mut table) = int_subset.entities {
+                    if table.lookup(&self.name).copied() == entity {
+                        table.remove_entry(&self.name, |_, _| {}).ok();
+                    }
+                }
+                if let Some(mut table) = int_subset.pentities {
+                    if table.lookup(&self.name).copied() == entity {
+                        table.remove_entry(&self.name, |_, _| {}).ok();
+                    }
+                }
+            }
+            if let Some(ext_subset) = doc.ext_subset {
+                if let Some(mut table) = ext_subset.entities {
+                    if table.lookup(&self.name).copied() == entity {
+                        table.remove_entry(&self.name, |_, _| {}).ok();
+                    }
+                }
+                if let Some(mut table) = ext_subset.pentities {
+                    if table.lookup(&self.name).copied() == entity {
+                        table.remove_entry(&self.name, |_, _| {}).ok();
+                    }
+                }
+            }
+        }
+        if let Some(mut parent) = self.parent() {
+            if parent.children() == XmlGenericNodePtr::from_raw(self) {
+                parent.set_children(self.next());
+            }
+            if parent.last() == XmlGenericNodePtr::from_raw(self) {
+                parent.set_last(self.prev());
+            }
+            self.set_parent(None);
+        }
+        if let Some(mut next) = self.next() {
+            next.set_prev(self.prev());
+        }
+        if let Some(mut prev) = self.prev() {
+            prev.set_next(self.next());
+        }
+        self.set_next(None);
+        self.set_prev(None);
+    }
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]

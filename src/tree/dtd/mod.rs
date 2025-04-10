@@ -197,6 +197,40 @@ impl NodeCommon for XmlDtd {
     fn set_parent(&mut self, parent: Option<XmlGenericNodePtr>) {
         self.parent = parent.map(|ptr| XmlDocPtr::try_from(ptr).unwrap());
     }
+
+    fn unlink(&mut self) {
+        let dtd = unsafe {
+            // # Safety
+            // Please see the document of `XmlDtdPtr::from_raw`.
+            // In addition, this pointer is not leaked to the out of this function.
+            XmlDtdPtr::from_raw(self).unwrap()
+        };
+        if let Some(mut doc) = self.document() {
+            if doc.int_subset == dtd {
+                doc.int_subset = None;
+            }
+            if doc.ext_subset == dtd {
+                doc.ext_subset = None;
+            }
+        }
+        if let Some(mut parent) = self.parent() {
+            if parent.children() == XmlGenericNodePtr::from_raw(self) {
+                parent.set_children(self.next());
+            }
+            if parent.last() == XmlGenericNodePtr::from_raw(self) {
+                parent.set_last(self.prev());
+            }
+            self.set_parent(None);
+        }
+        if let Some(mut next) = self.next() {
+            next.set_prev(self.prev());
+        }
+        if let Some(mut prev) = self.prev() {
+            prev.set_next(self.next());
+        }
+        self.set_next(None);
+        self.set_prev(None);
+    }
 }
 
 /// Create the internal subset of a document.  

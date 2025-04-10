@@ -140,6 +140,8 @@ impl NodeCommon for XmlNs {
         None
     }
     fn set_parent(&mut self, _parent: Option<XmlGenericNodePtr>) {}
+
+    fn unlink(&mut self) {}
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]

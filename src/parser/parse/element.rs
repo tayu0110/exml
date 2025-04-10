@@ -236,87 +236,83 @@ impl XmlParserCtxt {
     /// Returns the element name parsed
     #[doc(alias = "xmlParseStartTag")]
     #[cfg(feature = "sax1")]
-    pub(crate) unsafe fn parse_start_tag(&mut self) -> Option<String> {
-        unsafe {
-            use crate::parser::xml_err_attribute_dup;
+    pub(crate) fn parse_start_tag(&mut self) -> Option<String> {
+        use crate::parser::xml_err_attribute_dup;
 
-            if self.current_byte() != b'<' {
-                return None;
-            }
-            self.advance(1);
+        if self.current_byte() != b'<' {
+            return None;
+        }
+        self.advance(1);
 
-            let Some(name) = self.parse_name() else {
+        let Some(name) = self.parse_name() else {
+            xml_fatal_err_msg(
+                self,
+                XmlParserErrors::XmlErrNameRequired,
+                "xmlParseStartTag: invalid element name\n",
+            );
+            return None;
+        };
+
+        // Now parse the attributes, it ends up with the ending
+        //
+        // (S Attribute)* S?
+        self.skip_blanks();
+        self.grow();
+
+        let mut atts: Vec<(String, Option<String>)> = vec![];
+        while self.current_byte() != b'>'
+            && !self.content_bytes().starts_with(b"/>")
+            && xml_is_char(self.current_byte() as u32)
+            && !matches!(self.instate, XmlParserInputState::XmlParserEOF)
+        {
+            let (Some(attname), attvalue) = self.parse_attribute() else {
                 xml_fatal_err_msg(
                     self,
-                    XmlParserErrors::XmlErrNameRequired,
-                    "xmlParseStartTag: invalid element name\n",
+                    XmlParserErrors::XmlErrInternalError,
+                    "xmlParseStartTag: problem parsing attributes\n",
                 );
-                return None;
+                break;
             };
 
-            // Now parse the attributes, it ends up with the ending
-            //
-            // (S Attribute)* S?
-            self.skip_blanks();
+            if let Some(attvalue) = attvalue {
+                // [ WFC: Unique Att Spec ]
+                // No attribute name may appear more than once in the same
+                // start-tag or empty-element tag.
+                if atts.iter().any(|(att, _)| att.as_str() == attname) {
+                    xml_err_attribute_dup(self, None, &attname);
+                } else {
+                    // Add the pair to atts
+                    atts.push((attname, Some(attvalue)));
+                }
+            }
+
             self.grow();
-
-            let mut atts: Vec<(String, Option<String>)> = vec![];
-            while self.current_byte() != b'>'
-                && !self.content_bytes().starts_with(b"/>")
-                && xml_is_char(self.current_byte() as u32)
-                && !matches!(self.instate, XmlParserInputState::XmlParserEOF)
-            {
-                let (Some(attname), attvalue) = self.parse_attribute() else {
-                    xml_fatal_err_msg(
-                        self,
-                        XmlParserErrors::XmlErrInternalError,
-                        "xmlParseStartTag: problem parsing attributes\n",
-                    );
-                    break;
-                };
-
-                if let Some(attvalue) = attvalue {
-                    // [ WFC: Unique Att Spec ]
-                    // No attribute name may appear more than once in the same
-                    // start-tag or empty-element tag.
-                    if atts.iter().any(|(att, _)| att.as_str() == attname) {
-                        xml_err_attribute_dup(self, None, &attname);
-                    } else {
-                        // Add the pair to atts
-                        atts.push((attname, Some(attvalue)));
-                    }
-                }
-
-                self.grow();
-                if self.current_byte() == b'>' || self.content_bytes().starts_with(b"/>") {
-                    break;
-                }
-                if self.skip_blanks() == 0 {
-                    xml_fatal_err_msg(
-                        self,
-                        XmlParserErrors::XmlErrSpaceRequired,
-                        "attributes construct error\n",
-                    );
-                }
-                self.shrink();
-                self.grow();
+            if self.current_byte() == b'>' || self.content_bytes().starts_with(b"/>") {
+                break;
             }
-
-            // SAX: Start of Element !
-            if self.disable_sax == 0 {
-                if let Some(start_element) =
-                    self.sax.as_deref_mut().and_then(|sax| sax.start_element)
-                {
-                    if !atts.is_empty() {
-                        start_element(self, &name, atts.as_slice());
-                    } else {
-                        start_element(self, &name, &[]);
-                    }
-                }
+            if self.skip_blanks() == 0 {
+                xml_fatal_err_msg(
+                    self,
+                    XmlParserErrors::XmlErrSpaceRequired,
+                    "attributes construct error\n",
+                );
             }
-
-            Some(name)
+            self.shrink();
+            self.grow();
         }
+
+        // SAX: Start of Element !
+        if self.disable_sax == 0 {
+            if let Some(start_element) = self.sax.as_deref_mut().and_then(|sax| sax.start_element) {
+                if !atts.is_empty() {
+                    start_element(self, &name, atts.as_slice());
+                } else {
+                    start_element(self, &name, &[]);
+                }
+            }
+        }
+
+        Some(name)
     }
 
     /// Parse a start tag. Always consumes '<'.
@@ -342,141 +338,85 @@ impl XmlParserCtxt {
     ///
     /// Returns (Name, Prefix, URI)
     #[doc(alias = "xmlParseStartTag2")]
-    pub(crate) unsafe fn parse_start_tag2(
-        &mut self,
-    ) -> Option<(String, Option<String>, Option<String>)> {
-        unsafe {
-            if self.current_byte() != b'<' {
-                return None;
-            }
-            self.advance(1);
+    pub(crate) fn parse_start_tag2(&mut self) -> Option<(String, Option<String>, Option<String>)> {
+        if self.current_byte() != b'<' {
+            return None;
+        }
+        self.advance(1);
 
-            let inputid: i32 = self.input().unwrap().id;
-            let mut nbdef = 0usize;
-            let mut nb_ns = 0usize;
-            // Forget any namespaces added during an earlier parse of this element.
-            // self.ns_tab.len() = ns_nr;
+        let inputid: i32 = self.input().unwrap().id;
+        let mut nbdef = 0usize;
+        let mut nb_ns = 0usize;
+        // Forget any namespaces added during an earlier parse of this element.
+        // self.ns_tab.len() = ns_nr;
 
-            let (prefix, localname) = self.parse_qname();
-            let Some(localname) = localname else {
-                xml_fatal_err_msg(
+        let (prefix, localname) = self.parse_qname();
+        let Some(localname) = localname else {
+            xml_fatal_err_msg(
+                self,
+                XmlParserErrors::XmlErrNameRequired,
+                "StartTag: invalid element name\n",
+            );
+            return None;
+        };
+
+        // Now parse the attributes, it ends up with the ending
+        //
+        // (S Attribute)* S?
+        self.skip_blanks();
+        self.grow();
+
+        let mut atts = vec![];
+
+        while self.current_byte() != b'>'
+            && (self.current_byte() != b'/' || self.nth_byte(1) != b'>')
+            && xml_is_char(self.current_byte() as u32)
+            && !matches!(self.instate, XmlParserInputState::XmlParserEOF)
+        {
+            let Some((aprefix, attname, attvalue)) =
+                self.parse_attribute2(prefix.as_deref(), &localname)
+            else {
+                xml_fatal_err(
                     self,
-                    XmlParserErrors::XmlErrNameRequired,
-                    "StartTag: invalid element name\n",
+                    XmlParserErrors::XmlErrInternalError,
+                    Some("xmlParseStartTag: problem parsing attributes\n"),
                 );
-                return None;
+                break;
             };
 
-            // Now parse the attributes, it ends up with the ending
-            //
-            // (S Attribute)* S?
-            self.skip_blanks();
-            self.grow();
-
-            let mut atts = vec![];
-
-            while self.current_byte() != b'>'
-                && (self.current_byte() != b'/' || self.nth_byte(1) != b'>')
-                && xml_is_char(self.current_byte() as u32)
-                && !matches!(self.instate, XmlParserInputState::XmlParserEOF)
-            {
-                let Some((aprefix, attname, attvalue)) =
-                    self.parse_attribute2(prefix.as_deref(), &localname)
-                else {
-                    xml_fatal_err(
-                        self,
-                        XmlParserErrors::XmlErrInternalError,
-                        Some("xmlParseStartTag: problem parsing attributes\n"),
-                    );
-                    break;
+            'next_attr: {
+                let Some(attvalue) = attvalue else {
+                    break 'next_attr;
                 };
 
-                'next_attr: {
-                    let Some(attvalue) = attvalue else {
-                        break 'next_attr;
-                    };
-
-                    if Some(attname.as_str()) == self.str_xmlns.as_deref() && aprefix.is_none() {
-                        let url = attvalue.clone();
-                        if !url.is_empty() {
-                            if let Some(uri) = XmlURI::parse(&url) {
-                                if uri.scheme.is_none() {
-                                    xml_ns_warn!(
-                                        self,
-                                        XmlParserErrors::XmlWarNsURIRelative,
-                                        "xmlns: URI {} is not absolute\n",
-                                        url
-                                    );
-                                }
-                            } else {
-                                xml_ns_err!(
+                if Some(attname.as_str()) == self.str_xmlns.as_deref() && aprefix.is_none() {
+                    let url = attvalue.clone();
+                    if !url.is_empty() {
+                        if let Some(uri) = XmlURI::parse(&url) {
+                            if uri.scheme.is_none() {
+                                xml_ns_warn!(
                                     self,
-                                    XmlParserErrors::XmlWarNsURI,
-                                    "xmlns: '{}' is not a valid URI\n",
+                                    XmlParserErrors::XmlWarNsURIRelative,
+                                    "xmlns: URI {} is not absolute\n",
                                     url
                                 );
                             }
-                            if Some(url.as_str()) == self.str_xml_ns.as_deref() {
-                                if Some(attname.as_str()) != self.str_xml.as_deref() {
-                                    xml_ns_err!(
-                                        self,
-                                        XmlParserErrors::XmlNsErrXmlNamespace,
-                                        "xml namespace URI cannot be the default namespace\n"
-                                    );
-                                }
-                                break 'next_attr;
-                            }
-                            if url == "http://www.w3.org/2000/xmlns/" {
-                                xml_ns_err!(
-                                    self,
-                                    XmlParserErrors::XmlNsErrXmlNamespace,
-                                    "reuse of the xmlns namespace name is forbidden\n"
-                                );
-                                break 'next_attr;
-                            }
-                        }
-
-                        // check that it's not a defined namespace
-                        if self
-                            .ns_tab
-                            .iter()
-                            .rev()
-                            .take(nb_ns)
-                            .any(|(pre, _)| pre.is_none())
-                        {
-                            xml_err_attribute_dup(self, None, &attname);
-                        } else if self.ns_push(None, &url) > 0 {
-                            nb_ns += 1;
-                        }
-                    } else if aprefix.as_deref() == self.str_xmlns.as_deref() {
-                        let url = attvalue.clone();
-                        if Some(attname.as_str()) == self.str_xml.as_deref() {
-                            if Some(url.as_str()) != self.str_xml_ns.as_deref() {
-                                xml_ns_err!(
-                                    self,
-                                    XmlParserErrors::XmlNsErrXmlNamespace,
-                                    "xml namespace prefix mapped to wrong URI\n"
-                                );
-                            }
-                            // Do not keep a namespace definition node
-                            break 'next_attr;
+                        } else {
+                            xml_ns_err!(
+                                self,
+                                XmlParserErrors::XmlWarNsURI,
+                                "xmlns: '{}' is not a valid URI\n",
+                                url
+                            );
                         }
                         if Some(url.as_str()) == self.str_xml_ns.as_deref() {
                             if Some(attname.as_str()) != self.str_xml.as_deref() {
                                 xml_ns_err!(
                                     self,
                                     XmlParserErrors::XmlNsErrXmlNamespace,
-                                    "xml namespace URI mapped to wrong prefix\n"
+                                    "xml namespace URI cannot be the default namespace\n"
                                 );
                             }
-                            break 'next_attr;
-                        }
-                        if Some(attname.as_ref()) == self.str_xmlns.as_deref() {
-                            xml_ns_err!(
-                                self,
-                                XmlParserErrors::XmlNsErrXmlNamespace,
-                                "redefinition of the xmlns prefix is forbidden\n"
-                            );
                             break 'next_attr;
                         }
                         if url == "http://www.w3.org/2000/xmlns/" {
@@ -487,265 +427,315 @@ impl XmlParserCtxt {
                             );
                             break 'next_attr;
                         }
-                        if url.is_empty() {
+                    }
+
+                    // check that it's not a defined namespace
+                    if self
+                        .ns_tab
+                        .iter()
+                        .rev()
+                        .take(nb_ns)
+                        .any(|(pre, _)| pre.is_none())
+                    {
+                        xml_err_attribute_dup(self, None, &attname);
+                    } else if self.ns_push(None, &url) > 0 {
+                        nb_ns += 1;
+                    }
+                } else if aprefix.as_deref() == self.str_xmlns.as_deref() {
+                    let url = attvalue.clone();
+                    if Some(attname.as_str()) == self.str_xml.as_deref() {
+                        if Some(url.as_str()) != self.str_xml_ns.as_deref() {
                             xml_ns_err!(
                                 self,
                                 XmlParserErrors::XmlNsErrXmlNamespace,
-                                "xmlns:{}: Empty XML namespace is not allowed\n",
-                                attname
+                                "xml namespace prefix mapped to wrong URI\n"
                             );
-                            break 'next_attr;
                         }
-                        if let Some(uri) = XmlURI::parse(&url) {
-                            if self.pedantic != 0 && uri.scheme.is_none() {
-                                xml_ns_warn!(
-                                    self,
-                                    XmlParserErrors::XmlWarNsURIRelative,
-                                    "xmlns:{}: URI {} is not absolute\n",
-                                    attname,
-                                    url
-                                );
-                            }
-                        } else {
+                        // Do not keep a namespace definition node
+                        break 'next_attr;
+                    }
+                    if Some(url.as_str()) == self.str_xml_ns.as_deref() {
+                        if Some(attname.as_str()) != self.str_xml.as_deref() {
                             xml_ns_err!(
                                 self,
-                                XmlParserErrors::XmlWarNsURI,
-                                "xmlns:{}: '{}' is not a valid URI\n",
+                                XmlParserErrors::XmlNsErrXmlNamespace,
+                                "xml namespace URI mapped to wrong prefix\n"
+                            );
+                        }
+                        break 'next_attr;
+                    }
+                    if Some(attname.as_ref()) == self.str_xmlns.as_deref() {
+                        xml_ns_err!(
+                            self,
+                            XmlParserErrors::XmlNsErrXmlNamespace,
+                            "redefinition of the xmlns prefix is forbidden\n"
+                        );
+                        break 'next_attr;
+                    }
+                    if url == "http://www.w3.org/2000/xmlns/" {
+                        xml_ns_err!(
+                            self,
+                            XmlParserErrors::XmlNsErrXmlNamespace,
+                            "reuse of the xmlns namespace name is forbidden\n"
+                        );
+                        break 'next_attr;
+                    }
+                    if url.is_empty() {
+                        xml_ns_err!(
+                            self,
+                            XmlParserErrors::XmlNsErrXmlNamespace,
+                            "xmlns:{}: Empty XML namespace is not allowed\n",
+                            attname
+                        );
+                        break 'next_attr;
+                    }
+                    if let Some(uri) = XmlURI::parse(&url) {
+                        if self.pedantic != 0 && uri.scheme.is_none() {
+                            xml_ns_warn!(
+                                self,
+                                XmlParserErrors::XmlWarNsURIRelative,
+                                "xmlns:{}: URI {} is not absolute\n",
                                 attname,
                                 url
                             );
                         }
-                        // check that it's not a defined namespace
-                        if self
-                            .ns_tab
-                            .iter()
-                            .take(nb_ns)
-                            .any(|(pre, _)| pre.as_deref() == Some(&attname))
-                        {
-                            xml_err_attribute_dup(self, aprefix.as_deref(), &attname);
-                        } else if self.ns_push(Some(&attname), &url) > 0 {
-                            nb_ns += 1;
-                        }
                     } else {
-                        // Add the pair to atts
-                        atts.push((attname, aprefix, None, attvalue));
-                    }
-                }
-
-                //  next_attr:
-
-                self.grow();
-                if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                    break;
-                }
-                if self.current_byte() == b'>'
-                    || (self.current_byte() == b'/' && self.nth_byte(1) == b'>')
-                {
-                    break;
-                }
-                if self.skip_blanks() == 0 {
-                    xml_fatal_err_msg(
-                        self,
-                        XmlParserErrors::XmlErrSpaceRequired,
-                        "attributes construct error\n",
-                    );
-                    break;
-                }
-                self.grow();
-            }
-
-            if self.input().unwrap().id != inputid {
-                xml_fatal_err(
-                    self,
-                    XmlParserErrors::XmlErrInternalError,
-                    Some("Unexpected change of input\n"),
-                );
-                return None;
-            }
-
-            // The attributes defaulting
-            let atts_default = take(&mut self.atts_default);
-            let defaults = atts_default.get(&(
-                localname.as_str().into(),
-                prefix.as_deref().map(Cow::Borrowed),
-            ));
-            if let Some(defaults) = defaults {
-                for (attname, aprefix, def, external) in defaults {
-                    // special work for namespaces defaulted defs
-                    if Some(attname.as_str()) == self.str_xmlns.as_deref() && aprefix.is_none() {
-                        // check that it's not a defined namespace
-                        if self.ns_tab.iter().any(|(pre, _)| pre.is_none()) {
-                            continue;
-                        }
-
-                        let nsname = self.get_namespace(None);
-                        if nsname != Some(def) && self.ns_push(None, def) > 0 {
-                            nb_ns += 1;
-                        }
-                    } else if aprefix.as_deref() == self.str_xmlns.as_deref() {
-                        // check that it's not a defined namespace
-                        if self
-                            .ns_tab
-                            .iter()
-                            .any(|(pre, _)| pre.as_deref() == Some(attname))
-                        {
-                            continue;
-                        }
-
-                        let nsname = self.get_namespace(Some(attname));
-                        if nsname != Some(def) && self.ns_push(Some(attname), def) > 0 {
-                            nb_ns += 1;
-                        }
-                    } else {
-                        // check that it's not a defined attribute
-                        if atts
-                            .iter()
-                            .any(|att| att.0 == *attname && att.1.as_deref() == aprefix.as_deref())
-                        {
-                            continue;
-                        }
-
-                        let uri = aprefix.as_deref().and_then(|p| self.get_namespace(Some(p)));
-                        atts.push((
-                            attname.clone(),
-                            aprefix.clone(),
-                            uri.map(|uri| uri.to_owned()),
-                            def.clone(),
-                        ));
-                        if self.standalone == 1 && external.is_some() {
-                            xml_validity_error!(
-                                self,
-                                XmlParserErrors::XmlDTDStandaloneDefaulted,
-                                "standalone: attribute {} on {} defaulted from external subset\n",
-                                attname,
-                                localname
-                            );
-                        }
-                        nbdef += 1;
-                    }
-                }
-            }
-            self.atts_default = atts_default;
-
-            // The attributes checkings
-            for i in 0..atts.len() {
-                // The default namespace does not apply to attribute names.
-                let nsname = if atts[i].1.is_some() {
-                    let nsname = self
-                        .get_namespace(atts[i].1.as_deref())
-                        .map(|uri| uri.to_owned());
-                    if nsname.is_none() {
-                        let pre = atts[i].1.as_deref().unwrap();
-                        let loc = atts[i].0.as_str();
                         xml_ns_err!(
                             self,
-                            XmlParserErrors::XmlNsErrUndefinedNamespace,
-                            "Namespace prefix {} for {} on {} is not defined\n",
-                            pre,
-                            loc,
+                            XmlParserErrors::XmlWarNsURI,
+                            "xmlns:{}: '{}' is not a valid URI\n",
+                            attname,
+                            url
+                        );
+                    }
+                    // check that it's not a defined namespace
+                    if self
+                        .ns_tab
+                        .iter()
+                        .take(nb_ns)
+                        .any(|(pre, _)| pre.as_deref() == Some(&attname))
+                    {
+                        xml_err_attribute_dup(self, aprefix.as_deref(), &attname);
+                    } else if self.ns_push(Some(&attname), &url) > 0 {
+                        nb_ns += 1;
+                    }
+                } else {
+                    // Add the pair to atts
+                    atts.push((attname, aprefix, None, attvalue));
+                }
+            }
+
+            //  next_attr:
+
+            self.grow();
+            if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+                break;
+            }
+            if self.current_byte() == b'>'
+                || (self.current_byte() == b'/' && self.nth_byte(1) == b'>')
+            {
+                break;
+            }
+            if self.skip_blanks() == 0 {
+                xml_fatal_err_msg(
+                    self,
+                    XmlParserErrors::XmlErrSpaceRequired,
+                    "attributes construct error\n",
+                );
+                break;
+            }
+            self.grow();
+        }
+
+        if self.input().unwrap().id != inputid {
+            xml_fatal_err(
+                self,
+                XmlParserErrors::XmlErrInternalError,
+                Some("Unexpected change of input\n"),
+            );
+            return None;
+        }
+
+        // The attributes defaulting
+        let atts_default = take(&mut self.atts_default);
+        let defaults = atts_default.get(&(
+            localname.as_str().into(),
+            prefix.as_deref().map(Cow::Borrowed),
+        ));
+        if let Some(defaults) = defaults {
+            for (attname, aprefix, def, external) in defaults {
+                // special work for namespaces defaulted defs
+                if Some(attname.as_str()) == self.str_xmlns.as_deref() && aprefix.is_none() {
+                    // check that it's not a defined namespace
+                    if self.ns_tab.iter().any(|(pre, _)| pre.is_none()) {
+                        continue;
+                    }
+
+                    let nsname = self.get_namespace(None);
+                    if nsname != Some(def) && self.ns_push(None, def) > 0 {
+                        nb_ns += 1;
+                    }
+                } else if aprefix.as_deref() == self.str_xmlns.as_deref() {
+                    // check that it's not a defined namespace
+                    if self
+                        .ns_tab
+                        .iter()
+                        .any(|(pre, _)| pre.as_deref() == Some(attname))
+                    {
+                        continue;
+                    }
+
+                    let nsname = self.get_namespace(Some(attname));
+                    if nsname != Some(def) && self.ns_push(Some(attname), def) > 0 {
+                        nb_ns += 1;
+                    }
+                } else {
+                    // check that it's not a defined attribute
+                    if atts
+                        .iter()
+                        .any(|att| att.0 == *attname && att.1.as_deref() == aprefix.as_deref())
+                    {
+                        continue;
+                    }
+
+                    let uri = aprefix.as_deref().and_then(|p| self.get_namespace(Some(p)));
+                    atts.push((
+                        attname.clone(),
+                        aprefix.clone(),
+                        uri.map(|uri| uri.to_owned()),
+                        def.clone(),
+                    ));
+                    if self.standalone == 1 && external.is_some() {
+                        xml_validity_error!(
+                            self,
+                            XmlParserErrors::XmlDTDStandaloneDefaulted,
+                            "standalone: attribute {} on {} defaulted from external subset\n",
+                            attname,
                             localname
                         );
                     }
-                    atts[i].2 = nsname;
-                    atts[i].2.as_deref()
-                } else {
-                    None
-                };
-                // [ WFC: Unique Att Spec ]
-                // No attribute name may appear more than once in the same
-                // start-tag or empty-element tag.
-                // As extended by the Namespace in XML REC.
-                for j in 0..i {
-                    if atts[i].0 == atts[j].0 {
-                        if atts[i].1 == atts[j].1 {
-                            let pre = atts[i].1.as_deref();
-                            let loc = atts[i].0.as_str();
-                            xml_err_attribute_dup(self, pre, loc);
-                            break;
-                        }
-                        if let Some(nsname) = nsname.filter(|&a| Some(a) == atts[j].2.as_deref()) {
-                            let loc = atts[i].0.as_str();
-                            xml_ns_err!(
-                                self,
-                                XmlParserErrors::XmlNsErrAttributeRedefined,
-                                "Namespaced Attribute {} in '{}' redefined\n",
-                                loc,
-                                nsname
-                            );
-                            break;
-                        }
-                    }
+                    nbdef += 1;
                 }
             }
+        }
+        self.atts_default = atts_default;
 
-            let nsname = self.get_namespace(prefix.as_deref());
-            let uri = nsname.map(|uri| uri.to_owned());
-            if let Some(prefix) = prefix.as_deref() {
+        // The attributes checkings
+        for i in 0..atts.len() {
+            // The default namespace does not apply to attribute names.
+            let nsname = if atts[i].1.is_some() {
+                let nsname = self
+                    .get_namespace(atts[i].1.as_deref())
+                    .map(|uri| uri.to_owned());
                 if nsname.is_none() {
+                    let pre = atts[i].1.as_deref().unwrap();
+                    let loc = atts[i].0.as_str();
                     xml_ns_err!(
                         self,
                         XmlParserErrors::XmlNsErrUndefinedNamespace,
-                        "Namespace prefix {} on {} is not defined\n",
-                        prefix,
+                        "Namespace prefix {} for {} on {} is not defined\n",
+                        pre,
+                        loc,
                         localname
                     );
                 }
-            }
-
-            // SAX: Start of Element !
-            if self.disable_sax == 0 {
-                if let Some(start_element_ns) =
-                    self.sax.as_deref_mut().and_then(|sax| sax.start_element_ns)
-                {
-                    let ns_tab = self.ns_tab[self.ns_tab.len() - nb_ns..].to_vec();
-                    start_element_ns(
-                        self,
-                        &localname,
-                        prefix.as_deref(),
-                        uri.as_deref(),
-                        &ns_tab,
-                        nbdef,
-                        &atts,
-                    );
+                atts[i].2 = nsname;
+                atts[i].2.as_deref()
+            } else {
+                None
+            };
+            // [ WFC: Unique Att Spec ]
+            // No attribute name may appear more than once in the same
+            // start-tag or empty-element tag.
+            // As extended by the Namespace in XML REC.
+            for j in 0..i {
+                if atts[i].0 == atts[j].0 {
+                    if atts[i].1 == atts[j].1 {
+                        let pre = atts[i].1.as_deref();
+                        let loc = atts[i].0.as_str();
+                        xml_err_attribute_dup(self, pre, loc);
+                        break;
+                    }
+                    if let Some(nsname) = nsname.filter(|&a| Some(a) == atts[j].2.as_deref()) {
+                        let loc = atts[i].0.as_str();
+                        xml_ns_err!(
+                            self,
+                            XmlParserErrors::XmlNsErrAttributeRedefined,
+                            "Namespaced Attribute {} in '{}' redefined\n",
+                            loc,
+                            nsname
+                        );
+                        break;
+                    }
                 }
             }
-
-            Some((localname, prefix, uri))
         }
+
+        let nsname = self.get_namespace(prefix.as_deref());
+        let uri = nsname.map(|uri| uri.to_owned());
+        if let Some(prefix) = prefix.as_deref() {
+            if nsname.is_none() {
+                xml_ns_err!(
+                    self,
+                    XmlParserErrors::XmlNsErrUndefinedNamespace,
+                    "Namespace prefix {} on {} is not defined\n",
+                    prefix,
+                    localname
+                );
+            }
+        }
+
+        // SAX: Start of Element !
+        if self.disable_sax == 0 {
+            if let Some(start_element_ns) =
+                self.sax.as_deref_mut().and_then(|sax| sax.start_element_ns)
+            {
+                let ns_tab = self.ns_tab[self.ns_tab.len() - nb_ns..].to_vec();
+                start_element_ns(
+                    self,
+                    &localname,
+                    prefix.as_deref(),
+                    uri.as_deref(),
+                    &ns_tab,
+                    nbdef,
+                    &atts,
+                );
+            }
+        }
+
+        Some((localname, prefix, uri))
     }
 
     /// Parse the end of an XML element. Always consumes '</'.
     #[doc(alias = "xmlParseElementEnd")]
-    pub(crate) unsafe fn parse_element_end(&mut self) {
-        unsafe {
-            let cur = self.node;
+    pub(crate) fn parse_element_end(&mut self) {
+        let cur = self.node;
 
-            if self.name_tab.is_empty() {
-                if self.content_bytes().starts_with(b"</") {
-                    self.advance(2);
-                }
-                return;
+        if self.name_tab.is_empty() {
+            if self.content_bytes().starts_with(b"</") {
+                self.advance(2);
             }
+            return;
+        }
 
-            // parse the end of tag: '</' should be here.
-            if self.sax2 != 0 {
-                self.parse_end_tag2();
-                self.name_pop();
-            } else {
-                #[cfg(feature = "sax1")]
-                {
-                    self.parse_end_tag1(0);
-                }
+        // parse the end of tag: '</' should be here.
+        if self.sax2 != 0 {
+            self.parse_end_tag2();
+            self.name_pop();
+        } else {
+            #[cfg(feature = "sax1")]
+            {
+                self.parse_end_tag1(0);
             }
+        }
 
-            // Capture end position
-            if let Some(cur) = cur {
-                if self.record_info != 0 {
-                    if let Some(node_info) = self.find_node_info(cur) {
-                        node_info.borrow_mut().end_pos = self.input().unwrap().consumed
-                            + self.input().unwrap().offset_from_base() as u64;
-                        node_info.borrow_mut().end_line = self.input().unwrap().line as _;
-                    }
+        // Capture end position
+        if let Some(cur) = cur {
+            if self.record_info != 0 {
+                if let Some(node_info) = self.find_node_info(cur) {
+                    node_info.borrow_mut().end_pos = self.input().unwrap().consumed
+                        + self.input().unwrap().offset_from_base() as u64;
+                    node_info.borrow_mut().end_line = self.input().unwrap().line as _;
                 }
             }
         }
@@ -831,54 +821,52 @@ impl XmlParserCtxt {
     /// ```
     #[doc(alias = "xmlParseEndTag1")]
     #[cfg(feature = "sax1")]
-    pub(crate) unsafe fn parse_end_tag1(&mut self, line: i32) {
-        unsafe {
-            self.grow();
-            if !self.content_bytes().starts_with(b"</") {
-                xml_fatal_err_msg(
-                    self,
-                    XmlParserErrors::XmlErrLtSlashRequired,
-                    "xmlParseEndTag: '</' not found\n",
-                );
-                return;
-            }
-            self.advance(2);
-
-            let name = self.parse_name_and_compare();
-
-            // We should definitely be at the ending "S? '>'" part
-            self.grow();
-            self.skip_blanks();
-            if !xml_is_char(self.current_byte() as u32) || self.current_byte() != b'>' {
-                xml_fatal_err(self, XmlParserErrors::XmlErrGtRequired, None);
-            } else {
-                self.advance(1);
-            }
-
-            // [ WFC: Element Type Match ]
-            // The Name in an element's end-tag must match the element type in the start-tag.
-            if let Err(name) = name {
-                let name = name.as_deref().unwrap_or("unparsable");
-                xml_fatal_err_msg_str_int_str!(
-                    self,
-                    XmlParserErrors::XmlErrTagNameMismatch,
-                    "Opening and ending tag mismatch: {} line {} and {}\n",
-                    self.name.as_deref().unwrap(),
-                    line,
-                    name
-                );
-            }
-
-            // SAX: End of Tag
-            if self.disable_sax == 0 {
-                if let Some(end_element) = self.sax.as_deref_mut().and_then(|sax| sax.end_element) {
-                    end_element(self, self.name.clone().as_deref().unwrap());
-                }
-            }
-
-            self.name_pop();
-            self.space_pop();
+    pub(crate) fn parse_end_tag1(&mut self, line: i32) {
+        self.grow();
+        if !self.content_bytes().starts_with(b"</") {
+            xml_fatal_err_msg(
+                self,
+                XmlParserErrors::XmlErrLtSlashRequired,
+                "xmlParseEndTag: '</' not found\n",
+            );
+            return;
         }
+        self.advance(2);
+
+        let name = self.parse_name_and_compare();
+
+        // We should definitely be at the ending "S? '>'" part
+        self.grow();
+        self.skip_blanks();
+        if !xml_is_char(self.current_byte() as u32) || self.current_byte() != b'>' {
+            xml_fatal_err(self, XmlParserErrors::XmlErrGtRequired, None);
+        } else {
+            self.advance(1);
+        }
+
+        // [ WFC: Element Type Match ]
+        // The Name in an element's end-tag must match the element type in the start-tag.
+        if let Err(name) = name {
+            let name = name.as_deref().unwrap_or("unparsable");
+            xml_fatal_err_msg_str_int_str!(
+                self,
+                XmlParserErrors::XmlErrTagNameMismatch,
+                "Opening and ending tag mismatch: {} line {} and {}\n",
+                self.name.as_deref().unwrap(),
+                line,
+                name
+            );
+        }
+
+        // SAX: End of Tag
+        if self.disable_sax == 0 {
+            if let Some(end_element) = self.sax.as_deref_mut().and_then(|sax| sax.end_element) {
+                end_element(self, self.name.clone().as_deref().unwrap());
+            }
+        }
+
+        self.name_pop();
+        self.space_pop();
     }
 
     /// Parse an end tag. Always consumes '</'.
@@ -890,66 +878,63 @@ impl XmlParserCtxt {
     /// [NS 9] ETag ::= '</' QName S? '>'
     /// ```
     #[doc(alias = "xmlParseEndTag2")]
-    pub(crate) unsafe fn parse_end_tag2(&mut self) {
-        unsafe {
-            self.grow();
-            if !self.content_bytes().starts_with(b"</") {
-                xml_fatal_err(self, XmlParserErrors::XmlErrLtSlashRequired, None);
-                return;
-            }
-            self.advance(2);
+    pub(crate) fn parse_end_tag2(&mut self) {
+        self.grow();
+        if !self.content_bytes().starts_with(b"</") {
+            xml_fatal_err(self, XmlParserErrors::XmlErrLtSlashRequired, None);
+            return;
+        }
+        self.advance(2);
 
-            let tag_index = self.name_tab.len() - 1;
-            let name = if self.push_tab[tag_index].prefix.is_some() {
-                self.parse_qname_and_compare()
-            } else {
-                self.parse_name_and_compare()
-            };
+        let tag_index = self.name_tab.len() - 1;
+        let name = if self.push_tab[tag_index].prefix.is_some() {
+            self.parse_qname_and_compare()
+        } else {
+            self.parse_name_and_compare()
+        };
 
-            // We should definitely be at the ending "S? '>'" part
-            self.grow();
-            if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                return;
-            }
-            self.skip_blanks();
-            if !xml_is_char(self.current_byte() as u32) || self.current_byte() != b'>' {
-                xml_fatal_err(self, XmlParserErrors::XmlErrGtRequired, None);
-            } else {
-                self.advance(1);
-            }
+        // We should definitely be at the ending "S? '>'" part
+        self.grow();
+        if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+            return;
+        }
+        self.skip_blanks();
+        if !xml_is_char(self.current_byte() as u32) || self.current_byte() != b'>' {
+            xml_fatal_err(self, XmlParserErrors::XmlErrGtRequired, None);
+        } else {
+            self.advance(1);
+        }
 
-            // [ WFC: Element Type Match ]
-            // The Name in an element's end-tag must match the element type in the start-tag.
-            if let Err(name) = name {
-                let name = name.as_deref().unwrap_or("unparsable");
-                xml_fatal_err_msg_str_int_str!(
+        // [ WFC: Element Type Match ]
+        // The Name in an element's end-tag must match the element type in the start-tag.
+        if let Err(name) = name {
+            let name = name.as_deref().unwrap_or("unparsable");
+            xml_fatal_err_msg_str_int_str!(
+                self,
+                XmlParserErrors::XmlErrTagNameMismatch,
+                "Opening and ending tag mismatch: {} line {} and {}\n",
+                self.name.as_deref().unwrap(),
+                self.push_tab[tag_index].line,
+                name
+            );
+        }
+
+        // SAX: End of Tag
+        if self.disable_sax == 0 {
+            if let Some(end_element_ns) = self.sax.as_deref_mut().and_then(|sax| sax.end_element_ns)
+            {
+                end_element_ns(
                     self,
-                    XmlParserErrors::XmlErrTagNameMismatch,
-                    "Opening and ending tag mismatch: {} line {} and {}\n",
-                    self.name.as_deref().unwrap(),
-                    self.push_tab[tag_index].line,
-                    name
+                    self.name.clone().as_deref().unwrap(),
+                    self.push_tab[tag_index].prefix.clone().as_deref(),
+                    self.push_tab[tag_index].uri.clone().as_deref(),
                 );
             }
+        }
 
-            // SAX: End of Tag
-            if self.disable_sax == 0 {
-                if let Some(end_element_ns) =
-                    self.sax.as_deref_mut().and_then(|sax| sax.end_element_ns)
-                {
-                    end_element_ns(
-                        self,
-                        self.name.clone().as_deref().unwrap(),
-                        self.push_tab[tag_index].prefix.clone().as_deref(),
-                        self.push_tab[tag_index].uri.clone().as_deref(),
-                    );
-                }
-            }
-
-            self.space_pop();
-            if self.push_tab[tag_index].ns_nr != 0 {
-                self.ns_pop(self.push_tab[tag_index].ns_nr as usize);
-            }
+        self.space_pop();
+        if self.push_tab[tag_index].ns_nr != 0 {
+            self.ns_pop(self.push_tab[tag_index].ns_nr as usize);
         }
     }
 

@@ -1995,7 +1995,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
 
             cur = now.parent();
             while let Some(parent) = cur {
-                if parent == root.into() {
+                if parent == XmlGenericNodePtr::from(root) {
                     cur = None;
                     break;
                 }

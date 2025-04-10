@@ -133,7 +133,7 @@ impl XmlDoc {
                     }
                     cur = now.next;
                 }
-                if orig != cur_node.into() {
+                if orig != XmlGenericNodePtr::from(cur_node) {
                     let cur = cur_node.ns;
                     if let Some(cur) = cur.filter(|cur| {
                         cur.href.as_deref().is_some_and(|h| h == href)

@@ -251,7 +251,7 @@ pub trait NodeCommon {
             if let Some(mut cur_node) = XmlNodePtr::try_from(cur_node).ok().filter(|&cur_node| {
                 matches!(cur_node.element_type(), XmlElementType::XmlTextNode)
                     && cur_node.content.is_some()
-                    && cur != cur_node.into()
+                    && cur != XmlGenericNodePtr::from(cur_node)
             }) {
                 let node = XmlNodePtr::try_from(cur).unwrap();
                 let content = node.content.as_deref().unwrap();
@@ -469,103 +469,30 @@ pub trait NodeCommon {
     ///
     /// Note that namespace nodes can't be unlinked as they do not have pointer to their parent.
     #[doc(alias = "xmlUnlinkNode")]
-    unsafe fn unlink(&mut self) {
-        unsafe {
-            if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
-                return;
+    fn unlink(&mut self) {
+        if let Some(mut parent) = self.parent() {
+            if parent
+                .children()
+                .is_some_and(|par| std::ptr::addr_eq(par.as_ptr(), self))
+            {
+                parent.set_children(self.next());
             }
-
-            if matches!(self.element_type(), XmlElementType::XmlDTDNode) {
-                let dtd = XmlDtdPtr::from_raw(self as *mut Self as *mut XmlDtd).unwrap();
-                if let Some(mut doc) = self.document() {
-                    if doc.int_subset == dtd {
-                        doc.int_subset = None;
-                    }
-                    if doc.ext_subset == dtd {
-                        doc.ext_subset = None;
-                    }
-                }
+            if parent
+                .last()
+                .is_some_and(|last| std::ptr::addr_eq(last.as_ptr(), self))
+            {
+                parent.set_last(self.prev());
             }
-            if matches!(self.element_type(), XmlElementType::XmlEntityDecl) {
-                let name = self.name().map(|n| n.into_owned());
-                if let Some(doc) = self.document() {
-                    if let Some(int_subset) = doc.int_subset {
-                        if let (Some(mut table), Some(name)) =
-                            (int_subset.entities, name.as_deref())
-                        {
-                            if table.lookup(name).copied()
-                                == XmlEntityPtr::from_raw(self as *mut Self as *mut XmlEntity)
-                                    .unwrap()
-                            {
-                                table.remove_entry(name, |_, _| {}).ok();
-                            }
-                        }
-                        if let (Some(mut table), Some(name)) =
-                            (int_subset.pentities, name.as_deref())
-                        {
-                            if table.lookup(name).copied()
-                                == XmlEntityPtr::from_raw(self as *mut Self as *mut XmlEntity)
-                                    .unwrap()
-                            {
-                                table.remove_entry(name, |_, _| {}).ok();
-                            }
-                        }
-                    }
-                    if let Some(ext_subset) = doc.ext_subset {
-                        if let (Some(mut table), Some(name)) =
-                            (ext_subset.entities, name.as_deref())
-                        {
-                            if table.lookup(name).copied()
-                                == XmlEntityPtr::from_raw(self as *mut Self as *mut XmlEntity)
-                                    .unwrap()
-                            {
-                                table.remove_entry(name, |_, _| {}).ok();
-                            }
-                        }
-                        if let (Some(mut table), Some(name)) =
-                            (ext_subset.pentities, name.as_deref())
-                        {
-                            if table.lookup(name).copied()
-                                == XmlEntityPtr::from_raw(self as *mut Self as *mut XmlEntity)
-                                    .unwrap()
-                            {
-                                table.remove_entry(name, |_, _| {}).ok();
-                            }
-                        }
-                    }
-                }
-            }
-            if let Some(mut parent) = self.parent() {
-                if matches!(self.element_type(), XmlElementType::XmlAttributeNode) {
-                    let mut parent = XmlNodePtr::try_from(parent).unwrap();
-                    if parent.properties
-                        == XmlAttrPtr::from_raw(self as *mut Self as *mut XmlAttr).unwrap()
-                    {
-                        parent.properties = (*(self as *mut Self as *mut XmlAttr)).next;
-                    }
-                } else {
-                    if parent.children()
-                        == XmlGenericNodePtr::from_raw(self as *mut Self as *mut XmlNode)
-                    {
-                        parent.set_children(self.next());
-                    }
-                    if parent.last()
-                        == XmlGenericNodePtr::from_raw(self as *mut Self as *mut XmlNode)
-                    {
-                        parent.set_last(self.prev());
-                    }
-                }
-                self.set_parent(None);
-            }
-            if let Some(mut next) = self.next() {
-                next.set_prev(self.prev());
-            }
-            if let Some(mut prev) = self.prev() {
-                prev.set_next(self.next());
-            }
-            self.set_next(None);
-            self.set_prev(None);
+            self.set_parent(None);
         }
+        if let Some(mut next) = self.next() {
+            next.set_prev(self.prev());
+        }
+        if let Some(mut prev) = self.prev() {
+            prev.set_next(self.next());
+        }
+        self.set_next(None);
+        self.set_prev(None);
     }
 }
 
@@ -691,7 +618,7 @@ impl XmlGenericNodePtr {
                     }
                     cur = now.next;
                 }
-                if orig != cur_node.into() {
+                if orig != XmlGenericNodePtr::from(cur_node) {
                     let cur = cur_node.ns;
                     if let Some(cur) = cur {
                         if cur.prefix().is_none() && namespace.is_none() && cur.href.is_some() {
@@ -1695,6 +1622,15 @@ impl PartialEq for XmlGenericNodePtr {
 }
 
 impl Eq for XmlGenericNodePtr {}
+
+impl<N: NodeCommon> PartialEq<&mut N> for XmlGenericNodePtr {
+    fn eq(&self, other: &&mut N) -> bool {
+        let ptr = self.as_ptr();
+        let other = other as *const &mut N as *mut &mut N;
+        let other = unsafe { *other as *mut N as *mut XmlNode };
+        std::ptr::eq(ptr, other)
+    }
+}
 
 impl Deref for XmlGenericNodePtr {
     type Target = dyn NodeCommon;

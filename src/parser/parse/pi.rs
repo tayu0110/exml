@@ -120,123 +120,120 @@ impl XmlParserCtxt {
     ///
     /// The processing is transferred to SAX once parsed.
     #[doc(alias = "xmlParsePI")]
-    pub(crate) unsafe fn parse_pi(&mut self) {
-        unsafe {
-            let max_length = if self.options & XmlParserOption::XmlParseHuge as i32 != 0 {
-                XML_MAX_HUGE_LENGTH
-            } else {
-                XML_MAX_TEXT_LENGTH
-            };
+    pub(crate) fn parse_pi(&mut self) {
+        let max_length = if self.options & XmlParserOption::XmlParseHuge as i32 != 0 {
+            XML_MAX_HUGE_LENGTH
+        } else {
+            XML_MAX_TEXT_LENGTH
+        };
 
-            let mut buf = String::new();
-            if self.content_bytes().starts_with(b"<?") {
-                let inputid = self.input().unwrap().id;
-                let state = self.instate;
-                self.instate = XmlParserInputState::XmlParserPI;
-                // this is a Processing Instruction.
-                self.advance(2);
+        let mut buf = String::new();
+        if self.content_bytes().starts_with(b"<?") {
+            let inputid = self.input().unwrap().id;
+            let state = self.instate;
+            self.instate = XmlParserInputState::XmlParserPI;
+            // this is a Processing Instruction.
+            self.advance(2);
 
-                // Parse the target name and check for special support like namespace.
-                if let Some(target) = self.parse_pi_target() {
-                    if self.content_bytes().starts_with(b"?>") {
-                        if inputid != self.input().unwrap().id {
-                            xml_fatal_err_msg(
-                                self,
-                                XmlParserErrors::XmlErrEntityBoundary,
-                                "PI declaration doesn't start and stop in the same entity\n",
-                            );
-                        }
-                        self.advance(2);
-
-                        // SAX: PI detected.
-                        if self.disable_sax == 0 {
-                            if let Some(processing_instruction) = self
-                                .sax
-                                .as_deref_mut()
-                                .and_then(|sax| sax.processing_instruction)
-                            {
-                                processing_instruction(self, &target, None);
-                            }
-                        }
-                        if !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                            self.instate = state;
-                        }
-                        return;
-                    }
-                    if self.skip_blanks() == 0 {
-                        xml_fatal_err_msg_str!(
+            // Parse the target name and check for special support like namespace.
+            if let Some(target) = self.parse_pi_target() {
+                if self.content_bytes().starts_with(b"?>") {
+                    if inputid != self.input().unwrap().id {
+                        xml_fatal_err_msg(
                             self,
-                            XmlParserErrors::XmlErrSpaceRequired,
-                            "ParsePI: PI {} space expected\n",
-                            target
+                            XmlParserErrors::XmlErrEntityBoundary,
+                            "PI declaration doesn't start and stop in the same entity\n",
                         );
                     }
-                    while let Some(cur) = self.consume_char_if(|ctxt, c| {
-                        xml_is_char(c as u32) && (c != '?' || ctxt.nth_byte(1) != b'>')
-                    }) {
-                        buf.push(cur);
-                        if buf.len() > max_length {
-                            xml_fatal_err_msg_str!(
-                                self,
-                                XmlParserErrors::XmlErrPINotFinished,
-                                "PI {} too big found",
-                                target
-                            );
-                            self.instate = state;
-                            return;
+                    self.advance(2);
+
+                    // SAX: PI detected.
+                    if self.disable_sax == 0 {
+                        if let Some(processing_instruction) = self
+                            .sax
+                            .as_deref_mut()
+                            .and_then(|sax| sax.processing_instruction)
+                        {
+                            processing_instruction(self, &target, None);
                         }
                     }
-                    if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                        return;
+                    if !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+                        self.instate = state;
                     }
-                    let mut l = 0;
-                    if self.current_char(&mut l).unwrap_or('\0') != '?' {
+                    return;
+                }
+                if self.skip_blanks() == 0 {
+                    xml_fatal_err_msg_str!(
+                        self,
+                        XmlParserErrors::XmlErrSpaceRequired,
+                        "ParsePI: PI {} space expected\n",
+                        target
+                    );
+                }
+                while let Some(cur) = self.consume_char_if(|ctxt, c| {
+                    xml_is_char(c as u32) && (c != '?' || ctxt.nth_byte(1) != b'>')
+                }) {
+                    buf.push(cur);
+                    if buf.len() > max_length {
                         xml_fatal_err_msg_str!(
                             self,
                             XmlParserErrors::XmlErrPINotFinished,
-                            "ParsePI: PI {} never end ...\n",
+                            "PI {} too big found",
                             target
                         );
-                    } else {
-                        if inputid != self.input().unwrap().id {
-                            xml_fatal_err_msg(
-                                self,
-                                XmlParserErrors::XmlErrEntityBoundary,
-                                "PI declaration doesn't start and stop in the same entity\n",
-                            );
-                        }
-                        self.advance(2);
+                        self.instate = state;
+                        return;
+                    }
+                }
+                if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+                    return;
+                }
+                let mut l = 0;
+                if self.current_char(&mut l).unwrap_or('\0') != '?' {
+                    xml_fatal_err_msg_str!(
+                        self,
+                        XmlParserErrors::XmlErrPINotFinished,
+                        "ParsePI: PI {} never end ...\n",
+                        target
+                    );
+                } else {
+                    if inputid != self.input().unwrap().id {
+                        xml_fatal_err_msg(
+                            self,
+                            XmlParserErrors::XmlErrEntityBoundary,
+                            "PI declaration doesn't start and stop in the same entity\n",
+                        );
+                    }
+                    self.advance(2);
 
-                        #[cfg(feature = "catalog")]
-                        if matches!(
-                            state,
-                            XmlParserInputState::XmlParserMisc
-                                | XmlParserInputState::XmlParserStart
-                        ) && target == XML_CATALOG_PI
-                        {
-                            let allow = xml_catalog_get_defaults();
-                            if matches!(allow, XmlCatalogAllow::Document | XmlCatalogAllow::All) {
-                                self.parse_catalog_pi(&buf);
-                            }
-                        }
-
-                        // SAX: PI detected.
-                        if self.disable_sax == 0 {
-                            if let Some(processing_instruction) = self
-                                .sax
-                                .as_deref_mut()
-                                .and_then(|sax| sax.processing_instruction)
-                            {
-                                processing_instruction(self, &target, Some(&buf));
-                            }
+                    #[cfg(feature = "catalog")]
+                    if matches!(
+                        state,
+                        XmlParserInputState::XmlParserMisc | XmlParserInputState::XmlParserStart
+                    ) && target == XML_CATALOG_PI
+                    {
+                        let allow = xml_catalog_get_defaults();
+                        if matches!(allow, XmlCatalogAllow::Document | XmlCatalogAllow::All) {
+                            self.parse_catalog_pi(&buf);
                         }
                     }
-                } else {
-                    xml_fatal_err(self, XmlParserErrors::XmlErrPINotStarted, None);
+
+                    // SAX: PI detected.
+                    if self.disable_sax == 0 {
+                        if let Some(processing_instruction) = self
+                            .sax
+                            .as_deref_mut()
+                            .and_then(|sax| sax.processing_instruction)
+                        {
+                            processing_instruction(self, &target, Some(&buf));
+                        }
+                    }
                 }
-                if !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                    self.instate = state;
-                }
+            } else {
+                xml_fatal_err(self, XmlParserErrors::XmlErrPINotStarted, None);
+            }
+            if !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+                self.instate = state;
             }
         }
     }

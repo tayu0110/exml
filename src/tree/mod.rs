@@ -824,7 +824,7 @@ pub(crate) unsafe fn xml_static_copy_node(
                     }
 
                     now = now.parent().unwrap();
-                    if now == node.into() {
+                    if now == XmlGenericNodePtr::from(node) {
                         break None;
                     }
                     insert = insert.parent().unwrap();
@@ -1483,68 +1483,65 @@ pub fn xml_new_doc_fragment(doc: Option<XmlDocPtr>) -> Option<XmlNodePtr> {
 /// Returns the @old node
 #[doc(alias = "xmlReplaceNode")]
 #[cfg(any(feature = "libxml_tree", feature = "libxml_writer"))]
-pub unsafe fn xml_replace_node(
+pub fn xml_replace_node(
     mut old: XmlGenericNodePtr,
     cur: Option<XmlGenericNodePtr>,
 ) -> Option<XmlGenericNodePtr> {
-    unsafe {
-        if Some(old) == cur {
-            return None;
-        }
-        if matches!(old.element_type(), XmlElementType::XmlNamespaceDecl) || old.parent().is_none()
-        {
-            return None;
-        }
-        let Some(mut cur) =
-            cur.filter(|cur| !matches!(cur.element_type(), XmlElementType::XmlNamespaceDecl))
-        else {
-            old.unlink();
-            return Some(old);
-        };
-        if cur == old {
-            return Some(old);
-        }
-        if matches!(old.element_type(), XmlElementType::XmlAttributeNode)
-            && !matches!(cur.element_type(), XmlElementType::XmlAttributeNode)
-        {
-            return Some(old);
-        }
-        if matches!(cur.element_type(), XmlElementType::XmlAttributeNode)
-            && !matches!(old.element_type(), XmlElementType::XmlAttributeNode)
-        {
-            return Some(old);
-        }
-        cur.unlink();
-        cur.set_doc(old.document());
-        cur.set_parent(old.parent());
-        cur.set_next(old.next());
-        if let Some(mut next) = cur.next() {
-            next.set_prev(Some(cur));
-        }
-        cur.set_prev(old.prev());
-        if let Some(mut prev) = cur.prev() {
-            prev.set_next(Some(cur));
-        }
-        if let Some(mut parent) = cur.parent() {
-            if matches!(cur.element_type(), XmlElementType::XmlAttributeNode) {
-                let mut parent = XmlNodePtr::try_from(parent).unwrap();
-                if parent.properties.map(|prop| prop.into()) == Some(old) {
-                    parent.properties = Some(XmlAttrPtr::try_from(cur).unwrap());
-                }
-            } else {
-                if parent.children() == Some(old) {
-                    parent.set_children(Some(cur));
-                }
-                if parent.last() == Some(old) {
-                    parent.set_last(Some(cur));
-                }
+    if Some(old) == cur {
+        return None;
+    }
+    if matches!(old.element_type(), XmlElementType::XmlNamespaceDecl) || old.parent().is_none() {
+        return None;
+    }
+    let Some(mut cur) =
+        cur.filter(|cur| !matches!(cur.element_type(), XmlElementType::XmlNamespaceDecl))
+    else {
+        old.unlink();
+        return Some(old);
+    };
+    if cur == old {
+        return Some(old);
+    }
+    if matches!(old.element_type(), XmlElementType::XmlAttributeNode)
+        && !matches!(cur.element_type(), XmlElementType::XmlAttributeNode)
+    {
+        return Some(old);
+    }
+    if matches!(cur.element_type(), XmlElementType::XmlAttributeNode)
+        && !matches!(old.element_type(), XmlElementType::XmlAttributeNode)
+    {
+        return Some(old);
+    }
+    cur.unlink();
+    cur.set_doc(old.document());
+    cur.set_parent(old.parent());
+    cur.set_next(old.next());
+    if let Some(mut next) = cur.next() {
+        next.set_prev(Some(cur));
+    }
+    cur.set_prev(old.prev());
+    if let Some(mut prev) = cur.prev() {
+        prev.set_next(Some(cur));
+    }
+    if let Some(mut parent) = cur.parent() {
+        if matches!(cur.element_type(), XmlElementType::XmlAttributeNode) {
+            let mut parent = XmlNodePtr::try_from(parent).unwrap();
+            if parent.properties.map(|prop| prop.into()) == Some(old) {
+                parent.properties = Some(XmlAttrPtr::try_from(cur).unwrap());
+            }
+        } else {
+            if parent.children() == Some(old) {
+                parent.set_children(Some(cur));
+            }
+            if parent.last() == Some(old) {
+                parent.set_last(Some(cur));
             }
         }
-        old.set_next(None);
-        old.set_prev(None);
-        old.set_parent(None);
-        Some(old)
     }
+    old.set_next(None);
+    old.set_prev(None);
+    old.set_parent(None);
+    Some(old)
 }
 
 /// Merge two text nodes into one

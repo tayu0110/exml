@@ -125,64 +125,62 @@ impl XmlParserCtxt {
     /// The Name in the document type declaration must match the element type of the root element.
     /// ```
     #[doc(alias = "xmlParseDocTypeDecl")]
-    pub(crate) unsafe fn parse_doctypedecl(&mut self) {
-        unsafe {
-            // We know that '<!DOCTYPE' has been detected.
-            self.advance(9);
-            self.skip_blanks();
+    pub(crate) fn parse_doctypedecl(&mut self) {
+        // We know that '<!DOCTYPE' has been detected.
+        self.advance(9);
+        self.skip_blanks();
 
-            // Parse the DOCTYPE name.
-            let name = self.parse_name();
-            if name.is_none() {
-                xml_fatal_err_msg(
+        // Parse the DOCTYPE name.
+        let name = self.parse_name();
+        if name.is_none() {
+            xml_fatal_err_msg(
+                self,
+                XmlParserErrors::XmlErrNameRequired,
+                "xmlParseDocTypeDecl : no DOCTYPE name !\n",
+            );
+        }
+        self.int_sub_name = name.as_deref().map(|n| n.into());
+        self.skip_blanks();
+
+        // Check for SystemID and ExternalID
+        let (external_id, uri) = self.parse_external_id(true);
+
+        if uri.is_some() || external_id.is_some() {
+            self.has_external_subset = 1;
+        }
+        self.ext_sub_uri = uri.map(|uri| uri.into());
+        self.ext_sub_system = external_id.map(|id| id.into());
+
+        self.skip_blanks();
+
+        // Create and update the internal subset.
+        if self.disable_sax == 0 {
+            if let Some(internal_subset) =
+                self.sax.as_deref_mut().and_then(|sax| sax.internal_subset)
+            {
+                internal_subset(
                     self,
-                    XmlParserErrors::XmlErrNameRequired,
-                    "xmlParseDocTypeDecl : no DOCTYPE name !\n",
+                    name.as_deref(),
+                    self.ext_sub_system.clone().as_deref(),
+                    self.ext_sub_uri.clone().as_deref(),
                 );
             }
-            self.int_sub_name = name.as_deref().map(|n| n.into());
-            self.skip_blanks();
-
-            // Check for SystemID and ExternalID
-            let (external_id, uri) = self.parse_external_id(true);
-
-            if uri.is_some() || external_id.is_some() {
-                self.has_external_subset = 1;
-            }
-            self.ext_sub_uri = uri.map(|uri| uri.into());
-            self.ext_sub_system = external_id.map(|id| id.into());
-
-            self.skip_blanks();
-
-            // Create and update the internal subset.
-            if self.disable_sax == 0 {
-                if let Some(internal_subset) =
-                    self.sax.as_deref_mut().and_then(|sax| sax.internal_subset)
-                {
-                    internal_subset(
-                        self,
-                        name.as_deref(),
-                        self.ext_sub_system.clone().as_deref(),
-                        self.ext_sub_uri.clone().as_deref(),
-                    );
-                }
-            }
-            if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                return;
-            }
-
-            // Is there any internal subset declarations ?
-            // they are handled separately in xmlParseInternalSubset()
-            if self.current_byte() == b'[' {
-                return;
-            }
-
-            // We should be at the end of the DOCTYPE declaration.
-            if self.current_byte() != b'>' {
-                xml_fatal_err(self, XmlParserErrors::XmlErrDoctypeNotFinished, None);
-            }
-            self.skip_char();
         }
+        if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+            return;
+        }
+
+        // Is there any internal subset declarations ?
+        // they are handled separately in xmlParseInternalSubset()
+        if self.current_byte() == b'[' {
+            return;
+        }
+
+        // We should be at the end of the DOCTYPE declaration.
+        if self.current_byte() != b'>' {
+            xml_fatal_err(self, XmlParserErrors::XmlErrDoctypeNotFinished, None);
+        }
+        self.skip_char();
     }
 
     /// Parse the internal subset declaration
@@ -1096,130 +1094,124 @@ impl XmlParserCtxt {
     /// [53] AttDef      ::= S Name S AttType S DefaultDecl
     /// ```
     #[doc(alias = "xmlParseAttributeListDecl")]
-    unsafe fn parse_attribute_list_decl(&mut self) {
-        unsafe {
-            if !self.content_bytes().starts_with(b"<!") {
-                return;
+    fn parse_attribute_list_decl(&mut self) {
+        if !self.content_bytes().starts_with(b"<!") {
+            return;
+        }
+        self.advance(2);
+
+        if self.content_bytes().starts_with(b"ATTLIST") {
+            let inputid: i32 = self.input().unwrap().id;
+
+            self.advance(7);
+            if self.skip_blanks() == 0 {
+                xml_fatal_err_msg(
+                    self,
+                    XmlParserErrors::XmlErrSpaceRequired,
+                    "Space required after '<!ATTLIST'\n",
+                );
             }
-            self.advance(2);
-
-            if self.content_bytes().starts_with(b"ATTLIST") {
-                let inputid: i32 = self.input().unwrap().id;
-
-                self.advance(7);
+            let Some(elem_name) = self.parse_name() else {
+                xml_fatal_err_msg(
+                    self,
+                    XmlParserErrors::XmlErrNameRequired,
+                    "ATTLIST: no name for Element\n",
+                );
+                return;
+            };
+            self.skip_blanks();
+            self.grow();
+            while self.current_byte() != b'>'
+                && !matches!(self.instate, XmlParserInputState::XmlParserEOF)
+            {
+                self.grow();
+                let Some(attr_name) = self.parse_name() else {
+                    xml_fatal_err_msg(
+                        self,
+                        XmlParserErrors::XmlErrNameRequired,
+                        "ATTLIST: no name for Attribute\n",
+                    );
+                    break;
+                };
+                self.grow();
                 if self.skip_blanks() == 0 {
                     xml_fatal_err_msg(
                         self,
                         XmlParserErrors::XmlErrSpaceRequired,
-                        "Space required after '<!ATTLIST'\n",
+                        "Space required after the attribute name\n",
                     );
+                    break;
                 }
-                let Some(elem_name) = self.parse_name() else {
+
+                let mut tree = None;
+                let Some(typ) = self.parse_attribute_type(&mut tree) else {
+                    break;
+                };
+
+                self.grow();
+                if self.skip_blanks() == 0 {
                     xml_fatal_err_msg(
                         self,
-                        XmlParserErrors::XmlErrNameRequired,
-                        "ATTLIST: no name for Element\n",
+                        XmlParserErrors::XmlErrSpaceRequired,
+                        "Space required after the attribute typ\n",
                     );
-                    return;
-                };
-                self.skip_blanks();
+                    break;
+                }
+
+                let (def, mut default_value) = self.parse_default_decl();
+                if typ != XmlAttributeType::XmlAttributeCDATA {
+                    if let Some(value) = default_value {
+                        default_value = Some(attr_normalize_space(&value).into_owned());
+                    }
+                }
+
                 self.grow();
-                while self.current_byte() != b'>'
-                    && !matches!(self.instate, XmlParserInputState::XmlParserEOF)
+                if self.current_byte() != b'>' && self.skip_blanks() == 0 {
+                    xml_fatal_err_msg(
+                        self,
+                        XmlParserErrors::XmlErrSpaceRequired,
+                        "Space required after the attribute default value\n",
+                    );
+                    break;
+                }
+                if let Some(attribute_decl) = self
+                    .sax
+                    .as_deref_mut()
+                    .filter(|_| self.disable_sax == 0)
+                    .and_then(|sax| sax.attribute_decl)
                 {
-                    self.grow();
-                    let Some(attr_name) = self.parse_name() else {
-                        xml_fatal_err_msg(
-                            self,
-                            XmlParserErrors::XmlErrNameRequired,
-                            "ATTLIST: no name for Attribute\n",
-                        );
-                        break;
-                    };
-                    self.grow();
-                    if self.skip_blanks() == 0 {
-                        xml_fatal_err_msg(
-                            self,
-                            XmlParserErrors::XmlErrSpaceRequired,
-                            "Space required after the attribute name\n",
-                        );
-                        break;
-                    }
-
-                    let mut tree = None;
-                    let Some(typ) = self.parse_attribute_type(&mut tree) else {
-                        break;
-                    };
-
-                    self.grow();
-                    if self.skip_blanks() == 0 {
-                        xml_fatal_err_msg(
-                            self,
-                            XmlParserErrors::XmlErrSpaceRequired,
-                            "Space required after the attribute typ\n",
-                        );
-                        break;
-                    }
-
-                    let (def, mut default_value) = self.parse_default_decl();
-                    if typ != XmlAttributeType::XmlAttributeCDATA {
-                        if let Some(value) = default_value {
-                            default_value = Some(attr_normalize_space(&value).into_owned());
-                        }
-                    }
-
-                    self.grow();
-                    if self.current_byte() != b'>' && self.skip_blanks() == 0 {
-                        xml_fatal_err_msg(
-                            self,
-                            XmlParserErrors::XmlErrSpaceRequired,
-                            "Space required after the attribute default value\n",
-                        );
-                        break;
-                    }
-                    if let Some(attribute_decl) = self
-                        .sax
-                        .as_deref_mut()
-                        .filter(|_| self.disable_sax == 0)
-                        .and_then(|sax| sax.attribute_decl)
-                    {
-                        attribute_decl(
-                            self,
-                            &elem_name,
-                            &attr_name,
-                            typ,
-                            def,
-                            default_value.as_deref(),
-                            tree,
-                        );
-                    }
-
-                    if self.sax2 != 0
-                        && default_value.is_some()
-                        && def != XmlAttributeDefault::XmlAttributeImplied
-                        && def != XmlAttributeDefault::XmlAttributeRequired
-                    {
-                        self.add_def_attrs(
-                            &elem_name,
-                            &attr_name,
-                            default_value.as_deref().unwrap(),
-                        );
-                    }
-                    if self.sax2 != 0 {
-                        self.add_special_attr(&elem_name, &attr_name, typ);
-                    }
-                    self.grow();
+                    attribute_decl(
+                        self,
+                        &elem_name,
+                        &attr_name,
+                        typ,
+                        def,
+                        default_value.as_deref(),
+                        tree,
+                    );
                 }
-                if self.current_byte() == b'>' {
-                    if inputid != self.input().unwrap().id {
-                        xml_fatal_err_msg(
-                            self,
-                            XmlParserErrors::XmlErrEntityBoundary,
-                            "Attribute list declaration doesn't start and stop in the same entity\n",
-                        );
-                    }
-                    self.skip_char();
+
+                if self.sax2 != 0
+                    && default_value.is_some()
+                    && def != XmlAttributeDefault::XmlAttributeImplied
+                    && def != XmlAttributeDefault::XmlAttributeRequired
+                {
+                    self.add_def_attrs(&elem_name, &attr_name, default_value.as_deref().unwrap());
                 }
+                if self.sax2 != 0 {
+                    self.add_special_attr(&elem_name, &attr_name, typ);
+                }
+                self.grow();
+            }
+            if self.current_byte() == b'>' {
+                if inputid != self.input().unwrap().id {
+                    xml_fatal_err_msg(
+                        self,
+                        XmlParserErrors::XmlErrEntityBoundary,
+                        "Attribute list declaration doesn't start and stop in the same entity\n",
+                    );
+                }
+                self.skip_char();
             }
         }
     }
@@ -1262,38 +1254,36 @@ impl XmlParserCtxt {
     ///
     /// Returns the attribute type
     #[doc(alias = "xmlParseAttributeType")]
-    unsafe fn parse_attribute_type(
+    fn parse_attribute_type(
         &mut self,
         tree: &mut Option<Box<XmlEnumeration>>,
     ) -> Option<XmlAttributeType> {
-        unsafe {
-            if self.content_bytes().starts_with(b"CDATA") {
-                self.advance(5);
-                return Some(XmlAttributeType::XmlAttributeCDATA);
-            } else if self.content_bytes().starts_with(b"IDREFS") {
-                self.advance(6);
-                return Some(XmlAttributeType::XmlAttributeIDREFS);
-            } else if self.content_bytes().starts_with(b"IDREF") {
-                self.advance(5);
-                return Some(XmlAttributeType::XmlAttributeIDREF);
-            } else if self.content_bytes().starts_with(b"ID") {
-                self.advance(2);
-                return Some(XmlAttributeType::XmlAttributeID);
-            } else if self.content_bytes().starts_with(b"ENTITY") {
-                self.advance(6);
-                return Some(XmlAttributeType::XmlAttributeEntity);
-            } else if self.content_bytes().starts_with(b"ENTITIES") {
-                self.advance(8);
-                return Some(XmlAttributeType::XmlAttributeEntities);
-            } else if self.content_bytes().starts_with(b"NMTOKENS") {
-                self.advance(8);
-                return Some(XmlAttributeType::XmlAttributeNmtokens);
-            } else if self.content_bytes().starts_with(b"NMTOKEN") {
-                self.advance(7);
-                return Some(XmlAttributeType::XmlAttributeNmtoken);
-            }
-            self.parse_enumerated_type(tree)
+        if self.content_bytes().starts_with(b"CDATA") {
+            self.advance(5);
+            return Some(XmlAttributeType::XmlAttributeCDATA);
+        } else if self.content_bytes().starts_with(b"IDREFS") {
+            self.advance(6);
+            return Some(XmlAttributeType::XmlAttributeIDREFS);
+        } else if self.content_bytes().starts_with(b"IDREF") {
+            self.advance(5);
+            return Some(XmlAttributeType::XmlAttributeIDREF);
+        } else if self.content_bytes().starts_with(b"ID") {
+            self.advance(2);
+            return Some(XmlAttributeType::XmlAttributeID);
+        } else if self.content_bytes().starts_with(b"ENTITY") {
+            self.advance(6);
+            return Some(XmlAttributeType::XmlAttributeEntity);
+        } else if self.content_bytes().starts_with(b"ENTITIES") {
+            self.advance(8);
+            return Some(XmlAttributeType::XmlAttributeEntities);
+        } else if self.content_bytes().starts_with(b"NMTOKENS") {
+            self.advance(8);
+            return Some(XmlAttributeType::XmlAttributeNmtokens);
+        } else if self.content_bytes().starts_with(b"NMTOKEN") {
+            self.advance(7);
+            return Some(XmlAttributeType::XmlAttributeNmtoken);
         }
+        self.parse_enumerated_type(tree)
     }
 
     /// Parse an Enumerated attribute type.
@@ -1305,33 +1295,31 @@ impl XmlParserCtxt {
     ///
     /// Returns: XML_ATTRIBUTE_ENUMERATION or XML_ATTRIBUTE_NOTATION
     #[doc(alias = "xmlParseEnumeratedType")]
-    unsafe fn parse_enumerated_type(
+    fn parse_enumerated_type(
         &mut self,
         tree: &mut Option<Box<XmlEnumeration>>,
     ) -> Option<XmlAttributeType> {
-        unsafe {
-            if self.content_bytes().starts_with(b"NOTATION") {
-                self.advance(8);
-                if self.skip_blanks() == 0 {
-                    xml_fatal_err_msg(
-                        self,
-                        XmlParserErrors::XmlErrSpaceRequired,
-                        "Space required after 'NOTATION'\n",
-                    );
-                    return None;
-                }
-                *tree = self.parse_notation_type();
-                if tree.is_none() {
-                    return None;
-                }
-                return Some(XmlAttributeType::XmlAttributeNotation);
+        if self.content_bytes().starts_with(b"NOTATION") {
+            self.advance(8);
+            if self.skip_blanks() == 0 {
+                xml_fatal_err_msg(
+                    self,
+                    XmlParserErrors::XmlErrSpaceRequired,
+                    "Space required after 'NOTATION'\n",
+                );
+                return None;
             }
-            *tree = self.parse_enumeration_type();
+            *tree = self.parse_notation_type();
             if tree.is_none() {
                 return None;
             }
-            Some(XmlAttributeType::XmlAttributeEnumeration)
+            return Some(XmlAttributeType::XmlAttributeNotation);
         }
+        *tree = self.parse_enumeration_type();
+        if tree.is_none() {
+            return None;
+        }
+        Some(XmlAttributeType::XmlAttributeEnumeration)
     }
 
     /// Parse an Notation attribute type.
@@ -1349,59 +1337,57 @@ impl XmlParserCtxt {
     ///
     /// Returns: the notation attribute tree built while parsing
     #[doc(alias = "xmlParseNotationType")]
-    unsafe fn parse_notation_type(&mut self) -> Option<Box<XmlEnumeration>> {
-        unsafe {
-            let mut ret = None::<Box<XmlEnumeration>>;
+    fn parse_notation_type(&mut self) -> Option<Box<XmlEnumeration>> {
+        let mut ret = None::<Box<XmlEnumeration>>;
 
-            if self.current_byte() != b'(' {
-                xml_fatal_err(self, XmlParserErrors::XmlErrNotationNotStarted, None);
-                return None;
-            }
-            while {
-                self.skip_char();
-                self.skip_blanks();
-                let Some(name) = self.parse_name() else {
-                    xml_fatal_err_msg(
-                        self,
-                        XmlParserErrors::XmlErrNameRequired,
-                        "Name expected in NOTATION declaration\n",
-                    );
-                    return None;
-                };
-                let mut tmp = ret.as_deref();
-                while let Some(now) = tmp {
-                    if name == now.name {
-                        xml_validity_error!(
-                            self,
-                            XmlParserErrors::XmlDTDDupToken,
-                            "standalone: attribute notation value token {} duplicated\n",
-                            name
-                        );
-                        break;
-                    }
-                    tmp = now.next.as_deref();
-                }
-                if tmp.is_none() {
-                    let cur = xml_create_enumeration(&name);
-                    if let Some(mut ret) = ret.as_deref_mut() {
-                        while ret.next.is_some() {
-                            ret = ret.next.as_deref_mut().unwrap();
-                        }
-                        ret.next = Some(cur);
-                    } else {
-                        ret = Some(cur);
-                    }
-                }
-                self.skip_blanks();
-                self.current_byte() == b'|'
-            } {}
-            if self.current_byte() != b')' {
-                xml_fatal_err(self, XmlParserErrors::XmlErrNotationNotFinished, None);
-                return None;
-            }
-            self.skip_char();
-            ret
+        if self.current_byte() != b'(' {
+            xml_fatal_err(self, XmlParserErrors::XmlErrNotationNotStarted, None);
+            return None;
         }
+        while {
+            self.skip_char();
+            self.skip_blanks();
+            let Some(name) = self.parse_name() else {
+                xml_fatal_err_msg(
+                    self,
+                    XmlParserErrors::XmlErrNameRequired,
+                    "Name expected in NOTATION declaration\n",
+                );
+                return None;
+            };
+            let mut tmp = ret.as_deref();
+            while let Some(now) = tmp {
+                if name == now.name {
+                    xml_validity_error!(
+                        self,
+                        XmlParserErrors::XmlDTDDupToken,
+                        "standalone: attribute notation value token {} duplicated\n",
+                        name
+                    );
+                    break;
+                }
+                tmp = now.next.as_deref();
+            }
+            if tmp.is_none() {
+                let cur = xml_create_enumeration(&name);
+                if let Some(mut ret) = ret.as_deref_mut() {
+                    while ret.next.is_some() {
+                        ret = ret.next.as_deref_mut().unwrap();
+                    }
+                    ret.next = Some(cur);
+                } else {
+                    ret = Some(cur);
+                }
+            }
+            self.skip_blanks();
+            self.current_byte() == b'|'
+        } {}
+        if self.current_byte() != b')' {
+            xml_fatal_err(self, XmlParserErrors::XmlErrNotationNotFinished, None);
+            return None;
+        }
+        self.skip_char();
+        ret
     }
 
     /// Parse an Enumeration attribute type.
@@ -1415,55 +1401,53 @@ impl XmlParserCtxt {
     ///
     /// Returns: the enumeration attribute tree built while parsing
     #[doc(alias = "xmlParseEnumerationType")]
-    unsafe fn parse_enumeration_type(&mut self) -> Option<Box<XmlEnumeration>> {
-        unsafe {
-            let mut ret = None::<Box<XmlEnumeration>>;
+    fn parse_enumeration_type(&mut self) -> Option<Box<XmlEnumeration>> {
+        let mut ret = None::<Box<XmlEnumeration>>;
 
-            if self.current_byte() != b'(' {
-                xml_fatal_err(self, XmlParserErrors::XmlErrAttlistNotStarted, None);
-                return None;
-            }
-            while {
-                self.skip_char();
-                self.skip_blanks();
-                let Some(name) = self.parse_nmtoken() else {
-                    xml_fatal_err(self, XmlParserErrors::XmlErrNmtokenRequired, None);
-                    return ret;
-                };
-                let mut tmp = ret.as_deref();
-                while let Some(now) = tmp {
-                    if name == now.name {
-                        xml_validity_error!(
-                            self,
-                            XmlParserErrors::XmlDTDDupToken,
-                            "standalone: attribute enumeration value token {} duplicated\n",
-                            name
-                        );
-                        break;
-                    }
-                    tmp = now.next.as_deref();
-                }
-                if tmp.is_none() {
-                    let cur = xml_create_enumeration(&name);
-                    if let Some(mut ret) = ret.as_deref_mut() {
-                        while ret.next.is_some() {
-                            ret = ret.next.as_deref_mut().unwrap();
-                        }
-                        ret.next = Some(cur);
-                    } else {
-                        ret = Some(cur);
-                    }
-                }
-                self.skip_blanks();
-                self.current_byte() == b'|'
-            } {}
-            if self.current_byte() != b')' {
-                xml_fatal_err(self, XmlParserErrors::XmlErrAttlistNotFinished, None);
-                return ret;
-            }
-            self.skip_char();
-            ret
+        if self.current_byte() != b'(' {
+            xml_fatal_err(self, XmlParserErrors::XmlErrAttlistNotStarted, None);
+            return None;
         }
+        while {
+            self.skip_char();
+            self.skip_blanks();
+            let Some(name) = self.parse_nmtoken() else {
+                xml_fatal_err(self, XmlParserErrors::XmlErrNmtokenRequired, None);
+                return ret;
+            };
+            let mut tmp = ret.as_deref();
+            while let Some(now) = tmp {
+                if name == now.name {
+                    xml_validity_error!(
+                        self,
+                        XmlParserErrors::XmlDTDDupToken,
+                        "standalone: attribute enumeration value token {} duplicated\n",
+                        name
+                    );
+                    break;
+                }
+                tmp = now.next.as_deref();
+            }
+            if tmp.is_none() {
+                let cur = xml_create_enumeration(&name);
+                if let Some(mut ret) = ret.as_deref_mut() {
+                    while ret.next.is_some() {
+                        ret = ret.next.as_deref_mut().unwrap();
+                    }
+                    ret.next = Some(cur);
+                } else {
+                    ret = Some(cur);
+                }
+            }
+            self.skip_blanks();
+            self.current_byte() == b'|'
+        } {}
+        if self.current_byte() != b')' {
+            xml_fatal_err(self, XmlParserErrors::XmlErrAttlistNotFinished, None);
+            return ret;
+        }
+        self.skip_char();
+        ret
     }
 
     /// Parse an attribute default declaration
@@ -1492,39 +1476,37 @@ impl XmlParserCtxt {
     /// returns: XML_ATTRIBUTE_NONE, XML_ATTRIBUTE_REQUIRED, XML_ATTRIBUTE_IMPLIED
     ///  or XML_ATTRIBUTE_FIXED.
     #[doc(alias = "xmlParseDefaultDecl")]
-    unsafe fn parse_default_decl(&mut self) -> (XmlAttributeDefault, Option<String>) {
-        unsafe {
-            if self.content_bytes().starts_with(b"#REQUIRED") {
-                self.advance(9);
-                return (XmlAttributeDefault::XmlAttributeRequired, None);
-            }
-            if self.content_bytes().starts_with(b"#IMPLIED") {
-                self.advance(8);
-                return (XmlAttributeDefault::XmlAttributeImplied, None);
-            }
-            let mut val = XmlAttributeDefault::XmlAttributeNone;
-            if self.content_bytes().starts_with(b"#FIXED") {
-                self.advance(6);
-                val = XmlAttributeDefault::XmlAttributeFixed;
-                if self.skip_blanks() == 0 {
-                    xml_fatal_err_msg(
-                        self,
-                        XmlParserErrors::XmlErrSpaceRequired,
-                        "Space required after '#FIXED'\n",
-                    );
-                }
-            }
-            let ret = self.parse_att_value();
-            self.instate = XmlParserInputState::XmlParserDTD;
-            if ret.is_none() {
+    fn parse_default_decl(&mut self) -> (XmlAttributeDefault, Option<String>) {
+        if self.content_bytes().starts_with(b"#REQUIRED") {
+            self.advance(9);
+            return (XmlAttributeDefault::XmlAttributeRequired, None);
+        }
+        if self.content_bytes().starts_with(b"#IMPLIED") {
+            self.advance(8);
+            return (XmlAttributeDefault::XmlAttributeImplied, None);
+        }
+        let mut val = XmlAttributeDefault::XmlAttributeNone;
+        if self.content_bytes().starts_with(b"#FIXED") {
+            self.advance(6);
+            val = XmlAttributeDefault::XmlAttributeFixed;
+            if self.skip_blanks() == 0 {
                 xml_fatal_err_msg(
                     self,
-                    XmlParserErrors::try_from(self.err_no).unwrap(),
-                    "Attribute default value declaration error\n",
+                    XmlParserErrors::XmlErrSpaceRequired,
+                    "Space required after '#FIXED'\n",
                 );
             }
-            (val, ret)
         }
+        let ret = self.parse_att_value();
+        self.instate = XmlParserInputState::XmlParserDTD;
+        if ret.is_none() {
+            xml_fatal_err_msg(
+                self,
+                XmlParserErrors::try_from(self.err_no).unwrap(),
+                "Attribute default value declaration error\n",
+            );
+        }
+        (val, ret)
     }
 
     /// Parse a conditional section. Always consumes '<!['.
@@ -1706,161 +1688,159 @@ impl XmlParserCtxt {
     /// NOTE: misleading but this is handled.
     /// ```
     #[doc(alias = "xmlParsePEReference")]
-    pub(crate) unsafe fn parse_pe_reference(&mut self) {
-        unsafe {
-            if self.current_byte() != b'%' {
-                return;
-            }
-            self.skip_char();
-            let Some(name) = self.parse_name() else {
-                xml_fatal_err_msg(
+    pub(crate) fn parse_pe_reference(&mut self) {
+        if self.current_byte() != b'%' {
+            return;
+        }
+        self.skip_char();
+        let Some(name) = self.parse_name() else {
+            xml_fatal_err_msg(
+                self,
+                XmlParserErrors::XmlErrPERefNoName,
+                "PEReference: no name\n",
+            );
+            return;
+        };
+        if get_parser_debug_entities() != 0 {
+            generic_error!("PEReference: {}\n", name);
+        }
+        if self.current_byte() != b';' {
+            xml_fatal_err(self, XmlParserErrors::XmlErrPERefSemicolMissing, None);
+            return;
+        }
+
+        self.skip_char();
+
+        // Request the entity from SAX
+        let entity = self
+            .sax
+            .as_deref_mut()
+            .and_then(|sax| sax.get_parameter_entity)
+            .and_then(|get_parameter_entity| get_parameter_entity(self, &name));
+        if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+            return;
+        }
+        if let Some(mut entity) = entity {
+            // Internal checking in case the entity quest barfed
+            if !matches!(
+                entity.etype,
+                XmlEntityType::XmlInternalParameterEntity
+                    | XmlEntityType::XmlExternalParameterEntity
+            ) {
+                xml_warning_msg!(
                     self,
-                    XmlParserErrors::XmlErrPERefNoName,
-                    "PEReference: no name\n",
+                    XmlParserErrors::XmlWarUndeclaredEntity,
+                    "Internal: %{}; is not a parameter entity\n",
+                    name
                 );
-                return;
-            };
-            if get_parser_debug_entities() != 0 {
-                generic_error!("PEReference: {}\n", name);
-            }
-            if self.current_byte() != b';' {
-                xml_fatal_err(self, XmlParserErrors::XmlErrPERefSemicolMissing, None);
-                return;
-            }
+            } else {
+                if matches!(entity.etype, XmlEntityType::XmlExternalParameterEntity)
+                    && self.options & XmlParserOption::XmlParseNoEnt as i32 == 0
+                    && self.options & XmlParserOption::XmlParseDTDValid as i32 == 0
+                    && self.options & XmlParserOption::XmlParseDTDLoad as i32 == 0
+                    && self.options & XmlParserOption::XmlParseDTDAttr as i32 == 0
+                    && self.replace_entities == 0
+                    && self.validate == 0
+                {
+                    return;
+                }
 
-            self.skip_char();
+                if entity.flags & XML_ENT_EXPANDING as i32 != 0 {
+                    xml_fatal_err(self, XmlParserErrors::XmlErrEntityLoop, None);
+                    self.halt();
+                    return;
+                }
 
-            // Request the entity from SAX
-            let entity = self
-                .sax
-                .as_deref_mut()
-                .and_then(|sax| sax.get_parameter_entity)
-                .and_then(|get_parameter_entity| get_parameter_entity(self, &name));
-            if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                return;
-            }
-            if let Some(mut entity) = entity {
-                // Internal checking in case the entity quest barfed
-                if !matches!(
-                    entity.etype,
-                    XmlEntityType::XmlInternalParameterEntity
-                        | XmlEntityType::XmlExternalParameterEntity
-                ) {
-                    xml_warning_msg!(
-                        self,
-                        XmlParserErrors::XmlWarUndeclaredEntity,
-                        "Internal: %{}; is not a parameter entity\n",
-                        name
-                    );
-                } else {
-                    if matches!(entity.etype, XmlEntityType::XmlExternalParameterEntity)
-                        && self.options & XmlParserOption::XmlParseNoEnt as i32 == 0
-                        && self.options & XmlParserOption::XmlParseDTDValid as i32 == 0
-                        && self.options & XmlParserOption::XmlParseDTDLoad as i32 == 0
-                        && self.options & XmlParserOption::XmlParseDTDAttr as i32 == 0
-                        && self.replace_entities == 0
-                        && self.validate == 0
+                // Must be computed from old input before pushing new input.
+                let mut parent_consumed = self.input().unwrap().parent_consumed;
+                let old_ent = self.input().unwrap().entity;
+                if old_ent.is_none_or(|old_ent| {
+                    matches!(old_ent.etype, XmlEntityType::XmlExternalParameterEntity)
+                        && old_ent.flags & XML_ENT_PARSED as i32 == 0
+                }) {
+                    parent_consumed =
+                        parent_consumed.saturating_add(self.input().unwrap().consumed);
+                    parent_consumed = parent_consumed
+                        .saturating_add(self.input().unwrap().offset_from_base() as u64);
+                }
+
+                let Some(mut input) = XmlParserInput::from_entity(self, entity) else {
+                    return;
+                };
+                input.parent_consumed = parent_consumed;
+                if self.push_input(input) < 0 {
+                    return;
+                }
+
+                entity.flags |= XML_ENT_EXPANDING as i32;
+
+                if matches!(entity.etype, XmlEntityType::XmlExternalParameterEntity) {
+                    // Get the 4 first bytes and decode the charset
+                    // if enc != XML_CHAR_ENCODING_NONE
+                    // plug some encoding conversion routines.
+                    // Note that, since we may have some non-UTF8
+                    // encoding (like UTF16, bug 135229), the 'length'
+                    // is not known, but we can calculate based upon
+                    // the amount of data in the buffer.
+                    self.grow();
+                    if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+                        return;
+                    }
+                    if self.input().unwrap().remainder_len() >= 4 {
+                        let mut start: [u8; 4] = [0; 4];
+                        start.copy_from_slice(&self.content_bytes()[..4]);
+                        let enc = detect_encoding(&start);
+                        if !matches!(enc, XmlCharEncoding::None) {
+                            self.switch_encoding(enc);
+                        }
+                    }
+
+                    if self.content_bytes().starts_with(b"<?xml")
+                        && xml_is_blank_char(self.nth_byte(5) as u32)
                     {
-                        return;
-                    }
-
-                    if entity.flags & XML_ENT_EXPANDING as i32 != 0 {
-                        xml_fatal_err(self, XmlParserErrors::XmlErrEntityLoop, None);
-                        self.halt();
-                        return;
-                    }
-
-                    // Must be computed from old input before pushing new input.
-                    let mut parent_consumed = self.input().unwrap().parent_consumed;
-                    let old_ent = self.input().unwrap().entity;
-                    if old_ent.is_none_or(|old_ent| {
-                        matches!(old_ent.etype, XmlEntityType::XmlExternalParameterEntity)
-                            && old_ent.flags & XML_ENT_PARSED as i32 == 0
-                    }) {
-                        parent_consumed =
-                            parent_consumed.saturating_add(self.input().unwrap().consumed);
-                        parent_consumed = parent_consumed
-                            .saturating_add(self.input().unwrap().offset_from_base() as u64);
-                    }
-
-                    let Some(mut input) = XmlParserInput::from_entity(self, entity) else {
-                        return;
-                    };
-                    input.parent_consumed = parent_consumed;
-                    if self.push_input(input) < 0 {
-                        return;
-                    }
-
-                    entity.flags |= XML_ENT_EXPANDING as i32;
-
-                    if matches!(entity.etype, XmlEntityType::XmlExternalParameterEntity) {
-                        // Get the 4 first bytes and decode the charset
-                        // if enc != XML_CHAR_ENCODING_NONE
-                        // plug some encoding conversion routines.
-                        // Note that, since we may have some non-UTF8
-                        // encoding (like UTF16, bug 135229), the 'length'
-                        // is not known, but we can calculate based upon
-                        // the amount of data in the buffer.
-                        self.grow();
-                        if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                            return;
-                        }
-                        if self.input().unwrap().remainder_len() >= 4 {
-                            let mut start: [u8; 4] = [0; 4];
-                            start.copy_from_slice(&self.content_bytes()[..4]);
-                            let enc = detect_encoding(&start);
-                            if !matches!(enc, XmlCharEncoding::None) {
-                                self.switch_encoding(enc);
-                            }
-                        }
-
-                        if self.content_bytes().starts_with(b"<?xml")
-                            && xml_is_blank_char(self.nth_byte(5) as u32)
-                        {
-                            self.parse_text_decl();
-                        }
+                        self.parse_text_decl();
                     }
                 }
+            }
+        } else {
+            // [ WFC: Entity Declared ]
+            // In a document without any DTD, a document with only an
+            // internal DTD subset which contains no parameter entity
+            // references, or a document with "standalone='yes'", ...
+            // ... The declaration of a parameter entity must precede
+            // any reference to it...
+            if self.standalone == 1 || (self.has_external_subset == 0 && self.has_perefs == 0) {
+                xml_fatal_err_msg_str!(
+                    self,
+                    XmlParserErrors::XmlErrUndeclaredEntity,
+                    "PEReference: %{}; not found\n",
+                    name
+                );
             } else {
-                // [ WFC: Entity Declared ]
-                // In a document without any DTD, a document with only an
-                // internal DTD subset which contains no parameter entity
-                // references, or a document with "standalone='yes'", ...
-                // ... The declaration of a parameter entity must precede
-                // any reference to it...
-                if self.standalone == 1 || (self.has_external_subset == 0 && self.has_perefs == 0) {
-                    xml_fatal_err_msg_str!(
+                // [ VC: Entity Declared ]
+                // In a document with an external subset or external
+                // parameter entities with "standalone='no'", ...
+                // ... The declaration of a parameter entity must
+                // precede any reference to it...
+                if self.validate != 0 && self.vctxt.error.is_some() {
+                    xml_validity_error!(
                         self,
-                        XmlParserErrors::XmlErrUndeclaredEntity,
+                        XmlParserErrors::XmlWarUndeclaredEntity,
                         "PEReference: %{}; not found\n",
                         name
                     );
                 } else {
-                    // [ VC: Entity Declared ]
-                    // In a document with an external subset or external
-                    // parameter entities with "standalone='no'", ...
-                    // ... The declaration of a parameter entity must
-                    // precede any reference to it...
-                    if self.validate != 0 && self.vctxt.error.is_some() {
-                        xml_validity_error!(
-                            self,
-                            XmlParserErrors::XmlWarUndeclaredEntity,
-                            "PEReference: %{}; not found\n",
-                            name
-                        );
-                    } else {
-                        xml_warning_msg!(
-                            self,
-                            XmlParserErrors::XmlWarUndeclaredEntity,
-                            "PEReference: %{}; not found\n",
-                            name
-                        );
-                    }
-                    self.valid = 0;
+                    xml_warning_msg!(
+                        self,
+                        XmlParserErrors::XmlWarUndeclaredEntity,
+                        "PEReference: %{}; not found\n",
+                        name
+                    );
                 }
+                self.valid = 0;
             }
-            self.has_perefs = 1;
         }
+        self.has_perefs = 1;
     }
 
     /// Parse an entity declaration. Always consumes '<!'.
@@ -1877,129 +1857,227 @@ impl XmlParserCtxt {
     /// `[ VC: Notation Declared ]`  
     /// The Name must match the declared name of a notation.
     #[doc(alias = "xmlParseEntityDecl")]
-    unsafe fn parse_entity_decl(&mut self) {
-        unsafe {
-            let mut is_parameter: i32 = 0;
+    fn parse_entity_decl(&mut self) {
+        let mut is_parameter: i32 = 0;
 
-            if !self.content_bytes().starts_with(b"<!") {
-                return;
+        if !self.content_bytes().starts_with(b"<!") {
+            return;
+        }
+        self.advance(2);
+
+        // GROW; done in the caller
+        if self.content_bytes().starts_with(b"ENTITY") {
+            let inputid: i32 = self.input().unwrap().id;
+            self.advance(6);
+            if self.skip_blanks() == 0 {
+                xml_fatal_err_msg(
+                    self,
+                    XmlParserErrors::XmlErrSpaceRequired,
+                    "Space required after '<!ENTITY'\n",
+                );
             }
-            self.advance(2);
 
-            // GROW; done in the caller
-            if self.content_bytes().starts_with(b"ENTITY") {
-                let inputid: i32 = self.input().unwrap().id;
-                self.advance(6);
+            if self.current_byte() == b'%' {
+                self.skip_char();
                 if self.skip_blanks() == 0 {
                     xml_fatal_err_msg(
                         self,
                         XmlParserErrors::XmlErrSpaceRequired,
-                        "Space required after '<!ENTITY'\n",
+                        "Space required after '%'\n",
                     );
                 }
+                is_parameter = 1;
+            }
 
-                if self.current_byte() == b'%' {
-                    self.skip_char();
-                    if self.skip_blanks() == 0 {
-                        xml_fatal_err_msg(
-                            self,
-                            XmlParserErrors::XmlErrSpaceRequired,
-                            "Space required after '%'\n",
-                        );
+            let Some(name) = self.parse_name() else {
+                xml_fatal_err_msg(
+                    self,
+                    XmlParserErrors::XmlErrNameRequired,
+                    "xmlParseEntityDecl: no name\n",
+                );
+                return;
+            };
+            if name.contains(':') {
+                xml_ns_err!(
+                    self,
+                    XmlParserErrors::XmlNsErrColon,
+                    "colons are forbidden from entities names '{}'\n",
+                    name
+                );
+            }
+            if self.skip_blanks() == 0 {
+                xml_fatal_err_msg(
+                    self,
+                    XmlParserErrors::XmlErrSpaceRequired,
+                    "Space required after the entity name\n",
+                );
+            }
+
+            self.instate = XmlParserInputState::XmlParserEntityDecl;
+
+            // parsed entity value without reference substituted
+            let mut orig = None;
+
+            // handle the various case of definitions...
+            if is_parameter != 0 {
+                if self.current_byte() == b'"' || self.current_byte() == b'\'' {
+                    let (value, original) = self.parse_entity_value();
+                    orig = original;
+                    if let Some(value) = value {
+                        if self.disable_sax == 0 {
+                            if let Some(entity_decl) =
+                                self.sax.as_deref_mut().and_then(|sax| sax.entity_decl)
+                            {
+                                entity_decl(
+                                    self,
+                                    &name,
+                                    XmlEntityType::XmlInternalParameterEntity,
+                                    None,
+                                    None,
+                                    Some(&value),
+                                );
+                            }
+                        }
                     }
-                    is_parameter = 1;
-                }
-
-                let Some(name) = self.parse_name() else {
-                    xml_fatal_err_msg(
-                        self,
-                        XmlParserErrors::XmlErrNameRequired,
-                        "xmlParseEntityDecl: no name\n",
-                    );
-                    return;
-                };
-                if name.contains(':') {
-                    xml_ns_err!(
-                        self,
-                        XmlParserErrors::XmlNsErrColon,
-                        "colons are forbidden from entities names '{}'\n",
-                        name
-                    );
-                }
-                if self.skip_blanks() == 0 {
-                    xml_fatal_err_msg(
-                        self,
-                        XmlParserErrors::XmlErrSpaceRequired,
-                        "Space required after the entity name\n",
-                    );
-                }
-
-                self.instate = XmlParserInputState::XmlParserEntityDecl;
-
-                // parsed entity value without reference substituted
-                let mut orig = None;
-
-                // handle the various case of definitions...
-                if is_parameter != 0 {
-                    if self.current_byte() == b'"' || self.current_byte() == b'\'' {
-                        let (value, original) = self.parse_entity_value();
-                        orig = original;
-                        if let Some(value) = value {
-                            if self.disable_sax == 0 {
+                } else {
+                    let (literal, uri) = self.parse_external_id(true);
+                    if uri.is_none() && literal.is_none() {
+                        xml_fatal_err(self, XmlParserErrors::XmlErrValueRequired, None);
+                    }
+                    if let Some(uri) = uri {
+                        if let Some(parsed_uri) = XmlURI::parse(&uri) {
+                            // This really ought to be a well formedness error
+                            // but the XML Core WG decided otherwise c.f. issue
+                            // E26 of the XML erratas.
+                            if parsed_uri.fragment.is_some() {
+                                // Okay this is foolish to block those but not invalid URIs.
+                                xml_fatal_err(self, XmlParserErrors::XmlErrURIFragment, None);
+                            } else if self.disable_sax == 0 {
                                 if let Some(entity_decl) =
                                     self.sax.as_deref_mut().and_then(|sax| sax.entity_decl)
                                 {
                                     entity_decl(
                                         self,
                                         &name,
-                                        XmlEntityType::XmlInternalParameterEntity,
+                                        XmlEntityType::XmlExternalParameterEntity,
+                                        literal.as_deref(),
+                                        Some(&uri),
                                         None,
-                                        None,
-                                        Some(&value),
                                     );
                                 }
                             }
-                        }
-                    } else {
-                        let (literal, uri) = self.parse_external_id(true);
-                        if uri.is_none() && literal.is_none() {
-                            xml_fatal_err(self, XmlParserErrors::XmlErrValueRequired, None);
-                        }
-                        if let Some(uri) = uri {
-                            if let Some(parsed_uri) = XmlURI::parse(&uri) {
-                                // This really ought to be a well formedness error
-                                // but the XML Core WG decided otherwise c.f. issue
-                                // E26 of the XML erratas.
-                                if parsed_uri.fragment.is_some() {
-                                    // Okay this is foolish to block those but not invalid URIs.
-                                    xml_fatal_err(self, XmlParserErrors::XmlErrURIFragment, None);
-                                } else if self.disable_sax == 0 {
-                                    if let Some(entity_decl) =
-                                        self.sax.as_deref_mut().and_then(|sax| sax.entity_decl)
-                                    {
-                                        entity_decl(
-                                            self,
-                                            &name,
-                                            XmlEntityType::XmlExternalParameterEntity,
-                                            literal.as_deref(),
-                                            Some(&uri),
-                                            None,
-                                        );
-                                    }
-                                }
-                            } else {
-                                xml_err_msg_str!(
-                                    self,
-                                    XmlParserErrors::XmlErrInvalidURI,
-                                    "Invalid URI: {}\n",
-                                    uri
-                                );
-                            }
+                        } else {
+                            xml_err_msg_str!(
+                                self,
+                                XmlParserErrors::XmlErrInvalidURI,
+                                "Invalid URI: {}\n",
+                                uri
+                            );
                         }
                     }
-                } else if self.current_byte() == b'"' || self.current_byte() == b'\'' {
-                    let (value, original) = self.parse_entity_value();
-                    orig = original;
+                }
+            } else if self.current_byte() == b'"' || self.current_byte() == b'\'' {
+                let (value, original) = self.parse_entity_value();
+                orig = original;
+                if self.disable_sax == 0 {
+                    if let Some(entity_decl) =
+                        self.sax.as_deref_mut().and_then(|sax| sax.entity_decl)
+                    {
+                        entity_decl(
+                            self,
+                            &name,
+                            XmlEntityType::XmlInternalGeneralEntity,
+                            None,
+                            None,
+                            value.as_deref(),
+                        );
+                    }
+                }
+                // For expat compatibility in SAX mode.
+                if self
+                    .my_doc
+                    .is_none_or(|doc| doc.version.as_deref() == Some(SAX_COMPAT_MODE))
+                {
+                    let mut my_doc = if let Some(my_doc) = self.my_doc {
+                        my_doc
+                    } else {
+                        self.my_doc = xml_new_doc(Some(SAX_COMPAT_MODE));
+                        let Some(mut my_doc) = self.my_doc else {
+                            xml_err_memory(Some(self), Some("New Doc failed"));
+                            return;
+                        };
+                        my_doc.properties = XmlDocProperties::XmlDocInternal as i32;
+                        my_doc
+                    };
+                    if my_doc.int_subset.is_none() {
+                        my_doc.int_subset = xml_new_dtd(self.my_doc, Some("fake"), None, None);
+                    }
+
+                    xml_sax2_entity_decl(
+                        self,
+                        &name,
+                        XmlEntityType::XmlInternalGeneralEntity,
+                        None,
+                        None,
+                        value.as_deref(),
+                    );
+                }
+            } else {
+                let (literal, uri) = self.parse_external_id(true);
+                if uri.is_none() && literal.is_none() {
+                    xml_fatal_err(self, XmlParserErrors::XmlErrValueRequired, None);
+                }
+                if let Some(uri) = uri.as_deref() {
+                    if let Some(parsed_uri) = XmlURI::parse(uri) {
+                        // This really ought to be a well formedness error
+                        // but the XML Core WG decided otherwise c.f. issue
+                        // E26 of the XML erratas.
+                        if parsed_uri.fragment.is_some() {
+                            // Okay this is foolish to block those but not invalid URIs.
+                            xml_fatal_err(self, XmlParserErrors::XmlErrURIFragment, None);
+                        }
+                    } else {
+                        xml_err_msg_str!(
+                            self,
+                            XmlParserErrors::XmlErrInvalidURI,
+                            "Invalid URI: {}\n",
+                            uri
+                        );
+                    }
+                }
+                if self.current_byte() != b'>' && self.skip_blanks() == 0 {
+                    xml_fatal_err_msg(
+                        self,
+                        XmlParserErrors::XmlErrSpaceRequired,
+                        "Space required before 'NDATA'\n",
+                    );
+                }
+                if self.content_bytes().starts_with(b"NDATA") {
+                    self.advance(5);
+                    if self.skip_blanks() == 0 {
+                        xml_fatal_err_msg(
+                            self,
+                            XmlParserErrors::XmlErrSpaceRequired,
+                            "Space required after 'NDATA'\n",
+                        );
+                    }
+                    let ndata = self.parse_name();
+                    if self.disable_sax == 0 {
+                        if let Some(unparsed_ent) = self
+                            .sax
+                            .as_deref_mut()
+                            .and_then(|sax| sax.unparsed_entity_decl)
+                        {
+                            unparsed_ent(
+                                self,
+                                &name,
+                                literal.as_deref(),
+                                uri.as_deref(),
+                                ndata.as_deref(),
+                            );
+                        }
+                    }
+                } else {
                     if self.disable_sax == 0 {
                         if let Some(entity_decl) =
                             self.sax.as_deref_mut().and_then(|sax| sax.entity_decl)
@@ -2007,17 +2085,19 @@ impl XmlParserCtxt {
                             entity_decl(
                                 self,
                                 &name,
-                                XmlEntityType::XmlInternalGeneralEntity,
+                                XmlEntityType::XmlExternalGeneralParsedEntity,
+                                literal.as_deref(),
+                                uri.as_deref(),
                                 None,
-                                None,
-                                value.as_deref(),
                             );
                         }
                     }
                     // For expat compatibility in SAX mode.
-                    if self
-                        .my_doc
-                        .is_none_or(|doc| doc.version.as_deref() == Some(SAX_COMPAT_MODE))
+                    // assuming the entity replacement was asked for
+                    if self.replace_entities != 0
+                        && self
+                            .my_doc
+                            .is_none_or(|doc| doc.version.as_deref() == Some(SAX_COMPAT_MODE))
                     {
                         let mut my_doc = if let Some(my_doc) = self.my_doc {
                             my_doc
@@ -2030,170 +2110,66 @@ impl XmlParserCtxt {
                             my_doc.properties = XmlDocProperties::XmlDocInternal as i32;
                             my_doc
                         };
+
                         if my_doc.int_subset.is_none() {
                             my_doc.int_subset = xml_new_dtd(self.my_doc, Some("fake"), None, None);
                         }
-
                         xml_sax2_entity_decl(
                             self,
                             &name,
-                            XmlEntityType::XmlInternalGeneralEntity,
+                            XmlEntityType::XmlExternalGeneralParsedEntity,
+                            literal.as_deref(),
+                            uri.as_deref(),
                             None,
-                            None,
-                            value.as_deref(),
                         );
                     }
-                } else {
-                    let (literal, uri) = self.parse_external_id(true);
-                    if uri.is_none() && literal.is_none() {
-                        xml_fatal_err(self, XmlParserErrors::XmlErrValueRequired, None);
-                    }
-                    if let Some(uri) = uri.as_deref() {
-                        if let Some(parsed_uri) = XmlURI::parse(uri) {
-                            // This really ought to be a well formedness error
-                            // but the XML Core WG decided otherwise c.f. issue
-                            // E26 of the XML erratas.
-                            if parsed_uri.fragment.is_some() {
-                                // Okay this is foolish to block those but not invalid URIs.
-                                xml_fatal_err(self, XmlParserErrors::XmlErrURIFragment, None);
-                            }
-                        } else {
-                            xml_err_msg_str!(
-                                self,
-                                XmlParserErrors::XmlErrInvalidURI,
-                                "Invalid URI: {}\n",
-                                uri
-                            );
-                        }
-                    }
-                    if self.current_byte() != b'>' && self.skip_blanks() == 0 {
-                        xml_fatal_err_msg(
-                            self,
-                            XmlParserErrors::XmlErrSpaceRequired,
-                            "Space required before 'NDATA'\n",
-                        );
-                    }
-                    if self.content_bytes().starts_with(b"NDATA") {
-                        self.advance(5);
-                        if self.skip_blanks() == 0 {
-                            xml_fatal_err_msg(
-                                self,
-                                XmlParserErrors::XmlErrSpaceRequired,
-                                "Space required after 'NDATA'\n",
-                            );
-                        }
-                        let ndata = self.parse_name();
-                        if self.disable_sax == 0 {
-                            if let Some(unparsed_ent) = self
-                                .sax
-                                .as_deref_mut()
-                                .and_then(|sax| sax.unparsed_entity_decl)
-                            {
-                                unparsed_ent(
-                                    self,
-                                    &name,
-                                    literal.as_deref(),
-                                    uri.as_deref(),
-                                    ndata.as_deref(),
-                                );
-                            }
-                        }
-                    } else {
-                        if self.disable_sax == 0 {
-                            if let Some(entity_decl) =
-                                self.sax.as_deref_mut().and_then(|sax| sax.entity_decl)
-                            {
-                                entity_decl(
-                                    self,
-                                    &name,
-                                    XmlEntityType::XmlExternalGeneralParsedEntity,
-                                    literal.as_deref(),
-                                    uri.as_deref(),
-                                    None,
-                                );
-                            }
-                        }
-                        // For expat compatibility in SAX mode.
-                        // assuming the entity replacement was asked for
-                        if self.replace_entities != 0
-                            && self
-                                .my_doc
-                                .is_none_or(|doc| doc.version.as_deref() == Some(SAX_COMPAT_MODE))
-                        {
-                            let mut my_doc = if let Some(my_doc) = self.my_doc {
-                                my_doc
-                            } else {
-                                self.my_doc = xml_new_doc(Some(SAX_COMPAT_MODE));
-                                let Some(mut my_doc) = self.my_doc else {
-                                    xml_err_memory(Some(self), Some("New Doc failed"));
-                                    return;
-                                };
-                                my_doc.properties = XmlDocProperties::XmlDocInternal as i32;
-                                my_doc
-                            };
-
-                            if my_doc.int_subset.is_none() {
-                                my_doc.int_subset =
-                                    xml_new_dtd(self.my_doc, Some("fake"), None, None);
-                            }
-                            xml_sax2_entity_decl(
-                                self,
-                                &name,
-                                XmlEntityType::XmlExternalGeneralParsedEntity,
-                                literal.as_deref(),
-                                uri.as_deref(),
-                                None,
-                            );
-                        }
-                    }
                 }
-                if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                    return;
-                }
-                self.skip_blanks();
-                if self.current_byte() != b'>' {
-                    xml_fatal_err_msg_str!(
+            }
+            if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+                return;
+            }
+            self.skip_blanks();
+            if self.current_byte() != b'>' {
+                xml_fatal_err_msg_str!(
+                    self,
+                    XmlParserErrors::XmlErrEntityNotFinished,
+                    "xmlParseEntityDecl: entity {} not terminated\n",
+                    name
+                );
+                self.halt();
+            } else {
+                if inputid != self.input().unwrap().id {
+                    xml_fatal_err_msg(
                         self,
-                        XmlParserErrors::XmlErrEntityNotFinished,
-                        "xmlParseEntityDecl: entity {} not terminated\n",
-                        name
+                        XmlParserErrors::XmlErrEntityBoundary,
+                        "Entity declaration doesn't start and stop in the same entity\n",
                     );
-                    self.halt();
-                } else {
-                    if inputid != self.input().unwrap().id {
-                        xml_fatal_err_msg(
-                            self,
-                            XmlParserErrors::XmlErrEntityBoundary,
-                            "Entity declaration doesn't start and stop in the same entity\n",
-                        );
-                    }
-                    self.skip_char();
                 }
-                if let Some(orig) = orig {
-                    // Ugly mechanism to save the raw entity value.
-                    let mut cur = None;
+                self.skip_char();
+            }
+            if let Some(orig) = orig {
+                // Ugly mechanism to save the raw entity value.
+                let mut cur = None;
 
-                    if is_parameter != 0 {
-                        if let Some(get_parameter_entity) = self
-                            .sax
-                            .as_deref_mut()
-                            .and_then(|sax| sax.get_parameter_entity)
-                        {
-                            cur = get_parameter_entity(self, &name);
-                        }
-                    } else {
-                        if let Some(get_entity) =
-                            self.sax.as_deref_mut().and_then(|sax| sax.get_entity)
-                        {
-                            cur = get_entity(self, &name);
-                        }
-                        if cur.is_none() && self.user_data.is_none() {
-                            cur = xml_sax2_get_entity(self, &name);
-                        }
+                if is_parameter != 0 {
+                    if let Some(get_parameter_entity) = self
+                        .sax
+                        .as_deref_mut()
+                        .and_then(|sax| sax.get_parameter_entity)
+                    {
+                        cur = get_parameter_entity(self, &name);
                     }
-                    if let Some(mut cur) = cur.filter(|cur| cur.orig.is_none()) {
-                        cur.orig = Some(Cow::Owned(orig));
+                } else {
+                    if let Some(get_entity) = self.sax.as_deref_mut().and_then(|sax| sax.get_entity)
+                    {
+                        cur = get_entity(self, &name);
                     }
+                    if cur.is_none() && self.user_data.is_none() {
+                        cur = xml_sax2_get_entity(self, &name);
+                    }
+                }
+                if let Some(mut cur) = cur.filter(|cur| cur.orig.is_none()) {
+                    cur.orig = Some(Cow::Owned(orig));
                 }
             }
         }
@@ -2212,69 +2188,67 @@ impl XmlParserCtxt {
     ///
     /// See the NOTE on xmlParseExternalID().
     #[doc(alias = "xmlParseNotationDecl")]
-    unsafe fn parse_notation_decl(&mut self) {
-        unsafe {
-            if !self.content_bytes().starts_with(b"<!") {
+    fn parse_notation_decl(&mut self) {
+        if !self.content_bytes().starts_with(b"<!") {
+            return;
+        }
+        self.advance(2);
+
+        if self.content_bytes().starts_with(b"NOTATION") {
+            let inputid: i32 = self.input().unwrap().id;
+            self.advance(8);
+            if self.skip_blanks() == 0 {
+                xml_fatal_err_msg(
+                    self,
+                    XmlParserErrors::XmlErrSpaceRequired,
+                    "Space required after '<!NOTATION'\n",
+                );
                 return;
             }
-            self.advance(2);
 
-            if self.content_bytes().starts_with(b"NOTATION") {
-                let inputid: i32 = self.input().unwrap().id;
-                self.advance(8);
-                if self.skip_blanks() == 0 {
+            let Some(name) = self.parse_name() else {
+                xml_fatal_err(self, XmlParserErrors::XmlErrNotationNotStarted, None);
+                return;
+            };
+            if name.contains(':') {
+                xml_ns_err!(
+                    self,
+                    XmlParserErrors::XmlNsErrColon,
+                    "colons are forbidden from notation names '{}'\n",
+                    name
+                );
+            }
+            if self.skip_blanks() == 0 {
+                xml_fatal_err_msg(
+                    self,
+                    XmlParserErrors::XmlErrSpaceRequired,
+                    "Space required after the NOTATION name'\n",
+                );
+                return;
+            }
+
+            // Parse the IDs.
+            let (pubid, systemid) = self.parse_external_id(false);
+            self.skip_blanks();
+
+            if self.current_byte() == b'>' {
+                if inputid != self.input().unwrap().id {
                     xml_fatal_err_msg(
                         self,
-                        XmlParserErrors::XmlErrSpaceRequired,
-                        "Space required after '<!NOTATION'\n",
-                    );
-                    return;
-                }
-
-                let Some(name) = self.parse_name() else {
-                    xml_fatal_err(self, XmlParserErrors::XmlErrNotationNotStarted, None);
-                    return;
-                };
-                if name.contains(':') {
-                    xml_ns_err!(
-                        self,
-                        XmlParserErrors::XmlNsErrColon,
-                        "colons are forbidden from notation names '{}'\n",
-                        name
+                        XmlParserErrors::XmlErrEntityBoundary,
+                        "Notation declaration doesn't start and stop in the same entity\n",
                     );
                 }
-                if self.skip_blanks() == 0 {
-                    xml_fatal_err_msg(
-                        self,
-                        XmlParserErrors::XmlErrSpaceRequired,
-                        "Space required after the NOTATION name'\n",
-                    );
-                    return;
-                }
-
-                // Parse the IDs.
-                let (pubid, systemid) = self.parse_external_id(false);
-                self.skip_blanks();
-
-                if self.current_byte() == b'>' {
-                    if inputid != self.input().unwrap().id {
-                        xml_fatal_err_msg(
-                            self,
-                            XmlParserErrors::XmlErrEntityBoundary,
-                            "Notation declaration doesn't start and stop in the same entity\n",
-                        );
+                self.skip_char();
+                if self.disable_sax == 0 {
+                    if let Some(notation_decl) =
+                        self.sax.as_deref_mut().and_then(|sax| sax.notation_decl)
+                    {
+                        notation_decl(self, &name, pubid.as_deref(), systemid.as_deref());
                     }
-                    self.skip_char();
-                    if self.disable_sax == 0 {
-                        if let Some(notation_decl) =
-                            self.sax.as_deref_mut().and_then(|sax| sax.notation_decl)
-                        {
-                            notation_decl(self, &name, pubid.as_deref(), systemid.as_deref());
-                        }
-                    }
-                } else {
-                    xml_fatal_err(self, XmlParserErrors::XmlErrNotationNotFinished, None);
                 }
+            } else {
+                xml_fatal_err(self, XmlParserErrors::XmlErrNotationNotFinished, None);
             }
         }
     }

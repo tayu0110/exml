@@ -817,61 +817,61 @@ impl XmlParserCtxt {
 
     /// Reset a parser context
     #[doc(alias = "xmlCtxtReset")]
-    pub unsafe fn reset(&mut self) {
-        unsafe {
-            self.input_tab.clear();
-            self.space_tab.clear();
-            self.node_tab.clear();
-            self.node = None;
-            self.name_tab.clear();
-            self.name = None;
-            self.ns_tab.clear();
-            self.version = None;
-            self.encoding = None;
-            self.directory = None;
-            self.ext_sub_uri = None;
-            self.ext_sub_system = None;
-            if let Some(doc) = self.my_doc.take() {
+    pub fn reset(&mut self) {
+        self.input_tab.clear();
+        self.space_tab.clear();
+        self.node_tab.clear();
+        self.node = None;
+        self.name_tab.clear();
+        self.name = None;
+        self.ns_tab.clear();
+        self.version = None;
+        self.encoding = None;
+        self.directory = None;
+        self.ext_sub_uri = None;
+        self.ext_sub_system = None;
+        if let Some(doc) = self.my_doc.take() {
+            unsafe {
                 xml_free_doc(doc);
             }
+        }
 
-            self.standalone = -1;
-            self.has_external_subset = 0;
-            self.has_perefs = 0;
-            self.html = 0;
-            self.external = 0;
-            self.instate = XmlParserInputState::XmlParserStart;
-            self.token = 0;
-            self.well_formed = 1;
-            self.ns_well_formed = 1;
-            self.disable_sax = 0;
-            self.valid = 1;
-            self.record_info = 0;
-            self.check_index = 0;
-            self.end_check_state = 0;
-            self.in_subset = 0;
-            self.err_no = XmlParserErrors::XmlErrOK as i32;
-            self.depth = 0;
-            self.charset = XmlCharEncoding::UTF8;
-            #[cfg(feature = "catalog")]
-            {
-                self.catalogs = None;
-            }
-            self.sizeentities = 0;
-            self.sizeentcopy = 0;
-            self.node_seq.clear();
-            self.atts_default.clear();
-            let _ = self.atts_special.take().map(|t| t.into_inner());
+        self.standalone = -1;
+        self.has_external_subset = 0;
+        self.has_perefs = 0;
+        self.html = 0;
+        self.external = 0;
+        self.instate = XmlParserInputState::XmlParserStart;
+        self.token = 0;
+        self.well_formed = 1;
+        self.ns_well_formed = 1;
+        self.disable_sax = 0;
+        self.valid = 1;
+        self.record_info = 0;
+        self.check_index = 0;
+        self.end_check_state = 0;
+        self.in_subset = 0;
+        self.err_no = XmlParserErrors::XmlErrOK as i32;
+        self.depth = 0;
+        self.charset = XmlCharEncoding::UTF8;
+        #[cfg(feature = "catalog")]
+        {
+            self.catalogs = None;
+        }
+        self.sizeentities = 0;
+        self.sizeentcopy = 0;
+        self.node_seq.clear();
+        self.atts_default.clear();
+        let _ = self.atts_special.take().map(|t| t.into_inner());
 
-            #[cfg(feature = "catalog")]
-            {
-                self.catalogs = None;
-            }
-            self.nb_errors = 0;
-            self.nb_warnings = 0;
-            if self.last_error.is_err() {
-                self.last_error.reset();
-            }
+        #[cfg(feature = "catalog")]
+        {
+            self.catalogs = None;
+        }
+        self.nb_errors = 0;
+        self.nb_warnings = 0;
+        if self.last_error.is_err() {
+            self.last_error.reset();
         }
     }
 
@@ -879,72 +879,70 @@ impl XmlParserCtxt {
     ///
     /// Returns 0 in case of success and 1 in case of error
     #[doc(alias = "xmlCtxtResetPush")]
-    pub unsafe fn reset_push(
+    pub fn reset_push(
         &mut self,
         chunk: &[u8],
         filename: Option<&str>,
         encoding: Option<&str>,
     ) -> i32 {
-        unsafe {
-            let enc = if encoding.is_none() && chunk.len() >= 4 {
-                detect_encoding(chunk)
-            } else {
-                XmlCharEncoding::None
-            };
+        let enc = if encoding.is_none() && chunk.len() >= 4 {
+            detect_encoding(chunk)
+        } else {
+            XmlCharEncoding::None
+        };
 
-            let buf = XmlParserInputBuffer::new(enc);
+        let buf = XmlParserInputBuffer::new(enc);
 
-            self.reset();
+        self.reset();
 
-            if filename.is_none() {
-                self.directory = None;
-            } else if let Some(dir) = filename.and_then(xml_parser_get_directory) {
-                self.directory = Some(dir.to_string_lossy().into_owned());
-            }
-
-            let Some(mut input_stream) = XmlParserInput::new(Some(self)) else {
-                return 1;
-            };
-
-            input_stream.filename = filename
-                .map(canonic_path)
-                .map(|filanem| filanem.into_owned());
-            input_stream.buf = Some(buf);
-            input_stream.reset_base();
-
-            self.input_push(input_stream);
-
-            if !chunk.is_empty() && self.input().is_some() && self.input().unwrap().buf.is_some() {
-                let base = self.input().unwrap().get_base();
-                let cur = self.input().unwrap().offset_from_base();
-
-                self.input_mut()
-                    .unwrap()
-                    .buf
-                    .as_mut()
-                    .unwrap()
-                    .push_bytes(chunk);
-                self.input_mut().unwrap().set_base_and_cursor(base, cur);
-            }
-
-            if let Some(encoding) = encoding {
-                self.encoding = Some(encoding.to_owned());
-                if let Some(handler) = find_encoding_handler(self.encoding().unwrap()) {
-                    self.switch_to_encoding(handler);
-                } else {
-                    xml_fatal_err_msg_str!(
-                        self,
-                        XmlParserErrors::XmlErrUnsupportedEncoding,
-                        "Unsupported encoding {}\n",
-                        encoding
-                    );
-                };
-            } else if !matches!(enc, XmlCharEncoding::None) {
-                self.switch_encoding(enc);
-            }
-
-            0
+        if filename.is_none() {
+            self.directory = None;
+        } else if let Some(dir) = filename.and_then(xml_parser_get_directory) {
+            self.directory = Some(dir.to_string_lossy().into_owned());
         }
+
+        let Some(mut input_stream) = XmlParserInput::new(Some(self)) else {
+            return 1;
+        };
+
+        input_stream.filename = filename
+            .map(canonic_path)
+            .map(|filanem| filanem.into_owned());
+        input_stream.buf = Some(buf);
+        input_stream.reset_base();
+
+        self.input_push(input_stream);
+
+        if !chunk.is_empty() && self.input().is_some() && self.input().unwrap().buf.is_some() {
+            let base = self.input().unwrap().get_base();
+            let cur = self.input().unwrap().offset_from_base();
+
+            self.input_mut()
+                .unwrap()
+                .buf
+                .as_mut()
+                .unwrap()
+                .push_bytes(chunk);
+            self.input_mut().unwrap().set_base_and_cursor(base, cur);
+        }
+
+        if let Some(encoding) = encoding {
+            self.encoding = Some(encoding.to_owned());
+            if let Some(handler) = find_encoding_handler(self.encoding().unwrap()) {
+                self.switch_to_encoding(handler);
+            } else {
+                xml_fatal_err_msg_str!(
+                    self,
+                    XmlParserErrors::XmlErrUnsupportedEncoding,
+                    "Unsupported encoding {}\n",
+                    encoding
+                );
+            };
+        } else if !matches!(enc, XmlCharEncoding::None) {
+            self.switch_encoding(enc);
+        }
+
+        0
     }
 
     pub(crate) fn advance(&mut self, nth: usize) {
@@ -1089,105 +1087,102 @@ impl XmlParserCtxt {
     ///
     /// Returns the number of space chars skipped
     #[doc(alias = "xmlSkipBlankChars")]
-    pub(crate) unsafe fn skip_blanks(&mut self) -> i32 {
-        unsafe {
-            let mut res = 0i32;
+    pub(crate) fn skip_blanks(&mut self) -> i32 {
+        let mut res = 0i32;
 
-            // It's Okay to use CUR/NEXT here since all the blanks are on the ASCII range.
-            if (self.input_tab.len() == 1
-                && !matches!(self.instate, XmlParserInputState::XmlParserDTD))
-                || matches!(self.instate, XmlParserInputState::XmlParserStart)
+        // It's Okay to use CUR/NEXT here since all the blanks are on the ASCII range.
+        if (self.input_tab.len() == 1 && !matches!(self.instate, XmlParserInputState::XmlParserDTD))
+            || matches!(self.instate, XmlParserInputState::XmlParserStart)
+        {
+            // if we are in the document content, go really fast
+            let input = self.input().unwrap();
+            let mut line = input.line;
+            let mut col = input.col;
+            self.force_grow();
+            let mut content = self.content_bytes();
+            while content
+                .first()
+                .is_some_and(|&b| xml_is_blank_char(b as u32))
             {
-                // if we are in the document content, go really fast
-                let input = self.input().unwrap();
-                let mut line = input.line;
-                let mut col = input.col;
-                self.force_grow();
-                let mut content = self.content_bytes();
-                while content
-                    .first()
-                    .is_some_and(|&b| xml_is_blank_char(b as u32))
-                {
-                    if content[0] == b'\n' {
-                        line += 1;
-                        col = 1;
-                    } else {
-                        col += 1;
-                    }
-                    content = &content[1..];
-                    res = res.saturating_add(1);
-                    if content.is_empty() {
-                        let len = self.content_bytes().len();
-                        let input = self.input_mut().unwrap();
-                        input.cur += len;
-                        input.line = line;
-                        input.col = col;
-                        self.force_grow();
-                        content = self.content_bytes();
-                    }
+                if content[0] == b'\n' {
+                    line += 1;
+                    col = 1;
+                } else {
+                    col += 1;
                 }
-
-                let diff = self.content_bytes().len() - content.len();
-                if diff > 0 {
+                content = &content[1..];
+                res = res.saturating_add(1);
+                if content.is_empty() {
+                    let len = self.content_bytes().len();
                     let input = self.input_mut().unwrap();
-                    input.cur += diff;
+                    input.cur += len;
                     input.line = line;
                     input.col = col;
+                    self.force_grow();
+                    content = self.content_bytes();
                 }
-            } else {
-                let expand_pe = self.external != 0 || self.input_tab.len() != 1;
+            }
 
-                while !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                    if xml_is_blank_char(self.current_byte() as u32) {
-                        // CHECKED tstblanks.xml
-                        self.skip_char();
-                    } else if self.current_byte() == b'%' {
-                        // Need to handle support of entities branching here
-                        if !expand_pe
-                            || xml_is_blank_char(self.nth_byte(1) as u32)
-                            || self.nth_byte(1) == 0
-                        {
-                            break;
-                        }
-                        self.parse_pe_reference();
-                    } else if self.current_byte() == 0 {
-                        let mut consumed: u64;
+            let diff = self.content_bytes().len() - content.len();
+            if diff > 0 {
+                let input = self.input_mut().unwrap();
+                input.cur += diff;
+                input.line = line;
+                input.col = col;
+            }
+        } else {
+            let expand_pe = self.external != 0 || self.input_tab.len() != 1;
 
-                        if self.input_tab.len() <= 1 {
-                            break;
-                        }
+            while !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+                if xml_is_blank_char(self.current_byte() as u32) {
+                    // CHECKED tstblanks.xml
+                    self.skip_char();
+                } else if self.current_byte() == b'%' {
+                    // Need to handle support of entities branching here
+                    if !expand_pe
+                        || xml_is_blank_char(self.nth_byte(1) as u32)
+                        || self.nth_byte(1) == 0
+                    {
+                        break;
+                    }
+                    self.parse_pe_reference();
+                } else if self.current_byte() == 0 {
+                    let mut consumed: u64;
 
-                        consumed = self.input().unwrap().consumed;
-                        consumed = consumed
-                            .saturating_add(self.input().unwrap().offset_from_base() as u64);
-
-                        // Add to sizeentities when parsing an external entity for the first time.
-                        // Is this `unwrap` OK ????
-                        let mut ent = self.input().unwrap().entity.unwrap();
-                        if matches!(ent.etype, XmlEntityType::XmlExternalParameterEntity)
-                            && ent.flags & XML_ENT_PARSED as i32 == 0
-                        {
-                            ent.flags |= XML_ENT_PARSED as i32;
-
-                            self.sizeentities = self.sizeentities.saturating_add(consumed);
-                        }
-
-                        self.parser_entity_check(consumed);
-
-                        self.pop_input();
-                    } else {
+                    if self.input_tab.len() <= 1 {
                         break;
                     }
 
-                    // Also increase the counter when entering or exiting a PERef.
-                    // The spec says: "When a parameter-entity reference is recognized
-                    // in the DTD and included, its replacement text MUST be enlarged
-                    // by the attachment of one leading and one following space (#x20) character."
-                    res = res.saturating_add(1);
+                    consumed = self.input().unwrap().consumed;
+                    consumed =
+                        consumed.saturating_add(self.input().unwrap().offset_from_base() as u64);
+
+                    // Add to sizeentities when parsing an external entity for the first time.
+                    // Is this `unwrap` OK ????
+                    let mut ent = self.input().unwrap().entity.unwrap();
+                    if matches!(ent.etype, XmlEntityType::XmlExternalParameterEntity)
+                        && ent.flags & XML_ENT_PARSED as i32 == 0
+                    {
+                        ent.flags |= XML_ENT_PARSED as i32;
+
+                        self.sizeentities = self.sizeentities.saturating_add(consumed);
+                    }
+
+                    self.parser_entity_check(consumed);
+
+                    self.pop_input();
+                } else {
+                    break;
                 }
+
+                // Also increase the counter when entering or exiting a PERef.
+                // The spec says: "When a parameter-entity reference is recognized
+                // in the DTD and included, its replacement text MUST be enlarged
+                // by the attachment of one leading and one following space (#x20) character."
+                res = res.saturating_add(1);
             }
-            res
         }
+        res
     }
 
     /// The current c_char value, if using UTF-8 this may actually span multiple bytes

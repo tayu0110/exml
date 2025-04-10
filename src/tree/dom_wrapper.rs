@@ -884,7 +884,7 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
                         _ => {
                             // goto next_sibling;
                             'next_sibling: loop {
-                                if cur == elem.into() {
+                                if cur == XmlGenericNodePtr::from(elem) {
                                     break 'main;
                                 }
                                 if matches!(cur.element_type(), XmlElementType::XmlElementNode) {
@@ -935,7 +935,7 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
                         }
                         // next_sibling:
                         'next_sibling: loop {
-                            if cur == elem.into() {
+                            if cur == XmlGenericNodePtr::from(elem) {
                                 break 'main;
                             }
                             if matches!(cur.element_type(), XmlElementType::XmlElementNode) {
@@ -1353,7 +1353,7 @@ unsafe fn xml_dom_wrap_adopt_branch(
 
                     // leave_node:
                     'leave_node: loop {
-                        if cur_node == node.into() {
+                        if cur_node == XmlGenericNodePtr::from(node) {
                             break 'main;
                         }
                         if matches!(
@@ -1521,7 +1521,7 @@ fn xml_dom_wrap_adopt_attr(
         }
         // next_sibling:
         'next_sibling: loop {
-            if cur_node == attr.into() {
+            if cur_node == XmlGenericNodePtr::from(attr) {
                 break 'main;
             }
             if let Some(next) = cur_node.next() {

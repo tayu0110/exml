@@ -265,6 +265,29 @@ impl NodeCommon for XmlAttr {
     fn set_parent(&mut self, parent: Option<XmlGenericNodePtr>) {
         self.parent = parent.map(|children| XmlNodePtr::try_from(children).unwrap());
     }
+
+    fn unlink(&mut self) {
+        if let Some(mut parent) = self.parent {
+            let attr = unsafe {
+                // # Safety
+                // Please see the document of `XmlAttrPtr::from_raw`.
+                // In addition, this pointer is not leaked to the out of this function.
+                XmlAttrPtr::from_raw(self).unwrap()
+            };
+            if parent.properties == attr {
+                parent.properties = attr.and_then(|attr| attr.next);
+            }
+            self.set_parent(None);
+        }
+        if let Some(mut next) = self.next() {
+            next.set_prev(self.prev());
+        }
+        if let Some(mut prev) = self.prev() {
+            prev.set_next(self.next());
+        }
+        self.set_next(None);
+        self.set_prev(None);
+    }
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
