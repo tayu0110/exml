@@ -1536,9 +1536,7 @@ pub(crate) fn xml_raise_error(
                 line = node.line as _;
             }
             if line == 0 || line == 65535 {
-                unsafe {
-                    line = node.map_or(-1, |node| node.get_line_no() as i32);
-                }
+                line = node.map_or(-1, |node| node.get_line_no() as i32);
             }
         }
 
@@ -1566,9 +1564,7 @@ pub(crate) fn xml_raise_error(
                             if inclcount > 0 {
                                 inclcount -= 1;
                             } else {
-                                unsafe {
-                                    href = p.get_prop("href");
-                                }
+                                href = p.get_prop("href");
                                 if href.is_some() {
                                     break;
                                 }

@@ -50,7 +50,7 @@ use crate::{
         xmlstring::{XmlChar, xml_str_equal, xml_strdup, xml_strlen, xml_strndup},
     },
     list::XmlList,
-    parser::{XML_VCTXT_USE_PCTXT, XmlParserCtxtPtr, XmlParserMode, build_qname, split_qname2},
+    parser::{XML_VCTXT_USE_PCTXT, XmlParserCtxtPtr, build_qname, split_qname2},
     tree::{
         NodeCommon, XmlAttrPtr, XmlAttribute, XmlAttributeDefault, XmlAttributePtr,
         XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElement,
@@ -2039,79 +2039,79 @@ pub fn xml_dump_attribute_decl<'a>(buf: &mut (impl Write + 'a), attr: XmlAttribu
     writeln!(buf, ">").ok();
 }
 
-unsafe fn xml_is_streaming(ctxt: &mut XmlValidCtxt) -> i32 {
-    unsafe {
-        if ctxt.flags & XML_VCTXT_USE_PCTXT as u32 == 0 {
-            return 0;
-        }
-        let pctxt = ctxt
-            .user_data
-            .as_ref()
-            .and_then(|d| {
-                let lock = d.lock();
-                lock.downcast_ref::<XmlParserCtxtPtr>().copied()
-            })
-            .unwrap();
-        matches!((*pctxt).parse_mode, XmlParserMode::XmlParseReader) as i32
-    }
-}
+// unsafe fn xml_is_streaming(ctxt: &mut XmlValidCtxt) -> i32 {
+//     unsafe {
+//         if ctxt.flags & XML_VCTXT_USE_PCTXT as u32 == 0 {
+//             return 0;
+//         }
+//         let pctxt = ctxt
+//             .user_data
+//             .as_ref()
+//             .and_then(|d| {
+//                 let lock = d.lock();
+//                 lock.downcast_ref::<XmlParserCtxtPtr>().copied()
+//             })
+//             .unwrap();
+//         matches!((*pctxt).parse_mode, XmlParserMode::XmlParseReader) as i32
+//     }
+// }
 
 /// Register a new id declaration
 ///
 /// Returns null_mut() if not, otherwise the new xmlIDPtr
 #[doc(alias = "xmlAddID")]
-pub unsafe fn xml_add_id(
-    mut ctxt: Option<&mut XmlValidCtxt>,
+pub fn xml_add_id(
+    ctxt: Option<&mut XmlValidCtxt>,
     mut doc: XmlDocPtr,
     value: &str,
     mut attr: XmlAttrPtr,
 ) -> Option<()> {
-    unsafe {
-        if value.is_empty() {
-            return None;
-        }
-
-        let mut ret = XmlID {
-            value: value.to_owned(),
-            doc: Some(doc),
-            ..Default::default()
-        };
-        if ctxt
-            .as_mut()
-            .is_some_and(|ctxt| xml_is_streaming(ctxt) != 0)
-        {
-            // Operating in streaming mode, attr is gonna disappear
-            ret.name = attr.name().map(|n| n.into_owned());
-            ret.attr = None;
-        } else {
-            ret.attr = Some(attr);
-            ret.name = None;
-        }
-        ret.lineno = attr.parent().map_or(-1, |p| p.get_line_no() as i32);
-
-        // Create the ID table if needed.
-        doc.ids
-            .get_or_insert(Box::new(XmlHashTable::with_capacity(0)));
-        let table = doc.ids.as_deref_mut().unwrap();
-        if table.add_entry(value, ret).is_err() {
-            // The id is already defined in this DTD.
-            #[cfg(feature = "libxml_valid")]
-            if let Some(ctxt) = ctxt {
-                xml_err_valid_node(
-                    Some(ctxt),
-                    attr.parent(),
-                    XmlParserErrors::XmlDTDIDRedefined,
-                    format!("ID {value} already defined\n").as_str(),
-                    Some(value),
-                    None,
-                    None,
-                );
-            }
-            return None;
-        }
-        attr.atype = Some(XmlAttributeType::XmlAttributeID);
-        Some(())
+    if value.is_empty() {
+        return None;
     }
+
+    let mut ret = XmlID {
+        value: value.to_owned(),
+        doc: Some(doc),
+        ..Default::default()
+    };
+    // `XmlValidCtxt` no longer contains `XmlParserCtxt` as user data.
+    // Therefore, this condition is always `false`.
+    // if ctxt
+    //     .as_mut()
+    //     .is_some_and(|ctxt| xml_is_streaming(ctxt) != 0)
+    // {
+    //     // Operating in streaming mode, attr is gonna disappear
+    //     ret.name = attr.name().map(|n| n.into_owned());
+    //     ret.attr = None;
+    // } else {
+    ret.attr = Some(attr);
+    ret.name = None;
+    // }
+    ret.lineno = attr.parent().map_or(-1, |p| p.get_line_no() as i32);
+
+    // Create the ID table if needed.
+    doc.ids
+        .get_or_insert(Box::new(XmlHashTable::with_capacity(0)));
+    let table = doc.ids.as_deref_mut().unwrap();
+    if table.add_entry(value, ret).is_err() {
+        // The id is already defined in this DTD.
+        #[cfg(feature = "libxml_valid")]
+        if let Some(ctxt) = ctxt {
+            xml_err_valid_node(
+                Some(ctxt),
+                attr.parent(),
+                XmlParserErrors::XmlDTDIDRedefined,
+                format!("ID {value} already defined\n").as_str(),
+                Some(value),
+                None,
+                None,
+            );
+        }
+        return None;
+    }
+    attr.atype = Some(XmlAttributeType::XmlAttributeID);
+    Some(())
 }
 
 /// Search the attribute declaring the given ID
@@ -2222,28 +2222,26 @@ fn xml_valid_normalize_string(s: &str) -> Cow<'_, str> {
 ///
 /// Returns -1 if the lookup failed and 0 otherwise
 #[doc(alias = "xmlRemoveID")]
-pub unsafe fn xml_remove_id(mut doc: XmlDocPtr, mut attr: XmlAttrPtr) -> i32 {
-    unsafe {
-        if doc.ids.is_none() {
-            return -1;
-        }
-        let Some(id) = attr.children().and_then(|c| c.get_string(Some(doc), 1)) else {
-            return -1;
-        };
-        let id = xml_valid_normalize_string(&id);
-
-        let table = doc.ids.as_deref_mut().unwrap();
-        let Some(id_ptr) = table.lookup(&id) else {
-            return -1;
-        };
-        if id_ptr.attr != Some(attr) {
-            return -1;
-        }
-
-        table.remove_entry(&id, |_, _| {}).ok();
-        attr.atype = None;
-        0
+pub fn xml_remove_id(mut doc: XmlDocPtr, mut attr: XmlAttrPtr) -> i32 {
+    if doc.ids.is_none() {
+        return -1;
     }
+    let Some(id) = attr.children().and_then(|c| c.get_string(Some(doc), 1)) else {
+        return -1;
+    };
+    let id = xml_valid_normalize_string(&id);
+
+    let table = doc.ids.as_deref_mut().unwrap();
+    let Some(id_ptr) = table.lookup(&id) else {
+        return -1;
+    };
+    if id_ptr.attr != Some(attr) {
+        return -1;
+    }
+
+    table.remove_entry(&id, |_, _| {}).ok();
+    attr.atype = None;
+    0
 }
 
 /// Register a new ref declaration
@@ -2254,45 +2252,45 @@ pub unsafe fn xml_remove_id(mut doc: XmlDocPtr, mut attr: XmlAttrPtr) -> i32 {
 /// This function in original libxml2 returns new `xmlRefPtr`.  
 /// However, this function cannot returns `Option<&XmlRef>`.
 #[doc(alias = "xmlAddRef")]
-pub(crate) unsafe fn xml_add_ref(
-    mut ctxt: Option<&mut XmlValidCtxt>,
+pub(crate) fn xml_add_ref(
+    _ctxt: Option<&mut XmlValidCtxt>,
     mut doc: XmlDocPtr,
     value: &str,
     attr: XmlAttrPtr,
 ) -> Option<()> {
-    unsafe {
-        // Create the Ref table if needed.
-        let table = doc.refs.get_or_insert_with(HashMap::new);
-        let mut ret = XmlRef {
-            value: value.to_owned(),
-            ..Default::default()
-        };
-        // fill the structure.
-        if ctxt
-            .as_mut()
-            .is_some_and(|ctxt| xml_is_streaming(ctxt) != 0)
-        {
-            // Operating in streaming mode, attr is gonna disappear
-            ret.name = attr.name().map(|n| n.into_owned());
-            ret.attr = None;
-        } else {
-            ret.name = None;
-            ret.attr = Some(attr);
-        }
-        ret.lineno = attr.parent().map_or(-1, |p| p.get_line_no() as i32);
+    // Create the Ref table if needed.
+    let table = doc.refs.get_or_insert_with(HashMap::new);
+    let mut ret = XmlRef {
+        value: value.to_owned(),
+        ..Default::default()
+    };
+    // `XmlValidCtxt` no longer contains `XmlParserCtxt` as user data.
+    // Therefore, this condition is always `false`.
+    // fill the structure.
+    // if ctxt
+    //     .as_mut()
+    //     .is_some_and(|ctxt| xml_is_streaming(ctxt) != 0)
+    // {
+    //     // Operating in streaming mode, attr is gonna disappear
+    //     ret.name = attr.name().map(|n| n.into_owned());
+    //     ret.attr = None;
+    // } else {
+    ret.name = None;
+    ret.attr = Some(attr);
+    // }
+    ret.lineno = attr.parent().map_or(-1, |p| p.get_line_no() as i32);
 
-        // To add a reference :-
-        // References are maintained as a list of references,
-        // Lookup the entry, if no entry create new nodelist
-        // Add the owning node to the NodeList
-        // Return the ref
+    // To add a reference :-
+    // References are maintained as a list of references,
+    // Lookup the entry, if no entry create new nodelist
+    // Add the owning node to the NodeList
+    // Return the ref
 
-        let ref_list = table
-            .entry(value.to_owned())
-            .or_insert_with(|| XmlList::new(None, Rc::new(|_, _| std::cmp::Ordering::Equal)));
-        ref_list.insert_upper_bound(Box::new(ret));
-        Some(())
-    }
+    let ref_list = table
+        .entry(value.to_owned())
+        .or_insert_with(|| XmlList::new(None, Rc::new(|_, _| std::cmp::Ordering::Equal)));
+    ref_list.insert_upper_bound(Box::new(ret));
+    Some(())
 }
 
 /// Determine whether an attribute is of type Ref. In case we have DTD(s)

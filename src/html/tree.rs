@@ -827,62 +827,60 @@ fn html_dtd_dump_output(buf: &mut XmlOutputBuffer, doc: XmlDocPtr, _encoding: Op
 /// Dump an HTML attribute
 #[doc(alias = "htmlAttrDumpOutput")]
 #[cfg(feature = "libxml_output")]
-unsafe fn html_attr_dump_output(buf: &mut XmlOutputBuffer, doc: Option<XmlDocPtr>, cur: &XmlAttr) {
-    unsafe {
-        use crate::{libxml::chvalid::xml_is_blank_char, uri::escape_url_except};
+fn html_attr_dump_output(buf: &mut XmlOutputBuffer, doc: Option<XmlDocPtr>, cur: &XmlAttr) {
+    use crate::{libxml::chvalid::xml_is_blank_char, uri::escape_url_except};
 
-        // The html output method should not escape a & character
-        // occurring in an attribute value immediately followed by
-        // a { character (see Section B.7.1 of the HTML 4.0 Recommendation).
-        // This is implemented in xmlEncodeEntitiesReentrant
+    // The html output method should not escape a & character
+    // occurring in an attribute value immediately followed by
+    // a { character (see Section B.7.1 of the HTML 4.0 Recommendation).
+    // This is implemented in xmlEncodeEntitiesReentrant
 
-        buf.write_str(" ").ok();
-        if let Some(prefix) = cur.ns.as_deref().and_then(|ns| ns.prefix()) {
-            buf.write_str(&prefix).ok();
-            buf.write_str(":").ok();
-        }
+    buf.write_str(" ").ok();
+    if let Some(prefix) = cur.ns.as_deref().and_then(|ns| ns.prefix()) {
+        buf.write_str(&prefix).ok();
+        buf.write_str(":").ok();
+    }
 
-        buf.write_str(&cur.name).ok();
-        if let Some(children) = cur
-            .children()
-            .filter(|_| !html_is_boolean_attr(cur.name().as_deref().unwrap()))
-        {
-            if let Some(value) = children.get_string(doc, 0) {
-                buf.write_str("=").ok();
-                if cur.ns.is_none()
-                    && cur
-                        .parent()
-                        .map(|parent| XmlNodePtr::try_from(parent).unwrap())
-                        .filter(|p| {
-                            p.ns.is_none()
-                                && (cur.name.eq_ignore_ascii_case("href")
-                                    || cur.name.eq_ignore_ascii_case("action")
-                                    || cur.name.eq_ignore_ascii_case("src")
-                                    || (cur.name.eq_ignore_ascii_case("name")
-                                        && p.name.eq_ignore_ascii_case("a")))
-                        })
-                        .is_some()
-                {
-                    let tmp = value.trim_start_matches(|c| xml_is_blank_char(c as u32));
+    buf.write_str(&cur.name).ok();
+    if let Some(children) = cur
+        .children()
+        .filter(|_| !html_is_boolean_attr(cur.name().as_deref().unwrap()))
+    {
+        if let Some(value) = children.get_string(doc, 0) {
+            buf.write_str("=").ok();
+            if cur.ns.is_none()
+                && cur
+                    .parent()
+                    .map(|parent| XmlNodePtr::try_from(parent).unwrap())
+                    .filter(|p| {
+                        p.ns.is_none()
+                            && (cur.name.eq_ignore_ascii_case("href")
+                                || cur.name.eq_ignore_ascii_case("action")
+                                || cur.name.eq_ignore_ascii_case("src")
+                                || (cur.name.eq_ignore_ascii_case("name")
+                                    && p.name.eq_ignore_ascii_case("a")))
+                    })
+                    .is_some()
+            {
+                let tmp = value.trim_start_matches(|c| xml_is_blank_char(c as u32));
 
-                    // Angle brackets are technically illegal in URIs, but they're
-                    // used in server side includes, for example. Curly brackets
-                    // are illegal as well and often used in templates.
-                    // Don't escape non-whitespace, printable ASCII chars for
-                    // improved interoperability. Only escape space, control
-                    // and non-ASCII chars.
-                    let escaped = escape_url_except(tmp, b"\"#$%&+,/:;<=>?@[\\]^`{|}");
-                    if let Some(mut buf) = buf.buffer {
-                        let escaped = CString::new(escaped.as_ref()).unwrap();
-                        buf.push_quoted_cstr(&escaped).ok();
-                    }
-                } else if let Some(mut buf) = buf.buffer {
-                    let value = CString::new(value.as_str()).unwrap();
-                    buf.push_quoted_cstr(&value).ok();
+                // Angle brackets are technically illegal in URIs, but they're
+                // used in server side includes, for example. Curly brackets
+                // are illegal as well and often used in templates.
+                // Don't escape non-whitespace, printable ASCII chars for
+                // improved interoperability. Only escape space, control
+                // and non-ASCII chars.
+                let escaped = escape_url_except(tmp, b"\"#$%&+,/:;<=>?@[\\]^`{|}");
+                if let Some(mut buf) = buf.buffer {
+                    let escaped = CString::new(escaped.as_ref()).unwrap();
+                    buf.push_quoted_cstr(&escaped).ok();
                 }
-            } else {
-                buf.write_str("=\"\"").ok();
+            } else if let Some(mut buf) = buf.buffer {
+                let value = CString::new(value.as_str()).unwrap();
+                buf.push_quoted_cstr(&value).ok();
             }
+        } else {
+            buf.write_str("=\"\"").ok();
         }
     }
 }

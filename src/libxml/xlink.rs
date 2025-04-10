@@ -170,45 +170,43 @@ const XHTML_NAMESPACE: &str = "http://www.w3.org/1999/xhtml/";
 ///
 /// Returns the xlinkType of the node (XLINK_TYPE_NONE if there is no link detected.
 #[doc(alias = "xlinkIsLink")]
-pub unsafe fn xlink_is_link(doc: Option<XmlDocPtr>, mut node: XmlNodePtr) -> XlinkType {
-    unsafe {
-        let mut ret: XlinkType = XlinkType::XlinkTypeNone;
+pub fn xlink_is_link(doc: Option<XmlDocPtr>, mut node: XmlNodePtr) -> XlinkType {
+    let mut ret: XlinkType = XlinkType::XlinkTypeNone;
 
-        let doc = doc.or(node.doc);
-        if let Some(_doc) = doc.filter(|doc| doc.typ == XmlElementType::XmlHTMLDocumentNode) {
-            // This is an HTML document.
-        } else if node
-            .ns
-            .is_some_and(|ns| ns.href().as_deref() == Some(XHTML_NAMESPACE))
-        {
-            // !!!! We really need an IS_XHTML_ELEMENT function from HTMLtree.h @@@
-            // This is an XHTML element within an XML document
-            // Check whether it's one of the element able to carry links
-            // and in that case if it holds the attributes.
-        }
+    let doc = doc.or(node.doc);
+    if let Some(_doc) = doc.filter(|doc| doc.typ == XmlElementType::XmlHTMLDocumentNode) {
+        // This is an HTML document.
+    } else if node
+        .ns
+        .is_some_and(|ns| ns.href().as_deref() == Some(XHTML_NAMESPACE))
+    {
+        // !!!! We really need an IS_XHTML_ELEMENT function from HTMLtree.h @@@
+        // This is an XHTML element within an XML document
+        // Check whether it's one of the element able to carry links
+        // and in that case if it holds the attributes.
+    }
 
-        // We don't prevent a-priori having XML Linking constructs on XHTML elements
-        if let Some(typ) = node.get_ns_prop("type", Some(XLINK_NAMESPACE)) {
-            if typ == "simple" {
-                ret = XlinkType::XlinkTypeSimple;
-            } else if typ == "extended" {
-                if let Some(role) = node.get_ns_prop("role", Some(XLINK_NAMESPACE)) {
-                    if let Some(xlink) = node.search_ns(doc, Some(XLINK_NAMESPACE)) {
-                        let buf = format!("{}:external-linkset", (*xlink).prefix().unwrap());
-                        if role == buf {
-                            // ret = XlinkType::XlinkTypeExtendedSet;
-                        }
-                    } else {
-                        // Humm, fallback method
-                        if role == "xlink:external-linkset" {
-                            // ret = XlinkType::XlinkTypeExtendedSet;
-                        }
+    // We don't prevent a-priori having XML Linking constructs on XHTML elements
+    if let Some(typ) = node.get_ns_prop("type", Some(XLINK_NAMESPACE)) {
+        if typ == "simple" {
+            ret = XlinkType::XlinkTypeSimple;
+        } else if typ == "extended" {
+            if let Some(role) = node.get_ns_prop("role", Some(XLINK_NAMESPACE)) {
+                if let Some(xlink) = node.search_ns(doc, Some(XLINK_NAMESPACE)) {
+                    let buf = format!("{}:external-linkset", (*xlink).prefix().unwrap());
+                    if role == buf {
+                        // ret = XlinkType::XlinkTypeExtendedSet;
+                    }
+                } else {
+                    // Humm, fallback method
+                    if role == "xlink:external-linkset" {
+                        // ret = XlinkType::XlinkTypeExtendedSet;
                     }
                 }
-                ret = XlinkType::XlinkTypeExtended;
             }
+            ret = XlinkType::XlinkTypeExtended;
         }
-
-        ret
     }
+
+    ret
 }

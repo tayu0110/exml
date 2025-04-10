@@ -55,6 +55,12 @@ pub struct XmlAttribute {
     pub(crate) elem: Option<String>,           /* Element holding the attribute */
 }
 
+impl XmlAttribute {
+    pub(crate) fn get_prop_node_value_internal(&self) -> Option<String> {
+        self.default_value.as_deref().map(|def| def.to_owned())
+    }
+}
+
 impl Default for XmlAttribute {
     fn default() -> Self {
         Self {

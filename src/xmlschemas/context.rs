@@ -107,16 +107,16 @@ pub struct XmlSchemaParserCtxt {
 
 impl XmlSchemaParserCtxt {
     #[doc(alias = "xmlSchemaGetNodeContent")]
-    pub(crate) unsafe fn get_node_content(&self, node: Option<XmlGenericNodePtr>) -> String {
-        unsafe { node.and_then(|node| node.get_content()).unwrap_or_default() }
+    pub(crate) fn get_node_content(&self, node: Option<XmlGenericNodePtr>) -> String {
+        node.and_then(|node| node.get_content()).unwrap_or_default()
     }
 
     /// Read a attribute value and internalize the string
     ///
     /// Returns the string or NULL if not present.
     #[doc(alias = "xmlSchemaGetProp")]
-    pub(crate) unsafe fn get_prop(&self, node: XmlNodePtr, name: &str) -> Option<String> {
-        unsafe { node.get_no_ns_prop(name) }
+    pub(crate) fn get_prop(&self, node: XmlNodePtr, name: &str) -> Option<String> {
+        node.get_no_ns_prop(name)
     }
 
     /// Get the callback information used to handle errors for a parser context

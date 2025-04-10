@@ -638,11 +638,9 @@ pub fn xml_xpath_cast_number_to_string(val: f64) -> Cow<'static, str> {
 /// Returns a newly allocated string.
 #[doc(alias = "xmlXPathCastNodeToString")]
 #[cfg(feature = "xpath")]
-pub unsafe fn xml_xpath_cast_node_to_string(node: Option<XmlGenericNodePtr>) -> String {
-    unsafe {
-        node.and_then(|node| node.get_content())
-            .unwrap_or_else(|| "".to_owned())
-    }
+pub fn xml_xpath_cast_node_to_string(node: Option<XmlGenericNodePtr>) -> String {
+    node.and_then(|node| node.get_content())
+        .unwrap_or_else(|| "".to_owned())
 }
 
 /// Converts a node-set to its string value.

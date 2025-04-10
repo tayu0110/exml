@@ -2341,7 +2341,7 @@ pub fn xml_load_sgml_super_catalog(filename: impl AsRef<Path>) -> Option<XmlCata
 ///
 /// Returns the new Catalog entry node or null_mut() in case of error.
 #[doc(alias = "xmlParseXMLCatalogOneNode")]
-unsafe fn xml_parse_xml_catalog_one_node(
+fn xml_parse_xml_catalog_one_node(
     cur: XmlNodePtr,
     typ: XmlCatalogEntryType,
     name: &str,
@@ -2350,70 +2350,68 @@ unsafe fn xml_parse_xml_catalog_one_node(
     prefer: XmlCatalogPrefer,
     cgroup: Option<XmlCatalogEntry>,
 ) -> Option<XmlCatalogEntry> {
-    unsafe {
-        let mut ok = true;
-        let mut name_value = None;
+    let mut ok = true;
+    let mut name_value = None;
 
-        if let Some(attr_name) = attr_name {
-            name_value = cur.get_prop(attr_name);
-            if name_value.is_none() {
-                xml_catalog_err!(
-                    null_mut(),
-                    Some(cur.into()),
-                    XmlParserErrors::XmlCatalogMissingAttr,
-                    "{} entry lacks '{}'\n",
-                    name,
-                    attr_name,
-                );
-                ok = false;
-            }
-        }
-        let Some(uri_value) = cur.get_prop(uri_attr_name) else {
+    if let Some(attr_name) = attr_name {
+        name_value = cur.get_prop(attr_name);
+        if name_value.is_none() {
             xml_catalog_err!(
                 null_mut(),
                 Some(cur.into()),
                 XmlParserErrors::XmlCatalogMissingAttr,
                 "{} entry lacks '{}'\n",
                 name,
-                uri_attr_name,
+                attr_name,
             );
-            return None;
-        };
-        if !ok {
-            return None;
+            ok = false;
         }
+    }
+    let Some(uri_value) = cur.get_prop(uri_attr_name) else {
+        xml_catalog_err!(
+            null_mut(),
+            Some(cur.into()),
+            XmlParserErrors::XmlCatalogMissingAttr,
+            "{} entry lacks '{}'\n",
+            name,
+            uri_attr_name,
+        );
+        return None;
+    };
+    if !ok {
+        return None;
+    }
 
-        if let Some(url) = cur
-            .get_base(cur.doc)
-            .and_then(|base| build_uri(&uri_value, &base))
-        {
-            if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) > 1 {
-                if let Some(name_value) = name_value.as_deref() {
-                    generic_error!("Found {}: '{}' '{}'\n", name, name_value, url);
-                } else {
-                    generic_error!("Found {}: '{}'\n", name, url);
-                }
+    if let Some(url) = cur
+        .get_base(cur.doc)
+        .and_then(|base| build_uri(&uri_value, &base))
+    {
+        if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) > 1 {
+            if let Some(name_value) = name_value.as_deref() {
+                generic_error!("Found {}: '{}' '{}'\n", name, name_value, url);
+            } else {
+                generic_error!("Found {}: '{}'\n", name, url);
             }
-            Some(xml_new_catalog_entry(
-                typ,
-                name_value.as_deref(),
-                Some(&uri_value),
-                Some(PathBuf::from(url)),
-                prefer,
-                cgroup,
-            ))
-        } else {
-            xml_catalog_err!(
-                null_mut(),
-                Some(cur.into()),
-                XmlParserErrors::XmlCatalogEntryBroken,
-                "{} entry '{}' broken ?: {}\n",
-                name,
-                uri_attr_name,
-                uri_value,
-            );
-            None
         }
+        Some(xml_new_catalog_entry(
+            typ,
+            name_value.as_deref(),
+            Some(&uri_value),
+            Some(PathBuf::from(url)),
+            prefer,
+            cgroup,
+        ))
+    } else {
+        xml_catalog_err!(
+            null_mut(),
+            Some(cur.into()),
+            XmlParserErrors::XmlCatalogEntryBroken,
+            "{} entry '{}' broken ?: {}\n",
+            name,
+            uri_attr_name,
+            uri_value,
+        );
+        None
     }
 }
 

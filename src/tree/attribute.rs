@@ -120,6 +120,26 @@ impl XmlAttr {
         None
     }
 
+    pub(super) fn get_prop_node_value_internal(&self) -> Option<String> {
+        // Note that we return at least the empty string.
+        // TODO: Do we really always want that?
+        if let Some(children) = self.children() {
+            if children.next().is_none()
+                && matches!(
+                    children.element_type(),
+                    XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
+                )
+            {
+                let children = XmlNodePtr::try_from(children).unwrap();
+                // Optimization for the common case: only 1 text node.
+                return children.content.clone();
+            } else if let Some(ret) = children.get_string(self.document(), 1) {
+                return Some(ret);
+            }
+        }
+        Some("".to_owned())
+    }
+
     /// Read the value of a node, this can be either the text carried
     /// directly by this node if it's a TEXT node or the aggregate string
     /// of the values carried by this node child's (TEXT and ENTITY_REF).  
@@ -129,8 +149,8 @@ impl XmlAttr {
     /// Returns a new #XmlChar * or null_mut() if no content is available.  
     /// It's up to the caller to free the memory with xml_free().
     #[doc(alias = "xmlNodeGetContent")]
-    pub unsafe fn get_content(&self) -> Option<String> {
-        unsafe { self.get_prop_node_value_internal() }
+    pub fn get_content(&self) -> Option<String> {
+        self.get_prop_node_value_internal()
     }
 
     /// Read the value of a node `cur`, this can be either the text carried
@@ -141,25 +161,23 @@ impl XmlAttr {
     ///
     /// Returns 0 in case of success and -1 in case of error.
     #[doc(alias = "xmlBufGetNodeContent")]
-    pub unsafe fn get_content_to(&self, buf: &mut String) -> i32 {
-        unsafe {
-            assert!(matches!(
-                self.element_type(),
-                XmlElementType::XmlAttributeNode
-            ));
-            let mut tmp = self.children();
+    pub fn get_content_to(&self, buf: &mut String) -> i32 {
+        assert!(matches!(
+            self.element_type(),
+            XmlElementType::XmlAttributeNode
+        ));
+        let mut tmp = self.children();
 
-            while let Some(now) = tmp {
-                if matches!(now.element_type(), XmlElementType::XmlTextNode) {
-                    let now = XmlNodePtr::try_from(now).unwrap();
-                    buf.push_str(now.content.as_deref().unwrap());
-                } else {
-                    now.get_content_to(buf);
-                }
-                tmp = now.next();
+        while let Some(now) = tmp {
+            if matches!(now.element_type(), XmlElementType::XmlTextNode) {
+                let now = XmlNodePtr::try_from(now).unwrap();
+                buf.push_str(now.content.as_deref().unwrap());
+            } else {
+                now.get_content_to(buf);
             }
-            0
+            tmp = now.next();
         }
+        0
     }
 
     /// Set (or reset) the base URI of a node, i.e. the value of the xml:base attribute.
@@ -173,16 +191,14 @@ impl XmlAttr {
 
     /// update all nodes under the tree to point to the right document
     #[doc(alias = "xmlSetTreeDoc")]
-    pub unsafe fn set_doc(&mut self, doc: Option<XmlDocPtr>) {
-        unsafe {
-            if self.document() != doc {
-                if let Some(children) = self.children() {
-                    children.set_doc_all_sibling(doc);
-                }
-
-                // FIXME: self.ns should be updated as in xmlStaticCopyNode().
-                self.set_document(doc);
+    pub fn set_doc(&mut self, doc: Option<XmlDocPtr>) {
+        if self.document() != doc {
+            if let Some(children) = self.children() {
+                children.set_doc_all_sibling(doc);
             }
+
+            // FIXME: self.ns should be updated as in xmlStaticCopyNode().
+            self.set_document(doc);
         }
     }
 }
@@ -320,7 +336,7 @@ impl XmlAttrPtr {
     ///
     /// Returns 0 if success and -1 in case of error.
     #[doc(alias = "xmlRemoveProp")]
-    pub unsafe fn remove_prop(&mut self) -> i32 {
+    pub unsafe fn remove_prop(self) -> i32 {
         unsafe {
             let Some(mut parent) = self
                 .parent()
@@ -329,21 +345,21 @@ impl XmlAttrPtr {
                 return -1;
             };
             let mut tmp = parent.properties;
-            if tmp == Some(*self) {
+            if tmp == Some(self) {
                 parent.properties = self.next;
                 if let Some(mut next) = self.next {
                     next.prev = None;
                 }
-                xml_free_prop(*self);
+                xml_free_prop(self);
                 return 0;
             }
             while let Some(mut now) = tmp {
-                if now.next == Some(*self) {
+                if now.next == Some(self) {
                     now.next = self.next;
                     if let Some(mut next) = now.next {
                         next.prev = Some(now);
                     }
-                    xml_free_prop(*self);
+                    xml_free_prop(self);
                     return 0;
                 }
                 tmp = now.next;
@@ -418,137 +434,133 @@ impl From<XmlAttrPtr> for *mut XmlAttr {
 /// but XML special chars need to be escaped first by using.  
 /// xmlEncodeEntitiesReentrant(). Use xmlNewProp() if you don't need entities support.
 #[doc(alias = "xmlNewDocProp")]
-pub unsafe fn xml_new_doc_prop(
+pub fn xml_new_doc_prop(
     doc: Option<XmlDocPtr>,
     name: &str,
     value: Option<&str>,
 ) -> Option<XmlAttrPtr> {
-    unsafe {
-        // Allocate a new property and fill the fields.
-        let Some(mut cur) = XmlAttrPtr::new(XmlAttr {
-            typ: XmlElementType::XmlAttributeNode,
-            name: name.into(),
-            doc,
-            ..Default::default()
-        }) else {
-            xml_tree_err_memory("building attribute");
-            return None;
-        };
-        if let Some(value) = value {
-            cur.children = doc.and_then(|doc| doc.get_node_list(value));
-            cur.last = None;
+    // Allocate a new property and fill the fields.
+    let Some(mut cur) = XmlAttrPtr::new(XmlAttr {
+        typ: XmlElementType::XmlAttributeNode,
+        name: name.into(),
+        doc,
+        ..Default::default()
+    }) else {
+        xml_tree_err_memory("building attribute");
+        return None;
+    };
+    if let Some(value) = value {
+        cur.children = doc.and_then(|doc| doc.get_node_list(value));
+        cur.last = None;
 
-            let mut tmp = cur.children();
-            while let Some(mut now) = tmp {
-                now.set_parent(Some(cur.into()));
-                if now.next().is_none() {
-                    cur.set_last(Some(now));
-                }
-                tmp = now.next();
+        let mut tmp = cur.children();
+        while let Some(mut now) = tmp {
+            now.set_parent(Some(cur.into()));
+            if now.next().is_none() {
+                cur.set_last(Some(now));
             }
+            tmp = now.next();
         }
-
-        if let Some(register) = get_register_node_func() {
-            register(cur.into());
-        }
-
-        Some(cur)
     }
+
+    if let Some(register) = get_register_node_func() {
+        register(cur.into());
+    }
+
+    Some(cur)
 }
 
-pub(super) unsafe fn xml_new_prop_internal(
+pub(super) fn xml_new_prop_internal(
     node: Option<XmlNodePtr>,
     ns: Option<XmlNsPtr>,
     name: &str,
     value: Option<&str>,
 ) -> Option<XmlAttrPtr> {
-    unsafe {
-        if node.is_some_and(|node| !matches!(node.element_type(), XmlElementType::XmlElementNode)) {
-            return None;
-        }
-
-        // Allocate a new property and fill the fields.
-        let Some(mut cur) = XmlAttrPtr::new(XmlAttr {
-            typ: XmlElementType::XmlAttributeNode,
-            parent: node,
-            ns,
-            name: name.into(),
-            ..Default::default()
-        }) else {
-            xml_tree_err_memory("building attribute");
-            return None;
-        };
-
-        let mut doc = None;
-        if let Some(node) = node {
-            doc = node.doc;
-            cur.doc = doc;
-        }
-
-        if let Some(value) = value {
-            cur.set_children(xml_new_doc_text(doc, Some(value)).map(|node| node.into()));
-            cur.set_last(None);
-            let mut tmp = cur.children();
-            while let Some(mut now) = tmp {
-                now.set_parent(Some(cur.into()));
-                if now.next().is_none() {
-                    cur.set_last(Some(now));
-                }
-                tmp = now.next();
-            }
-        }
-
-        // Add it at the end to preserve parsing order ...
-        if let Some(mut node) = node {
-            if let Some(mut prev) = node.properties {
-                while let Some(next) = prev.next {
-                    prev = next;
-                }
-                prev.next = Some(cur);
-                cur.prev = Some(prev);
-            } else {
-                node.properties = Some(cur);
-            }
-        }
-
-        if let Some(value) = value {
-            if let Some(node) = node {
-                if xml_is_id(node.doc, Some(node), Some(cur)) == 1 {
-                    xml_add_id(None, node.doc.unwrap(), value, cur);
-                }
-            }
-        }
-
-        if let Some(register) = get_register_node_func() {
-            register(cur.into());
-        }
-
-        Some(cur)
+    if node.is_some_and(|node| !matches!(node.element_type(), XmlElementType::XmlElementNode)) {
+        return None;
     }
+
+    // Allocate a new property and fill the fields.
+    let Some(mut cur) = XmlAttrPtr::new(XmlAttr {
+        typ: XmlElementType::XmlAttributeNode,
+        parent: node,
+        ns,
+        name: name.into(),
+        ..Default::default()
+    }) else {
+        xml_tree_err_memory("building attribute");
+        return None;
+    };
+
+    let mut doc = None;
+    if let Some(node) = node {
+        doc = node.doc;
+        cur.doc = doc;
+    }
+
+    if let Some(value) = value {
+        cur.set_children(xml_new_doc_text(doc, Some(value)).map(|node| node.into()));
+        cur.set_last(None);
+        let mut tmp = cur.children();
+        while let Some(mut now) = tmp {
+            now.set_parent(Some(cur.into()));
+            if now.next().is_none() {
+                cur.set_last(Some(now));
+            }
+            tmp = now.next();
+        }
+    }
+
+    // Add it at the end to preserve parsing order ...
+    if let Some(mut node) = node {
+        if let Some(mut prev) = node.properties {
+            while let Some(next) = prev.next {
+                prev = next;
+            }
+            prev.next = Some(cur);
+            cur.prev = Some(prev);
+        } else {
+            node.properties = Some(cur);
+        }
+    }
+
+    if let Some(value) = value {
+        if let Some(node) = node {
+            if xml_is_id(node.doc, Some(node), Some(cur)) == 1 {
+                xml_add_id(None, node.doc.unwrap(), value, cur);
+            }
+        }
+    }
+
+    if let Some(register) = get_register_node_func() {
+        register(cur.into());
+    }
+
+    Some(cur)
 }
 
 /// Create a new property carried by a node.  
 /// Returns a pointer to the attribute
 #[doc(alias = "xmlNewProp")]
 #[cfg(any(feature = "libxml_tree", feature = "html", feature = "schema"))]
-pub unsafe fn xml_new_prop(
+pub fn xml_new_prop(
     node: Option<XmlNodePtr>,
     name: &str,
     value: Option<&str>,
 ) -> Option<XmlAttrPtr> {
-    unsafe { xml_new_prop_internal(node, None, name, value) }
+    xml_new_prop_internal(node, None, name, value)
 }
 
 /// Create a new property tagged with a namespace and carried by a node.  
 /// Returns a pointer to the attribute
 #[doc(alias = "xmlNewNsProp")]
-pub unsafe fn xml_new_ns_prop(
+pub fn xml_new_ns_prop(
     node: Option<XmlNodePtr>,
     ns: Option<XmlNsPtr>,
     name: &str,
     value: Option<&str>,
 ) -> Option<XmlAttrPtr> {
-    unsafe { xml_new_prop_internal(node, ns, name, value) }
+    xml_new_prop_internal(node, ns, name, value)
 }
 
 pub(super) unsafe fn xml_copy_prop_internal(

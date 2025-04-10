@@ -3606,7 +3606,7 @@ pub(crate) unsafe fn xml_schema_add_schema_doc(
 ///
 /// Returns the attribute or NULL if not present.
 #[doc(alias = "xmlSchemaGetPropNode")]
-pub(crate) unsafe fn xml_schema_get_prop_node(node: XmlNodePtr, name: &str) -> Option<XmlAttrPtr> {
+pub(crate) fn xml_schema_get_prop_node(node: XmlNodePtr, name: &str) -> Option<XmlAttrPtr> {
     let mut prop = node.properties;
     while let Some(now) = prop {
         if now.ns.is_none() && now.name().as_deref() == Some(name) {
@@ -3617,8 +3617,8 @@ pub(crate) unsafe fn xml_schema_get_prop_node(node: XmlNodePtr, name: &str) -> O
     None
 }
 
-unsafe fn xml_schema_get_node_content_no_dict(node: XmlGenericNodePtr) -> Option<String> {
-    unsafe { node.get_content() }
+fn xml_schema_get_node_content_no_dict(node: XmlGenericNodePtr) -> Option<String> {
+    node.get_content()
 }
 
 /// Extracts and validates the ID of an attribute value.
@@ -3626,15 +3626,14 @@ unsafe fn xml_schema_get_node_content_no_dict(node: XmlGenericNodePtr) -> Option
 /// Returns 0, in case the ID is valid, a positive error code
 /// if not valid and -1 if an internal error occurs.
 #[doc(alias = "xmlSchemaPValAttrID")]
-pub(crate) unsafe fn xml_schema_pval_attr_node_id(
+pub(crate) fn xml_schema_pval_attr_node_id(
     ctxt: XmlSchemaParserCtxtPtr,
     attr: Option<XmlAttrPtr>,
 ) -> i32 {
     let Some(mut attr) = attr else {
         return 0;
     };
-    let Some(value) = (unsafe { xml_schema_get_node_content_no_dict(attr.into()).map(Cow::Owned) })
-    else {
+    let Some(value) = xml_schema_get_node_content_no_dict(attr.into()).map(Cow::Owned) else {
         return -1;
     };
     let ret = validate_ncname::<true>(&value);
@@ -3644,9 +3643,9 @@ pub(crate) unsafe fn xml_schema_pval_attr_node_id(
             if !matches!(attr.atype, Some(XmlAttributeType::XmlAttributeID)) {
                 // TODO: Use xmlSchemaStrip here; it's not exported at this moment.
                 let res = if let Some(strip) = xml_schema_collapse_string(&value) {
-                    unsafe { xml_add_id(None, attr.doc.unwrap(), &strip, attr) }
+                    xml_add_id(None, attr.doc.unwrap(), &strip, attr)
                 } else {
-                    unsafe { xml_add_id(None, attr.doc.unwrap(), &value, attr) }
+                    xml_add_id(None, attr.doc.unwrap(), &value, attr)
                 };
                 if res.is_none() {
                     unsafe {
@@ -3696,17 +3695,15 @@ pub(crate) unsafe fn xml_schema_pval_attr_node_id(
     }
 }
 
-pub(crate) unsafe fn xml_schema_pval_attr_id(
+pub(crate) fn xml_schema_pval_attr_id(
     ctxt: XmlSchemaParserCtxtPtr,
     owner_elem: XmlNodePtr,
     name: &str,
 ) -> i32 {
-    unsafe {
-        let Some(attr) = xml_schema_get_prop_node(owner_elem, name) else {
-            return 0;
-        };
-        xml_schema_pval_attr_node_id(ctxt, Some(attr))
-    }
+    let Some(attr) = xml_schema_get_prop_node(owner_elem, name) else {
+        return 0;
+    };
+    xml_schema_pval_attr_node_id(ctxt, Some(attr))
 }
 
 /// Validates a value against the given built-in type.

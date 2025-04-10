@@ -196,16 +196,14 @@ impl XmlDoc {
     /// Returns a new #XmlChar * or null_mut() if no content is available.  
     /// It's up to the caller to free the memory with xml_free().
     #[doc(alias = "xmlNodeGetContent")]
-    pub unsafe fn get_content(&self) -> Option<String> {
-        unsafe {
-            assert!(matches!(
-                self.element_type(),
-                XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
-            ));
-            let mut buf = String::new();
-            self.get_content_to(&mut buf);
-            Some(buf)
-        }
+    pub fn get_content(&self) -> Option<String> {
+        assert!(matches!(
+            self.element_type(),
+            XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
+        ));
+        let mut buf = String::new();
+        self.get_content_to(&mut buf);
+        Some(buf)
     }
 
     /// Read the value of a node `cur`, this can be either the text carried
@@ -216,214 +214,24 @@ impl XmlDoc {
     ///
     /// Returns 0 in case of success and -1 in case of error.
     #[doc(alias = "xmlBufGetNodeContent")]
-    pub unsafe fn get_content_to(&self, buf: &mut String) -> i32 {
-        unsafe {
-            assert!(matches!(
-                self.element_type(),
-                XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
-            ));
-            let mut next = self.children();
-            while let Some(cur) = next {
-                if matches!(
-                    cur.element_type(),
-                    XmlElementType::XmlElementNode
-                        | XmlElementType::XmlTextNode
-                        | XmlElementType::XmlCDATASectionNode
-                ) {
-                    cur.get_content_to(buf);
-                }
-                next = cur.next();
+    pub fn get_content_to(&self, buf: &mut String) -> i32 {
+        assert!(matches!(
+            self.element_type(),
+            XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
+        ));
+        let mut next = self.children();
+        while let Some(cur) = next {
+            if matches!(
+                cur.element_type(),
+                XmlElementType::XmlElementNode
+                    | XmlElementType::XmlTextNode
+                    | XmlElementType::XmlCDATASectionNode
+            ) {
+                cur.get_content_to(buf);
             }
-            0
+            next = cur.next();
         }
-    }
-
-    /// Parse the value string and build the node list associated.  
-    /// Should produce a flat tree with only TEXTs and ENTITY_REFs.
-    ///
-    /// Returns a pointer to the first child.
-    #[doc(alias = "xmlStringGetNodeList")]
-    pub unsafe fn get_node_list(&self, value: &str) -> Option<XmlNodePtr> {
-        unsafe {
-            let mut head: Option<XmlNodePtr> = None;
-            let mut last: Option<XmlNodePtr> = None;
-            let mut buf = String::new();
-            let mut cur = value;
-            let mut q = cur;
-            while !cur.is_empty() {
-                if cur.starts_with('&') {
-                    let mut charval = 0;
-
-                    // Save the current text.
-                    if cur.len() != q.len() {
-                        let len = q.len() - cur.len();
-                        buf.push_str(&q[..len]);
-                    }
-
-                    if cur[1..].starts_with("#x") {
-                        cur = &cur[3..];
-                        if let Some((value, rem)) = cur.split_once(';').and_then(|(head, tail)| {
-                            u32::from_str_radix(head, 16).ok().map(|val| (val, tail))
-                        }) {
-                            charval = value;
-                            cur = rem;
-                        } else {
-                            xml_tree_err(
-                                XmlParserErrors::XmlTreeInvalidHex,
-                                XmlGenericNodePtr::from_raw(self as *const XmlDoc as *mut XmlDoc),
-                                None,
-                            );
-                            charval = 0;
-                        };
-                        q = cur;
-                    } else if cur[1..].starts_with('#') {
-                        cur = &cur[2..];
-                        if let Some((value, rem)) = cur.split_once(';').and_then(|(head, tail)| {
-                            head.parse::<u32>().ok().map(|val| (val, tail))
-                        }) {
-                            charval = value;
-                            cur = rem;
-                        } else {
-                            xml_tree_err(
-                                XmlParserErrors::XmlTreeInvalidDec,
-                                XmlGenericNodePtr::from_raw(self as *const XmlDoc as *mut XmlDoc),
-                                None,
-                            );
-                            charval = 0;
-                        };
-                        q = cur;
-                    } else {
-                        // Read the entity string
-                        cur = &cur[1..];
-                        q = cur;
-                        let Some((entity, rem)) = cur.split_once(';') else {
-                            xml_tree_err(
-                                XmlParserErrors::XmlTreeUnterminatedEntity,
-                                XmlGenericNodePtr::from_raw(self as *const XmlDoc as *mut XmlDoc),
-                                Some(q),
-                            );
-                            if let Some(head) = head {
-                                xml_free_node_list(Some(head));
-                            }
-                            return None;
-                        };
-                        if !entity.is_empty() {
-                            // Predefined entities don't generate nodes
-                            let ent = xml_get_doc_entity(
-                                XmlDocPtr::from_raw(self as *const XmlDoc as _).unwrap(),
-                                entity,
-                            );
-                            if let Some(ent) = ent.filter(|ent| {
-                                matches!(ent.etype, XmlEntityType::XmlInternalPredefinedEntity)
-                            }) {
-                                buf.push_str(ent.content.as_deref().unwrap());
-                            } else {
-                                // Flush buffer so far
-                                if !buf.is_empty() {
-                                    let Some(mut node) = xml_new_doc_text(
-                                        XmlDocPtr::from_raw(self as *const XmlDoc as *mut XmlDoc)
-                                            .unwrap(),
-                                        None,
-                                    ) else {
-                                        if let Some(head) = head {
-                                            xml_free_node_list(Some(head));
-                                        }
-                                        return None;
-                                    };
-                                    node.content.get_or_insert_default().push_str(&buf);
-                                    buf.clear();
-
-                                    if let Some(mut l) = last {
-                                        last = l
-                                            .add_next_sibling(node.into())
-                                            .map(|node| XmlNodePtr::try_from(node).unwrap());
-                                    } else {
-                                        last = Some(node);
-                                        head = Some(node);
-                                    }
-                                }
-
-                                // Create a new REFERENCE_REF node
-                                let Some(node) = xml_new_reference(
-                                    XmlDocPtr::from_raw(self as *const XmlDoc as _).unwrap(),
-                                    entity,
-                                ) else {
-                                    if let Some(head) = head {
-                                        xml_free_node_list(Some(head));
-                                    }
-                                    return None;
-                                };
-                                if let Some(mut ent) = ent.filter(|ent| {
-                                    ent.flags & XML_ENT_PARSED as i32 == 0
-                                        && ent.flags & XML_ENT_EXPANDING as i32 == 0
-                                }) {
-                                    // The entity should have been checked already,
-                                    // but set the flag anyway to avoid recursion.
-                                    ent.flags |= XML_ENT_EXPANDING as i32;
-                                    let content = node.content.as_deref().unwrap();
-                                    ent.set_children(
-                                        self.get_node_list(content).map(|node| node.into()),
-                                    );
-                                    ent.owner = 1;
-                                    ent.flags &= !XML_ENT_EXPANDING as i32;
-                                    ent.flags |= XML_ENT_PARSED as i32;
-                                    let mut temp = ent.children();
-                                    while let Some(mut now) = temp {
-                                        now.set_parent(Some(ent.into()));
-                                        ent.set_last(Some(now));
-                                        temp = now.next();
-                                    }
-                                }
-                                if let Some(mut l) = last {
-                                    last = l
-                                        .add_next_sibling(node.into())
-                                        .map(|node| XmlNodePtr::try_from(node).unwrap());
-                                } else {
-                                    last = Some(node);
-                                    head = Some(node);
-                                }
-                            }
-                        }
-                        cur = rem;
-                        q = cur;
-                    }
-                    if charval != 0 {
-                        if let Some(c) = char::from_u32(charval) {
-                            buf.push(c);
-                        }
-                    }
-                } else {
-                    let c = cur.chars().next().unwrap();
-                    cur = &cur[c.len_utf8()..];
-                }
-            }
-            if cur != q || head.is_none() {
-                // Handle the last piece of text.
-                let len = q.len() - cur.len();
-                buf.push_str(&q[..len]);
-            }
-
-            if !buf.is_empty() {
-                let Some(mut node) = xml_new_doc_text(
-                    XmlDocPtr::from_raw(self as *const XmlDoc as *mut XmlDoc).unwrap(),
-                    None,
-                ) else {
-                    if let Some(head) = head {
-                        xml_free_node_list(Some(head));
-                    }
-                    return None;
-                };
-                node.content = Some(buf);
-
-                if let Some(mut last) = last {
-                    last.add_next_sibling(node.into());
-                } else {
-                    head = Some(node);
-                }
-            }
-
-            head
-        }
+        0
     }
 
     /// Set (or reset) the base URI of a node, i.e. the value of the xml:base attribute.
@@ -644,6 +452,208 @@ impl XmlDocPtr {
     // pub(crate) unsafe fn into_inner(self) -> Box<XmlDoc> {
     //     unsafe { Box::from_raw(self.0.as_ptr()) }
     // }
+
+    /// Parse the value string and build the node list associated.  
+    /// Should produce a flat tree with only TEXTs and ENTITY_REFs.
+    ///
+    /// Returns a pointer to the first child.
+    #[doc(alias = "xmlStringGetNodeList")]
+    pub fn get_node_list(self, value: &str) -> Option<XmlNodePtr> {
+        let mut head: Option<XmlNodePtr> = None;
+        let mut last: Option<XmlNodePtr> = None;
+        let mut buf = String::new();
+        let mut cur = value;
+        let mut q = cur;
+        while !cur.is_empty() {
+            if cur.starts_with('&') {
+                let mut charval = 0;
+
+                // Save the current text.
+                if cur.len() != q.len() {
+                    let len = q.len() - cur.len();
+                    buf.push_str(&q[..len]);
+                }
+
+                if cur[1..].starts_with("#x") {
+                    cur = &cur[3..];
+                    if let Some((value, rem)) = cur.split_once(';').and_then(|(head, tail)| {
+                        u32::from_str_radix(head, 16).ok().map(|val| (val, tail))
+                    }) {
+                        charval = value;
+                        cur = rem;
+                    } else {
+                        xml_tree_err(XmlParserErrors::XmlTreeInvalidHex, Some(self.into()), None);
+                        charval = 0;
+                    };
+                    q = cur;
+                } else if cur[1..].starts_with('#') {
+                    cur = &cur[2..];
+                    if let Some((value, rem)) = cur
+                        .split_once(';')
+                        .and_then(|(head, tail)| head.parse::<u32>().ok().map(|val| (val, tail)))
+                    {
+                        charval = value;
+                        cur = rem;
+                    } else {
+                        xml_tree_err(XmlParserErrors::XmlTreeInvalidDec, Some(self.into()), None);
+                        charval = 0;
+                    };
+                    q = cur;
+                } else {
+                    // Read the entity string
+                    cur = &cur[1..];
+                    q = cur;
+                    let Some((entity, rem)) = cur.split_once(';') else {
+                        xml_tree_err(
+                            XmlParserErrors::XmlTreeUnterminatedEntity,
+                            Some(self.into()),
+                            Some(q),
+                        );
+                        if let Some(head) = head {
+                            unsafe {
+                                // # Safety
+                                // This node list is generated in this function,
+                                // and is not still committed in any outer data.
+                                // Therefore, this operation is safe.
+                                xml_free_node_list(Some(head));
+                            }
+                        }
+                        return None;
+                    };
+                    if !entity.is_empty() {
+                        // Predefined entities don't generate nodes
+                        let ent = xml_get_doc_entity(Some(self), entity);
+                        if let Some(ent) = ent.filter(|ent| {
+                            matches!(ent.etype, XmlEntityType::XmlInternalPredefinedEntity)
+                        }) {
+                            buf.push_str(ent.content.as_deref().unwrap());
+                        } else {
+                            // Flush buffer so far
+                            if !buf.is_empty() {
+                                let Some(mut node) = xml_new_doc_text(Some(self), None) else {
+                                    if let Some(head) = head {
+                                        unsafe {
+                                            // # Safety
+                                            // This node list is generated in this function,
+                                            // and is not still committed in any outer data.
+                                            // Therefore, this operation is safe.
+                                            xml_free_node_list(Some(head));
+                                        }
+                                    }
+                                    return None;
+                                };
+                                node.content.get_or_insert_default().push_str(&buf);
+                                buf.clear();
+
+                                if let Some(mut l) = last {
+                                    unsafe {
+                                        // # Safety
+                                        // `node` is no longer used in this scope.
+                                        last = l
+                                            .add_next_sibling(node.into())
+                                            .map(|node| XmlNodePtr::try_from(node).unwrap());
+                                    }
+                                } else {
+                                    last = Some(node);
+                                    head = Some(node);
+                                }
+                            }
+
+                            // Create a new REFERENCE_REF node
+                            let Some(node) = xml_new_reference(Some(self), entity) else {
+                                if let Some(head) = head {
+                                    unsafe {
+                                        // # Safety
+                                        // This node list is generated in this function,
+                                        // and is not still committed in any outer data.
+                                        // Therefore, this operation is safe.
+                                        xml_free_node_list(Some(head));
+                                    }
+                                }
+                                return None;
+                            };
+                            if let Some(mut ent) = ent.filter(|ent| {
+                                ent.flags & XML_ENT_PARSED as i32 == 0
+                                    && ent.flags & XML_ENT_EXPANDING as i32 == 0
+                            }) {
+                                // The entity should have been checked already,
+                                // but set the flag anyway to avoid recursion.
+                                ent.flags |= XML_ENT_EXPANDING as i32;
+                                let content = node.content.as_deref().unwrap();
+                                ent.set_children(
+                                    self.get_node_list(content).map(|node| node.into()),
+                                );
+                                ent.owner = 1;
+                                ent.flags &= !XML_ENT_EXPANDING as i32;
+                                ent.flags |= XML_ENT_PARSED as i32;
+                                let mut temp = ent.children();
+                                while let Some(mut now) = temp {
+                                    now.set_parent(Some(ent.into()));
+                                    ent.set_last(Some(now));
+                                    temp = now.next();
+                                }
+                            }
+                            if let Some(mut l) = last {
+                                unsafe {
+                                    // # Safety
+                                    // `node` is no longer used in this scope.
+                                    last = l
+                                        .add_next_sibling(node.into())
+                                        .map(|node| XmlNodePtr::try_from(node).unwrap());
+                                }
+                            } else {
+                                last = Some(node);
+                                head = Some(node);
+                            }
+                        }
+                    }
+                    cur = rem;
+                    q = cur;
+                }
+                if charval != 0 {
+                    if let Some(c) = char::from_u32(charval) {
+                        buf.push(c);
+                    }
+                }
+            } else {
+                let c = cur.chars().next().unwrap();
+                cur = &cur[c.len_utf8()..];
+            }
+        }
+        if cur != q || head.is_none() {
+            // Handle the last piece of text.
+            let len = q.len() - cur.len();
+            buf.push_str(&q[..len]);
+        }
+
+        if !buf.is_empty() {
+            let Some(mut node) = xml_new_doc_text(Some(self), None) else {
+                if let Some(head) = head {
+                    unsafe {
+                        // # Safety
+                        // This node list is generated in this function,
+                        // and is not still committed in any outer data.
+                        // Therefore, this operation is safe.
+                        xml_free_node_list(Some(head));
+                    }
+                }
+                return None;
+            };
+            node.content = Some(buf);
+
+            if let Some(mut last) = last {
+                unsafe {
+                    // # Safety
+                    // `node` is no longer used in this scope.
+                    last.add_next_sibling(node.into());
+                }
+            } else {
+                head = Some(node);
+            }
+        }
+
+        head
+    }
 }
 
 impl Clone for XmlDocPtr {

@@ -47,55 +47,48 @@ impl XmlParserCtxt {
     ///
     /// Returns null_mut() if not, otherwise the new xmlIDPtr
     #[doc(alias = "xmlAddID")]
-    pub unsafe fn add_id(
-        &mut self,
-        mut doc: XmlDocPtr,
-        value: &str,
-        mut attr: XmlAttrPtr,
-    ) -> Option<()> {
-        unsafe {
-            if value.is_empty() {
-                return None;
-            }
-
-            let mut ret = XmlID {
-                value: value.to_owned(),
-                doc: Some(doc),
-                ..Default::default()
-            };
-            if self.is_streaming() {
-                // Operating in streaming mode, attr is gonna disappear
-                ret.name = Some(attr.name.as_ref().to_owned());
-                ret.attr = None;
-            } else {
-                ret.attr = Some(attr);
-                ret.name = None;
-            }
-            ret.lineno = attr.parent.map_or(-1, |p| p.get_line_no() as i32);
-
-            // Create the ID table if needed.
-            doc.ids
-                .get_or_insert(Box::new(XmlHashTable::with_capacity(0)));
-            let table = doc.ids.as_deref_mut().unwrap();
-            if table.add_entry(value, ret).is_err() {
-                // The id is already defined in this DTD.
-                #[cfg(feature = "libxml_valid")]
-                {
-                    xml_err_valid_node(
-                        self,
-                        attr.parent.map(|par| par.into()),
-                        XmlParserErrors::XmlDTDIDRedefined,
-                        format!("ID {value} already defined\n").as_str(),
-                        Some(value),
-                        None,
-                        None,
-                    );
-                }
-                return None;
-            }
-            attr.atype = Some(XmlAttributeType::XmlAttributeID);
-            Some(())
+    pub fn add_id(&mut self, mut doc: XmlDocPtr, value: &str, mut attr: XmlAttrPtr) -> Option<()> {
+        if value.is_empty() {
+            return None;
         }
+
+        let mut ret = XmlID {
+            value: value.to_owned(),
+            doc: Some(doc),
+            ..Default::default()
+        };
+        if self.is_streaming() {
+            // Operating in streaming mode, attr is gonna disappear
+            ret.name = Some(attr.name.as_ref().to_owned());
+            ret.attr = None;
+        } else {
+            ret.attr = Some(attr);
+            ret.name = None;
+        }
+        ret.lineno = attr.parent.map_or(-1, |p| p.get_line_no() as i32);
+
+        // Create the ID table if needed.
+        doc.ids
+            .get_or_insert(Box::new(XmlHashTable::with_capacity(0)));
+        let table = doc.ids.as_deref_mut().unwrap();
+        if table.add_entry(value, ret).is_err() {
+            // The id is already defined in this DTD.
+            #[cfg(feature = "libxml_valid")]
+            {
+                xml_err_valid_node(
+                    self,
+                    attr.parent.map(|par| par.into()),
+                    XmlParserErrors::XmlDTDIDRedefined,
+                    format!("ID {value} already defined\n").as_str(),
+                    Some(value),
+                    None,
+                    None,
+                );
+            }
+            return None;
+        }
+        attr.atype = Some(XmlAttributeType::XmlAttributeID);
+        Some(())
     }
 
     /// Register a new ref declaration
@@ -106,42 +99,40 @@ impl XmlParserCtxt {
     /// This function in original libxml2 returns new `xmlRefPtr`.  
     /// However, this function cannot returns `Option<&XmlRef>`.
     #[doc(alias = "xmlAddRef")]
-    pub(crate) unsafe fn add_ref(
+    pub(crate) fn add_ref(
         &mut self,
         mut doc: XmlDocPtr,
         value: &str,
         attr: XmlAttrPtr,
     ) -> Option<()> {
-        unsafe {
-            // Create the Ref table if needed.
-            let table = doc.refs.get_or_insert_with(HashMap::new);
-            let mut ret = XmlRef {
-                value: value.to_owned(),
-                ..Default::default()
-            };
-            // fill the structure.
-            if self.is_streaming() {
-                // Operating in streaming mode, attr is gonna disappear
-                ret.name = Some(attr.name.as_ref().to_owned());
-                ret.attr = None;
-            } else {
-                ret.name = None;
-                ret.attr = Some(attr);
-            }
-            ret.lineno = attr.parent.map_or(-1, |p| p.get_line_no() as i32);
-
-            // To add a reference :-
-            // References are maintained as a list of references,
-            // Lookup the entry, if no entry create new nodelist
-            // Add the owning node to the NodeList
-            // Return the ref
-
-            let ref_list = table
-                .entry(value.to_owned())
-                .or_insert_with(|| XmlList::new(None, Rc::new(|_, _| std::cmp::Ordering::Equal)));
-            ref_list.insert_upper_bound(Box::new(ret));
-            Some(())
+        // Create the Ref table if needed.
+        let table = doc.refs.get_or_insert_with(HashMap::new);
+        let mut ret = XmlRef {
+            value: value.to_owned(),
+            ..Default::default()
+        };
+        // fill the structure.
+        if self.is_streaming() {
+            // Operating in streaming mode, attr is gonna disappear
+            ret.name = Some(attr.name.as_ref().to_owned());
+            ret.attr = None;
+        } else {
+            ret.name = None;
+            ret.attr = Some(attr);
         }
+        ret.lineno = attr.parent.map_or(-1, |p| p.get_line_no() as i32);
+
+        // To add a reference :-
+        // References are maintained as a list of references,
+        // Lookup the entry, if no entry create new nodelist
+        // Add the owning node to the NodeList
+        // Return the ref
+
+        let ref_list = table
+            .entry(value.to_owned())
+            .or_insert_with(|| XmlList::new(None, Rc::new(|_, _| std::cmp::Ordering::Equal)));
+        ref_list.insert_upper_bound(Box::new(ret));
+        Some(())
     }
 
     /// Register a new element declaration

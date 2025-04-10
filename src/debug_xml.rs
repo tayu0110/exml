@@ -1836,25 +1836,23 @@ impl XmlShellCtxt<'_> {
     /// Returns 0
     #[doc(alias = "xmlShellBase")]
     #[cfg(feature = "xpath")]
-    pub unsafe fn xml_shell_base(
+    pub fn xml_shell_base(
         &mut self,
         _arg: Option<&str>,
         node: Option<XmlGenericNodePtr>,
         _node2: Option<XmlGenericNodePtr>,
     ) -> i32 {
-        unsafe {
-            let Some(node) = node else {
-                writeln!(self.output, "NULL").ok();
-                return 0;
-            };
+        let Some(node) = node else {
+            writeln!(self.output, "NULL").ok();
+            return 0;
+        };
 
-            if let Some(base) = node.get_base(node.document()) {
-                writeln!(self.output, "{base}").ok();
-            } else {
-                writeln!(self.output, " No base found !!!").ok();
-            }
-            0
+        if let Some(base) = node.get_base(node.document()) {
+            writeln!(self.output, "{base}").ok();
+        } else {
+            writeln!(self.output, " No base found !!!").ok();
         }
+        0
     }
 
     /// Implements the XML shell function "dir"

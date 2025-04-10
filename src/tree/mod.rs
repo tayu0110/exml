@@ -1012,35 +1012,33 @@ pub unsafe fn xml_copy_dtd(dtd: XmlDtdPtr) -> Option<XmlDtdPtr> {
 ///
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewDocNode")]
-pub unsafe fn xml_new_doc_node(
+pub fn xml_new_doc_node(
     doc: Option<XmlDocPtr>,
     ns: Option<XmlNsPtr>,
     name: &str,
     content: Option<&str>,
 ) -> Option<XmlNodePtr> {
-    unsafe {
-        let cur = xml_new_node(ns, name);
-        if let Some(mut cur) = cur {
-            cur.doc = doc;
-            if let Some(content) = content {
-                cur.set_children(
-                    doc.and_then(|doc| doc.get_node_list(content).map(|node| node.into())),
-                );
-                if let Some(mut ulccur) = cur.children() {
-                    while let Some(next) = ulccur.next() {
-                        ulccur.set_parent(Some(cur.into()));
-                        ulccur = next;
-                    }
-                    (*ulccur).set_parent(Some(cur.into()));
-                    cur.set_last(Some(ulccur));
-                } else {
-                    cur.set_last(None);
+    let cur = xml_new_node(ns, name);
+    if let Some(mut cur) = cur {
+        cur.doc = doc;
+        if let Some(content) = content {
+            cur.set_children(
+                doc.and_then(|doc| doc.get_node_list(content).map(|node| node.into())),
+            );
+            if let Some(mut ulccur) = cur.children() {
+                while let Some(next) = ulccur.next() {
+                    ulccur.set_parent(Some(cur.into()));
+                    ulccur = next;
                 }
+                (*ulccur).set_parent(Some(cur.into()));
+                cur.set_last(Some(ulccur));
+            } else {
+                cur.set_last(None);
             }
         }
-
-        cur
     }
+
+    cur
 }
 
 /// Creation of a new node element. @ns is optional (null_mut()).
@@ -1079,51 +1077,49 @@ pub fn xml_new_node(ns: Option<XmlNsPtr>, name: &str) -> Option<XmlNodePtr> {
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewChild")]
 #[cfg(any(feature = "libxml_tree", feature = "schema"))]
-pub unsafe fn xml_new_child(
+pub fn xml_new_child(
     mut parent: XmlGenericNodePtr,
     ns: Option<XmlNsPtr>,
     name: &str,
     content: Option<&str>,
 ) -> Option<XmlNodePtr> {
-    unsafe {
-        // Allocate a new node
-        let mut cur = if let Some(node) = XmlNodePtr::try_from(parent)
-            .ok()
-            .filter(|node| node.element_type() == XmlElementType::XmlElementNode)
-        {
-            if ns.is_none() {
-                xml_new_doc_node(node.doc, node.ns, name, content)
-            } else {
-                xml_new_doc_node(node.doc, ns, name, content)
-            }
-        } else if let Ok(parent) = XmlDocPtr::try_from(parent) {
-            if ns.is_none() {
-                xml_new_doc_node(Some(parent), None, name, content)
-            } else {
-                xml_new_doc_node(Some(parent), ns, name, content)
-            }
-        } else if matches!(parent.element_type(), XmlElementType::XmlDocumentFragNode) {
-            xml_new_doc_node(parent.document(), ns, name, content)
+    // Allocate a new node
+    let mut cur = if let Some(node) = XmlNodePtr::try_from(parent)
+        .ok()
+        .filter(|node| node.element_type() == XmlElementType::XmlElementNode)
+    {
+        if ns.is_none() {
+            xml_new_doc_node(node.doc, node.ns, name, content)
         } else {
-            None
-        }?;
-
-        // add the new element at the end of the children list.
-        cur.typ = XmlElementType::XmlElementNode;
-        cur.set_parent(Some(parent));
-        cur.doc = parent.document();
-        if parent.children().is_none() {
-            parent.set_children(Some(cur.into()));
-            parent.set_last(Some(cur.into()));
-        } else {
-            let mut prev = parent.last().unwrap();
-            prev.set_next(Some(cur.into()));
-            cur.prev = Some(prev);
-            parent.set_last(Some(cur.into()));
+            xml_new_doc_node(node.doc, ns, name, content)
         }
+    } else if let Ok(parent) = XmlDocPtr::try_from(parent) {
+        if ns.is_none() {
+            xml_new_doc_node(Some(parent), None, name, content)
+        } else {
+            xml_new_doc_node(Some(parent), ns, name, content)
+        }
+    } else if matches!(parent.element_type(), XmlElementType::XmlDocumentFragNode) {
+        xml_new_doc_node(parent.document(), ns, name, content)
+    } else {
+        None
+    }?;
 
-        Some(cur)
+    // add the new element at the end of the children list.
+    cur.typ = XmlElementType::XmlElementNode;
+    cur.set_parent(Some(parent));
+    cur.doc = parent.document();
+    if parent.children().is_none() {
+        parent.set_children(Some(cur.into()));
+        parent.set_last(Some(cur.into()));
+    } else {
+        let mut prev = parent.last().unwrap();
+        prev.set_next(Some(cur.into()));
+        cur.prev = Some(prev);
+        parent.set_last(Some(cur.into()));
     }
+
+    Some(cur)
 }
 
 /// Creation of a new text node within a document.
@@ -1379,51 +1375,49 @@ pub unsafe fn xml_copy_node_list(node: Option<XmlGenericNodePtr>) -> Option<XmlG
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewTextChild")]
 #[cfg(feature = "libxml_tree")]
-pub unsafe fn xml_new_text_child(
+pub fn xml_new_text_child(
     mut parent: XmlGenericNodePtr,
     ns: Option<XmlNsPtr>,
     name: &str,
     content: Option<&str>,
 ) -> Option<XmlNodePtr> {
-    unsafe {
-        // Allocate a new node
-        let mut cur = if let Some(parent) = XmlNodePtr::try_from(parent)
-            .ok()
-            .filter(|parent| matches!(parent.element_type(), XmlElementType::XmlElementNode))
-        {
-            if ns.is_none() {
-                xml_new_doc_raw_node(parent.doc, parent.ns, name, content)
-            } else {
-                xml_new_doc_raw_node(parent.doc, ns, name, content)
-            }
-        } else if let Ok(parent) = XmlDocPtr::try_from(parent) {
-            if ns.is_none() {
-                xml_new_doc_raw_node(Some(parent), None, name, content)
-            } else {
-                xml_new_doc_raw_node(Some(parent), ns, name, content)
-            }
-        } else if matches!(parent.element_type(), XmlElementType::XmlDocumentFragNode) {
-            xml_new_doc_raw_node(parent.document(), ns, name, content)
+    // Allocate a new node
+    let mut cur = if let Some(parent) = XmlNodePtr::try_from(parent)
+        .ok()
+        .filter(|parent| matches!(parent.element_type(), XmlElementType::XmlElementNode))
+    {
+        if ns.is_none() {
+            xml_new_doc_raw_node(parent.doc, parent.ns, name, content)
         } else {
-            None
-        }?;
-
-        // add the new element at the end of the children list.
-        cur.typ = XmlElementType::XmlElementNode;
-        cur.set_parent(Some(parent));
-        cur.doc = parent.document();
-        if parent.children().is_none() {
-            parent.set_children(Some(cur.into()));
-            parent.set_last(Some(cur.into()));
-        } else {
-            let mut prev = parent.last().unwrap();
-            prev.set_next(Some(cur.into()));
-            cur.prev = Some(prev);
-            parent.set_last(Some(cur.into()));
+            xml_new_doc_raw_node(parent.doc, ns, name, content)
         }
+    } else if let Ok(parent) = XmlDocPtr::try_from(parent) {
+        if ns.is_none() {
+            xml_new_doc_raw_node(Some(parent), None, name, content)
+        } else {
+            xml_new_doc_raw_node(Some(parent), ns, name, content)
+        }
+    } else if matches!(parent.element_type(), XmlElementType::XmlDocumentFragNode) {
+        xml_new_doc_raw_node(parent.document(), ns, name, content)
+    } else {
+        None
+    }?;
 
-        Some(cur)
+    // add the new element at the end of the children list.
+    cur.typ = XmlElementType::XmlElementNode;
+    cur.set_parent(Some(parent));
+    cur.doc = parent.document();
+    if parent.children().is_none() {
+        parent.set_children(Some(cur.into()));
+        parent.set_last(Some(cur.into()));
+    } else {
+        let mut prev = parent.last().unwrap();
+        prev.set_next(Some(cur.into()));
+        cur.prev = Some(prev);
+        parent.set_last(Some(cur.into()));
     }
+
+    Some(cur)
 }
 
 /// Creation of a new node element within a document. @ns and @content
@@ -1432,32 +1426,30 @@ pub unsafe fn xml_new_text_child(
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewDocRawNode")]
 #[cfg(feature = "libxml_tree")]
-pub unsafe fn xml_new_doc_raw_node(
+pub fn xml_new_doc_raw_node(
     doc: Option<XmlDocPtr>,
     ns: Option<XmlNsPtr>,
     name: &str,
     content: Option<&str>,
 ) -> Option<XmlNodePtr> {
-    unsafe {
-        let cur = xml_new_doc_node(doc, ns, name, None);
-        if let Some(mut cur) = cur {
-            cur.doc = doc;
-            if let Some(content) = content {
-                cur.set_children(xml_new_doc_text(doc, Some(content)).map(|node| node.into()));
-                if let Some(mut ulccur) = cur.children() {
-                    while let Some(next) = ulccur.next() {
-                        ulccur.set_parent(Some(cur.into()));
-                        ulccur = next;
-                    }
-                    (*ulccur).set_parent(Some(cur.into()));
-                    cur.set_last(Some(ulccur));
-                } else {
-                    cur.set_last(None);
+    let cur = xml_new_doc_node(doc, ns, name, None);
+    if let Some(mut cur) = cur {
+        cur.doc = doc;
+        if let Some(content) = content {
+            cur.set_children(xml_new_doc_text(doc, Some(content)).map(|node| node.into()));
+            if let Some(mut ulccur) = cur.children() {
+                while let Some(next) = ulccur.next() {
+                    ulccur.set_parent(Some(cur.into()));
+                    ulccur = next;
                 }
+                (*ulccur).set_parent(Some(cur.into()));
+                cur.set_last(Some(ulccur));
+            } else {
+                cur.set_last(None);
             }
         }
-        cur
     }
+    cur
 }
 
 /// Creation of a new Fragment node.

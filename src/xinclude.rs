@@ -193,18 +193,16 @@ impl XmlXIncludeCtxt {
     ///
     /// Returns the value (to be freed) or NULL if not found
     #[doc(alias = "xmlXIncludeGetProp")]
-    unsafe fn get_prop(&self, cur: XmlNodePtr, name: &str) -> Option<String> {
-        unsafe {
-            if let Some(ret) = cur.get_ns_prop(XINCLUDE_NS, Some(name)) {
+    fn get_prop(&self, cur: XmlNodePtr, name: &str) -> Option<String> {
+        if let Some(ret) = cur.get_ns_prop(XINCLUDE_NS, Some(name)) {
+            return Some(ret);
+        }
+        if self.legacy != 0 {
+            if let Some(ret) = cur.get_ns_prop(XINCLUDE_OLD_NS, Some(name)) {
                 return Some(ret);
             }
-            if self.legacy != 0 {
-                if let Some(ret) = cur.get_ns_prop(XINCLUDE_OLD_NS, Some(name)) {
-                    return Some(ret);
-                }
-            }
-            cur.get_prop(name)
         }
+        cur.get_prop(name)
     }
 
     /// In streaming mode, XPointer expressions aren't allowed.
