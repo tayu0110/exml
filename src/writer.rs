@@ -120,41 +120,39 @@ impl<'a> XmlTextWriter<'a> {
     ///
     /// Returns the new xmlTextWriterPtr or NULL in case of error
     #[doc(alias = "xmlNewTextWriter")]
-    pub unsafe fn new(out: XmlOutputBuffer<'a>) -> Self {
-        unsafe {
-            Self {
-                nsstack: XmlList::new(
-                    None,
-                    Rc::new(|d1, d2| {
-                        if std::ptr::eq(d1, d2) {
-                            return std::cmp::Ordering::Equal;
-                        }
+    pub fn new(out: XmlOutputBuffer<'a>) -> Self {
+        Self {
+            nsstack: XmlList::new(
+                None,
+                Rc::new(|d1, d2| {
+                    if std::ptr::eq(d1, d2) {
+                        return std::cmp::Ordering::Equal;
+                    }
 
-                        let mut rc = d1.prefix.cmp(&d2.prefix);
+                    let mut rc = d1.prefix.cmp(&d2.prefix);
 
-                        if !rc.is_eq() {
-                            rc = std::cmp::Ordering::Less;
-                        }
-                        match (d1.elem.as_ref(), d2.elem.as_ref()) {
-                            (Some(d1), Some(d2)) => {
-                                if !Rc::ptr_eq(d1, d2) {
-                                    rc = std::cmp::Ordering::Less;
-                                }
+                    if !rc.is_eq() {
+                        rc = std::cmp::Ordering::Less;
+                    }
+                    match (d1.elem.as_ref(), d2.elem.as_ref()) {
+                        (Some(d1), Some(d2)) => {
+                            if !Rc::ptr_eq(d1, d2) {
+                                rc = std::cmp::Ordering::Less;
                             }
-                            (None, None) => {}
-                            _ => rc = std::cmp::Ordering::Less,
                         }
-                        rc
-                    }),
-                ),
-                out,
-                ichar: Cow::Borrowed(" "),
-                qchar: b'"',
-                doc: xml_new_doc(None),
-                no_doc_free: 0,
-                nodes: VecDeque::new(),
-                ..Default::default()
-            }
+                        (None, None) => {}
+                        _ => rc = std::cmp::Ordering::Less,
+                    }
+                    rc
+                }),
+            ),
+            out,
+            ichar: Cow::Borrowed(" "),
+            qchar: b'"',
+            doc: xml_new_doc(None),
+            no_doc_free: 0,
+            nodes: VecDeque::new(),
+            ..Default::default()
         }
     }
 
@@ -162,22 +160,20 @@ impl<'a> XmlTextWriter<'a> {
     ///
     /// Returns the new xmlTextWriterPtr or NULL in case of error
     #[doc(alias = "xmlNewTextWriterFilename")]
-    pub unsafe fn from_filename<'b: 'a>(uri: &'b str, compression: i32) -> Option<Self> {
-        unsafe {
-            let Some(out) = XmlOutputBuffer::from_uri(uri, None, compression) else {
-                xml_writer_err_msg(
-                    None,
-                    XmlParserErrors::XmlIOEIO,
-                    "xmlNewTextWriterFilename : cannot open uri\n",
-                );
-                return None;
-            };
+    pub fn from_filename<'b: 'a>(uri: &'b str, compression: i32) -> Option<Self> {
+        let Some(out) = XmlOutputBuffer::from_uri(uri, None, compression) else {
+            xml_writer_err_msg(
+                None,
+                XmlParserErrors::XmlIOEIO,
+                "xmlNewTextWriterFilename : cannot open uri\n",
+            );
+            return None;
+        };
 
-            let mut ret = XmlTextWriter::new(out);
-            ret.indent = 0;
-            ret.doindent = 0;
-            Some(ret)
-        }
+        let mut ret = XmlTextWriter::new(out);
+        ret.indent = 0;
+        ret.doindent = 0;
+        Some(ret)
     }
 
     /// Create a new xmlNewTextWriter structure with @ctxt as output
@@ -187,32 +183,29 @@ impl<'a> XmlTextWriter<'a> {
     ///
     /// Returns the new xmlTextWriterPtr or NULL in case of error
     #[doc(alias = "xmlNewTextWriterPushParser")]
-    pub unsafe fn from_push_parser(ctxt: XmlParserCtxtPtr, _compression: i32) -> Option<Self> {
-        unsafe {
-            if ctxt.is_null() {
-                xml_writer_err_msg(
-                    None,
-                    XmlParserErrors::XmlErrInternalError,
-                    "xmlNewTextWriterPushParser : invalid context!\n",
-                );
-                return None;
-            }
-
-            let Some(out) =
-                XmlOutputBuffer::from_writer(TextWriterPushContext { context: ctxt }, None)
-            else {
-                xml_writer_err_msg(
-                    None,
-                    XmlParserErrors::XmlErrInternalError,
-                    "xmlNewTextWriterPushParser : error at xmlOutputBufferCreateIO!\n",
-                );
-                return None;
-            };
-
-            let mut ret = XmlTextWriter::new(out);
-            ret.ctxt = ctxt;
-            Some(ret)
+    pub fn from_push_parser(ctxt: XmlParserCtxtPtr, _compression: i32) -> Option<Self> {
+        if ctxt.is_null() {
+            xml_writer_err_msg(
+                None,
+                XmlParserErrors::XmlErrInternalError,
+                "xmlNewTextWriterPushParser : invalid context!\n",
+            );
+            return None;
         }
+
+        let Some(out) = XmlOutputBuffer::from_writer(TextWriterPushContext { context: ctxt }, None)
+        else {
+            xml_writer_err_msg(
+                None,
+                XmlParserErrors::XmlErrInternalError,
+                "xmlNewTextWriterPushParser : error at xmlOutputBufferCreateIO!\n",
+            );
+            return None;
+        };
+
+        let mut ret = XmlTextWriter::new(out);
+        ret.ctxt = ctxt;
+        Some(ret)
     }
 
     /// Create a new xmlNewTextWriter structure with @*doc as output

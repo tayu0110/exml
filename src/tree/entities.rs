@@ -57,30 +57,6 @@ pub enum XmlEntityType {
     XmlInternalPredefinedEntity = 6,
 }
 
-impl TryFrom<i32> for XmlEntityType {
-    type Error = anyhow::Error;
-    fn try_from(value: i32) -> Result<Self, Self::Error> {
-        if value == 1 {
-            Ok(Self::XmlInternalGeneralEntity)
-        } else if value == 2 {
-            Ok(Self::XmlExternalGeneralParsedEntity)
-        } else if value == 3 {
-            Ok(Self::XmlExternalGeneralUnparsedEntity)
-        } else if value == 4 {
-            Ok(Self::XmlInternalParameterEntity)
-        } else if value == 5 {
-            Ok(Self::XmlExternalParameterEntity)
-        } else if value == 6 {
-            Ok(Self::XmlInternalPredefinedEntity)
-        } else {
-            Err(anyhow::anyhow!(
-                "Invalid convert from value '{value}' to {}",
-                type_name::<Self>()
-            ))
-        }
-    }
-}
-
 #[repr(C)]
 pub struct XmlEntity {
     // application data
@@ -726,7 +702,7 @@ thread_local! {
 ///
 /// Returns NULL if not, otherwise the entity
 #[doc(alias = "xmlGetPredefinedEntity")]
-pub unsafe fn xml_get_predefined_entity(name: &str) -> Option<XmlEntityPtr> {
+pub fn xml_get_predefined_entity(name: &str) -> Option<XmlEntityPtr> {
     unsafe {
         match name {
             "lt" => XML_ENTITY_LT.with(|ptr| {
@@ -767,30 +743,28 @@ fn xml_get_entity_from_table(
 ///
 /// Returns A pointer to the entity structure or NULL if not found.
 #[doc(alias = "xmlGetDocEntity")]
-pub unsafe fn xml_get_doc_entity(doc: Option<XmlDocPtr>, name: &str) -> Option<XmlEntityPtr> {
-    unsafe {
-        if let Some(doc) = doc {
-            if let Some(int_subset) = doc.int_subset {
-                if let Some(table) = int_subset.entities {
+pub fn xml_get_doc_entity(doc: Option<XmlDocPtr>, name: &str) -> Option<XmlEntityPtr> {
+    if let Some(doc) = doc {
+        if let Some(int_subset) = doc.int_subset {
+            if let Some(table) = int_subset.entities {
+                let cur = xml_get_entity_from_table(table, name);
+                if cur.is_some() {
+                    return cur;
+                }
+            }
+        }
+        if doc.standalone != 1 {
+            if let Some(ext_subset) = doc.ext_subset {
+                if let Some(table) = ext_subset.entities {
                     let cur = xml_get_entity_from_table(table, name);
                     if cur.is_some() {
                         return cur;
                     }
                 }
             }
-            if doc.standalone != 1 {
-                if let Some(ext_subset) = doc.ext_subset {
-                    if let Some(table) = ext_subset.entities {
-                        let cur = xml_get_entity_from_table(table, name);
-                        if cur.is_some() {
-                            return cur;
-                        }
-                    }
-                }
-            }
         }
-        xml_get_predefined_entity(name)
     }
+    xml_get_predefined_entity(name)
 }
 
 /// Do an entity lookup in the DTD entity hash table and

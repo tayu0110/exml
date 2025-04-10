@@ -24,17 +24,16 @@ use std::io::Write;
 use std::{
     ffi::{CString, c_char},
     ptr::{null, null_mut},
-    sync::atomic::Ordering,
 };
 
 use crate::{
     encoding::XmlCharEncoding,
+    globals::get_register_node_func,
     html::parser::html_err_memory,
-    libxml::{globals::xml_register_node_default_value, xmlstring::XmlChar},
+    libxml::xmlstring::XmlChar,
     tree::{
-        __XML_REGISTER_CALLBACKS, NodeCommon, XmlAttr, XmlAttrPtr, XmlDoc, XmlDocProperties,
-        XmlDocPtr, XmlElementType, XmlNodePtr, xml_create_int_subset, xml_free_node,
-        xml_new_doc_node, xml_new_prop,
+        NodeCommon, XmlAttr, XmlAttrPtr, XmlDoc, XmlDocProperties, XmlDocPtr, XmlElementType,
+        XmlNodePtr, xml_create_int_subset, xml_free_node, xml_new_doc_node, xml_new_prop,
     },
 };
 #[cfg(feature = "libxml_output")]
@@ -110,10 +109,8 @@ pub unsafe fn html_new_doc_no_dtd(
         if external_id.is_some() || uri.is_some() {
             xml_create_int_subset(Some(cur), Some("html"), external_id, uri);
         }
-        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-        /* && xmlRegisterNodeDefaultValue() */
-        {
-            xml_register_node_default_value(cur.into());
+        if let Some(register) = get_register_node_func() {
+            register(cur.into());
         }
         Some(cur)
     }

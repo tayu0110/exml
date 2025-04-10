@@ -1429,7 +1429,7 @@ unsafe fn xml_dom_wrap_adopt_branch(
 ///
 /// Returns 0 if succeeded, -1 otherwise and on API/internal errors.
 #[doc(alias = "xmlDOMWrapAdoptAttr")]
-unsafe fn xml_dom_wrap_adopt_attr(
+fn xml_dom_wrap_adopt_attr(
     ctxt: XmlDOMWrapCtxtPtr,
     _source_doc: Option<XmlDocPtr>,
     mut attr: XmlAttrPtr,
@@ -1437,110 +1437,108 @@ unsafe fn xml_dom_wrap_adopt_attr(
     dest_parent: Option<XmlNodePtr>,
     _options: i32,
 ) -> i32 {
-    unsafe {
-        attr.doc = Some(dest_doc);
-        if let Some(attr_ns) = attr.ns {
-            let mut ns = None;
+    attr.doc = Some(dest_doc);
+    if let Some(attr_ns) = attr.ns {
+        let mut ns = None;
 
-            if !ctxt.is_null() { /* TODO: User defined. */ }
-            // XML Namespace.
-            if attr_ns.prefix().as_deref() == Some("xml") {
-                ns = dest_doc.ensure_xmldecl();
-            } else if let Some(dest_parent) = dest_parent {
-                // Declare on @destParent.
-                if xml_search_ns_by_namespace_strict(
-                    dest_doc,
-                    dest_parent.into(),
-                    attr_ns.href.as_deref().unwrap(),
-                    &mut ns,
-                    1,
-                ) == -1
-                {
-                    // goto internal_error;
-                    return -1;
-                }
-                if ns.is_none() {
-                    ns = xml_dom_wrap_nsnorm_declare_ns_forced(
-                        dest_doc,
-                        dest_parent,
-                        attr_ns.href.as_deref(),
-                        attr_ns.prefix.as_deref(),
-                        1,
-                    );
-                }
-            } else {
-                // Store in @(*destDoc).oldNs.
-                ns = xml_dom_wrap_store_ns(
-                    dest_doc,
-                    attr_ns.href.as_deref(),
-                    attr_ns.prefix().as_deref(),
-                );
-            }
-            let Some(ns) = ns else {
+        if !ctxt.is_null() { /* TODO: User defined. */ }
+        // XML Namespace.
+        if attr_ns.prefix().as_deref() == Some("xml") {
+            ns = dest_doc.ensure_xmldecl();
+        } else if let Some(dest_parent) = dest_parent {
+            // Declare on @destParent.
+            if xml_search_ns_by_namespace_strict(
+                dest_doc,
+                dest_parent.into(),
+                attr_ns.href.as_deref().unwrap(),
+                &mut ns,
+                1,
+            ) == -1
+            {
                 // goto internal_error;
                 return -1;
-            };
-            attr.ns = Some(ns);
+            }
+            if ns.is_none() {
+                ns = xml_dom_wrap_nsnorm_declare_ns_forced(
+                    dest_doc,
+                    dest_parent,
+                    attr_ns.href.as_deref(),
+                    attr_ns.prefix.as_deref(),
+                    1,
+                );
+            }
+        } else {
+            // Store in @(*destDoc).oldNs.
+            ns = xml_dom_wrap_store_ns(
+                dest_doc,
+                attr_ns.href.as_deref(),
+                attr_ns.prefix().as_deref(),
+            );
         }
-
-        attr.atype = None;
-        attr.psvi = null_mut();
-        // Walk content.
-        let Some(children) = attr.children() else {
-            return 0;
-        };
-        if matches!(children.element_type(), XmlElementType::XmlNamespaceDecl) {
+        let Some(ns) = ns else {
             // goto internal_error;
             return -1;
-        }
-        let mut cur = Some(children);
-        'main: while let Some(mut cur_node) = cur {
-            cur_node.set_document(Some(dest_doc));
-            match cur_node.element_type() {
-                XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode => {}
-                XmlElementType::XmlEntityRefNode => {
-                    let mut cur = XmlNodePtr::try_from(cur_node).unwrap();
-                    // Remove reference to the entity-node.
-                    cur.content = None;
-                    cur.set_children(None);
-                    cur.set_last(None);
-                    if dest_doc.int_subset.is_some() || dest_doc.ext_subset.is_some() {
-                        // Assign new entity-node if available.
-                        let ent = xml_get_doc_entity(Some(dest_doc), &cur.name().unwrap());
-                        if let Some(ent) = ent {
-                            cur.content = ent.content.as_deref().map(|cont| cont.to_owned());
-                            cur.set_children(Some(ent.into()));
-                            cur.set_last(Some(ent.into()));
-                        }
+        };
+        attr.ns = Some(ns);
+    }
+
+    attr.atype = None;
+    attr.psvi = null_mut();
+    // Walk content.
+    let Some(children) = attr.children() else {
+        return 0;
+    };
+    if matches!(children.element_type(), XmlElementType::XmlNamespaceDecl) {
+        // goto internal_error;
+        return -1;
+    }
+    let mut cur = Some(children);
+    'main: while let Some(mut cur_node) = cur {
+        cur_node.set_document(Some(dest_doc));
+        match cur_node.element_type() {
+            XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode => {}
+            XmlElementType::XmlEntityRefNode => {
+                let mut cur = XmlNodePtr::try_from(cur_node).unwrap();
+                // Remove reference to the entity-node.
+                cur.content = None;
+                cur.set_children(None);
+                cur.set_last(None);
+                if dest_doc.int_subset.is_some() || dest_doc.ext_subset.is_some() {
+                    // Assign new entity-node if available.
+                    let ent = xml_get_doc_entity(Some(dest_doc), &cur.name().unwrap());
+                    if let Some(ent) = ent {
+                        cur.content = ent.content.as_deref().map(|cont| cont.to_owned());
+                        cur.set_children(Some(ent.into()));
+                        cur.set_last(Some(ent.into()));
                     }
                 }
-                _ => {}
             }
-            if let Some(children) = cur_node.children() {
-                cur = Some(children);
-                continue;
-            }
-            // next_sibling:
-            'next_sibling: loop {
-                if cur_node == attr.into() {
-                    break 'main;
-                }
-                if let Some(next) = cur_node.next() {
-                    cur_node = next;
-                } else {
-                    cur_node = cur_node.parent().unwrap();
-                    // goto next_sibling;
-                    continue 'next_sibling;
-                }
-
-                cur = Some(cur_node);
-                break 'next_sibling;
-            }
+            _ => {}
         }
-        0
-        // internal_error:
-        //     return -1;
+        if let Some(children) = cur_node.children() {
+            cur = Some(children);
+            continue;
+        }
+        // next_sibling:
+        'next_sibling: loop {
+            if cur_node == attr.into() {
+                break 'main;
+            }
+            if let Some(next) = cur_node.next() {
+                cur_node = next;
+            } else {
+                cur_node = cur_node.parent().unwrap();
+                // goto next_sibling;
+                continue 'next_sibling;
+            }
+
+            cur = Some(cur_node);
+            break 'next_sibling;
+        }
     }
+    0
+    // internal_error:
+    //     return -1;
 }
 
 /// References of out-of scope ns-decls are remapped to point to @destDoc:

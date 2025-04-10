@@ -37,7 +37,6 @@ use crate::{
     error::{XmlError, generic_error_default},
     io::{XmlOutputBuffer, XmlParserInputBuffer},
     libxml::{
-        globals::{XmlDeregisterNodeFunc, XmlRegisterNodeFunc},
         sax2::{
             xml_sax2_get_column_number, xml_sax2_get_line_number, xml_sax2_get_public_id,
             xml_sax2_get_system_id,
@@ -46,8 +45,15 @@ use crate::{
         xmlstring::xml_strdup,
     },
     parser::XmlSAXLocator,
-    tree::{BASE_BUFFER_SIZE, XmlBufferAllocationScheme},
+    tree::{BASE_BUFFER_SIZE, XmlBufferAllocationScheme, XmlGenericNodePtr},
 };
+
+/// Signature for the registration callback of a created node
+#[doc(alias = "xmlRegisterNodeFunc")]
+pub type XmlRegisterNodeFunc = fn(node: XmlGenericNodePtr);
+/// Signature for the deregistration callback of a discarded node
+#[doc(alias = "xmlDeregisterNodeFunc")]
+pub type XmlDeregisterNodeFunc = fn(node: XmlGenericNodePtr);
 
 pub type GenericError = for<'a> fn(Option<GenericErrorContext>, &str);
 pub type StructuredError = fn(Option<GenericErrorContext>, &XmlError);
@@ -311,4 +317,30 @@ pub fn get_tree_indent_string() -> Cow<'static, str> {
 
 pub fn set_tree_indent_string(indent: Cow<'static, str>) {
     GLOBAL_STATE.with_borrow_mut(|state| state.tree_indent_string = indent);
+}
+
+pub fn get_register_node_func() -> Option<XmlRegisterNodeFunc> {
+    GLOBAL_STATE.with_borrow(|state| state.register_node_default_value)
+}
+
+pub fn set_register_node_func(func: Option<XmlRegisterNodeFunc>) -> Option<XmlRegisterNodeFunc> {
+    GLOBAL_STATE.with_borrow_mut(|state| {
+        let old = state.register_node_default_value.take();
+        state.register_node_default_value = func;
+        old
+    })
+}
+
+pub fn get_deregister_node_func() -> Option<XmlDeregisterNodeFunc> {
+    GLOBAL_STATE.with_borrow(|state| state.deregister_node_default_value)
+}
+
+pub fn set_deregister_node_func(
+    func: Option<XmlDeregisterNodeFunc>,
+) -> Option<XmlDeregisterNodeFunc> {
+    GLOBAL_STATE.with_borrow_mut(|state| {
+        let old = state.deregister_node_default_value.take();
+        state.deregister_node_default_value = func;
+        old
+    })
 }

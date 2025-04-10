@@ -24,19 +24,18 @@ use std::{
     ops::{Deref, DerefMut},
     os::raw::c_void,
     ptr::{NonNull, null_mut},
-    sync::atomic::Ordering,
 };
 
-use crate::libxml::{
-    globals::{xml_deregister_node_default_value, xml_register_node_default_value},
-    valid::{xml_add_id, xml_is_id, xml_remove_id},
+use crate::{
+    globals::{get_deregister_node_func, get_register_node_func},
+    libxml::valid::{xml_add_id, xml_is_id, xml_remove_id},
 };
 
 use super::{
-    __XML_REGISTER_CALLBACKS, InvalidNodePointerCastError, NodeCommon, XML_XML_NAMESPACE,
-    XmlAttributeType, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNodePtr, XmlNsPtr,
-    xml_free_node_list, xml_new_doc_text, xml_new_ns, xml_new_reconciled_ns, xml_ns_in_scope,
-    xml_static_copy_node_list, xml_tree_err_memory,
+    InvalidNodePointerCastError, NodeCommon, XML_XML_NAMESPACE, XmlAttributeType, XmlDocPtr,
+    XmlElementType, XmlGenericNodePtr, XmlNodePtr, XmlNsPtr, xml_free_node_list, xml_new_doc_text,
+    xml_new_ns, xml_new_reconciled_ns, xml_ns_in_scope, xml_static_copy_node_list,
+    xml_tree_err_memory,
 };
 
 #[repr(C)]
@@ -449,11 +448,10 @@ pub unsafe fn xml_new_doc_prop(
             }
         }
 
-        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-        //  && xmlRegisterNodeDefaultValue.is_some()
-        {
-            xml_register_node_default_value(cur.into());
+        if let Some(register) = get_register_node_func() {
+            register(cur.into());
         }
+
         Some(cur)
     }
 }
@@ -521,11 +519,10 @@ pub(super) unsafe fn xml_new_prop_internal(
             }
         }
 
-        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-        //  && xmlRegisterNodeDefaultValue.is_some()
-        {
-            xml_register_node_default_value(cur.into());
+        if let Some(register) = get_register_node_func() {
+            register(cur.into());
         }
+
         Some(cur)
     }
 }
@@ -703,10 +700,8 @@ pub unsafe fn xml_copy_prop_list(
 #[doc(alias = "xmlFreeProp")]
 pub unsafe fn xml_free_prop(cur: XmlAttrPtr) {
     unsafe {
-        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-        // && xmlDeregisterNodeDefaultValue.is_some()
-        {
-            xml_deregister_node_default_value(cur.into());
+        if let Some(deregister) = get_deregister_node_func() {
+            deregister(cur.into());
         }
 
         // Check for ID removal -> leading to invalid references !

@@ -29,21 +29,18 @@ use std::{
     ops::{Deref, DerefMut},
     os::raw::c_void,
     ptr::{NonNull, null_mut},
-    sync::atomic::Ordering,
 };
 
 use crate::{
+    globals::{get_deregister_node_func, get_register_node_func},
     hash::{XmlHashTable, XmlHashTableRef},
-    libxml::{
-        globals::{xml_deregister_node_default_value, xml_register_node_default_value},
-        valid::xml_free_attribute_table,
-    },
+    libxml::valid::xml_free_attribute_table,
     parser::split_qname2,
 };
 
 use super::{
-    __XML_REGISTER_CALLBACKS, InvalidNodePointerCastError, NodeCommon, XmlDocPtr, XmlElementType,
-    XmlEntityPtr, XmlGenericNodePtr, xml_free_entities_table, xml_free_node, xml_tree_err_memory,
+    InvalidNodePointerCastError, NodeCommon, XmlDocPtr, XmlElementType, XmlEntityPtr,
+    XmlGenericNodePtr, xml_free_entities_table, xml_free_node, xml_tree_err_memory,
 };
 
 pub use attribute::*;
@@ -269,11 +266,10 @@ pub unsafe fn xml_create_int_subset(
             }
         }
 
-        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-        //  && xmlRegisterNodeDefaultValue.is_some()
-        {
-            xml_register_node_default_value(cur.into());
+        if let Some(register) = get_register_node_func() {
+            register(cur.into());
         }
+
         Some(cur)
     }
 }
@@ -283,41 +279,38 @@ pub unsafe fn xml_create_int_subset(
 ///
 /// Returns a pointer to the new DTD structure
 #[doc(alias = "xmlNewDtd")]
-pub unsafe fn xml_new_dtd(
+pub fn xml_new_dtd(
     doc: Option<XmlDocPtr>,
     name: Option<&str>,
     external_id: Option<&str>,
     system_id: Option<&str>,
 ) -> Option<XmlDtdPtr> {
-    unsafe {
-        if doc.is_some_and(|doc| doc.ext_subset.is_some()) {
-            return None;
-        }
-
-        // Allocate a new DTD and fill the fields.
-        let Some(mut cur) = XmlDtdPtr::new(XmlDtd {
-            typ: XmlElementType::XmlDTDNode,
-            external_id: external_id.map(|e| e.to_owned()),
-            system_id: system_id.map(|s| s.to_owned()),
-            doc,
-            ..Default::default()
-        }) else {
-            xml_tree_err_memory("building DTD");
-            return None;
-        };
-
-        cur.name = name.map(|name| name.to_owned());
-        if let Some(mut doc) = doc {
-            doc.ext_subset = Some(cur);
-        }
-
-        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-        //  && xmlRegisterNodeDefaultValue.is_some()
-        {
-            xml_register_node_default_value(cur.into());
-        }
-        Some(cur)
+    if doc.is_some_and(|doc| doc.ext_subset.is_some()) {
+        return None;
     }
+
+    // Allocate a new DTD and fill the fields.
+    let Some(mut cur) = XmlDtdPtr::new(XmlDtd {
+        typ: XmlElementType::XmlDTDNode,
+        external_id: external_id.map(|e| e.to_owned()),
+        system_id: system_id.map(|s| s.to_owned()),
+        doc,
+        ..Default::default()
+    }) else {
+        xml_tree_err_memory("building DTD");
+        return None;
+    };
+
+    cur.name = name.map(|name| name.to_owned());
+    if let Some(mut doc) = doc {
+        doc.ext_subset = Some(cur);
+    }
+
+    if let Some(register) = get_register_node_func() {
+        register(cur.into());
+    }
+
+    Some(cur)
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
@@ -449,13 +442,11 @@ impl From<XmlDtdPtr> for *mut XmlDtd {
 #[doc(alias = "xmlFreeDtd")]
 pub unsafe fn xml_free_dtd(mut cur: XmlDtdPtr) {
     unsafe {
-        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-        // && xmlDeregisterNodeDefaultValue.is_some()
-        {
-            xml_deregister_node_default_value(cur.into());
+        if let Some(deregister) = get_deregister_node_func() {
+            deregister(cur.into());
         }
 
-        if let Some(children) = (*cur).children() {
+        if let Some(children) = cur.children() {
             // Cleanup all nodes which are not part of the specific lists
             // of notations, elements, attributes and entities.
             let mut c = Some(children);

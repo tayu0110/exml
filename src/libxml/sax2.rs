@@ -19,7 +19,7 @@
 //
 // Daniel Veillard <daniel@veillard.com>
 
-use std::{ffi::c_void, mem::replace, ptr::null, sync::atomic::Ordering};
+use std::{ffi::c_void, mem::replace, ptr::null};
 
 use crate::{
     encoding::{XmlCharEncoding, detect_encoding},
@@ -27,7 +27,7 @@ use crate::{
         __xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors, parser_error,
         parser_warning,
     },
-    globals::StructuredError,
+    globals::{StructuredError, get_register_node_func},
     html::tree::html_new_doc_no_dtd,
     libxml::{valid::xml_validate_document_final, xmlstring::XmlChar},
     parser::{
@@ -37,25 +37,21 @@ use crate::{
         build_qname, split_qname, xml_err_memory, xml_load_external_entity,
     },
     tree::{
-        __XML_REGISTER_CALLBACKS, NodeCommon, XmlAttr, XmlAttributeDefault, XmlAttributeType,
-        XmlDocProperties, XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr,
-        XmlEntityType, XmlEnumeration, XmlNode, XmlNodePtr, XmlNsPtr, validate_ncname,
-        xml_add_doc_entity, xml_add_dtd_entity, xml_create_int_subset, xml_free_dtd, xml_free_node,
-        xml_get_doc_entity, xml_get_parameter_entity, xml_get_predefined_entity,
-        xml_new_cdata_block, xml_new_char_ref, xml_new_doc, xml_new_doc_comment, xml_new_doc_node,
-        xml_new_doc_pi, xml_new_doc_text, xml_new_dtd, xml_new_ns, xml_new_ns_prop,
-        xml_new_reference, xml_text_concat,
+        NodeCommon, XmlAttr, XmlAttributeDefault, XmlAttributeType, XmlDocProperties,
+        XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType,
+        XmlEnumeration, XmlNode, XmlNodePtr, XmlNsPtr, validate_ncname, xml_add_doc_entity,
+        xml_add_dtd_entity, xml_create_int_subset, xml_free_dtd, xml_free_node, xml_get_doc_entity,
+        xml_get_parameter_entity, xml_get_predefined_entity, xml_new_cdata_block, xml_new_char_ref,
+        xml_new_doc, xml_new_doc_comment, xml_new_doc_node, xml_new_doc_pi, xml_new_doc_text,
+        xml_new_dtd, xml_new_ns, xml_new_ns_prop, xml_new_reference, xml_text_concat,
     },
     uri::{build_uri, canonic_path, path_to_uri},
 };
 
-use super::{
-    globals::xml_register_node_default_value,
-    valid::{
-        xml_add_notation_decl, xml_get_dtd_qelement_desc, xml_is_id, xml_is_ref,
-        xml_valid_ctxt_normalize_attribute_value, xml_valid_normalize_attribute_value,
-        xml_validate_notation_decl,
-    },
+use super::valid::{
+    xml_add_notation_decl, xml_get_dtd_qelement_desc, xml_is_id, xml_is_ref,
+    xml_valid_ctxt_normalize_attribute_value, xml_valid_normalize_attribute_value,
+    xml_validate_notation_decl,
 };
 
 /// Provides the public ID e.g. "-//SGMLSOURCE//DTD DEMO//EN"
@@ -1829,10 +1825,8 @@ pub fn xml_sax2_start_element_ns(
             } else {
                 ret.name = localname.to_owned().into();
             }
-            if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-            // && xmlRegisterNodeDefaultValue.is_some()
-            {
-                xml_register_node_default_value(ret.into());
+            if let Some(register) = get_register_node_func() {
+                register(ret.into());
             }
             ret
         } else {
@@ -2005,10 +1999,8 @@ fn xml_sax2_text_node(ctxt: &mut XmlParserCtxt, s: &str) -> Option<XmlNodePtr> {
             }
         }
 
-        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-        //  && xmlRegisterNodeDefaultValue.is_some()
-        {
-            xml_register_node_default_value(ret.into());
+        if let Some(register) = get_register_node_func() {
+            register(ret.into());
         }
         Some(ret)
     }
@@ -2068,10 +2060,8 @@ unsafe fn xml_sax2_attribute_ns(
                 ctxt.node.unwrap().properties = Some(ret);
             }
 
-            if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-            // && xmlRegisterNodeDefaultValue.is_some()
-            {
-                xml_register_node_default_value(ret.into());
+            if let Some(register) = get_register_node_func() {
+                register(ret.into());
             }
             ret
         } else {

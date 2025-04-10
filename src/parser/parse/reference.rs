@@ -223,168 +223,164 @@ impl XmlParserCtxt {
     ///
     /// Returns the xmlEntityPtr if found, or NULL otherwise.
     #[doc(alias = "xmlParseEntityRef")]
-    pub(crate) unsafe fn parse_entity_ref(&mut self) -> Option<XmlEntityPtr> {
-        unsafe {
-            self.grow();
-            if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                return None;
-            }
+    pub(crate) fn parse_entity_ref(&mut self) -> Option<XmlEntityPtr> {
+        self.grow();
+        if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+            return None;
+        }
 
-            if self.current_byte() != b'&' {
-                return None;
+        if self.current_byte() != b'&' {
+            return None;
+        }
+        self.skip_char();
+        let Some(name) = self.parse_name() else {
+            xml_fatal_err_msg(
+                self,
+                XmlParserErrors::XmlErrNameRequired,
+                "xmlParseEntityRef: no name\n",
+            );
+            return None;
+        };
+        if self.current_byte() != b';' {
+            xml_fatal_err(self, XmlParserErrors::XmlErrEntityRefSemicolMissing, None);
+            return None;
+        }
+        self.skip_char();
+
+        // Predefined entities override any extra definition
+        if self.options & XmlParserOption::XmlParseOldSAX as i32 == 0 {
+            if let Some(ent) = xml_get_predefined_entity(&name) {
+                return Some(ent);
             }
-            self.skip_char();
-            let Some(name) = self.parse_name() else {
-                xml_fatal_err_msg(
+        }
+
+        let mut ent = None;
+        // Ask first SAX for entity resolution, otherwise try the
+        // entities which may have stored in the parser context.
+        if let Some(sax) = self.sax.as_deref_mut() {
+            if let Some(get_entity) = sax.get_entity {
+                ent = get_entity(self, &name);
+            }
+            if self.well_formed == 1
+                && ent.is_none()
+                && self.options & XmlParserOption::XmlParseOldSAX as i32 != 0
+            {
+                ent = xml_get_predefined_entity(&name);
+            }
+            if self.well_formed == 1 && ent.is_none() && self.user_data.is_none() {
+                ent = xml_sax2_get_entity(self, &name);
+            }
+        }
+        if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+            return None;
+        }
+        // [ WFC: Entity Declared ]
+        // In a document without any DTD, a document with only an
+        // internal DTD subset which contains no parameter entity
+        // references, or a document with "standalone='yes'", the
+        // Name given in the entity reference must match that in an
+        // entity declaration, except that well-formed documents
+        // need not declare any of the following entities: amp, lt,
+        // gt, apos, quot.
+        // The declaration of a parameter entity must precede any
+        // reference to it.
+        // Similarly, the declaration of a general entity must
+        // precede any reference to it which appears in a default
+        // value in an attribute-list declaration. Note that if
+        // entities are declared in the external subset or in
+        // external parameter entities, a non-validating processor
+        // is not obligated to read and process their declarations;
+        // for such documents, the rule that an entity must be
+        // declared is a well-formedness constraint only if
+        // standalone='yes'.
+        if let Some(mut ent) = ent {
+            if matches!(ent.etype, XmlEntityType::XmlExternalGeneralUnparsedEntity) {
+                // [ WFC: Parsed Entity ]
+                // An entity reference must not contain the name of an unparsed entity
+                xml_fatal_err_msg_str!(
                     self,
-                    XmlParserErrors::XmlErrNameRequired,
-                    "xmlParseEntityRef: no name\n",
+                    XmlParserErrors::XmlErrUnparsedEntity,
+                    "Entity reference to unparsed entity {}\n",
+                    name
                 );
-                return None;
-            };
-            if self.current_byte() != b';' {
-                xml_fatal_err(self, XmlParserErrors::XmlErrEntityRefSemicolMissing, None);
-                return None;
-            }
-            self.skip_char();
-
-            // Predefined entities override any extra definition
-            if self.options & XmlParserOption::XmlParseOldSAX as i32 == 0 {
-                if let Some(ent) = xml_get_predefined_entity(&name) {
-                    return Some(ent);
-                }
-            }
-
-            let mut ent = None;
-            // Ask first SAX for entity resolution, otherwise try the
-            // entities which may have stored in the parser context.
-            if let Some(sax) = self.sax.as_deref_mut() {
-                if let Some(get_entity) = sax.get_entity {
-                    ent = get_entity(self, &name);
-                }
-                if self.well_formed == 1
-                    && ent.is_none()
-                    && self.options & XmlParserOption::XmlParseOldSAX as i32 != 0
-                {
-                    ent = xml_get_predefined_entity(&name);
-                }
-                if self.well_formed == 1 && ent.is_none() && self.user_data.is_none() {
-                    ent = xml_sax2_get_entity(self, &name);
-                }
-            }
-            if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                return None;
-            }
-            // [ WFC: Entity Declared ]
-            // In a document without any DTD, a document with only an
-            // internal DTD subset which contains no parameter entity
-            // references, or a document with "standalone='yes'", the
-            // Name given in the entity reference must match that in an
-            // entity declaration, except that well-formed documents
-            // need not declare any of the following entities: amp, lt,
-            // gt, apos, quot.
-            // The declaration of a parameter entity must precede any
-            // reference to it.
-            // Similarly, the declaration of a general entity must
-            // precede any reference to it which appears in a default
-            // value in an attribute-list declaration. Note that if
-            // entities are declared in the external subset or in
-            // external parameter entities, a non-validating processor
-            // is not obligated to read and process their declarations;
-            // for such documents, the rule that an entity must be
-            // declared is a well-formedness constraint only if
-            // standalone='yes'.
-            if let Some(mut ent) = ent {
-                if matches!(ent.etype, XmlEntityType::XmlExternalGeneralUnparsedEntity) {
-                    // [ WFC: Parsed Entity ]
-                    // An entity reference must not contain the name of an unparsed entity
-                    xml_fatal_err_msg_str!(
-                        self,
-                        XmlParserErrors::XmlErrUnparsedEntity,
-                        "Entity reference to unparsed entity {}\n",
-                        name
-                    );
-                } else if matches!(self.instate, XmlParserInputState::XmlParserAttributeValue)
-                    && matches!(ent.etype, XmlEntityType::XmlExternalGeneralParsedEntity)
-                {
-                    // [ WFC: No External Entity References ]
-                    // Attribute values cannot contain direct or indirect
-                    // entity references to external entities.
-                    xml_fatal_err_msg_str!(
-                        self,
-                        XmlParserErrors::XmlErrEntityIsExternal,
-                        "Attribute references external entity '{}'\n",
-                        name
-                    );
-                } else if matches!(self.instate, XmlParserInputState::XmlParserAttributeValue)
-                    && !matches!(ent.etype, XmlEntityType::XmlInternalPredefinedEntity)
-                {
-                    // [ WFC: No < in Attribute Values ]
-                    // The replacement text of any entity referred to directly or
-                    // indirectly in an attribute value (other than "&lt;") must not contain a <.
-                    if ent.flags & XML_ENT_CHECKED_LT as i32 == 0 {
-                        if let Some(content) = ent.content.as_deref() {
-                            if content.contains('<') {
-                                ent.flags |= XML_ENT_CONTAINS_LT as i32;
-                            }
+            } else if matches!(self.instate, XmlParserInputState::XmlParserAttributeValue)
+                && matches!(ent.etype, XmlEntityType::XmlExternalGeneralParsedEntity)
+            {
+                // [ WFC: No External Entity References ]
+                // Attribute values cannot contain direct or indirect
+                // entity references to external entities.
+                xml_fatal_err_msg_str!(
+                    self,
+                    XmlParserErrors::XmlErrEntityIsExternal,
+                    "Attribute references external entity '{}'\n",
+                    name
+                );
+            } else if matches!(self.instate, XmlParserInputState::XmlParserAttributeValue)
+                && !matches!(ent.etype, XmlEntityType::XmlInternalPredefinedEntity)
+            {
+                // [ WFC: No < in Attribute Values ]
+                // The replacement text of any entity referred to directly or
+                // indirectly in an attribute value (other than "&lt;") must not contain a <.
+                if ent.flags & XML_ENT_CHECKED_LT as i32 == 0 {
+                    if let Some(content) = ent.content.as_deref() {
+                        if content.contains('<') {
+                            ent.flags |= XML_ENT_CONTAINS_LT as i32;
                         }
-                        ent.flags |= XML_ENT_CHECKED_LT as i32;
                     }
-                    if ent.flags & XML_ENT_CONTAINS_LT as i32 != 0 {
+                    ent.flags |= XML_ENT_CHECKED_LT as i32;
+                }
+                if ent.flags & XML_ENT_CONTAINS_LT as i32 != 0 {
+                    xml_fatal_err_msg_str!(
+                        self,
+                        XmlParserErrors::XmlErrLtInAttribute,
+                        "'<' in entity '{}' is not allowed in attributes values\n",
+                        name
+                    );
+                }
+            } else {
+                // Internal check, no parameter entities here ...
+                match ent.etype {
+                    XmlEntityType::XmlInternalParameterEntity
+                    | XmlEntityType::XmlExternalParameterEntity => {
                         xml_fatal_err_msg_str!(
                             self,
-                            XmlParserErrors::XmlErrLtInAttribute,
-                            "'<' in entity '{}' is not allowed in attributes values\n",
+                            XmlParserErrors::XmlErrEntityIsParameter,
+                            "Attempt to reference the parameter entity '{}'\n",
                             name
                         );
                     }
-                } else {
-                    // Internal check, no parameter entities here ...
-                    match ent.etype {
-                        XmlEntityType::XmlInternalParameterEntity
-                        | XmlEntityType::XmlExternalParameterEntity => {
-                            xml_fatal_err_msg_str!(
-                                self,
-                                XmlParserErrors::XmlErrEntityIsParameter,
-                                "Attempt to reference the parameter entity '{}'\n",
-                                name
-                            );
-                        }
-                        _ => {}
-                    }
+                    _ => {}
                 }
-            } else {
-                if self.standalone == 1 || (self.has_external_subset == 0 && self.has_perefs == 0) {
-                    xml_fatal_err_msg_str!(
-                        self,
-                        XmlParserErrors::XmlErrUndeclaredEntity,
-                        "Entity '{}' not defined\n",
-                        name
-                    );
-                } else {
-                    xml_err_msg_str!(
-                        self,
-                        XmlParserErrors::XmlWarUndeclaredEntity,
-                        "Entity '{}' not defined\n",
-                        name
-                    );
-                    if self.in_subset == 0 {
-                        if let Some(reference) =
-                            self.sax.as_deref_mut().and_then(|sax| sax.reference)
-                        {
-                            reference(self, &name);
-                        }
-                    }
-                }
-                self.valid = 0;
             }
-
-            // [ WFC: No Recursion ]
-            // A parsed entity must not contain a recursive reference
-            // to itself, either directly or indirectly.
-            // Done somewhere else
-            ent
+        } else {
+            if self.standalone == 1 || (self.has_external_subset == 0 && self.has_perefs == 0) {
+                xml_fatal_err_msg_str!(
+                    self,
+                    XmlParserErrors::XmlErrUndeclaredEntity,
+                    "Entity '{}' not defined\n",
+                    name
+                );
+            } else {
+                xml_err_msg_str!(
+                    self,
+                    XmlParserErrors::XmlWarUndeclaredEntity,
+                    "Entity '{}' not defined\n",
+                    name
+                );
+                if self.in_subset == 0 {
+                    if let Some(reference) = self.sax.as_deref_mut().and_then(|sax| sax.reference) {
+                        reference(self, &name);
+                    }
+                }
+            }
+            self.valid = 0;
         }
+
+        // [ WFC: No Recursion ]
+        // A parsed entity must not contain a recursive reference
+        // to itself, either directly or indirectly.
+        // Done somewhere else
+        ent
     }
 
     /// Parse ENTITY references declarations, but this version parses it from
@@ -415,158 +411,154 @@ impl XmlParserCtxt {
     /// Returns the xmlEntityPtr if found, or NULL otherwise. The str pointer
     /// is updated to the current location in the string.
     #[doc(alias = "xmlParseStringEntityRef")]
-    pub(super) unsafe fn parse_string_entity_ref<'a>(
+    pub(super) fn parse_string_entity_ref<'a>(
         &mut self,
         s: &'a str,
     ) -> (Option<XmlEntityPtr>, &'a str) {
-        unsafe {
-            let Some(ptr) = s.strip_prefix('&') else {
-                return (None, s);
-            };
+        let Some(ptr) = s.strip_prefix('&') else {
+            return (None, s);
+        };
 
-            let (Some(name), rem) = self.parse_string_name(ptr) else {
-                xml_fatal_err_msg(
-                    self,
-                    XmlParserErrors::XmlErrNameRequired,
-                    "xmlParseStringEntityRef: no name\n",
-                );
-                return (None, ptr);
-            };
-            let Some(ptr) = rem.strip_prefix(';') else {
-                xml_fatal_err(self, XmlParserErrors::XmlErrEntityRefSemicolMissing, None);
-                return (None, rem);
-            };
+        let (Some(name), rem) = self.parse_string_name(ptr) else {
+            xml_fatal_err_msg(
+                self,
+                XmlParserErrors::XmlErrNameRequired,
+                "xmlParseStringEntityRef: no name\n",
+            );
+            return (None, ptr);
+        };
+        let Some(ptr) = rem.strip_prefix(';') else {
+            xml_fatal_err(self, XmlParserErrors::XmlErrEntityRefSemicolMissing, None);
+            return (None, rem);
+        };
 
-            let mut ent = None;
-            // Predefined entities override any extra definition
-            if self.options & XmlParserOption::XmlParseOldSAX as i32 == 0 {
+        let mut ent = None;
+        // Predefined entities override any extra definition
+        if self.options & XmlParserOption::XmlParseOldSAX as i32 == 0 {
+            ent = xml_get_predefined_entity(name);
+            if ent.is_some() {
+                return (ent, ptr);
+            }
+        }
+
+        // Ask first SAX for entity resolution, otherwise try the
+        // entities which may have stored in the parser context.
+        if let Some(sax) = self.sax.as_deref_mut() {
+            if let Some(get_entity) = sax.get_entity {
+                ent = get_entity(self, name);
+            }
+            if ent.is_none() && self.options & XmlParserOption::XmlParseOldSAX as i32 != 0 {
                 ent = xml_get_predefined_entity(name);
-                if ent.is_some() {
-                    return (ent, ptr);
-                }
             }
+            if ent.is_none() && self.user_data.is_none() {
+                ent = xml_sax2_get_entity(self, name);
+            }
+        }
+        if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+            return (None, s);
+        }
 
-            // Ask first SAX for entity resolution, otherwise try the
-            // entities which may have stored in the parser context.
-            if let Some(sax) = self.sax.as_deref_mut() {
-                if let Some(get_entity) = sax.get_entity {
-                    ent = get_entity(self, name);
-                }
-                if ent.is_none() && self.options & XmlParserOption::XmlParseOldSAX as i32 != 0 {
-                    ent = xml_get_predefined_entity(name);
-                }
-                if ent.is_none() && self.user_data.is_none() {
-                    ent = xml_sax2_get_entity(self, name);
-                }
-            }
-            if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                return (None, s);
-            }
-
-            // [ WFC: Entity Declared ]
-            // In a document without any DTD, a document with only an
-            // internal DTD subset which contains no parameter entity
-            // references, or a document with "standalone='yes'", the
-            // Name given in the entity reference must match that in an
-            // entity declaration, except that well-formed documents
-            // need not declare any of the following entities: amp, lt,
-            // gt, apos, quot.
-            // The declaration of a parameter entity must precede any
-            // reference to it.
-            // Similarly, the declaration of a general entity must
-            // precede any reference to it which appears in a default
-            // value in an attribute-list declaration. Note that if
-            // entities are declared in the external subset or in
-            // external parameter entities, a non-validating processor
-            // is not obligated to read and process their declarations;
-            // for such documents, the rule that an entity must be
-            // declared is a well-formedness constraint only if
-            // standalone='yes'.
-            if let Some(mut ent) = ent {
-                if matches!(ent.etype, XmlEntityType::XmlExternalGeneralUnparsedEntity) {
-                    // [ WFC: Parsed Entity ]
-                    // An entity reference must not contain the name of an
-                    // unparsed entity
-                    xml_fatal_err_msg_str!(
-                        self,
-                        XmlParserErrors::XmlErrUnparsedEntity,
-                        "Entity reference to unparsed entity {}\n",
-                        name
-                    );
-                } else if matches!(self.instate, XmlParserInputState::XmlParserAttributeValue)
-                    && matches!(ent.etype, XmlEntityType::XmlExternalGeneralParsedEntity)
-                {
-                    // [ WFC: No External Entity References ]
-                    // Attribute values cannot contain direct or indirect
-                    // entity references to external entities.
-                    xml_fatal_err_msg_str!(
-                        self,
-                        XmlParserErrors::XmlErrEntityIsExternal,
-                        "Attribute references external entity '{}'\n",
-                        name
-                    );
-                } else if matches!(self.instate, XmlParserInputState::XmlParserAttributeValue)
-                    && !matches!(ent.etype, XmlEntityType::XmlInternalPredefinedEntity)
-                {
-                    // [ WFC: No < in Attribute Values ]
-                    // The replacement text of any entity referred to directly or
-                    // indirectly in an attribute value (other than "&lt;") must
-                    // not contain a <.
-                    if ent.flags & XML_ENT_CHECKED_LT as i32 == 0 {
-                        if let Some(content) = ent.content.as_deref() {
-                            if content.contains('<') {
-                                ent.flags |= XML_ENT_CONTAINS_LT as i32;
-                            }
+        // [ WFC: Entity Declared ]
+        // In a document without any DTD, a document with only an
+        // internal DTD subset which contains no parameter entity
+        // references, or a document with "standalone='yes'", the
+        // Name given in the entity reference must match that in an
+        // entity declaration, except that well-formed documents
+        // need not declare any of the following entities: amp, lt,
+        // gt, apos, quot.
+        // The declaration of a parameter entity must precede any
+        // reference to it.
+        // Similarly, the declaration of a general entity must
+        // precede any reference to it which appears in a default
+        // value in an attribute-list declaration. Note that if
+        // entities are declared in the external subset or in
+        // external parameter entities, a non-validating processor
+        // is not obligated to read and process their declarations;
+        // for such documents, the rule that an entity must be
+        // declared is a well-formedness constraint only if
+        // standalone='yes'.
+        if let Some(mut ent) = ent {
+            if matches!(ent.etype, XmlEntityType::XmlExternalGeneralUnparsedEntity) {
+                // [ WFC: Parsed Entity ]
+                // An entity reference must not contain the name of an
+                // unparsed entity
+                xml_fatal_err_msg_str!(
+                    self,
+                    XmlParserErrors::XmlErrUnparsedEntity,
+                    "Entity reference to unparsed entity {}\n",
+                    name
+                );
+            } else if matches!(self.instate, XmlParserInputState::XmlParserAttributeValue)
+                && matches!(ent.etype, XmlEntityType::XmlExternalGeneralParsedEntity)
+            {
+                // [ WFC: No External Entity References ]
+                // Attribute values cannot contain direct or indirect
+                // entity references to external entities.
+                xml_fatal_err_msg_str!(
+                    self,
+                    XmlParserErrors::XmlErrEntityIsExternal,
+                    "Attribute references external entity '{}'\n",
+                    name
+                );
+            } else if matches!(self.instate, XmlParserInputState::XmlParserAttributeValue)
+                && !matches!(ent.etype, XmlEntityType::XmlInternalPredefinedEntity)
+            {
+                // [ WFC: No < in Attribute Values ]
+                // The replacement text of any entity referred to directly or
+                // indirectly in an attribute value (other than "&lt;") must
+                // not contain a <.
+                if ent.flags & XML_ENT_CHECKED_LT as i32 == 0 {
+                    if let Some(content) = ent.content.as_deref() {
+                        if content.contains('<') {
+                            ent.flags |= XML_ENT_CONTAINS_LT as i32;
                         }
-                        ent.flags |= XML_ENT_CHECKED_LT as i32;
                     }
-                    if ent.flags & XML_ENT_CONTAINS_LT as i32 != 0 {
+                    ent.flags |= XML_ENT_CHECKED_LT as i32;
+                }
+                if ent.flags & XML_ENT_CONTAINS_LT as i32 != 0 {
+                    xml_fatal_err_msg_str!(
+                        self,
+                        XmlParserErrors::XmlErrLtInAttribute,
+                        "'<' in entity '{}' is not allowed in attributes values\n",
+                        name
+                    );
+                }
+            } else {
+                // Internal check, no parameter entities here ...
+                match ent.etype {
+                    XmlEntityType::XmlInternalParameterEntity
+                    | XmlEntityType::XmlExternalParameterEntity => {
                         xml_fatal_err_msg_str!(
                             self,
-                            XmlParserErrors::XmlErrLtInAttribute,
-                            "'<' in entity '{}' is not allowed in attributes values\n",
+                            XmlParserErrors::XmlErrEntityIsParameter,
+                            "Attempt to reference the parameter entity '{}'\n",
                             name
                         );
                     }
-                } else {
-                    // Internal check, no parameter entities here ...
-                    match ent.etype {
-                        XmlEntityType::XmlInternalParameterEntity
-                        | XmlEntityType::XmlExternalParameterEntity => {
-                            xml_fatal_err_msg_str!(
-                                self,
-                                XmlParserErrors::XmlErrEntityIsParameter,
-                                "Attempt to reference the parameter entity '{}'\n",
-                                name
-                            );
-                        }
-                        _ => {}
-                    }
+                    _ => {}
                 }
-            } else if self.standalone == 1
-                || (self.has_external_subset == 0 && self.has_perefs == 0)
-            {
-                xml_fatal_err_msg_str!(
-                    self,
-                    XmlParserErrors::XmlErrUndeclaredEntity,
-                    "Entity '{}' not defined\n",
-                    name
-                );
-            } else {
-                xml_err_msg_str!(
-                    self,
-                    XmlParserErrors::XmlWarUndeclaredEntity,
-                    "Entity '{}' not defined\n",
-                    name
-                );
             }
-
-            // [ WFC: No Recursion ]
-            // A parsed entity must not contain a recursive reference
-            // to itself, either directly or indirectly.
-            // Done somewhere else
-            (ent, ptr)
+        } else if self.standalone == 1 || (self.has_external_subset == 0 && self.has_perefs == 0) {
+            xml_fatal_err_msg_str!(
+                self,
+                XmlParserErrors::XmlErrUndeclaredEntity,
+                "Entity '{}' not defined\n",
+                name
+            );
+        } else {
+            xml_err_msg_str!(
+                self,
+                XmlParserErrors::XmlWarUndeclaredEntity,
+                "Entity '{}' not defined\n",
+                name
+            );
         }
+
+        // [ WFC: No Recursion ]
+        // A parsed entity must not contain a recursive reference
+        // to itself, either directly or indirectly.
+        // Done somewhere else
+        (ent, ptr)
     }
 
     /// Parse PEReference declarations

@@ -44,9 +44,10 @@ use std::{
 
 use crate::{
     error::{__xml_simple_error, __xml_simple_oom_error, XmlErrorDomain, XmlParserErrors},
+    globals::{get_deregister_node_func, get_register_node_func},
     libxml::{
         chvalid::xml_is_blank_char,
-        globals::{xml_deregister_node_default_value, xml_free, xml_register_node_default_value},
+        globals::xml_free,
         xmlstring::{XmlChar, xml_strdup, xml_strndup},
     },
     parser::{XML_STRING_COMMENT, XML_STRING_TEXT},
@@ -707,10 +708,8 @@ pub(crate) unsafe fn xml_static_copy_node(
             // this is a tricky part for the node register thing:
             // in case ret does get coalesced in xmlAddChild
             // the deregister-node callback is called; so we register ret now already
-            if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-            // && xmlRegisterNodeDefaultValue.is_some()
-            {
-                xml_register_node_default_value(ret.into());
+            if let Some(register) = get_register_node_func() {
+                register(ret.into());
             }
 
             // Note that since (*ret).parent is already set, xmlAddChild will
@@ -729,10 +728,10 @@ pub(crate) unsafe fn xml_static_copy_node(
         if extended == 0 {
             //  goto out;
             // if parent != null_mut() we already registered the node above
-            if parent.is_none() && __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-            // && xmlRegisterNodeDefaultValue.is_some()
-            {
-                xml_register_node_default_value(ret.into());
+            if parent.is_none() {
+                if let Some(register) = get_register_node_func() {
+                    register(ret.into());
+                }
             }
 
             return Some(ret.into());
@@ -835,10 +834,10 @@ pub(crate) unsafe fn xml_static_copy_node(
 
         //  out:
         /* if parent != null_mut() we already registered the node above */
-        if parent.is_none() && __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-        // && xmlRegisterNodeDefaultValue.is_some()
-        {
-            xml_register_node_default_value(ret.into());
+        if parent.is_none() {
+            if let Some(register) = get_register_node_func() {
+                register(ret.into());
+            }
         }
 
         Some(ret.into())
@@ -1050,26 +1049,23 @@ pub unsafe fn xml_new_doc_node(
 ///
 /// Returns a pointer to the new node object. Uses xml_strdup() to make copy of @name.
 #[doc(alias = "xmlNewNode")]
-pub unsafe fn xml_new_node(ns: Option<XmlNsPtr>, name: &str) -> Option<XmlNodePtr> {
-    unsafe {
-        // Allocate a new node and fill the fields.
-        let Some(cur) = XmlNodePtr::new(XmlNode {
-            typ: XmlElementType::XmlElementNode,
-            name: name.to_owned().into(),
-            ns,
-            ..Default::default()
-        }) else {
-            xml_tree_err_memory("building node");
-            return None;
-        };
+pub fn xml_new_node(ns: Option<XmlNsPtr>, name: &str) -> Option<XmlNodePtr> {
+    // Allocate a new node and fill the fields.
+    let Some(cur) = XmlNodePtr::new(XmlNode {
+        typ: XmlElementType::XmlElementNode,
+        name: name.to_owned().into(),
+        ns,
+        ..Default::default()
+    }) else {
+        xml_tree_err_memory("building node");
+        return None;
+    };
 
-        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-        //  && xmlRegisterNodeDefaultValue.is_some()
-        {
-            xml_register_node_default_value(cur.into());
-        }
-        Some(cur)
+    if let Some(register) = get_register_node_func() {
+        register(cur.into());
     }
+
+    Some(cur)
 }
 
 /// Creation of a new child element, added at the end of @parent children list.
@@ -1133,17 +1129,12 @@ pub unsafe fn xml_new_child(
 /// Creation of a new text node within a document.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewDocText")]
-pub unsafe fn xml_new_doc_text(
-    doc: Option<XmlDocPtr>,
-    content: Option<&str>,
-) -> Option<XmlNodePtr> {
-    unsafe {
-        let cur = xml_new_text(content);
-        if let Some(mut cur) = cur {
-            cur.doc = doc;
-        }
-        cur
+pub fn xml_new_doc_text(doc: Option<XmlDocPtr>, content: Option<&str>) -> Option<XmlNodePtr> {
+    let cur = xml_new_text(content);
+    if let Some(mut cur) = cur {
+        cur.doc = doc;
     }
+    cur
 }
 
 /// Creation of a new text node.
@@ -1152,56 +1143,50 @@ pub unsafe fn xml_new_doc_text(
 ///
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewText")]
-pub unsafe fn xml_new_text(content: Option<&str>) -> Option<XmlNodePtr> {
-    unsafe {
-        // Allocate a new node and fill the fields.
-        let Some(mut cur) = XmlNodePtr::new(XmlNode {
-            typ: XmlElementType::XmlTextNode,
-            name: Cow::Borrowed(XML_STRING_TEXT),
-            ..Default::default()
-        }) else {
-            xml_tree_err_memory("building text");
-            return None;
-        };
-        cur.content = content.map(|content| content.to_owned());
+pub fn xml_new_text(content: Option<&str>) -> Option<XmlNodePtr> {
+    // Allocate a new node and fill the fields.
+    let Some(mut cur) = XmlNodePtr::new(XmlNode {
+        typ: XmlElementType::XmlTextNode,
+        name: Cow::Borrowed(XML_STRING_TEXT),
+        ..Default::default()
+    }) else {
+        xml_tree_err_memory("building text");
+        return None;
+    };
+    cur.content = content.map(|content| content.to_owned());
 
-        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-        //  && xmlRegisterNodeDefaultValue.is_some()
-        {
-            xml_register_node_default_value(cur.into());
-        }
-        Some(cur)
+    if let Some(register) = get_register_node_func() {
+        register(cur.into());
     }
+
+    Some(cur)
 }
 
 /// Creation of a processing instruction element.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewDocPI")]
-pub unsafe fn xml_new_doc_pi(
+pub fn xml_new_doc_pi(
     doc: Option<XmlDocPtr>,
     name: &str,
     content: Option<&str>,
 ) -> Option<XmlNodePtr> {
-    unsafe {
-        // Allocate a new node and fill the fields.
-        let Some(mut cur) = XmlNodePtr::new(XmlNode {
-            typ: XmlElementType::XmlPINode,
-            name: name.to_owned().into(),
-            ..Default::default()
-        }) else {
-            xml_tree_err_memory("building PI");
-            return None;
-        };
-        cur.content = content.map(|content| content.to_owned());
-        cur.doc = doc;
+    // Allocate a new node and fill the fields.
+    let Some(mut cur) = XmlNodePtr::new(XmlNode {
+        typ: XmlElementType::XmlPINode,
+        name: name.to_owned().into(),
+        ..Default::default()
+    }) else {
+        xml_tree_err_memory("building PI");
+        return None;
+    };
+    cur.content = content.map(|content| content.to_owned());
+    cur.doc = doc;
 
-        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-        //  && xmlRegisterNodeDefaultValue.is_some()
-        {
-            xml_register_node_default_value(cur.into());
-        }
-        Some(cur)
+    if let Some(register) = get_register_node_func() {
+        register(cur.into());
     }
+
+    Some(cur)
 }
 
 /// Creation of a processing instruction element.
@@ -1210,21 +1195,19 @@ pub unsafe fn xml_new_doc_pi(
 ///
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewPI")]
-pub unsafe fn xml_new_pi(name: &str, content: Option<&str>) -> Option<XmlNodePtr> {
-    unsafe { xml_new_doc_pi(None, name, content) }
+pub fn xml_new_pi(name: &str, content: Option<&str>) -> Option<XmlNodePtr> {
+    xml_new_doc_pi(None, name, content)
 }
 
 /// Creation of a new node containing a comment within a document.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewDocComment")]
-pub unsafe fn xml_new_doc_comment(doc: Option<XmlDocPtr>, content: &str) -> Option<XmlNodePtr> {
-    unsafe {
-        let cur = xml_new_comment(content);
-        if let Some(mut cur) = cur {
-            cur.doc = doc;
-        }
-        cur
+pub fn xml_new_doc_comment(doc: Option<XmlDocPtr>, content: &str) -> Option<XmlNodePtr> {
+    let cur = xml_new_comment(content);
+    if let Some(mut cur) = cur {
+        cur.doc = doc;
     }
+    cur
 }
 
 /// Use of this function is DISCOURAGED in favor of xmlNewDocComment.
@@ -1232,127 +1215,115 @@ pub unsafe fn xml_new_doc_comment(doc: Option<XmlDocPtr>, content: &str) -> Opti
 /// Creation of a new node containing a comment.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewComment")]
-pub unsafe fn xml_new_comment(content: &str) -> Option<XmlNodePtr> {
-    unsafe {
-        // Allocate a new node and fill the fields.
-        let Some(cur) = XmlNodePtr::new(XmlNode {
-            typ: XmlElementType::XmlCommentNode,
-            name: Cow::Borrowed(XML_STRING_COMMENT),
-            content: Some(content.to_owned()),
-            ..Default::default()
-        }) else {
-            xml_tree_err_memory("building comment");
-            return None;
-        };
+pub fn xml_new_comment(content: &str) -> Option<XmlNodePtr> {
+    // Allocate a new node and fill the fields.
+    let Some(cur) = XmlNodePtr::new(XmlNode {
+        typ: XmlElementType::XmlCommentNode,
+        name: Cow::Borrowed(XML_STRING_COMMENT),
+        content: Some(content.to_owned()),
+        ..Default::default()
+    }) else {
+        xml_tree_err_memory("building comment");
+        return None;
+    };
 
-        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-        //  && xmlRegisterNodeDefaultValue.is_some()
-        {
-            xml_register_node_default_value(cur.into());
-        }
-        Some(cur)
+    if let Some(register) = get_register_node_func() {
+        register(cur.into());
     }
+
+    Some(cur)
 }
 
 /// Creation of a new node containing a CDATA block.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewCDataBlock")]
-pub unsafe fn xml_new_cdata_block(doc: Option<XmlDocPtr>, content: &str) -> Option<XmlNodePtr> {
-    unsafe {
-        // Allocate a new node and fill the fields.
-        let Some(cur) = XmlNodePtr::new(XmlNode {
-            typ: XmlElementType::XmlCDATASectionNode,
-            doc,
-            content: Some(content.to_owned()),
-            ..Default::default()
-        }) else {
-            xml_tree_err_memory("building CDATA");
-            return None;
-        };
+pub fn xml_new_cdata_block(doc: Option<XmlDocPtr>, content: &str) -> Option<XmlNodePtr> {
+    // Allocate a new node and fill the fields.
+    let Some(cur) = XmlNodePtr::new(XmlNode {
+        typ: XmlElementType::XmlCDATASectionNode,
+        doc,
+        content: Some(content.to_owned()),
+        ..Default::default()
+    }) else {
+        xml_tree_err_memory("building CDATA");
+        return None;
+    };
 
-        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-        //  && xmlRegisterNodeDefaultValue.is_some()
-        {
-            xml_register_node_default_value(cur.into());
-        }
-        Some(cur)
+    if let Some(register) = get_register_node_func() {
+        register(cur.into());
     }
+
+    Some(cur)
 }
 
 /// Creation of a new character reference node.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewCharRef")]
-pub unsafe fn xml_new_char_ref(doc: Option<XmlDocPtr>, name: &str) -> Option<XmlNodePtr> {
-    unsafe {
-        // Allocate a new node and fill the fields.
-        let Some(mut cur) = XmlNodePtr::new(XmlNode {
-            typ: XmlElementType::XmlEntityRefNode,
-            doc,
-            ..Default::default()
-        }) else {
-            xml_tree_err_memory("building character reference");
-            return None;
-        };
-        if let Some(name) = name.strip_prefix('&') {
-            if let Some(name) = name.strip_suffix(';') {
-                cur.name = name.to_owned().into();
-            } else {
-                cur.name = name.to_owned().into();
-            }
+pub fn xml_new_char_ref(doc: Option<XmlDocPtr>, name: &str) -> Option<XmlNodePtr> {
+    // Allocate a new node and fill the fields.
+    let Some(mut cur) = XmlNodePtr::new(XmlNode {
+        typ: XmlElementType::XmlEntityRefNode,
+        doc,
+        ..Default::default()
+    }) else {
+        xml_tree_err_memory("building character reference");
+        return None;
+    };
+    if let Some(name) = name.strip_prefix('&') {
+        if let Some(name) = name.strip_suffix(';') {
+            cur.name = name.to_owned().into();
         } else {
             cur.name = name.to_owned().into();
         }
-
-        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-        //  && xmlRegisterNodeDefaultValue.is_some()
-        {
-            xml_register_node_default_value(cur.into());
-        }
-        Some(cur)
+    } else {
+        cur.name = name.to_owned().into();
     }
+
+    if let Some(register) = get_register_node_func() {
+        register(cur.into());
+    }
+
+    Some(cur)
 }
 
 /// Creation of a new reference node.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewReference")]
-pub unsafe fn xml_new_reference(doc: Option<XmlDocPtr>, name: &str) -> Option<XmlNodePtr> {
-    unsafe {
-        // Allocate a new node and fill the fields.
-        let Some(mut cur) = XmlNodePtr::new(XmlNode {
-            typ: XmlElementType::XmlEntityRefNode,
-            doc,
-            ..Default::default()
-        }) else {
-            xml_tree_err_memory("building reference");
-            return None;
-        };
-        if let Some(name) = name.strip_prefix('&') {
-            if let Some(name) = name.strip_suffix(';') {
-                cur.name = name.to_owned().into();
-            } else {
-                cur.name = name.to_owned().into();
-            }
+pub fn xml_new_reference(doc: Option<XmlDocPtr>, name: &str) -> Option<XmlNodePtr> {
+    // Allocate a new node and fill the fields.
+    let Some(mut cur) = XmlNodePtr::new(XmlNode {
+        typ: XmlElementType::XmlEntityRefNode,
+        doc,
+        ..Default::default()
+    }) else {
+        xml_tree_err_memory("building reference");
+        return None;
+    };
+    if let Some(name) = name.strip_prefix('&') {
+        if let Some(name) = name.strip_suffix(';') {
+            cur.name = name.to_owned().into();
         } else {
             cur.name = name.to_owned().into();
         }
-
-        let ent = xml_get_doc_entity(doc, &cur.name().unwrap());
-        if let Some(ent) = ent {
-            cur.content = ent.content.as_deref().map(|cont| cont.to_owned());
-            // The parent pointer in entity is a DTD pointer and thus is NOT
-            // updated.  Not sure if this is 100% correct.
-            //  -George
-            cur.set_children(Some(ent.into()));
-            cur.set_last(Some(ent.into()));
-        }
-
-        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-        //  && xmlRegisterNodeDefaultValue.is_some()
-        {
-            xml_register_node_default_value(cur.into());
-        }
-        Some(cur)
+    } else {
+        cur.name = name.to_owned().into();
     }
+
+    let ent = xml_get_doc_entity(doc, &cur.name().unwrap());
+    if let Some(ent) = ent {
+        cur.content = ent.content.as_deref().map(|cont| cont.to_owned());
+        // The parent pointer in entity is a DTD pointer and thus is NOT
+        // updated.  Not sure if this is 100% correct.
+        //  -George
+        cur.set_children(Some(ent.into()));
+        cur.set_last(Some(ent.into()));
+    }
+
+    if let Some(register) = get_register_node_func() {
+        register(cur.into());
+    }
+
+    Some(cur)
 }
 
 /// Do a copy of the node.
@@ -1493,25 +1464,22 @@ pub unsafe fn xml_new_doc_raw_node(
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewDocFragment")]
 #[cfg(feature = "libxml_tree")]
-pub unsafe fn xml_new_doc_fragment(doc: Option<XmlDocPtr>) -> Option<XmlNodePtr> {
-    unsafe {
-        // Allocate a new DocumentFragment node and fill the fields.
-        let Some(cur) = XmlNodePtr::new(XmlNode {
-            typ: XmlElementType::XmlDocumentFragNode,
-            doc,
-            ..Default::default()
-        }) else {
-            xml_tree_err_memory("building fragment");
-            return None;
-        };
+pub fn xml_new_doc_fragment(doc: Option<XmlDocPtr>) -> Option<XmlNodePtr> {
+    // Allocate a new DocumentFragment node and fill the fields.
+    let Some(cur) = XmlNodePtr::new(XmlNode {
+        typ: XmlElementType::XmlDocumentFragNode,
+        doc,
+        ..Default::default()
+    }) else {
+        xml_tree_err_memory("building fragment");
+        return None;
+    };
 
-        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-        //  && xmlRegisterNodeDefaultValue.is_some()
-        {
-            xml_register_node_default_value(cur.into());
-        }
-        Some(cur)
+    if let Some(register) = get_register_node_func() {
+        register(cur.into());
     }
+
+    Some(cur)
 }
 
 /// Unlink the old node from its current context, prune the new one
@@ -1671,10 +1639,8 @@ pub unsafe fn xml_free_node_list(cur: Option<impl Into<XmlGenericNodePtr>>) {
                 xml_free_doc(doc);
             } else if !matches!(cur.element_type(), XmlElementType::XmlDTDNode) {
                 let cur = XmlNodePtr::try_from(cur).unwrap();
-                if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-                // && xmlDeregisterNodeDefaultValue.is_some()
-                {
-                    xml_deregister_node_default_value(cur.into());
+                if let Some(deregister) = get_deregister_node_func() {
+                    deregister(cur.into())
                 }
 
                 if (matches!(cur.element_type(), XmlElementType::XmlElementNode)
@@ -1733,10 +1699,8 @@ pub unsafe fn xml_free_node(cur: impl Into<XmlGenericNodePtr>) {
             return;
         }
 
-        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-        // && xmlDeregisterNodeDefaultValue.is_some()
-        {
-            xml_deregister_node_default_value(cur);
+        if let Some(deregister) = get_deregister_node_func() {
+            deregister(cur)
         }
 
         if let Ok(mut ent) = XmlEntityPtr::try_from(cur) {

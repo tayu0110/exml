@@ -40,9 +40,7 @@ use crate::{
     globals::reset_last_error,
     libxml::xmlmemory::{XmlFreeFunc, XmlMallocFunc, XmlReallocFunc, XmlStrdupFunc},
     parser::{XmlSAXLocator, xml_init_parser},
-    tree::{
-        __XML_REGISTER_CALLBACKS, BASE_BUFFER_SIZE, XmlBufferAllocationScheme, XmlGenericNodePtr,
-    },
+    tree::{BASE_BUFFER_SIZE, XmlBufferAllocationScheme},
 };
 
 use super::{
@@ -71,13 +69,6 @@ pub unsafe extern "C" fn xml_init_globals() {
 #[deprecated = "This function is a no-op"]
 pub unsafe extern "C" fn xml_cleanup_globals() {}
 
-/// Signature for the registration callback of a created node
-#[doc(alias = "xmlRegisterNodeFunc")]
-pub type XmlRegisterNodeFunc = unsafe fn(node: XmlGenericNodePtr);
-/// Signature for the deregistration callback of a discarded node
-#[doc(alias = "xmlDeregisterNodeFunc")]
-pub type XmlDeregisterNodeFunc = unsafe fn(node: XmlGenericNodePtr);
-
 pub type XmlGlobalStatePtr = *mut XmlGlobalState;
 pub struct XmlGlobalState {
     // pub(crate) xml_parser_version: *const c_char,
@@ -103,9 +94,6 @@ pub struct XmlGlobalState {
     pub(crate) xml_pedantic_parser_default_value: i32,
 
     pub(crate) xml_indent_tree_output: i32,
-    pub(crate) xml_register_node_default_value: Option<XmlRegisterNodeFunc>,
-    pub(crate) xml_deregister_node_default_value: Option<XmlDeregisterNodeFunc>,
-
     pub(crate) xml_malloc_atomic: Option<XmlMallocFunc>,
     pub(crate) xml_last_error: XmlError,
 
@@ -273,22 +261,6 @@ pub(crate) static _XML_GENERIC_ERROR_CONTEXT: AtomicPtr<c_void> = AtomicPtr::new
 pub(crate) static _XML_STRUCTURED_ERROR_CONTEXT: AtomicPtr<c_void> = AtomicPtr::new(null_mut());
 static XML_STRUCTURED_ERROR_CONTEXT_THR_DEF: AtomicPtr<c_void> = AtomicPtr::new(null_mut());
 
-/**
- * xmlRegisterNodeDefaultValue:
- *
- * DEPRECATED: Don't use
- */
-pub(crate) static mut _XML_REGISTER_NODE_DEFAULT_VALUE: Option<XmlRegisterNodeFunc> = None;
-static mut XML_REGISTER_NODE_DEFAULT_VALUE_THR_DEF: Option<XmlRegisterNodeFunc> = None;
-
-/**
- * xmlDeregisterNodeDefaultValue:
- *
- * DEPRECATED: Don't use
- */
-pub(crate) static mut _XML_DEREGISTER_NODE_DEFAULT_VALUE: Option<XmlDeregisterNodeFunc> = None;
-static mut XML_DEREGISTER_NODE_DEFAULT_VALUE_THR_DEF: Option<XmlDeregisterNodeFunc> = None;
-
 /// xmlInitializeGlobalState() initialize a global state with all the
 /// default values of the library.
 #[doc(alias = "xmlInitializeGlobalState")]
@@ -322,8 +294,6 @@ pub unsafe extern "C" fn xml_initialize_global_state(gs: XmlGlobalStatePtr) {
             XML_STRUCTURED_ERROR_CONTEXT_THR_DEF.load(Ordering::Relaxed),
             Ordering::Relaxed,
         );
-        (*gs).xml_register_node_default_value = XML_REGISTER_NODE_DEFAULT_VALUE_THR_DEF;
-        (*gs).xml_deregister_node_default_value = XML_DEREGISTER_NODE_DEFAULT_VALUE_THR_DEF;
 
         memset(
             addr_of_mut!((*gs).xml_last_error) as _,
@@ -332,62 +302,6 @@ pub unsafe extern "C" fn xml_initialize_global_state(gs: XmlGlobalStatePtr) {
         );
 
         xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
-    }
-}
-
-/// Registers a callback for node creation
-///
-/// Returns the old value of the registration function
-#[doc(alias = "xmlRegisterNodeDefault")]
-pub unsafe fn xml_register_node_default(
-    func: Option<XmlRegisterNodeFunc>,
-) -> Option<XmlRegisterNodeFunc> {
-    let old = unsafe { _XML_REGISTER_NODE_DEFAULT_VALUE };
-
-    __XML_REGISTER_CALLBACKS.store(1, Ordering::Relaxed);
-    unsafe { _XML_REGISTER_NODE_DEFAULT_VALUE = func };
-    old
-}
-
-pub unsafe fn xml_thr_def_register_node_default(
-    func: XmlRegisterNodeFunc,
-) -> Option<XmlRegisterNodeFunc> {
-    unsafe { xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX)) };
-    let old = unsafe { XML_REGISTER_NODE_DEFAULT_VALUE_THR_DEF };
-
-    __XML_REGISTER_CALLBACKS.store(1, Ordering::Relaxed);
-    unsafe { XML_REGISTER_NODE_DEFAULT_VALUE_THR_DEF = Some(func) };
-    unsafe { xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX)) };
-
-    old
-}
-
-/// Registers a callback for node destruction
-///
-/// Returns the previous value of the deregistration function
-#[doc(alias = "xmlDeregisterNodeDefault")]
-pub unsafe fn xml_deregister_node_default(
-    func: XmlDeregisterNodeFunc,
-) -> Option<XmlDeregisterNodeFunc> {
-    let old = unsafe { _XML_DEREGISTER_NODE_DEFAULT_VALUE };
-
-    __XML_REGISTER_CALLBACKS.store(1, Ordering::Relaxed);
-    unsafe { _XML_DEREGISTER_NODE_DEFAULT_VALUE = Some(func) };
-    old
-}
-
-pub unsafe fn xml_thr_def_deregister_node_default(
-    func: XmlDeregisterNodeFunc,
-) -> Option<XmlDeregisterNodeFunc> {
-    unsafe {
-        xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
-        let old = XML_DEREGISTER_NODE_DEFAULT_VALUE_THR_DEF;
-
-        __XML_REGISTER_CALLBACKS.store(1, Ordering::Relaxed);
-        XML_DEREGISTER_NODE_DEFAULT_VALUE_THR_DEF = Some(func);
-        xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
-
-        old
     }
 }
 
@@ -506,40 +420,6 @@ static mut _XML_DEFAULT_SAXLOCATOR: XmlSAXLocator = XmlSAXLocator {
 
 pub unsafe extern "C" fn xml_default_sax_locator() -> *mut XmlSAXLocator {
     unsafe { __xml_default_sax_locator() }
-}
-
-#[deprecated]
-pub unsafe fn __xml_register_node_default_value() -> XmlRegisterNodeFunc {
-    unsafe {
-        if IS_MAIN_THREAD!() != 0 {
-            _XML_REGISTER_NODE_DEFAULT_VALUE.unwrap()
-        } else {
-            (*xml_get_global_state())
-                .xml_register_node_default_value
-                .unwrap()
-        }
-    }
-}
-
-pub unsafe fn xml_register_node_default_value(node: XmlGenericNodePtr) {
-    unsafe { __xml_register_node_default_value()(node) }
-}
-
-#[deprecated]
-pub unsafe fn __xml_deregister_node_default_value() -> XmlDeregisterNodeFunc {
-    unsafe {
-        if IS_MAIN_THREAD!() != 0 {
-            _XML_DEREGISTER_NODE_DEFAULT_VALUE.unwrap()
-        } else {
-            (*xml_get_global_state())
-                .xml_deregister_node_default_value
-                .unwrap()
-        }
-    }
-}
-
-pub unsafe fn xml_deregister_node_default_value(node: XmlGenericNodePtr) {
-    unsafe { __xml_deregister_node_default_value()(node) }
 }
 
 /**

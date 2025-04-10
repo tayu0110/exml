@@ -36,154 +36,152 @@ impl XmlParserCtxt {
         end3: char,
         check: i32,
     ) -> Option<String> {
-        unsafe {
-            if (self.depth > 40 && self.options & XmlParserOption::XmlParseHuge as i32 == 0)
-                || self.depth > 100
-            {
-                xml_fatal_err_msg(
-                    self,
-                    XmlParserErrors::XmlErrEntityLoop,
-                    "Maximum entity nesting depth exceeded",
-                );
-                return None;
-            }
+        if (self.depth > 40 && self.options & XmlParserOption::XmlParseHuge as i32 == 0)
+            || self.depth > 100
+        {
+            xml_fatal_err_msg(
+                self,
+                XmlParserErrors::XmlErrEntityLoop,
+                "Maximum entity nesting depth exceeded",
+            );
+            return None;
+        }
 
-            // allocate a translation buffer.
-            let mut buffer = String::new();
-            // OK loop until we reach one of the ending c_char or a size limit.
-            // we are operating on already parsed values.
-            while let Some(c) = s.chars().next().filter(|&c| {
-                c != end
-                    && c != end2
-                    && c != end3
-                    && !matches!(self.instate, XmlParserInputState::XmlParserEOF)
-            }) {
-                if s.starts_with("&#") {
-                    let (Some(val), rem) = self.parse_string_char_ref(s) else {
+        // allocate a translation buffer.
+        let mut buffer = String::new();
+        // OK loop until we reach one of the ending c_char or a size limit.
+        // we are operating on already parsed values.
+        while let Some(c) = s.chars().next().filter(|&c| {
+            c != end
+                && c != end2
+                && c != end3
+                && !matches!(self.instate, XmlParserInputState::XmlParserEOF)
+        }) {
+            if s.starts_with("&#") {
+                let (Some(val), rem) = self.parse_string_char_ref(s) else {
+                    return None;
+                };
+                buffer.push(val);
+                s = rem;
+            } else if c == '&' && what & XML_SUBSTITUTE_REF as i32 != 0 {
+                if get_parser_debug_entities() != 0 {
+                    generic_error!(
+                        "String decoding Entity Reference: {}\n",
+                        s.chars().take(30).collect::<String>()
+                    );
+                }
+                let (ent, rem) = self.parse_string_entity_ref(s);
+                s = rem;
+                if let Some(ent) = ent
+                    .filter(|ent| matches!(ent.etype, XmlEntityType::XmlInternalPredefinedEntity))
+                {
+                    if let Some(content) = ent.content.as_deref() {
+                        buffer.push_str(content);
+                    } else {
+                        xml_fatal_err_msg(
+                            self,
+                            XmlParserErrors::XmlErrInternalError,
+                            "predefined entity has no content\n",
+                        );
+                        return None;
+                    }
+                } else if let Some(mut ent) = ent.filter(|ent| ent.content.is_some()) {
+                    if check != 0 && self.parser_entity_check(ent.length as _) != 0 {
+                        return None;
+                    }
+
+                    if ent.flags & XML_ENT_EXPANDING as i32 != 0 {
+                        xml_fatal_err(self, XmlParserErrors::XmlErrEntityLoop, None);
+                        self.halt();
+                        ent.content = Some(Cow::Borrowed(""));
+                        return None;
+                    }
+
+                    ent.flags |= XML_ENT_EXPANDING as i32;
+                    self.depth += 1;
+                    let rep = ent.content.as_deref().and_then(|content| {
+                        self.string_decode_entities_int(content, what, '\0', '\0', '\0', check)
+                    });
+                    self.depth -= 1;
+                    ent.flags &= !XML_ENT_EXPANDING as i32;
+
+                    let Some(rep) = rep else {
+                        ent.content = Some(Cow::Borrowed(""));
                         return None;
                     };
-                    buffer.push(val);
-                    s = rem;
-                } else if c == '&' && what & XML_SUBSTITUTE_REF as i32 != 0 {
-                    if get_parser_debug_entities() != 0 {
-                        generic_error!(
-                            "String decoding Entity Reference: {}\n",
-                            s.chars().take(30).collect::<String>()
-                        );
-                    }
-                    let (ent, rem) = self.parse_string_entity_ref(s);
-                    s = rem;
-                    if let Some(ent) = ent.filter(|ent| {
-                        matches!(ent.etype, XmlEntityType::XmlInternalPredefinedEntity)
-                    }) {
-                        if let Some(content) = ent.content.as_deref() {
-                            buffer.push_str(content);
-                        } else {
-                            xml_fatal_err_msg(
-                                self,
-                                XmlParserErrors::XmlErrInternalError,
-                                "predefined entity has no content\n",
-                            );
-                            return None;
-                        }
-                    } else if let Some(mut ent) = ent.filter(|ent| ent.content.is_some()) {
-                        if check != 0 && self.parser_entity_check(ent.length as _) != 0 {
-                            return None;
-                        }
 
-                        if ent.flags & XML_ENT_EXPANDING as i32 != 0 {
-                            xml_fatal_err(self, XmlParserErrors::XmlErrEntityLoop, None);
-                            self.halt();
-                            ent.content = Some(Cow::Borrowed(""));
-                            return None;
-                        }
-
-                        ent.flags |= XML_ENT_EXPANDING as i32;
-                        self.depth += 1;
-                        let rep = ent.content.as_deref().and_then(|content| {
-                            self.string_decode_entities_int(content, what, '\0', '\0', '\0', check)
-                        });
-                        self.depth -= 1;
-                        ent.flags &= !XML_ENT_EXPANDING as i32;
-
-                        let Some(rep) = rep else {
-                            ent.content = Some(Cow::Borrowed(""));
-                            return None;
-                        };
-
-                        buffer.push_str(&rep);
-                    } else if let Some(ent) = ent {
-                        buffer.push('&');
-                        buffer.push_str(&ent.name().unwrap());
-                        buffer.push(';');
-                    }
-                } else if c == '%' && what & XML_SUBSTITUTE_PEREF as i32 != 0 {
-                    if get_parser_debug_entities() != 0 {
-                        generic_error!(
-                            "String decoding PE Reference: {}\n",
-                            s.chars().take(30).collect::<String>()
-                        );
-                    }
-                    let (ent, rem) = self.parse_string_pereference(s);
-                    s = rem;
-                    if let Some(mut ent) = ent {
-                        if ent.content.is_none() {
-                            // Note: external parsed entities will not be loaded,
-                            // it is not required for a non-validating parser to
-                            // complete external PEReferences coming from the
-                            // internal subset
-                            if self.options & XmlParserOption::XmlParseNoEnt as i32 != 0
-                                || self.options & XmlParserOption::XmlParseDTDValid as i32 != 0
-                                || self.validate != 0
-                            {
-                                self.load_entity_content(ent);
-                            } else {
-                                let name = ent.name().unwrap().into_owned();
-                                xml_warning_msg!(
-                                    self,
-                                    XmlParserErrors::XmlErrEntityProcessing,
-                                    "not validating will not read content for PE entity {}\n",
-                                    name
-                                );
-                            }
-                        }
-
-                        if check != 0 && self.parser_entity_check(ent.length as _) != 0 {
-                            return None;
-                        }
-
-                        if ent.flags & XML_ENT_EXPANDING as i32 != 0 {
-                            xml_fatal_err(self, XmlParserErrors::XmlErrEntityLoop, None);
-                            self.halt();
-                            if ent.content.is_some() {
-                                ent.content = Some(Cow::Borrowed(""));
-                            }
-                            return None;
-                        }
-
-                        ent.flags |= XML_ENT_EXPANDING as i32;
-                        self.depth += 1;
-                        let rep = ent.content.as_deref().and_then(|content| {
-                            self.string_decode_entities_int(content, what, '\0', '\0', '\0', check)
-                        });
-                        self.depth -= 1;
-                        ent.flags &= !XML_ENT_EXPANDING as i32;
-
-                        let Some(rep) = rep else {
-                            if ent.content.is_some() {
-                                ent.content = Some(Cow::Borrowed(""));
-                            }
-                            return None;
-                        };
-                        buffer.push_str(&rep);
-                    }
-                } else {
-                    buffer.push(c);
-                    s = &s[c.len_utf8()..];
+                    buffer.push_str(&rep);
+                } else if let Some(ent) = ent {
+                    buffer.push('&');
+                    buffer.push_str(&ent.name().unwrap());
+                    buffer.push(';');
                 }
+            } else if c == '%' && what & XML_SUBSTITUTE_PEREF as i32 != 0 {
+                if get_parser_debug_entities() != 0 {
+                    generic_error!(
+                        "String decoding PE Reference: {}\n",
+                        s.chars().take(30).collect::<String>()
+                    );
+                }
+                let (ent, rem) = self.parse_string_pereference(s);
+                s = rem;
+                if let Some(mut ent) = ent {
+                    if ent.content.is_none() {
+                        // Note: external parsed entities will not be loaded,
+                        // it is not required for a non-validating parser to
+                        // complete external PEReferences coming from the
+                        // internal subset
+                        if self.options & XmlParserOption::XmlParseNoEnt as i32 != 0
+                            || self.options & XmlParserOption::XmlParseDTDValid as i32 != 0
+                            || self.validate != 0
+                        {
+                            self.load_entity_content(ent);
+                        } else {
+                            let name = ent.name().unwrap().into_owned();
+                            xml_warning_msg!(
+                                self,
+                                XmlParserErrors::XmlErrEntityProcessing,
+                                "not validating will not read content for PE entity {}\n",
+                                name
+                            );
+                        }
+                    }
+
+                    if check != 0 && self.parser_entity_check(ent.length as _) != 0 {
+                        return None;
+                    }
+
+                    if ent.flags & XML_ENT_EXPANDING as i32 != 0 {
+                        xml_fatal_err(self, XmlParserErrors::XmlErrEntityLoop, None);
+                        self.halt();
+                        if ent.content.is_some() {
+                            ent.content = Some(Cow::Borrowed(""));
+                        }
+                        return None;
+                    }
+
+                    ent.flags |= XML_ENT_EXPANDING as i32;
+                    self.depth += 1;
+                    let rep = ent.content.as_deref().and_then(|content| {
+                        self.string_decode_entities_int(content, what, '\0', '\0', '\0', check)
+                    });
+                    self.depth -= 1;
+                    ent.flags &= !XML_ENT_EXPANDING as i32;
+
+                    let Some(rep) = rep else {
+                        if ent.content.is_some() {
+                            ent.content = Some(Cow::Borrowed(""));
+                        }
+                        return None;
+                    };
+                    buffer.push_str(&rep);
+                }
+            } else {
+                buffer.push(c);
+                s = &s[c.len_utf8()..];
             }
-            Some(buffer)
         }
+        Some(buffer)
     }
 
     /// Takes a entity string content and process to do the adequate substitutions.

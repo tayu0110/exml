@@ -25,23 +25,22 @@ use std::{
     ops::{Deref, DerefMut},
     os::raw::c_void,
     ptr::{NonNull, null_mut},
-    sync::atomic::Ordering,
 };
 
 use crate::{
     encoding::XmlCharEncoding,
     error::XmlParserErrors,
+    globals::{get_deregister_node_func, get_register_node_func},
     hash::XmlHashTable,
-    libxml::globals::{xml_deregister_node_default_value, xml_register_node_default_value},
     list::XmlList,
 };
 
 use super::{
-    __XML_REGISTER_CALLBACKS, InvalidNodePointerCastError, NodeCommon, XML_ENT_EXPANDING,
-    XML_ENT_PARSED, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE, XmlDocProperties, XmlDtdPtr,
-    XmlElementType, XmlEntityType, XmlGenericNodePtr, XmlID, XmlNodePtr, XmlNs, XmlNsPtr, XmlRef,
-    xml_free_dtd, xml_free_node_list, xml_free_ns_list, xml_get_doc_entity, xml_new_doc_text,
-    xml_new_reference, xml_ns_in_scope, xml_tree_err, xml_tree_err_memory,
+    InvalidNodePointerCastError, NodeCommon, XML_ENT_EXPANDING, XML_ENT_PARSED,
+    XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE, XmlDocProperties, XmlDtdPtr, XmlElementType,
+    XmlEntityType, XmlGenericNodePtr, XmlID, XmlNodePtr, XmlNs, XmlNsPtr, XmlRef, xml_free_dtd,
+    xml_free_node_list, xml_free_ns_list, xml_get_doc_entity, xml_new_doc_text, xml_new_reference,
+    xml_ns_in_scope, xml_tree_err, xml_tree_err_memory,
 };
 
 #[repr(C)]
@@ -710,35 +709,32 @@ impl From<XmlDocPtr> for *mut XmlDoc {
 ///
 /// Returns a new document
 #[doc(alias = "xmlNewDoc")]
-pub unsafe fn xml_new_doc(version: Option<&str>) -> Option<XmlDocPtr> {
-    unsafe {
-        let version = version.unwrap_or("1.0");
+pub fn xml_new_doc(version: Option<&str>) -> Option<XmlDocPtr> {
+    let version = version.unwrap_or("1.0");
 
-        // Allocate a new document and fill the fields.
-        let Some(mut cur) = XmlDocPtr::new(XmlDoc {
-            typ: XmlElementType::XmlDocumentNode,
-            version: Some(version.to_owned()),
-            standalone: -1,
-            compression: -1, /* not initialized */
-            parse_flags: 0,
-            properties: XmlDocProperties::XmlDocUserbuilt as i32,
-            // The in memory encoding is always UTF8
-            // This field will never change and would
-            // be obsolete if not for binary compatibility.
-            charset: XmlCharEncoding::UTF8,
-            ..Default::default()
-        }) else {
-            xml_tree_err_memory("building doc");
-            return None;
-        };
-        cur.doc = Some(cur);
-        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-        //  && xmlRegisterNodeDefaultValue.is_some()
-        {
-            xml_register_node_default_value(cur.into());
-        }
-        Some(cur)
+    // Allocate a new document and fill the fields.
+    let Some(mut cur) = XmlDocPtr::new(XmlDoc {
+        typ: XmlElementType::XmlDocumentNode,
+        version: Some(version.to_owned()),
+        standalone: -1,
+        compression: -1, /* not initialized */
+        parse_flags: 0,
+        properties: XmlDocProperties::XmlDocUserbuilt as i32,
+        // The in memory encoding is always UTF8
+        // This field will never change and would
+        // be obsolete if not for binary compatibility.
+        charset: XmlCharEncoding::UTF8,
+        ..Default::default()
+    }) else {
+        xml_tree_err_memory("building doc");
+        return None;
+    };
+    cur.doc = Some(cur);
+    if let Some(register) = get_register_node_func() {
+        register(cur.into());
     }
+
+    Some(cur)
 }
 
 /// Do a copy of the document info. If recursive, the content tree will
@@ -799,10 +795,8 @@ pub unsafe fn xml_copy_doc(doc: XmlDocPtr, recursive: i32) -> Option<XmlDocPtr> 
 #[doc(alias = "xmlFreeDoc")]
 pub unsafe fn xml_free_doc(mut cur: XmlDocPtr) {
     unsafe {
-        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-        // && xmlDeregisterNodeDefaultValue.is_some()
-        {
-            xml_deregister_node_default_value(cur.into());
+        if let Some(deregister) = get_deregister_node_func() {
+            deregister(cur.into());
         }
 
         // Do this before freeing the children list to avoid ID lookups

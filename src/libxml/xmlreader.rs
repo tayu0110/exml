@@ -45,7 +45,7 @@ use crate::{
     io::XmlParserInputBuffer,
     libxml::{
         dict::{XmlDictPtr, xml_dict_create, xml_dict_free},
-        globals::{xml_deregister_node_default_value, xml_free, xml_malloc},
+        globals::{xml_free, xml_malloc},
         relaxng::{
             XmlRelaxNGPtr, xml_relaxng_free, xml_relaxng_parse, xml_relaxng_set_valid_errors,
             xml_relaxng_set_valid_structured_errors, xml_relaxng_validate_full_element,
@@ -1181,37 +1181,34 @@ impl XmlTextReader {
     /// attribute node or all the attribute values have been read, or -1 in case of error.
     #[doc(alias = "xmlTextReaderReadAttributeValue")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn read_attribute_value(&mut self) -> i32 {
-        unsafe {
-            use crate::tree::XmlNsPtr;
+    pub fn read_attribute_value(&mut self) -> i32 {
+        use crate::tree::XmlNsPtr;
 
-            if self.node.is_none() {
-                return -1;
-            }
-            let Some(curnode) = self.curnode else {
+        if self.node.is_none() {
+            return -1;
+        }
+        let Some(curnode) = self.curnode else {
+            return 0;
+        };
+        if curnode.element_type() == XmlElementType::XmlAttributeNode {
+            let Some(children) = curnode.children() else {
                 return 0;
             };
-            if curnode.element_type() == XmlElementType::XmlAttributeNode {
-                let Some(children) = curnode.children() else {
-                    return 0;
-                };
-                self.curnode = Some(children);
-            } else if let Ok(ns) = XmlNsPtr::try_from(curnode) {
-                if let Some(mut faketext) = self.faketext {
-                    faketext.content = ns.href.as_deref().map(|href| href.to_owned());
-                } else {
-                    self.faketext =
-                        xml_new_doc_text(self.node.unwrap().document(), ns.href.as_deref());
-                }
-                self.curnode = self.faketext.map(|node| node.into());
+            self.curnode = Some(children);
+        } else if let Ok(ns) = XmlNsPtr::try_from(curnode) {
+            if let Some(mut faketext) = self.faketext {
+                faketext.content = ns.href.as_deref().map(|href| href.to_owned());
             } else {
-                let Some(next) = curnode.next() else {
-                    return 0;
-                };
-                self.curnode = Some(next);
+                self.faketext = xml_new_doc_text(self.node.unwrap().document(), ns.href.as_deref());
             }
-            1
+            self.curnode = self.faketext.map(|node| node.into());
+        } else {
+            let Some(next) = curnode.next() else {
+                return 0;
+            };
+            self.curnode = Some(next);
         }
+        1
     }
 
     /// Makes sure that the current node is fully read as well as all its descendant.  
@@ -4118,6 +4115,8 @@ unsafe fn xml_text_reader_free_prop_list(reader: &mut XmlTextReader, mut cur: Op
 #[doc(alias = "xmlTextReaderFreeNodeList")]
 #[cfg(feature = "libxml_reader")]
 unsafe fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mut cur: XmlGenericNodePtr) {
+    use crate::globals::get_deregister_node_func;
+
     unsafe {
         use crate::tree::{NodeCommon, XmlNodePtr, XmlNsPtr};
 
@@ -4149,10 +4148,9 @@ unsafe fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mut cur: XmlG
             // unroll to speed up freeing the document
             if cur.element_type() != XmlElementType::XmlDTDNode {
                 if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0 {
-                    // if let Some(f) = xmlDeregisterNodeDefaultValue {
-                    //     f(cur as _);
-                    // }
-                    xml_deregister_node_default_value(cur);
+                    if let Some(deregister) = get_deregister_node_func() {
+                        deregister(cur);
+                    }
                 }
 
                 let mut cur = XmlNodePtr::try_from(cur).unwrap();
@@ -4217,12 +4215,13 @@ unsafe fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mut cur: XmlG
 #[doc(alias = "xmlTextReaderFreeProp")]
 #[cfg(feature = "libxml_reader")]
 unsafe fn xml_text_reader_free_prop(reader: XmlTextReaderPtr, mut cur: XmlAttrPtr) {
+    use crate::globals::get_deregister_node_func;
+
     unsafe {
         if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0 {
-            // if let Some(f) = xmlDeregisterNodeDefaultValue {
-            //     f(cur as _);
-            // }
-            xml_deregister_node_default_value(cur.into());
+            if let Some(deregister) = get_deregister_node_func() {
+                deregister(cur.into());
+            }
         }
 
         if let Some(children) = cur.children.map(XmlGenericNodePtr::from) {
@@ -4247,6 +4246,8 @@ unsafe fn xml_text_reader_free_prop(reader: XmlTextReaderPtr, mut cur: XmlAttrPt
 #[doc(alias = "xmlTextReaderFreeNode")]
 #[cfg(feature = "libxml_reader")]
 unsafe fn xml_text_reader_free_node(reader: XmlTextReaderPtr, mut cur: XmlGenericNodePtr) {
+    use crate::globals::get_deregister_node_func;
+
     unsafe {
         use crate::tree::{NodeCommon, XmlDtdPtr, XmlNodePtr, XmlNsPtr};
 
@@ -4274,10 +4275,9 @@ unsafe fn xml_text_reader_free_node(reader: XmlTextReaderPtr, mut cur: XmlGeneri
         }
 
         if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0 {
-            // if let Some(f) = xmlDeregisterNodeDefaultValue {
-            //     f(cur);
-            // }
-            xml_deregister_node_default_value(cur);
+            if let Some(deregister) = get_deregister_node_func() {
+                deregister(cur);
+            }
         }
 
         let mut cur = XmlNodePtr::try_from(cur).unwrap();
@@ -4380,14 +4380,15 @@ fn xml_text_reader_collect_siblings(node: XmlGenericNodePtr) -> Option<String> {
 #[doc(alias = "xmlTextReaderFreeDoc")]
 #[cfg(feature = "libxml_reader")]
 unsafe fn xml_text_reader_free_doc(reader: &mut XmlTextReader, mut cur: XmlDocPtr) {
+    use crate::globals::get_deregister_node_func;
+
     unsafe {
         use crate::tree::NodeCommon;
 
         if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0 {
-            // if let Some(f) = xmlDeregisterNodeDefaultValue {
-            //     f(cur as _);
-            // }
-            xml_deregister_node_default_value(cur.into());
+            if let Some(deregister) = get_deregister_node_func() {
+                deregister(cur.into());
+            }
         }
 
         // Do this before freeing the children list to avoid ID lookups

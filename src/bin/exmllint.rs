@@ -49,7 +49,8 @@ use exml::{
     generic_error,
     globals::{
         GenericError, GenericErrorContext, get_load_ext_dtd_default_value,
-        set_load_ext_dtd_default_value, set_parser_debug_entities, set_tree_indent_string,
+        set_deregister_node_func, set_load_ext_dtd_default_value, set_parser_debug_entities,
+        set_register_node_func, set_tree_indent_string,
     },
     html::{
         HtmlParserCtxtPtr,
@@ -61,7 +62,7 @@ use exml::{
     },
     io::XmlParserInputBuffer,
     libxml::{
-        globals::{xml_deregister_node_default, xml_free, xml_register_node_default},
+        globals::xml_free,
         relaxng::{
             XmlRelaxNG, xml_relaxng_free, xml_relaxng_parse, xml_relaxng_set_valid_errors,
             xml_relaxng_validate_doc,
@@ -588,10 +589,8 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
     }
 
     if cmd_args.chkregister {
-        unsafe {
-            xml_register_node_default(Some(register_node));
-            xml_deregister_node_default(deregister_node);
-        }
+        set_register_node_func(Some(register_node));
+        set_deregister_node_func(Some(deregister_node));
     }
 
     if let Ok(indent) = std::env::var("XMLLINT_INDENT") {
@@ -3251,7 +3250,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: Option<XmlParserC
 
 // Usage and Main
 
-unsafe fn register_node(node: XmlGenericNodePtr) {
+fn register_node(node: XmlGenericNodePtr) {
     unsafe {
         let private = malloc(size_of::<c_long>());
         if private.is_null() {
@@ -3282,7 +3281,7 @@ unsafe fn register_node(node: XmlGenericNodePtr) {
     }
 }
 
-unsafe fn deregister_node(node: XmlGenericNodePtr) {
+fn deregister_node(node: XmlGenericNodePtr) {
     unsafe {
         let private = if let Ok(mut node) = XmlNodePtr::try_from(node) {
             node._private
