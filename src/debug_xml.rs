@@ -1858,8 +1858,9 @@ impl XmlShellCtxt<'_> {
         _node2: Option<XmlGenericNodePtr>,
     ) -> i32 {
         unsafe {
+            #[cfg(feature = "html")]
+            use crate::html::parser::html_parse_file;
             use crate::{
-                html::parser::html_parse_file,
                 parser::xml_read_file,
                 uri::canonic_path,
                 xpath::{xml_xpath_free_context, xml_xpath_new_context},
@@ -1880,7 +1881,7 @@ impl XmlShellCtxt<'_> {
                 }
                 #[cfg(not(feature = "html"))]
                 {
-                    write!(self.output, "HTML support not compiled in\n".as_ptr()).ok();
+                    writeln!(self.output, "HTML support not compiled in").ok();
                     None
                 }
             } else {
@@ -1923,6 +1924,7 @@ impl XmlShellCtxt<'_> {
         _node2: Option<XmlGenericNodePtr>,
     ) -> i32 {
         unsafe {
+            #[cfg(feature = "html")]
             use crate::html::tree::{html_doc_dump, html_node_dump_file};
 
             let Some(node) = node else {
@@ -1947,9 +1949,9 @@ impl XmlShellCtxt<'_> {
                     .ok()
                     .filter(|doc| doc.element_type() == XmlElementType::XmlDocumentNode)
                 {
-                    doc.dump_file(self.output);
+                    doc.dump_file(&mut self.output);
                 } else {
-                    xml_elem_dump(self.output, self.doc, node);
+                    node.dump_file(&mut self.output, Some(doc));
                 }
             } else if let Some(mut doc) = XmlDocPtr::try_from(node)
                 .ok()
@@ -1983,6 +1985,7 @@ impl XmlShellCtxt<'_> {
         unsafe {
             use std::fs::File;
 
+            #[cfg(feature = "html")]
             use crate::html::tree::html_save_file;
 
             if filename.is_empty() {
@@ -2003,11 +2006,8 @@ impl XmlShellCtxt<'_> {
                         return -1;
                     }
                     #[cfg(not(feature = "html"))]
-                    if xml_save_file(filename as *mut c_char, self.doc) < -1 {
-                        generic_error!(
-                            "Failed to write to {}\n",
-                            CStr::from_ptr(filename as *const i8).to_string_lossy()
-                        );
+                    if self.doc.unwrap().save_file(filename) < -1 {
+                        generic_error!("Failed to write to {}\n", filename);
                         return -1;
                     }
                 }
@@ -2046,6 +2046,7 @@ impl XmlShellCtxt<'_> {
         _node2: Option<XmlGenericNodePtr>,
     ) -> i32 {
         unsafe {
+            #[cfg(feature = "html")]
             use crate::html::tree::html_save_file;
 
             let Some(mut doc) = self.doc else {
@@ -2066,7 +2067,7 @@ impl XmlShellCtxt<'_> {
                         generic_error!("Failed to save to {}\n", filename);
                     }
                     #[cfg(not(feature = "html"))]
-                    if (xml_save_file(filename, self.doc) < 0) {
+                    if self.doc.unwrap().save_file(filename) < 0 {
                         generic_error!("Failed to save to {}\n", filename);
                     }
                 }

@@ -59,11 +59,12 @@ pub(crate) use attribute::*;
 pub use dtd::*;
 pub(crate) use entity::*;
 
+#[cfg(feature = "html")]
+use crate::html::parser::{__html_parse_content, HtmlParserOption, html_create_memory_parser_ctxt};
 use crate::{
     encoding::{XmlCharEncoding, detect_encoding, find_encoding_handler},
     error::XmlParserErrors,
     globals::GenericErrorContext,
-    html::parser::{__html_parse_content, HtmlParserOption, html_create_memory_parser_ctxt},
     libxml::chvalid::xml_is_blank_char,
     parser::XmlParserOption,
     tree::{

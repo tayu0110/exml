@@ -483,7 +483,6 @@ pub(crate) fn des_int_ptr(_no: i32, _val: *mut i32, _nr: i32) {}
 
 pub(crate) fn des_const_unsigned_char_ptr(_no: i32, _val: *const u8, _nr: i32) {}
 
-#[cfg(feature = "html")]
 pub(crate) fn gen_const_xml_char_ptr_ptr(_no: i32, _nr: i32) -> *mut *mut XmlChar {
     null_mut()
 }

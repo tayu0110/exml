@@ -22,6 +22,11 @@ use std::{
 use const_format::concatcp;
 #[cfg(feature = "c14n")]
 use exml::c14n::XmlC14NMode;
+#[cfg(feature = "html")]
+use exml::html::{
+    parser::{html_ctxt_read_file, html_new_sax_parser_ctxt, html_read_file},
+    tree::html_doc_dump_memory,
+};
 #[cfg(feature = "libxml_reader")]
 use exml::libxml::xmlreader::XmlTextReaderPtr;
 #[cfg(feature = "libxml_regexp")]
@@ -43,10 +48,6 @@ use exml::{
     globals::{
         GenericErrorContext, reset_last_error, set_generic_error,
         set_pedantic_parser_default_value, set_structured_error,
-    },
-    html::{
-        parser::{html_ctxt_read_file, html_new_sax_parser_ctxt, html_read_file},
-        tree::html_doc_dump_memory,
     },
     io::{XmlInputCallback, pop_input_callbacks, register_input_callbacks},
     libxml::{
@@ -75,7 +76,9 @@ use exml::{
 };
 #[cfg(feature = "libxml_push")]
 use libc::size_t;
-use libc::{free, malloc, memcpy, strlen};
+#[cfg(feature = "html")]
+use libc::strlen;
+use libc::{free, malloc, memcpy};
 
 /// pseudo flag for the unification of HTML and XML tests
 const XML_PARSE_HTML: i32 = 1 << 24;
@@ -1452,17 +1455,20 @@ unsafe fn sax_parse_test(
 
         #[cfg(not(feature = "html"))]
         {
-            let ctxt = XmlParserCtxt::xml_create_file_parser_ctxt(filename);
-            memcpy(
-                (*ctxt).sax,
-                addr_of_mut!(EMPTY_SAXHANDLER_STRUCT),
-                sizeof(XmlSAXHandler),
-            );
-            (*ctxt).use_options(options);
-            xml_parse_document(ctxt);
-            ret = if (*ctxt).wellFormed { 0 } else { (*ctxt).errNo };
-            xml_free_doc((*ctxt).myDoc);
-            xml_free_parser_ctxt(ctxt);
+            let mut ctxt = XmlParserCtxt::from_filename(Some(filename)).unwrap();
+            let mut sax = XmlSAXHandler::default();
+            std::ptr::copy(&EMPTY_SAXHANDLER_STRUCT, &mut sax, 1);
+            ctxt.sax = Some(Box::new(sax));
+            ctxt.use_options(options);
+            ctxt.parse_document();
+            ret = if ctxt.well_formed != 0 {
+                0
+            } else {
+                ctxt.err_no
+            };
+            if let Some(my_doc) = ctxt.my_doc.take() {
+                xml_free_doc(my_doc);
+            }
         }
 
         if ret == XmlParserErrors::XmlWarUndeclaredEntity as i32 {
@@ -1505,30 +1511,25 @@ unsafe fn sax_parse_test(
             }
             #[cfg(not(feature = "html"))]
             {
-                let ctxt = XmlParserCtxt::xml_create_file_parser_ctxt(filename);
+                let mut ctxt = XmlParserCtxt::from_filename(Some(filename)).unwrap();
+                let mut sax = XmlSAXHandler::default();
                 if options & XmlParserOption::XmlParseSAX1 as i32 != 0 {
-                    memcpy(
-                        (*ctxt).sax as _,
-                        addr_of_mut!(DEBUG_SAXHANDLER_STRUCT) as _,
-                        size_of::<XmlSAXHandler>(),
-                    );
+                    std::ptr::copy(&DEBUG_SAXHANDLER_STRUCT, &mut sax, 1);
                     options -= XmlParserOption::XmlParseSAX1 as i32;
                 } else {
-                    memcpy(
-                        (*ctxt).sax as _,
-                        addr_of_mut!(DEBUG_SAX2_HANDLER_STRUCT) as _,
-                        size_of::<XmlSAXHandler>(),
-                    );
+                    std::ptr::copy(&DEBUG_SAX2_HANDLER_STRUCT, &mut sax, 1);
                 }
-                (*ctxt).use_options(options);
-                xml_parse_document(ctxt);
-                ret = if (*ctxt).well_formed != 0 {
+                ctxt.sax = Some(Box::new(sax));
+                ctxt.use_options(options);
+                ctxt.parse_document();
+                ret = if ctxt.well_formed != 0 {
                     0
                 } else {
-                    (*ctxt).err_no
+                    ctxt.err_no
                 };
-                xml_free_doc(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap());
-                xml_free_parser_ctxt(ctxt);
+                if let Some(my_doc) = ctxt.my_doc {
+                    xml_free_doc(my_doc);
+                }
             }
             if ret == XmlParserErrors::XmlWarUndeclaredEntity as i32 {
                 sax_debugln!("xmlSAXUserParseFile returned error {}", ret);
@@ -1624,14 +1625,14 @@ unsafe fn push_parse_test(
     err: Option<String>,
     options: i32,
 ) -> i32 {
-    use exml::tree::NodeCommon;
+    #[cfg(feature = "html")]
+    use exml::{
+        encoding::XmlCharEncoding,
+        html::parser::{html_create_push_parser_ctxt, html_parse_chunk},
+        tree::NodeCommon,
+    };
 
     unsafe {
-        use exml::{
-            encoding::XmlCharEncoding,
-            html::parser::{html_create_push_parser_ctxt, html_parse_chunk},
-        };
-
         let mut base: *const c_char = null();
         let mut size: i32 = 0;
         let mut res: i32;
@@ -1666,9 +1667,9 @@ unsafe fn push_parse_test(
             XmlParserCtxt::new_push_parser(None, None, chunk, Some(filename)).unwrap()
         };
         #[cfg(not(feature = "html"))]
-        let ctxt = {
+        let mut ctxt = {
             let chunk = from_raw_parts(base.add(cur as usize) as *const u8, chunk_size as usize);
-            XmlParserCtxt::xml_create_push_parser_ctxt(None, None, chunk, filename)
+            XmlParserCtxt::new_push_parser(None, None, chunk, Some(filename)).unwrap()
         };
         ctxt.use_options(options);
         cur += chunk_size;
@@ -1749,11 +1750,8 @@ unsafe fn push_parse_test(
         }
         #[cfg(not(feature = "html"))]
         {
-            xml_doc_dump_memory(
-                doc,
-                addr_of_mut!(base) as *mut *mut XmlChar,
-                addr_of_mut!(size),
-            );
+            doc.unwrap()
+                .dump_memory(addr_of_mut!(base) as *mut *mut XmlChar, addr_of_mut!(size));
         }
         xml_free_doc(doc.unwrap());
         res = compare_file_mem(
@@ -1862,7 +1860,7 @@ fn comment_bnd(ctxt: &mut XmlParserCtxt, value: &str) {
     xml_sax2_comment(ctxt, value);
 }
 
-#[cfg(feature = "libxml_push")]
+#[cfg(all(feature = "libxml_push", feature = "html"))]
 fn start_element_bnd(ctxt: &mut XmlParserCtxt, xname: &str, atts: &[(String, Option<String>)]) {
     use exml::libxml::sax2::xml_sax2_start_element;
 
@@ -1873,7 +1871,7 @@ fn start_element_bnd(ctxt: &mut XmlParserCtxt, xname: &str, atts: &[(String, Opt
     xml_sax2_start_element(ctxt, xname, atts);
 }
 
-#[cfg(feature = "libxml_push")]
+#[cfg(all(feature = "libxml_push", feature = "html"))]
 fn end_element_bnd(ctx: &mut XmlParserCtxt, name: &str) {
     /*pushBoundaryCount++;*/
 
@@ -1930,13 +1928,17 @@ unsafe fn push_boundary_test(
     options: i32,
 ) -> i32 {
     unsafe {
+        #[cfg(feature = "html")]
         use exml::{
             encoding::XmlCharEncoding,
             html::{
                 parser::{html_create_push_parser_ctxt, html_parse_chunk},
                 tree::html_doc_dump_memory,
             },
-            libxml::sax2::{xml_sax_version, xml_sax2_init_html_default_sax_handler},
+            libxml::sax2::xml_sax2_init_html_default_sax_handler,
+        };
+        use exml::{
+            libxml::sax2::xml_sax_version,
             parser::{XmlParserInputState, XmlSAXHandler},
         };
 
@@ -1969,7 +1971,7 @@ unsafe fn push_boundary_test(
         }
         #[cfg(not(feature = "html"))]
         {
-            xml_sax_version(addr_of_mut!(bndSAX) as _, 2);
+            xml_sax_version(&mut bnd_sax, 2);
             bnd_sax.start_element_ns = Some(start_element_ns_bnd);
             bnd_sax.end_element_ns = Some(end_element_ns_bnd);
         }
@@ -2008,12 +2010,11 @@ unsafe fn push_boundary_test(
             .unwrap()
         };
         #[cfg(not(feature = "html"))]
-        let mut ctxt = XmlParserCtxt::xml_create_push_parser_ctxt(
+        let mut ctxt = XmlParserCtxt::new_push_parser(
             Some(Box::new(bnd_sax)),
-            null_mut(),
-            base,
-            1,
-            filename,
+            None,
+            &[*base as u8],
+            Some(filename),
         )
         .unwrap();
         ctxt.use_options(options);
@@ -2125,7 +2126,7 @@ unsafe fn push_boundary_test(
         }
         #[cfg(not(feature = "html"))]
         {
-            res = ctxt.wellFormed;
+            res = ctxt.well_formed;
         }
         free(base as _);
         if num_callbacks > 1 {
@@ -2164,11 +2165,8 @@ unsafe fn push_boundary_test(
         }
         #[cfg(not(feature = "html"))]
         {
-            xml_doc_dump_memory(
-                doc,
-                addr_of_mut!(base) as *mut *mut XmlChar,
-                addr_of_mut!(size),
-            );
+            doc.unwrap()
+                .dump_memory(addr_of_mut!(base) as *mut *mut XmlChar, addr_of_mut!(size));
         }
         xml_free_doc(doc.unwrap());
         res = compare_file_mem(
@@ -2341,11 +2339,7 @@ unsafe fn err_parse_test(
                 }
                 #[cfg(not(feature = "html"))]
                 {
-                    xml_doc_dump_memory(
-                        doc,
-                        addr_of_mut!(base) as *mut *mut XmlChar,
-                        addr_of_mut!(size),
-                    );
+                    doc.dump_memory(addr_of_mut!(base) as *mut *mut XmlChar, addr_of_mut!(size));
                 }
             } else {
                 base = c"".as_ptr();

@@ -29,16 +29,17 @@ use std::{
 use crate::{
     encoding::find_encoding_handler,
     error::XmlParserErrors,
-    html::tree::html_node_dump_output,
     io::XmlOutputBuffer,
     libxml::xmlstring::{XmlChar, xml_strndup},
     parser::xml_init_parser,
     save::{
-        XmlSaveCtxt, XmlSaveOption, xhtml_node_dump_output, xml_node_dump_output_internal,
-        xml_save_err, xml_save_err_memory,
+        XmlSaveCtxt, XmlSaveOption, xml_node_dump_output_internal, xml_save_err,
+        xml_save_err_memory,
     },
-    tree::{XmlNodePtr, is_xhtml},
+    tree::XmlNodePtr,
 };
+#[cfg(feature = "html")]
+use crate::{html::tree::html_node_dump_output, save::xhtml_node_dump_output, tree::is_xhtml};
 
 use super::{XmlDoc, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNode};
 
@@ -407,7 +408,7 @@ impl XmlNode {
     pub unsafe fn dump_output(
         &mut self,
         buf: XmlOutputBuffer,
-        doc: Option<XmlDocPtr>,
+        #[cfg_attr(not(feature = "html"), allow(unused))] doc: Option<XmlDocPtr>,
         level: i32,
         format: i32,
         mut encoding: Option<&str>,
@@ -453,7 +454,10 @@ impl XmlNode {
             }
             #[cfg(not(feature = "html"))]
             {
-                xml_node_dump_output_internal(addr_of_mut!(ctxt) as _, cur);
+                xml_node_dump_output_internal(
+                    &mut ctxt as _,
+                    XmlNodePtr::from_raw(self).unwrap().unwrap().into(),
+                );
             }
             ctxt.buf.flush();
         }
@@ -468,6 +472,7 @@ impl XmlNode {
             let Some(mut outbuf) = XmlOutputBuffer::from_writer(f, None) else {
                 return;
             };
+            #[cfg_attr(not(feature = "html"), allow(unused))]
             if let Some(doc) =
                 doc.filter(|doc| matches!(doc.typ, XmlElementType::XmlHTMLDocumentNode))
             {
@@ -484,8 +489,8 @@ impl XmlNode {
                 {
                     xml_save_err(
                         XmlParserErrors::XmlErrInternalError,
-                        cur,
-                        "HTML support not compiled in\n",
+                        XmlGenericNodePtr::from_raw(self),
+                        Some("HTML support not compiled in\n"),
                     );
                 }
                 outbuf.flush();
@@ -532,7 +537,7 @@ impl XmlGenericNodePtr {
     pub unsafe fn dump_output<'a>(
         self,
         buf: XmlOutputBuffer<'a>,
-        doc: Option<XmlDocPtr>,
+        #[cfg_attr(not(feature = "html"), allow(unused))] doc: Option<XmlDocPtr>,
         level: i32,
         format: i32,
         mut encoding: Option<&str>,
@@ -572,7 +577,7 @@ impl XmlGenericNodePtr {
             }
             #[cfg(not(feature = "html"))]
             {
-                xml_node_dump_output_internal(addr_of_mut!(ctxt) as _, cur);
+                xml_node_dump_output_internal(&mut ctxt as _, self);
             }
             ctxt.buf.flush();
             take(&mut ctxt.buf)
@@ -588,6 +593,7 @@ impl XmlGenericNodePtr {
             let Some(mut outbuf) = XmlOutputBuffer::from_writer(f, None) else {
                 return;
             };
+            #[cfg_attr(not(feature = "html"), allow(unused))]
             if let Some(doc) =
                 doc.filter(|doc| matches!(doc.typ, XmlElementType::XmlHTMLDocumentNode))
             {
@@ -599,8 +605,8 @@ impl XmlGenericNodePtr {
                 {
                     xml_save_err(
                         XmlParserErrors::XmlErrInternalError,
-                        cur,
-                        "HTML support not compiled in\n",
+                        Some(self),
+                        Some("HTML support not compiled in\n"),
                     );
                 }
                 outbuf.flush();

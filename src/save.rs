@@ -29,16 +29,11 @@ use std::{
     str::from_utf8_unchecked,
 };
 
-#[cfg(feature = "html")]
-use crate::tree::XmlNode;
 use crate::{
     buf::XmlBufRef,
     encoding::{XmlCharEncoding, XmlCharEncodingHandler, find_encoding_handler},
     error::{__xml_simple_error, __xml_simple_oom_error, XmlErrorDomain, XmlParserErrors},
     globals::{GLOBAL_STATE, get_indent_tree_output},
-    html::tree::{
-        html_doc_content_dump_format_output, html_get_meta_encoding, html_set_meta_encoding,
-    },
     io::XmlOutputBuffer,
     libxml::{
         chvalid::xml_is_char,
@@ -48,8 +43,15 @@ use crate::{
     tree::{
         NodeCommon, XML_LOCAL_NAMESPACE, XmlAttrPtr, XmlAttributePtr, XmlDocPtr, XmlDtdPtr,
         XmlElementPtr, XmlElementType, XmlEntityPtr, XmlGenericNodePtr, XmlNodePtr, XmlNotation,
-        XmlNsPtr, is_xhtml, xml_dump_entity_decl,
+        XmlNsPtr, xml_dump_entity_decl,
     },
+};
+#[cfg(feature = "html")]
+use crate::{
+    html::tree::{
+        html_doc_content_dump_format_output, html_get_meta_encoding, html_set_meta_encoding,
+    },
+    tree::{XmlNode, is_xhtml},
 };
 
 use super::hash::XmlHashTable;

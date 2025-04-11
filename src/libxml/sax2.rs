@@ -21,6 +21,10 @@
 
 use std::{cell::RefCell, ffi::c_void, mem::replace, rc::Rc};
 
+#[cfg(not(feature = "html"))]
+use crate::generic_error;
+#[cfg(feature = "html")]
+use crate::html::tree::html_new_doc_no_dtd;
 use crate::{
     encoding::{XmlCharEncoding, detect_encoding},
     error::{
@@ -28,7 +32,6 @@ use crate::{
         parser_warning,
     },
     globals::{StructuredError, get_register_node_func},
-    html::tree::html_new_doc_no_dtd,
     libxml::valid::xml_validate_document_final,
     parser::{
         XML_COMPLETE_ATTRS, XML_MAX_TEXT_LENGTH, XML_SAX2_MAGIC, XML_SKIP_IDS, XML_STRING_TEXT,
@@ -916,13 +919,10 @@ pub fn xml_sax2_start_document(ctxt: &mut XmlParserCtxt) {
             }
             #[cfg(not(feature = "html"))]
             {
-                xmlGenericError(
-                    xmlGenericErrorContext,
-                    "libxml2 built without HTML support\n",
-                );
-                ctxt.errNo = XmlParserErrors::XmlErrInternalError as i32;
+                generic_error!("libxml2 built without HTML support\n",);
+                ctxt.err_no = XmlParserErrors::XmlErrInternalError as i32;
                 ctxt.instate = XmlParserInputState::XmlParserEOF;
-                ctxt.disableSAX = 1;
+                ctxt.disable_sax = 1;
                 return;
             }
         } else {
@@ -1129,7 +1129,9 @@ unsafe fn xml_sax2_attribute_internal(
     value: Option<&str>,
     prefix: Option<&str>,
 ) {
-    use crate::{html::tree::html_is_boolean_attr, parser::XML_SKIP_IDS, uri::XmlURI};
+    #[cfg(feature = "html")]
+    use crate::html::tree::html_is_boolean_attr;
+    use crate::{parser::XML_SKIP_IDS, uri::XmlURI};
 
     unsafe {
         let (ns, name) = if ctxt.html != 0 {

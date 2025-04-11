@@ -33,8 +33,17 @@ use clap::Parser;
 use exml::c14n::{XmlC14NMode, xml_c14n_doc_dump_memory};
 #[cfg(feature = "libxml_debug")]
 use exml::debug_xml::{xml_debug_dump_document, xml_debug_dump_entities, xml_shell};
-#[cfg(feature = "libxml_push")]
+#[cfg(all(feature = "libxml_push", feature = "html"))]
 use exml::html::parser::{html_create_push_parser_ctxt, html_parse_chunk};
+#[cfg(feature = "html")]
+use exml::html::{
+    HtmlParserCtxtPtr,
+    parser::{
+        HtmlParserOption, html_ctxt_use_options, html_free_parser_ctxt, html_read_file,
+        html_read_memory,
+    },
+    tree::{html_doc_dump, html_save_file_format},
+};
 #[cfg(feature = "catalog")]
 use exml::libxml::catalog::xml_load_catalogs;
 #[cfg(feature = "libxml_reader")]
@@ -57,14 +66,6 @@ use exml::{
         GenericError, GenericErrorContext, get_load_ext_dtd_default_value,
         set_deregister_node_func, set_load_ext_dtd_default_value, set_parser_debug_entities,
         set_register_node_func, set_tree_indent_string,
-    },
-    html::{
-        HtmlParserCtxtPtr,
-        parser::{
-            HtmlParserOption, html_ctxt_use_options, html_free_parser_ctxt, html_read_file,
-            html_read_memory,
-        },
-        tree::{html_doc_dump, html_save_file_format},
     },
     io::XmlParserInputBuffer,
     libxml::{
@@ -440,6 +441,7 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
     if cmd_args.nodict {
         OPTIONS.fetch_or(XmlParserOption::XmlParseNoDict as i32, Ordering::Relaxed);
     }
+    #[cfg(feature = "html")]
     if cmd_args.nodefdtd {
         OPTIONS.fetch_or(
             HtmlParserOption::HtmlParseNodefdtd as i32,
@@ -2799,7 +2801,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: Option<XmlParserC
         }
 
         match () {
-            #[cfg(feature = "libxml_valid")]
+            #[cfg(all(feature = "libxml_valid", feature = "html"))]
             _ if CMD_ARGS.insert && !CMD_ARGS.html => {
                 let mut list = [const { Cow::Borrowed("") }; 256];
 
@@ -2840,9 +2842,9 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: Option<XmlParserC
                 if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
                     start_timer();
                 }
-                if cfg!(feature = "html") && CMD_ARGS.html && !CMD_ARGS.xmlout {
+                match () {
                     #[cfg(feature = "html")]
-                    {
+                    _ if CMD_ARGS.html && !CMD_ARGS.xmlout => {
                         // if COMPRESS != 0 {
                         //     let o = OUTPUT
                         //         .lock()
@@ -2880,9 +2882,8 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: Option<XmlParserC
                             end_timer!("Saving");
                         }
                     }
-                } else if cfg!(feature = "c14n") && CMD_ARGS.c14n {
                     #[cfg(feature = "c14n")]
-                    {
+                    _ if CMD_ARGS.c14n => {
                         let mut result = String::new();
 
                         let size = xml_c14n_doc_dump_memory(
@@ -2900,9 +2901,8 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: Option<XmlParserC
                             PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
                         }
                     }
-                } else if cfg!(feature = "c14n") && CMD_ARGS.c14n11 {
                     #[cfg(feature = "c14n")]
-                    {
+                    _ if CMD_ARGS.c14n11 => {
                         let mut result = String::new();
 
                         let size: i32 = xml_c14n_doc_dump_memory(
@@ -2920,9 +2920,8 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: Option<XmlParserC
                             PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
                         }
                     }
-                } else if cfg!(feature = "c14n") && CMD_ARGS.exc_c14n {
                     #[cfg(feature = "c14n")]
-                    {
+                    _ if CMD_ARGS.exc_c14n => {
                         let mut result = String::new();
 
                         let size: i32 = xml_c14n_doc_dump_memory(
@@ -2940,72 +2939,70 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: Option<XmlParserC
                             PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
                         }
                     }
-                } else if CMD_ARGS.memory {
-                    let mut result: *mut XmlChar = null_mut();
-                    let mut len: i32 = 0;
+                    _ if CMD_ARGS.memory => {
+                        let mut result: *mut XmlChar = null_mut();
+                        let mut len: i32 = 0;
 
-                    if let Some(encoding) = CMD_ARGS.encode.as_deref() {
-                        if CMD_ARGS.format {
-                            (*doc).dump_format_memory_enc(
-                                addr_of_mut!(result),
-                                addr_of_mut!(len),
-                                Some(encoding),
-                                1,
-                            );
+                        if let Some(encoding) = CMD_ARGS.encode.as_deref() {
+                            if CMD_ARGS.format {
+                                (*doc).dump_format_memory_enc(
+                                    addr_of_mut!(result),
+                                    addr_of_mut!(len),
+                                    Some(encoding),
+                                    1,
+                                );
+                            } else {
+                                (*doc).dump_memory_enc(
+                                    addr_of_mut!(result),
+                                    addr_of_mut!(len),
+                                    Some(encoding),
+                                );
+                            }
+                        } else if CMD_ARGS.format {
+                            (*doc).dump_format_memory(addr_of_mut!(result), addr_of_mut!(len), 1);
                         } else {
-                            (*doc).dump_memory_enc(
-                                addr_of_mut!(result),
-                                addr_of_mut!(len),
-                                Some(encoding),
-                            );
+                            (*doc).dump_memory(addr_of_mut!(result), addr_of_mut!(len));
                         }
-                    } else if CMD_ARGS.format {
-                        (*doc).dump_format_memory(addr_of_mut!(result), addr_of_mut!(len), 1);
-                    } else {
-                        (*doc).dump_memory(addr_of_mut!(result), addr_of_mut!(len));
-                    }
-                    if result.is_null() {
-                        eprintln!("Failed to save");
-                        PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
-                    } else {
-                        if write(1, result as _, len as _) == -1 {
-                            eprintln!("Can't write data");
+                        if result.is_null() {
+                            eprintln!("Failed to save");
+                            PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
+                        } else {
+                            if write(1, result as _, len as _) == -1 {
+                                eprintln!("Can't write data");
+                            }
+                            xml_free(result as _);
                         }
-                        xml_free(result as _);
                     }
-                // } else if COMPRESS != 0 {
-                //     let o = OUTPUT.lock().unwrap();
-                //     let o = o.as_deref().unwrap_or(c"-");
-                //     (*doc).save_file(o.to_string_lossy().as_ref());
-                } else {
-                    let mut save_opts: i32 = 0;
+                    _ => {
+                        let mut save_opts: i32 = 0;
 
-                    if CMD_ARGS.format {
-                        save_opts |= XmlSaveOption::XmlSaveFormat as i32;
-                    } else if CMD_ARGS.pretty == Some(2) {
-                        save_opts |= XmlSaveOption::XmlSaveWsNonSig as i32;
-                    }
+                        if CMD_ARGS.format {
+                            save_opts |= XmlSaveOption::XmlSaveFormat as i32;
+                        } else if CMD_ARGS.pretty == Some(2) {
+                            save_opts |= XmlSaveOption::XmlSaveWsNonSig as i32;
+                        }
 
-                    #[cfg(any(feature = "html", feature = "libxml_valid"))]
-                    if CMD_ARGS.xmlout {
-                        save_opts |= XmlSaveOption::XmlSaveAsXML as i32;
-                    }
+                        #[cfg(all(feature = "html", feature = "libxml_valid"))]
+                        if CMD_ARGS.xmlout {
+                            save_opts |= XmlSaveOption::XmlSaveAsXML as i32;
+                        }
 
-                    let encoding = CMD_ARGS.encode.as_deref();
-                    let ctxt = if let Some(o) = CMD_ARGS.output.as_deref() {
-                        XmlSaveCtxt::save_to_filename(o, encoding, save_opts)
-                    } else {
-                        XmlSaveCtxt::save_to_io(stdout(), encoding, save_opts)
-                    };
+                        let encoding = CMD_ARGS.encode.as_deref();
+                        let ctxt = if let Some(o) = CMD_ARGS.output.as_deref() {
+                            XmlSaveCtxt::save_to_filename(o, encoding, save_opts)
+                        } else {
+                            XmlSaveCtxt::save_to_io(stdout(), encoding, save_opts)
+                        };
 
-                    if let Some(mut ctxt) = ctxt {
-                        if ctxt.save_doc(doc) < 0 {
-                            let o = CMD_ARGS.output.as_deref().unwrap_or("-");
-                            eprintln!("failed save to {o}");
+                        if let Some(mut ctxt) = ctxt {
+                            if ctxt.save_doc(doc) < 0 {
+                                let o = CMD_ARGS.output.as_deref().unwrap_or("-");
+                                eprintln!("failed save to {o}");
+                                PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
+                            }
+                        } else {
                             PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
                         }
-                    } else {
-                        PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
                     }
                 }
                 if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
@@ -3237,10 +3234,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: Option<XmlParserC
             }
         }
 
-        #[cfg(all(
-            feature = "libxml_debug",
-            any(feature = "html", feature = "libxml_valid")
-        ))]
+        #[cfg(all(feature = "libxml_debug", feature = "html", feature = "libxml_valid"))]
         if CMD_ARGS.debugent && !CMD_ARGS.html {
             xml_debug_dump_entities(stderr(), Some(doc));
         }
