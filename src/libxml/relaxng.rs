@@ -33,6 +33,8 @@ use std::{
 
 use libc::{memcpy, memset, snprintf};
 
+#[cfg(feature = "libxml_regexp")]
+use crate::libxml::xmlregexp::{XmlRegExecCtxt, XmlRegExecCtxtPtr, XmlRegexp};
 use crate::{
     error::XmlParserErrors,
     globals::{GenericError, GenericErrorContext, StructuredError},
@@ -43,7 +45,6 @@ use crate::{
             XmlHashTablePtr, xml_hash_add_entry2, xml_hash_create, xml_hash_free, xml_hash_lookup2,
         },
         valid::{XmlValidCtxt, xml_validate_document_final},
-        xmlregexp::XmlRegExecCtxtPtr,
         xmlstring::{XmlChar, xml_str_equal, xml_strdup, xml_strlen},
     },
     parser::{split_qname2, xml_read_file, xml_read_memory},
@@ -69,7 +70,6 @@ use crate::{
 use super::{
     chvalid::xml_is_blank_char,
     xmlautomata::XmlAutomata,
-    xmlregexp::{XmlRegExecCtxt, XmlRegexp},
     xmlstring::{xml_strncat, xml_strndup},
 };
 

@@ -22,6 +22,8 @@
 
 use std::{any::type_name, ffi::c_void, ptr::drop_in_place, rc::Rc};
 
+#[cfg(feature = "libxml_regexp")]
+use crate::libxml::xmlregexp::XmlRegexp;
 use crate::{
     tree::XmlNodePtr,
     xmlschemas::{
@@ -32,7 +34,6 @@ use crate::{
 
 use super::{
     globals::xml_free,
-    xmlregexp::XmlRegexp,
     xmlschemastypes::{XmlSchemaValPtr, xml_schema_free_facet},
 };
 

@@ -31,6 +31,10 @@ use std::{
 use clap::Parser;
 #[cfg(feature = "c14n")]
 use exml::c14n::{XmlC14NMode, xml_c14n_doc_dump_memory};
+#[cfg(feature = "libxml_debug")]
+use exml::debug_xml::{xml_debug_dump_document, xml_debug_dump_entities, xml_shell};
+#[cfg(feature = "libxml_push")]
+use exml::html::parser::{html_create_push_parser_ctxt, html_parse_chunk};
 #[cfg(feature = "catalog")]
 use exml::libxml::catalog::xml_load_catalogs;
 #[cfg(feature = "libxml_reader")]
@@ -46,7 +50,6 @@ use exml::xinclude::xml_xinclude_process_flags;
 #[cfg(feature = "schema")]
 use exml::xmlschemas::schema::XmlSchema;
 use exml::{
-    debug_xml::{xml_debug_dump_document, xml_debug_dump_entities, xml_shell},
     encoding::{XmlCharEncoding, add_encoding_alias},
     error::generic_error_default,
     generic_error,
@@ -58,8 +61,8 @@ use exml::{
     html::{
         HtmlParserCtxtPtr,
         parser::{
-            HtmlParserOption, html_create_push_parser_ctxt, html_ctxt_use_options,
-            html_free_parser_ctxt, html_parse_chunk, html_read_file, html_read_memory,
+            HtmlParserOption, html_ctxt_use_options, html_free_parser_ctxt, html_read_file,
+            html_read_memory,
         },
         tree::{html_doc_dump, html_save_file_format},
     },
@@ -415,7 +418,7 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
             );
         }
     }
-
+    #[cfg(feature = "libxml_debug")]
     if cmd_args.shell {
         cmd_args.noout = true;
     }
@@ -471,6 +474,7 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
             Ordering::Relaxed,
         );
     }
+    #[cfg(feature = "libxml_push")]
     if cmd_args.pushsmall {
         PUSHSIZE.store(10, Ordering::Relaxed);
     }
@@ -507,6 +511,7 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
             Ordering::Relaxed,
         );
     }
+    #[cfg(feature = "libxml_debug")]
     if cmd_args.debugent {
         set_parser_debug_entities(1);
     }

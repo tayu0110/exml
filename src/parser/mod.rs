@@ -50,8 +50,8 @@ mod legacy;
 mod loader;
 mod node_info;
 mod parse;
-mod push;
 #[cfg(feature = "libxml_push")]
+mod push;
 mod qname;
 mod sax;
 mod valid;
@@ -92,7 +92,6 @@ pub use legacy::*;
 pub use loader::*;
 pub use node_info::*;
 pub use parse::*;
-#[cfg(feature = "libxml_push")]
 pub use qname::*;
 pub use sax::*;
 

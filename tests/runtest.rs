@@ -73,7 +73,9 @@ use exml::{
     uri::{XmlURI, build_uri, normalize_uri_path},
     xpath::XmlXPathObjectPtr,
 };
-use libc::{free, malloc, memcpy, size_t, strlen};
+#[cfg(feature = "libxml_push")]
+use libc::size_t;
+use libc::{free, malloc, memcpy, strlen};
 
 /// pseudo flag for the unification of HTML and XML tests
 const XML_PARSE_HTML: i32 = 1 << 24;

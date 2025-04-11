@@ -21,10 +21,12 @@
 //
 // daniel@veillard.com
 
+#[cfg(feature = "libxml_push")]
+use std::ffi::c_char;
 use std::{
     borrow::Cow,
     cell::RefCell,
-    ffi::{CStr, c_char},
+    ffi::CStr,
     io::Read,
     os::raw::c_void,
     ptr::{addr_of_mut, null_mut},
@@ -33,7 +35,9 @@ use std::{
     sync::atomic::{AtomicI32, Ordering},
 };
 
-use libc::{INT_MAX, memcpy, size_t};
+#[cfg(feature = "libxml_push")]
+use libc::INT_MAX;
+use libc::{memcpy, size_t};
 
 use crate::{
     encoding::{XmlCharEncoding, detect_encoding, find_encoding_handler},
@@ -62,9 +66,11 @@ use crate::{
     uri::canonic_path,
 };
 
+#[cfg(feature = "libxml_push")]
+use super::HtmlParserInput;
 use super::{
-    HtmlDocPtr, HtmlNodePtr, HtmlParserCtxt, HtmlParserCtxtPtr, HtmlParserInput,
-    HtmlParserNodeInfo, HtmlSAXHandler, taginfo::*,
+    HtmlDocPtr, HtmlNodePtr, HtmlParserCtxt, HtmlParserCtxtPtr, HtmlParserNodeInfo, HtmlSAXHandler,
+    taginfo::*,
 };
 
 #[doc(alias = "htmlInitAutoClose")]
