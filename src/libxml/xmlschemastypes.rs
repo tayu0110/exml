@@ -53,9 +53,10 @@ use crate::{
         },
         xmlstring::{XmlChar, xml_str_equal, xml_strcat, xml_strcmp, xml_strdup, xml_strndup},
     },
+    parser::split_qname2,
     tree::{
         XmlAttrPtr, XmlAttributeType, XmlEntityType, XmlGenericNodePtr, validate_name,
-        validate_ncname, validate_nmtoken, validate_qname, xml_get_doc_entity, xml_split_qname2,
+        validate_ncname, validate_nmtoken, validate_qname, xml_get_doc_entity,
     },
     uri::XmlURI,
     xmlschemas::{
@@ -2805,20 +2806,15 @@ unsafe fn xml_schema_val_atomic_type(
                                         break 'done;
                                     }
                                     if let Some(node) = node {
-                                        let mut prefix: *mut XmlChar = null_mut();
-
-                                        local = xml_split_qname2(value, addr_of_mut!(prefix));
-                                        let ns = node.search_ns(
-                                            node.document(),
-                                            (!prefix.is_null())
-                                                .then(|| {
-                                                    CStr::from_ptr(prefix as *const i8)
-                                                        .to_string_lossy()
-                                                })
-                                                .as_deref(),
-                                        );
-                                        if ns.is_none() && !prefix.is_null() {
-                                            xml_free(prefix as _);
+                                        let mut prefix = None;
+                                        let qname =
+                                            CStr::from_ptr(value as *const i8).to_string_lossy();
+                                        if let Some((pre, loc)) = split_qname2(&qname) {
+                                            prefix = Some(pre);
+                                            local = xml_strndup(loc.as_ptr(), loc.len() as i32);
+                                        }
+                                        let ns = node.search_ns(node.document(), prefix);
+                                        if ns.is_none() && prefix.is_some() {
                                             if !local.is_null() {
                                                 xml_free(local as _);
                                             }
@@ -2826,9 +2822,6 @@ unsafe fn xml_schema_val_atomic_type(
                                         }
                                         if let Some(ns) = ns {
                                             uri = ns.href.clone();
-                                        }
-                                        if !prefix.is_null() {
-                                            xml_free(prefix as _);
                                         }
                                     }
                                     if !val.is_null() {
@@ -3086,18 +3079,13 @@ unsafe fn xml_schema_val_atomic_type(
                                     )
                                     .is_err() as i32;
                                     if let Some(node) = node.filter(|_| ret == 0) {
-                                        let mut prefix: *mut XmlChar = null_mut();
-
-                                        local = xml_split_qname2(value, addr_of_mut!(prefix));
-                                        if !prefix.is_null() {
-                                            if let Some(ns) = node.search_ns(
-                                                node.document(),
-                                                Some(
-                                                    CStr::from_ptr(prefix as *const i8)
-                                                        .to_string_lossy()
-                                                        .as_ref(),
-                                                ),
-                                            ) {
+                                        if let Some((prefix, loc)) = split_qname2(
+                                            &CStr::from_ptr(value as *const i8).to_string_lossy(),
+                                        ) {
+                                            local = xml_strndup(loc.as_ptr(), loc.len() as i32);
+                                            if let Some(ns) =
+                                                node.search_ns(node.document(), Some(prefix))
+                                            {
                                                 if !val.is_null() {
                                                     uri = ns.href.clone();
                                                 }
@@ -3107,9 +3095,6 @@ unsafe fn xml_schema_val_atomic_type(
                                         }
                                         if !local.is_null() && (val.is_null() || ret != 0) {
                                             xml_free(local as _);
-                                        }
-                                        if !prefix.is_null() {
-                                            xml_free(prefix as _);
                                         }
                                     }
                                     if let Some(doc) = node.and_then(|node| node.document()) {

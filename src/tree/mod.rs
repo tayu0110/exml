@@ -47,11 +47,7 @@ use std::{
 use crate::{
     error::{__xml_simple_error, __xml_simple_oom_error, XmlErrorDomain, XmlParserErrors},
     globals::{get_deregister_node_func, get_register_node_func},
-    libxml::{
-        chvalid::xml_is_blank_char,
-        globals::xml_free,
-        xmlstring::{XmlChar, xml_strdup, xml_strndup},
-    },
+    libxml::chvalid::xml_is_blank_char,
     parser::{XML_STRING_COMMENT, XML_STRING_TEXT},
 };
 
@@ -523,66 +519,6 @@ pub fn validate_nmtoken<const ALLOW_SPACE: bool>(value: &str) -> Result<(), &'st
 #[doc(alias = "xmlTreeErrMemory")]
 fn xml_tree_err_memory(extra: &str) {
     __xml_simple_oom_error(XmlErrorDomain::XmlFromTree, None, Some(extra));
-}
-
-/// Parse an XML qualified name string
-///
-/// ```text
-/// [NS 5] QName ::= (Prefix ':')? LocalPart
-///
-/// [NS 6] Prefix ::= NCName
-///
-/// [NS 7] LocalPart ::= NCName
-/// ```
-///
-/// Returns NULL if the name doesn't have a prefix. Otherwise, returns the
-/// local part, and prefix is updated to get the Prefix. Both the return value
-/// and the prefix must be freed by the caller.
-#[doc(alias = "xmlSplitQName2")]
-pub unsafe fn xml_split_qname2(name: *const XmlChar, prefix: *mut *mut XmlChar) -> *mut XmlChar {
-    unsafe {
-        let mut len: i32 = 0;
-
-        if prefix.is_null() {
-            return null_mut();
-        }
-        *prefix = null_mut();
-        if name.is_null() {
-            return null_mut();
-        }
-
-        // nasty but valid
-        if *name.add(0) == b':' {
-            return null_mut();
-        }
-
-        // we are not trying to validate but just to cut, and yes it will
-        // work even if this is as set of UTF-8 encoded chars
-        while *name.add(len as usize) != 0 && *name.add(len as usize) != b':' {
-            len += 1;
-        }
-
-        if *name.add(len as usize) == 0 {
-            return null_mut();
-        }
-
-        *prefix = xml_strndup(name, len) as _;
-        if (*prefix).is_null() {
-            xml_tree_err_memory("QName split");
-            return null_mut();
-        }
-        let ret: *mut XmlChar = xml_strdup(name.add(len as usize + 1) as _) as _;
-        if ret.is_null() {
-            xml_tree_err_memory("QName split");
-            if !(*prefix).is_null() {
-                xml_free(*prefix as _);
-                *prefix = null_mut();
-            }
-            return null_mut();
-        }
-
-        ret
-    }
 }
 
 /// This function tries to locate a namespace definition in a tree
@@ -2086,37 +2022,6 @@ mod tests {
                     leaks == 0,
                     "{leaks} Leaks are found in xmlGetCompressMode()"
                 );
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_split_qname2() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                for n_prefix in 0..GEN_NB_XML_CHAR_PTR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let name = gen_const_xml_char_ptr(n_name, 0);
-                    let prefix = gen_xml_char_ptr_ptr(n_prefix, 1);
-
-                    let ret_val = xml_split_qname2(name as *const XmlChar, prefix);
-                    desret_xml_char_ptr(ret_val);
-                    des_const_xml_char_ptr(n_name, name, 0);
-                    des_xml_char_ptr_ptr(n_prefix, prefix, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlSplitQName2",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlSplitQName2()");
-                        eprint!(" {}", n_name);
-                        eprintln!(" {}", n_prefix);
-                    }
-                }
             }
         }
     }

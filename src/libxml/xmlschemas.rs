@@ -111,7 +111,6 @@ use crate::{
         XmlElementContent, XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType,
         XmlEnumeration, XmlGenericNodePtr, XmlNodePtr, validate_ncname, validate_qname,
         xml_free_doc, xml_free_node, xml_new_doc_text, xml_new_ns, xml_new_ns_prop, xml_new_prop,
-        xml_split_qname2,
     },
     uri::build_uri,
     xmlschemas::{
@@ -1111,7 +1110,7 @@ unsafe fn xml_schema_validate_notation(
     vctxt: XmlSchemaValidCtxtPtr,
     schema: XmlSchemaPtr,
     node: Option<XmlGenericNodePtr>,
-    value: *const XmlChar,
+    value: &str,
     val: *mut XmlSchemaValPtr,
     val_needed: i32,
 ) -> i32 {
@@ -1126,58 +1125,29 @@ unsafe fn xml_schema_validate_notation(
             );
             return -1;
         }
-        if validate_qname::<true>(
-            CStr::from_ptr(value as *const i8)
-                .to_string_lossy()
-                .as_ref(),
-        )
-        .is_err()
-        {
+        if validate_qname::<true>(value).is_err() {
             return 1;
         }
-        let mut prefix: *mut XmlChar = null_mut();
-        let local_name: *mut XmlChar = xml_split_qname2(value, &raw mut prefix);
-        if !prefix.is_null() {
+        if let Some((prefix, local_name)) = split_qname2(value) {
             let mut ns_name = None;
 
             if !vctxt.is_null() {
-                ns_name = (*vctxt).lookup_namespace(
-                    (!prefix.is_null())
-                        .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
-                        .as_deref(),
-                );
+                ns_name = (*vctxt).lookup_namespace(Some(prefix));
             } else if let Some(node) = node {
-                let ns = node.search_ns(
-                    node.document(),
-                    (!prefix.is_null())
-                        .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
-                        .as_deref(),
-                );
+                let ns = node.search_ns(node.document(), Some(prefix));
                 if let Some(ns) = ns {
                     ns_name = ns.href.as_deref().map(|href| href.to_owned());
                 }
             } else {
-                xml_free(prefix as _);
-                xml_free(local_name as _);
                 return 1;
             }
             let Some(ns_name) = ns_name else {
-                xml_free(prefix as _);
-                xml_free(local_name as _);
                 return 1;
             };
-            if !(*schema)
-                .get_notation(
-                    CStr::from_ptr(local_name as *const i8)
-                        .to_string_lossy()
-                        .as_ref(),
-                    Some(&ns_name),
-                )
-                .is_null()
-            {
+            if !(*schema).get_notation(local_name, Some(&ns_name)).is_null() {
                 if val_needed != 0 && !val.is_null() {
                     *val = xml_schema_new_notation_value(
-                        xml_strdup(local_name),
+                        xml_strndup(local_name.as_ptr(), local_name.len() as i32),
                         xml_strndup(ns_name.as_ptr(), ns_name.len() as i32),
                     );
                     if (*val).is_null() {
@@ -1187,19 +1157,12 @@ unsafe fn xml_schema_validate_notation(
             } else {
                 ret = 1;
             }
-            xml_free(prefix as _);
-            xml_free(local_name as _);
-        } else if !(*schema)
-            .get_notation(
-                CStr::from_ptr(value as *const i8)
-                    .to_string_lossy()
-                    .as_ref(),
-                None,
-            )
-            .is_null()
-        {
+        } else if !(*schema).get_notation(value, None).is_null() {
             if val_needed != 0 && !val.is_null() {
-                *val = xml_schema_new_notation_value(xml_strdup(value), null_mut());
+                *val = xml_schema_new_notation_value(
+                    xml_strndup(value.as_ptr(), value.len() as i32),
+                    null_mut(),
+                );
                 if (*val).is_null() {
                     ret = -1;
                 }
@@ -1213,22 +1176,14 @@ unsafe fn xml_schema_validate_notation(
 
 unsafe fn xml_schema_validate_qname(
     vctxt: XmlSchemaValidCtxtPtr,
-    value: *const XmlChar,
+    value: &str,
     val: *mut XmlSchemaValPtr,
     val_needed: i32,
 ) -> i32 {
     unsafe {
         let mut ret = 0;
-        let mut local: *mut XmlChar;
-        let mut prefix: *mut XmlChar = null_mut();
 
-        if validate_qname::<true>(
-            CStr::from_ptr(value as *const i8)
-                .to_string_lossy()
-                .as_ref(),
-        )
-        .is_err()
-        {
+        if validate_qname::<true>(value).is_err() {
             if ret == -1 {
                 VERROR_INT!(
                     vctxt,
@@ -1241,37 +1196,23 @@ unsafe fn xml_schema_validate_qname(
         }
         // NOTE: xmlSplitQName2 will always return a duplicated strings.
         // TODO: Export and use xmlSchemaStrip instead
-        let stripped: *mut XmlChar = xml_schema_collapse_string(
-            CStr::from_ptr(value as *const i8)
-                .to_string_lossy()
-                .as_ref(),
-        )
-        .map_or(null_mut(), |res| {
-            xml_strndup(res.as_ptr(), res.len() as i32)
-        });
-        local = xml_split_qname2(
-            if !stripped.is_null() { stripped } else { value },
-            &raw mut prefix,
-        );
-        xml_free(stripped as _);
-        if local.is_null() {
-            local = xml_strdup(value);
+        let loc = value;
+        let stripped = xml_schema_collapse_string(loc);
+        let mut prefix = None;
+        let mut local = loc;
+        if let Some((pre, loc)) = split_qname2(stripped.as_deref().unwrap_or(loc.as_ref())) {
+            prefix = Some(pre);
+            local = loc;
         }
         // OPTIMIZE TODO: Use flags for:
         //  - is there any namespace binding?
         //  - is there a default namespace?
-        let ns_name = (*vctxt).lookup_namespace(
-            (!prefix.is_null())
-                .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
-                .as_deref(),
-        );
+        let ns_name = (*vctxt).lookup_namespace(prefix);
 
-        if !prefix.is_null() {
-            xml_free(prefix as _);
+        if prefix.is_some() {
             // A namespace must be found if the prefix is NOT NULL.
             if ns_name.is_none() {
                 ret = XmlParserErrors::XmlSchemavCvcDatatypeValid1_2_1 as i32;
-                let value = CStr::from_ptr(value as *const i8).to_string_lossy();
                 xml_schema_custom_err(
                     vctxt as XmlSchemaAbstractCtxtPtr,
                     XmlParserErrors::try_from(ret).unwrap(),
@@ -1282,12 +1223,9 @@ unsafe fn xml_schema_validate_qname(
                         value
                     )
                     .as_str(),
-                    Some(&value),
+                    Some(value),
                     None,
                 );
-                if !local.is_null() {
-                    xml_free(local as _);
-                }
                 return ret;
             }
         }
@@ -1295,13 +1233,14 @@ unsafe fn xml_schema_validate_qname(
             if let Some(ns_name) = ns_name {
                 *val = xml_schema_new_qname_value(
                     xml_strndup(ns_name.as_ptr(), ns_name.len() as i32),
-                    local,
+                    xml_strndup(local.as_ptr(), local.len() as i32),
                 );
             } else {
-                *val = xml_schema_new_qname_value(null_mut(), local);
+                *val = xml_schema_new_qname_value(
+                    null_mut(),
+                    xml_strndup(local.as_ptr(), local.len() as i32),
+                );
             }
-        } else {
-            xml_free(local as _);
         }
         0
     }
@@ -1996,7 +1935,7 @@ pub(crate) unsafe fn xml_schema_vcheck_cvc_simple_type(
                                 actxt as XmlSchemaValidCtxtPtr,
                                 (*(actxt as XmlSchemaValidCtxtPtr)).schema,
                                 None,
-                                value,
+                                &CStr::from_ptr(value as *const i8).to_string_lossy(),
                                 &raw mut val,
                                 val_needed,
                             );
@@ -2004,7 +1943,7 @@ pub(crate) unsafe fn xml_schema_vcheck_cvc_simple_type(
                         Ok(XmlSchemaValType::XmlSchemasQName) => {
                             ret = xml_schema_validate_qname(
                                 actxt as XmlSchemaValidCtxtPtr,
-                                value,
+                                &CStr::from_ptr(value as *const i8).to_string_lossy(),
                                 &raw mut val,
                                 val_needed,
                             );
@@ -2035,7 +1974,7 @@ pub(crate) unsafe fn xml_schema_vcheck_cvc_simple_type(
                                 null_mut(),
                                 (*(actxt as XmlSchemaParserCtxtPtr)).schema,
                                 node,
-                                value,
+                                &CStr::from_ptr(value as *const i8).to_string_lossy(),
                                 &raw mut val,
                                 val_needed,
                             );
@@ -14443,40 +14382,38 @@ unsafe fn xml_schema_vexpand_qname(
             );
             return 1;
         }
-        let mut prefix: *mut XmlChar = null_mut();
 
         // NOTE: xmlSplitQName2 will return a duplicated string.
-        let local: *mut XmlChar = xml_split_qname2(value, &raw mut prefix);
-        if local.is_null() {
-            *local_name = xml_dict_lookup((*vctxt).dict, value, -1);
+        let value = CStr::from_ptr(value as *const i8).to_string_lossy();
+        let mut prefix = None;
+        if let Some((pre, local)) = split_qname2(&value) {
+            prefix = Some(pre);
+            *local_name = xml_dict_lookup((*vctxt).dict, local.as_ptr(), local.len() as i32);
         } else {
-            *local_name = xml_dict_lookup((*vctxt).dict, local, -1);
-            xml_free(local as _);
+            *local_name = xml_dict_lookup((*vctxt).dict, value.as_ptr(), value.len() as i32);
         }
 
-        if let Some(href) = (*vctxt).lookup_namespace(
-            (!prefix.is_null())
-                .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
-                .as_deref(),
-        ) {
+        if let Some(href) = (*vctxt).lookup_namespace(prefix) {
             *ns_name = xml_dict_lookup((*vctxt).dict, href.as_ptr(), href.len() as i32);
         }
 
-        if !prefix.is_null() {
-            xml_free(prefix as _);
+        if prefix.is_some() {
             // A namespace must be found if the prefix is NOT NULL.
             if (*ns_name).is_null() {
-                let value = CStr::from_ptr(value as *const i8).to_string_lossy();
                 xml_schema_custom_err(
-                vctxt as XmlSchemaAbstractCtxtPtr,
-                XmlParserErrors::XmlSchemavCvcDatatypeValid1_2_1,
-                None,
-                xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasQName)
-                    as XmlSchemaBasicItemPtr,
-                format!("The QName value '{value}' has no corresponding namespace declaration in scope").as_str(),
-                Some(&value),
-                None,
-            );
+                    vctxt as XmlSchemaAbstractCtxtPtr,
+                    XmlParserErrors::XmlSchemavCvcDatatypeValid1_2_1,
+                    None,
+                    xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasQName)
+                        as XmlSchemaBasicItemPtr,
+                    format!(
+                        "The QName value '{}' has no corresponding namespace declaration in scope",
+                        value
+                    )
+                    .as_str(),
+                    Some(&value),
+                    None,
+                );
                 return 2;
             }
         }
