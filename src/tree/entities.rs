@@ -1065,7 +1065,7 @@ fn xml_dump_entity_content<'a>(buf: &mut (impl Write + 'a), content: &str) {
         let mut cur = content;
         while let Some(pos) = cur.find(['"', '%']) {
             let (head, tail) = cur.split_at(pos);
-            write!(buf, "{head}");
+            write!(buf, "{head}").ok();
             if tail.starts_with('"') {
                 write!(buf, "&quot;").ok();
             } else {

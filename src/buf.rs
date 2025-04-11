@@ -22,7 +22,7 @@ use std::{
 use anyhow::{bail, ensure};
 
 use crate::{
-    error::{__xml_simple_error, __xml_simple_oom_error, XmlErrorDomain, XmlParserErrors},
+    error::{__xml_simple_oom_error, XmlErrorDomain, XmlParserErrors},
     globals::GLOBAL_STATE,
     parser::XML_MAX_TEXT_LENGTH,
     tree::{BASE_BUFFER_SIZE, XmlBufferAllocationScheme},
@@ -35,21 +35,21 @@ fn xml_buf_memory_error(buf: &mut XmlBuf, extra: &str) {
     }
 }
 
-/// Handle a buffer overflow error
-/// To be improved...
-#[doc(alias = "xmlBufOverflowError")]
-pub(crate) fn xml_buf_overflow_error(buf: &mut XmlBuf, extra: &str) {
-    __xml_simple_error!(
-        XmlErrorDomain::XmlFromBuffer,
-        XmlParserErrors::XmlBufOverflow,
-        None,
-        None,
-        extra
-    );
-    if buf.is_ok() {
-        buf.error = XmlParserErrors::XmlBufOverflow;
-    }
-}
+// /// Handle a buffer overflow error
+// /// To be improved...
+// #[doc(alias = "xmlBufOverflowError")]
+// pub(crate) fn xml_buf_overflow_error(buf: &mut XmlBuf, extra: &str) {
+//     __xml_simple_error!(
+//         XmlErrorDomain::XmlFromBuffer,
+//         XmlParserErrors::XmlBufOverflow,
+//         None,
+//         None,
+//         extra
+//     );
+//     if buf.is_ok() {
+//         buf.error = XmlParserErrors::XmlBufOverflow;
+//     }
+// }
 
 #[derive(Debug, Clone)]
 pub struct XmlBuf {
@@ -143,9 +143,9 @@ impl XmlBuf {
         self.len() == 0
     }
 
-    pub(crate) fn capacity(&self) -> usize {
-        self.content.len()
-    }
+    // pub(crate) fn capacity(&self) -> usize {
+    //     self.content.len()
+    // }
 
     /// Expand the buffer so that the remaining capacity is greater than or equal to `additional`.
     ///
@@ -400,9 +400,9 @@ impl XmlBuf {
         .map(|_| self.len())
     }
 
-    pub(crate) fn as_mut_ptr(&mut self) -> *mut u8 {
-        self.content[self.next_rw..].as_mut_ptr()
-    }
+    // pub(crate) fn as_mut_ptr(&mut self) -> *mut u8 {
+    //     self.content[self.next_rw..].as_mut_ptr()
+    // }
 
     // pub(crate) fn add_len(&mut self, additional: usize) -> Result<(), anyhow::Error> {
     //     ensure!(
@@ -520,18 +520,18 @@ impl DerefMut for XmlBufRef {
 mod tests {
     use super::*;
 
-    #[test]
-    fn buffer_resize_test() {
-        let mut buf = XmlBuf::with_capacity(8);
-        assert_eq!(buf.len(), 0);
-        assert!(buf.capacity() >= 8);
-        assert!(buf.resize(16).is_ok());
-        assert_eq!(buf.len(), 0);
-        assert!(buf.capacity() >= 16);
-        assert!(buf.resize(8).is_ok());
-        assert_eq!(buf.len(), 0);
-        assert!(buf.capacity() >= 16);
-    }
+    // #[test]
+    // fn buffer_resize_test() {
+    //     let mut buf = XmlBuf::with_capacity(8);
+    //     assert_eq!(buf.len(), 0);
+    //     assert!(buf.capacity() >= 8);
+    //     assert!(buf.resize(16).is_ok());
+    //     assert_eq!(buf.len(), 0);
+    //     assert!(buf.capacity() >= 16);
+    //     assert!(buf.resize(8).is_ok());
+    //     assert_eq!(buf.len(), 0);
+    //     assert!(buf.capacity() >= 16);
+    // }
 
     #[test]
     fn buffer_modify_test() {

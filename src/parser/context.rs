@@ -504,108 +504,106 @@ impl XmlParserCtxt {
         sax: Option<Box<XmlSAXHandler>>,
         user_data: Option<GenericErrorContext>,
     ) -> Result<(), Option<Box<XmlSAXHandler>>> {
-        unsafe {
-            xml_init_parser();
+        xml_init_parser();
 
-            if let Some(mut sax) = sax {
-                if sax.initialized != XML_SAX2_MAGIC as u32 {
-                    // These fields won't used in SAX1 handling.
-                    sax._private = AtomicPtr::new(null_mut());
-                    sax.start_element_ns = None;
-                    sax.end_element_ns = None;
-                    sax.serror = None;
-                }
-                self.sax = Some(sax);
-                self.user_data = user_data;
-            } else {
-                let mut sax = XmlSAXHandler::default();
-                xml_sax_version(&mut sax, 2);
-                self.sax = Some(Box::new(sax));
-                self.user_data = None;
+        if let Some(mut sax) = sax {
+            if sax.initialized != XML_SAX2_MAGIC as u32 {
+                // These fields won't used in SAX1 handling.
+                sax._private = AtomicPtr::new(null_mut());
+                sax.start_element_ns = None;
+                sax.end_element_ns = None;
+                sax.serror = None;
             }
-
-            self.maxatts = 0;
-            self.atts = vec![];
-            // Allocate the Input stack
-            self.input_tab.clear();
-            self.version = None;
-            self.encoding = None;
-            self.standalone = -1;
-            self.has_external_subset = 0;
-            self.has_perefs = 0;
-            self.html = 0;
-            self.external = 0;
-            self.instate = XmlParserInputState::XmlParserStart;
-            self.token = 0;
-            self.directory = None;
-
-            // Allocate the Node stack
-            self.node_tab.clear();
-            self.node = None;
-
-            // Allocate the Name stack
-            self.name_tab.clear();
-            self.name = None;
-
-            // Allocate the space stack
-            self.space_tab.clear();
-            self.space_tab.push(-1);
-
-            self.my_doc = None;
-            self.well_formed = 1;
-            self.ns_well_formed = 1;
-            self.valid = 1;
-            self.loadsubset = get_load_ext_dtd_default_value();
-            if self.loadsubset != 0 {
-                self.options |= XmlParserOption::XmlParseDTDLoad as i32;
-            }
-            self.validate = get_do_validity_checking_default_value();
-            self.pedantic = get_pedantic_parser_default_value();
-            if self.pedantic != 0 {
-                self.options |= XmlParserOption::XmlParsePedantic as i32;
-            }
-            self.linenumbers = get_line_numbers_default_value();
-            self.keep_blanks = get_keep_blanks_default_value();
-            if self.keep_blanks == 0 {
-                if let Some(sax) = self.sax.as_deref_mut() {
-                    sax.ignorable_whitespace = Some(xml_sax2_ignorable_whitespace);
-                }
-                self.options |= XmlParserOption::XmlParseNoBlanks as i32;
-            }
-
-            self.vctxt.flags = XML_VCTXT_USE_PCTXT as _;
-            self.vctxt.user_data = None;
-            self.vctxt.error = Some(parser_validity_error);
-            self.vctxt.warning = Some(parser_validity_warning);
-            if self.validate != 0 {
-                if get_get_warnings_default_value() == 0 {
-                    self.vctxt.warning = None;
-                } else {
-                    self.vctxt.warning = Some(parser_validity_warning);
-                }
-                self.vctxt.node_tab.clear();
-                self.options |= XmlParserOption::XmlParseDTDValid as i32;
-            }
-            self.replace_entities = get_substitute_entities_default_value();
-            if self.replace_entities != 0 {
-                self.options |= XmlParserOption::XmlParseNoEnt as i32;
-            }
-            self.record_info = 0;
-            self.check_index = 0;
-            self.in_subset = 0;
-            self.err_no = XmlParserErrors::XmlErrOK as i32;
-            self.depth = 0;
-            self.charset = XmlCharEncoding::UTF8;
-            #[cfg(feature = "catalog")]
-            {
-                self.catalogs = None;
-            }
-            self.sizeentities = 0;
-            self.sizeentcopy = 0;
-            self.input_id = 1;
-            self.node_seq.clear();
-            Ok(())
+            self.sax = Some(sax);
+            self.user_data = user_data;
+        } else {
+            let mut sax = XmlSAXHandler::default();
+            xml_sax_version(&mut sax, 2);
+            self.sax = Some(Box::new(sax));
+            self.user_data = None;
         }
+
+        self.maxatts = 0;
+        self.atts = vec![];
+        // Allocate the Input stack
+        self.input_tab.clear();
+        self.version = None;
+        self.encoding = None;
+        self.standalone = -1;
+        self.has_external_subset = 0;
+        self.has_perefs = 0;
+        self.html = 0;
+        self.external = 0;
+        self.instate = XmlParserInputState::XmlParserStart;
+        self.token = 0;
+        self.directory = None;
+
+        // Allocate the Node stack
+        self.node_tab.clear();
+        self.node = None;
+
+        // Allocate the Name stack
+        self.name_tab.clear();
+        self.name = None;
+
+        // Allocate the space stack
+        self.space_tab.clear();
+        self.space_tab.push(-1);
+
+        self.my_doc = None;
+        self.well_formed = 1;
+        self.ns_well_formed = 1;
+        self.valid = 1;
+        self.loadsubset = get_load_ext_dtd_default_value();
+        if self.loadsubset != 0 {
+            self.options |= XmlParserOption::XmlParseDTDLoad as i32;
+        }
+        self.validate = get_do_validity_checking_default_value();
+        self.pedantic = get_pedantic_parser_default_value();
+        if self.pedantic != 0 {
+            self.options |= XmlParserOption::XmlParsePedantic as i32;
+        }
+        self.linenumbers = get_line_numbers_default_value();
+        self.keep_blanks = get_keep_blanks_default_value();
+        if self.keep_blanks == 0 {
+            if let Some(sax) = self.sax.as_deref_mut() {
+                sax.ignorable_whitespace = Some(xml_sax2_ignorable_whitespace);
+            }
+            self.options |= XmlParserOption::XmlParseNoBlanks as i32;
+        }
+
+        self.vctxt.flags = XML_VCTXT_USE_PCTXT as _;
+        self.vctxt.user_data = None;
+        self.vctxt.error = Some(parser_validity_error);
+        self.vctxt.warning = Some(parser_validity_warning);
+        if self.validate != 0 {
+            if get_get_warnings_default_value() == 0 {
+                self.vctxt.warning = None;
+            } else {
+                self.vctxt.warning = Some(parser_validity_warning);
+            }
+            self.vctxt.node_tab.clear();
+            self.options |= XmlParserOption::XmlParseDTDValid as i32;
+        }
+        self.replace_entities = get_substitute_entities_default_value();
+        if self.replace_entities != 0 {
+            self.options |= XmlParserOption::XmlParseNoEnt as i32;
+        }
+        self.record_info = 0;
+        self.check_index = 0;
+        self.in_subset = 0;
+        self.err_no = XmlParserErrors::XmlErrOK as i32;
+        self.depth = 0;
+        self.charset = XmlCharEncoding::UTF8;
+        #[cfg(feature = "catalog")]
+        {
+            self.catalogs = None;
+        }
+        self.sizeentities = 0;
+        self.sizeentcopy = 0;
+        self.input_id = 1;
+        self.node_seq.clear();
+        Ok(())
     }
 
     pub fn encoding(&self) -> Option<&str> {
@@ -1764,37 +1762,40 @@ impl XmlParserCtxt {
     ///
     /// Returns the resulting document tree or NULL
     #[doc(alias = "xmlDoRead")]
-    pub(crate) unsafe fn do_read(
+    pub(crate) fn do_read(
         &mut self,
         url: Option<&str>,
         encoding: Option<&str>,
         options: i32,
     ) -> Option<XmlDocPtr> {
-        unsafe {
-            self.use_options_internal(options, encoding);
-            if let Some(encoding) = encoding {
-                // TODO: We should consider to set XML_PARSE_IGNORE_ENC if the
-                // caller provided an encoding. Otherwise, we might match to
-                // the encoding from the XML declaration which is likely to
-                // break things. Also see xmlSwitchInputEncoding.
-                if let Some(handler) = find_encoding_handler(encoding) {
-                    self.switch_to_encoding(handler);
-                }
+        self.use_options_internal(options, encoding);
+        if let Some(encoding) = encoding {
+            // TODO: We should consider to set XML_PARSE_IGNORE_ENC if the
+            // caller provided an encoding. Otherwise, we might match to
+            // the encoding from the XML declaration which is likely to
+            // break things. Also see xmlSwitchInputEncoding.
+            if let Some(handler) = find_encoding_handler(encoding) {
+                self.switch_to_encoding(handler);
             }
-            if url.is_some() {
-                if let Some(input) = self.input_mut().filter(|input| input.filename.is_none()) {
-                    input.filename = url.map(|u| u.to_owned());
-                }
+        }
+        if url.is_some() {
+            if let Some(input) = self.input_mut().filter(|input| input.filename.is_none()) {
+                input.filename = url.map(|u| u.to_owned());
             }
-            self.parse_document();
-            if self.well_formed != 0 || self.recovery != 0 {
-                self.my_doc.take()
-            } else {
-                if let Some(my_doc) = self.my_doc.take() {
+        }
+        self.parse_document();
+        if self.well_formed != 0 || self.recovery != 0 {
+            self.my_doc.take()
+        } else {
+            if let Some(my_doc) = self.my_doc.take() {
+                unsafe {
+                    // # Safety
+                    // `my_doc` is no longer used and not leaked to the out of this function.
+                    // Therefore, this operation is safe.
                     xml_free_doc(my_doc);
                 }
-                None
             }
+            None
         }
     }
 

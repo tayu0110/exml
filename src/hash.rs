@@ -249,9 +249,7 @@ impl<'a, T> XmlHashTable<'a, T> {
 
     /// Create new `XmlHashTable` with capacity.
     pub fn with_capacity(size: usize) -> Self {
-        unsafe {
-            xml_init_parser();
-        }
+        xml_init_parser();
 
         let table = (0..size)
             .map(|_| XmlHashEntry::default())

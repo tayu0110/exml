@@ -39,7 +39,7 @@ use crate::{
     error::XmlError,
     globals::reset_last_error,
     libxml::xmlmemory::{XmlFreeFunc, XmlMallocFunc, XmlReallocFunc, XmlStrdupFunc},
-    parser::{XmlSAXLocator, xml_init_parser},
+    parser::XmlSAXLocator,
     tree::{BASE_BUFFER_SIZE, XmlBufferAllocationScheme},
 };
 
@@ -54,20 +54,6 @@ use super::{
     },
     xmlstring::{XmlChar, xml_char_strdup, xml_strdup},
 };
-
-#[doc(alias = "xmlInitGlobals")]
-#[deprecated = "Alias for xmlInitParser"]
-pub unsafe extern "C" fn xml_init_globals() {
-    unsafe { xml_init_parser() };
-}
-
-/// DEPRECATED: This function is a no-op. Call xmlCleanupParser
-/// to free global state but see the warnings there. xmlCleanupParser
-/// should be only called once at program exit. In most cases, you don't
-/// have call cleanup functions at all.
-#[doc(alias = "xmlCleanupGlobals")]
-#[deprecated = "This function is a no-op"]
-pub unsafe extern "C" fn xml_cleanup_globals() {}
 
 pub type XmlGlobalStatePtr = *mut XmlGlobalState;
 pub struct XmlGlobalState {

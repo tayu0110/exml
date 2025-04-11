@@ -95,7 +95,7 @@ impl XmlParserCtxt {
     /// Returns 0, -1 in case of error. the parser context is augmented
     ///                as a result of the parsing.
     #[doc(alias = "xmlParseDocument")]
-    pub unsafe fn parse_document(&mut self) -> i32 {
+    pub fn parse_document(&mut self) -> i32 {
         unsafe {
             xml_init_parser();
 
@@ -493,7 +493,7 @@ pub unsafe fn xml_parse_in_node_context(
 /// In case recover is set to 1, the nodelist will not be empty even if
 /// the parsed chunk is not well balanced.
 #[doc(alias = "xmlParseBalancedChunkMemoryInternal")]
-pub(crate) unsafe fn xml_parse_balanced_chunk_memory_internal(
+pub(crate) fn xml_parse_balanced_chunk_memory_internal(
     oldctxt: &mut XmlParserCtxt,
     string: &str,
     user_data: Option<GenericErrorContext>,

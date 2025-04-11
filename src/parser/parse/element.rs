@@ -22,32 +22,30 @@ impl XmlParserCtxt {
     /// The Name in an element's end-tag must match the element type in the start-tag.
     /// ```
     #[doc(alias = "xmlParseElement")]
-    pub(crate) unsafe fn parse_element(&mut self) {
-        unsafe {
-            if self.parse_element_start() != 0 {
-                return;
-            }
-
-            self.parse_content_internal();
-            if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                return;
-            }
-
-            if self.current_byte() == 0 {
-                let name = self.name_tab[self.name_tab.len() - 1].clone();
-                let line: i32 = self.push_tab[self.name_tab.len() - 1].line;
-                xml_fatal_err_msg_str_int_str!(
-                    self,
-                    XmlParserErrors::XmlErrTagNotFinished,
-                    "Premature end of data in tag {} line {}\n",
-                    name,
-                    line
-                );
-                return;
-            }
-
-            self.parse_element_end();
+    pub(crate) fn parse_element(&mut self) {
+        if self.parse_element_start() != 0 {
+            return;
         }
+
+        self.parse_content_internal();
+        if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+            return;
+        }
+
+        if self.current_byte() == 0 {
+            let name = self.name_tab[self.name_tab.len() - 1].clone();
+            let line: i32 = self.push_tab[self.name_tab.len() - 1].line;
+            xml_fatal_err_msg_str_int_str!(
+                self,
+                XmlParserErrors::XmlErrTagNotFinished,
+                "Premature end of data in tag {} line {}\n",
+                name,
+                line
+            );
+            return;
+        }
+
+        self.parse_element_end();
     }
 
     /// Parse the start of an XML element. Returns -1 in case of error, 0 if an
@@ -934,47 +932,43 @@ impl XmlParserCtxt {
 
     /// Parse a content sequence. Stops at EOF or '</'. Leaves checking of unexpected EOF to the caller.
     #[doc(alias = "xmlParseContentInternal")]
-    pub(crate) unsafe fn parse_content_internal(&mut self) {
-        unsafe {
-            let name_nr = self.name_tab.len();
+    pub(crate) fn parse_content_internal(&mut self) {
+        let name_nr = self.name_tab.len();
 
-            self.grow();
-            while !self.content_bytes().is_empty()
-                && !matches!(self.instate, XmlParserInputState::XmlParserEOF)
-            {
-                match self.content_bytes() {
-                    // First case : a Processing Instruction.
-                    [b'<', b'?', ..] => self.parse_pi(),
-                    // Second case : a CDSection
-                    // 2.6.0 test was *cur not RAW
-                    [b'<', b'!', b'[', b'C', b'D', b'A', b'T', b'A', b'[', ..] => {
-                        self.parse_cdsect()
-                    }
-                    // Third case :  a comment
-                    [b'<', b'!', b'-', b'-', ..] => {
-                        self.parse_comment();
-                        self.instate = XmlParserInputState::XmlParserContent;
-                    }
-                    // Fourth case :  a sub-element.
-                    [b'<', b'/', ..] => {
-                        if self.name_tab.len() <= name_nr {
-                            break;
-                        }
-                        self.parse_element_end();
-                    }
-                    [b'<', ..] => {
-                        self.parse_element_start();
-                    }
-                    // Fifth case : a reference. If if has not been resolved,
-                    //    parsing returns it's Name, create the node
-                    [b'&', ..] => self.parse_reference(),
-                    // Last case, text. Note that References are handled directly.
-                    _ => self.parse_char_data_internal(0),
+        self.grow();
+        while !self.content_bytes().is_empty()
+            && !matches!(self.instate, XmlParserInputState::XmlParserEOF)
+        {
+            match self.content_bytes() {
+                // First case : a Processing Instruction.
+                [b'<', b'?', ..] => self.parse_pi(),
+                // Second case : a CDSection
+                // 2.6.0 test was *cur not RAW
+                [b'<', b'!', b'[', b'C', b'D', b'A', b'T', b'A', b'[', ..] => self.parse_cdsect(),
+                // Third case :  a comment
+                [b'<', b'!', b'-', b'-', ..] => {
+                    self.parse_comment();
+                    self.instate = XmlParserInputState::XmlParserContent;
                 }
-
-                self.shrink();
-                self.grow();
+                // Fourth case :  a sub-element.
+                [b'<', b'/', ..] => {
+                    if self.name_tab.len() <= name_nr {
+                        break;
+                    }
+                    self.parse_element_end();
+                }
+                [b'<', ..] => {
+                    self.parse_element_start();
+                }
+                // Fifth case : a reference. If if has not been resolved,
+                //    parsing returns it's Name, create the node
+                [b'&', ..] => self.parse_reference(),
+                // Last case, text. Note that References are handled directly.
+                _ => self.parse_char_data_internal(0),
             }
+
+            self.shrink();
+            self.grow();
         }
     }
 
@@ -984,25 +978,23 @@ impl XmlParserCtxt {
     /// [43] content ::= (element | CharData | Reference | CDSect | PI | Comment)*
     /// ```
     #[doc(alias = "xmlParseContent")]
-    pub unsafe fn parse_content(&mut self) {
-        unsafe {
-            let name_nr = self.name_tab.len();
+    pub fn parse_content(&mut self) {
+        let name_nr = self.name_tab.len();
 
-            self.parse_content_internal();
+        self.parse_content_internal();
 
-            if !matches!(self.instate, XmlParserInputState::XmlParserEOF)
-                && self.name_tab.len() > name_nr
-            {
-                let name = self.name_tab[self.name_tab.len() - 1].clone();
-                let line: i32 = self.push_tab[self.name_tab.len() - 1].line;
-                xml_fatal_err_msg_str_int_str!(
-                    self,
-                    XmlParserErrors::XmlErrTagNotFinished,
-                    "Premature end of data in tag {} line {}\n",
-                    name,
-                    line
-                );
-            }
+        if !matches!(self.instate, XmlParserInputState::XmlParserEOF)
+            && self.name_tab.len() > name_nr
+        {
+            let name = self.name_tab[self.name_tab.len() - 1].clone();
+            let line: i32 = self.push_tab[self.name_tab.len() - 1].line;
+            xml_fatal_err_msg_str_int_str!(
+                self,
+                XmlParserErrors::XmlErrTagNotFinished,
+                "Premature end of data in tag {} line {}\n",
+                name,
+                line
+            );
         }
     }
 }

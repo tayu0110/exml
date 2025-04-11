@@ -1417,15 +1417,6 @@ unsafe fn xml_xpath_cmp_nodes_ext(
     Some(std::cmp::Ordering::Greater)
 }
 
-#[doc(alias = "xmlXPathInit")]
-#[cfg(any(feature = "xpath", feature = "schema"))]
-#[deprecated = "Alias for xmlInitParser"]
-pub unsafe fn xml_xpath_init() {
-    unsafe {
-        xml_init_parser();
-    }
-}
-
 /// Returns 1 if the value is a NaN, 0 otherwise
 #[doc(alias = "xmlXPathIsNaN")]
 #[cfg(any(feature = "xpath", feature = "schema"))]
@@ -1442,13 +1433,6 @@ pub fn xml_xpath_is_inf(val: f64) -> i32 {
     } else {
         0
     }
-}
-
-/// Initialize the XPath environment
-#[doc(alias = "xmlInitXPathInternal")]
-pub(crate) fn xml_init_xpath_internal() {
-    // In original libxml, NAN, PINF and NINF is initialized at here.
-    // They are defined as constants on this crate.
 }
 
 #[cfg(test)]
@@ -2026,27 +2010,6 @@ mod tests {
                         eprintln!(" {}", n_res);
                     }
                 }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_init() {
-        #[cfg(any(feature = "xpath", feature = "schema"))]
-        unsafe {
-            let mut leaks = 0;
-
-            let mem_base = xml_mem_blocks();
-
-            xml_xpath_init();
-            reset_last_error();
-            if mem_base != xml_mem_blocks() {
-                leaks += 1;
-                eprintln!(
-                    "Leak of {} blocks found in xmlXPathInit",
-                    xml_mem_blocks() - mem_base
-                );
-                assert!(leaks == 0, "{leaks} Leaks are found in xmlXPathInit()");
             }
         }
     }

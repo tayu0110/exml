@@ -1169,7 +1169,6 @@ const LI_ELT: &[&str] = &["li"];
 const UL_DEPR: &[&str] = &["type", "compact"];
 const DIR_ATTR: &[&str] = &["dir"];
 
-pub type HtmlEntityDescPtr = *mut HtmlEntityDesc;
 /// Internal description of an HTML entity.
 pub struct HtmlEntityDesc {
     pub(super) value: u32,         /* the UNICODE value for the character */
@@ -1178,7 +1177,6 @@ pub struct HtmlEntityDesc {
     desc: &'static str, /* the description */
 }
 
-pub type HtmlElemDescPtr = *mut HtmlElemDesc;
 // Internal description of an HTML element, representing HTML 4.01
 // and XHTML 1.0 (which share the same structure).
 #[repr(C)]

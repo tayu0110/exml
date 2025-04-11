@@ -4940,9 +4940,7 @@ fn test_cleanup() {
             })
         {
             if prev == 1 {
-                unsafe {
-                    xml_cleanup_parser();
-                }
+                xml_cleanup_parser();
 
                 *lock = false;
             }

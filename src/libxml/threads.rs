@@ -27,8 +27,8 @@ use std::{
 };
 
 use libc::{
-    PTHREAD_MUTEX_INITIALIZER, free, malloc, memcpy, memset, pthread_cond_destroy,
-    pthread_cond_init, pthread_cond_signal, pthread_cond_t, pthread_cond_wait, pthread_getspecific,
+    PTHREAD_MUTEX_INITIALIZER, free, malloc, memset, pthread_cond_destroy, pthread_cond_init,
+    pthread_cond_signal, pthread_cond_t, pthread_cond_wait, pthread_getspecific,
     pthread_key_create, pthread_key_delete, pthread_key_t, pthread_mutex_destroy,
     pthread_mutex_init, pthread_mutex_lock, pthread_mutex_t, pthread_mutex_unlock, pthread_self,
     pthread_setspecific, pthread_t,
@@ -218,34 +218,6 @@ pub unsafe extern "C" fn xml_free_rmutex(tok: XmlRMutexPtr) {
             pthread_cond_destroy(&mut (*tok).cv as _);
         }
         free(tok as _);
-    }
-}
-
-#[doc(alias = "xmlInitThreads")]
-#[deprecated = "Alias for xmlInitParser"]
-pub unsafe extern "C" fn xml_init_threads() {
-    unsafe {
-        xml_init_parser();
-    }
-}
-
-/// xmlGetThreadId() find the current thread ID number
-/// Note that this is likely to be broken on some platforms using pthreads
-/// as the specification doesn't mandate pthread_t to be an integer type
-///
-/// Returns the current thread ID number
-#[doc(alias = "xmlGetThreadId")]
-pub(crate) unsafe extern "C" fn xml_get_thread_id() -> i32 {
-    unsafe {
-        let mut ret: i32 = 0;
-
-        if !XML_IS_THREADED {
-            return 0;
-        }
-        let id: pthread_t = pthread_self();
-        /* horrible but preserves compat, see warning above */
-        memcpy(&raw mut ret as _, &raw const id as _, size_of_val(&ret));
-        ret
     }
 }
 

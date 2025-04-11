@@ -638,16 +638,16 @@ impl XmlGenericNodePtr {
         None
     }
 
-    fn get_prop_node_value_internal(&self) -> Option<String> {
-        if let Ok(attr) = XmlAttrPtr::try_from(*self) {
-            attr.get_prop_node_value_internal()
-        } else if matches!(self.element_type(), XmlElementType::XmlAttributeDecl) {
-            let attr_decl = XmlAttributePtr::try_from(*self).unwrap();
-            attr_decl.default_value.as_deref().map(|def| def.to_owned())
-        } else {
-            None
-        }
-    }
+    // fn get_prop_node_value_internal(&self) -> Option<String> {
+    //     if let Ok(attr) = XmlAttrPtr::try_from(*self) {
+    //         attr.get_prop_node_value_internal()
+    //     } else if matches!(self.element_type(), XmlElementType::XmlAttributeDecl) {
+    //         let attr_decl = XmlAttributePtr::try_from(*self).unwrap();
+    //         attr_decl.default_value.as_deref().map(|def| def.to_owned())
+    //     } else {
+    //         None
+    //     }
+    // }
 
     /// Search and get the value of an attribute associated to a node.  
     ///

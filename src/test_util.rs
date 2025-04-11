@@ -7,8 +7,6 @@ use std::{
     sync::Mutex,
 };
 
-#[cfg(feature = "html")]
-use crate::html::HtmlParserCtxtPtr;
 #[cfg(feature = "catalog")]
 use crate::libxml::catalog::{XmlCatalogAllow, XmlCatalogPrefer};
 #[cfg(feature = "schema")]
@@ -18,7 +16,6 @@ use crate::xmlschemas::{
     schema::XmlSchemaPtr,
 };
 use crate::{
-    html::parser::html_free_parser_ctxt,
     libxml::{
         globals::xml_free,
         relaxng::XmlRelaxNGPtr,
@@ -28,7 +25,6 @@ use crate::{
         xmlschemastypes::{XmlSchemaValPtr, XmlSchemaWhitespaceValueType},
         xmlstring::XmlChar,
     },
-    parser::{XmlParserCtxtPtr, xml_free_parser_ctxt},
     tree::{XmlAttr, XmlDoc, XmlDtd, XmlNode, XmlNs},
     xpath::{
         XmlNodeSet, XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathObjectPtr,
@@ -53,7 +49,6 @@ thread_local! {
 pub(crate) const GEN_NB_UNSIGNED_CHAR_PTR: i32 = 1;
 pub(crate) const GEN_NB_INT_PTR: i32 = 2;
 pub(crate) const GEN_NB_CONST_UNSIGNED_CHAR_PTR: i32 = 1;
-pub(crate) const GEN_NB_HTML_PARSER_CTXT_PTR: i32 = 3;
 pub(crate) const GEN_NB_CONST_CHAR_PTR: i32 = 4;
 pub(crate) const GEN_NB_CONST_XML_CHAR_PTR: i32 = 5;
 pub(crate) const GEN_NB_INT: i32 = 4;
@@ -61,18 +56,15 @@ pub(crate) const GEN_NB_CONST_XML_CHAR_PTR_PTR: i32 = 1;
 pub(crate) const GEN_NB_FILE_PTR: i32 = 1;
 pub(crate) const GEN_NB_XML_CHAR_PTR_PTR: i32 = 1;
 pub(crate) const GEN_NB_VOID_PTR: i32 = 2;
-pub(crate) const GEN_NB_XML_CHAR_PTR: i32 = 2;
 #[cfg(feature = "xpath")]
 pub(crate) const GEN_NB_XML_NODE_SET_PTR: i32 = 1;
 #[cfg(feature = "catalog")]
 pub(crate) const GEN_NB_XML_CATALOG_ALLOW: i32 = 4;
 #[cfg(feature = "catalog")]
 pub(crate) const GEN_NB_XML_CATALOG_PREFER: i32 = 3;
-pub(crate) const GEN_NB_XML_FEATURE: i32 = 4;
 pub(crate) const GEN_NB_XML_CHAR: i32 = 4;
 #[cfg(feature = "schema")]
 pub(crate) const GEN_NB_XML_RELAXNG_PTR: i32 = 1;
-pub(crate) const GEN_NB_XML_ELEMENT_CONTENT_PTR: i32 = 1;
 #[cfg(feature = "libxml_reader")]
 pub(crate) const GEN_NB_XML_TEXT_READER_LOCATOR_PTR: i32 = 1;
 #[cfg(feature = "schema")]
@@ -407,12 +399,6 @@ pub(crate) fn gen_xml_char(no: i32, _nr: i32) -> XmlChar {
 
 pub(crate) fn des_xml_char(_no: i32, _val: XmlChar, _nr: i32) {}
 
-pub(crate) unsafe fn desret_xml_parser_ctxt_ptr(val: XmlParserCtxtPtr) {
-    unsafe {
-        xml_free_parser_ctxt(val);
-    }
-}
-
 pub(crate) fn desret_unsigned_long(_val: u64) {}
 
 #[cfg(feature = "catalog")]
@@ -470,16 +456,6 @@ pub(crate) fn gen_xml_node_set_ptr(_no: i32, _nr: i32) -> Option<Box<XmlNodeSet>
 #[cfg(feature = "xpath")]
 pub(crate) fn des_xml_node_set_ptr(_no: i32, _val: Option<Box<XmlNodeSet>>, _nr: i32) {}
 
-pub(crate) unsafe fn gen_xml_char_ptr(no: i32, _nr: i32) -> *mut XmlChar {
-    CHARTAB.with_borrow_mut(|table| {
-        if no == 0 {
-            return addr_of_mut!(table[0]);
-        }
-        null_mut()
-    })
-}
-pub(crate) fn des_xml_char_ptr(_no: i32, _val: *mut XmlChar, _nr: i32) {}
-
 pub(crate) fn gen_unsigned_char_ptr(_no: i32, _nr: i32) -> *mut u8 {
     null_mut()
 }
@@ -505,15 +481,6 @@ pub(crate) fn des_unsigned_char_ptr(_no: i32, _val: *mut u8, _nr: i32) {}
 pub(crate) fn des_int_ptr(_no: i32, _val: *mut i32, _nr: i32) {}
 
 pub(crate) fn des_const_unsigned_char_ptr(_no: i32, _val: *const u8, _nr: i32) {}
-
-#[cfg(feature = "html")]
-pub(crate) unsafe fn desret_html_parser_ctxt_ptr(val: HtmlParserCtxtPtr) {
-    unsafe {
-        if !val.is_null() {
-            html_free_parser_ctxt(val);
-        }
-    }
-}
 
 #[cfg(feature = "html")]
 pub(crate) fn gen_const_xml_char_ptr_ptr(_no: i32, _nr: i32) -> *mut *mut XmlChar {

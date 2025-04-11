@@ -290,10 +290,8 @@ mod tests {
 
     fn do_test(docs: &[(&str, &str)]) {
         for &(doc, res) in docs {
-            unsafe {
-                let mut ctxt = make_parser_context();
-                xml_ctxt_read_memory(&mut ctxt, doc.as_bytes().to_vec(), None, None, 0);
-            }
+            let mut ctxt = make_parser_context();
+            xml_ctxt_read_memory(&mut ctxt, doc.as_bytes().to_vec(), None, None, 0);
             let result = RESULT.with_borrow(|result| result.clone());
             assert_eq!(result, res);
             RESULT.with_borrow_mut(|result| result.clear());

@@ -57,13 +57,11 @@ mod sax;
 mod valid;
 
 use std::{
-    ffi::CStr,
     io::Read,
     sync::atomic::{AtomicBool, Ordering},
 };
 
 use crate::{
-    dict::{__xml_initialize_dict, xml_cleanup_dict_internal},
     encoding::XmlCharEncoding,
     io::{
         XmlParserInputBuffer, cleanup_input_callbacks, cleanup_output_callbacks,
@@ -85,7 +83,6 @@ use crate::{
     },
     relaxng::xml_relaxng_cleanup_types,
     tree::XmlDocPtr,
-    xpath::xml_init_xpath_internal,
 };
 
 pub use context::*;
@@ -559,70 +556,58 @@ pub(crate) fn check_language_id(lang: &str) -> bool {
 ///
 /// Returns the resulting document tree
 #[doc(alias = "xmlReadDoc")]
-pub unsafe fn xml_read_doc(
+pub fn xml_read_doc(
     cur: Vec<u8>,
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
 ) -> Option<XmlDocPtr> {
-    unsafe {
-        xml_init_parser();
+    xml_init_parser();
 
-        XmlParserCtxt::from_memory(cur)?.do_read(url, encoding, options)
-    }
+    XmlParserCtxt::from_memory(cur)?.do_read(url, encoding, options)
 }
 
 /// Parse an XML file from the filesystem or the network.
 ///
 /// Returns the resulting document tree
 #[doc(alias = "xmlReadFile")]
-pub unsafe fn xml_read_file(
-    filename: &str,
-    encoding: Option<&str>,
-    options: i32,
-) -> Option<XmlDocPtr> {
-    unsafe {
-        xml_init_parser();
-        XmlParserCtxt::from_filename_with_options(Some(filename), options)?
-            .do_read(None, encoding, options)
-    }
+pub fn xml_read_file(filename: &str, encoding: Option<&str>, options: i32) -> Option<XmlDocPtr> {
+    xml_init_parser();
+    XmlParserCtxt::from_filename_with_options(Some(filename), options)?
+        .do_read(None, encoding, options)
 }
 
 /// Parse an XML in-memory document and build a tree.
 ///
 /// Returns the resulting document tree
 #[doc(alias = "xmlReadMemory")]
-pub unsafe fn xml_read_memory(
+pub fn xml_read_memory(
     buffer: Vec<u8>,
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
 ) -> Option<XmlDocPtr> {
-    unsafe {
-        xml_init_parser();
-        XmlParserCtxt::from_memory(buffer)?.do_read(url, encoding, options)
-    }
+    xml_init_parser();
+    XmlParserCtxt::from_memory(buffer)?.do_read(url, encoding, options)
 }
 
 /// Parse an XML document from I/O functions and source and build a tree.
 ///
 /// Returns the resulting document tree
 #[doc(alias = "xmlReadIO")]
-pub unsafe fn xml_read_io(
+pub fn xml_read_io(
     ioctx: impl Read + 'static,
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
 ) -> Option<XmlDocPtr> {
-    unsafe {
-        xml_init_parser();
+    xml_init_parser();
 
-        let input = XmlParserInputBuffer::from_reader(ioctx, XmlCharEncoding::None);
-        let mut ctxt = XmlParserCtxt::new()?;
-        let stream = XmlParserInput::from_io(&mut ctxt, input, XmlCharEncoding::None)?;
-        ctxt.input_push(stream);
-        ctxt.do_read(url, encoding, options)
-    }
+    let input = XmlParserInputBuffer::from_reader(ioctx, XmlCharEncoding::None);
+    let mut ctxt = XmlParserCtxt::new()?;
+    let stream = XmlParserInput::from_io(&mut ctxt, input, XmlCharEncoding::None)?;
+    ctxt.input_push(stream);
+    ctxt.do_read(url, encoding, options)
 }
 
 /// Parse an XML in-memory document and build a tree.
@@ -630,25 +615,14 @@ pub unsafe fn xml_read_io(
 ///
 /// Returns the resulting document tree
 #[doc(alias = "xmlCtxtReadDoc")]
-pub unsafe fn xml_ctxt_read_doc(
+pub fn xml_ctxt_read_doc(
     ctxt: &mut XmlParserCtxt,
-    cur: *const u8,
+    cur: Vec<u8>,
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
 ) -> Option<XmlDocPtr> {
-    unsafe {
-        if cur.is_null() {
-            return None;
-        }
-        xml_ctxt_read_memory(
-            ctxt,
-            CStr::from_ptr(cur as *const i8).to_bytes().to_vec(),
-            url,
-            encoding,
-            options,
-        )
-    }
+    xml_ctxt_read_memory(ctxt, cur, url, encoding, options)
 }
 
 /// Parse an XML file from the filesystem or the network.
@@ -656,21 +630,19 @@ pub unsafe fn xml_ctxt_read_doc(
 ///
 /// Returns the resulting document tree
 #[doc(alias = "xmlCtxtReadFile")]
-pub unsafe fn xml_ctxt_read_file(
+pub fn xml_ctxt_read_file(
     ctxt: &mut XmlParserCtxt,
     filename: &str,
     encoding: Option<&str>,
     options: i32,
 ) -> Option<XmlDocPtr> {
-    unsafe {
-        xml_init_parser();
+    xml_init_parser();
 
-        ctxt.reset();
+    ctxt.reset();
 
-        let stream = xml_load_external_entity(Some(filename), None, ctxt)?;
-        ctxt.input_push(stream);
-        ctxt.do_read(None, encoding, options)
-    }
+    let stream = xml_load_external_entity(Some(filename), None, ctxt)?;
+    ctxt.input_push(stream);
+    ctxt.do_read(None, encoding, options)
 }
 
 /// Parse an XML in-memory document and build a tree.
@@ -678,22 +650,20 @@ pub unsafe fn xml_ctxt_read_file(
 ///
 /// Returns the resulting document tree
 #[doc(alias = "xmlCtxtReadMemory")]
-pub unsafe fn xml_ctxt_read_memory(
+pub fn xml_ctxt_read_memory(
     ctxt: &mut XmlParserCtxt,
     buffer: Vec<u8>,
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
 ) -> Option<XmlDocPtr> {
-    unsafe {
-        xml_init_parser();
-        ctxt.reset();
+    xml_init_parser();
+    ctxt.reset();
 
-        let input = XmlParserInputBuffer::from_memory(buffer, XmlCharEncoding::None)?;
-        let stream = XmlParserInput::from_io(ctxt, input, XmlCharEncoding::None)?;
-        ctxt.input_push(stream);
-        ctxt.do_read(url, encoding, options)
-    }
+    let input = XmlParserInputBuffer::from_memory(buffer, XmlCharEncoding::None)?;
+    let stream = XmlParserInput::from_io(ctxt, input, XmlCharEncoding::None)?;
+    ctxt.input_push(stream);
+    ctxt.do_read(url, encoding, options)
 }
 
 /// Parse an XML document from I/O functions and source and build a tree.
@@ -701,22 +671,20 @@ pub unsafe fn xml_ctxt_read_memory(
 ///
 /// Returns the resulting document tree
 #[doc(alias = "xmlCtxtReadIO")]
-pub unsafe fn xml_ctxt_read_io(
+pub fn xml_ctxt_read_io(
     ctxt: &mut XmlParserCtxt,
     ioctx: impl Read + 'static,
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
 ) -> Option<XmlDocPtr> {
-    unsafe {
-        xml_init_parser();
-        ctxt.reset();
+    xml_init_parser();
+    ctxt.reset();
 
-        let input = XmlParserInputBuffer::from_reader(ioctx, XmlCharEncoding::None);
-        let stream = XmlParserInput::from_io(ctxt, input, XmlCharEncoding::None)?;
-        ctxt.input_push(stream);
-        ctxt.do_read(url, encoding, options)
-    }
+    let input = XmlParserInputBuffer::from_reader(ioctx, XmlCharEncoding::None);
+    let stream = XmlParserInput::from_io(ctxt, input, XmlCharEncoding::None)?;
+    ctxt.input_push(stream);
+    ctxt.do_read(url, encoding, options)
 }
 
 static XML_PARSER_INITIALIZED: AtomicBool = AtomicBool::new(false);
@@ -725,7 +693,7 @@ static XML_PARSER_INITIALIZED: AtomicBool = AtomicBool::new(false);
 /// This is not reentrant. Call once before processing in case of
 /// use in multithreaded programs.
 #[doc(alias = "xmlInitParser")]
-pub unsafe fn xml_init_parser() {
+pub fn xml_init_parser() {
     unsafe {
         // Note that the initialization code must not make memory allocations.
         if XML_PARSER_INITIALIZED.load(Ordering::Acquire) {
@@ -737,15 +705,10 @@ pub unsafe fn xml_init_parser() {
             xml_init_threads_internal();
             xml_init_globals_internal();
             xml_init_memory_internal();
-            __xml_initialize_dict();
             register_default_input_callbacks();
             #[cfg(feature = "libxml_output")]
             {
                 register_default_output_callbacks();
-            }
-            #[cfg(any(feature = "xpath", feature = "schema"))]
-            {
-                xml_init_xpath_internal();
             }
             XML_PARSER_INITIALIZED.store(true, Ordering::Release);
         }
@@ -773,7 +736,7 @@ pub unsafe fn xml_init_parser() {
 /// from calling this function or do it just before calling exit()
 /// to avoid leak reports from valgrind !
 #[doc(alias = "xmlCleanupParser")]
-pub unsafe fn xml_cleanup_parser() {
+pub fn xml_cleanup_parser() {
     unsafe {
         if !XML_PARSER_INITIALIZED.load(Ordering::Acquire) {
             return;
@@ -783,7 +746,6 @@ pub unsafe fn xml_cleanup_parser() {
         {
             xml_catalog_cleanup();
         }
-        xml_cleanup_dict_internal();
         cleanup_input_callbacks();
         #[cfg(feature = "libxml_output")]
         {

@@ -142,30 +142,30 @@ impl XmlAttributePtr {
         NonNull::new(Box::leak(boxed)).map(Self)
     }
 
-    /// Create `XmlAttributePtr` from a raw pointer.  
-    ///
-    /// If `ptr` is a NULL pointer, return `Ok(None)`.  
-    /// If `ptr` is a valid pointer of `XmlAttribute`, return `Ok(Some(Self))`.  
-    /// Otherwise, return `Err`.
-    ///
-    /// # Safety
-    /// - `ptr` must be a pointer of types that is implemented `NodeCommon` at least.
-    pub(crate) unsafe fn from_raw(
-        ptr: *mut XmlAttribute,
-    ) -> Result<Option<Self>, InvalidNodePointerCastError> {
-        unsafe {
-            if ptr.is_null() {
-                return Ok(None);
-            }
-            match (*ptr).element_type() {
-                XmlElementType::XmlAttributeDecl => Ok(Some(Self(NonNull::new_unchecked(ptr)))),
-                _ => Err(InvalidNodePointerCastError {
-                    from: (*ptr).element_type(),
-                    to: type_name::<Self>(),
-                }),
-            }
-        }
-    }
+    // /// Create `XmlAttributePtr` from a raw pointer.
+    // ///
+    // /// If `ptr` is a NULL pointer, return `Ok(None)`.
+    // /// If `ptr` is a valid pointer of `XmlAttribute`, return `Ok(Some(Self))`.
+    // /// Otherwise, return `Err`.
+    // ///
+    // /// # Safety
+    // /// - `ptr` must be a pointer of types that is implemented `NodeCommon` at least.
+    // pub(crate) unsafe fn from_raw(
+    //     ptr: *mut XmlAttribute,
+    // ) -> Result<Option<Self>, InvalidNodePointerCastError> {
+    //     unsafe {
+    //         if ptr.is_null() {
+    //             return Ok(None);
+    //         }
+    //         match (*ptr).element_type() {
+    //             XmlElementType::XmlAttributeDecl => Ok(Some(Self(NonNull::new_unchecked(ptr)))),
+    //             _ => Err(InvalidNodePointerCastError {
+    //                 from: (*ptr).element_type(),
+    //                 to: type_name::<Self>(),
+    //             }),
+    //         }
+    //     }
+    // }
 
     // pub(crate) fn as_ptr(self) -> *mut XmlAttribute {
     //     self.0.as_ptr()

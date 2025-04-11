@@ -1327,9 +1327,7 @@ fn cleanup_test() {
         if NUM_LAUNCH_TEST
             .fetch_update(Ordering::Release, Ordering::Acquire, |old| {
                 if old == 1 {
-                    unsafe {
-                        xml_cleanup_parser();
-                    }
+                    xml_cleanup_parser();
                 }
                 old.checked_sub(1)
             })

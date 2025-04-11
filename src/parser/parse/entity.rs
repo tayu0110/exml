@@ -479,34 +479,32 @@ impl XmlParserCtxt {
     /// Returns 0 if the entity is well formed, -1 in case of args problem and
     /// the parser error code otherwise
     #[doc(alias = "xmlParseCtxtExternalEntity")]
-    pub unsafe fn parse_external_entity(
+    pub fn parse_external_entity(
         &mut self,
         url: Option<&str>,
         id: Option<&str>,
         lst: Option<&mut Option<XmlGenericNodePtr>>,
     ) -> i32 {
-        unsafe {
-            // If the user provided their own SAX callbacks, then reuse the
-            // userData callback field, otherwise the expected setup in a
-            // DOM builder is to have userData == ctxt
-            let user_data = self.user_data.clone();
+        // If the user provided their own SAX callbacks, then reuse the
+        // userData callback field, otherwise the expected setup in a
+        // DOM builder is to have userData == ctxt
+        let user_data = self.user_data.clone();
 
-            let has_sax = self.sax.is_some();
-            let sax = self.sax.take();
-            let (sax, error) = parse_external_entity_private(
-                self.my_doc.unwrap(),
-                self,
-                sax,
-                user_data,
-                self.depth + 1,
-                url,
-                id,
-                lst,
-            );
-            assert_eq!(has_sax, sax.is_some());
-            self.sax = sax;
-            error as i32
-        }
+        let has_sax = self.sax.is_some();
+        let sax = self.sax.take();
+        let (sax, error) = parse_external_entity_private(
+            self.my_doc.unwrap(),
+            self,
+            sax,
+            user_data,
+            self.depth + 1,
+            url,
+            id,
+            lst,
+        );
+        assert_eq!(has_sax, sax.is_some());
+        self.sax = sax;
+        error as i32
     }
 
     /// parse a general parsed entity
@@ -613,7 +611,7 @@ impl XmlParserCtxt {
 /// the parser error code otherwise
 #[doc(alias = "xmlParseExternalEntityPrivate")]
 #[allow(clippy::too_many_arguments)]
-pub(crate) unsafe fn parse_external_entity_private(
+pub(crate) fn parse_external_entity_private(
     doc: XmlDocPtr,
     oldctxt: &mut XmlParserCtxt,
     sax: Option<Box<XmlSAXHandler>>,

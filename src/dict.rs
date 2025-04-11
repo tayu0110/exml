@@ -1066,9 +1066,7 @@ impl XmlDictRef {
     /// // DO NOT use after this point !
     /// ```
     pub fn new() -> Option<Self> {
-        unsafe {
-            xml_init_parser();
-        }
+        xml_init_parser();
 
         let boxed = Box::new(XmlDict::default());
         NonNull::new(Box::leak(boxed)).map(Self)
@@ -1132,7 +1130,7 @@ pub(crate) mod libxml_api {
         slice::from_raw_parts,
     };
 
-    use crate::{libxml::xmlstring::XmlChar, parser::xml_init_parser};
+    use crate::libxml::xmlstring::XmlChar;
 
     use super::{XmlDict, XmlDictRef};
 
@@ -1283,33 +1281,9 @@ pub(crate) mod libxml_api {
         dict.len() as i32
     }
 
-    #[deprecated = "Alias for xml_init_parser."]
-    pub extern "C" fn xml_initialize_dict() -> i32 {
-        unsafe {
-            xml_init_parser();
-        }
-        0
-    }
-
     #[deprecated = "Alias for rand::random"]
     pub(crate) extern "C" fn __xml_random() -> i32 {
         rand::random()
-    }
-
-    #[deprecated = "This method do nothing."]
-    pub extern "C" fn xml_dict_cleanup() {
-        // This method do nothing also in original code.
-    }
-
-    pub(crate) extern "C" fn __xml_initialize_dict() -> i32 {
-        // In original code, this method initializes Mutex and random seed.
-        // However, since neither is used, this method just only returns 1.
-        1
-    }
-
-    pub(crate) extern "C" fn xml_cleanup_dict_internal() {
-        // In original code, this method clean up Mutex.
-        // However, since Mutex is no longer needed, this method does nothing.
     }
 
     #[cfg(test)]

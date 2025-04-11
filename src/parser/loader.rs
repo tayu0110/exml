@@ -129,53 +129,50 @@ fn xml_resolve_resource_from_catalog(
         XmlCatalogAllow, xml_catalog_get_defaults, xml_catalog_resolve, xml_catalog_resolve_uri,
     };
 
-    unsafe {
-        let mut resource = None;
+    let mut resource = None;
 
-        // If the resource doesn't exists as a file,
-        // try to load it from the resource pointed in the catalogs
-        let pref: XmlCatalogAllow = xml_catalog_get_defaults();
+    // If the resource doesn't exists as a file,
+    // try to load it from the resource pointed in the catalogs
+    let pref: XmlCatalogAllow = xml_catalog_get_defaults();
 
-        if !matches!(pref, XmlCatalogAllow::None) && xml_no_net_exists(url) == 0 {
-            // Do a local lookup
-            if matches!(pref, XmlCatalogAllow::All | XmlCatalogAllow::Document) {
-                if let Some(catalogs) = ctxt.catalogs.as_mut() {
-                    resource = catalogs.local_resolve(id, url);
-                }
-            }
-            // Try a global lookup
-            if resource.is_none() && matches!(pref, XmlCatalogAllow::All | XmlCatalogAllow::Global)
-            {
-                resource = xml_catalog_resolve(id, url);
-            }
-            if resource.is_none() && url.is_some() {
-                resource = url.map(|url| url.to_owned());
-            }
-
-            // TODO: do an URI lookup on the reference
-            if let Some(rsrc) = resource
-                .as_deref()
-                .filter(|resource| xml_no_net_exists(Some(resource)) == 0)
-            {
-                let mut tmp = None;
-
-                if matches!(pref, XmlCatalogAllow::All | XmlCatalogAllow::Document) {
-                    if let Some(catalogs) = ctxt.catalogs.as_mut() {
-                        tmp = catalogs.local_resolve_uri(rsrc);
-                    }
-                }
-                if tmp.is_none() && matches!(pref, XmlCatalogAllow::All | XmlCatalogAllow::Global) {
-                    tmp = xml_catalog_resolve_uri(rsrc);
-                }
-
-                if let Some(tmp) = tmp {
-                    resource = Some(tmp);
-                }
+    if !matches!(pref, XmlCatalogAllow::None) && xml_no_net_exists(url) == 0 {
+        // Do a local lookup
+        if matches!(pref, XmlCatalogAllow::All | XmlCatalogAllow::Document) {
+            if let Some(catalogs) = ctxt.catalogs.as_mut() {
+                resource = catalogs.local_resolve(id, url);
             }
         }
+        // Try a global lookup
+        if resource.is_none() && matches!(pref, XmlCatalogAllow::All | XmlCatalogAllow::Global) {
+            resource = xml_catalog_resolve(id, url);
+        }
+        if resource.is_none() && url.is_some() {
+            resource = url.map(|url| url.to_owned());
+        }
 
-        resource
+        // TODO: do an URI lookup on the reference
+        if let Some(rsrc) = resource
+            .as_deref()
+            .filter(|resource| xml_no_net_exists(Some(resource)) == 0)
+        {
+            let mut tmp = None;
+
+            if matches!(pref, XmlCatalogAllow::All | XmlCatalogAllow::Document) {
+                if let Some(catalogs) = ctxt.catalogs.as_mut() {
+                    tmp = catalogs.local_resolve_uri(rsrc);
+                }
+            }
+            if tmp.is_none() && matches!(pref, XmlCatalogAllow::All | XmlCatalogAllow::Global) {
+                tmp = xml_catalog_resolve_uri(rsrc);
+            }
+
+            if let Some(tmp) = tmp {
+                resource = Some(tmp);
+            }
+        }
     }
+
+    resource
 }
 
 /// A specific entity loader disabling network accesses,

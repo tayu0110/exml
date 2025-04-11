@@ -676,7 +676,7 @@ impl XmlParserCtxt {
     /// [67] Reference ::= EntityRef | CharRef
     /// ```
     #[doc(alias = "xmlParseReference")]
-    pub(crate) unsafe fn parse_reference(&mut self) {
+    pub(crate) fn parse_reference(&mut self) {
         unsafe {
             let mut was_checked: i32;
             let mut list = None;
