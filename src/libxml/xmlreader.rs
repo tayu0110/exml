@@ -336,13 +336,6 @@ impl XmlTextReader {
         self.allocs = XML_TEXTREADER_CTXT;
         self.doc = Some(doc);
         self.state = XmlTextReaderState::Start;
-        if self.dict.is_null() {
-            if let Some(ctxt) = self.ctxt.as_deref().filter(|ctxt| !ctxt.dict.is_null()) {
-                self.dict = ctxt.dict;
-            } else {
-                self.dict = xml_dict_create();
-            }
-        }
         0
     }
 
@@ -455,21 +448,6 @@ impl XmlTextReader {
 
             self.ctxt.as_deref_mut().unwrap().input_push(input_stream);
             self.cur = 0;
-        }
-        if !self.dict.is_null() {
-            if !self.ctxt.as_deref_mut().unwrap().dict.is_null() {
-                if self.dict != self.ctxt.as_deref_mut().unwrap().dict {
-                    xml_dict_free(self.dict);
-                    self.dict = self.ctxt.as_deref_mut().unwrap().dict;
-                }
-            } else {
-                self.ctxt.as_deref_mut().unwrap().dict = self.dict;
-            }
-        } else {
-            if self.ctxt.as_deref_mut().unwrap().dict.is_null() {
-                self.ctxt.as_deref_mut().unwrap().dict = xml_dict_create();
-            }
-            self.dict = self.ctxt.as_deref_mut().unwrap().dict;
         }
         self.ctxt.as_deref_mut().unwrap()._private = self as *mut Self as _;
         self.ctxt.as_deref_mut().unwrap().linenumbers = 1;
@@ -3965,7 +3943,6 @@ pub unsafe fn xml_new_text_reader(
         (*ret).allocs = XML_TEXTREADER_CTXT;
         // use the parser dictionary to allocate all elements and attributes names
         ctxt.docdict = 1;
-        (*ret).dict = ctxt.dict;
         (*ret).ctxt = Some(ctxt);
         #[cfg(feature = "xinclude")]
         {
@@ -4057,13 +4034,8 @@ pub unsafe fn xml_free_text_reader(reader: XmlTextReaderPtr) {
         if (*reader).mode != XmlTextReaderMode::XmlTextreaderModeClosed {
             xml_text_reader_close(&mut *reader);
         }
-        if let Some(ctxt) = (*reader).ctxt.as_deref() {
-            if (*reader).dict == ctxt.dict {
-                (*reader).dict = null_mut();
-            }
-            if (*reader).allocs & XML_TEXTREADER_CTXT != 0 {
-                (*reader).ctxt.take();
-            }
+        if (*reader).allocs & XML_TEXTREADER_CTXT != 0 {
+            (*reader).ctxt.take();
         }
         if !(*reader).dict.is_null() {
             xml_dict_free((*reader).dict);

@@ -53,14 +53,13 @@ mod pi;
 mod reference;
 mod xmldecl;
 
-use std::{borrow::Cow, mem::take, ptr::null_mut};
+use std::{borrow::Cow, mem::take};
 
 pub(crate) use attribute::*;
 pub use dtd::*;
 pub(crate) use entity::*;
 
 use crate::{
-    dict::xml_dict_free,
     encoding::{XmlCharEncoding, detect_encoding, find_encoding_handler},
     error::XmlParserErrors,
     globals::GenericErrorContext,
@@ -526,10 +525,6 @@ pub(crate) unsafe fn xml_parse_balanced_chunk_memory_internal(
         ctxt.nb_errors = oldctxt.nb_errors;
         ctxt.nb_warnings = oldctxt.nb_warnings;
         ctxt.user_data = user_data;
-        if !ctxt.dict.is_null() {
-            xml_dict_free(ctxt.dict);
-        }
-        ctxt.dict = oldctxt.dict;
         ctxt.input_id = oldctxt.input_id;
         ctxt.str_xml = Some(Cow::Borrowed("xml"));
         ctxt.str_xmlns = Some(Cow::Borrowed("xmlns"));
@@ -557,7 +552,6 @@ pub(crate) unsafe fn xml_parse_balanced_chunk_memory_internal(
             let Some(mut new) = xml_new_doc(Some("1.0")) else {
                 oldctxt.sax = ctxt.sax.take();
                 ctxt.sax = oldsax;
-                ctxt.dict = null_mut();
                 return XmlParserErrors::XmlErrInternalError;
             };
             new_doc = Some(new);
@@ -568,7 +562,6 @@ pub(crate) unsafe fn xml_parse_balanced_chunk_memory_internal(
         let Some(new_root) = xml_new_doc_node(ctxt.my_doc, None, "pseudoroot", None) else {
             oldctxt.sax = ctxt.sax.take();
             ctxt.sax = oldsax;
-            ctxt.dict = null_mut();
             if let Some(new_doc) = new_doc {
                 xml_free_doc(new_doc);
             }
@@ -657,7 +650,6 @@ pub(crate) unsafe fn xml_parse_balanced_chunk_memory_internal(
         oldctxt.nb_warnings = ctxt.nb_warnings;
         oldctxt.sax = ctxt.sax.take();
         ctxt.sax = oldsax;
-        ctxt.dict = null_mut();
         ctxt.atts_default.clear();
         ctxt.atts_special = None;
         if let Some(new_doc) = new_doc {

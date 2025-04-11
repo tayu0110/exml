@@ -3407,13 +3407,6 @@ pub(crate) unsafe fn xml_schema_add_schema_doc(
                             );
                             break 'exit_failure;
                         };
-                        if !(*pctxt).dict.is_null() && !parser_ctxt.dict.is_null() {
-                            // TODO: Do we have to burden the schema parser dict with all
-                            // the content of the schema doc?
-                            xml_dict_free(parser_ctxt.dict);
-                            parser_ctxt.dict = (*pctxt).dict;
-                            xml_dict_reference(parser_ctxt.dict);
-                        }
                         if !schema_location.is_null() {
                             // Parse from file.
                             doc = xml_ctxt_read_file(

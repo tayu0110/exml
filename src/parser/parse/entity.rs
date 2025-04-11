@@ -1,7 +1,6 @@
-use std::{borrow::Cow, mem::take, ptr::null_mut};
+use std::{borrow::Cow, mem::take};
 
 use crate::{
-    dict::xml_dict_free,
     encoding::{XmlCharEncoding, detect_encoding},
     error::XmlParserErrors,
     generic_error,
@@ -729,10 +728,6 @@ pub(crate) unsafe fn parse_external_entity_private(
             ctxt.vctxt.flags = oldctxt.vctxt.flags;
         }
         ctxt.external = oldctxt.external;
-        if !ctxt.dict.is_null() {
-            xml_dict_free(ctxt.dict);
-        }
-        ctxt.dict = oldctxt.dict;
         ctxt.str_xml = Some(Cow::Borrowed("xml"));
         ctxt.str_xmlns = Some(Cow::Borrowed("xmlns"));
         ctxt.str_xml_ns = Some(Cow::Borrowed(XML_XML_NAMESPACE));
@@ -785,7 +780,6 @@ pub(crate) unsafe fn parse_external_entity_private(
             oldctxt.sizeentcopy = oldctxt.sizeentcopy.saturating_add(ctxt.sizeentcopy);
         }
 
-        ctxt.dict = null_mut();
         ctxt.atts_default.clear();
         ctxt.atts_special = None;
         oldctxt.nb_errors = ctxt.nb_errors;

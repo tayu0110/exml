@@ -12,7 +12,6 @@ use std::{
 
 use crate::{
     buf::XmlBufRef,
-    dict::{XmlDictPtr, xml_dict_create, xml_dict_free, xml_dict_set_limit},
     encoding::{
         XmlCharEncoding, XmlCharEncodingHandler, detect_encoding, find_encoding_handler,
         get_encoding_handler,
@@ -39,9 +38,9 @@ use crate::{
     },
     parser::{
         __xml_err_encoding, INPUT_CHUNK, LINE_LEN, XML_COMPLETE_ATTRS, XML_DETECT_IDS,
-        XML_MAX_DICTIONARY_LIMIT, XML_MAX_LOOKUP_LIMIT, XML_PARSER_MAX_DEPTH, XML_VCTXT_USE_PCTXT,
-        XmlParserInputState, XmlSAXHandler, XmlStartTag, xml_err_encoding_int, xml_err_internal,
-        xml_fatal_err_msg_int, xml_fatal_err_msg_str, xml_init_parser,
+        XML_MAX_LOOKUP_LIMIT, XML_PARSER_MAX_DEPTH, XML_VCTXT_USE_PCTXT, XmlParserInputState,
+        XmlSAXHandler, XmlStartTag, xml_err_encoding_int, xml_err_internal, xml_fatal_err_msg_int,
+        xml_fatal_err_msg_str, xml_init_parser,
     },
     tree::{
         XML_ENT_EXPANDING, XML_ENT_PARSED, XML_XML_NAMESPACE, XmlAttrPtr, XmlAttributeType,
@@ -234,8 +233,6 @@ pub struct XmlParserCtxt {
     pub(crate) recovery: i32,
     // is this a progressive parsing
     pub(crate) progressive: i32,
-    // dictionary for the parser
-    pub(crate) dict: XmlDictPtr,
     // array for the attributes callbacks
     pub(crate) atts: Vec<(String, Option<String>)>,
     // the size of the array
@@ -509,15 +506,6 @@ impl XmlParserCtxt {
     ) -> Result<(), Option<Box<XmlSAXHandler>>> {
         unsafe {
             xml_init_parser();
-
-            if self.dict.is_null() {
-                self.dict = xml_dict_create();
-            }
-            if self.dict.is_null() {
-                xml_err_memory(None, Some("cannot initialize parser context\n"));
-                return Err(sax);
-            }
-            xml_dict_set_limit(self.dict, XML_MAX_DICTIONARY_LIMIT);
 
             if let Some(mut sax) = sax {
                 if sax.initialized != XML_SAX2_MAGIC as u32 {
@@ -1746,9 +1734,6 @@ impl XmlParserCtxt {
         if options & XmlParserOption::XmlParseHuge as i32 != 0 {
             self.options |= XmlParserOption::XmlParseHuge as i32;
             options -= XmlParserOption::XmlParseHuge as i32;
-            if !self.dict.is_null() {
-                xml_dict_set_limit(self.dict, 0);
-            }
         }
         if options & XmlParserOption::XmlParseOldSAX as i32 != 0 {
             self.options |= XmlParserOption::XmlParseOldSAX as i32;
@@ -2072,7 +2057,6 @@ impl Default for XmlParserCtxt {
             catalogs: None,
             recovery: 0,
             progressive: 0,
-            dict: null_mut(),
             atts: vec![],
             maxatts: 0,
             docdict: 0,
@@ -2112,9 +2096,6 @@ impl Drop for XmlParserCtxt {
     #[doc(alias = "xmlFreeParserCtxt")]
     fn drop(&mut self) {
         unsafe {
-            if !self.dict.is_null() {
-                xml_dict_free(self.dict);
-            }
             if !self.attallocs.is_null() {
                 xml_free(self.attallocs as _);
             }
