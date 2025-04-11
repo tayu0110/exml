@@ -516,12 +516,13 @@ impl XmlDebugCtxt<'_> {
                         write!(self.output, ", MIXED ").ok();
                     }
                 }
-                if elem.element_type() != XmlElementType::XmlElementNode && !elem.content.is_null()
-                {
-                    let mut buf = String::with_capacity(5000);
+                if elem.element_type() != XmlElementType::XmlElementNode {
+                    if let Some(content) = elem.content.clone() {
+                        let mut buf = String::with_capacity(5000);
 
-                    xml_snprintf_element_content(&mut buf, 5000, elem.content, 1);
-                    write!(self.output, "{}", buf).ok();
+                        xml_snprintf_element_content(&mut buf, 5000, content, 1);
+                        write!(self.output, "{}", buf).ok();
+                    }
                 }
                 writeln!(self.output).ok();
             }

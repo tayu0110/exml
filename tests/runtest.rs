@@ -66,7 +66,7 @@ use exml::{
     },
     relaxng::xml_relaxng_init_types,
     tree::{
-        XmlAttributeDefault, XmlAttributeType, XmlDocPtr, XmlElementContentPtr, XmlElementType,
+        XmlAttributeDefault, XmlAttributeType, XmlDocPtr, XmlElementContent, XmlElementType,
         XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNodePtr, xml_free_doc,
     },
     uri::{XmlURI, build_uri, normalize_uri_path},
@@ -792,7 +792,7 @@ fn element_decl_debug(
     _ctx: &mut XmlParserCtxt,
     name: &str,
     typ: Option<XmlElementTypeVal>,
-    _content: XmlElementContentPtr,
+    _content: Option<Rc<RefCell<XmlElementContent>>>,
 ) {
     increment_callbacks_counter();
     sax_debugln!(

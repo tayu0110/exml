@@ -23,14 +23,13 @@ use crate::{
         globals::xml_free,
         relaxng::XmlRelaxNGPtr,
         schemas_internals::{XmlSchemaFacetPtr, XmlSchemaValType},
-        valid::xml_free_element_content,
         xmlreader::XmlTextReaderLocatorPtr,
         xmlregexp::{XmlExpCtxtPtr, XmlExpNodePtr},
         xmlschemastypes::{XmlSchemaValPtr, XmlSchemaWhitespaceValueType},
         xmlstring::XmlChar,
     },
     parser::{XmlParserCtxtPtr, xml_free_parser_ctxt},
-    tree::{XmlAttr, XmlDoc, XmlDtd, XmlElementContentPtr, XmlNode, XmlNs},
+    tree::{XmlAttr, XmlDoc, XmlDtd, XmlNode, XmlNs},
     xpath::{
         XmlNodeSet, XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathObjectPtr,
         XmlXPathParserContextPtr,
@@ -480,24 +479,6 @@ pub(crate) unsafe fn gen_xml_char_ptr(no: i32, _nr: i32) -> *mut XmlChar {
     })
 }
 pub(crate) fn des_xml_char_ptr(_no: i32, _val: *mut XmlChar, _nr: i32) {}
-
-pub(crate) fn gen_xml_element_content_ptr(_no: i32, _nr: i32) -> XmlElementContentPtr {
-    null_mut()
-}
-pub(crate) unsafe fn des_xml_element_content_ptr(_no: i32, val: XmlElementContentPtr, _nr: i32) {
-    unsafe {
-        if !val.is_null() {
-            xml_free_element_content(val);
-        }
-    }
-}
-pub(crate) unsafe fn desret_xml_element_content_ptr(val: XmlElementContentPtr) {
-    unsafe {
-        if !val.is_null() {
-            xml_free_element_content(val);
-        }
-    }
-}
 
 pub(crate) fn gen_unsigned_char_ptr(_no: i32, _nr: i32) -> *mut u8 {
     null_mut()

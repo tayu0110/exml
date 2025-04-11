@@ -21,6 +21,7 @@
 
 use std::{
     borrow::Cow,
+    cell::RefCell,
     ffi::{CStr, CString, c_char},
     mem::{size_of, take},
     os::raw::c_void,
@@ -107,7 +108,7 @@ use crate::{
     },
     tree::{
         NodeCommon, XmlAttrPtr, XmlAttributeDefault, XmlAttributeType, XmlDocPtr,
-        XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType,
+        XmlElementContent, XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType,
         XmlEnumeration, XmlGenericNodePtr, XmlNodePtr, validate_ncname, validate_qname,
         xml_free_doc, xml_free_node, xml_new_doc_text, xml_new_ns, xml_new_ns_prop, xml_new_prop,
         xml_split_qname2,
@@ -19383,7 +19384,7 @@ fn element_decl_split(
     ctxt: &mut XmlParserCtxt,
     name: &str,
     typ: Option<XmlElementTypeVal>,
-    content: XmlElementContentPtr,
+    content: Option<Rc<RefCell<XmlElementContent>>>,
 ) {
     unsafe {
         let user_data = ctxt.user_data.clone().unwrap();

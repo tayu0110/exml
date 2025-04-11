@@ -19,6 +19,7 @@ use std::{
     mem::zeroed,
     process::exit,
     ptr::{addr_of_mut, null, null_mut},
+    rc::Rc,
     slice::from_raw_parts,
     sync::{
         LazyLock, Mutex,
@@ -93,7 +94,7 @@ use exml::{
     save::{XmlSaveCtxt, XmlSaveOption},
     tree::{
         NodeCommon, XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDoc,
-        XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElementContentPtr, XmlElementPtr, XmlElementTypeVal,
+        XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElementContent, XmlElementPtr, XmlElementTypeVal,
         XmlEntity, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlGenericNodePtr, XmlNode,
         XmlNodePtr, XmlNsPtr, xml_copy_doc, xml_encode_entities_reentrant, xml_free_doc,
         xml_free_dtd, xml_new_doc, xml_new_doc_node,
@@ -1477,7 +1478,7 @@ fn element_decl_debug(
     _ctx: &mut XmlParserCtxt,
     name: &str,
     typ: Option<XmlElementTypeVal>,
-    _content: XmlElementContentPtr,
+    _content: Option<Rc<RefCell<XmlElementContent>>>,
 ) {
     CALLBACKS.fetch_add(1, Ordering::Relaxed);
     if CMD_ARGS.noout {

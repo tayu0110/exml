@@ -42,15 +42,15 @@
 //
 // daniel@veillard.com
 
-use std::{ffi::c_void, rc::Rc, sync::atomic::AtomicPtr};
+use std::{cell::RefCell, ffi::c_void, rc::Rc, sync::atomic::AtomicPtr};
 
 use crate::{
     globals::{GenericErrorContext, StructuredError},
     libxml::xmlstring::XmlChar,
     parser::XmlParserInput,
     tree::{
-        XmlAttributeDefault, XmlAttributeType, XmlElementContentPtr, XmlElementTypeVal,
-        XmlEntityPtr, XmlEntityType, XmlEnumeration,
+        XmlAttributeDefault, XmlAttributeType, XmlElementContent, XmlElementTypeVal, XmlEntityPtr,
+        XmlEntityType, XmlEnumeration,
     },
 };
 
@@ -131,7 +131,7 @@ pub type AttributeDeclSAXFunc = fn(
 /// An element definition has been parsed.
 #[doc(alias = "elementDeclSAXFunc")]
 pub type ElementDeclSAXFunc =
-    fn(&mut XmlParserCtxt, &str, Option<XmlElementTypeVal>, XmlElementContentPtr);
+    fn(&mut XmlParserCtxt, &str, Option<XmlElementTypeVal>, Option<Rc<RefCell<XmlElementContent>>>);
 
 /// What to do when an unparsed entity declaration is parsed.
 #[doc(alias = "unparsedEntityDeclSAXFunc")]

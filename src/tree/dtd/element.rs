@@ -21,6 +21,7 @@
 use std::{
     any::type_name,
     borrow::Cow,
+    cell::RefCell,
     ops::{Deref, DerefMut},
     os::raw::c_void,
     ptr::{NonNull, null_mut},
@@ -29,12 +30,9 @@ use std::{
 
 #[cfg(feature = "libxml_regexp")]
 use crate::libxml::xmlregexp::XmlRegexp;
-use crate::{
-    libxml::valid::xml_free_doc_element_content,
-    tree::{
-        InvalidNodePointerCastError, NodeCommon, XmlDocPtr, XmlElementContentPtr, XmlElementType,
-        XmlElementTypeVal, XmlGenericNodePtr,
-    },
+use crate::tree::{
+    InvalidNodePointerCastError, NodeCommon, XmlDocPtr, XmlElementContent, XmlElementType,
+    XmlElementTypeVal, XmlGenericNodePtr,
 };
 
 use super::{XmlAttributePtr, XmlDtdPtr};
@@ -51,10 +49,10 @@ pub struct XmlElement {
     pub(crate) prev: Option<XmlGenericNodePtr>,     /* previous sibling link  */
     pub(crate) doc: Option<XmlDocPtr>,              /* the containing document */
 
-    pub(crate) etype: XmlElementTypeVal,            /* The type */
-    pub(crate) content: XmlElementContentPtr,       /* the allowed element content */
+    pub(crate) etype: XmlElementTypeVal, /* The type */
+    pub(crate) content: Option<Rc<RefCell<XmlElementContent>>>, /* the allowed element content */
     pub(crate) attributes: Option<XmlAttributePtr>, /* List of the declared attributes */
-    pub(crate) prefix: Option<String>,              /* the namespace prefix if any */
+    pub(crate) prefix: Option<String>,   /* the namespace prefix if any */
     #[cfg(feature = "libxml_regexp")]
     pub(crate) cont_model: Option<Rc<XmlRegexp>>, /* the validating regexp */
     #[cfg(not(feature = "libxml_regexp"))]
@@ -74,7 +72,7 @@ impl Default for XmlElement {
             prev: None,
             doc: None,
             etype: XmlElementTypeVal::XmlElementTypeUndefined,
-            content: null_mut(),
+            content: None,
             attributes: None,
             prefix: None,
             cont_model: None,
@@ -262,7 +260,7 @@ pub(crate) unsafe fn xml_copy_element(elem: XmlElementPtr) -> Option<XmlElementP
             etype: elem.etype,
             name: elem.name.clone(),
             prefix: elem.prefix.clone(),
-            content: xml_copy_element_content(elem.content),
+            content: xml_copy_element_content(elem.content.clone()),
             // TODO : rebuild the attribute list on the copy
             attributes: None,
             ..Default::default()
@@ -282,9 +280,6 @@ pub(crate) unsafe fn xml_free_element(elem: Option<XmlElementPtr>) {
             return;
         };
         elem.unlink();
-        xml_free_doc_element_content(elem.doc, elem.content);
-        elem.name = None;
-        elem.prefix = None;
         elem.free();
     }
 }

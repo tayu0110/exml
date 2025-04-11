@@ -7,6 +7,7 @@ use std::{
     io::{self, Read},
     os::raw::c_void,
     ptr::null_mut,
+    rc::Rc,
     sync::atomic::{AtomicPtr, AtomicU64, AtomicUsize, Ordering},
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -29,7 +30,7 @@ use exml::{
         xml_set_external_entity_loader,
     },
     tree::{
-        XmlAttributeDefault, XmlAttributeType, XmlElementContentPtr, XmlElementType,
+        XmlAttributeDefault, XmlAttributeType, XmlElementContent, XmlElementType,
         XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNodePtr, xml_free_doc,
     },
 };
@@ -750,7 +751,7 @@ fn element_decl_callback(
     _ctx: &mut XmlParserCtxt,
     _name: &str,
     _typ: Option<XmlElementTypeVal>,
-    _content: XmlElementContentPtr,
+    _content: Option<Rc<RefCell<XmlElementContent>>>,
 ) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }

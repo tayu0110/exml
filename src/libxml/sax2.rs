@@ -19,7 +19,7 @@
 //
 // Daniel Veillard <daniel@veillard.com>
 
-use std::{ffi::c_void, mem::replace, ptr::null};
+use std::{cell::RefCell, ffi::c_void, mem::replace, ptr::null, rc::Rc};
 
 use crate::{
     encoding::{XmlCharEncoding, detect_encoding},
@@ -38,7 +38,7 @@ use crate::{
     },
     tree::{
         NodeCommon, XmlAttr, XmlAttributeDefault, XmlAttributeType, XmlDocProperties,
-        XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType,
+        XmlElementContent, XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType,
         XmlEnumeration, XmlNode, XmlNodePtr, XmlNsPtr, validate_ncname, xml_add_doc_entity,
         xml_add_dtd_entity, xml_create_int_subset, xml_free_dtd, xml_free_node, xml_get_doc_entity,
         xml_get_parameter_entity, xml_get_predefined_entity, xml_new_cdata_block, xml_new_char_ref,
@@ -735,7 +735,7 @@ pub fn xml_sax2_element_decl(
     ctxt: &mut XmlParserCtxt,
     name: &str,
     typ: Option<XmlElementTypeVal>,
-    content: XmlElementContentPtr,
+    content: Option<Rc<RefCell<XmlElementContent>>>,
 ) {
     unsafe {
         let Some(my_doc) = ctxt.my_doc else {

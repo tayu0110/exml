@@ -37,8 +37,10 @@ mod node;
 
 use std::{
     borrow::Cow,
+    cell::RefCell,
     fmt::Display,
     ptr::null_mut,
+    rc::{Rc, Weak},
     sync::atomic::{AtomicBool, AtomicI32, Ordering},
 };
 
@@ -170,16 +172,29 @@ pub enum XmlElementContentOccur {
 }
 
 /// An XML Element content as stored after parsing an element definition in a DTD.
-pub type XmlElementContentPtr = *mut XmlElementContent;
 #[repr(C)]
 pub struct XmlElementContent {
     pub(crate) typ: XmlElementContentType, /* PCDATA, ELEMENT, SEQ or OR */
     pub(crate) ocur: XmlElementContentOccur, /* ONCE, OPT, MULT or PLUS */
-    pub(crate) name: *const XmlChar,       /* Element name */
-    pub(crate) c1: *mut XmlElementContent, /* first child */
-    pub(crate) c2: *mut XmlElementContent, /* second child */
-    pub(crate) parent: *mut XmlElementContent, /* parent */
-    pub(crate) prefix: *const XmlChar,     /* Namespace prefix */
+    pub(crate) name: Option<Box<str>>,     /* Element name */
+    pub(crate) c1: Option<Rc<RefCell<XmlElementContent>>>, /* first child */
+    pub(crate) c2: Option<Rc<RefCell<XmlElementContent>>>, /* second child */
+    pub(crate) parent: Weak<RefCell<XmlElementContent>>, /* parent */
+    pub(crate) prefix: Option<Box<str>>,   /* Namespace prefix */
+}
+
+impl Default for XmlElementContent {
+    fn default() -> Self {
+        Self {
+            typ: XmlElementContentType::XmlElementContentPCDATA,
+            ocur: XmlElementContentOccur::XmlElementContentOnce,
+            name: None,
+            c1: None,
+            c2: None,
+            parent: Weak::new(),
+            prefix: None,
+        }
+    }
 }
 
 /// The different possibilities for an element content type.
