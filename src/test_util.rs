@@ -9,6 +9,8 @@ use std::{
 
 #[cfg(feature = "catalog")]
 use crate::libxml::catalog::{XmlCatalogAllow, XmlCatalogPrefer};
+#[cfg(feature = "libxml_reader")]
+use crate::libxml::xmlreader::XmlTextReaderLocatorPtr;
 #[cfg(feature = "schema")]
 use crate::xmlschemas::{
     context::{XmlSchemaParserCtxtPtr, XmlSchemaValidCtxtPtr},
@@ -20,7 +22,6 @@ use crate::{
         globals::xml_free,
         relaxng::XmlRelaxNGPtr,
         schemas_internals::{XmlSchemaFacetPtr, XmlSchemaValType},
-        xmlreader::XmlTextReaderLocatorPtr,
         xmlregexp::{XmlExpCtxtPtr, XmlExpNodePtr},
         xmlschemastypes::{XmlSchemaValPtr, XmlSchemaWhitespaceValueType},
         xmlstring::XmlChar,

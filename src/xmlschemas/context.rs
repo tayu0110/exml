@@ -20,6 +20,8 @@ use std::{
 
 #[cfg(feature = "libxml_automata")]
 use crate::libxml::xmlautomata::XmlAutomata;
+#[cfg(feature = "libxml_reader")]
+use crate::libxml::xmlreader::XmlTextReaderPtr;
 use crate::{
     dict::{XmlDictPtr, xml_dict_create, xml_dict_free, xml_dict_reference},
     encoding::XmlCharEncoding,
@@ -27,7 +29,6 @@ use crate::{
     io::XmlParserInputBuffer,
     libxml::{
         globals::xml_free,
-        xmlreader::XmlTextReaderPtr,
         xmlregexp::XmlRegExecCtxtPtr,
         xmlschemas::{
             XML_SCHEMA_CTXT_PARSER, XML_SCHEMA_CTXT_VALIDATOR,
@@ -813,6 +814,7 @@ impl Default for XmlSchemaValidCtxt {
             size_idc_keys: 0,
             flags: 0,
             dict: null_mut(),
+            #[cfg(feature = "libxml_reader")]
             reader: null_mut(),
             attr_infos: null_mut(),
             nb_attr_infos: 0,

@@ -31,8 +31,6 @@ use std::{
 use crate::pattern::{XmlPattern, xml_pattern_compile};
 #[cfg(feature = "schema")]
 use crate::relaxng::{XmlRelaxNGValidCtxtPtr, xml_relaxng_new_parser_ctxt};
-#[cfg(feature = "libxml_reader")]
-use crate::tree::{XmlAttrPtr, XmlDocPtr};
 #[cfg(feature = "xinclude")]
 use crate::xinclude::XmlXIncludeCtxt;
 #[cfg(feature = "schema")]
@@ -64,9 +62,9 @@ use crate::{
         XmlSAXHandler,
     },
     tree::{
-        __XML_REGISTER_CALLBACKS, XmlElementType, XmlGenericNodePtr, XmlNodePtr, xml_copy_dtd,
-        xml_doc_copy_node, xml_free_doc, xml_free_dtd, xml_free_node, xml_free_ns,
-        xml_free_ns_list, xml_new_doc_text,
+        __XML_REGISTER_CALLBACKS, XmlAttrPtr, XmlDocPtr, XmlElementType, XmlGenericNodePtr,
+        XmlNodePtr, xml_copy_dtd, xml_doc_copy_node, xml_free_doc, xml_free_dtd, xml_free_node,
+        xml_free_ns, xml_free_ns_list, xml_new_doc_text,
     },
     xmlschemas::context::XmlSchemaValidCtxtPtr,
 };
@@ -84,7 +82,6 @@ pub enum XmlParserSeverities {
 
 /// Internal state values for the reader.
 #[doc(alias = "xmlTextReaderMode")]
-#[cfg(feature = "libxml_reader")]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum XmlTextReaderMode {
@@ -101,7 +98,6 @@ pub enum XmlTextReaderMode {
 /// is better to use xmlParserOption and the xmlReaderNewxxx and
 /// xmlReaderForxxx APIs now.
 #[doc(alias = "xmlParserProperties")]
-#[cfg(feature = "libxml_reader")]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum XmlParserProperties {
@@ -133,7 +129,6 @@ impl TryFrom<i32> for XmlParserProperties {
 
 /// Predefined constants for the different types of nodes.
 #[doc(alias = "xmlReaderTypes")]
-#[cfg(feature = "libxml_reader")]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum XmlReaderTypes {
@@ -157,12 +152,9 @@ pub enum XmlReaderTypes {
     XmlReaderTypeXmlDeclaration = 17,
 }
 
-#[cfg(feature = "libxml_reader")]
 const XML_TEXTREADER_INPUT: i32 = 1;
-#[cfg(feature = "libxml_reader")]
 const XML_TEXTREADER_CTXT: i32 = 2;
 
-#[cfg(feature = "libxml_reader")]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 enum XmlTextReaderState {
@@ -177,7 +169,6 @@ enum XmlTextReaderState {
     Error = 6,
 }
 
-#[cfg(feature = "libxml_reader")]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 enum XmlTextReaderValidate {
@@ -190,11 +181,9 @@ enum XmlTextReaderValidate {
 
 /// Pointer to an xmlReader context.
 #[doc(alias = "xmlTextReaderPtr")]
-#[cfg(feature = "libxml_reader")]
 pub type XmlTextReaderPtr = *mut XmlTextReader;
 /// Structure for an xmlReader context.
 #[doc(alias = "xmlTextReader")]
-#[cfg(feature = "libxml_reader")]
 #[repr(C)]
 pub struct XmlTextReader {
     // the parsing mode
@@ -314,7 +303,6 @@ impl XmlTextReader {
     ///
     /// Returns 0 in case of success and -1 in case of error
     #[doc(alias = "xmlReaderNewWalker")]
-    #[cfg(feature = "libxml_reader")]
     pub fn new_walker(&mut self, doc: XmlDocPtr) -> i32 {
         if self.input.is_some() {
             let _ = self.input.take();
@@ -340,7 +328,6 @@ impl XmlTextReader {
     ///
     /// Returns 0 in case of success and -1 in case of error.
     #[doc(alias = "xmlTextReaderSetup")]
-    #[cfg(feature = "libxml_reader")]
     pub fn setup(
         &mut self,
         input: Option<XmlParserInputBuffer>,
@@ -504,7 +491,6 @@ impl XmlTextReader {
     /// Returns 1 if the node was read successfully, 0 if there is no more nodes to read,
     /// or -1 in case of error
     #[doc(alias = "xmlTextReaderRead")]
-    #[cfg(feature = "libxml_reader")]
     pub unsafe fn read(&mut self) -> i32 {
         use crate::parser::XmlParserInputState;
 
@@ -1019,7 +1005,6 @@ impl XmlTextReader {
     /// Returns 1 if the node was read successfully, 0 if there is no more nodes to read,
     /// or -1 in case of error
     #[doc(alias = "xmlTextReaderReadTree")]
-    #[cfg(feature = "libxml_reader")]
     fn read_tree(&mut self) -> i32 {
         if self.state == XmlTextReaderState::End {
             return 0;
@@ -1116,7 +1101,6 @@ impl XmlTextReader {
     /// or NULL if the reader is positioned on any other type of node.
     /// The string must be deallocated by the caller.
     #[doc(alias = "xmlTextReaderReadString")]
-    #[cfg(feature = "libxml_reader")]
     pub unsafe fn read_string(&mut self) -> Option<String> {
         unsafe {
             let current_node = self.node?;
@@ -1148,7 +1132,6 @@ impl XmlTextReader {
     /// Returns 1 in case of success, 0 if the reader was not positioned on an
     /// attribute node or all the attribute values have been read, or -1 in case of error.
     #[doc(alias = "xmlTextReaderReadAttributeValue")]
-    #[cfg(feature = "libxml_reader")]
     pub fn read_attribute_value(&mut self) -> i32 {
         use crate::tree::XmlNsPtr;
 
@@ -1185,7 +1168,6 @@ impl XmlTextReader {
     /// Returns 1 if the node was expanded successfully, 0 if there is no more nodes to read,
     /// or -1 in case of error
     #[doc(alias = "xmlTextReaderDoExpand")]
-    #[cfg(feature = "libxml_reader")]
     unsafe fn do_expand(&mut self) -> i32 {
         use crate::parser::XmlParserInputState;
 
@@ -1229,7 +1211,6 @@ impl XmlTextReader {
     ///
     /// Returns a node pointer valid until the next xmlTextReaderRead() call or NULL in case of error.
     #[doc(alias = "xmlTextReaderExpand")]
-    #[cfg(feature = "libxml_reader")]
     pub unsafe fn expand(&mut self) -> Option<XmlGenericNodePtr> {
         unsafe {
             self.node?;
@@ -1248,7 +1229,6 @@ impl XmlTextReader {
     ///
     /// Returns -1 in case of failure, 0 otherwise
     #[doc(alias = "xmlTextReaderPushData")]
-    #[cfg(feature = "libxml_reader")]
     unsafe fn push_data(&mut self) -> i32 {
         unsafe {
             let mut val: i32;
@@ -1360,7 +1340,6 @@ impl XmlTextReader {
     ///
     /// Returns -1 in case of error, the index in the stack otherwise
     #[doc(alias = "xmlTextReaderEntPush")]
-    #[cfg(feature = "libxml_reader")]
     fn entity_push(&mut self, value: XmlNodePtr) -> i32 {
         self.ent_tab.push(value);
         self.ent = Some(value);
@@ -1371,7 +1350,6 @@ impl XmlTextReader {
     ///
     /// Returns the entity just removed
     #[doc(alias = "xmlTextReaderEntPop")]
-    #[cfg(feature = "libxml_reader")]
     fn entity_pop(&mut self) -> Option<XmlNodePtr> {
         let res = self.ent_tab.pop()?;
         self.ent = self.ent_tab.last().copied();
@@ -1446,7 +1424,6 @@ impl XmlTextReader {
 
     /// Pop the current node from validation
     #[doc(alias = "xmlTextReaderValidatePop")]
-    #[cfg(feature = "libxml_reader")]
     unsafe fn validate_pop(&mut self) {
         use crate::tree::NodeCommon;
 
@@ -1941,7 +1918,6 @@ impl XmlTextReader {
     ///
     /// Returns the flag value `Some(true)` if valid, `Some(false)` if no, and `None` in case of error
     #[doc(alias = "xmlTextReaderIsValid")]
-    #[cfg(feature = "libxml_reader")]
     pub fn is_valid(&self) -> Option<bool> {
         #[cfg(feature = "schema")]
         {
@@ -1966,7 +1942,6 @@ impl XmlTextReader {
     ///
     /// Returns `false` if not defaulted, `true` if defaulted
     #[doc(alias = "xmlTextReaderIsDefault")]
-    #[cfg(feature = "libxml_reader")]
     pub fn is_default(&self) -> bool {
         false
     }
@@ -1975,7 +1950,6 @@ impl XmlTextReader {
     ///
     /// Returns `Some(true)` if empty, `Some(false)` if not and `None` in case of error
     #[doc(alias = "xmlTextReaderIsEmptyElement")]
-    #[cfg(feature = "libxml_reader")]
     pub fn is_empty_element(&self) -> Option<bool> {
         let current_node = self.node?;
         if current_node.element_type() != XmlElementType::XmlElementNode {
@@ -2007,7 +1981,6 @@ impl XmlTextReader {
     /// `Some(false)` if it is a regular attribute or other type of node,
     /// or `None` in case of error.
     #[doc(alias = "xmlTextReaderIsNamespaceDecl")]
-    #[cfg(feature = "libxml_reader")]
     pub fn is_namespace_decl(&self) -> Option<bool> {
         let current_node = self.node?;
 
@@ -2020,7 +1993,6 @@ impl XmlTextReader {
     ///
     /// Returns `true` if true, `false` if false.
     #[doc(alias = "xmlTextReaderHasAttributes")]
-    #[cfg(feature = "libxml_reader")]
     pub fn has_attributes(&self) -> bool {
         use crate::tree::NodeCommon;
 
@@ -2044,7 +2016,6 @@ impl XmlTextReader {
 
     /// Whether the node can have a text value.
     #[doc(alias = "xmlTextReaderHasValue")]
-    #[cfg(feature = "libxml_reader")]
     pub fn has_value(&self) -> bool {
         let Some(current_node) = self.node else {
             return false;
@@ -2065,7 +2036,6 @@ impl XmlTextReader {
     ///
     /// Returns a string containing the value of the specified attribute, or `None` in case of error.  
     #[doc(alias = "xmlTextReaderGetAttribute")]
-    #[cfg(feature = "libxml_reader")]
     pub fn get_attribute(&mut self, name: &str) -> Option<String> {
         use crate::{parser::split_qname2, tree::NodeCommon};
 
@@ -2116,7 +2086,6 @@ impl XmlTextReader {
     /// Returns a string containing the value of the specified attribute, or NULL in case of error.  
     /// The string must be deallocated by the caller.
     #[doc(alias = "xmlTextReaderGetAttributeNs")]
-    #[cfg(feature = "libxml_reader")]
     pub fn get_attribute_ns(
         &mut self,
         local_name: &str,
@@ -2155,7 +2124,6 @@ impl XmlTextReader {
     ///
     /// Returns a string containing the value of the specified attribute, or `None` in case of error.  
     #[doc(alias = "xmlTextReaderGetAttributeNo")]
-    #[cfg(feature = "libxml_reader")]
     pub fn get_attribute_no(&mut self, no: i32) -> Option<String> {
         use crate::tree::NodeCommon;
 
@@ -2192,7 +2160,6 @@ impl XmlTextReader {
     ///
     /// Returns the value, usually 0 or 1, or -1 in case of error.
     #[doc(alias = "xmlTextReaderGetParserProp")]
-    #[cfg(feature = "libxml_reader")]
     pub fn get_parser_prop(&mut self, prop: XmlParserProperties) -> i32 {
         let Some(ctxt) = self.ctxt.as_deref() else {
             return -1;
@@ -2220,7 +2187,6 @@ impl XmlTextReader {
     ///
     /// Returns an int or 0 if not available
     #[doc(alias = "xmlTextReaderGetParserLineNumber")]
-    #[cfg(feature = "libxml_reader")]
     pub fn get_parser_line_number(&self) -> i32 {
         if self.ctxt.is_none() || self.ctxt.as_deref().unwrap().input().is_none() {
             return 0;
@@ -2232,7 +2198,6 @@ impl XmlTextReader {
     ///
     /// Returns an int or 0 if not available
     #[doc(alias = "xmlTextReaderGetParserColumnNumber")]
-    #[cfg(feature = "libxml_reader")]
     pub fn get_parser_column_number(&self) -> i32 {
         if self.ctxt.is_none() || self.ctxt.as_deref().unwrap().input().is_none() {
             return 0;
@@ -2250,7 +2215,6 @@ impl XmlTextReader {
     ///
     /// Returns the xmlParserInputBufferPtr attached to the XML or NULL in case of error.
     #[doc(alias = "xmlTextReaderGetRemainder")]
-    #[cfg(feature = "libxml_reader")]
     pub unsafe fn get_remainder(&mut self) -> Option<XmlParserInputBuffer> {
         unsafe {
             self.node?;
@@ -2282,7 +2246,6 @@ impl XmlTextReader {
 
     /// Retrieve the error callback function and user argument.
     #[doc(alias = "xmlTextReaderGetErrorHandler")]
-    #[cfg(feature = "libxml_reader")]
     pub fn get_error_handler(
         &self,
         f: &mut Option<XmlTextReaderErrorFunc>,
@@ -2297,7 +2260,6 @@ impl XmlTextReader {
     ///
     /// Returns 0 if the call was successful, or -1 in case of error
     #[doc(alias = "xmlTextReaderSetParserProp")]
-    #[cfg(feature = "libxml_reader")]
     pub fn set_parser_prop(&mut self, prop: XmlParserProperties, value: i32) -> i32 {
         let Some(ctxt) = self.ctxt.as_deref_mut() else {
             return -1;
@@ -2353,7 +2315,6 @@ impl XmlTextReader {
     ///
     /// If @f is NULL, the default error and warning handlers are restored.
     #[doc(alias = "xmlTextReaderSetErrorHandler")]
-    #[cfg(feature = "libxml_reader")]
     pub unsafe fn set_error_handler(
         &mut self,
         f: Option<XmlTextReaderErrorFunc>,
@@ -2438,7 +2399,6 @@ impl XmlTextReader {
     ///
     /// If @f is NULL, the default error and warning handlers are restored.
     #[doc(alias = "xmlTextReaderSetStructuredErrorHandler")]
-    #[cfg(feature = "libxml_reader")]
     pub unsafe fn set_structured_error_handler(
         &mut self,
         f: Option<StructuredError>,
@@ -2691,7 +2651,6 @@ impl XmlTextReader {
     ///
     /// Returns 1 in case of success, -1 in case of error, 0 if not moved
     #[doc(alias = "xmlTextReaderMoveToElement")]
-    #[cfg(feature = "libxml_reader")]
     pub fn move_to_element(&mut self) -> i32 {
         if self.node.is_none() {
             return -1;
@@ -2710,7 +2669,6 @@ impl XmlTextReader {
     ///
     /// Returns 1 in case of success, -1 in case of error, 0 if not found
     #[doc(alias = "xmlTextReaderMoveToAttribute")]
-    #[cfg(feature = "libxml_reader")]
     pub fn move_to_attribute(&mut self, name: &str) -> i32 {
         use crate::{parser::split_qname2, tree::NodeCommon};
 
@@ -2796,7 +2754,6 @@ impl XmlTextReader {
     ///
     /// Returns 1 in case of success, -1 in case of error, 0 if not found
     #[doc(alias = "xmlTextReaderMoveToAttributeNs")]
-    #[cfg(feature = "libxml_reader")]
     pub fn move_to_attribute_ns(&mut self, local_name: &str, namespace_uri: &str) -> i32 {
         use crate::tree::NodeCommon;
 
@@ -2849,7 +2806,6 @@ impl XmlTextReader {
     ///
     /// Returns 1 in case of success, -1 in case of error, 0 if not found
     #[doc(alias = "xmlTextReaderMoveToAttributeNo")]
-    #[cfg(feature = "libxml_reader")]
     pub fn move_to_attribute_no(&mut self, no: i32) -> i32 {
         use crate::tree::NodeCommon;
 
@@ -2897,7 +2853,6 @@ impl XmlTextReader {
     ///
     /// Returns 1 in case of success, -1 in case of error, 0 if not found
     #[doc(alias = "xmlTextReaderMoveToFirstAttribute")]
-    #[cfg(feature = "libxml_reader")]
     pub fn move_to_first_attribute(&mut self) -> i32 {
         use crate::tree::NodeCommon;
 
@@ -2928,7 +2883,6 @@ impl XmlTextReader {
     ///
     /// Returns 1 in case of success, -1 in case of error, 0 if not found
     #[doc(alias = "xmlTextReaderMoveToNextAttribute")]
-    #[cfg(feature = "libxml_reader")]
     pub fn move_to_next_attribute(&mut self) -> i32 {
         use crate::tree::{NodeCommon, XmlNsPtr};
 
@@ -2971,7 +2925,6 @@ impl XmlTextReader {
     /// Returns a string containing the namespace URI to which the prefix maps or NULL in case of error.  
     /// The string must be deallocated by the caller.
     #[doc(alias = "xmlTextReaderLookupNamespace")]
-    #[cfg(feature = "libxml_reader")]
     pub fn lookup_namespace(&mut self, prefix: Option<&str>) -> Option<String> {
         let current_node = self.node.as_ref()?;
 
@@ -2986,7 +2939,6 @@ impl XmlTextReader {
     ///
     /// Returns " or ' and `None` in case of error
     #[doc(alias = "xmlTextReaderQuoteChar")]
-    #[cfg(feature = "libxml_reader")]
     pub fn quote_char(&self) -> Option<char> {
         // TODO maybe lookup the attribute value for " first
         Some('"')
@@ -2996,7 +2948,6 @@ impl XmlTextReader {
     ///
     /// Returns the state value, or -1 in case of error
     #[doc(alias = "xmlTextReaderReadState")]
-    #[cfg(feature = "libxml_reader")]
     pub fn read_state(&self) -> XmlTextReaderMode {
         self.mode
     }
@@ -3010,7 +2961,6 @@ impl XmlTextReader {
     /// Returns the index in bytes from the beginning of the entity or -1
     /// in case the index could not be computed.
     #[doc(alias = "xmlTextReaderByteConsumed")]
-    #[cfg(feature = "libxml_reader")]
     pub fn byte_consumed(&mut self) -> i64 {
         self.ctxt
             .as_deref_mut()
@@ -3027,7 +2977,6 @@ impl XmlTextReader {
     ///
     /// Returns the xmlDocPtr or NULL in case of error.
     #[doc(alias = "xmlTextReaderCurrentDoc")]
-    #[cfg(feature = "libxml_reader")]
     pub fn current_doc(&mut self) -> Option<XmlDocPtr> {
         if self.doc.is_some() {
             return self.doc;
@@ -3044,7 +2993,6 @@ impl XmlTextReader {
     ///
     /// Returns the xmlNodePtr or NULL in case of error.
     #[doc(alias = "xmlTextReaderCurrentNode")]
-    #[cfg(feature = "libxml_reader")]
     pub fn current_node(&self) -> Option<XmlGenericNodePtr> {
         self.curnode.or(self.node)
     }
@@ -3055,7 +3003,6 @@ impl XmlTextReader {
     /// Returns 1 if the node was read successfully, 0 if there is no more nodes to read,
     /// or -1 in case of error
     #[doc(alias = "xmlTextReaderNext")]
-    #[cfg(feature = "libxml_reader")]
     pub unsafe fn next(&mut self) -> i32 {
         unsafe {
             use crate::tree::NodeCommon;
@@ -3092,7 +3039,6 @@ impl XmlTextReader {
         }
     }
 
-    #[cfg(feature = "libxml_reader")]
     unsafe fn next_tree(&mut self) -> i32 {
         unsafe {
             if self.state == XmlTextReaderState::End {
@@ -3158,7 +3104,6 @@ impl XmlTextReader {
     /// Returns 1 if the node was read successfully, 0 if there is no more nodes to read,
     /// or -1 in case of error
     #[doc(alias = "xmlTextReaderNextSibling")]
-    #[cfg(feature = "libxml_reader")]
     pub unsafe fn next_sibling(&mut self) -> i32 {
         unsafe {
             if self.doc.is_none() {
@@ -3188,7 +3133,6 @@ impl XmlTextReader {
     ///
     /// Returns the depth or -1 in case of error
     #[doc(alias = "xmlTextReaderDepth")]
-    #[cfg(feature = "libxml_reader")]
     pub fn depth(&self) -> i32 {
         if self.node.is_none() {
             return 0;
@@ -3214,7 +3158,6 @@ impl XmlTextReader {
     ///
     /// Returns 1 or -1 in case of error.
     #[doc(alias = "xmlTextReaderNormalization")]
-    #[cfg(feature = "libxml_reader")]
     pub fn normalization(&self) -> i32 {
         1
     }
@@ -3226,7 +3169,6 @@ impl XmlTextReader {
     ///
     /// Returns the xmlReaderTypes of the current node or -1 in case of error
     #[doc(alias = "xmlTextReaderNodeType")]
-    #[cfg(feature = "libxml_reader")]
     pub fn node_type(&self) -> XmlReaderTypes {
         let Some(current_node) = self.node else {
             return XmlReaderTypes::XmlReaderTypeNone;
@@ -3287,7 +3229,6 @@ impl XmlTextReader {
     /// Returns a string containing the XML version of the document or NULL in case of error.  
     /// The string is deallocated with the reader.
     #[doc(alias = "xmlTextReaderConstXmlVersion")]
-    #[cfg(feature = "libxml_reader")]
     pub fn xml_version(&mut self) -> Option<&str> {
         let doc = self.doc.as_deref().or_else(|| {
             (self.ctxt.is_some())
@@ -3303,7 +3244,6 @@ impl XmlTextReader {
     /// Returns a string containing the encoding of the document or NULL in case of error.  
     /// The string is deallocated with the reader.
     #[doc(alias = "xmlTextReaderConstEncoding")]
-    #[cfg(feature = "libxml_reader")]
     pub fn encoding(&self) -> Option<&str> {
         let doc = self.doc.as_deref().or_else(|| {
             (self.ctxt.is_some())
@@ -3318,7 +3258,6 @@ impl XmlTextReader {
     ///
     /// Returns the base URI or `None` if not available.
     #[doc(alias = "xmlTextReaderBaseUri")]
-    #[cfg(feature = "libxml_reader")]
     pub fn base_uri(&self) -> Option<String> {
         self.node?.get_base(None)
     }
@@ -3327,7 +3266,6 @@ impl XmlTextReader {
     ///
     /// Returns the local name or `None` if not available.
     #[doc(alias = "xmlTextReaderLocalName")]
-    #[cfg(feature = "libxml_reader")]
     pub fn local_name(&self) -> Option<String> {
         use crate::tree::XmlNsPtr;
 
@@ -3353,7 +3291,6 @@ impl XmlTextReader {
     ///
     /// Returns the local name or `None` if not available.
     #[doc(alias = "xmlTextReaderName")]
-    #[cfg(feature = "libxml_reader")]
     pub fn name(&self) -> Option<String> {
         use crate::tree::{NodeCommon, XmlNsPtr};
 
@@ -3420,7 +3357,6 @@ impl XmlTextReader {
     ///
     /// Returns the namespace URI or `None` if not available.
     #[doc(alias = "xmlTextReaderNamespaceUri")]
-    #[cfg(feature = "libxml_reader")]
     pub fn namespace_uri(&self) -> Option<String> {
         let current_node = self.node?;
         let node = self.curnode.unwrap_or(current_node);
@@ -3446,7 +3382,6 @@ impl XmlTextReader {
     ///
     /// Returns the prefix or `None` if not available.
     #[doc(alias = "xmlTextReaderPrefix")]
-    #[cfg(feature = "libxml_reader")]
     pub fn prefix(&self) -> Option<String> {
         use crate::tree::XmlNsPtr;
 
@@ -3477,7 +3412,6 @@ impl XmlTextReader {
     /// `Some(false)`  if it was declared to be not standalone,
     /// or `None` if the document did not specify its standalone status or in case of error.
     #[doc(alias = "xmlTextReaderStandalone")]
-    #[cfg(feature = "libxml_reader")]
     pub fn standalone(&self) -> Option<bool> {
         let doc = self.doc.or_else(|| {
             (self.ctxt.is_some())
@@ -3496,7 +3430,6 @@ impl XmlTextReader {
     ///
     /// Returns the xml:lang value or `None` if none exists.
     #[doc(alias = "xmlTextReaderXmlLang")]
-    #[cfg(feature = "libxml_reader")]
     pub fn xml_lang(&self) -> Option<String> {
         self.node?.get_lang()
     }
@@ -3507,7 +3440,6 @@ impl XmlTextReader {
     ///
     /// Returns the xmlNodePtr or NULL in case of error.
     #[doc(alias = "xmlTextReaderPreserve")]
-    #[cfg(feature = "libxml_reader")]
     pub unsafe fn preserve(&mut self) -> Option<XmlGenericNodePtr> {
         let cur = self.curnode.or(self.node)?;
 
@@ -3558,7 +3490,6 @@ impl XmlTextReader {
     ///
     /// Returns the string or `None` if not available.  
     #[doc(alias = "xmlTextReaderValue")]
-    #[cfg(feature = "libxml_reader")]
     pub fn text_value(&self) -> Option<String> {
         use crate::tree::{NodeCommon, XmlAttrPtr, XmlNsPtr};
 
@@ -3597,7 +3528,6 @@ impl XmlTextReader {
     ///
     /// Returns 0 i no attributes, -1 in case of error or the attribute count
     #[doc(alias = "xmlTextReaderAttributeCount")]
-    #[cfg(feature = "libxml_reader")]
     pub fn num_attributes(&mut self) -> usize {
         use crate::tree::NodeCommon;
 
@@ -3833,7 +3763,6 @@ fn xml_text_reader_cdata_block(ctxt: &mut XmlParserCtxt, ch: &str) {
 ///
 /// Returns the new xmlTextReaderPtr or NULL in case of error
 #[doc(alias = "xmlNewTextReader")]
-#[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_new_text_reader(
     input: XmlParserInputBuffer,
     uri: Option<&str>,
@@ -3956,7 +3885,6 @@ pub unsafe fn xml_new_text_reader(
 ///
 /// Returns the new xmlTextReaderPtr or NULL in case of error
 #[doc(alias = "xmlNewTextReaderFilename")]
-#[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_new_text_reader_filename(uri: &str) -> XmlTextReaderPtr {
     unsafe {
         use crate::{encoding::XmlCharEncoding, io::xml_parser_get_directory};
@@ -3981,7 +3909,6 @@ pub unsafe fn xml_new_text_reader_filename(uri: &str) -> XmlTextReaderPtr {
 
 /// Deallocate all the resources associated to the reader
 #[doc(alias = "xmlFreeTextReader")]
-#[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_free_text_reader(reader: XmlTextReaderPtr) {
     use crate::xmlschemas::{context::xml_schema_free_valid_ctxt, schema::xml_schema_free};
 
@@ -4040,12 +3967,10 @@ pub unsafe fn xml_free_text_reader(reader: XmlTextReaderPtr) {
 
 const CHUNK_SIZE: usize = 512;
 
-#[cfg(feature = "libxml_reader")]
 const MAX_FREE_NODES: i32 = 100;
 
 /// Free a property and all its siblings, all the children are freed too.
 #[doc(alias = "xmlTextReaderFreePropList")]
-#[cfg(feature = "libxml_reader")]
 unsafe fn xml_text_reader_free_prop_list(reader: &mut XmlTextReader, mut cur: Option<XmlAttrPtr>) {
     unsafe {
         while let Some(now) = cur {
@@ -4058,7 +3983,6 @@ unsafe fn xml_text_reader_free_prop_list(reader: &mut XmlTextReader, mut cur: Op
 
 /// Free a node and all its siblings, this is a recursive behaviour, all the children are freed too.
 #[doc(alias = "xmlTextReaderFreeNodeList")]
-#[cfg(feature = "libxml_reader")]
 unsafe fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mut cur: XmlGenericNodePtr) {
     use crate::globals::get_deregister_node_func;
 
@@ -4158,7 +4082,6 @@ unsafe fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mut cur: XmlG
 
 /// Free a node.
 #[doc(alias = "xmlTextReaderFreeProp")]
-#[cfg(feature = "libxml_reader")]
 unsafe fn xml_text_reader_free_prop(reader: XmlTextReaderPtr, mut cur: XmlAttrPtr) {
     use crate::globals::get_deregister_node_func;
 
@@ -4189,7 +4112,6 @@ unsafe fn xml_text_reader_free_prop(reader: XmlTextReaderPtr, mut cur: XmlAttrPt
 /// Free a node, this is a recursive behaviour, all the children are freed too.
 /// This doesn't unlink the child from the list, use xmlUnlinkNode() first.
 #[doc(alias = "xmlTextReaderFreeNode")]
-#[cfg(feature = "libxml_reader")]
 unsafe fn xml_text_reader_free_node(reader: XmlTextReaderPtr, mut cur: XmlGenericNodePtr) {
     use crate::globals::get_deregister_node_func;
 
@@ -4272,7 +4194,6 @@ unsafe fn xml_text_reader_free_node(reader: XmlTextReaderPtr, mut cur: XmlGeneri
 ///
 /// Returns the successor node or NULL
 #[doc(alias = "xmlTextReaderGetSuccessor")]
-#[cfg(feature = "libxml_reader")]
 fn xml_text_reader_get_successor(cur: XmlGenericNodePtr) -> Option<XmlGenericNodePtr> {
     if let Some(next) = cur.next() {
         return Some(next);
@@ -4293,7 +4214,6 @@ fn xml_text_reader_get_successor(cur: XmlGenericNodePtr) -> Option<XmlGenericNod
 ///
 ///  Returns a string containing the content, or NULL in case of error.
 #[doc(alias = "xmlTextReaderCollectSiblings")]
-#[cfg(feature = "libxml_reader")]
 fn xml_text_reader_collect_siblings(node: XmlGenericNodePtr) -> Option<String> {
     if node.element_type() == XmlElementType::XmlNamespaceDecl {
         return None;
@@ -4323,7 +4243,6 @@ fn xml_text_reader_collect_siblings(node: XmlGenericNodePtr) -> Option<String> {
 
 /// Free up all the structures used by a document, tree included.
 #[doc(alias = "xmlTextReaderFreeDoc")]
-#[cfg(feature = "libxml_reader")]
 unsafe fn xml_text_reader_free_doc(reader: &mut XmlTextReader, mut cur: XmlDocPtr) {
     use crate::globals::get_deregister_node_func;
 
@@ -4369,7 +4288,6 @@ unsafe fn xml_text_reader_free_doc(reader: &mut XmlTextReader, mut cur: XmlDocPt
 ///
 /// Returns 0 or -1 in case of error
 #[doc(alias = "xmlTextReaderClose")]
-#[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_text_reader_close(reader: &mut XmlTextReader) -> i32 {
     unsafe {
         reader.node = None;
@@ -4399,7 +4317,6 @@ pub unsafe fn xml_text_reader_close(reader: &mut XmlTextReader) -> i32 {
     }
 }
 
-#[cfg(feature = "libxml_reader")]
 fn xml_text_reader_generic_error(
     ctxt: Option<GenericErrorContext>,
     severity: XmlParserSeverities,
@@ -4429,7 +4346,6 @@ fn xml_text_reader_generic_error(
     }
 }
 
-#[cfg(feature = "libxml_reader")]
 fn xml_text_reader_validity_error(ctxt: Option<GenericErrorContext>, msg: &str) {
     let len = msg.len();
 
@@ -4471,7 +4387,6 @@ fn xml_text_reader_validity_error_relay(ctx: Option<GenericErrorContext>, msg: &
     }
 }
 
-#[cfg(feature = "libxml_reader")]
 fn xml_text_reader_validity_warning(ctxt: Option<GenericErrorContext>, msg: &str) {
     let len = msg.len();
 
@@ -4513,7 +4428,6 @@ fn xml_text_reader_validity_warning_relay(ctx: Option<GenericErrorContext>, msg:
     }
 }
 
-#[cfg(feature = "libxml_reader")]
 fn xml_text_reader_structured_error(ctxt: Option<GenericErrorContext>, error: &XmlError) {
     let ctx = ctxt
         .and_then(|c| {
@@ -4620,7 +4534,6 @@ unsafe fn xml_text_reader_locator(
 ///
 /// Returns the new reader or NULL in case of error.
 #[doc(alias = "xmlReaderWalker")]
-#[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_reader_walker(doc: XmlDocPtr) -> XmlTextReaderPtr {
     unsafe {
         use crate::generic_error;
@@ -4648,7 +4561,6 @@ pub unsafe fn xml_reader_walker(doc: XmlDocPtr) -> XmlTextReaderPtr {
 ///
 /// Returns the new reader or NULL in case of error.
 #[doc(alias = "xmlReaderForDoc")]
-#[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_reader_for_doc(
     cur: &[u8],
     url: Option<&str>,
@@ -4663,7 +4575,6 @@ pub unsafe fn xml_reader_for_doc(
 ///
 /// Returns the new reader or NULL in case of error.
 #[doc(alias = "xmlReaderForFile")]
-#[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_reader_for_file(
     filename: &str,
     encoding: Option<&str>,
@@ -4684,7 +4595,6 @@ pub unsafe fn xml_reader_for_file(
 ///
 /// Returns the new reader or NULL in case of error.
 #[doc(alias = "xmlReaderForMemory")]
-#[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_reader_for_memory(
     buffer: Vec<u8>,
     url: Option<&str>,
@@ -4712,7 +4622,6 @@ pub unsafe fn xml_reader_for_memory(
 ///
 /// Returns the new reader or NULL in case of error.
 #[doc(alias = "xmlReaderForIO")]
-#[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_reader_for_io(
     ioctx: impl Read + 'static,
     url: Option<&str>,
@@ -4739,7 +4648,6 @@ pub unsafe fn xml_reader_for_io(
 ///
 /// Returns 0 in case of success and -1 in case of error
 #[doc(alias = "xmlReaderNewDoc")]
-#[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_reader_new_doc(
     reader: XmlTextReaderPtr,
     cur: &[u8],
@@ -4762,7 +4670,6 @@ pub unsafe fn xml_reader_new_doc(
 ///
 /// Returns 0 in case of success and -1 in case of error
 #[doc(alias = "xmlReaderNewFile")]
-#[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_reader_new_file(
     reader: XmlTextReaderPtr,
     filename: &str,
@@ -4789,7 +4696,6 @@ pub unsafe fn xml_reader_new_file(
 ///
 /// Returns 0 in case of success and -1 in case of error
 #[doc(alias = "xmlReaderNewMemory")]
-#[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_reader_new_memory(
     reader: XmlTextReaderPtr,
     buffer: Vec<u8>,
@@ -4817,7 +4723,6 @@ pub unsafe fn xml_reader_new_memory(
 ///
 /// Returns 0 in case of success and -1 in case of error
 #[doc(alias = "xmlReaderNewIO")]
-#[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_reader_new_io(
     reader: XmlTextReaderPtr,
     ioctx: impl Read + 'static,
@@ -4838,12 +4743,10 @@ pub unsafe fn xml_reader_new_io(
 }
 
 /// Error handling extensions
-#[cfg(feature = "libxml_reader")]
 pub type XmlTextReaderLocatorPtr = *mut c_void;
 
 /// Signature of an error callback from a reader parser
 #[doc(alias = "xmlTextReaderErrorFunc")]
-#[cfg(feature = "libxml_reader")]
 pub type XmlTextReaderErrorFunc = unsafe fn(
     arg: Option<GenericErrorContext>,
     msg: *const c_char,
@@ -4855,7 +4758,6 @@ pub type XmlTextReaderErrorFunc = unsafe fn(
 ///
 /// Returns the line number or -1 in case of error.
 #[doc(alias = "xmlTextReaderLocatorLineNumber")]
-#[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_text_reader_locator_line_number(locator: XmlTextReaderLocatorPtr) -> i32 {
     unsafe {
         // we know that locator is a xmlParserCtxtPtr
@@ -4891,7 +4793,6 @@ pub unsafe fn xml_text_reader_locator_line_number(locator: XmlTextReaderLocatorP
 ///
 /// Returns the base URI or NULL in case of error, if non NULL it need to be freed by the caller.
 #[doc(alias = "xmlTextReaderLocatorBaseURI")]
-#[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_text_reader_locator_base_uri(locator: XmlTextReaderLocatorPtr) -> *mut XmlChar {
     unsafe {
         // we know that locator is a xmlParserCtxtPtr
@@ -4932,12 +4833,10 @@ pub unsafe fn xml_text_reader_locator_base_uri(locator: XmlTextReaderLocatorPtr)
     }
 }
 
-#[cfg(feature = "libxml_reader")]
 fn xml_text_reader_error(ctxt: Option<GenericErrorContext>, msg: &str) {
     xml_text_reader_generic_error(ctxt, XmlParserSeverities::XmlParserSeverityError, msg as _);
 }
 
-#[cfg(feature = "libxml_reader")]
 fn xml_text_reader_warning(ctxt: Option<GenericErrorContext>, msg: &str) {
     xml_text_reader_generic_error(ctxt, XmlParserSeverities::XmlParserSeverityWarning, msg);
 }
@@ -4950,7 +4849,6 @@ mod tests {
 
     #[test]
     fn test_xml_text_reader_locator_base_uri() {
-        #[cfg(feature = "libxml_reader")]
         unsafe {
             let mut leaks = 0;
 
@@ -4980,7 +4878,6 @@ mod tests {
 
     #[test]
     fn test_xml_text_reader_locator_line_number() {
-        #[cfg(feature = "libxml_reader")]
         unsafe {
             let mut leaks = 0;
 

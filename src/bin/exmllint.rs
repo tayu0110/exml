@@ -33,6 +33,8 @@ use clap::Parser;
 use exml::c14n::{XmlC14NMode, xml_c14n_doc_dump_memory};
 #[cfg(feature = "catalog")]
 use exml::libxml::catalog::xml_load_catalogs;
+#[cfg(feature = "libxml_reader")]
+use exml::libxml::xmlreader::XmlTextReaderPtr;
 #[cfg(feature = "libxml_pattern")]
 use exml::pattern::{XmlPattern, XmlStreamCtxt, xml_pattern_compile};
 #[cfg(feature = "schematron")]
@@ -76,7 +78,6 @@ use exml::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_size,
             xml_mem_used, xml_memory_strdup,
         },
-        xmlreader::XmlTextReaderPtr,
         xmlschemas::{xml_schema_validate_doc, xml_schema_validate_stream},
         xmlstring::XmlChar,
     },
@@ -542,6 +543,7 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
             cmd_args.format = true;
         }
     }
+    #[cfg(feature = "libxml_reader")]
     if cmd_args.walker {
         cmd_args.noout = true;
     }
@@ -2791,9 +2793,9 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: Option<XmlParserC
             }
         }
 
-        if cfg!(feature = "libxml_valid") && CMD_ARGS.insert && !CMD_ARGS.html {
+        match () {
             #[cfg(feature = "libxml_valid")]
-            {
+            _ if CMD_ARGS.insert && !CMD_ARGS.html => {
                 let mut list = [const { Cow::Borrowed("") }; 256];
 
                 if let Some(children) = doc.children() {
@@ -2820,11 +2822,11 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: Option<XmlParserC
                     }
                 }
             }
-        } else if cfg!(feature = "libxml_reader") && CMD_ARGS.walker {
             #[cfg(feature = "libxml_reader")]
-            {
+            _ if CMD_ARGS.walker => {
                 walk_doc(doc);
             }
+            _ => {}
         }
         #[cfg(feature = "libxml_output")]
         if !CMD_ARGS.noout {
@@ -3334,32 +3336,21 @@ fn main() {
                             }
                         }
                         #[cfg(not(feature = "libxml_reader"))]
-                        {
-                            let carg =
-                                CString::new(arg.as_str()).expect("Failed to construct argument");
-                            if cmd_args.sax {
-                                test_sax(carg.as_ptr() as _);
-                            } else {
-                                parse_and_print_file(
-                                    carg.as_ptr() as _,
-                                    XmlParserCtxt::xml_new_parser_ctxt(),
-                                );
-                            }
+                        if CMD_ARGS.sax {
+                            test_sax(arg.as_str());
+                        } else {
+                            parse_and_print_file(Some(&arg), XmlParserCtxt::new());
                         }
                     }
                 } else {
                     NBREGISTER.store(0, Ordering::Relaxed);
                     let carg = CString::new(arg.as_str()).expect("Failed to construct argument");
 
-                    if cfg!(feature = "libxml_reader") && CMD_ARGS.stream {
+                    match () {
                         #[cfg(feature = "libxml_reader")]
-                        {
-                            stream_file(carg.as_ptr() as _);
-                        }
-                    } else if CMD_ARGS.sax {
-                        test_sax(arg.as_str());
-                    } else {
-                        parse_and_print_file(Some(&arg), None);
+                        _ if CMD_ARGS.stream => stream_file(carg.as_ptr() as _),
+                        _ if CMD_ARGS.sax => test_sax(arg.as_str()),
+                        _ => parse_and_print_file(Some(&arg), None),
                     }
 
                     if CMD_ARGS.chkregister && NBREGISTER.load(Ordering::Relaxed) != 0 {

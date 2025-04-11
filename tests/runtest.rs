@@ -22,9 +22,11 @@ use std::{
 use const_format::concatcp;
 #[cfg(feature = "c14n")]
 use exml::c14n::XmlC14NMode;
+#[cfg(feature = "libxml_reader")]
+use exml::libxml::xmlreader::XmlTextReaderPtr;
 #[cfg(feature = "libxml_regexp")]
 use exml::libxml::xmlregexp::XmlRegexp;
-#[cfg(feature = "libxml_pattern")]
+#[cfg(all(feature = "libxml_pattern", feature = "libxml_reader"))]
 use exml::pattern::{XmlPattern, XmlStreamCtxt};
 #[cfg(feature = "schematron")]
 use exml::schematron::XmlSchematron;
@@ -54,7 +56,6 @@ use exml::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
             xml_memory_strdup,
         },
-        xmlreader::XmlTextReaderPtr,
         xmlschemastypes::xml_schema_init_types,
         xmlstring::XmlChar,
     },
