@@ -1072,122 +1072,120 @@ pub fn xml_copy_doc_element_content(
 /// This will dump the content of the element content definition
 /// Intended just for the debug routine
 #[doc(alias = "xmlSnprintfElementContent")]
-pub unsafe fn xml_snprintf_element_content(
+pub fn xml_snprintf_element_content(
     buf: &mut String,
     size: usize,
     content: Rc<RefCell<XmlElementContent>>,
     englob: i32,
 ) {
-    unsafe {
-        let len = buf.len();
-        if size - len < 50 {
-            if size - len > 4 && !buf.ends_with('.') {
+    let len = buf.len();
+    if size - len < 50 {
+        if size - len > 4 && !buf.ends_with('.') {
+            buf.push_str(" ...");
+        }
+        return;
+    }
+    if englob != 0 {
+        buf.push('(');
+    }
+    let content = content.borrow();
+    match content.typ {
+        XmlElementContentType::XmlElementContentPCDATA => {
+            buf.push_str("#PCDATA");
+        }
+        XmlElementContentType::XmlElementContentElement => {
+            let mut qname_len = content.name.as_deref().map_or(0, |name| name.len());
+
+            if let Some(prefix) = content.prefix.as_deref() {
+                qname_len += prefix.len() + 1;
+            }
+            if size - len < qname_len + 10 {
                 buf.push_str(" ...");
+                return;
             }
-            return;
-        }
-        if englob != 0 {
-            buf.push('(');
-        }
-        let content = content.borrow();
-        match content.typ {
-            XmlElementContentType::XmlElementContentPCDATA => {
-                buf.push_str("#PCDATA");
+            if let Some(prefix) = content.prefix.as_deref() {
+                buf.push_str(prefix);
+                buf.push(':');
             }
-            XmlElementContentType::XmlElementContentElement => {
-                let mut qname_len = content.name.as_deref().map_or(0, |name| name.len());
+            if let Some(name) = content.name.as_deref() {
+                buf.push_str(name);
+            }
+        }
+        XmlElementContentType::XmlElementContentSeq => {
+            let c1 = content.c1.clone().unwrap();
+            if matches!(
+                c1.borrow().typ,
+                XmlElementContentType::XmlElementContentOr
+                    | XmlElementContentType::XmlElementContentSeq
+            ) {
+                xml_snprintf_element_content(buf, size, c1, 1);
+            } else {
+                xml_snprintf_element_content(buf, size, c1, 0);
+            }
 
-                if let Some(prefix) = content.prefix.as_deref() {
-                    qname_len += prefix.len() + 1;
-                }
-                if size - len < qname_len + 10 {
+            let len = buf.len();
+            if size - len < 50 {
+                if size - len > 4 && !buf.ends_with('.') {
                     buf.push_str(" ...");
-                    return;
                 }
-                if let Some(prefix) = content.prefix.as_deref() {
-                    buf.push_str(prefix);
-                    buf.push(':');
-                }
-                if let Some(name) = content.name.as_deref() {
-                    buf.push_str(name);
-                }
+                return;
             }
-            XmlElementContentType::XmlElementContentSeq => {
-                let c1 = content.c1.clone().unwrap();
-                if matches!(
-                    c1.borrow().typ,
-                    XmlElementContentType::XmlElementContentOr
-                        | XmlElementContentType::XmlElementContentSeq
-                ) {
-                    xml_snprintf_element_content(buf, size, c1, 1);
-                } else {
-                    xml_snprintf_element_content(buf, size, c1, 0);
-                }
-
-                let len = buf.len();
-                if size - len < 50 {
-                    if size - len > 4 && !buf.ends_with('.') {
-                        buf.push_str(" ...");
-                    }
-                    return;
-                }
-                buf.push_str(" , ");
-                let c2 = content.c2.clone().unwrap();
-                let typ = c2.borrow().typ;
-                let ocur = c2.borrow().ocur;
-                if (matches!(typ, XmlElementContentType::XmlElementContentOr)
-                    || !matches!(ocur, XmlElementContentOccur::XmlElementContentOnce))
-                    && !matches!(typ, XmlElementContentType::XmlElementContentElement)
-                {
-                    xml_snprintf_element_content(buf, size, c2, 1);
-                } else {
-                    xml_snprintf_element_content(buf, size, c2, 0);
-                }
-            }
-            XmlElementContentType::XmlElementContentOr => {
-                let c1 = content.c1.clone().unwrap();
-                if matches!(
-                    c1.borrow().typ,
-                    XmlElementContentType::XmlElementContentOr
-                        | XmlElementContentType::XmlElementContentSeq
-                ) {
-                    xml_snprintf_element_content(buf, size, c1, 1);
-                } else {
-                    xml_snprintf_element_content(buf, size, c1, 0);
-                }
-                let len = buf.len();
-                if size - len < 50 {
-                    if size - len > 4 && !buf.ends_with('.') {
-                        buf.push_str(" ...");
-                    }
-                    return;
-                }
-                let c2 = content.c2.clone().unwrap();
-                let typ = c2.borrow().typ;
-                let ocur = c2.borrow().ocur;
-                buf.push_str(" | ");
-                if (matches!(typ, XmlElementContentType::XmlElementContentSeq)
-                    || !matches!(ocur, XmlElementContentOccur::XmlElementContentOnce))
-                    && !matches!(typ, XmlElementContentType::XmlElementContentElement)
-                {
-                    xml_snprintf_element_content(buf, size, c2, 1);
-                } else {
-                    xml_snprintf_element_content(buf, size, c2, 0);
-                }
+            buf.push_str(" , ");
+            let c2 = content.c2.clone().unwrap();
+            let typ = c2.borrow().typ;
+            let ocur = c2.borrow().ocur;
+            if (matches!(typ, XmlElementContentType::XmlElementContentOr)
+                || !matches!(ocur, XmlElementContentOccur::XmlElementContentOnce))
+                && !matches!(typ, XmlElementContentType::XmlElementContentElement)
+            {
+                xml_snprintf_element_content(buf, size, c2, 1);
+            } else {
+                xml_snprintf_element_content(buf, size, c2, 0);
             }
         }
-        if size - buf.len() <= 2 {
-            return;
+        XmlElementContentType::XmlElementContentOr => {
+            let c1 = content.c1.clone().unwrap();
+            if matches!(
+                c1.borrow().typ,
+                XmlElementContentType::XmlElementContentOr
+                    | XmlElementContentType::XmlElementContentSeq
+            ) {
+                xml_snprintf_element_content(buf, size, c1, 1);
+            } else {
+                xml_snprintf_element_content(buf, size, c1, 0);
+            }
+            let len = buf.len();
+            if size - len < 50 {
+                if size - len > 4 && !buf.ends_with('.') {
+                    buf.push_str(" ...");
+                }
+                return;
+            }
+            let c2 = content.c2.clone().unwrap();
+            let typ = c2.borrow().typ;
+            let ocur = c2.borrow().ocur;
+            buf.push_str(" | ");
+            if (matches!(typ, XmlElementContentType::XmlElementContentSeq)
+                || !matches!(ocur, XmlElementContentOccur::XmlElementContentOnce))
+                && !matches!(typ, XmlElementContentType::XmlElementContentElement)
+            {
+                xml_snprintf_element_content(buf, size, c2, 1);
+            } else {
+                xml_snprintf_element_content(buf, size, c2, 0);
+            }
         }
-        if englob != 0 {
-            buf.push(')');
-        }
-        match content.ocur {
-            XmlElementContentOccur::XmlElementContentOnce => {}
-            XmlElementContentOccur::XmlElementContentOpt => buf.push('?'),
-            XmlElementContentOccur::XmlElementContentMult => buf.push('*'),
-            XmlElementContentOccur::XmlElementContentPlus => buf.push('+'),
-        }
+    }
+    if size - buf.len() <= 2 {
+        return;
+    }
+    if englob != 0 {
+        buf.push(')');
+    }
+    match content.ocur {
+        XmlElementContentOccur::XmlElementContentOnce => {}
+        XmlElementContentOccur::XmlElementContentOpt => buf.push('?'),
+        XmlElementContentOccur::XmlElementContentMult => buf.push('*'),
+        XmlElementContentOccur::XmlElementContentPlus => buf.push('+'),
     }
 }
 

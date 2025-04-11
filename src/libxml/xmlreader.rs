@@ -44,7 +44,6 @@ use crate::{
     globals::{GenericErrorContext, StructuredError},
     io::XmlParserInputBuffer,
     libxml::{
-        dict::{XmlDictPtr, xml_dict_create, xml_dict_free},
         globals::{xml_free, xml_malloc},
         relaxng::{
             XmlRelaxNGPtr, xml_relaxng_free, xml_relaxng_parse, xml_relaxng_set_valid_errors,
@@ -237,8 +236,6 @@ pub struct XmlTextReader {
     preserve: i32,
     // used to return const xmlChar *
     buffer: String,
-    // the context dictionary
-    dict: XmlDictPtr,
 
     // entity stack when traversing entities content
     // Current Entity Ref Node
@@ -3659,7 +3656,6 @@ impl Default for XmlTextReader {
             faketext: None,
             preserve: 0,
             buffer: "".to_owned(),
-            dict: null_mut(),
             ent: None,
             ent_tab: vec![],
             error_func: None,
@@ -4036,9 +4032,6 @@ pub unsafe fn xml_free_text_reader(reader: XmlTextReaderPtr) {
         }
         if (*reader).allocs & XML_TEXTREADER_CTXT != 0 {
             (*reader).ctxt.take();
-        }
-        if !(*reader).dict.is_null() {
-            xml_dict_free((*reader).dict);
         }
         drop_in_place(reader);
         xml_free(reader as _);
@@ -4646,7 +4639,6 @@ pub unsafe fn xml_reader_walker(doc: XmlDocPtr) -> XmlTextReaderPtr {
         (*ret).allocs = XML_TEXTREADER_CTXT;
         (*ret).doc = Some(doc);
         (*ret).state = XmlTextReaderState::Start;
-        (*ret).dict = xml_dict_create();
         ret
     }
 }

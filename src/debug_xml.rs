@@ -20,7 +20,6 @@
 // Daniel Veillard <daniel@veillard.com>
 
 use std::{
-    ffi::CString,
     io::{Write, stdout},
     ptr::{null, null_mut},
 };
@@ -28,13 +27,11 @@ use std::{
 #[cfg(feature = "xpath")]
 use crate::xpath::{XmlXPathContextPtr, XmlXPathObjectPtr, XmlXPathObjectType};
 use crate::{
-    dict::{XmlDictPtr, xml_dict_lookup, xml_dict_owns},
     error::{__xml_raise_error, XmlParserErrors},
     generic_error,
     libxml::{chvalid::xml_is_blank_char, valid::xml_snprintf_element_content},
     parser::{
-        XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC, XmlParserOption,
-        xml_parse_in_node_context,
+        XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC, xml_parse_in_node_context,
     },
     tree::{
         NodeCommon, XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDocPtr,
@@ -79,11 +76,11 @@ pub struct XmlDebugCtxt<'a> {
     depth: i32,                      /* current depth */
     doc: Option<XmlDocPtr>,          /* current document */
     node: Option<XmlGenericNodePtr>, /* current node */
-    dict: XmlDictPtr,                /* the doc dictionary */
-    check: i32,                      /* do just checkings */
-    errors: i32,                     /* number of errors found */
-    nodict: i32,                     /* if the document has no dictionary */
-    options: i32,                    /* options */
+    // dict: XmlDictPtr,                /* the doc dictionary */
+    check: i32,   /* do just checkings */
+    errors: i32,  /* number of errors found */
+    nodict: i32,  /* if the document has no dictionary */
+    options: i32, /* options */
 }
 
 impl XmlDebugCtxt<'_> {
@@ -179,270 +176,241 @@ impl XmlDebugCtxt<'_> {
     /// Do debugging on the name, for example the dictionary status and
     /// conformance to the Name production.
     #[doc(alias = "xmlCtxtCheckName")]
-    unsafe fn check_name(&mut self, name: Option<&str>) {
-        unsafe {
-            if self.check != 0 {
-                let Some(name) = name else {
-                    xml_debug_err!(self, XmlParserErrors::XmlCheckNoName, "Name is NULL",);
-                    return;
-                };
-                let cname = CString::new(name).unwrap();
-                #[cfg(any(feature = "libxml_tree", feature = "schema"))]
-                if validate_name::<false>(name).is_err() {
-                    xml_debug_err!(
-                        self,
-                        XmlParserErrors::XmlCheckNotNCName,
-                        "Name is not an NCName '{name}'",
-                    );
-                }
-                if !self.dict.is_null()
-                    && xml_dict_owns(self.dict, cname.as_ptr() as *const u8) == 0
-                    && self.doc.is_none_or(|doc| {
-                        doc.parse_flags
-                            & (XmlParserOption::XmlParseSAX1 as i32
-                                | XmlParserOption::XmlParseNoDict as i32)
-                            == 0
-                    })
-                {
-                    xml_debug_err!(
-                        self,
-                        XmlParserErrors::XmlCheckOutsideDict,
-                        "Name is not from the document dictionary '{name}'",
-                    );
-                }
+    fn check_name(&mut self, name: Option<&str>) {
+        if self.check != 0 {
+            let Some(name) = name else {
+                xml_debug_err!(self, XmlParserErrors::XmlCheckNoName, "Name is NULL",);
+                return;
+            };
+            #[cfg(any(feature = "libxml_tree", feature = "schema"))]
+            if validate_name::<false>(name).is_err() {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckNotNCName,
+                    "Name is not an NCName '{name}'",
+                );
             }
         }
     }
 
     #[doc(alias = "xmlCtxtGenericNodeCheck")]
-    unsafe fn generic_node_check(&mut self, node: XmlGenericNodePtr) {
-        unsafe {
-            let doc = node.document();
+    fn generic_node_check(&mut self, node: XmlGenericNodePtr) {
+        let doc = node.document();
 
-            if node.parent().is_none() {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckNoParent,
-                    "Node has no parent\n",
-                );
+        if node.parent().is_none() {
+            xml_debug_err!(
+                self,
+                XmlParserErrors::XmlCheckNoParent,
+                "Node has no parent\n",
+            );
+        }
+        if let Some(doc) = doc {
+            self.nodict = 1;
+            if self.doc.is_none() {
+                self.doc = Some(doc);
             }
-            if let Some(doc) = doc {
-                self.nodict = 1;
-                if self.doc.is_none() {
-                    self.doc = Some(doc);
-                }
-            } else {
-                xml_debug_err!(self, XmlParserErrors::XmlCheckNoDoc, "Node has no doc\n",);
-            }
-            if node
-                .parent()
-                .filter(|p| {
-                    node.document() != p.document() && node.name().as_deref() != Some("pseudoroot")
-                })
-                .is_some()
-            {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckWrongDoc,
-                    "Node doc differs from parent's one\n",
-                );
-            }
-            if node.prev().is_none() {
-                if let Ok(attr) = XmlAttrPtr::try_from(node) {
-                    if attr
-                        .parent()
-                        .map(|parent| XmlNodePtr::try_from(parent).unwrap())
-                        .filter(|p| Some(attr) != p.properties)
-                        .is_some()
-                    {
-                        xml_debug_err!(
-                            self,
-                            XmlParserErrors::XmlCheckNoPrev,
-                            "Attr has no prev and not first of attr list\n",
-                        );
-                    }
-                } else if node
+        } else {
+            xml_debug_err!(self, XmlParserErrors::XmlCheckNoDoc, "Node has no doc\n",);
+        }
+        if node
+            .parent()
+            .filter(|p| {
+                node.document() != p.document() && node.name().as_deref() != Some("pseudoroot")
+            })
+            .is_some()
+        {
+            xml_debug_err!(
+                self,
+                XmlParserErrors::XmlCheckWrongDoc,
+                "Node doc differs from parent's one\n",
+            );
+        }
+        if node.prev().is_none() {
+            if let Ok(attr) = XmlAttrPtr::try_from(node) {
+                if attr
                     .parent()
-                    .filter(|p| p.children() != Some(node))
+                    .map(|parent| XmlNodePtr::try_from(parent).unwrap())
+                    .filter(|p| Some(attr) != p.properties)
                     .is_some()
                 {
                     xml_debug_err!(
                         self,
                         XmlParserErrors::XmlCheckNoPrev,
-                        "Node has no prev and not first of parent list\n",
-                    );
-                }
-            } else if node.prev().unwrap().next() != Some(node) {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckWrongPrev,
-                    "Node prev->next : back link wrong\n",
-                );
-            }
-            if let Some(next) = node.next() {
-                if next.prev() != Some(node) {
-                    xml_debug_err!(
-                        self,
-                        XmlParserErrors::XmlCheckWrongNext,
-                        "Node next->prev : forward link wrong\n",
-                    );
-                }
-                if next.parent() != node.parent() {
-                    xml_debug_err!(
-                        self,
-                        XmlParserErrors::XmlCheckWrongParent,
-                        "Node next->prev : forward link wrong\n",
+                        "Attr has no prev and not first of attr list\n",
                     );
                 }
             } else if node
                 .parent()
-                .filter(|p| {
-                    node.element_type() != XmlElementType::XmlAttributeNode
-                        && p.last() != Some(node)
-                        && p.element_type() == XmlElementType::XmlElementNode
-                })
+                .filter(|p| p.children() != Some(node))
                 .is_some()
             {
                 xml_debug_err!(
                     self,
-                    XmlParserErrors::XmlCheckNoNext,
-                    "Node has no next and not last of parent list\n",
+                    XmlParserErrors::XmlCheckNoPrev,
+                    "Node has no prev and not first of parent list\n",
                 );
             }
-            if node.element_type() == XmlElementType::XmlElementNode {
-                let node = XmlNodePtr::try_from(node).unwrap();
-                let mut ns = node.ns_def;
-                while let Some(now) = ns {
-                    self.ns_check_scope(node.into(), now);
-                    ns = now.next;
-                }
-                if let Some(ns) = node.ns {
-                    self.ns_check_scope(node.into(), ns);
-                }
-            } else if let Some(ns) = XmlAttrPtr::try_from(node).ok().and_then(|attr| attr.ns) {
-                self.ns_check_scope(node, ns);
+        } else if node.prev().unwrap().next() != Some(node) {
+            xml_debug_err!(
+                self,
+                XmlParserErrors::XmlCheckWrongPrev,
+                "Node prev->next : back link wrong\n",
+            );
+        }
+        if let Some(next) = node.next() {
+            if next.prev() != Some(node) {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckWrongNext,
+                    "Node next->prev : forward link wrong\n",
+                );
             }
+            if next.parent() != node.parent() {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckWrongParent,
+                    "Node next->prev : forward link wrong\n",
+                );
+            }
+        } else if node
+            .parent()
+            .filter(|p| {
+                node.element_type() != XmlElementType::XmlAttributeNode
+                    && p.last() != Some(node)
+                    && p.element_type() == XmlElementType::XmlElementNode
+            })
+            .is_some()
+        {
+            xml_debug_err!(
+                self,
+                XmlParserErrors::XmlCheckNoNext,
+                "Node has no next and not last of parent list\n",
+            );
+        }
+        if node.element_type() == XmlElementType::XmlElementNode {
+            let node = XmlNodePtr::try_from(node).unwrap();
+            let mut ns = node.ns_def;
+            while let Some(now) = ns {
+                self.ns_check_scope(node.into(), now);
+                ns = now.next;
+            }
+            if let Some(ns) = node.ns {
+                self.ns_check_scope(node.into(), ns);
+            }
+        } else if let Some(ns) = XmlAttrPtr::try_from(node).ok().and_then(|attr| attr.ns) {
+            self.ns_check_scope(node, ns);
+        }
 
-            if !matches!(
-                node.element_type(),
-                XmlElementType::XmlElementNode
-                    | XmlElementType::XmlAttributeNode
-                    | XmlElementType::XmlElementDecl
-                    | XmlElementType::XmlAttributeDecl
-                    | XmlElementType::XmlDTDNode
-                    | XmlElementType::XmlHTMLDocumentNode
-                    | XmlElementType::XmlDocumentNode
-            ) {
-                let content = if let Ok(node) = XmlNodePtr::try_from(node) {
-                    node.content.clone()
-                } else if let Ok(ent) = XmlEntityPtr::try_from(node) {
-                    ent.content.as_deref().map(|cont| cont.to_owned())
-                } else {
-                    todo!("What is this type ????: {:?}", node.element_type());
-                };
-                if let Some(content) = content {
-                    self.check_string(&content);
-                }
-            }
-            match node.element_type() {
-                XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {
-                    self.check_name(node.name().as_deref());
-                }
-                XmlElementType::XmlTextNode => {
-                    if node.name().map_or(null(), |n| n.as_ptr()) != XML_STRING_TEXT.as_ptr() as _
-                        && node.name().map_or(null(), |n| n.as_ptr())
-                            != XML_STRING_TEXT_NOENC.as_ptr() as _
-                    {
-                        // some case of entity substitution can lead to this
-                        if self.dict.is_null()
-                            || (node.name().map_or(null(), |n| n.as_ptr())
-                                != xml_dict_lookup(self.dict, c"nbktext".as_ptr() as _, 7))
-                        {
-                            xml_debug_err!(
-                                self,
-                                XmlParserErrors::XmlCheckWrongName,
-                                "Text node has wrong name '{}'",
-                                node.name().unwrap()
-                            );
-                        }
-                    }
-                }
-                XmlElementType::XmlCommentNode => {
-                    if node.name().map_or(null(), |n| n.as_ptr())
-                        != XML_STRING_COMMENT.as_ptr() as _
-                    {
-                        xml_debug_err!(
-                            self,
-                            XmlParserErrors::XmlCheckWrongName,
-                            "Comment node has wrong name '{}'",
-                            node.name().unwrap()
-                        );
-                    }
-                }
-                XmlElementType::XmlPINode => {
-                    self.check_name(node.name().as_deref());
-                }
-                XmlElementType::XmlCDATASectionNode => {
-                    if let Some(name) = node.name() {
-                        xml_debug_err!(
-                            self,
-                            XmlParserErrors::XmlCheckNameNotNull,
-                            "CData section has non NULL name '{name}'",
-                        );
-                    }
-                }
-                XmlElementType::XmlEntityRefNode
-                | XmlElementType::XmlEntityNode
-                | XmlElementType::XmlDocumentTypeNode
-                | XmlElementType::XmlDocumentFragNode
-                | XmlElementType::XmlNotationNode
-                | XmlElementType::XmlDTDNode
+        if !matches!(
+            node.element_type(),
+            XmlElementType::XmlElementNode
+                | XmlElementType::XmlAttributeNode
                 | XmlElementType::XmlElementDecl
                 | XmlElementType::XmlAttributeDecl
-                | XmlElementType::XmlEntityDecl
-                | XmlElementType::XmlNamespaceDecl
-                | XmlElementType::XmlXIncludeStart
-                | XmlElementType::XmlXIncludeEnd
+                | XmlElementType::XmlDTDNode
+                | XmlElementType::XmlHTMLDocumentNode
                 | XmlElementType::XmlDocumentNode
-                | XmlElementType::XmlHTMLDocumentNode => {}
-                _ => unreachable!(),
+        ) {
+            let content = if let Ok(node) = XmlNodePtr::try_from(node) {
+                node.content.clone()
+            } else if let Ok(ent) = XmlEntityPtr::try_from(node) {
+                ent.content.as_deref().map(|cont| cont.to_owned())
+            } else {
+                todo!("What is this type ????: {:?}", node.element_type());
+            };
+            if let Some(content) = content {
+                self.check_string(&content);
             }
+        }
+        match node.element_type() {
+            XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {
+                self.check_name(node.name().as_deref());
+            }
+            XmlElementType::XmlTextNode => {
+                if node.name().map_or(null(), |n| n.as_ptr()) != XML_STRING_TEXT.as_ptr() as _
+                    && node.name().map_or(null(), |n| n.as_ptr())
+                        != XML_STRING_TEXT_NOENC.as_ptr() as _
+                {
+                    // some case of entity substitution can lead to this
+                    xml_debug_err!(
+                        self,
+                        XmlParserErrors::XmlCheckWrongName,
+                        "Text node has wrong name '{}'",
+                        node.name().unwrap()
+                    );
+                }
+            }
+            XmlElementType::XmlCommentNode => {
+                if node.name().map_or(null(), |n| n.as_ptr()) != XML_STRING_COMMENT.as_ptr() as _ {
+                    xml_debug_err!(
+                        self,
+                        XmlParserErrors::XmlCheckWrongName,
+                        "Comment node has wrong name '{}'",
+                        node.name().unwrap()
+                    );
+                }
+            }
+            XmlElementType::XmlPINode => {
+                self.check_name(node.name().as_deref());
+            }
+            XmlElementType::XmlCDATASectionNode => {
+                if let Some(name) = node.name() {
+                    xml_debug_err!(
+                        self,
+                        XmlParserErrors::XmlCheckNameNotNull,
+                        "CData section has non NULL name '{name}'",
+                    );
+                }
+            }
+            XmlElementType::XmlEntityRefNode
+            | XmlElementType::XmlEntityNode
+            | XmlElementType::XmlDocumentTypeNode
+            | XmlElementType::XmlDocumentFragNode
+            | XmlElementType::XmlNotationNode
+            | XmlElementType::XmlDTDNode
+            | XmlElementType::XmlElementDecl
+            | XmlElementType::XmlAttributeDecl
+            | XmlElementType::XmlEntityDecl
+            | XmlElementType::XmlNamespaceDecl
+            | XmlElementType::XmlXIncludeStart
+            | XmlElementType::XmlXIncludeEnd
+            | XmlElementType::XmlDocumentNode
+            | XmlElementType::XmlHTMLDocumentNode => {}
+            _ => unreachable!(),
         }
     }
 
     #[doc(alias = "xmlCtxtDumpDtdNode")]
-    unsafe fn dump_dtd_node(&mut self, dtd: Option<XmlDtdPtr>) {
-        unsafe {
-            self.dump_spaces();
+    fn dump_dtd_node(&mut self, dtd: Option<XmlDtdPtr>) {
+        self.dump_spaces();
 
-            let Some(dtd) = dtd else {
-                if self.check == 0 {
-                    writeln!(self.output, "DTD node is NULL").ok();
-                }
-                return;
-            };
-
-            if dtd.element_type() != XmlElementType::XmlDTDNode {
-                xml_debug_err!(self, XmlParserErrors::XmlCheckNotDTD, "Node is not a DTD",);
-                return;
-            }
+        let Some(dtd) = dtd else {
             if self.check == 0 {
-                if let Some(name) = dtd.name() {
-                    write!(self.output, "DTD({name})").ok();
-                } else {
-                    write!(self.output, "DTD").ok();
-                }
-                if let Some(external_id) = dtd.external_id.as_deref() {
-                    write!(self.output, ", PUBLIC {external_id}").ok();
-                }
-                if let Some(system_id) = dtd.system_id.as_deref() {
-                    write!(self.output, ", SYSTEM {system_id}").ok();
-                }
-                writeln!(self.output).ok();
+                writeln!(self.output, "DTD node is NULL").ok();
             }
-            // Do a bit of checking
-            self.generic_node_check(dtd.into());
+            return;
+        };
+
+        if dtd.element_type() != XmlElementType::XmlDTDNode {
+            xml_debug_err!(self, XmlParserErrors::XmlCheckNotDTD, "Node is not a DTD",);
+            return;
         }
+        if self.check == 0 {
+            if let Some(name) = dtd.name() {
+                write!(self.output, "DTD({name})").ok();
+            } else {
+                write!(self.output, "DTD").ok();
+            }
+            if let Some(external_id) = dtd.external_id.as_deref() {
+                write!(self.output, ", PUBLIC {external_id}").ok();
+            }
+            if let Some(system_id) = dtd.system_id.as_deref() {
+                write!(self.output, ", SYSTEM {system_id}").ok();
+            }
+            writeln!(self.output).ok();
+        }
+        // Do a bit of checking
+        self.generic_node_check(dtd.into());
     }
 
     /// Dumps debug information for the DTD
@@ -467,266 +435,260 @@ impl XmlDebugCtxt<'_> {
     }
 
     #[doc(alias = "xmlCtxtDumpElemDecl")]
-    unsafe fn dump_elem_decl(&mut self, elem: Option<XmlElementPtr>) {
-        unsafe {
-            self.dump_spaces();
+    fn dump_elem_decl(&mut self, elem: Option<XmlElementPtr>) {
+        self.dump_spaces();
 
-            let Some(elem) = elem else {
-                if self.check == 0 {
-                    writeln!(self.output, "Element declaration is NULL").ok();
-                }
-                return;
-            };
-            if elem.element_type() != XmlElementType::XmlElementDecl {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckNotElemDecl,
-                    "Node is not an element declaration",
-                );
-                return;
-            }
-            if let Some(name) = elem.name() {
-                if self.check == 0 {
-                    write!(self.output, "ELEMDECL(").ok();
-                    self.dump_string(Some(&name));
-                    write!(self.output, ")").ok();
-                }
-            } else {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckNoName,
-                    "Element declaration has no name",
-                );
-            }
+        let Some(elem) = elem else {
             if self.check == 0 {
-                match elem.etype {
-                    XmlElementTypeVal::XmlElementTypeUndefined => {
-                        write!(self.output, ", UNDEFINED").ok();
-                    }
-                    XmlElementTypeVal::XmlElementTypeEmpty => {
-                        write!(self.output, ", EMPTY").ok();
-                    }
-                    XmlElementTypeVal::XmlElementTypeAny => {
-                        write!(self.output, ", ANY").ok();
-                    }
-                    XmlElementTypeVal::XmlElementTypeMixed => {
-                        write!(self.output, ", MIXED ").ok();
-                    }
-                    XmlElementTypeVal::XmlElementTypeElement => {
-                        write!(self.output, ", MIXED ").ok();
-                    }
-                }
-                if elem.element_type() != XmlElementType::XmlElementNode {
-                    if let Some(content) = elem.content.clone() {
-                        let mut buf = String::with_capacity(5000);
-
-                        xml_snprintf_element_content(&mut buf, 5000, content, 1);
-                        write!(self.output, "{}", buf).ok();
-                    }
-                }
-                writeln!(self.output).ok();
+                writeln!(self.output, "Element declaration is NULL").ok();
             }
-
-            // Do a bit of checking
-            self.generic_node_check(elem.into());
+            return;
+        };
+        if elem.element_type() != XmlElementType::XmlElementDecl {
+            xml_debug_err!(
+                self,
+                XmlParserErrors::XmlCheckNotElemDecl,
+                "Node is not an element declaration",
+            );
+            return;
         }
+        if let Some(name) = elem.name() {
+            if self.check == 0 {
+                write!(self.output, "ELEMDECL(").ok();
+                self.dump_string(Some(&name));
+                write!(self.output, ")").ok();
+            }
+        } else {
+            xml_debug_err!(
+                self,
+                XmlParserErrors::XmlCheckNoName,
+                "Element declaration has no name",
+            );
+        }
+        if self.check == 0 {
+            match elem.etype {
+                XmlElementTypeVal::XmlElementTypeUndefined => {
+                    write!(self.output, ", UNDEFINED").ok();
+                }
+                XmlElementTypeVal::XmlElementTypeEmpty => {
+                    write!(self.output, ", EMPTY").ok();
+                }
+                XmlElementTypeVal::XmlElementTypeAny => {
+                    write!(self.output, ", ANY").ok();
+                }
+                XmlElementTypeVal::XmlElementTypeMixed => {
+                    write!(self.output, ", MIXED ").ok();
+                }
+                XmlElementTypeVal::XmlElementTypeElement => {
+                    write!(self.output, ", MIXED ").ok();
+                }
+            }
+            if elem.element_type() != XmlElementType::XmlElementNode {
+                if let Some(content) = elem.content.clone() {
+                    let mut buf = String::with_capacity(5000);
+
+                    xml_snprintf_element_content(&mut buf, 5000, content, 1);
+                    write!(self.output, "{}", buf).ok();
+                }
+            }
+            writeln!(self.output).ok();
+        }
+
+        // Do a bit of checking
+        self.generic_node_check(elem.into());
     }
 
     #[doc(alias = "xmlCtxtDumpAttrDecl")]
-    unsafe fn dump_attr_decl(&mut self, attr: Option<XmlAttributePtr>) {
-        unsafe {
-            self.dump_spaces();
+    fn dump_attr_decl(&mut self, attr: Option<XmlAttributePtr>) {
+        self.dump_spaces();
 
-            let Some(attr) = attr else {
-                if self.check == 0 {
-                    writeln!(self.output, "Attribute declaration is NULL").ok();
-                }
-                return;
-            };
-            if attr.element_type() != XmlElementType::XmlAttributeDecl {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckNotAttrDecl,
-                    "Node is not an attribute declaration",
-                );
-                return;
-            }
-            if let Some(name) = attr.name.as_deref() {
-                if self.check == 0 {
-                    write!(self.output, "ATTRDECL({name})").ok();
-                }
-            } else {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckNoName,
-                    "Node attribute declaration has no name",
-                );
-            }
-            if let Some(elem) = attr.elem.as_deref() {
-                if self.check == 0 {
-                    write!(self.output, " for {elem}").ok();
-                }
-            } else {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckNoElem,
-                    "Node attribute declaration has no element name",
-                );
-            }
+        let Some(attr) = attr else {
             if self.check == 0 {
-                match attr.atype {
-                    XmlAttributeType::XmlAttributeCDATA => {
-                        write!(self.output, " CDATA").ok();
-                    }
-                    XmlAttributeType::XmlAttributeID => {
-                        write!(self.output, " ID").ok();
-                    }
-                    XmlAttributeType::XmlAttributeIDREF => {
-                        write!(self.output, " IDREF").ok();
-                    }
-                    XmlAttributeType::XmlAttributeIDREFS => {
-                        write!(self.output, " IDREFS").ok();
-                    }
-                    XmlAttributeType::XmlAttributeEntity => {
-                        write!(self.output, " ENTITY").ok();
-                    }
-                    XmlAttributeType::XmlAttributeEntities => {
-                        write!(self.output, " ENTITIES").ok();
-                    }
-                    XmlAttributeType::XmlAttributeNmtoken => {
-                        write!(self.output, " NMTOKEN").ok();
-                    }
-                    XmlAttributeType::XmlAttributeNmtokens => {
-                        write!(self.output, " NMTOKENS").ok();
-                    }
-                    XmlAttributeType::XmlAttributeEnumeration => {
-                        write!(self.output, " ENUMERATION").ok();
-                    }
-                    XmlAttributeType::XmlAttributeNotation => {
-                        write!(self.output, " NOTATION ").ok();
-                    }
-                }
-                if let Some(mut cur) = attr.tree.as_deref() {
-                    let mut remain = true;
-                    for indx in 0..5 {
-                        if indx != 0 {
-                            write!(self.output, "|{}", cur.name).ok();
-                        } else {
-                            write!(self.output, " ({}", cur.name).ok();
-                        }
-                        let Some(next) = cur.next.as_deref() else {
-                            remain = false;
-                            break;
-                        };
-                        cur = next;
-                    }
-                    if !remain {
-                        write!(self.output, ")").ok();
-                    } else {
-                        write!(self.output, "...)").ok();
-                    }
-                }
-                match attr.def {
-                    XmlAttributeDefault::XmlAttributeNone => {}
-                    XmlAttributeDefault::XmlAttributeRequired => {
-                        write!(self.output, " REQUIRED").ok();
-                    }
-                    XmlAttributeDefault::XmlAttributeImplied => {
-                        write!(self.output, " IMPLIED").ok();
-                    }
-                    XmlAttributeDefault::XmlAttributeFixed => {
-                        write!(self.output, " FIXED").ok();
-                    }
-                }
-                if let Some(def) = attr.default_value.as_deref() {
-                    write!(self.output, "\"").ok();
-                    self.dump_string(Some(def));
-                    write!(self.output, "\"").ok();
-                }
-                writeln!(self.output).ok();
+                writeln!(self.output, "Attribute declaration is NULL").ok();
             }
-
-            // Do a bit of checking
-            self.generic_node_check(attr.into());
+            return;
+        };
+        if attr.element_type() != XmlElementType::XmlAttributeDecl {
+            xml_debug_err!(
+                self,
+                XmlParserErrors::XmlCheckNotAttrDecl,
+                "Node is not an attribute declaration",
+            );
+            return;
         }
+        if let Some(name) = attr.name.as_deref() {
+            if self.check == 0 {
+                write!(self.output, "ATTRDECL({name})").ok();
+            }
+        } else {
+            xml_debug_err!(
+                self,
+                XmlParserErrors::XmlCheckNoName,
+                "Node attribute declaration has no name",
+            );
+        }
+        if let Some(elem) = attr.elem.as_deref() {
+            if self.check == 0 {
+                write!(self.output, " for {elem}").ok();
+            }
+        } else {
+            xml_debug_err!(
+                self,
+                XmlParserErrors::XmlCheckNoElem,
+                "Node attribute declaration has no element name",
+            );
+        }
+        if self.check == 0 {
+            match attr.atype {
+                XmlAttributeType::XmlAttributeCDATA => {
+                    write!(self.output, " CDATA").ok();
+                }
+                XmlAttributeType::XmlAttributeID => {
+                    write!(self.output, " ID").ok();
+                }
+                XmlAttributeType::XmlAttributeIDREF => {
+                    write!(self.output, " IDREF").ok();
+                }
+                XmlAttributeType::XmlAttributeIDREFS => {
+                    write!(self.output, " IDREFS").ok();
+                }
+                XmlAttributeType::XmlAttributeEntity => {
+                    write!(self.output, " ENTITY").ok();
+                }
+                XmlAttributeType::XmlAttributeEntities => {
+                    write!(self.output, " ENTITIES").ok();
+                }
+                XmlAttributeType::XmlAttributeNmtoken => {
+                    write!(self.output, " NMTOKEN").ok();
+                }
+                XmlAttributeType::XmlAttributeNmtokens => {
+                    write!(self.output, " NMTOKENS").ok();
+                }
+                XmlAttributeType::XmlAttributeEnumeration => {
+                    write!(self.output, " ENUMERATION").ok();
+                }
+                XmlAttributeType::XmlAttributeNotation => {
+                    write!(self.output, " NOTATION ").ok();
+                }
+            }
+            if let Some(mut cur) = attr.tree.as_deref() {
+                let mut remain = true;
+                for indx in 0..5 {
+                    if indx != 0 {
+                        write!(self.output, "|{}", cur.name).ok();
+                    } else {
+                        write!(self.output, " ({}", cur.name).ok();
+                    }
+                    let Some(next) = cur.next.as_deref() else {
+                        remain = false;
+                        break;
+                    };
+                    cur = next;
+                }
+                if !remain {
+                    write!(self.output, ")").ok();
+                } else {
+                    write!(self.output, "...)").ok();
+                }
+            }
+            match attr.def {
+                XmlAttributeDefault::XmlAttributeNone => {}
+                XmlAttributeDefault::XmlAttributeRequired => {
+                    write!(self.output, " REQUIRED").ok();
+                }
+                XmlAttributeDefault::XmlAttributeImplied => {
+                    write!(self.output, " IMPLIED").ok();
+                }
+                XmlAttributeDefault::XmlAttributeFixed => {
+                    write!(self.output, " FIXED").ok();
+                }
+            }
+            if let Some(def) = attr.default_value.as_deref() {
+                write!(self.output, "\"").ok();
+                self.dump_string(Some(def));
+                write!(self.output, "\"").ok();
+            }
+            writeln!(self.output).ok();
+        }
+
+        // Do a bit of checking
+        self.generic_node_check(attr.into());
     }
 
     #[doc(alias = "xmlCtxtDumpEntityDecl")]
-    unsafe fn dump_entity_decl(&mut self, ent: Option<XmlEntityPtr>) {
-        unsafe {
-            self.dump_spaces();
+    fn dump_entity_decl(&mut self, ent: Option<XmlEntityPtr>) {
+        self.dump_spaces();
 
-            let Some(ent) = ent else {
-                if self.check == 0 {
-                    writeln!(self.output, "Entity declaration is NULL").ok();
-                }
-                return;
-            };
-            if ent.element_type() != XmlElementType::XmlEntityDecl {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckNotEntityDecl,
-                    "Node is not an entity declaration",
-                );
-                return;
-            }
-            if let Some(name) = ent.name() {
-                if self.check == 0 {
-                    write!(self.output, "ENTITYDECL(").ok();
-                    self.dump_string(Some(&name));
-                    write!(self.output, ")").ok();
-                }
-            } else {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckNoName,
-                    "Entity declaration has no name",
-                );
-            }
+        let Some(ent) = ent else {
             if self.check == 0 {
-                match ent.etype {
-                    XmlEntityType::XmlInternalGeneralEntity => {
-                        writeln!(self.output, ", internal").ok();
-                    }
-                    XmlEntityType::XmlExternalGeneralParsedEntity => {
-                        writeln!(self.output, ", external parsed").ok();
-                    }
-                    XmlEntityType::XmlExternalGeneralUnparsedEntity => {
-                        writeln!(self.output, ", unparsed").ok();
-                    }
-                    XmlEntityType::XmlInternalParameterEntity => {
-                        writeln!(self.output, ", parameter").ok();
-                    }
-                    XmlEntityType::XmlExternalParameterEntity => {
-                        writeln!(self.output, ", external parameter").ok();
-                    }
-                    XmlEntityType::XmlInternalPredefinedEntity => {
-                        writeln!(self.output, ", predefined").ok();
-                    }
+                writeln!(self.output, "Entity declaration is NULL").ok();
+            }
+            return;
+        };
+        if ent.element_type() != XmlElementType::XmlEntityDecl {
+            xml_debug_err!(
+                self,
+                XmlParserErrors::XmlCheckNotEntityDecl,
+                "Node is not an entity declaration",
+            );
+            return;
+        }
+        if let Some(name) = ent.name() {
+            if self.check == 0 {
+                write!(self.output, "ENTITYDECL(").ok();
+                self.dump_string(Some(&name));
+                write!(self.output, ")").ok();
+            }
+        } else {
+            xml_debug_err!(
+                self,
+                XmlParserErrors::XmlCheckNoName,
+                "Entity declaration has no name",
+            );
+        }
+        if self.check == 0 {
+            match ent.etype {
+                XmlEntityType::XmlInternalGeneralEntity => {
+                    writeln!(self.output, ", internal").ok();
                 }
-                if let Some(external_id) = ent.external_id.as_deref() {
-                    self.dump_spaces();
-                    writeln!(self.output, " ExternalID={external_id}").ok();
+                XmlEntityType::XmlExternalGeneralParsedEntity => {
+                    writeln!(self.output, ", external parsed").ok();
                 }
-                if let Some(system_id) = ent.system_id.as_deref() {
-                    self.dump_spaces();
-                    writeln!(self.output, " SystemID={system_id}").ok();
+                XmlEntityType::XmlExternalGeneralUnparsedEntity => {
+                    writeln!(self.output, ", unparsed").ok();
                 }
-                if let Some(uri) = ent.uri.as_deref() {
-                    self.dump_spaces();
-                    writeln!(self.output, " URI={uri}").ok();
+                XmlEntityType::XmlInternalParameterEntity => {
+                    writeln!(self.output, ", parameter").ok();
                 }
-                if let Some(content) = ent.content.as_deref() {
-                    self.dump_spaces();
-                    write!(self.output, " content=").ok();
-                    self.dump_string(Some(content));
-                    writeln!(self.output).ok();
+                XmlEntityType::XmlExternalParameterEntity => {
+                    writeln!(self.output, ", external parameter").ok();
+                }
+                XmlEntityType::XmlInternalPredefinedEntity => {
+                    writeln!(self.output, ", predefined").ok();
                 }
             }
-
-            // Do a bit of checking
-            self.generic_node_check(ent.into());
+            if let Some(external_id) = ent.external_id.as_deref() {
+                self.dump_spaces();
+                writeln!(self.output, " ExternalID={external_id}").ok();
+            }
+            if let Some(system_id) = ent.system_id.as_deref() {
+                self.dump_spaces();
+                writeln!(self.output, " SystemID={system_id}").ok();
+            }
+            if let Some(uri) = ent.uri.as_deref() {
+                self.dump_spaces();
+                writeln!(self.output, " URI={uri}").ok();
+            }
+            if let Some(content) = ent.content.as_deref() {
+                self.dump_spaces();
+                write!(self.output, " content=").ok();
+                self.dump_string(Some(content));
+                writeln!(self.output).ok();
+            }
         }
+
+        // Do a bit of checking
+        self.generic_node_check(ent.into());
     }
 
     #[doc(alias = "xmlCtxtDumpNamespace")]
@@ -1379,7 +1341,6 @@ impl Default for XmlDebugCtxt<'_> {
             output: Box::new(stdout()),
             doc: None,
             node: None,
-            dict: null_mut(),
             nodict: 0,
             options: 0,
             shift: " ".repeat(100),
