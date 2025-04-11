@@ -241,82 +241,80 @@ pub fn xml_sax2_external_subset(
     external_id: Option<&str>,
     system_id: Option<&str>,
 ) {
-    unsafe {
-        if (external_id.is_some() || system_id.is_some())
-            && ((ctxt.validate != 0 || ctxt.loadsubset != 0)
-                && (ctxt.well_formed != 0 && ctxt.my_doc.is_some()))
-        {
-            let mut consumed: u64;
+    if (external_id.is_some() || system_id.is_some())
+        && ((ctxt.validate != 0 || ctxt.loadsubset != 0)
+            && (ctxt.well_formed != 0 && ctxt.my_doc.is_some()))
+    {
+        let mut consumed: u64;
 
-            // Ask the Entity resolver to load the damn thing
-            let Some(input) = ctxt
-                .sax
-                .as_deref_mut()
-                .and_then(|sax| sax.resolve_entity)
-                .and_then(|resolve_entity| resolve_entity(ctxt, external_id, system_id))
-            else {
-                return;
-            };
+        // Ask the Entity resolver to load the damn thing
+        let Some(input) = ctxt
+            .sax
+            .as_deref_mut()
+            .and_then(|sax| sax.resolve_entity)
+            .and_then(|resolve_entity| resolve_entity(ctxt, external_id, system_id))
+        else {
+            return;
+        };
 
-            xml_new_dtd(ctxt.my_doc, name, external_id, system_id);
+        xml_new_dtd(ctxt.my_doc, name, external_id, system_id);
 
-            // make sure we won't destroy the main document context
+        // make sure we won't destroy the main document context
 
-            // Try to fetch and parse the external subset.
-            let oldinput_tab = replace(&mut ctxt.input_tab, Vec::with_capacity(5));
-            let oldcharset = ctxt.charset;
-            let oldencoding = ctxt.encoding.take();
-            let oldprogressive: i32 = ctxt.progressive;
-            ctxt.progressive = 0;
-            ctxt.push_input(input);
+        // Try to fetch and parse the external subset.
+        let oldinput_tab = replace(&mut ctxt.input_tab, Vec::with_capacity(5));
+        let oldcharset = ctxt.charset;
+        let oldencoding = ctxt.encoding.take();
+        let oldprogressive: i32 = ctxt.progressive;
+        ctxt.progressive = 0;
+        ctxt.push_input(input);
 
-            // On the fly encoding conversion if needed
-            if ctxt.input().unwrap().length >= 4 {
-                let enc = detect_encoding(&ctxt.content_bytes()[..4]);
-                ctxt.switch_encoding(enc);
-            }
-
-            if let Some(input) = ctxt.input_mut() {
-                if input.filename.is_none() {
-                    if let Some(system_id) = system_id {
-                        let canonic = canonic_path(system_id);
-                        input.filename = Some(canonic.into_owned());
-                    }
-                }
-                input.line = 1;
-                input.col = 1;
-                input.base += input.cur;
-                input.cur = 0;
-            }
-
-            // let's parse that entity knowing it's an external subset.
-            ctxt.parse_external_subset(external_id, system_id);
-
-            // Free up the external entities
-            while ctxt.input_tab.len() > 1 {
-                ctxt.pop_input();
-            }
-
-            consumed = ctxt.input().unwrap().consumed;
-            let buffered = ctxt.input().unwrap().offset_from_base();
-            if buffered as u64 > u64::MAX - consumed {
-                consumed = u64::MAX;
-            } else {
-                consumed += buffered as u64;
-            }
-            if consumed > u64::MAX - ctxt.sizeentities {
-                ctxt.sizeentities = u64::MAX;
-            } else {
-                ctxt.sizeentities += consumed;
-            }
-
-            // Restore the parsing context of the main entity
-            ctxt.input_tab = oldinput_tab;
-            ctxt.charset = oldcharset;
-            ctxt.encoding = oldencoding;
-            ctxt.progressive = oldprogressive;
-            // ctxt.wellFormed = oldwellFormed;
+        // On the fly encoding conversion if needed
+        if ctxt.input().unwrap().length >= 4 {
+            let enc = detect_encoding(&ctxt.content_bytes()[..4]);
+            ctxt.switch_encoding(enc);
         }
+
+        if let Some(input) = ctxt.input_mut() {
+            if input.filename.is_none() {
+                if let Some(system_id) = system_id {
+                    let canonic = canonic_path(system_id);
+                    input.filename = Some(canonic.into_owned());
+                }
+            }
+            input.line = 1;
+            input.col = 1;
+            input.base += input.cur;
+            input.cur = 0;
+        }
+
+        // let's parse that entity knowing it's an external subset.
+        ctxt.parse_external_subset(external_id, system_id);
+
+        // Free up the external entities
+        while ctxt.input_tab.len() > 1 {
+            ctxt.pop_input();
+        }
+
+        consumed = ctxt.input().unwrap().consumed;
+        let buffered = ctxt.input().unwrap().offset_from_base();
+        if buffered as u64 > u64::MAX - consumed {
+            consumed = u64::MAX;
+        } else {
+            consumed += buffered as u64;
+        }
+        if consumed > u64::MAX - ctxt.sizeentities {
+            ctxt.sizeentities = u64::MAX;
+        } else {
+            ctxt.sizeentities += consumed;
+        }
+
+        // Restore the parsing context of the main entity
+        ctxt.input_tab = oldinput_tab;
+        ctxt.charset = oldcharset;
+        ctxt.encoding = oldencoding;
+        ctxt.progressive = oldprogressive;
+        // ctxt.wellFormed = oldwellFormed;
     }
 }
 

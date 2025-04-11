@@ -954,11 +954,11 @@ pub fn xml_dump_notation_table<'a>(
 ///
 /// Returns null_mut() if not, otherwise the new element content structure
 #[doc(alias = "xmlNewElementContent")]
-pub unsafe fn xml_new_element_content(
+pub fn xml_new_element_content(
     name: Option<&str>,
     typ: XmlElementContentType,
 ) -> XmlElementContent {
-    unsafe { xml_new_doc_element_content(None, name, typ) }
+    xml_new_doc_element_content(None, name, typ)
 }
 
 /// Build a copy of an element content description.
@@ -976,7 +976,7 @@ pub fn xml_copy_element_content(
 ///
 /// Returns null_mut() if not, otherwise the new element content structure
 #[doc(alias = "xmlNewDocElementContent")]
-pub unsafe fn xml_new_doc_element_content(
+pub fn xml_new_doc_element_content(
     _doc: Option<XmlDocPtr>,
     name: Option<&str>,
     typ: XmlElementContentType,
@@ -5917,7 +5917,7 @@ pub fn xml_is_mixed_element(doc: XmlDocPtr, name: &str) -> i32 {
 ///
 /// returns the xmlNotationPtr if found or null_mut()
 #[doc(alias = "xmlGetDtdNotationDesc")]
-pub unsafe fn xml_get_dtd_notation_desc<'a>(
+pub fn xml_get_dtd_notation_desc<'a>(
     dtd: Option<&'a XmlDtd>,
     name: &str,
 ) -> Option<&'a XmlNotation> {
@@ -5929,7 +5929,7 @@ pub unsafe fn xml_get_dtd_notation_desc<'a>(
 ///
 /// returns the xmlElementPtr if found or null_mut()
 #[doc(alias = "xmlGetDtdQElementDesc")]
-pub unsafe fn xml_get_dtd_qelement_desc(
+pub fn xml_get_dtd_qelement_desc(
     dtd: Option<XmlDtdPtr>,
     name: &str,
     prefix: Option<&str>,

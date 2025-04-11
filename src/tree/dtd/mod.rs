@@ -236,74 +236,72 @@ impl NodeCommon for XmlDtd {
 /// Create the internal subset of a document.  
 /// Returns a pointer to the new DTD structure
 #[doc(alias = "xmlCreateIntSubset")]
-pub unsafe fn xml_create_int_subset(
+pub fn xml_create_int_subset(
     doc: Option<XmlDocPtr>,
     name: Option<&str>,
     external_id: Option<&str>,
     system_id: Option<&str>,
 ) -> Option<XmlDtdPtr> {
-    unsafe {
-        if doc.is_some_and(|doc| doc.get_int_subset().is_some()) {
-            return None;
-        }
-
-        // Allocate a new DTD and fill the fields.
-        let Some(mut cur) = XmlDtdPtr::new(XmlDtd {
-            typ: XmlElementType::XmlDTDNode,
-            external_id: external_id.map(|e| e.to_owned()),
-            system_id: system_id.map(|e| e.to_owned()),
-            ..Default::default()
-        }) else {
-            xml_tree_err_memory("building internal subset");
-            return None;
-        };
-
-        cur.name = name.map(|name| name.to_owned());
-        if let Some(mut doc) = doc {
-            doc.int_subset = Some(cur);
-            cur.parent = Some(doc);
-            cur.doc = Some(doc);
-            if let Some(children) = doc.children() {
-                if matches!(doc.typ, XmlElementType::XmlHTMLDocumentNode) {
-                    let mut prev = children;
-                    prev.set_prev(Some(cur.into()));
-                    cur.set_next(Some(prev));
-                    doc.set_children(Some(cur.into()));
-                } else {
-                    let mut next = Some(children);
-                    while let Some(now) =
-                        next.filter(|n| !matches!(n.element_type(), XmlElementType::XmlElementNode))
-                    {
-                        next = now.next();
-                    }
-                    if let Some(mut next) = next {
-                        cur.set_next(Some(next));
-                        cur.set_prev(next.prev());
-                        if let Some(mut prev) = cur.prev() {
-                            prev.set_next(Some(cur.into()));
-                        } else {
-                            doc.set_children(Some(cur.into()));
-                        }
-                        next.set_prev(Some(cur.into()));
-                    } else {
-                        cur.set_prev(doc.last());
-                        cur.prev().unwrap().set_next(Some(cur.into()));
-                        cur.set_next(None);
-                        doc.set_last(Some(cur.into()));
-                    }
-                }
-            } else {
-                doc.children = Some(cur.into());
-                doc.last = Some(cur.into());
-            }
-        }
-
-        if let Some(register) = get_register_node_func() {
-            register(cur.into());
-        }
-
-        Some(cur)
+    if doc.is_some_and(|doc| doc.get_int_subset().is_some()) {
+        return None;
     }
+
+    // Allocate a new DTD and fill the fields.
+    let Some(mut cur) = XmlDtdPtr::new(XmlDtd {
+        typ: XmlElementType::XmlDTDNode,
+        external_id: external_id.map(|e| e.to_owned()),
+        system_id: system_id.map(|e| e.to_owned()),
+        ..Default::default()
+    }) else {
+        xml_tree_err_memory("building internal subset");
+        return None;
+    };
+
+    cur.name = name.map(|name| name.to_owned());
+    if let Some(mut doc) = doc {
+        doc.int_subset = Some(cur);
+        cur.parent = Some(doc);
+        cur.doc = Some(doc);
+        if let Some(children) = doc.children() {
+            if matches!(doc.typ, XmlElementType::XmlHTMLDocumentNode) {
+                let mut prev = children;
+                prev.set_prev(Some(cur.into()));
+                cur.set_next(Some(prev));
+                doc.set_children(Some(cur.into()));
+            } else {
+                let mut next = Some(children);
+                while let Some(now) =
+                    next.filter(|n| !matches!(n.element_type(), XmlElementType::XmlElementNode))
+                {
+                    next = now.next();
+                }
+                if let Some(mut next) = next {
+                    cur.set_next(Some(next));
+                    cur.set_prev(next.prev());
+                    if let Some(mut prev) = cur.prev() {
+                        prev.set_next(Some(cur.into()));
+                    } else {
+                        doc.set_children(Some(cur.into()));
+                    }
+                    next.set_prev(Some(cur.into()));
+                } else {
+                    cur.set_prev(doc.last());
+                    cur.prev().unwrap().set_next(Some(cur.into()));
+                    cur.set_next(None);
+                    doc.set_last(Some(cur.into()));
+                }
+            }
+        } else {
+            doc.children = Some(cur.into());
+            doc.last = Some(cur.into());
+        }
+    }
+
+    if let Some(register) = get_register_node_func() {
+        register(cur.into());
+    }
+
+    Some(cur)
 }
 
 /// Creation of a new DTD for the external subset.  

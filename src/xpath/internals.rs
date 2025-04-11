@@ -3029,117 +3029,115 @@ pub(super) unsafe fn xml_xpath_cache_wrap_string(
 ///
 /// Returns an int usable as a hash
 #[doc(alias = "xmlXPathNodeValHash")]
-unsafe fn xml_xpath_node_val_hash(node: Option<XmlGenericNodePtr>) -> u32 {
-    unsafe {
-        let mut len: i32 = 2;
-        let mut ret: u32 = 0;
+fn xml_xpath_node_val_hash(node: Option<XmlGenericNodePtr>) -> u32 {
+    let mut len: i32 = 2;
+    let mut ret: u32 = 0;
 
-        let Some(mut node) = node else {
+    let Some(mut node) = node else {
+        return 0;
+    };
+
+    if matches!(node.element_type(), XmlElementType::XmlDocumentNode) {
+        if let Some(tmp) = XmlDocPtr::try_from(node)
+            .unwrap()
+            .get_root_element()
+            .map(|root| root.into())
+        {
+            node = tmp;
+        } else if let Some(tmp) = node.children() {
+            node = tmp;
+        } else {
             return 0;
-        };
-
-        if matches!(node.element_type(), XmlElementType::XmlDocumentNode) {
-            if let Some(tmp) = XmlDocPtr::try_from(node)
-                .unwrap()
-                .get_root_element()
-                .map(|root| root.into())
-            {
-                node = tmp;
-            } else if let Some(tmp) = node.children() {
-                node = tmp;
-            } else {
-                return 0;
-            }
         }
-
-        let mut tmp = match node.element_type() {
-            XmlElementType::XmlCommentNode
-            | XmlElementType::XmlPINode
-            | XmlElementType::XmlCDATASectionNode
-            | XmlElementType::XmlTextNode => {
-                let node = XmlNodePtr::try_from(node).unwrap();
-                let Some(string) = node.content.as_deref() else {
-                    return 0;
-                };
-                if string.is_empty() {
-                    return 0;
-                }
-                let s0 = string.as_bytes()[0];
-                let s1 = *string.as_bytes().get(1).unwrap_or(&0);
-                return s0 as u32 + ((s1 as u32) << 8);
-            }
-            XmlElementType::XmlNamespaceDecl => {
-                let ns = XmlNsPtr::try_from(node).unwrap();
-                let Some(string) = ns.href.as_deref() else {
-                    return 0;
-                };
-                if string.is_empty() {
-                    return 0;
-                }
-                let s0 = string.as_bytes()[0];
-                let s1 = *string.as_bytes().get(1).unwrap_or(&0);
-                return s0 as u32 + ((s1 as u32) << 8);
-            }
-            XmlElementType::XmlAttributeNode => {
-                let attr = XmlAttrPtr::try_from(node).unwrap();
-                attr.children.map(XmlGenericNodePtr::from)
-            }
-            XmlElementType::XmlElementNode => node.children(),
-            _ => {
-                return 0;
-            }
-        };
-        while let Some(now) = tmp {
-            let string = match now.element_type() {
-                XmlElementType::XmlCDATASectionNode | XmlElementType::XmlTextNode => {
-                    let node = XmlNodePtr::try_from(now).unwrap();
-                    node.content.clone()
-                }
-                _ => None,
-            };
-            if let Some(string) = string.filter(|s| !s.is_empty()) {
-                let bytes = string.as_bytes();
-                if len == 1 {
-                    return ret + ((bytes[0] as u32) << 8);
-                }
-                if bytes.len() == 1 {
-                    len = 1;
-                    ret = bytes[0] as u32;
-                } else {
-                    return bytes[0] as u32 + ((bytes[1] as u32) << 8);
-                }
-            }
-            // Skip to next node
-            if let Some(children) = now.children().filter(|children| {
-                !matches!(now.element_type(), XmlElementType::XmlDTDNode)
-                    && !matches!(children.element_type(), XmlElementType::XmlEntityDecl)
-            }) {
-                tmp = Some(children);
-                continue;
-            }
-            if tmp == Some(node) {
-                break;
-            }
-
-            if let Some(next) = now.next() {
-                tmp = Some(next);
-                continue;
-            }
-
-            tmp = loop {
-                let Some(tmp) = now.parent() else {
-                    break None;
-                };
-                if tmp == node {
-                    break None;
-                }
-                if let Some(next) = tmp.next() {
-                    break Some(next);
-                }
-            };
-        }
-        ret
     }
+
+    let mut tmp = match node.element_type() {
+        XmlElementType::XmlCommentNode
+        | XmlElementType::XmlPINode
+        | XmlElementType::XmlCDATASectionNode
+        | XmlElementType::XmlTextNode => {
+            let node = XmlNodePtr::try_from(node).unwrap();
+            let Some(string) = node.content.as_deref() else {
+                return 0;
+            };
+            if string.is_empty() {
+                return 0;
+            }
+            let s0 = string.as_bytes()[0];
+            let s1 = *string.as_bytes().get(1).unwrap_or(&0);
+            return s0 as u32 + ((s1 as u32) << 8);
+        }
+        XmlElementType::XmlNamespaceDecl => {
+            let ns = XmlNsPtr::try_from(node).unwrap();
+            let Some(string) = ns.href.as_deref() else {
+                return 0;
+            };
+            if string.is_empty() {
+                return 0;
+            }
+            let s0 = string.as_bytes()[0];
+            let s1 = *string.as_bytes().get(1).unwrap_or(&0);
+            return s0 as u32 + ((s1 as u32) << 8);
+        }
+        XmlElementType::XmlAttributeNode => {
+            let attr = XmlAttrPtr::try_from(node).unwrap();
+            attr.children.map(XmlGenericNodePtr::from)
+        }
+        XmlElementType::XmlElementNode => node.children(),
+        _ => {
+            return 0;
+        }
+    };
+    while let Some(now) = tmp {
+        let string = match now.element_type() {
+            XmlElementType::XmlCDATASectionNode | XmlElementType::XmlTextNode => {
+                let node = XmlNodePtr::try_from(now).unwrap();
+                node.content.clone()
+            }
+            _ => None,
+        };
+        if let Some(string) = string.filter(|s| !s.is_empty()) {
+            let bytes = string.as_bytes();
+            if len == 1 {
+                return ret + ((bytes[0] as u32) << 8);
+            }
+            if bytes.len() == 1 {
+                len = 1;
+                ret = bytes[0] as u32;
+            } else {
+                return bytes[0] as u32 + ((bytes[1] as u32) << 8);
+            }
+        }
+        // Skip to next node
+        if let Some(children) = now.children().filter(|children| {
+            !matches!(now.element_type(), XmlElementType::XmlDTDNode)
+                && !matches!(children.element_type(), XmlElementType::XmlEntityDecl)
+        }) {
+            tmp = Some(children);
+            continue;
+        }
+        if tmp == Some(node) {
+            break;
+        }
+
+        if let Some(next) = now.next() {
+            tmp = Some(next);
+            continue;
+        }
+
+        tmp = loop {
+            let Some(tmp) = now.parent() else {
+                break None;
+            };
+            if tmp == node {
+                break None;
+            }
+            if let Some(next) = tmp.next() {
+                break Some(next);
+            }
+        };
+    }
+    ret
 }
 
 /// Implement the equal / not equal operation on XPath nodesets:

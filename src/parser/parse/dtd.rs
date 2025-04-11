@@ -193,59 +193,57 @@ impl XmlParserCtxt {
     /// [28 end] ('[' (markupdecl | PEReference | S)* ']' S?)? '>'
     /// ```
     #[doc(alias = "xmlParseInternalSubset")]
-    pub(crate) unsafe fn parse_internal_subset(&mut self) {
-        unsafe {
-            // Is there any DTD definition ?
-            if self.current_byte() == b'[' {
-                let base_input_nr = self.input_tab.len();
-                self.instate = XmlParserInputState::XmlParserDTD;
-                self.skip_char();
-                // Parse the succession of Markup declarations and
-                // PEReferences.
-                // Subsequence (markupdecl | PEReference | S)*
-                self.skip_blanks();
-                while (self.current_byte() != b']' || self.input_tab.len() > base_input_nr)
-                    && !matches!(self.instate, XmlParserInputState::XmlParserEOF)
-                {
-                    // Conditional sections are allowed from external entities included
-                    // by PE References in the internal subset.
-                    if self.input_tab.len() > 1
-                        && self.input().unwrap().filename.is_some()
-                        && self.content_bytes().starts_with(b"<![")
-                    {
-                        self.parse_conditional_sections();
-                    } else if self.current_byte() == b'<'
-                        && (self.nth_byte(1) == b'!' || self.nth_byte(1) == b'?')
-                    {
-                        self.parse_markup_decl();
-                    } else if self.current_byte() == b'%' {
-                        self.parse_pe_reference();
-                    } else {
-                        xml_fatal_err(
-                            self,
-                            XmlParserErrors::XmlErrInternalError,
-                            Some("xmlParseInternalSubset: error detected in Markup declaration\n"),
-                        );
-                        self.halt();
-                        return;
-                    }
-                    self.skip_blanks();
-                    self.shrink();
-                    self.grow();
-                }
-                if self.current_byte() == b']' {
-                    self.skip_char();
-                    self.skip_blanks();
-                }
-            }
-
-            // We should be at the end of the DOCTYPE declaration.
-            if self.current_byte() != b'>' {
-                xml_fatal_err(self, XmlParserErrors::XmlErrDoctypeNotFinished, None);
-                return;
-            }
+    pub(crate) fn parse_internal_subset(&mut self) {
+        // Is there any DTD definition ?
+        if self.current_byte() == b'[' {
+            let base_input_nr = self.input_tab.len();
+            self.instate = XmlParserInputState::XmlParserDTD;
             self.skip_char();
+            // Parse the succession of Markup declarations and
+            // PEReferences.
+            // Subsequence (markupdecl | PEReference | S)*
+            self.skip_blanks();
+            while (self.current_byte() != b']' || self.input_tab.len() > base_input_nr)
+                && !matches!(self.instate, XmlParserInputState::XmlParserEOF)
+            {
+                // Conditional sections are allowed from external entities included
+                // by PE References in the internal subset.
+                if self.input_tab.len() > 1
+                    && self.input().unwrap().filename.is_some()
+                    && self.content_bytes().starts_with(b"<![")
+                {
+                    self.parse_conditional_sections();
+                } else if self.current_byte() == b'<'
+                    && (self.nth_byte(1) == b'!' || self.nth_byte(1) == b'?')
+                {
+                    self.parse_markup_decl();
+                } else if self.current_byte() == b'%' {
+                    self.parse_pe_reference();
+                } else {
+                    xml_fatal_err(
+                        self,
+                        XmlParserErrors::XmlErrInternalError,
+                        Some("xmlParseInternalSubset: error detected in Markup declaration\n"),
+                    );
+                    self.halt();
+                    return;
+                }
+                self.skip_blanks();
+                self.shrink();
+                self.grow();
+            }
+            if self.current_byte() == b']' {
+                self.skip_char();
+                self.skip_blanks();
+            }
         }
+
+        // We should be at the end of the DOCTYPE declaration.
+        if self.current_byte() != b'>' {
+            xml_fatal_err(self, XmlParserErrors::XmlErrDoctypeNotFinished, None);
+            return;
+        }
+        self.skip_char();
     }
 
     /// Parse markup declarations. Always consumes '<!' or '<?'.
@@ -267,38 +265,36 @@ impl XmlParserCtxt {
     /// entities or to the external subset.)
     /// ```
     #[doc(alias = "xmlParseMarkupDecl")]
-    unsafe fn parse_markup_decl(&mut self) {
-        unsafe {
-            self.grow();
-            if self.current_byte() == b'<' {
-                if self.nth_byte(1) == b'!' {
-                    match self.nth_byte(2) {
-                        b'E' => match self.nth_byte(3) {
-                            b'L' => {
-                                self.parse_element_decl();
-                            }
-                            b'N' => self.parse_entity_decl(),
-                            _ => self.advance(2),
-                        },
-                        b'A' => self.parse_attribute_list_decl(),
-                        b'N' => self.parse_notation_decl(),
-                        b'-' => self.parse_comment(),
-                        // there is an error but it will be detected later
+    fn parse_markup_decl(&mut self) {
+        self.grow();
+        if self.current_byte() == b'<' {
+            if self.nth_byte(1) == b'!' {
+                match self.nth_byte(2) {
+                    b'E' => match self.nth_byte(3) {
+                        b'L' => {
+                            self.parse_element_decl();
+                        }
+                        b'N' => self.parse_entity_decl(),
                         _ => self.advance(2),
-                    }
-                } else if self.nth_byte(1) == b'?' {
-                    self.parse_pi();
+                    },
+                    b'A' => self.parse_attribute_list_decl(),
+                    b'N' => self.parse_notation_decl(),
+                    b'-' => self.parse_comment(),
+                    // there is an error but it will be detected later
+                    _ => self.advance(2),
                 }
+            } else if self.nth_byte(1) == b'?' {
+                self.parse_pi();
             }
-
-            // detect requirement to exit there and act accordingly
-            // and avoid having instate overridden later on
-            if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                return;
-            }
-
-            self.instate = XmlParserInputState::XmlParserDTD;
         }
+
+        // detect requirement to exit there and act accordingly
+        // and avoid having instate overridden later on
+        if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+            return;
+        }
+
+        self.instate = XmlParserInputState::XmlParserDTD;
     }
 
     /// Parse Markup declarations from an external subset
@@ -308,70 +304,63 @@ impl XmlParserCtxt {
     /// [31] extSubsetDecl ::= (markupdecl | conditionalSect | PEReference | S) *
     /// ```
     #[doc(alias = "xmlParseExternalSubset")]
-    pub unsafe fn parse_external_subset(
-        &mut self,
-        external_id: Option<&str>,
-        system_id: Option<&str>,
-    ) {
-        unsafe {
-            self.detect_sax2();
-            self.grow();
+    pub fn parse_external_subset(&mut self, external_id: Option<&str>, system_id: Option<&str>) {
+        self.detect_sax2();
+        self.grow();
 
-            if self.encoding.is_none() && self.input().unwrap().remainder_len() >= 4 {
-                let mut start = [0; 4];
-                start.copy_from_slice(&self.content_bytes()[..4]);
-                let enc = detect_encoding(&start);
-                if !matches!(enc, XmlCharEncoding::None) {
-                    self.switch_encoding(enc);
-                }
+        if self.encoding.is_none() && self.input().unwrap().remainder_len() >= 4 {
+            let mut start = [0; 4];
+            start.copy_from_slice(&self.content_bytes()[..4]);
+            let enc = detect_encoding(&start);
+            if !matches!(enc, XmlCharEncoding::None) {
+                self.switch_encoding(enc);
             }
+        }
 
-            if self.content_bytes().starts_with(b"<?xml") {
-                self.parse_text_decl();
-                if self.err_no == XmlParserErrors::XmlErrUnsupportedEncoding as i32 {
-                    // The XML REC instructs us to stop parsing right here
+        if self.content_bytes().starts_with(b"<?xml") {
+            self.parse_text_decl();
+            if self.err_no == XmlParserErrors::XmlErrUnsupportedEncoding as i32 {
+                // The XML REC instructs us to stop parsing right here
+                self.halt();
+                return;
+            }
+        }
+        let my_doc = if let Some(my_doc) = self.my_doc {
+            my_doc
+        } else {
+            self.my_doc = xml_new_doc(Some("1.0"));
+            let Some(mut my_doc) = self.my_doc else {
+                xml_err_memory(Some(self), Some("New Doc failed"));
+                return;
+            };
+            my_doc.properties = XmlDocProperties::XmlDocInternal as i32;
+            my_doc
+        };
+        if my_doc.int_subset.is_none() {
+            xml_create_int_subset(self.my_doc, None, external_id, system_id);
+        }
+
+        self.instate = XmlParserInputState::XmlParserDTD;
+        self.external = 1;
+        self.skip_blanks();
+        while !matches!(self.instate, XmlParserInputState::XmlParserEOF) && self.current_byte() != 0
+        {
+            self.grow();
+            match self.content_bytes() {
+                [b'<', b'!', b'[', ..] => self.parse_conditional_sections(),
+                [b'<', b'!', ..] | [b'<', b'?', ..] => self.parse_markup_decl(),
+                _ => {
+                    xml_fatal_err(self, XmlParserErrors::XmlErrExtSubsetNotFinished, None);
                     self.halt();
                     return;
                 }
             }
-            let my_doc = if let Some(my_doc) = self.my_doc {
-                my_doc
-            } else {
-                self.my_doc = xml_new_doc(Some("1.0"));
-                let Some(mut my_doc) = self.my_doc else {
-                    xml_err_memory(Some(self), Some("New Doc failed"));
-                    return;
-                };
-                my_doc.properties = XmlDocProperties::XmlDocInternal as i32;
-                my_doc
-            };
-            if my_doc.int_subset.is_none() {
-                xml_create_int_subset(self.my_doc, None, external_id, system_id);
-            }
-
-            self.instate = XmlParserInputState::XmlParserDTD;
-            self.external = 1;
             self.skip_blanks();
-            while !matches!(self.instate, XmlParserInputState::XmlParserEOF)
-                && self.current_byte() != 0
-            {
-                self.grow();
-                match self.content_bytes() {
-                    [b'<', b'!', b'[', ..] => self.parse_conditional_sections(),
-                    [b'<', b'!', ..] | [b'<', b'?', ..] => self.parse_markup_decl(),
-                    _ => {
-                        xml_fatal_err(self, XmlParserErrors::XmlErrExtSubsetNotFinished, None);
-                        self.halt();
-                        return;
-                    }
-                }
-                self.skip_blanks();
-                self.shrink();
-            }
+            self.shrink();
+        }
 
-            if self.current_byte() != 0 {
-                xml_fatal_err(self, XmlParserErrors::XmlErrExtSubsetNotFinished, None);
-            }
+        if self.current_byte() != 0 {
+            xml_fatal_err(self, XmlParserErrors::XmlErrExtSubsetNotFinished, None);
         }
     }
 
@@ -386,109 +375,104 @@ impl XmlParserCtxt {
     ///
     /// Returns the type of the element, or -1 in case of error
     #[doc(alias = "xmlParseElementDecl")]
-    unsafe fn parse_element_decl(&mut self) -> i32 {
-        unsafe {
-            if !self.content_bytes().starts_with(b"<!") {
-                return -1;
+    fn parse_element_decl(&mut self) -> i32 {
+        if !self.content_bytes().starts_with(b"<!") {
+            return -1;
+        }
+        self.advance(2);
+
+        // GROW; done in the caller
+
+        if !self.content_bytes().starts_with(b"ELEMENT") {
+            return -1;
+        }
+        let inputid: i32 = self.input().unwrap().id;
+        self.advance(7);
+
+        if self.skip_blanks() == 0 {
+            xml_fatal_err_msg(
+                self,
+                XmlParserErrors::XmlErrSpaceRequired,
+                "Space required after 'ELEMENT'\n",
+            );
+            return -1;
+        }
+        let Some(name) = self.parse_name() else {
+            xml_fatal_err_msg(
+                self,
+                XmlParserErrors::XmlErrNameRequired,
+                "xmlParseElementDecl: no name for Element\n",
+            );
+            return -1;
+        };
+
+        if self.skip_blanks() == 0 {
+            xml_fatal_err_msg(
+                self,
+                XmlParserErrors::XmlErrSpaceRequired,
+                "Space required after the element name\n",
+            );
+        }
+
+        let mut content = None;
+        let ret = match self.content_bytes() {
+            [b'E', b'M', b'P', b'T', b'Y', ..] => {
+                self.advance(5);
+                // Element must always be empty.
+                Some(XmlElementTypeVal::XmlElementTypeEmpty)
             }
-            self.advance(2);
-
-            // GROW; done in the caller
-
-            if !self.content_bytes().starts_with(b"ELEMENT") {
-                return -1;
+            [b'A', b'N', b'Y', ..] => {
+                self.advance(3);
+                // Element is a generic container.
+                Some(XmlElementTypeVal::XmlElementTypeAny)
             }
-            let inputid: i32 = self.input().unwrap().id;
-            self.advance(7);
-
-            if self.skip_blanks() == 0 {
-                xml_fatal_err_msg(
-                    self,
-                    XmlParserErrors::XmlErrSpaceRequired,
-                    "Space required after 'ELEMENT'\n",
-                );
-                return -1;
-            }
-            let Some(name) = self.parse_name() else {
-                xml_fatal_err_msg(
-                    self,
-                    XmlParserErrors::XmlErrNameRequired,
-                    "xmlParseElementDecl: no name for Element\n",
-                );
-                return -1;
-            };
-
-            if self.skip_blanks() == 0 {
-                xml_fatal_err_msg(
-                    self,
-                    XmlParserErrors::XmlErrSpaceRequired,
-                    "Space required after the element name\n",
-                );
-            }
-
-            let mut content = None;
-            let ret = match self.content_bytes() {
-                [b'E', b'M', b'P', b'T', b'Y', ..] => {
-                    self.advance(5);
-                    // Element must always be empty.
-                    Some(XmlElementTypeVal::XmlElementTypeEmpty)
-                }
-                [b'A', b'N', b'Y', ..] => {
-                    self.advance(3);
-                    // Element is a generic container.
-                    Some(XmlElementTypeVal::XmlElementTypeAny)
-                }
-                [b'(', ..] => self.parse_element_content_decl(&name, &mut content),
-                _ => {
-                    // [ WFC: PEs in Internal Subset ] error handling.
-                    if self.current_byte() == b'%'
-                        && self.external == 0
-                        && self.input_tab.len() == 1
-                    {
-                        xml_fatal_err_msg(
-                            self,
-                            XmlParserErrors::XmlErrPERefInIntSubset,
-                            "PEReference: forbidden within markup decl in internal subset\n",
-                        );
-                    } else {
-                        xml_fatal_err_msg(
-                            self,
-                            XmlParserErrors::XmlErrElemcontentNotStarted,
-                            "xmlParseElementDecl: 'EMPTY', 'ANY' or '(' expected\n",
-                        );
-                    }
-                    return -1;
-                }
-            };
-
-            self.skip_blanks();
-
-            if self.current_byte() != b'>' {
-                xml_fatal_err(self, XmlParserErrors::XmlErrGtRequired, None);
-            } else {
-                if inputid != self.input().unwrap().id {
+            [b'(', ..] => self.parse_element_content_decl(&name, &mut content),
+            _ => {
+                // [ WFC: PEs in Internal Subset ] error handling.
+                if self.current_byte() == b'%' && self.external == 0 && self.input_tab.len() == 1 {
                     xml_fatal_err_msg(
                         self,
-                        XmlParserErrors::XmlErrEntityBoundary,
-                        "Element declaration doesn't start and stop in the same entity\n",
+                        XmlParserErrors::XmlErrPERefInIntSubset,
+                        "PEReference: forbidden within markup decl in internal subset\n",
+                    );
+                } else {
+                    xml_fatal_err_msg(
+                        self,
+                        XmlParserErrors::XmlErrElemcontentNotStarted,
+                        "xmlParseElementDecl: 'EMPTY', 'ANY' or '(' expected\n",
                     );
                 }
-
-                self.skip_char();
-                if let Some(element_decl) = self
-                    .sax
-                    .as_deref_mut()
-                    .filter(|_| self.disable_sax == 0)
-                    .and_then(|sax| sax.element_decl)
-                {
-                    if let Some(content) = content.as_ref() {
-                        content.borrow_mut().parent = Weak::new();
-                    }
-                    element_decl(self, &name, ret, content);
-                }
+                return -1;
             }
-            ret.map_or(-1, |ret| ret as i32)
+        };
+
+        self.skip_blanks();
+
+        if self.current_byte() != b'>' {
+            xml_fatal_err(self, XmlParserErrors::XmlErrGtRequired, None);
+        } else {
+            if inputid != self.input().unwrap().id {
+                xml_fatal_err_msg(
+                    self,
+                    XmlParserErrors::XmlErrEntityBoundary,
+                    "Element declaration doesn't start and stop in the same entity\n",
+                );
+            }
+
+            self.skip_char();
+            if let Some(element_decl) = self
+                .sax
+                .as_deref_mut()
+                .filter(|_| self.disable_sax == 0)
+                .and_then(|sax| sax.element_decl)
+            {
+                if let Some(content) = content.as_ref() {
+                    content.borrow_mut().parent = Weak::new();
+                }
+                element_decl(self, &name, ret, content);
+            }
         }
+        ret.map_or(-1, |ret| ret as i32)
     }
 
     /// Parse the declaration for an Element content either Mixed or Children,
@@ -500,41 +484,39 @@ impl XmlParserCtxt {
     ///
     /// returns: the type of element content XML_ELEMENT_TYPE_xxx
     #[doc(alias = "xmlParseElementContentDecl")]
-    unsafe fn parse_element_content_decl(
+    fn parse_element_content_decl(
         &mut self,
         name: &str,
         result: &mut Option<Rc<RefCell<XmlElementContent>>>,
     ) -> Option<XmlElementTypeVal> {
-        unsafe {
-            let inputid: i32 = self.input().unwrap().id;
+        let inputid: i32 = self.input().unwrap().id;
 
-            *result = None;
+        *result = None;
 
-            if self.current_byte() != b'(' {
-                xml_fatal_err_msg_str!(
-                    self,
-                    XmlParserErrors::XmlErrElemcontentNotStarted,
-                    "xmlParseElementContentDecl : {} '(' expected\n",
-                    name
-                );
-                return None;
-            }
-            self.skip_char();
-            self.grow();
-            if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                return None;
-            }
-            self.skip_blanks();
-            let res = if self.content_bytes().starts_with(b"#PCDATA") {
-                *result = self.parse_element_mixed_content_decl(inputid);
-                XmlElementTypeVal::XmlElementTypeMixed
-            } else {
-                *result = self.parse_element_children_content_decl_priv(inputid, 1);
-                XmlElementTypeVal::XmlElementTypeElement
-            };
-            self.skip_blanks();
-            Some(res)
+        if self.current_byte() != b'(' {
+            xml_fatal_err_msg_str!(
+                self,
+                XmlParserErrors::XmlErrElemcontentNotStarted,
+                "xmlParseElementContentDecl : {} '(' expected\n",
+                name
+            );
+            return None;
         }
+        self.skip_char();
+        self.grow();
+        if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+            return None;
+        }
+        self.skip_blanks();
+        let res = if self.content_bytes().starts_with(b"#PCDATA") {
+            *result = self.parse_element_mixed_content_decl(inputid);
+            XmlElementTypeVal::XmlElementTypeMixed
+        } else {
+            *result = self.parse_element_children_content_decl_priv(inputid, 1);
+            XmlElementTypeVal::XmlElementTypeElement
+        };
+        self.skip_blanks();
+        Some(res)
     }
 
     /// Parse the declaration for a Mixed Element content
@@ -560,312 +542,309 @@ impl XmlParserCtxt {
     ///
     /// Returns the tree of xmlElementContentPtr describing the element hierarchy.
     #[doc(alias = "xmlParseElementChildrenContentDeclPriv")]
-    unsafe fn parse_element_children_content_decl_priv(
+    fn parse_element_children_content_decl_priv(
         &mut self,
         inputchk: i32,
         depth: i32,
     ) -> Option<Rc<RefCell<XmlElementContent>>> {
-        unsafe {
-            let mut ret;
-            let mut cur;
-            let mut last: Option<Rc<RefCell<XmlElementContent>>> = None;
-            let mut typ = 0;
+        let mut ret;
+        let mut cur;
+        let mut last: Option<Rc<RefCell<XmlElementContent>>> = None;
+        let mut typ = 0;
 
-            if (depth > 128 && self.options & XmlParserOption::XmlParseHuge as i32 == 0)
-                || depth > 2048
-            {
-                xml_fatal_err_msg_int!(
-                    self,
-                    XmlParserErrors::XmlErrElemcontentNotFinished,
-                    "xmlParseElementChildrenContentDecl : depth %d too deep, use xmlParserOption::XML_PARSE_HUGE\n",
-                    depth
+        if (depth > 128 && self.options & XmlParserOption::XmlParseHuge as i32 == 0) || depth > 2048
+        {
+            xml_fatal_err_msg_int!(
+                self,
+                XmlParserErrors::XmlErrElemcontentNotFinished,
+                "xmlParseElementChildrenContentDecl : depth %d too deep, use xmlParserOption::XML_PARSE_HUGE\n",
+                depth
+            );
+            return None;
+        }
+        self.skip_blanks();
+        self.grow();
+        if self.current_byte() == b'(' {
+            let inputid: i32 = self.input().unwrap().id;
+
+            // Recurse on first child
+            self.skip_char();
+            self.skip_blanks();
+            cur = Some(self.parse_element_children_content_decl_priv(inputid, depth + 1)?);
+            ret = cur.clone();
+            self.skip_blanks();
+            self.grow();
+        } else {
+            let Some(elem) = self.parse_name() else {
+                xml_fatal_err(self, XmlParserErrors::XmlErrElemcontentNotStarted, None);
+                return None;
+            };
+            let mut c = xml_new_doc_element_content(
+                self.my_doc,
+                Some(&elem),
+                XmlElementContentType::XmlElementContentElement,
+            );
+            self.grow();
+            match self.current_byte() {
+                b'?' => {
+                    c.ocur = XmlElementContentOccur::XmlElementContentOpt;
+                    self.skip_char();
+                }
+                b'*' => {
+                    c.ocur = XmlElementContentOccur::XmlElementContentMult;
+                    self.skip_char();
+                }
+                b'+' => {
+                    c.ocur = XmlElementContentOccur::XmlElementContentPlus;
+                    self.skip_char();
+                }
+                _ => c.ocur = XmlElementContentOccur::XmlElementContentOnce,
+            }
+            cur = Some(Rc::new(RefCell::new(c)));
+            ret = cur.clone();
+            self.grow();
+        }
+        self.skip_blanks();
+        while self.current_byte() != b')'
+            && !matches!(self.instate, XmlParserInputState::XmlParserEOF)
+        {
+            // Each loop we parse one separator and one element.
+            if self.current_byte() == b',' {
+                if typ == 0 {
+                    typ = self.current_byte();
+                } else if typ != self.current_byte() {
+                    // Detect "Name | Name , Name" error
+                    xml_fatal_err_msg_int!(
+                        self,
+                        XmlParserErrors::XmlErrSeparatorRequired,
+                        format!(
+                            "xmlParseElementChildrenContentDecl : '{}' expected\n",
+                            typ as char
+                        )
+                        .as_str(),
+                        typ as i32
+                    );
+                    return None;
+                }
+                self.skip_char();
+
+                let mut op = xml_new_doc_element_content(
+                    self.my_doc,
+                    None,
+                    XmlElementContentType::XmlElementContentSeq,
                 );
+                if let Some(last) = last.take() {
+                    op.parent = Rc::downgrade(cur.as_ref().unwrap());
+                    op.c1 = Some(last.clone());
+                    let op = Rc::new(RefCell::new(op));
+                    last.borrow_mut().parent = Rc::downgrade(&op);
+                    cur.as_deref().unwrap().borrow_mut().c2 = Some(op.clone());
+                    cur = Some(op);
+                } else {
+                    op.c1 = ret.clone();
+                    let op = Rc::new(RefCell::new(op));
+                    if let Some(ret) = ret.as_deref() {
+                        ret.borrow_mut().parent = Rc::downgrade(&op);
+                    }
+                    ret = Some(op);
+                    cur = ret.clone();
+                }
+            } else if self.current_byte() == b'|' {
+                if typ == 0 {
+                    typ = self.current_byte();
+                } else if typ != self.current_byte() {
+                    // Detect "Name , Name | Name" error
+                    xml_fatal_err_msg_int!(
+                        self,
+                        XmlParserErrors::XmlErrSeparatorRequired,
+                        format!(
+                            "xmlParseElementChildrenContentDecl : '{}' expected\n",
+                            typ as char
+                        )
+                        .as_str(),
+                        typ as i32
+                    );
+                    return None;
+                }
+                self.skip_char();
+
+                let mut op = xml_new_doc_element_content(
+                    self.my_doc,
+                    None,
+                    XmlElementContentType::XmlElementContentOr,
+                );
+                if let Some(last) = last.take() {
+                    op.parent = Rc::downgrade(cur.as_ref().unwrap());
+                    op.c1 = Some(last.clone());
+                    let op = Rc::new(RefCell::new(op));
+                    last.borrow_mut().parent = Rc::downgrade(&op);
+                    cur.as_deref().unwrap().borrow_mut().c2 = Some(op.clone());
+                    cur = Some(op);
+                } else {
+                    op.c1 = ret.clone();
+                    let op = Rc::new(RefCell::new(op));
+                    if let Some(ret) = ret.as_deref() {
+                        ret.borrow_mut().parent = Rc::downgrade(&op);
+                    }
+                    ret = Some(op);
+                    cur = ret.clone();
+                }
+            } else {
+                xml_fatal_err(self, XmlParserErrors::XmlErrElemcontentNotFinished, None);
                 return None;
             }
+            self.grow();
             self.skip_blanks();
             self.grow();
             if self.current_byte() == b'(' {
                 let inputid: i32 = self.input().unwrap().id;
-
-                // Recurse on first child
+                // Recurse on second child
                 self.skip_char();
                 self.skip_blanks();
-                cur = Some(self.parse_element_children_content_decl_priv(inputid, depth + 1)?);
-                ret = cur.clone();
+                last = Some(self.parse_element_children_content_decl_priv(inputid, depth + 1)?);
                 self.skip_blanks();
-                self.grow();
             } else {
                 let Some(elem) = self.parse_name() else {
                     xml_fatal_err(self, XmlParserErrors::XmlErrElemcontentNotStarted, None);
                     return None;
                 };
-                let mut c = xml_new_doc_element_content(
+                let mut l = xml_new_doc_element_content(
                     self.my_doc,
                     Some(&elem),
                     XmlElementContentType::XmlElementContentElement,
                 );
-                self.grow();
                 match self.current_byte() {
                     b'?' => {
-                        c.ocur = XmlElementContentOccur::XmlElementContentOpt;
+                        l.ocur = XmlElementContentOccur::XmlElementContentOpt;
                         self.skip_char();
                     }
                     b'*' => {
-                        c.ocur = XmlElementContentOccur::XmlElementContentMult;
+                        l.ocur = XmlElementContentOccur::XmlElementContentMult;
                         self.skip_char();
                     }
                     b'+' => {
-                        c.ocur = XmlElementContentOccur::XmlElementContentPlus;
+                        l.ocur = XmlElementContentOccur::XmlElementContentPlus;
                         self.skip_char();
                     }
-                    _ => c.ocur = XmlElementContentOccur::XmlElementContentOnce,
+                    _ => l.ocur = XmlElementContentOccur::XmlElementContentOnce,
                 }
-                cur = Some(Rc::new(RefCell::new(c)));
-                ret = cur.clone();
-                self.grow();
+                last = Some(Rc::new(RefCell::new(l)));
             }
             self.skip_blanks();
-            while self.current_byte() != b')'
-                && !matches!(self.instate, XmlParserInputState::XmlParserEOF)
-            {
-                // Each loop we parse one separator and one element.
-                if self.current_byte() == b',' {
-                    if typ == 0 {
-                        typ = self.current_byte();
-                    } else if typ != self.current_byte() {
-                        // Detect "Name | Name , Name" error
-                        xml_fatal_err_msg_int!(
-                            self,
-                            XmlParserErrors::XmlErrSeparatorRequired,
-                            format!(
-                                "xmlParseElementChildrenContentDecl : '{}' expected\n",
-                                typ as char
-                            )
-                            .as_str(),
-                            typ as i32
-                        );
-                        return None;
-                    }
-                    self.skip_char();
-
-                    let mut op = xml_new_doc_element_content(
-                        self.my_doc,
-                        None,
-                        XmlElementContentType::XmlElementContentSeq,
-                    );
-                    if let Some(last) = last.take() {
-                        op.parent = Rc::downgrade(cur.as_ref().unwrap());
-                        op.c1 = Some(last.clone());
-                        let op = Rc::new(RefCell::new(op));
-                        last.borrow_mut().parent = Rc::downgrade(&op);
-                        cur.as_deref().unwrap().borrow_mut().c2 = Some(op.clone());
-                        cur = Some(op);
-                    } else {
-                        op.c1 = ret.clone();
-                        let op = Rc::new(RefCell::new(op));
-                        if let Some(ret) = ret.as_deref() {
-                            ret.borrow_mut().parent = Rc::downgrade(&op);
-                        }
-                        ret = Some(op);
-                        cur = ret.clone();
-                    }
-                } else if self.current_byte() == b'|' {
-                    if typ == 0 {
-                        typ = self.current_byte();
-                    } else if typ != self.current_byte() {
-                        // Detect "Name , Name | Name" error
-                        xml_fatal_err_msg_int!(
-                            self,
-                            XmlParserErrors::XmlErrSeparatorRequired,
-                            format!(
-                                "xmlParseElementChildrenContentDecl : '{}' expected\n",
-                                typ as char
-                            )
-                            .as_str(),
-                            typ as i32
-                        );
-                        return None;
-                    }
-                    self.skip_char();
-
-                    let mut op = xml_new_doc_element_content(
-                        self.my_doc,
-                        None,
-                        XmlElementContentType::XmlElementContentOr,
-                    );
-                    if let Some(last) = last.take() {
-                        op.parent = Rc::downgrade(cur.as_ref().unwrap());
-                        op.c1 = Some(last.clone());
-                        let op = Rc::new(RefCell::new(op));
-                        last.borrow_mut().parent = Rc::downgrade(&op);
-                        cur.as_deref().unwrap().borrow_mut().c2 = Some(op.clone());
-                        cur = Some(op);
-                    } else {
-                        op.c1 = ret.clone();
-                        let op = Rc::new(RefCell::new(op));
-                        if let Some(ret) = ret.as_deref() {
-                            ret.borrow_mut().parent = Rc::downgrade(&op);
-                        }
-                        ret = Some(op);
-                        cur = ret.clone();
-                    }
+            self.grow();
+        }
+        if let Some((cur, last)) = cur.as_ref().zip(last.clone()) {
+            last.borrow_mut().parent = Rc::downgrade(cur);
+            cur.borrow_mut().c2 = Some(last);
+        }
+        if self.input().unwrap().id != inputchk {
+            xml_fatal_err_msg(
+                self,
+                XmlParserErrors::XmlErrEntityBoundary,
+                "Element content declaration doesn't start and stop in the same entity\n",
+            );
+        }
+        self.skip_char();
+        if self.current_byte() == b'?' {
+            if let Some(ret) = ret.as_deref() {
+                let mut ret = ret.borrow_mut();
+                if matches!(
+                    ret.ocur,
+                    XmlElementContentOccur::XmlElementContentPlus
+                        | XmlElementContentOccur::XmlElementContentMult
+                ) {
+                    ret.ocur = XmlElementContentOccur::XmlElementContentMult;
                 } else {
-                    xml_fatal_err(self, XmlParserErrors::XmlErrElemcontentNotFinished, None);
-                    return None;
+                    ret.ocur = XmlElementContentOccur::XmlElementContentOpt;
                 }
-                self.grow();
-                self.skip_blanks();
-                self.grow();
-                if self.current_byte() == b'(' {
-                    let inputid: i32 = self.input().unwrap().id;
-                    // Recurse on second child
-                    self.skip_char();
-                    self.skip_blanks();
-                    last = Some(self.parse_element_children_content_decl_priv(inputid, depth + 1)?);
-                    self.skip_blanks();
-                } else {
-                    let Some(elem) = self.parse_name() else {
-                        xml_fatal_err(self, XmlParserErrors::XmlErrElemcontentNotStarted, None);
-                        return None;
-                    };
-                    let mut l = xml_new_doc_element_content(
-                        self.my_doc,
-                        Some(&elem),
-                        XmlElementContentType::XmlElementContentElement,
-                    );
-                    match self.current_byte() {
-                        b'?' => {
-                            l.ocur = XmlElementContentOccur::XmlElementContentOpt;
-                            self.skip_char();
-                        }
-                        b'*' => {
-                            l.ocur = XmlElementContentOccur::XmlElementContentMult;
-                            self.skip_char();
-                        }
-                        b'+' => {
-                            l.ocur = XmlElementContentOccur::XmlElementContentPlus;
-                            self.skip_char();
-                        }
-                        _ => l.ocur = XmlElementContentOccur::XmlElementContentOnce,
-                    }
-                    last = Some(Rc::new(RefCell::new(l)));
-                }
-                self.skip_blanks();
-                self.grow();
-            }
-            if let Some((cur, last)) = cur.as_ref().zip(last.clone()) {
-                last.borrow_mut().parent = Rc::downgrade(cur);
-                cur.borrow_mut().c2 = Some(last);
-            }
-            if self.input().unwrap().id != inputchk {
-                xml_fatal_err_msg(
-                    self,
-                    XmlParserErrors::XmlErrEntityBoundary,
-                    "Element content declaration doesn't start and stop in the same entity\n",
-                );
             }
             self.skip_char();
-            if self.current_byte() == b'?' {
-                if let Some(ret) = ret.as_deref() {
+        } else if self.current_byte() == b'*' {
+            if let Some(ret) = ret.clone() {
+                ret.borrow_mut().ocur = XmlElementContentOccur::XmlElementContentMult;
+                let mut cur = Some(ret);
+                // Some normalization:
+                // (a | b* | c?)* == (a | b | c)*
+                while let Some(now) = cur.filter(|cur| {
+                    cur.borrow().typ == { XmlElementContentType::XmlElementContentOr }
+                }) {
+                    let now = now.borrow();
+                    if let Some(c1) = now.c1.as_deref().filter(|c1| {
+                        let c1 = c1.borrow();
+                        matches!(
+                            c1.ocur,
+                            XmlElementContentOccur::XmlElementContentOpt
+                                | XmlElementContentOccur::XmlElementContentMult
+                        )
+                    }) {
+                        c1.borrow_mut().ocur = XmlElementContentOccur::XmlElementContentOnce;
+                    }
+                    if let Some(c2) = now.c2.as_deref().filter(|c2| {
+                        let c2 = c2.borrow();
+                        matches!(
+                            c2.ocur,
+                            XmlElementContentOccur::XmlElementContentOpt
+                                | XmlElementContentOccur::XmlElementContentMult
+                        )
+                    }) {
+                        c2.borrow_mut().ocur = XmlElementContentOccur::XmlElementContentOnce;
+                    }
+                    cur = now.c2.clone();
+                }
+            }
+            self.skip_char();
+        } else if self.current_byte() == b'+' {
+            if let Some(ret) = ret.as_deref() {
+                let mut found: i32 = 0;
+
+                {
                     let mut ret = ret.borrow_mut();
                     if matches!(
                         ret.ocur,
-                        XmlElementContentOccur::XmlElementContentPlus
+                        XmlElementContentOccur::XmlElementContentOpt
                             | XmlElementContentOccur::XmlElementContentMult
                     ) {
                         ret.ocur = XmlElementContentOccur::XmlElementContentMult;
                     } else {
-                        ret.ocur = XmlElementContentOccur::XmlElementContentOpt;
+                        ret.ocur = XmlElementContentOccur::XmlElementContentPlus;
                     }
                 }
-                self.skip_char();
-            } else if self.current_byte() == b'*' {
-                if let Some(ret) = ret.clone() {
-                    ret.borrow_mut().ocur = XmlElementContentOccur::XmlElementContentMult;
-                    let mut cur = Some(ret);
-                    // Some normalization:
-                    // (a | b* | c?)* == (a | b | c)*
-                    while let Some(now) = cur.filter(|cur| {
-                        cur.borrow().typ == { XmlElementContentType::XmlElementContentOr }
-                    }) {
-                        let now = now.borrow();
-                        if let Some(c1) = now.c1.as_deref().filter(|c1| {
-                            let c1 = c1.borrow();
-                            matches!(
-                                c1.ocur,
-                                XmlElementContentOccur::XmlElementContentOpt
-                                    | XmlElementContentOccur::XmlElementContentMult
-                            )
-                        }) {
-                            c1.borrow_mut().ocur = XmlElementContentOccur::XmlElementContentOnce;
-                        }
-                        if let Some(c2) = now.c2.as_deref().filter(|c2| {
-                            let c2 = c2.borrow();
-                            matches!(
-                                c2.ocur,
-                                XmlElementContentOccur::XmlElementContentOpt
-                                    | XmlElementContentOccur::XmlElementContentMult
-                            )
-                        }) {
-                            c2.borrow_mut().ocur = XmlElementContentOccur::XmlElementContentOnce;
-                        }
-                        cur = now.c2.clone();
-                    }
-                }
-                self.skip_char();
-            } else if self.current_byte() == b'+' {
-                if let Some(ret) = ret.as_deref() {
-                    let mut found: i32 = 0;
-
-                    {
-                        let mut ret = ret.borrow_mut();
-                        if matches!(
-                            ret.ocur,
+                // Some normalization:
+                // (a | b*)+ == (a | b)*
+                // (a | b?)+ == (a | b)*
+                while let Some(now) = cur.clone().filter(|cur| {
+                    matches!(cur.borrow().typ, XmlElementContentType::XmlElementContentOr)
+                }) {
+                    let now = now.borrow_mut();
+                    if let Some(c1) = now.c1.as_deref().filter(|c1| {
+                        matches!(
+                            c1.borrow().ocur,
                             XmlElementContentOccur::XmlElementContentOpt
                                 | XmlElementContentOccur::XmlElementContentMult
-                        ) {
-                            ret.ocur = XmlElementContentOccur::XmlElementContentMult;
-                        } else {
-                            ret.ocur = XmlElementContentOccur::XmlElementContentPlus;
-                        }
-                    }
-                    // Some normalization:
-                    // (a | b*)+ == (a | b)*
-                    // (a | b?)+ == (a | b)*
-                    while let Some(now) = cur.clone().filter(|cur| {
-                        matches!(cur.borrow().typ, XmlElementContentType::XmlElementContentOr)
+                        )
                     }) {
-                        let now = now.borrow_mut();
-                        if let Some(c1) = now.c1.as_deref().filter(|c1| {
-                            matches!(
-                                c1.borrow().ocur,
-                                XmlElementContentOccur::XmlElementContentOpt
-                                    | XmlElementContentOccur::XmlElementContentMult
-                            )
-                        }) {
-                            c1.borrow_mut().ocur = XmlElementContentOccur::XmlElementContentOnce;
-                            found = 1;
-                        }
-                        if let Some(c2) = now.c2.as_deref().filter(|c2| {
-                            matches!(
-                                c2.borrow().ocur,
-                                XmlElementContentOccur::XmlElementContentOpt
-                                    | XmlElementContentOccur::XmlElementContentMult
-                            )
-                        }) {
-                            c2.borrow_mut().ocur = XmlElementContentOccur::XmlElementContentOnce;
-                        }
+                        c1.borrow_mut().ocur = XmlElementContentOccur::XmlElementContentOnce;
+                        found = 1;
+                    }
+                    if let Some(c2) = now.c2.as_deref().filter(|c2| {
+                        matches!(
+                            c2.borrow().ocur,
+                            XmlElementContentOccur::XmlElementContentOpt
+                                | XmlElementContentOccur::XmlElementContentMult
+                        )
+                    }) {
+                        c2.borrow_mut().ocur = XmlElementContentOccur::XmlElementContentOnce;
+                    }
 
-                        cur = now.c2.clone();
-                    }
-                    if found != 0 {
-                        ret.borrow_mut().ocur = XmlElementContentOccur::XmlElementContentMult;
-                    }
+                    cur = now.c2.clone();
                 }
-                self.skip_char();
+                if found != 0 {
+                    ret.borrow_mut().ocur = XmlElementContentOccur::XmlElementContentMult;
+                }
             }
-            ret
+            self.skip_char();
         }
+        ret
     }
 
     /// Parse the declaration for a Mixed Element content
@@ -883,123 +862,121 @@ impl XmlParserCtxt {
     ///
     /// returns: the list of the xmlElementContentPtr describing the element choices
     #[doc(alias = "xmlParseElementMixedContentDecl")]
-    unsafe fn parse_element_mixed_content_decl(
+    fn parse_element_mixed_content_decl(
         &mut self,
         inputchk: i32,
     ) -> Option<Rc<RefCell<XmlElementContent>>> {
-        unsafe {
-            let mut ret = None;
-            let mut cur = None;
+        let mut ret = None;
+        let mut cur = None;
 
-            self.grow();
-            if !self.content_bytes().starts_with(b"#PCDATA") {
-                xml_fatal_err(self, XmlParserErrors::XmlErrPCDATARequired, None);
-            }
-            self.advance(7);
-            self.skip_blanks();
-            if self.current_byte() == b')' {
-                if self.input().unwrap().id != inputchk {
-                    xml_fatal_err_msg(
-                        self,
-                        XmlParserErrors::XmlErrEntityBoundary,
-                        "Element content declaration doesn't start and stop in the same entity\n",
-                    );
-                }
-                self.skip_char();
-                let mut ret = xml_new_doc_element_content(
-                    self.my_doc,
-                    None,
-                    XmlElementContentType::XmlElementContentPCDATA,
+        self.grow();
+        if !self.content_bytes().starts_with(b"#PCDATA") {
+            xml_fatal_err(self, XmlParserErrors::XmlErrPCDATARequired, None);
+        }
+        self.advance(7);
+        self.skip_blanks();
+        if self.current_byte() == b')' {
+            if self.input().unwrap().id != inputchk {
+                xml_fatal_err_msg(
+                    self,
+                    XmlParserErrors::XmlErrEntityBoundary,
+                    "Element content declaration doesn't start and stop in the same entity\n",
                 );
-                if self.current_byte() == b'*' {
-                    ret.ocur = XmlElementContentOccur::XmlElementContentMult;
-                    self.skip_char();
-                }
-                return Some(Rc::new(RefCell::new(ret)));
             }
-            if matches!(self.current_byte(), b'(' | b'|') {
-                ret = Some(Rc::new(RefCell::new(xml_new_doc_element_content(
+            self.skip_char();
+            let mut ret = xml_new_doc_element_content(
+                self.my_doc,
+                None,
+                XmlElementContentType::XmlElementContentPCDATA,
+            );
+            if self.current_byte() == b'*' {
+                ret.ocur = XmlElementContentOccur::XmlElementContentMult;
+                self.skip_char();
+            }
+            return Some(Rc::new(RefCell::new(ret)));
+        }
+        if matches!(self.current_byte(), b'(' | b'|') {
+            ret = Some(Rc::new(RefCell::new(xml_new_doc_element_content(
+                self.my_doc,
+                None,
+                XmlElementContentType::XmlElementContentPCDATA,
+            ))));
+            cur = ret.clone();
+        }
+        let mut elem: Option<String> = None;
+        while self.current_byte() == b'|'
+            && !matches!(self.instate, XmlParserInputState::XmlParserEOF)
+        {
+            self.skip_char();
+            if let Some(elem) = elem.as_deref() {
+                let mut n = xml_new_doc_element_content(
                     self.my_doc,
                     None,
-                    XmlElementContentType::XmlElementContentPCDATA,
-                ))));
+                    XmlElementContentType::XmlElementContentOr,
+                );
+                let c1 = Rc::new(RefCell::new(xml_new_doc_element_content(
+                    self.my_doc,
+                    Some(elem),
+                    XmlElementContentType::XmlElementContentElement,
+                )));
+                n.c1 = Some(c1.clone());
+                n.parent = Rc::downgrade(cur.as_ref().unwrap());
+                let n = Rc::new(RefCell::new(n));
+                c1.borrow_mut().parent = Rc::downgrade(&n);
+                cur.as_ref().unwrap().borrow_mut().c2 = Some(n.clone());
+                cur = Some(n);
+            } else {
+                let mut n = xml_new_doc_element_content(
+                    self.my_doc,
+                    None,
+                    XmlElementContentType::XmlElementContentOr,
+                );
+                n.c1 = cur.clone();
+                ret = Some(Rc::new(RefCell::new(n)));
+                if let Some(cur) = cur.as_deref() {
+                    cur.borrow_mut().parent = Rc::downgrade(ret.as_ref().unwrap());
+                }
                 cur = ret.clone();
             }
-            let mut elem: Option<String> = None;
-            while self.current_byte() == b'|'
-                && !matches!(self.instate, XmlParserInputState::XmlParserEOF)
-            {
-                self.skip_char();
-                if let Some(elem) = elem.as_deref() {
-                    let mut n = xml_new_doc_element_content(
-                        self.my_doc,
-                        None,
-                        XmlElementContentType::XmlElementContentOr,
-                    );
-                    let c1 = Rc::new(RefCell::new(xml_new_doc_element_content(
-                        self.my_doc,
-                        Some(elem),
-                        XmlElementContentType::XmlElementContentElement,
-                    )));
-                    n.c1 = Some(c1.clone());
-                    n.parent = Rc::downgrade(cur.as_ref().unwrap());
-                    let n = Rc::new(RefCell::new(n));
-                    c1.borrow_mut().parent = Rc::downgrade(&n);
-                    cur.as_ref().unwrap().borrow_mut().c2 = Some(n.clone());
-                    cur = Some(n);
-                } else {
-                    let mut n = xml_new_doc_element_content(
-                        self.my_doc,
-                        None,
-                        XmlElementContentType::XmlElementContentOr,
-                    );
-                    n.c1 = cur.clone();
-                    ret = Some(Rc::new(RefCell::new(n)));
-                    if let Some(cur) = cur.as_deref() {
-                        cur.borrow_mut().parent = Rc::downgrade(ret.as_ref().unwrap());
-                    }
-                    cur = ret.clone();
-                }
-                self.skip_blanks();
-                elem = self.parse_name();
-                if elem.is_none() {
-                    xml_fatal_err_msg(
-                        self,
-                        XmlParserErrors::XmlErrNameRequired,
-                        "xmlParseElementMixedContentDecl : Name expected\n",
-                    );
-                    return None;
-                }
-                self.skip_blanks();
-                self.grow();
-            }
-            if self.content_bytes().starts_with(b")*") {
-                if let Some(elem) = elem {
-                    let mut c2 = xml_new_doc_element_content(
-                        self.my_doc,
-                        Some(&elem),
-                        XmlElementContentType::XmlElementContentElement,
-                    );
-                    c2.parent = Rc::downgrade(cur.as_ref().unwrap());
-                    cur.as_ref().unwrap().borrow_mut().c2 = Some(Rc::new(RefCell::new(c2)));
-                }
-                if let Some(ret) = ret.as_ref() {
-                    ret.borrow_mut().ocur = XmlElementContentOccur::XmlElementContentMult;
-                }
-                if self.input().unwrap().id != inputchk {
-                    xml_fatal_err_msg(
-                        self,
-                        XmlParserErrors::XmlErrEntityBoundary,
-                        "Element content declaration doesn't start and stop in the same entity\n",
-                    );
-                }
-                self.advance(2);
-            } else {
-                xml_fatal_err(self, XmlParserErrors::XmlErrMixedNotStarted, None);
+            self.skip_blanks();
+            elem = self.parse_name();
+            if elem.is_none() {
+                xml_fatal_err_msg(
+                    self,
+                    XmlParserErrors::XmlErrNameRequired,
+                    "xmlParseElementMixedContentDecl : Name expected\n",
+                );
                 return None;
             }
-            ret
+            self.skip_blanks();
+            self.grow();
         }
+        if self.content_bytes().starts_with(b")*") {
+            if let Some(elem) = elem {
+                let mut c2 = xml_new_doc_element_content(
+                    self.my_doc,
+                    Some(&elem),
+                    XmlElementContentType::XmlElementContentElement,
+                );
+                c2.parent = Rc::downgrade(cur.as_ref().unwrap());
+                cur.as_ref().unwrap().borrow_mut().c2 = Some(Rc::new(RefCell::new(c2)));
+            }
+            if let Some(ret) = ret.as_ref() {
+                ret.borrow_mut().ocur = XmlElementContentOccur::XmlElementContentMult;
+            }
+            if self.input().unwrap().id != inputchk {
+                xml_fatal_err_msg(
+                    self,
+                    XmlParserErrors::XmlErrEntityBoundary,
+                    "Element content declaration doesn't start and stop in the same entity\n",
+                );
+            }
+            self.advance(2);
+        } else {
+            xml_fatal_err(self, XmlParserErrors::XmlErrMixedNotStarted, None);
+            return None;
+        }
+        ret
     }
 
     /// Parse an attribute list declaration for an element. Always consumes '<!'.
@@ -1434,145 +1411,131 @@ impl XmlParserCtxt {
     /// [65] Ignore ::= Char* - (Char* ('<![' | ']]>') Char*)
     /// ```
     #[doc(alias = "xmlParseConditionalSections")]
-    unsafe fn parse_conditional_sections(&mut self) {
-        unsafe {
-            let mut depth = 0;
-            let mut input_ids = vec![];
+    fn parse_conditional_sections(&mut self) {
+        let mut depth = 0;
+        let mut input_ids = vec![];
 
-            while !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                match self.content_bytes() {
-                    [b'<', b'!', b'[', ..] => {
-                        let id: i32 = self.input().unwrap().id;
+        while !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+            match self.content_bytes() {
+                [b'<', b'!', b'[', ..] => {
+                    let id: i32 = self.input().unwrap().id;
 
-                        self.advance(3);
-                        self.skip_blanks();
+                    self.advance(3);
+                    self.skip_blanks();
 
-                        match self.content_bytes() {
-                            [b'I', b'N', b'C', b'L', b'U', b'D', b'E', ..] => {
-                                self.advance(7);
-                                self.skip_blanks();
-                                if self.current_byte() != b'[' {
-                                    xml_fatal_err(
-                                        self,
-                                        XmlParserErrors::XmlErrCondsecInvalid,
-                                        None,
-                                    );
-                                    self.halt();
-                                    return;
-                                }
-                                if self.input().unwrap().id != id {
-                                    xml_fatal_err_msg(
-                                        self,
-                                        XmlParserErrors::XmlErrEntityBoundary,
-                                        "All markup of the conditional section is not in the same entity\n",
-                                    );
-                                }
-                                self.skip_char();
-
-                                if input_ids.len() <= depth {
-                                    input_ids.resize(depth + 1, 0);
-                                }
-                                input_ids[depth] = id;
-                                depth += 1;
-                            }
-                            [b'I', b'G', b'N', b'O', b'R', b'E', ..] => {
-                                let mut ignore_depth = 0;
-
-                                self.advance(6);
-                                self.skip_blanks();
-                                if self.current_byte() != b'[' {
-                                    xml_fatal_err(
-                                        self,
-                                        XmlParserErrors::XmlErrCondsecInvalid,
-                                        None,
-                                    );
-                                    self.halt();
-                                    return;
-                                }
-                                if self.input().unwrap().id != id {
-                                    xml_fatal_err_msg(
-                                        self,
-                                        XmlParserErrors::XmlErrEntityBoundary,
-                                        "All markup of the conditional section is not in the same entity\n",
-                                    );
-                                }
-                                self.skip_char();
-
-                                while self.current_byte() != 0 {
-                                    if self.content_bytes().starts_with(b"<![") {
-                                        self.advance(3);
-                                        ignore_depth += 1;
-                                        // Check for integer overflow
-                                        if ignore_depth == 0 {
-                                            xml_err_memory(Some(self), None);
-                                            return;
-                                        }
-                                    } else if self.content_bytes().starts_with(b"]]>") {
-                                        if ignore_depth == 0 {
-                                            break;
-                                        }
-                                        self.advance(3);
-                                        ignore_depth -= 1;
-                                    } else {
-                                        self.skip_char();
-                                    }
-                                }
-
-                                if self.current_byte() == 0 {
-                                    xml_fatal_err(
-                                        self,
-                                        XmlParserErrors::XmlErrCondsecNotFinished,
-                                        None,
-                                    );
-                                    return;
-                                }
-                                if self.input().unwrap().id != id {
-                                    xml_fatal_err_msg(
-                                        self,
-                                        XmlParserErrors::XmlErrEntityBoundary,
-                                        "All markup of the conditional section is not in the same entity\n",
-                                    );
-                                }
-                                self.advance(3);
-                            }
-                            _ => {
-                                xml_fatal_err(
-                                    self,
-                                    XmlParserErrors::XmlErrCondsecInvalidKeyword,
-                                    None,
-                                );
+                    match self.content_bytes() {
+                        [b'I', b'N', b'C', b'L', b'U', b'D', b'E', ..] => {
+                            self.advance(7);
+                            self.skip_blanks();
+                            if self.current_byte() != b'[' {
+                                xml_fatal_err(self, XmlParserErrors::XmlErrCondsecInvalid, None);
                                 self.halt();
                                 return;
                             }
+                            if self.input().unwrap().id != id {
+                                xml_fatal_err_msg(
+                                    self,
+                                    XmlParserErrors::XmlErrEntityBoundary,
+                                    "All markup of the conditional section is not in the same entity\n",
+                                );
+                            }
+                            self.skip_char();
+
+                            if input_ids.len() <= depth {
+                                input_ids.resize(depth + 1, 0);
+                            }
+                            input_ids[depth] = id;
+                            depth += 1;
+                        }
+                        [b'I', b'G', b'N', b'O', b'R', b'E', ..] => {
+                            let mut ignore_depth = 0;
+
+                            self.advance(6);
+                            self.skip_blanks();
+                            if self.current_byte() != b'[' {
+                                xml_fatal_err(self, XmlParserErrors::XmlErrCondsecInvalid, None);
+                                self.halt();
+                                return;
+                            }
+                            if self.input().unwrap().id != id {
+                                xml_fatal_err_msg(
+                                    self,
+                                    XmlParserErrors::XmlErrEntityBoundary,
+                                    "All markup of the conditional section is not in the same entity\n",
+                                );
+                            }
+                            self.skip_char();
+
+                            while self.current_byte() != 0 {
+                                if self.content_bytes().starts_with(b"<![") {
+                                    self.advance(3);
+                                    ignore_depth += 1;
+                                    // Check for integer overflow
+                                    if ignore_depth == 0 {
+                                        xml_err_memory(Some(self), None);
+                                        return;
+                                    }
+                                } else if self.content_bytes().starts_with(b"]]>") {
+                                    if ignore_depth == 0 {
+                                        break;
+                                    }
+                                    self.advance(3);
+                                    ignore_depth -= 1;
+                                } else {
+                                    self.skip_char();
+                                }
+                            }
+
+                            if self.current_byte() == 0 {
+                                xml_fatal_err(
+                                    self,
+                                    XmlParserErrors::XmlErrCondsecNotFinished,
+                                    None,
+                                );
+                                return;
+                            }
+                            if self.input().unwrap().id != id {
+                                xml_fatal_err_msg(
+                                    self,
+                                    XmlParserErrors::XmlErrEntityBoundary,
+                                    "All markup of the conditional section is not in the same entity\n",
+                                );
+                            }
+                            self.advance(3);
+                        }
+                        _ => {
+                            xml_fatal_err(self, XmlParserErrors::XmlErrCondsecInvalidKeyword, None);
+                            self.halt();
+                            return;
                         }
                     }
-                    [b']', b']', b'>', ..] if depth > 0 => {
-                        depth -= 1;
-                        if self.input().unwrap().id != input_ids[depth] {
-                            xml_fatal_err_msg(
-                                self,
-                                XmlParserErrors::XmlErrEntityBoundary,
-                                "All markup of the conditional section is not in the same entity\n",
-                            );
-                        }
-                        self.advance(3);
-                    }
-                    [b'<', b'!', ..] | [b'<', b'?', ..] => self.parse_markup_decl(),
-                    _ => {
-                        xml_fatal_err(self, XmlParserErrors::XmlErrExtSubsetNotFinished, None);
-                        self.halt();
-                        return;
-                    }
                 }
-
-                if depth == 0 {
-                    break;
+                [b']', b']', b'>', ..] if depth > 0 => {
+                    depth -= 1;
+                    if self.input().unwrap().id != input_ids[depth] {
+                        xml_fatal_err_msg(
+                            self,
+                            XmlParserErrors::XmlErrEntityBoundary,
+                            "All markup of the conditional section is not in the same entity\n",
+                        );
+                    }
+                    self.advance(3);
                 }
-
-                self.skip_blanks();
-                self.shrink();
-                self.grow();
+                [b'<', b'!', ..] | [b'<', b'?', ..] => self.parse_markup_decl(),
+                _ => {
+                    xml_fatal_err(self, XmlParserErrors::XmlErrExtSubsetNotFinished, None);
+                    self.halt();
+                    return;
+                }
             }
+
+            if depth == 0 {
+                break;
+            }
+
+            self.skip_blanks();
+            self.shrink();
+            self.grow();
         }
     }
 
@@ -2189,79 +2152,84 @@ pub unsafe fn xml_parse_dtd(
 /// `input` will be freed by the function in any case.
 #[doc(alias = "xmlIOParseDTD")]
 #[cfg(feature = "libxml_valid")]
-pub unsafe fn xml_io_parse_dtd(
+pub fn xml_io_parse_dtd(
     sax: Option<Box<XmlSAXHandler>>,
     input: XmlParserInputBuffer,
     mut enc: XmlCharEncoding,
 ) -> Option<XmlDtdPtr> {
     use crate::{parser::XmlParserOption, tree::xml_free_doc};
 
-    unsafe {
-        let mut ctxt = XmlParserCtxt::new_sax_parser(sax, None).ok()?;
+    let mut ctxt = XmlParserCtxt::new_sax_parser(sax, None).ok()?;
 
-        // We are loading a DTD
-        ctxt.options |= XmlParserOption::XmlParseDTDLoad as i32;
+    // We are loading a DTD
+    ctxt.options |= XmlParserOption::XmlParseDTDLoad as i32;
 
-        ctxt.detect_sax2();
+    ctxt.detect_sax2();
 
-        // generate a parser input from the I/O handler
-        let pinput = XmlParserInput::from_io(&mut ctxt, input, XmlCharEncoding::None)?;
-        let input_id = pinput.id;
+    // generate a parser input from the I/O handler
+    let pinput = XmlParserInput::from_io(&mut ctxt, input, XmlCharEncoding::None)?;
+    let input_id = pinput.id;
 
-        // plug some encoding conversion routines here.
-        if ctxt.push_input(pinput) < 0 {
-            return None;
-        }
+    // plug some encoding conversion routines here.
+    if ctxt.push_input(pinput) < 0 {
+        return None;
+    }
+    if !matches!(enc, XmlCharEncoding::None) {
+        ctxt.switch_encoding(enc);
+    }
+
+    if let Some(pinput) = ctxt.input_tab.iter_mut().find(|input| input.id == input_id) {
+        pinput.filename = None;
+        pinput.line = 1;
+        pinput.col = 1;
+        pinput.base += pinput.cur;
+        pinput.cur = 0;
+    }
+
+    // let's parse that entity knowing it's an external subset.
+    ctxt.in_subset = 2;
+    ctxt.my_doc = xml_new_doc(Some("1.0"));
+    let Some(mut my_doc) = ctxt.my_doc else {
+        xml_err_memory(Some(&mut ctxt), Some("New Doc failed"));
+        return None;
+    };
+    my_doc.properties = XmlDocProperties::XmlDocInternal as i32;
+    my_doc.ext_subset = xml_new_dtd(ctxt.my_doc, Some("none"), Some("none"), Some("none"));
+
+    if matches!(enc, XmlCharEncoding::None) && ctxt.input().unwrap().remainder_len() >= 4 {
+        // Get the 4 first bytes and decode the charset
+        // if enc != xmlCharEncoding::XML_CHAR_ENCODING_NONE
+        // plug some encoding conversion routines.
+        enc = detect_encoding(&ctxt.content_bytes()[..4]);
         if !matches!(enc, XmlCharEncoding::None) {
             ctxt.switch_encoding(enc);
         }
+    }
 
-        if let Some(pinput) = ctxt.input_tab.iter_mut().find(|input| input.id == input_id) {
-            pinput.filename = None;
-            pinput.line = 1;
-            pinput.col = 1;
-            pinput.base += pinput.cur;
-            pinput.cur = 0;
-        }
+    ctxt.parse_external_subset(Some("none"), Some("none"));
 
-        // let's parse that entity knowing it's an external subset.
-        ctxt.in_subset = 2;
-        ctxt.my_doc = xml_new_doc(Some("1.0"));
-        let Some(mut my_doc) = ctxt.my_doc else {
-            xml_err_memory(Some(&mut ctxt), Some("New Doc failed"));
-            return None;
-        };
-        my_doc.properties = XmlDocProperties::XmlDocInternal as i32;
-        my_doc.ext_subset = xml_new_dtd(ctxt.my_doc, Some("none"), Some("none"), Some("none"));
-
-        if matches!(enc, XmlCharEncoding::None) && ctxt.input().unwrap().remainder_len() >= 4 {
-            // Get the 4 first bytes and decode the charset
-            // if enc != xmlCharEncoding::XML_CHAR_ENCODING_NONE
-            // plug some encoding conversion routines.
-            enc = detect_encoding(&ctxt.content_bytes()[..4]);
-            if !matches!(enc, XmlCharEncoding::None) {
-                ctxt.switch_encoding(enc);
-            }
-        }
-
-        ctxt.parse_external_subset(Some("none"), Some("none"));
-
-        let mut ret = None;
-        if let Some(mut my_doc) = ctxt.my_doc.take() {
-            if ctxt.well_formed != 0 {
-                ret = my_doc.ext_subset.take();
-                if let Some(mut ret) = ret {
-                    ret.doc = None;
-                    let mut tmp = ret.children;
-                    while let Some(mut now) = tmp {
-                        now.set_document(None);
-                        tmp = now.next();
-                    }
+    let mut ret = None;
+    if let Some(mut my_doc) = ctxt.my_doc.take() {
+        if ctxt.well_formed != 0 {
+            ret = my_doc.ext_subset.take();
+            if let Some(mut ret) = ret {
+                ret.doc = None;
+                let mut tmp = ret.children;
+                while let Some(mut now) = tmp {
+                    now.set_document(None);
+                    tmp = now.next();
                 }
             }
+        }
+        unsafe {
+            // # Safety
+            // The parser that owns `my_doc` is created in this function
+            // and dropped in this function.
+            // Also, the member owning `XmlDtdPtr` to be returned
+            // is overwritten with `None` and will not be freed by this operation.
             xml_free_doc(my_doc);
         }
-
-        ret
     }
+
+    ret
 }

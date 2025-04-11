@@ -1219,57 +1219,53 @@ impl XmlParserCtxt {
     /// returns 1 if valid or 0 otherwise
     #[doc(alias = "xmlValidateRoot")]
     #[cfg(feature = "libxml_valid")]
-    pub unsafe fn validate_root(&mut self, doc: XmlDocPtr) -> i32 {
+    pub fn validate_root(&mut self, doc: XmlDocPtr) -> i32 {
         use crate::parser::build_qname;
 
-        unsafe {
-            let Some(root) = doc.get_root_element() else {
-                xml_err_valid(
-                    Some(self),
-                    XmlParserErrors::XmlDTDNoRoot,
-                    "no root element\n",
+        let Some(root) = doc.get_root_element() else {
+            xml_err_valid(
+                Some(self),
+                XmlParserErrors::XmlDTDNoRoot,
+                "no root element\n",
+                None,
+            );
+            return 0;
+        };
+
+        // When doing post validation against a separate DTD, those may
+        // no internal subset has been generated
+        if let Some(int_subset) = doc.int_subset.filter(|dtd| dtd.name.is_some()) {
+            // Check first the document root against the NQName
+            if int_subset.name() != root.name() {
+                if let Some(prefix) = root.ns.as_deref().and_then(|ns| ns.prefix()) {
+                    let root_name = root.name();
+                    let fullname = build_qname(root_name.as_deref().unwrap(), Some(&prefix));
+                    if int_subset.name() == Some(fullname) {
+                        return 1;
+                    }
+                }
+                if int_subset.name.as_deref() == Some("HTML") && root.name == "html" {
+                    // goto name_ok;
+                    return 1;
+                }
+
+                let root_name = root.name().unwrap();
+                let subset_name = int_subset.name().unwrap();
+                xml_err_valid_node(
+                    self,
+                    Some(root.into()),
+                    XmlParserErrors::XmlDTDRootName,
+                    format!("root and DTD name do not match '{root_name}' and '{subset_name}'\n")
+                        .as_str(),
+                    Some(&root_name),
+                    Some(&subset_name),
                     None,
                 );
                 return 0;
-            };
-
-            // When doing post validation against a separate DTD, those may
-            // no internal subset has been generated
-            if let Some(int_subset) = doc.int_subset.filter(|dtd| dtd.name.is_some()) {
-                // Check first the document root against the NQName
-                if int_subset.name() != root.name() {
-                    if let Some(prefix) = root.ns.as_deref().and_then(|ns| ns.prefix()) {
-                        let root_name = root.name();
-                        let fullname = build_qname(root_name.as_deref().unwrap(), Some(&prefix));
-                        if int_subset.name() == Some(fullname) {
-                            return 1;
-                        }
-                    }
-                    if int_subset.name.as_deref() == Some("HTML") && root.name == "html" {
-                        // goto name_ok;
-                        return 1;
-                    }
-
-                    let root_name = root.name().unwrap();
-                    let subset_name = int_subset.name().unwrap();
-                    xml_err_valid_node(
-                        self,
-                        Some(root.into()),
-                        XmlParserErrors::XmlDTDRootName,
-                        format!(
-                            "root and DTD name do not match '{root_name}' and '{subset_name}'\n"
-                        )
-                        .as_str(),
-                        Some(&root_name),
-                        Some(&subset_name),
-                        None,
-                    );
-                    return 0;
-                }
             }
-            // name_ok:
-            1
         }
+        // name_ok:
+        1
     }
 
     /// Try to validate the content model of an element
@@ -2276,7 +2272,7 @@ impl XmlParserCtxt {
     /// returns 1 if valid or 0 otherwise
     #[doc(alias = "xmlValidateOneAttribute")]
     #[cfg(feature = "libxml_valid")]
-    pub unsafe fn validate_one_attribute(
+    pub fn validate_one_attribute(
         &mut self,
         doc: XmlDocPtr,
         elem: XmlNodePtr,
@@ -2285,281 +2281,279 @@ impl XmlParserCtxt {
     ) -> i32 {
         use crate::libxml::valid::xml_get_dtd_notation_desc;
 
-        unsafe {
-            let mut ret: i32 = 1;
+        let mut ret: i32 = 1;
 
-            if doc.int_subset.is_none() && doc.ext_subset.is_none() {
-                return 0;
-            };
-            let Some(mut attr) = attr else {
-                return 0;
-            };
+        if doc.int_subset.is_none() && doc.ext_subset.is_none() {
+            return 0;
+        };
+        let Some(mut attr) = attr else {
+            return 0;
+        };
 
-            let mut attr_decl = None;
-            if let Some(prefix) = elem.ns.as_deref().and_then(|ns| ns.prefix()) {
-                let name = elem.name().unwrap();
-                let fullname = build_qname(&name, Some(&prefix));
+        let mut attr_decl = None;
+        if let Some(prefix) = elem.ns.as_deref().and_then(|ns| ns.prefix()) {
+            let name = elem.name().unwrap();
+            let fullname = build_qname(&name, Some(&prefix));
 
-                if let Some(attr_ns) = attr.ns {
-                    attr_decl = doc.int_subset.and_then(|dtd| {
+            if let Some(attr_ns) = attr.ns {
+                attr_decl = doc.int_subset.and_then(|dtd| {
+                    dtd.get_qattr_desc(
+                        &fullname,
+                        attr.name().as_deref().unwrap(),
+                        attr_ns.prefix().as_deref(),
+                    )
+                });
+                if attr_decl.is_none() && doc.ext_subset.is_some() {
+                    attr_decl = doc.ext_subset.and_then(|dtd| {
                         dtd.get_qattr_desc(
                             &fullname,
                             attr.name().as_deref().unwrap(),
                             attr_ns.prefix().as_deref(),
                         )
                     });
-                    if attr_decl.is_none() && doc.ext_subset.is_some() {
-                        attr_decl = doc.ext_subset.and_then(|dtd| {
-                            dtd.get_qattr_desc(
-                                &fullname,
-                                attr.name().as_deref().unwrap(),
-                                attr_ns.prefix().as_deref(),
-                            )
-                        });
-                    }
-                } else {
-                    attr_decl = doc.int_subset.and_then(|dtd| {
+                }
+            } else {
+                attr_decl = doc
+                    .int_subset
+                    .and_then(|dtd| dtd.get_attr_desc(&fullname, attr.name().as_deref().unwrap()));
+                if attr_decl.is_none() && doc.ext_subset.is_some() {
+                    attr_decl = doc.ext_subset.and_then(|dtd| {
                         dtd.get_attr_desc(&fullname, attr.name().as_deref().unwrap())
                     });
-                    if attr_decl.is_none() && doc.ext_subset.is_some() {
-                        attr_decl = doc.ext_subset.and_then(|dtd| {
-                            dtd.get_attr_desc(&fullname, attr.name().as_deref().unwrap())
-                        });
-                    }
                 }
             }
-            if attr_decl.is_none() {
-                if let Some(attr_ns) = attr.ns {
-                    attr_decl = doc.int_subset.and_then(|dtd| {
+        }
+        if attr_decl.is_none() {
+            if let Some(attr_ns) = attr.ns {
+                attr_decl = doc.int_subset.and_then(|dtd| {
+                    dtd.get_qattr_desc(
+                        elem.name().unwrap().as_ref(),
+                        attr.name().as_deref().unwrap(),
+                        attr_ns.prefix().as_deref(),
+                    )
+                });
+                if attr_decl.is_none() && doc.ext_subset.is_some() {
+                    attr_decl = doc.ext_subset.and_then(|dtd| {
                         dtd.get_qattr_desc(
                             elem.name().unwrap().as_ref(),
                             attr.name().as_deref().unwrap(),
                             attr_ns.prefix().as_deref(),
                         )
                     });
-                    if attr_decl.is_none() && doc.ext_subset.is_some() {
-                        attr_decl = doc.ext_subset.and_then(|dtd| {
-                            dtd.get_qattr_desc(
-                                elem.name().unwrap().as_ref(),
-                                attr.name().as_deref().unwrap(),
-                                attr_ns.prefix().as_deref(),
-                            )
-                        });
-                    }
-                } else {
-                    attr_decl = doc.int_subset.and_then(|dtd| {
+                }
+            } else {
+                attr_decl = doc.int_subset.and_then(|dtd| {
+                    dtd.get_attr_desc(
+                        elem.name().as_deref().unwrap(),
+                        attr.name().as_deref().unwrap(),
+                    )
+                });
+                if attr_decl.is_none() && doc.ext_subset.is_some() {
+                    attr_decl = doc.ext_subset.and_then(|dtd| {
                         dtd.get_attr_desc(
                             elem.name().as_deref().unwrap(),
                             attr.name().as_deref().unwrap(),
                         )
                     });
-                    if attr_decl.is_none() && doc.ext_subset.is_some() {
-                        attr_decl = doc.ext_subset.and_then(|dtd| {
-                            dtd.get_attr_desc(
-                                elem.name().as_deref().unwrap(),
-                                attr.name().as_deref().unwrap(),
-                            )
-                        });
-                    }
                 }
             }
+        }
 
-            // Validity Constraint: Attribute Value Type
-            let Some(attr_decl) = attr_decl else {
+        // Validity Constraint: Attribute Value Type
+        let Some(attr_decl) = attr_decl else {
+            let attr_name = attr.name().unwrap();
+            let elem_name = elem.name().unwrap();
+            xml_err_valid_node(
+                self,
+                Some(elem.into()),
+                XmlParserErrors::XmlDTDUnknownAttribute,
+                format!(
+                    "No declaration for attribute {} of element {}\n",
+                    attr_name, elem_name
+                )
+                .as_str(),
+                Some(&attr_name),
+                Some(&elem_name),
+                None,
+            );
+            return 0;
+        };
+        attr.atype = Some(attr_decl.atype);
+
+        let val: i32 = xml_validate_attribute_value_internal(Some(doc), attr_decl.atype, value);
+        if val == 0 {
+            let attr_name = attr.name().unwrap();
+            let elem_name = elem.name().unwrap();
+            xml_err_valid_node(
+                self,
+                Some(elem.into()),
+                XmlParserErrors::XmlDTDAttributeValue,
+                format!(
+                    "Syntax of value for attribute {} of {} is not valid\n",
+                    attr_name, elem_name
+                )
+                .as_str(),
+                Some(&attr_name),
+                Some(&elem_name),
+                None,
+            );
+            ret = 0;
+        }
+
+        // Validity constraint: Fixed Attribute Default
+        if matches!(attr_decl.def, XmlAttributeDefault::XmlAttributeFixed)
+            && Some(value) != attr_decl.default_value.as_deref()
+        {
+            let attr_name = attr.name().unwrap();
+            let elem_name = elem.name().unwrap();
+            let def_value = attr_decl.default_value.as_deref().unwrap();
+            xml_err_valid_node(
+                self,
+                Some(elem.into()),
+                XmlParserErrors::XmlDTDAttributeDefault,
+                format!(
+                    "Value for attribute {} of {} is different from default \"{}\"\n",
+                    attr_name, elem_name, def_value
+                )
+                .as_str(),
+                Some(&attr_name),
+                Some(&elem_name),
+                Some(def_value),
+            );
+            ret = 0;
+        }
+
+        // Validity Constraint: ID uniqueness
+        if matches!(attr_decl.atype, XmlAttributeType::XmlAttributeID)
+            && self.add_id(doc, value, attr).is_none()
+        {
+            ret = 0;
+        }
+
+        if matches!(
+            attr_decl.atype,
+            XmlAttributeType::XmlAttributeIDREF | XmlAttributeType::XmlAttributeIDREFS
+        ) && self.add_ref(doc, value, attr).is_none()
+        {
+            ret = 0;
+        }
+
+        // Validity Constraint: Notation Attributes
+        if matches!(attr_decl.atype, XmlAttributeType::XmlAttributeNotation) {
+            let mut tree = attr_decl.tree.as_deref();
+
+            // First check that the given NOTATION was declared
+            let nota = xml_get_dtd_notation_desc(doc.int_subset.as_deref(), value)
+                .or_else(|| xml_get_dtd_notation_desc(doc.ext_subset.as_deref(), value));
+
+            if nota.is_none() {
                 let attr_name = attr.name().unwrap();
                 let elem_name = elem.name().unwrap();
                 xml_err_valid_node(
                     self,
                     Some(elem.into()),
-                    XmlParserErrors::XmlDTDUnknownAttribute,
+                    XmlParserErrors::XmlDTDUnknownNotation,
                     format!(
-                        "No declaration for attribute {} of element {}\n",
-                        attr_name, elem_name
+                        "Value \"{}\" for attribute {} of {} is not a declared Notation\n",
+                        value, attr_name, elem_name
                     )
                     .as_str(),
-                    Some(&attr_name),
-                    Some(&elem_name),
-                    None,
-                );
-                return 0;
-            };
-            attr.atype = Some(attr_decl.atype);
-
-            let val: i32 = xml_validate_attribute_value_internal(Some(doc), attr_decl.atype, value);
-            if val == 0 {
-                let attr_name = attr.name().unwrap();
-                let elem_name = elem.name().unwrap();
-                xml_err_valid_node(
-                    self,
-                    Some(elem.into()),
-                    XmlParserErrors::XmlDTDAttributeValue,
-                    format!(
-                        "Syntax of value for attribute {} of {} is not valid\n",
-                        attr_name, elem_name
-                    )
-                    .as_str(),
-                    Some(&attr_name),
-                    Some(&elem_name),
-                    None,
-                );
-                ret = 0;
-            }
-
-            // Validity constraint: Fixed Attribute Default
-            if matches!(attr_decl.def, XmlAttributeDefault::XmlAttributeFixed)
-                && Some(value) != attr_decl.default_value.as_deref()
-            {
-                let attr_name = attr.name().unwrap();
-                let elem_name = elem.name().unwrap();
-                let def_value = attr_decl.default_value.as_deref().unwrap();
-                xml_err_valid_node(
-                    self,
-                    Some(elem.into()),
-                    XmlParserErrors::XmlDTDAttributeDefault,
-                    format!(
-                        "Value for attribute {} of {} is different from default \"{}\"\n",
-                        attr_name, elem_name, def_value
-                    )
-                    .as_str(),
-                    Some(&attr_name),
-                    Some(&elem_name),
-                    Some(def_value),
-                );
-                ret = 0;
-            }
-
-            // Validity Constraint: ID uniqueness
-            if matches!(attr_decl.atype, XmlAttributeType::XmlAttributeID)
-                && self.add_id(doc, value, attr).is_none()
-            {
-                ret = 0;
-            }
-
-            if matches!(
-                attr_decl.atype,
-                XmlAttributeType::XmlAttributeIDREF | XmlAttributeType::XmlAttributeIDREFS
-            ) && self.add_ref(doc, value, attr).is_none()
-            {
-                ret = 0;
-            }
-
-            // Validity Constraint: Notation Attributes
-            if matches!(attr_decl.atype, XmlAttributeType::XmlAttributeNotation) {
-                let mut tree = attr_decl.tree.as_deref();
-
-                // First check that the given NOTATION was declared
-                let nota = xml_get_dtd_notation_desc(doc.int_subset.as_deref(), value)
-                    .or_else(|| xml_get_dtd_notation_desc(doc.ext_subset.as_deref(), value));
-
-                if nota.is_none() {
-                    let attr_name = attr.name().unwrap();
-                    let elem_name = elem.name().unwrap();
-                    xml_err_valid_node(
-                        self,
-                        Some(elem.into()),
-                        XmlParserErrors::XmlDTDUnknownNotation,
-                        format!(
-                            "Value \"{}\" for attribute {} of {} is not a declared Notation\n",
-                            value, attr_name, elem_name
-                        )
-                        .as_str(),
-                        Some(value),
-                        Some(&attr_name),
-                        Some(&elem_name),
-                    );
-                    ret = 0;
-                }
-
-                // Second, verify that it's among the list
-                while let Some(now) = tree {
-                    if now.name == value {
-                        break;
-                    }
-                    tree = now.next.as_deref();
-                }
-                if tree.is_none() {
-                    let attr_name = attr.name().unwrap();
-                    let elem_name = elem.name().unwrap();
-                    xml_err_valid_node(
-                    self,
-                    Some(elem.into()),
-                    XmlParserErrors::XmlDTDNotationValue,
-                    format!(
-                        "Value \"{}\" for attribute {} of {} is not among the enumerated notations\n",
-                        value,
-                        attr_name,
-                        elem_name,
-                    ).as_str(),
                     Some(value),
                     Some(&attr_name),
                     Some(&elem_name),
                 );
-                    ret = 0;
-                }
+                ret = 0;
             }
 
-            // Validity Constraint: Enumeration
-            if matches!(attr_decl.atype, XmlAttributeType::XmlAttributeEnumeration) {
-                let mut tree = attr_decl.tree.as_deref();
-                while let Some(now) = tree {
-                    if now.name == value {
-                        break;
-                    }
-                    tree = now.next.as_deref();
+            // Second, verify that it's among the list
+            while let Some(now) = tree {
+                if now.name == value {
+                    break;
                 }
-                if tree.is_none() {
-                    let attr_name = attr.name().unwrap();
-                    let elem_name = elem.name().unwrap();
-                    xml_err_valid_node(
-                        self,
-                        Some(elem.into()),
-                        XmlParserErrors::XmlDTDAttributeValue,
-                        format!(
-                            "Value \"{}\" for attribute {} of {} is not among the enumerated set\n",
-                            value, attr_name, elem_name
-                        )
-                        .as_str(),
-                        Some(value),
-                        Some(&attr_name),
-                        Some(&elem_name),
-                    );
-                    ret = 0;
-                }
+                tree = now.next.as_deref();
             }
-
-            // Fixed Attribute Default
-            if matches!(attr_decl.def, XmlAttributeDefault::XmlAttributeFixed)
-                && attr_decl.default_value.as_deref() != Some(value)
-            {
+            if tree.is_none() {
                 let attr_name = attr.name().unwrap();
                 let elem_name = elem.name().unwrap();
-                let def_value = attr_decl.default_value.as_deref().unwrap();
+                xml_err_valid_node(
+                self,
+                Some(elem.into()),
+                XmlParserErrors::XmlDTDNotationValue,
+                format!(
+                    "Value \"{}\" for attribute {} of {} is not among the enumerated notations\n",
+                    value,
+                    attr_name,
+                    elem_name,
+                ).as_str(),
+                Some(value),
+                Some(&attr_name),
+                Some(&elem_name),
+            );
+                ret = 0;
+            }
+        }
+
+        // Validity Constraint: Enumeration
+        if matches!(attr_decl.atype, XmlAttributeType::XmlAttributeEnumeration) {
+            let mut tree = attr_decl.tree.as_deref();
+            while let Some(now) = tree {
+                if now.name == value {
+                    break;
+                }
+                tree = now.next.as_deref();
+            }
+            if tree.is_none() {
+                let attr_name = attr.name().unwrap();
+                let elem_name = elem.name().unwrap();
                 xml_err_valid_node(
                     self,
                     Some(elem.into()),
                     XmlParserErrors::XmlDTDAttributeValue,
                     format!(
-                        "Value for attribute {} of {} must be \"{}\"\n",
-                        attr_name, elem_name, def_value
+                        "Value \"{}\" for attribute {} of {} is not among the enumerated set\n",
+                        value, attr_name, elem_name
                     )
                     .as_str(),
+                    Some(value),
                     Some(&attr_name),
                     Some(&elem_name),
-                    Some(def_value),
                 );
                 ret = 0;
             }
-
-            // Extra check for the attribute value
-            ret &= self.validate_attribute_value2(
-                doc,
-                attr.name().as_deref().unwrap(),
-                attr_decl.atype,
-                value,
-            );
-
-            ret
         }
+
+        // Fixed Attribute Default
+        if matches!(attr_decl.def, XmlAttributeDefault::XmlAttributeFixed)
+            && attr_decl.default_value.as_deref() != Some(value)
+        {
+            let attr_name = attr.name().unwrap();
+            let elem_name = elem.name().unwrap();
+            let def_value = attr_decl.default_value.as_deref().unwrap();
+            xml_err_valid_node(
+                self,
+                Some(elem.into()),
+                XmlParserErrors::XmlDTDAttributeValue,
+                format!(
+                    "Value for attribute {} of {} must be \"{}\"\n",
+                    attr_name, elem_name, def_value
+                )
+                .as_str(),
+                Some(&attr_name),
+                Some(&elem_name),
+                Some(def_value),
+            );
+            ret = 0;
+        }
+
+        // Extra check for the attribute value
+        ret &= self.validate_attribute_value2(
+            doc,
+            attr.name().as_deref().unwrap(),
+            attr_decl.atype,
+            value,
+        );
+
+        ret
     }
 
     /// Validate that the given attribute value match a given type.
@@ -2580,54 +2574,37 @@ impl XmlParserCtxt {
     ///
     /// Returns 1 if valid or 0 otherwise
     #[doc(alias = "xmlValidateAttributeValue2")]
-    unsafe fn validate_attribute_value2(
+    fn validate_attribute_value2(
         &mut self,
         mut doc: XmlDocPtr,
         name: &str,
         typ: XmlAttributeType,
         value: &str,
     ) -> i32 {
-        unsafe {
-            let mut ret: i32 = 1;
-            match typ {
-                XmlAttributeType::XmlAttributeIDREFS
-                | XmlAttributeType::XmlAttributeIDREF
-                | XmlAttributeType::XmlAttributeID
-                | XmlAttributeType::XmlAttributeNmtokens
-                | XmlAttributeType::XmlAttributeEnumeration
-                | XmlAttributeType::XmlAttributeNmtoken
-                | XmlAttributeType::XmlAttributeCDATA => {}
-                XmlAttributeType::XmlAttributeEntity => {
-                    let mut ent = xml_get_doc_entity(Some(doc), value);
-                    // yeah it's a bit messy...
-                    if ent.is_none() && doc.standalone == 1 {
-                        doc.standalone = 0;
-                        ent = xml_get_doc_entity(Some(doc), value);
-                    }
-                    if let Some(ent) = ent {
-                        if !matches!(ent.etype, XmlEntityType::XmlExternalGeneralUnparsedEntity) {
-                            xml_err_valid_node(
-                                self,
-                                Some(doc.into()),
-                                XmlParserErrors::XmlDTDEntityType,
-                                format!(
-                                    "ENTITY attribute {} reference an entity \"{}\" of wrong type\n",
-                                    name, value
-                                )
-                                .as_str(),
-                                Some(name),
-                                Some(value),
-                                None,
-                            );
-                            ret = 0;
-                        }
-                    } else {
+        let mut ret: i32 = 1;
+        match typ {
+            XmlAttributeType::XmlAttributeIDREFS
+            | XmlAttributeType::XmlAttributeIDREF
+            | XmlAttributeType::XmlAttributeID
+            | XmlAttributeType::XmlAttributeNmtokens
+            | XmlAttributeType::XmlAttributeEnumeration
+            | XmlAttributeType::XmlAttributeNmtoken
+            | XmlAttributeType::XmlAttributeCDATA => {}
+            XmlAttributeType::XmlAttributeEntity => {
+                let mut ent = xml_get_doc_entity(Some(doc), value);
+                // yeah it's a bit messy...
+                if ent.is_none() && doc.standalone == 1 {
+                    doc.standalone = 0;
+                    ent = xml_get_doc_entity(Some(doc), value);
+                }
+                if let Some(ent) = ent {
+                    if !matches!(ent.etype, XmlEntityType::XmlExternalGeneralUnparsedEntity) {
                         xml_err_valid_node(
                             self,
                             Some(doc.into()),
-                            XmlParserErrors::XmlDTDUnknownEntity,
+                            XmlParserErrors::XmlDTDEntityType,
                             format!(
-                                "ENTITY attribute {} reference an unknown entity \"{}\"\n",
+                                "ENTITY attribute {} reference an entity \"{}\" of wrong type\n",
                                 name, value
                             )
                             .as_str(),
@@ -2637,31 +2614,46 @@ impl XmlParserCtxt {
                         );
                         ret = 0;
                     }
+                } else {
+                    xml_err_valid_node(
+                        self,
+                        Some(doc.into()),
+                        XmlParserErrors::XmlDTDUnknownEntity,
+                        format!(
+                            "ENTITY attribute {} reference an unknown entity \"{}\"\n",
+                            name, value
+                        )
+                        .as_str(),
+                        Some(name),
+                        Some(value),
+                        None,
+                    );
+                    ret = 0;
                 }
-                XmlAttributeType::XmlAttributeEntities => {
-                    for nam in value
-                        .split(|c: char| xml_is_blank_char(c as u32))
-                        .filter(|nam| !nam.is_empty())
-                    {
-                        if let Some(ent) = xml_get_doc_entity(Some(doc), nam) {
-                            if !matches!(ent.etype, XmlEntityType::XmlExternalGeneralUnparsedEntity)
-                            {
-                                xml_err_valid_node(
-                                self,
-                                Some(doc.into()),
-                                XmlParserErrors::XmlDTDEntityType,
-                                format!(
-                                    "ENTITIES attribute {} reference an entity \"{}\" of wrong type\n",
-                                    name, nam
-                                ).as_str(),
-                                Some(name),
-                                Some(nam),
-                                None,
-                            );
-                                ret = 0;
-                            }
-                        } else {
+            }
+            XmlAttributeType::XmlAttributeEntities => {
+                for nam in value
+                    .split(|c: char| xml_is_blank_char(c as u32))
+                    .filter(|nam| !nam.is_empty())
+                {
+                    if let Some(ent) = xml_get_doc_entity(Some(doc), nam) {
+                        if !matches!(ent.etype, XmlEntityType::XmlExternalGeneralUnparsedEntity) {
                             xml_err_valid_node(
+                            self,
+                            Some(doc.into()),
+                            XmlParserErrors::XmlDTDEntityType,
+                            format!(
+                                "ENTITIES attribute {} reference an entity \"{}\" of wrong type\n",
+                                name, nam
+                            ).as_str(),
+                            Some(name),
+                            Some(nam),
+                            None,
+                        );
+                            ret = 0;
+                        }
+                    } else {
+                        xml_err_valid_node(
                             self,
                             Some(doc.into()),
                             XmlParserErrors::XmlDTDUnknownEntity,
@@ -2673,16 +2665,16 @@ impl XmlParserCtxt {
                             Some(nam),
                             None,
                         );
-                            ret = 0;
-                        }
+                        ret = 0;
                     }
                 }
-                XmlAttributeType::XmlAttributeNotation => {
-                    let nota = xml_get_dtd_notation_desc(doc.int_subset.as_deref(), value)
-                        .or_else(|| xml_get_dtd_notation_desc(doc.ext_subset.as_deref(), value));
+            }
+            XmlAttributeType::XmlAttributeNotation => {
+                let nota = xml_get_dtd_notation_desc(doc.int_subset.as_deref(), value)
+                    .or_else(|| xml_get_dtd_notation_desc(doc.ext_subset.as_deref(), value));
 
-                    if nota.is_none() {
-                        xml_err_valid_node(
+                if nota.is_none() {
+                    xml_err_valid_node(
                         self,
                         Some(doc.into()),
                         XmlParserErrors::XmlDTDUnknownNotation,
@@ -2694,12 +2686,11 @@ impl XmlParserCtxt {
                         Some(value),
                         None,
                     );
-                        ret = 0;
-                    }
+                    ret = 0;
                 }
             }
-            ret
         }
+        ret
     }
 
     /// Check that an element follows #CDATA
@@ -2773,7 +2764,7 @@ impl XmlParserCtxt {
     /// returns 1 if valid or 0 otherwise
     #[doc(alias = "xmlValidateOneNamespace")]
     #[cfg(feature = "libxml_valid")]
-    pub unsafe fn validate_one_namespace(
+    pub fn validate_one_namespace(
         &mut self,
         doc: XmlDocPtr,
         elem: XmlNodePtr,
@@ -2781,217 +2772,212 @@ impl XmlParserCtxt {
         ns: XmlNsPtr,
         value: &str,
     ) -> i32 {
-        unsafe {
-            let mut ret: i32 = 1;
+        let mut ret: i32 = 1;
 
-            if doc.int_subset.is_none() && doc.ext_subset.is_none() {
-                return 0;
-            };
-            if ns.href.is_none() {
-                return 0;
-            }
+        if doc.int_subset.is_none() && doc.ext_subset.is_none() {
+            return 0;
+        };
+        if ns.href.is_none() {
+            return 0;
+        }
 
-            let mut attr_decl = None;
-            if let Some(prefix) = prefix {
-                let fullname = build_qname(&elem.name, Some(prefix));
+        let mut attr_decl = None;
+        if let Some(prefix) = prefix {
+            let fullname = build_qname(&elem.name, Some(prefix));
 
-                if let Some(prefix) = ns.prefix() {
+            if let Some(prefix) = ns.prefix() {
+                attr_decl = doc
+                    .int_subset
+                    .and_then(|dtd| dtd.get_qattr_desc(&fullname, &prefix, Some("xmlns")));
+                if attr_decl.is_none() && doc.ext_subset.is_some() {
                     attr_decl = doc
-                        .int_subset
+                        .ext_subset
                         .and_then(|dtd| dtd.get_qattr_desc(&fullname, &prefix, Some("xmlns")));
-                    if attr_decl.is_none() && doc.ext_subset.is_some() {
-                        attr_decl = doc
-                            .ext_subset
-                            .and_then(|dtd| dtd.get_qattr_desc(&fullname, &prefix, Some("xmlns")));
-                    }
-                } else {
+                }
+            } else {
+                attr_decl = doc
+                    .int_subset
+                    .and_then(|dtd| dtd.get_attr_desc(&fullname, "xmlns"));
+                if attr_decl.is_none() && doc.ext_subset.is_some() {
                     attr_decl = doc
-                        .int_subset
+                        .ext_subset
                         .and_then(|dtd| dtd.get_attr_desc(&fullname, "xmlns"));
-                    if attr_decl.is_none() && doc.ext_subset.is_some() {
-                        attr_decl = doc
-                            .ext_subset
-                            .and_then(|dtd| dtd.get_attr_desc(&fullname, "xmlns"));
-                    }
                 }
             }
-            if attr_decl.is_none() {
-                if let Some(prefix) = ns.prefix() {
-                    attr_decl = doc.int_subset.and_then(|dtd| {
+        }
+        if attr_decl.is_none() {
+            if let Some(prefix) = ns.prefix() {
+                attr_decl = doc.int_subset.and_then(|dtd| {
+                    dtd.get_qattr_desc(elem.name().unwrap().as_ref(), &prefix, Some("xmlns"))
+                });
+                if attr_decl.is_none() && doc.ext_subset.is_some() {
+                    attr_decl = doc.ext_subset.and_then(|dtd| {
                         dtd.get_qattr_desc(elem.name().unwrap().as_ref(), &prefix, Some("xmlns"))
                     });
-                    if attr_decl.is_none() && doc.ext_subset.is_some() {
-                        attr_decl = doc.ext_subset.and_then(|dtd| {
-                            dtd.get_qattr_desc(
-                                elem.name().unwrap().as_ref(),
-                                &prefix,
-                                Some("xmlns"),
-                            )
-                        });
-                    }
-                } else {
-                    attr_decl = doc.int_subset.and_then(|dtd| {
+                }
+            } else {
+                attr_decl = doc
+                    .int_subset
+                    .and_then(|dtd| dtd.get_attr_desc(elem.name().as_deref().unwrap(), "xmlns"));
+                if attr_decl.is_none() && doc.ext_subset.is_some() {
+                    attr_decl = doc.ext_subset.and_then(|dtd| {
                         dtd.get_attr_desc(elem.name().as_deref().unwrap(), "xmlns")
                     });
-                    if attr_decl.is_none() && doc.ext_subset.is_some() {
-                        attr_decl = doc.ext_subset.and_then(|dtd| {
-                            dtd.get_attr_desc(elem.name().as_deref().unwrap(), "xmlns")
-                        });
-                    }
                 }
             }
+        }
 
-            // Validity Constraint: Attribute Value Type
-            let Some(attr_decl) = attr_decl else {
+        // Validity Constraint: Attribute Value Type
+        let Some(attr_decl) = attr_decl else {
+            if let Some(prefix) = ns.prefix() {
+                let elem_name = elem.name().unwrap();
+                xml_err_valid_node(
+                    self,
+                    Some(elem.into()),
+                    XmlParserErrors::XmlDTDUnknownAttribute,
+                    format!(
+                        "No declaration for attribute xmlns:{} of element {}\n",
+                        prefix, elem_name
+                    )
+                    .as_str(),
+                    Some(&prefix),
+                    Some(&elem_name),
+                    None,
+                );
+            } else {
+                let elem_name = elem.name().unwrap();
+                xml_err_valid_node(
+                    self,
+                    Some(elem.into()),
+                    XmlParserErrors::XmlDTDUnknownAttribute,
+                    format!(
+                        "No declaration for attribute xmlns of element {}\n",
+                        elem_name
+                    )
+                    .as_str(),
+                    Some(&elem_name),
+                    None,
+                    None,
+                );
+            }
+            return 0;
+        };
+
+        let val: i32 = xml_validate_attribute_value_internal(Some(doc), attr_decl.atype, value);
+        if val == 0 {
+            if let Some(prefix) = ns.prefix() {
+                let elem_name = elem.name().unwrap();
+                xml_err_valid_node(
+                    self,
+                    Some(elem.into()),
+                    XmlParserErrors::XmlDTDInvalidDefault,
+                    format!(
+                        "Syntax of value for attribute xmlns:{} of {} is not valid\n",
+                        prefix, elem_name
+                    )
+                    .as_str(),
+                    Some(&prefix),
+                    Some(&elem_name),
+                    None,
+                );
+            } else {
+                let elem_name = elem.name().unwrap();
+                xml_err_valid_node(
+                    self,
+                    Some(elem.into()),
+                    XmlParserErrors::XmlDTDInvalidDefault,
+                    format!(
+                        "Syntax of value for attribute xmlns of {} is not valid\n",
+                        elem_name
+                    )
+                    .as_str(),
+                    Some(&elem_name),
+                    None,
+                    None,
+                );
+            }
+            ret = 0;
+        }
+
+        // Validity constraint: Fixed Attribute Default
+        if matches!(attr_decl.def, XmlAttributeDefault::XmlAttributeFixed)
+            && Some(value) != attr_decl.default_value.as_deref()
+        {
+            if let Some(prefix) = ns.prefix() {
+                let elem_name = elem.name().unwrap();
+                let def_value = attr_decl.default_value.as_deref().unwrap();
+                xml_err_valid_node(
+            self,
+            Some(elem.into()),
+            XmlParserErrors::XmlDTDAttributeDefault,
+            format!("Value for attribute xmlns:{prefix} of {elem_name} is different from default \"{def_value}\"\n").as_str(),
+            Some(&prefix),
+            Some(&elem_name),
+            Some(def_value),
+        );
+            } else {
+                let elem_name = elem.name().unwrap();
+                let def_value = attr_decl.default_value.as_deref().unwrap();
+                xml_err_valid_node(
+                    self,
+                    Some(elem.into()),
+                    XmlParserErrors::XmlDTDAttributeDefault,
+                    format!(
+                        "Value for attribute xmlns of {} is different from default \"{}\"\n",
+                        elem_name, def_value
+                    )
+                    .as_str(),
+                    Some(&elem_name),
+                    Some(def_value),
+                    None,
+                );
+            }
+            ret = 0;
+        }
+
+        // Casting ns to xmlAttrPtr is wrong. We'd need separate functions
+        // xmlAddID and xmlAddRef for namespace declarations, but it makes
+        // no practical sense to use ID types anyway.
+        // #if 0
+        // /* Validity Constraint: ID uniqueness */
+        // if ((*attrDecl).atype == XML_ATTRIBUTE_ID) {
+        //     if (xmlAddID(ctxt, doc, value, (xmlAttrPtr) ns).is_null())
+        //         ret = 0;
+        // }
+        // if (((*attrDecl).atype == XML_ATTRIBUTE_IDREF) || ((*attrDecl).atype == XML_ATTRIBUTE_IDREFS)) {
+        //     if (xmlAddRef(ctxt, doc, value, (xmlAttrPtr) ns).is_null())
+        // 	       ret = 0;
+        // }
+        // #endif
+
+        // Validity Constraint: Notation Attributes
+        if matches!(attr_decl.atype, XmlAttributeType::XmlAttributeNotation) {
+            let mut tree = attr_decl.tree.as_deref();
+
+            // First check that the given NOTATION was declared
+            let nota = xml_get_dtd_notation_desc(doc.int_subset.as_deref(), value)
+                .or_else(|| xml_get_dtd_notation_desc(doc.ext_subset.as_deref(), value));
+
+            if nota.is_none() {
                 if let Some(prefix) = ns.prefix() {
                     let elem_name = elem.name().unwrap();
                     xml_err_valid_node(
-                        self,
-                        Some(elem.into()),
-                        XmlParserErrors::XmlDTDUnknownAttribute,
-                        format!(
-                            "No declaration for attribute xmlns:{} of element {}\n",
-                            prefix, elem_name
-                        )
-                        .as_str(),
-                        Some(&prefix),
-                        Some(&elem_name),
-                        None,
-                    );
+                    self,
+                    Some(elem.into()),
+                    XmlParserErrors::XmlDTDUnknownNotation,
+                    format!(
+                        "Value \"{}\" for attribute xmlns:{} of {} is not a declared Notation\n",
+                        value,
+                        prefix,
+                        elem_name,
+                    ).as_str(),
+                    Some(value),
+                    Some(&prefix),
+                    Some(&elem_name),
+                );
                 } else {
                     let elem_name = elem.name().unwrap();
                     xml_err_valid_node(
-                        self,
-                        Some(elem.into()),
-                        XmlParserErrors::XmlDTDUnknownAttribute,
-                        format!(
-                            "No declaration for attribute xmlns of element {}\n",
-                            elem_name
-                        )
-                        .as_str(),
-                        Some(&elem_name),
-                        None,
-                        None,
-                    );
-                }
-                return 0;
-            };
-
-            let val: i32 = xml_validate_attribute_value_internal(Some(doc), attr_decl.atype, value);
-            if val == 0 {
-                if let Some(prefix) = ns.prefix() {
-                    let elem_name = elem.name().unwrap();
-                    xml_err_valid_node(
-                        self,
-                        Some(elem.into()),
-                        XmlParserErrors::XmlDTDInvalidDefault,
-                        format!(
-                            "Syntax of value for attribute xmlns:{} of {} is not valid\n",
-                            prefix, elem_name
-                        )
-                        .as_str(),
-                        Some(&prefix),
-                        Some(&elem_name),
-                        None,
-                    );
-                } else {
-                    let elem_name = elem.name().unwrap();
-                    xml_err_valid_node(
-                        self,
-                        Some(elem.into()),
-                        XmlParserErrors::XmlDTDInvalidDefault,
-                        format!(
-                            "Syntax of value for attribute xmlns of {} is not valid\n",
-                            elem_name
-                        )
-                        .as_str(),
-                        Some(&elem_name),
-                        None,
-                        None,
-                    );
-                }
-                ret = 0;
-            }
-
-            // Validity constraint: Fixed Attribute Default
-            if matches!(attr_decl.def, XmlAttributeDefault::XmlAttributeFixed)
-                && Some(value) != attr_decl.default_value.as_deref()
-            {
-                if let Some(prefix) = ns.prefix() {
-                    let elem_name = elem.name().unwrap();
-                    let def_value = attr_decl.default_value.as_deref().unwrap();
-                    xml_err_valid_node(
-                self,
-                Some(elem.into()),
-                XmlParserErrors::XmlDTDAttributeDefault,
-                format!("Value for attribute xmlns:{prefix} of {elem_name} is different from default \"{def_value}\"\n").as_str(),
-                Some(&prefix),
-                Some(&elem_name),
-                Some(def_value),
-            );
-                } else {
-                    let elem_name = elem.name().unwrap();
-                    let def_value = attr_decl.default_value.as_deref().unwrap();
-                    xml_err_valid_node(
-                        self,
-                        Some(elem.into()),
-                        XmlParserErrors::XmlDTDAttributeDefault,
-                        format!(
-                            "Value for attribute xmlns of {} is different from default \"{}\"\n",
-                            elem_name, def_value
-                        )
-                        .as_str(),
-                        Some(&elem_name),
-                        Some(def_value),
-                        None,
-                    );
-                }
-                ret = 0;
-            }
-
-            // Casting ns to xmlAttrPtr is wrong. We'd need separate functions
-            // xmlAddID and xmlAddRef for namespace declarations, but it makes
-            // no practical sense to use ID types anyway.
-            // #if 0
-            // /* Validity Constraint: ID uniqueness */
-            // if ((*attrDecl).atype == XML_ATTRIBUTE_ID) {
-            //     if (xmlAddID(ctxt, doc, value, (xmlAttrPtr) ns).is_null())
-            //         ret = 0;
-            // }
-            // if (((*attrDecl).atype == XML_ATTRIBUTE_IDREF) || ((*attrDecl).atype == XML_ATTRIBUTE_IDREFS)) {
-            //     if (xmlAddRef(ctxt, doc, value, (xmlAttrPtr) ns).is_null())
-            // 	       ret = 0;
-            // }
-            // #endif
-
-            // Validity Constraint: Notation Attributes
-            if matches!(attr_decl.atype, XmlAttributeType::XmlAttributeNotation) {
-                let mut tree = attr_decl.tree.as_deref();
-
-                // First check that the given NOTATION was declared
-                let nota = xml_get_dtd_notation_desc(doc.int_subset.as_deref(), value)
-                    .or_else(|| xml_get_dtd_notation_desc(doc.ext_subset.as_deref(), value));
-
-                if nota.is_none() {
-                    if let Some(prefix) = ns.prefix() {
-                        let elem_name = elem.name().unwrap();
-                        xml_err_valid_node(
-                        self,
-                        Some(elem.into()),
-                        XmlParserErrors::XmlDTDUnknownNotation,
-                        format!(
-                            "Value \"{}\" for attribute xmlns:{} of {} is not a declared Notation\n",
-                            value,
-                            prefix,
-                            elem_name,
-                        ).as_str(),
-                        Some(value),
-                        Some(&prefix),
-                        Some(&elem_name),
-                    );
-                    } else {
-                        let elem_name = elem.name().unwrap();
-                        xml_err_valid_node(
                         self,
                         Some(elem.into()),
                         XmlParserErrors::XmlDTDUnknownNotation,
@@ -3004,149 +2990,148 @@ impl XmlParserCtxt {
                         Some(&elem_name),
                         None,
                     );
-                    }
-                    ret = 0;
-                }
-
-                // Second, verify that it's among the list
-                while let Some(now) = tree {
-                    if now.name == value {
-                        break;
-                    }
-                    tree = now.next.as_deref();
-                }
-                if tree.is_none() {
-                    let elem_name = elem.name().unwrap();
-                    if let Some(prefix) = ns.prefix() {
-                        xml_err_valid_node(
-                        self,
-                        Some(elem.into()),
-                        XmlParserErrors::XmlDTDNotationValue,
-                        format!(
-                            "Value \"{}\" for attribute xmlns:{} of {} is not among the enumerated notations\n",
-                            value,
-                            prefix,
-                            elem_name,
-                        ).as_str(),
-                        Some(value),
-                        Some(&prefix),
-                        Some(&elem_name),
-                    );
-                    } else {
-                        xml_err_valid_node(
-                        self,
-                        Some(elem.into()),
-                        XmlParserErrors::XmlDTDNotationValue,
-                        format!(
-                            "Value \"{}\" for attribute xmlns of {} is not among the enumerated notations\n",
-                            value,
-                            elem_name,
-                        ).as_str(),
-                        Some(value),
-                        Some(&elem_name),
-                        None,
-                    );
-                    }
-                    ret = 0;
-                }
-            }
-
-            // Validity Constraint: Enumeration
-            if matches!(attr_decl.atype, XmlAttributeType::XmlAttributeEnumeration) {
-                let mut tree = attr_decl.tree.as_deref();
-                while let Some(now) = tree {
-                    if now.name == value {
-                        break;
-                    }
-                    tree = now.next.as_deref();
-                }
-                if tree.is_none() {
-                    if let Some(prefix) = ns.prefix() {
-                        let elem_name = elem.name().unwrap();
-                        xml_err_valid_node(
-                        self,
-                        Some(elem.into()),
-                        XmlParserErrors::XmlDTDAttributeValue,
-                        format!(
-                            "Value \"{}\" for attribute xmlns:{} of {} is not among the enumerated set\n",
-                            value,
-                            prefix,
-                            elem_name,
-                        ).as_str(),
-                        Some(value),
-                        Some(&prefix),
-                        Some(&elem_name),
-                    );
-                    } else {
-                        let elem_name = elem.name().unwrap();
-                        xml_err_valid_node(
-                        self,
-                        Some(elem.into()),
-                        XmlParserErrors::XmlDTDAttributeValue,
-                        format!(
-                            "Value \"{}\" for attribute xmlns of {} is not among the enumerated set\n",
-                            value,
-                            elem_name,
-                        )
-                        .as_str(),
-                        Some(value),
-                        Some(&elem_name),
-                        None,
-                    );
-                    }
-                    ret = 0;
-                }
-            }
-
-            // Fixed Attribute Default
-            if matches!(attr_decl.def, XmlAttributeDefault::XmlAttributeFixed)
-                && attr_decl.default_value.as_deref() != Some(value)
-            {
-                if let Some(prefix) = ns.prefix() {
-                    let elem_name = elem.name().unwrap();
-                    let def_value = attr_decl.default_value.as_deref().unwrap();
-                    xml_err_valid_node(
-                        self,
-                        Some(elem.into()),
-                        XmlParserErrors::XmlDTDElemNamespace,
-                        format!(
-                            "Value for attribute xmlns:{} of {} must be \"{}\"\n",
-                            prefix, elem_name, def_value
-                        )
-                        .as_str(),
-                        Some(&prefix),
-                        Some(&elem_name),
-                        Some(def_value),
-                    );
-                } else {
-                    let elem_name = elem.name().unwrap();
-                    let def_value = attr_decl.default_value.as_deref().unwrap();
-                    xml_err_valid_node(
-                        self,
-                        Some(elem.into()),
-                        XmlParserErrors::XmlDTDElemNamespace,
-                        format!(
-                            "Value for attribute xmlns of {} must be \"{}\"\n",
-                            elem_name, def_value
-                        )
-                        .as_str(),
-                        Some(&elem_name),
-                        Some(def_value),
-                        None,
-                    );
                 }
                 ret = 0;
             }
 
-            // Extra check for the attribute value
-            if let Some(prefix) = ns.prefix() {
-                ret &= self.validate_attribute_value2(doc, &prefix, attr_decl.atype, value);
-            } else {
-                ret &= self.validate_attribute_value2(doc, "xmlns", attr_decl.atype, value);
+            // Second, verify that it's among the list
+            while let Some(now) = tree {
+                if now.name == value {
+                    break;
+                }
+                tree = now.next.as_deref();
             }
-
-            ret
+            if tree.is_none() {
+                let elem_name = elem.name().unwrap();
+                if let Some(prefix) = ns.prefix() {
+                    xml_err_valid_node(
+                    self,
+                    Some(elem.into()),
+                    XmlParserErrors::XmlDTDNotationValue,
+                    format!(
+                        "Value \"{}\" for attribute xmlns:{} of {} is not among the enumerated notations\n",
+                        value,
+                        prefix,
+                        elem_name,
+                    ).as_str(),
+                    Some(value),
+                    Some(&prefix),
+                    Some(&elem_name),
+                );
+                } else {
+                    xml_err_valid_node(
+                    self,
+                    Some(elem.into()),
+                    XmlParserErrors::XmlDTDNotationValue,
+                    format!(
+                        "Value \"{}\" for attribute xmlns of {} is not among the enumerated notations\n",
+                        value,
+                        elem_name,
+                    ).as_str(),
+                    Some(value),
+                    Some(&elem_name),
+                    None,
+                );
+                }
+                ret = 0;
+            }
         }
+
+        // Validity Constraint: Enumeration
+        if matches!(attr_decl.atype, XmlAttributeType::XmlAttributeEnumeration) {
+            let mut tree = attr_decl.tree.as_deref();
+            while let Some(now) = tree {
+                if now.name == value {
+                    break;
+                }
+                tree = now.next.as_deref();
+            }
+            if tree.is_none() {
+                if let Some(prefix) = ns.prefix() {
+                    let elem_name = elem.name().unwrap();
+                    xml_err_valid_node(
+                    self,
+                    Some(elem.into()),
+                    XmlParserErrors::XmlDTDAttributeValue,
+                    format!(
+                        "Value \"{}\" for attribute xmlns:{} of {} is not among the enumerated set\n",
+                        value,
+                        prefix,
+                        elem_name,
+                    ).as_str(),
+                    Some(value),
+                    Some(&prefix),
+                    Some(&elem_name),
+                );
+                } else {
+                    let elem_name = elem.name().unwrap();
+                    xml_err_valid_node(
+                    self,
+                    Some(elem.into()),
+                    XmlParserErrors::XmlDTDAttributeValue,
+                    format!(
+                        "Value \"{}\" for attribute xmlns of {} is not among the enumerated set\n",
+                        value,
+                        elem_name,
+                    )
+                    .as_str(),
+                    Some(value),
+                    Some(&elem_name),
+                    None,
+                );
+                }
+                ret = 0;
+            }
+        }
+
+        // Fixed Attribute Default
+        if matches!(attr_decl.def, XmlAttributeDefault::XmlAttributeFixed)
+            && attr_decl.default_value.as_deref() != Some(value)
+        {
+            if let Some(prefix) = ns.prefix() {
+                let elem_name = elem.name().unwrap();
+                let def_value = attr_decl.default_value.as_deref().unwrap();
+                xml_err_valid_node(
+                    self,
+                    Some(elem.into()),
+                    XmlParserErrors::XmlDTDElemNamespace,
+                    format!(
+                        "Value for attribute xmlns:{} of {} must be \"{}\"\n",
+                        prefix, elem_name, def_value
+                    )
+                    .as_str(),
+                    Some(&prefix),
+                    Some(&elem_name),
+                    Some(def_value),
+                );
+            } else {
+                let elem_name = elem.name().unwrap();
+                let def_value = attr_decl.default_value.as_deref().unwrap();
+                xml_err_valid_node(
+                    self,
+                    Some(elem.into()),
+                    XmlParserErrors::XmlDTDElemNamespace,
+                    format!(
+                        "Value for attribute xmlns of {} must be \"{}\"\n",
+                        elem_name, def_value
+                    )
+                    .as_str(),
+                    Some(&elem_name),
+                    Some(def_value),
+                    None,
+                );
+            }
+            ret = 0;
+        }
+
+        // Extra check for the attribute value
+        if let Some(prefix) = ns.prefix() {
+            ret &= self.validate_attribute_value2(doc, &prefix, attr_decl.atype, value);
+        } else {
+            ret &= self.validate_attribute_value2(doc, "xmlns", attr_decl.atype, value);
+        }
+
+        ret
     }
 
     /// Does the final step for the dtds validation once all the subsets have been parsed
@@ -3160,163 +3145,157 @@ impl XmlParserCtxt {
     /// Returns 1 if valid or 0 if invalid and -1 if not well-formed
     #[doc(alias = "xmlValidateDtdFinal")]
     #[cfg(feature = "libxml_valid")]
-    pub unsafe fn validate_dtd_final(&mut self, doc: XmlDocPtr) -> i32 {
-        unsafe {
-            if doc.int_subset.is_none() && doc.ext_subset.is_none() {
-                return 0;
-            }
-            self.vctxt.doc = Some(doc);
-            self.vctxt.valid = 1;
-            let dtd = doc.int_subset;
-            if let Some(dtd) = dtd {
-                if let Some(table) = dtd.attributes {
-                    table.scan(|&payload, _, _, _| {
-                        self.validate_attribute_callback(payload);
-                    });
-                }
-                if let Some(entities) = dtd.entities {
-                    entities.scan(|payload, _, _, _| {
-                        self.validate_notation_callback(*payload);
-                    });
-                }
-            }
-            let dtd = doc.ext_subset;
-            if let Some(dtd) = dtd {
-                if let Some(table) = dtd.attributes {
-                    table.scan(|payload, _, _, _| {
-                        self.validate_attribute_callback(*payload);
-                    });
-                }
-                if let Some(entities) = dtd.entities {
-                    entities.scan(|entity, _, _, _| {
-                        self.validate_notation_callback(*entity);
-                    });
-                }
-            }
-            self.vctxt.valid
+    pub fn validate_dtd_final(&mut self, doc: XmlDocPtr) -> i32 {
+        if doc.int_subset.is_none() && doc.ext_subset.is_none() {
+            return 0;
         }
+        self.vctxt.doc = Some(doc);
+        self.vctxt.valid = 1;
+        let dtd = doc.int_subset;
+        if let Some(dtd) = dtd {
+            if let Some(table) = dtd.attributes {
+                table.scan(|&payload, _, _, _| {
+                    self.validate_attribute_callback(payload);
+                });
+            }
+            if let Some(entities) = dtd.entities {
+                entities.scan(|payload, _, _, _| {
+                    self.validate_notation_callback(*payload);
+                });
+            }
+        }
+        let dtd = doc.ext_subset;
+        if let Some(dtd) = dtd {
+            if let Some(table) = dtd.attributes {
+                table.scan(|payload, _, _, _| {
+                    self.validate_attribute_callback(*payload);
+                });
+            }
+            if let Some(entities) = dtd.entities {
+                entities.scan(|entity, _, _, _| {
+                    self.validate_notation_callback(*entity);
+                });
+            }
+        }
+        self.vctxt.valid
     }
 
-    unsafe fn validate_attribute_callback(&mut self, cur: XmlAttributePtr) {
-        unsafe {
-            let mut ret: i32;
+    fn validate_attribute_callback(&mut self, cur: XmlAttributePtr) {
+        let mut ret: i32;
 
-            match cur.atype {
-                XmlAttributeType::XmlAttributeCDATA
-                | XmlAttributeType::XmlAttributeID
-                | XmlAttributeType::XmlAttributeIDREF
-                | XmlAttributeType::XmlAttributeIDREFS
-                | XmlAttributeType::XmlAttributeNmtoken
-                | XmlAttributeType::XmlAttributeNmtokens
-                | XmlAttributeType::XmlAttributeEnumeration => {}
-                XmlAttributeType::XmlAttributeEntity
-                | XmlAttributeType::XmlAttributeEntities
-                | XmlAttributeType::XmlAttributeNotation => {
-                    if let Some(def) = cur.default_value.as_deref() {
+        match cur.atype {
+            XmlAttributeType::XmlAttributeCDATA
+            | XmlAttributeType::XmlAttributeID
+            | XmlAttributeType::XmlAttributeIDREF
+            | XmlAttributeType::XmlAttributeIDREFS
+            | XmlAttributeType::XmlAttributeNmtoken
+            | XmlAttributeType::XmlAttributeNmtokens
+            | XmlAttributeType::XmlAttributeEnumeration => {}
+            XmlAttributeType::XmlAttributeEntity
+            | XmlAttributeType::XmlAttributeEntities
+            | XmlAttributeType::XmlAttributeNotation => {
+                if let Some(def) = cur.default_value.as_deref() {
+                    ret = self.validate_attribute_value2(
+                        self.vctxt.doc.unwrap(),
+                        cur.name.as_deref().unwrap(),
+                        cur.atype,
+                        def,
+                    );
+                    if ret == 0 && self.vctxt.valid == 1 {
+                        self.vctxt.valid = 0;
+                    }
+                }
+                if cur.tree.is_some() {
+                    let mut tree = cur.tree.as_deref();
+                    while let Some(now) = tree {
                         ret = self.validate_attribute_value2(
                             self.vctxt.doc.unwrap(),
                             cur.name.as_deref().unwrap(),
                             cur.atype,
-                            def,
+                            &now.name,
                         );
                         if ret == 0 && self.vctxt.valid == 1 {
                             self.vctxt.valid = 0;
                         }
-                    }
-                    if cur.tree.is_some() {
-                        let mut tree = cur.tree.as_deref();
-                        while let Some(now) = tree {
-                            ret = self.validate_attribute_value2(
-                                self.vctxt.doc.unwrap(),
-                                cur.name.as_deref().unwrap(),
-                                cur.atype,
-                                &now.name,
-                            );
-                            if ret == 0 && self.vctxt.valid == 1 {
-                                self.vctxt.valid = 0;
-                            }
-                            tree = now.next.as_deref();
-                        }
+                        tree = now.next.as_deref();
                     }
                 }
             }
-            if matches!(cur.atype, XmlAttributeType::XmlAttributeNotation) {
-                let doc = cur.doc;
-                let Some(cur_elem) = cur.elem.as_deref() else {
-                    xml_err_valid(
-                        Some(self),
-                        XmlParserErrors::XmlErrInternalError,
-                        format!(
-                            "xmlValidateAttributeCallback({}): internal error\n",
-                            cur.name.as_deref().unwrap()
-                        )
-                        .as_str(),
-                        cur.name().as_deref(),
-                    );
-                    return;
-                };
+        }
+        if matches!(cur.atype, XmlAttributeType::XmlAttributeNotation) {
+            let doc = cur.doc;
+            let Some(cur_elem) = cur.elem.as_deref() else {
+                xml_err_valid(
+                    Some(self),
+                    XmlParserErrors::XmlErrInternalError,
+                    format!(
+                        "xmlValidateAttributeCallback({}): internal error\n",
+                        cur.name.as_deref().unwrap()
+                    )
+                    .as_str(),
+                    cur.name().as_deref(),
+                );
+                return;
+            };
 
-                let mut elem = None;
-                if let Some(doc) = doc {
-                    elem = xml_get_dtd_element_desc(doc.int_subset, cur_elem);
-                    if elem.is_none() {
-                        elem = xml_get_dtd_element_desc(doc.ext_subset, cur_elem);
-                    }
-                }
+            let mut elem = None;
+            if let Some(doc) = doc {
+                elem = xml_get_dtd_element_desc(doc.int_subset, cur_elem);
                 if elem.is_none() {
-                    if let Some(dtd) = cur
-                        .parent
-                        .filter(|dtd| dtd.element_type() == XmlElementType::XmlDTDNode)
-                    {
-                        elem = xml_get_dtd_element_desc(Some(dtd), cur_elem);
-                    }
+                    elem = xml_get_dtd_element_desc(doc.ext_subset, cur_elem);
                 }
-                let Some(elem) = elem else {
-                    let name = cur.name().unwrap();
-                    xml_err_valid_node(
-                        self,
-                        None,
-                        XmlParserErrors::XmlDTDUnknownElem,
-                        format!(
-                            "attribute {}: could not find decl for element {}\n",
-                            name, cur_elem
-                        )
-                        .as_str(),
-                        Some(&name),
-                        Some(cur_elem),
-                        None,
-                    );
-                    return;
-                };
-                if matches!(elem.etype, XmlElementTypeVal::XmlElementTypeEmpty) {
-                    let name = cur.name().unwrap();
-                    xml_err_valid_node(
-                        self,
-                        None,
-                        XmlParserErrors::XmlDTDEmptyNotation,
-                        format!(
-                            "NOTATION attribute {} declared for EMPTY element {}\n",
-                            name, cur_elem
-                        )
-                        .as_str(),
-                        Some(&name),
-                        Some(cur_elem),
-                        None,
-                    );
-                    self.vctxt.valid = 0;
+            }
+            if elem.is_none() {
+                if let Some(dtd) = cur
+                    .parent
+                    .filter(|dtd| dtd.element_type() == XmlElementType::XmlDTDNode)
+                {
+                    elem = xml_get_dtd_element_desc(Some(dtd), cur_elem);
                 }
+            }
+            let Some(elem) = elem else {
+                let name = cur.name().unwrap();
+                xml_err_valid_node(
+                    self,
+                    None,
+                    XmlParserErrors::XmlDTDUnknownElem,
+                    format!(
+                        "attribute {}: could not find decl for element {}\n",
+                        name, cur_elem
+                    )
+                    .as_str(),
+                    Some(&name),
+                    Some(cur_elem),
+                    None,
+                );
+                return;
+            };
+            if matches!(elem.etype, XmlElementTypeVal::XmlElementTypeEmpty) {
+                let name = cur.name().unwrap();
+                xml_err_valid_node(
+                    self,
+                    None,
+                    XmlParserErrors::XmlDTDEmptyNotation,
+                    format!(
+                        "NOTATION attribute {} declared for EMPTY element {}\n",
+                        name, cur_elem
+                    )
+                    .as_str(),
+                    Some(&name),
+                    Some(cur_elem),
+                    None,
+                );
+                self.vctxt.valid = 0;
             }
         }
     }
 
-    unsafe fn validate_notation_callback(&mut self, cur: XmlEntityPtr) {
-        unsafe {
-            if matches!(cur.etype, XmlEntityType::XmlExternalGeneralUnparsedEntity) {
-                if let Some(notation) = cur.content.as_deref() {
-                    let ret: i32 = self.validate_notation_use(cur.doc.unwrap(), notation);
-                    if ret != 1 {
-                        self.vctxt.valid = 0;
-                    }
+    fn validate_notation_callback(&mut self, cur: XmlEntityPtr) {
+        if matches!(cur.etype, XmlEntityType::XmlExternalGeneralUnparsedEntity) {
+            if let Some(notation) = cur.content.as_deref() {
+                let ret: i32 = self.validate_notation_use(cur.doc.unwrap(), notation);
+                if ret != 1 {
+                    self.vctxt.valid = 0;
                 }
             }
         }
@@ -3332,11 +3311,7 @@ impl XmlParserCtxt {
     /// returns 1 if valid or 0 otherwise
     #[doc(alias = "xmlValidateElementDecl")]
     #[cfg(feature = "libxml_valid")]
-    pub unsafe fn validate_element_decl(
-        &mut self,
-        doc: XmlDocPtr,
-        elem: Option<XmlElementPtr>,
-    ) -> i32 {
+    pub fn validate_element_decl(&mut self, doc: XmlDocPtr, elem: Option<XmlElementPtr>) -> i32 {
         let mut ret: i32 = 1;
 
         if doc.int_subset.is_none() && doc.ext_subset.is_none() {
@@ -3684,29 +3659,27 @@ impl XmlParserCtxt {
     /// returns 1 if valid or 0 otherwise
     #[doc(alias = "xmlValidateNotationUse")]
     #[cfg(any(feature = "libxml_valid", feature = "schema"))]
-    pub unsafe fn validate_notation_use(&mut self, doc: XmlDocPtr, notation_name: &str) -> i32 {
-        unsafe {
-            if doc.int_subset.is_none() {
-                return -1;
-            }
-
-            let nota_decl = xml_get_dtd_notation_desc(doc.int_subset.as_deref(), notation_name)
-                .or_else(|| xml_get_dtd_notation_desc(doc.ext_subset.as_deref(), notation_name));
-
-            if nota_decl.is_none() {
-                xml_err_valid_node(
-                    self,
-                    Some(doc.into()),
-                    XmlParserErrors::XmlDTDUnknownNotation,
-                    format!("NOTATION {} is not declared\n", notation_name).as_str(),
-                    Some(notation_name),
-                    None,
-                    None,
-                );
-                return 0;
-            }
-            1
+    pub fn validate_notation_use(&mut self, doc: XmlDocPtr, notation_name: &str) -> i32 {
+        if doc.int_subset.is_none() {
+            return -1;
         }
+
+        let nota_decl = xml_get_dtd_notation_desc(doc.int_subset.as_deref(), notation_name)
+            .or_else(|| xml_get_dtd_notation_desc(doc.ext_subset.as_deref(), notation_name));
+
+        if nota_decl.is_none() {
+            xml_err_valid_node(
+                self,
+                Some(doc.into()),
+                XmlParserErrors::XmlDTDUnknownNotation,
+                format!("NOTATION {} is not declared\n", notation_name).as_str(),
+                Some(notation_name),
+                None,
+                None,
+            );
+            return 0;
+        }
+        1
     }
 
     /// Check if the given node is part of the content model.

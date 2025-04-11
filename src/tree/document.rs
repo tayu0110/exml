@@ -152,7 +152,7 @@ impl XmlDoc {
     /// Get the internal subset of a document
     /// Returns a pointer to the DTD structure or null_mut() if not found
     #[doc(alias = "xmlGetIntSubset")]
-    pub unsafe fn get_int_subset(&self) -> Option<XmlDtdPtr> {
+    pub fn get_int_subset(&self) -> Option<XmlDtdPtr> {
         let mut cur = self.children();
         while let Some(now) = cur {
             if matches!(now.element_type(), XmlElementType::XmlDTDNode) {
@@ -168,7 +168,7 @@ impl XmlDoc {
     ///
     /// Returns the `XmlNodePtr` for the root or NULL
     #[doc(alias = "xmlDocGetRootElement")]
-    pub unsafe fn get_root_element(&self) -> Option<XmlNodePtr> {
+    pub fn get_root_element(&self) -> Option<XmlNodePtr> {
         let mut ret = self.children();
         while let Some(now) = ret {
             if matches!(now.element_type(), XmlElementType::XmlElementNode) {
@@ -254,9 +254,9 @@ impl XmlDoc {
         unsafe {
             use crate::tree::{NodeCommon, xml_replace_node};
 
-            (*root).unlink();
-            (*root).set_doc(XmlDocPtr::from_raw(self).unwrap());
-            (*root).set_parent(XmlGenericNodePtr::from_raw(self));
+            root.unlink();
+            root.set_doc(XmlDocPtr::from_raw(self).unwrap());
+            root.set_parent(XmlGenericNodePtr::from_raw(self));
             let mut old = self.children();
             while let Some(now) = old {
                 if matches!(now.element_type(), XmlElementType::XmlElementNode) {
