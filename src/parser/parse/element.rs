@@ -2,10 +2,7 @@ use std::{borrow::Cow, cell::RefCell, mem::take, rc::Rc};
 
 use crate::{
     error::XmlParserErrors,
-    libxml::{
-        chvalid::{xml_is_blank_char, xml_is_char},
-        valid::xml_validate_root,
-    },
+    libxml::chvalid::{xml_is_blank_char, xml_is_char},
     parser::{
         XML_PARSER_MAX_DEPTH, XmlParserCtxt, XmlParserInputState, XmlParserNodeInfo,
         XmlParserOption, xml_err_attribute_dup, xml_fatal_err, xml_fatal_err_msg,
@@ -58,161 +55,158 @@ impl XmlParserCtxt {
     ///
     /// Always consumes '<'.
     #[doc(alias = "xmlParseElementStart")]
-    pub(crate) unsafe fn parse_element_start(&mut self) -> i32 {
-        unsafe {
-            let ns_nr = self.ns_tab.len();
+    pub(crate) fn parse_element_start(&mut self) -> i32 {
+        let ns_nr = self.ns_tab.len();
 
-            if self.name_tab.len() as u32 > XML_PARSER_MAX_DEPTH
-                && self.options & XmlParserOption::XmlParseHuge as i32 == 0
-            {
-                let max_depth = XML_PARSER_MAX_DEPTH as i32;
-                xml_fatal_err_msg_int!(
-                    self,
-                    XmlParserErrors::XmlErrInternalError,
-                    format!(
-                        "Excessive depth in document: {} use xmlParserOption::XML_PARSE_HUGE option\n",
-                        max_depth
-                    )
-                    .as_str(),
+        if self.name_tab.len() as u32 > XML_PARSER_MAX_DEPTH
+            && self.options & XmlParserOption::XmlParseHuge as i32 == 0
+        {
+            let max_depth = XML_PARSER_MAX_DEPTH as i32;
+            xml_fatal_err_msg_int!(
+                self,
+                XmlParserErrors::XmlErrInternalError,
+                format!(
+                    "Excessive depth in document: {} use xmlParserOption::XML_PARSE_HUGE option\n",
                     max_depth
-                );
-                self.halt();
-                return -1;
-            }
-
-            // Capture start position
-            let (begin_pos, begin_line) = if self.record_info != 0 {
-                (
-                    self.input().unwrap().consumed
-                        + self.input().unwrap().offset_from_base() as u64,
-                    self.input().unwrap().line as u64,
                 )
-            } else {
-                (0, 0)
-            };
-
-            if self.space_tab.is_empty() || self.space() == -2 {
-                self.space_push(-1);
-            } else {
-                self.space_push(self.space());
-            }
-
-            let line: i32 = self.input().unwrap().line;
-            #[cfg(feature = "sax1")]
-            let tag = if self.sax2 != 0 {
-                self.parse_start_tag2()
-            } else {
-                self.parse_start_tag().map(|name| (name, None, None))
-            };
-            #[cfg(not(feature = "sax1"))]
-            let tag = self.parse_start_tag2();
-
-            if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                return -1;
-            }
-            let Some((name, prefix, uri)) = tag else {
-                self.space_pop();
-                return -1;
-            };
-            self.name_ns_push(
-                &name,
-                prefix.as_deref(),
-                uri.as_deref(),
-                line,
-                self.ns_tab.len() as i32 - ns_nr as i32,
+                .as_str(),
+                max_depth
             );
-            let cur = self.node;
+            self.halt();
+            return -1;
+        }
 
-            // [ VC: Root Element Type ]
-            // The Name in the document type declaration must match the element type of the root element.
-            #[cfg(feature = "libxml_valid")]
-            if self.validate != 0 && self.well_formed != 0 {
-                if let Some(context_node) = self.node {
-                    if let Some(my_doc) = self
-                        .my_doc
-                        .filter(|doc| doc.children == Some(context_node.into()))
+        // Capture start position
+        let (begin_pos, begin_line) = if self.record_info != 0 {
+            (
+                self.input().unwrap().consumed + self.input().unwrap().offset_from_base() as u64,
+                self.input().unwrap().line as u64,
+            )
+        } else {
+            (0, 0)
+        };
+
+        if self.space_tab.is_empty() || self.space() == -2 {
+            self.space_push(-1);
+        } else {
+            self.space_push(self.space());
+        }
+
+        let line: i32 = self.input().unwrap().line;
+        #[cfg(feature = "sax1")]
+        let tag = if self.sax2 != 0 {
+            self.parse_start_tag2()
+        } else {
+            self.parse_start_tag().map(|name| (name, None, None))
+        };
+        #[cfg(not(feature = "sax1"))]
+        let tag = self.parse_start_tag2();
+
+        if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+            return -1;
+        }
+        let Some((name, prefix, uri)) = tag else {
+            self.space_pop();
+            return -1;
+        };
+        self.name_ns_push(
+            &name,
+            prefix.as_deref(),
+            uri.as_deref(),
+            line,
+            self.ns_tab.len() as i32 - ns_nr as i32,
+        );
+        let cur = self.node;
+
+        // [ VC: Root Element Type ]
+        // The Name in the document type declaration must match the element type of the root element.
+        #[cfg(feature = "libxml_valid")]
+        if self.validate != 0 && self.well_formed != 0 {
+            if let Some(context_node) = self.node {
+                if let Some(my_doc) = self
+                    .my_doc
+                    .filter(|doc| doc.children == Some(context_node.into()))
+                {
+                    self.valid &= self.validate_root(my_doc);
+                }
+            }
+        }
+
+        // Check for an Empty Element.
+        if self.content_bytes().starts_with(b"/>") {
+            self.advance(2);
+            if self.sax2 != 0 {
+                if self.disable_sax == 0 {
+                    if let Some(end_element_ns) =
+                        self.sax.as_deref_mut().and_then(|sax| sax.end_element_ns)
                     {
-                        self.valid &= xml_validate_root(&raw mut self.vctxt, my_doc);
-                    }
-                }
-            }
-
-            // Check for an Empty Element.
-            if self.content_bytes().starts_with(b"/>") {
-                self.advance(2);
-                if self.sax2 != 0 {
-                    if self.disable_sax == 0 {
-                        if let Some(end_element_ns) =
-                            self.sax.as_deref_mut().and_then(|sax| sax.end_element_ns)
-                        {
-                            end_element_ns(self, &name, prefix.as_deref(), uri.as_deref());
-                        }
-                    }
-                } else {
-                    #[cfg(feature = "sax1")]
-                    if self.disable_sax == 0 {
-                        if let Some(end_element) =
-                            self.sax.as_deref_mut().and_then(|sax| sax.end_element)
-                        {
-                            end_element(self, &name);
-                        }
-                    }
-                }
-                self.name_pop();
-                self.space_pop();
-                if ns_nr != self.ns_tab.len() {
-                    self.ns_pop(self.ns_tab.len() - ns_nr);
-                }
-                if let Some(cur) = cur {
-                    if self.record_info != 0 {
-                        let node_info = XmlParserNodeInfo {
-                            node: Some(cur),
-                            begin_pos,
-                            begin_line,
-                            end_pos: self.input().unwrap().consumed
-                                + self.input().unwrap().offset_from_base() as u64,
-                            end_line: self.input().unwrap().line as u64,
-                        };
-                        self.add_node_info(Rc::new(RefCell::new(node_info)));
-                    }
-                }
-                return 1;
-            }
-            if self.current_byte() == b'>' {
-                self.advance(1);
-                if let Some(cur) = cur {
-                    if self.record_info != 0 {
-                        let node_info = XmlParserNodeInfo {
-                            node: Some(cur),
-                            begin_pos,
-                            begin_line,
-                            end_pos: 0,
-                            end_line: 0,
-                        };
-                        self.add_node_info(Rc::new(RefCell::new(node_info)));
+                        end_element_ns(self, &name, prefix.as_deref(), uri.as_deref());
                     }
                 }
             } else {
-                xml_fatal_err_msg_str_int_str!(
-                    self,
-                    XmlParserErrors::XmlErrGtRequired,
-                    "Couldn't find end of Start Tag {} line {}\n",
-                    name,
-                    line
-                );
-
-                // end of parsing of this node.
-                self.node_pop();
-                self.name_pop();
-                self.space_pop();
-                if ns_nr != self.ns_tab.len() {
-                    self.ns_pop(self.ns_tab.len() - ns_nr);
+                #[cfg(feature = "sax1")]
+                if self.disable_sax == 0 {
+                    if let Some(end_element) =
+                        self.sax.as_deref_mut().and_then(|sax| sax.end_element)
+                    {
+                        end_element(self, &name);
+                    }
                 }
-                return -1;
             }
-
-            0
+            self.name_pop();
+            self.space_pop();
+            if ns_nr != self.ns_tab.len() {
+                self.ns_pop(self.ns_tab.len() - ns_nr);
+            }
+            if let Some(cur) = cur {
+                if self.record_info != 0 {
+                    let node_info = XmlParserNodeInfo {
+                        node: Some(cur),
+                        begin_pos,
+                        begin_line,
+                        end_pos: self.input().unwrap().consumed
+                            + self.input().unwrap().offset_from_base() as u64,
+                        end_line: self.input().unwrap().line as u64,
+                    };
+                    self.add_node_info(Rc::new(RefCell::new(node_info)));
+                }
+            }
+            return 1;
         }
+        if self.current_byte() == b'>' {
+            self.advance(1);
+            if let Some(cur) = cur {
+                if self.record_info != 0 {
+                    let node_info = XmlParserNodeInfo {
+                        node: Some(cur),
+                        begin_pos,
+                        begin_line,
+                        end_pos: 0,
+                        end_line: 0,
+                    };
+                    self.add_node_info(Rc::new(RefCell::new(node_info)));
+                }
+            }
+        } else {
+            xml_fatal_err_msg_str_int_str!(
+                self,
+                XmlParserErrors::XmlErrGtRequired,
+                "Couldn't find end of Start Tag {} line {}\n",
+                name,
+                line
+            );
+
+            // end of parsing of this node.
+            self.node_pop();
+            self.name_pop();
+            self.space_pop();
+            if ns_nr != self.ns_tab.len() {
+                self.ns_pop(self.ns_tab.len() - ns_nr);
+            }
+            return -1;
+        }
+
+        0
     }
 
     /// Parse a start tag. Always consumes '<'.
