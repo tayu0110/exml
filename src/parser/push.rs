@@ -4,11 +4,7 @@ use crate::{
     generic_error,
     globals::GenericErrorContext,
     io::XmlParserInputBuffer,
-    libxml::{
-        chvalid::{xml_is_blank_char, xml_is_char},
-        globals::xml_default_sax_locator,
-        valid::xml_validate_root,
-    },
+    libxml::chvalid::{xml_is_blank_char, xml_is_char},
     parser::{
         __xml_err_encoding, XML_MAX_LOOKUP_LIMIT, XML_PARSER_BIG_BUFFER_SIZE, XmlSAXHandler,
         xml_err_memory, xml_fatal_err_msg_str,
@@ -18,7 +14,7 @@ use crate::{
 
 use super::{
     XML_DEFAULT_VERSION, XmlParserCtxt, XmlParserCtxtPtr, XmlParserInputState, XmlParserOption,
-    xml_fatal_err,
+    XmlSAXLocator, xml_fatal_err,
 };
 
 /// Check that the block of characters is okay as SCdata content [20]
@@ -401,7 +397,7 @@ impl XmlParserCtxt {
                                     .as_deref_mut()
                                     .and_then(|sax| sax.set_document_locator)
                                 {
-                                    set_document_locator(self, xml_default_sax_locator());
+                                    set_document_locator(self, XmlSAXLocator::default());
                                 }
                                 xml_fatal_err(
                                     &mut *self,
@@ -432,7 +428,7 @@ impl XmlParserCtxt {
                                     .as_deref_mut()
                                     .and_then(|sax| sax.set_document_locator)
                                 {
-                                    set_document_locator(self, xml_default_sax_locator());
+                                    set_document_locator(self, XmlSAXLocator::default());
                                 }
                                 if self.content_bytes()[2..].starts_with(b"xml")
                                     && xml_is_blank_char(self.nth_byte(5) as u32)
@@ -481,7 +477,7 @@ impl XmlParserCtxt {
                                     .as_deref_mut()
                                     .and_then(|sax| sax.set_document_locator)
                                 {
-                                    set_document_locator(self, xml_default_sax_locator());
+                                    set_document_locator(self, XmlSAXLocator::default());
                                 }
                                 self.version = Some(XML_DEFAULT_VERSION.to_owned());
                                 if self.disable_sax == 0 {
@@ -556,8 +552,7 @@ impl XmlParserCtxt {
                                         .my_doc
                                         .filter(|doc| doc.children == Some(context_node.into()))
                                     {
-                                        self.valid &=
-                                            xml_validate_root(&raw mut self.vctxt as _, my_doc);
+                                        self.valid &= self.validate_root(my_doc);
                                     }
                                 }
                             }

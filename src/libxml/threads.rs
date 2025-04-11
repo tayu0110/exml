@@ -34,7 +34,7 @@ use libc::{
     pthread_setspecific, pthread_t,
 };
 
-use crate::{libxml::globals::XmlGlobalStatePtr, parser::xml_init_parser};
+use crate::libxml::globals::XmlGlobalStatePtr;
 
 use super::globals::XmlGlobalState;
 
@@ -221,21 +221,6 @@ pub unsafe extern "C" fn xml_free_rmutex(tok: XmlRMutexPtr) {
     }
 }
 
-/// xmlIsMainThread() check whether the current thread is the main thread.
-///
-/// Returns 1 if the current thread is the main thread, 0 otherwise
-#[doc(alias = "xmlIsMainThread")]
-pub(crate) unsafe extern "C" fn xml_is_main_thread() -> i32 {
-    unsafe {
-        xml_init_parser();
-
-        if !XML_IS_THREADED {
-            return 1;
-        }
-        pthread_equal(MAINTHREAD, pthread_self())
-    }
-}
-
 /// xmlNewGlobalState() allocates a global state. This structure is used to
 /// hold all data for use by a thread when supporting backwards compatibility
 /// of libxml2 to pre-thread-safe behaviour.
@@ -283,17 +268,6 @@ pub(crate) unsafe extern "C" fn xml_get_global_state() -> XmlGlobalStatePtr {
         globalval
     }
 }
-
-// #if defined(LIBXML_THREAD_ENABLED) && defined(_WIN32) && \
-//     !defined(HAVE_COMPILER_TLS) && defined(LIBXML_STATIC_FOR_DLL)
-#[doc(hidden)]
-#[cfg(target_os = "windows")]
-pub unsafe extern "C" fn xmlDllMain(
-    hinstDLL: *mut c_void,
-    fdwReason: c_ulong,
-    lpvReserved: *mut c_void,
-) -> i32;
-// #endif
 
 /// Makes sure that the global initialization mutex is initialized and locks it.
 #[doc(alias = "xmlGlobalInitMutexLock")]

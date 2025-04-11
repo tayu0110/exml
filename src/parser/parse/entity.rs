@@ -5,15 +5,12 @@ use crate::{
     error::XmlParserErrors,
     generic_error,
     globals::{GenericErrorContext, get_parser_debug_entities},
-    libxml::{
-        chvalid::{xml_is_blank_char, xml_is_char},
-        globals::xml_default_sax_locator,
-    },
+    libxml::chvalid::{xml_is_blank_char, xml_is_char},
     parser::{
         XML_ENT_FIXED_COST, XML_MAX_HUGE_LENGTH, XML_MAX_TEXT_LENGTH, XML_PARSER_ALLOWED_EXPANSION,
         XML_PARSER_NON_LINEAR, XML_SUBSTITUTE_PEREF, XML_SUBSTITUTE_REF, XmlParserCtxt,
-        XmlParserInput, XmlParserInputState, XmlParserOption, XmlSAXHandler, xml_fatal_err,
-        xml_fatal_err_msg, xml_fatal_err_msg_int, xml_warning_msg,
+        XmlParserInput, XmlParserInputState, XmlParserOption, XmlSAXHandler, XmlSAXLocator,
+        xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_int, xml_warning_msg,
     },
     tree::{
         NodeCommon, XML_ENT_EXPANDING, XML_ENT_PARSED, XML_XML_NAMESPACE, XmlDocProperties,
@@ -517,91 +514,87 @@ impl XmlParserCtxt {
     ///
     /// Returns 0, -1 in case of error. the parser context is augmented as a result of the parsing.
     #[doc(alias = "xmlParseExtParsedEnt")]
-    pub unsafe fn parse_ext_parsed_ent(&mut self) -> i32 {
-        unsafe {
-            if self.input().is_none() {
-                return -1;
-            }
-
-            self.detect_sax2();
-            self.grow();
-
-            // SAX: beginning of the document processing.
-            if let Some(set_document_locator) = self
-                .sax
-                .as_deref_mut()
-                .and_then(|sax| sax.set_document_locator)
-            {
-                set_document_locator(self, xml_default_sax_locator());
-            }
-
-            // Get the 4 first bytes and decode the charset
-            // if enc != XML_CHAR_ENCODING_NONE
-            // plug some encoding conversion routines.
-            if self.input().unwrap().remainder_len() >= 4 {
-                let enc = detect_encoding(&self.content_bytes()[..4]);
-                if !matches!(enc, XmlCharEncoding::None) {
-                    self.switch_encoding(enc);
-                }
-            }
-
-            if self.current_byte() == 0 {
-                xml_fatal_err(self, XmlParserErrors::XmlErrDocumentEmpty, None);
-            }
-
-            // Check for the XMLDecl in the Prolog.
-            self.grow();
-            if self.content_bytes().starts_with(b"<?xml")
-                && xml_is_blank_char(self.nth_byte(5) as u32)
-            {
-                // Note that we will switch encoding on the fly.
-                self.parse_xmldecl();
-                if self.err_no == XmlParserErrors::XmlErrUnsupportedEncoding as i32 {
-                    // The XML REC instructs us to stop parsing right here
-                    return -1;
-                }
-                self.skip_blanks();
-            } else {
-                self.version = Some(XML_DEFAULT_VERSION.to_owned());
-            }
-            if self.disable_sax == 0 {
-                if let Some(start_document) =
-                    self.sax.as_deref_mut().and_then(|sax| sax.start_document)
-                {
-                    start_document(self);
-                }
-            }
-            if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                return -1;
-            }
-
-            // Doing validity checking on chunk doesn't make sense
-            self.instate = XmlParserInputState::XmlParserContent;
-            self.validate = 0;
-            self.loadsubset = 0;
-            self.depth = 0;
-
-            self.parse_content();
-            if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                return -1;
-            }
-
-            if self.content_bytes().starts_with(b"</") {
-                xml_fatal_err(self, XmlParserErrors::XmlErrNotWellBalanced, None);
-            } else if self.current_byte() != 0 {
-                xml_fatal_err(self, XmlParserErrors::XmlErrExtraContent, None);
-            }
-
-            // SAX: end of the document processing.
-            if let Some(end_document) = self.sax.as_deref_mut().and_then(|sax| sax.end_document) {
-                end_document(self);
-            }
-
-            if self.well_formed == 0 {
-                return -1;
-            }
-            0
+    pub fn parse_ext_parsed_ent(&mut self) -> i32 {
+        if self.input().is_none() {
+            return -1;
         }
+
+        self.detect_sax2();
+        self.grow();
+
+        // SAX: beginning of the document processing.
+        if let Some(set_document_locator) = self
+            .sax
+            .as_deref_mut()
+            .and_then(|sax| sax.set_document_locator)
+        {
+            set_document_locator(self, XmlSAXLocator::default());
+        }
+
+        // Get the 4 first bytes and decode the charset
+        // if enc != XML_CHAR_ENCODING_NONE
+        // plug some encoding conversion routines.
+        if self.input().unwrap().remainder_len() >= 4 {
+            let enc = detect_encoding(&self.content_bytes()[..4]);
+            if !matches!(enc, XmlCharEncoding::None) {
+                self.switch_encoding(enc);
+            }
+        }
+
+        if self.current_byte() == 0 {
+            xml_fatal_err(self, XmlParserErrors::XmlErrDocumentEmpty, None);
+        }
+
+        // Check for the XMLDecl in the Prolog.
+        self.grow();
+        if self.content_bytes().starts_with(b"<?xml") && xml_is_blank_char(self.nth_byte(5) as u32)
+        {
+            // Note that we will switch encoding on the fly.
+            self.parse_xmldecl();
+            if self.err_no == XmlParserErrors::XmlErrUnsupportedEncoding as i32 {
+                // The XML REC instructs us to stop parsing right here
+                return -1;
+            }
+            self.skip_blanks();
+        } else {
+            self.version = Some(XML_DEFAULT_VERSION.to_owned());
+        }
+        if self.disable_sax == 0 {
+            if let Some(start_document) = self.sax.as_deref_mut().and_then(|sax| sax.start_document)
+            {
+                start_document(self);
+            }
+        }
+        if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+            return -1;
+        }
+
+        // Doing validity checking on chunk doesn't make sense
+        self.instate = XmlParserInputState::XmlParserContent;
+        self.validate = 0;
+        self.loadsubset = 0;
+        self.depth = 0;
+
+        self.parse_content();
+        if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+            return -1;
+        }
+
+        if self.content_bytes().starts_with(b"</") {
+            xml_fatal_err(self, XmlParserErrors::XmlErrNotWellBalanced, None);
+        } else if self.current_byte() != 0 {
+            xml_fatal_err(self, XmlParserErrors::XmlErrExtraContent, None);
+        }
+
+        // SAX: end of the document processing.
+        if let Some(end_document) = self.sax.as_deref_mut().and_then(|sax| sax.end_document) {
+            end_document(self);
+        }
+
+        if self.well_formed == 0 {
+            return -1;
+        }
+        0
     }
 }
 

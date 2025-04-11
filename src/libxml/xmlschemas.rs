@@ -104,7 +104,7 @@ use crate::{
     },
     parser::{
         XML_SAX2_MAGIC, XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput, XmlParserOption,
-        XmlSAXHandler, XmlSAXLocatorPtr, split_qname2, xml_ctxt_read_file, xml_ctxt_read_memory,
+        XmlSAXHandler, XmlSAXLocator, split_qname2, xml_ctxt_read_file, xml_ctxt_read_memory,
     },
     tree::{
         NodeCommon, XmlAttrPtr, XmlAttributeDefault, XmlAttributeType, XmlDocPtr,
@@ -18904,7 +18904,7 @@ fn xml_schema_sax_handle_start_element_ns(
         }
         let ielem: XmlSchemaNodeInfoPtr = (*vctxt).inode;
         // TODO: Is this OK?
-        (*ielem).node_line = xml_sax2_get_line_number(ctxt as XmlParserCtxtPtr as _);
+        (*ielem).node_line = xml_sax2_get_line_number(ctxt);
         (*ielem).local_name = Some(localname.to_owned());
         (*ielem).ns_name = uri.map(|uri| uri.to_owned());
         (*ielem).flags |= XML_SCHEMA_ELEM_INFO_EMPTY;
@@ -19440,7 +19440,7 @@ fn unparsed_entity_decl_split(
     }
 }
 
-fn set_document_locator_split(ctxt: &mut XmlParserCtxt, loc: XmlSAXLocatorPtr) {
+fn set_document_locator_split(ctxt: &mut XmlParserCtxt, loc: XmlSAXLocator) {
     unsafe {
         let user_data = ctxt.user_data.clone().unwrap();
         let lock = user_data.lock();

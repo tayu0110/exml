@@ -29,8 +29,8 @@
 use std::{
     ffi::c_void,
     mem::{size_of, zeroed},
-    ptr::{addr_of_mut, null_mut},
-    sync::atomic::{AtomicI32, AtomicPtr, Ordering},
+    ptr::addr_of_mut,
+    sync::atomic::AtomicPtr,
 };
 
 use libc::{free, malloc, memset, realloc};
@@ -40,7 +40,7 @@ use crate::{
     globals::reset_last_error,
     libxml::xmlmemory::{XmlFreeFunc, XmlMallocFunc, XmlReallocFunc, XmlStrdupFunc},
     parser::XmlSAXLocator,
-    tree::{BASE_BUFFER_SIZE, XmlBufferAllocationScheme},
+    tree::XmlBufferAllocationScheme,
 };
 
 use super::{
@@ -89,164 +89,6 @@ pub struct XmlGlobalState {
 /// Mutex to protect "ForNewThreads" variables
 static mut XML_THR_DEF_MUTEX: XmlMutex = unsafe { zeroed() };
 
-/**
- * xmlBufferAllocScheme:
- *
- * DEPRECATED: Don't use.
- *
- * Global setting, default allocation policy for buffers, default is
- * XML_BUFFER_ALLOC_EXACT
- */
-pub(crate) static mut _XML_BUFFER_ALLOC_SCHEME: XmlBufferAllocationScheme =
-    XmlBufferAllocationScheme::XmlBufferAllocExact;
-static mut XML_BUFFER_ALLOC_SCHEME_THR_DEF: XmlBufferAllocationScheme =
-    XmlBufferAllocationScheme::XmlBufferAllocExact;
-
-/**
- * xmlDefaultBufferSize:
- *
- * DEPRECATED: Don't use.
- *
- * Global setting, default buffer size. Default value is BASE_BUFFER_SIZE
- */
-pub(crate) static mut _XML_DEFAULT_BUFFER_SIZE: i32 = BASE_BUFFER_SIZE as i32;
-pub(crate) static mut XML_DEFAULT_BUFFER_SIZE_THR_DEF: i32 = BASE_BUFFER_SIZE as i32;
-
-/**
- * xmlDoValidityCheckingDefaultValue:
- *
- * DEPRECATED: Use the modern options API with XML_PARSE_DTDVALID.
- *
- * Global setting, indicate that the parser should work in validating mode.
- * Disabled by default.
- */
-pub(crate) static _XML_DO_VALIDITY_CHECKING_DEFAULT_VALUE: AtomicI32 = AtomicI32::new(0);
-static mut XML_DO_VALIDITY_CHECKING_DEFAULT_VALUE_THR_DEF: i32 = 0;
-
-/**
- * xmlGetWarningsDefaultValue:
- *
- * DEPRECATED: Don't use
- *
- * Global setting, indicate that the DTD validation should provide warnings.
- * Activated by default.
- */
-pub(crate) static _XML_GET_WARNINGS_DEFAULT_VALUE: AtomicI32 = AtomicI32::new(1);
-static mut XML_GET_WARNINGS_DEFAULT_VALUE_THR_DEF: i32 = 1;
-
-/*
- * output defaults
- */
-/**
- * xmlIndentTreeOutput:
- *
- * Global setting, asking the serializer to indent the output tree by default
- * Enabled by default
- */
-pub(crate) static _XML_INDENT_TREE_OUTPUT: AtomicI32 = AtomicI32::new(1);
-static mut XML_INDENT_TREE_OUTPUT_THR_DEF: i32 = 1;
-
-/**
- * xmlKeepBlanksDefaultValue:
- *
- * DEPRECATED: Use the modern options API with XML_PARSE_NOBLANKS.
- *
- * Global setting, indicate that the parser should keep all blanks
- * nodes found in the content
- * Activated by default, this is actually needed to have the parser
- * conformant to the XML Recommendation, however the option is kept
- * for some applications since this was libxml1 default behaviour.
- */
-pub(crate) static _XML_KEEP_BLANKS_DEFAULT_VALUE: AtomicI32 = AtomicI32::new(1);
-static mut XML_KEEP_BLANKS_DEFAULT_VALUE_THR_DEF: i32 = 1;
-
-/**
- * xmlLineNumbersDefaultValue:
- *
- * DEPRECATED: The modern options API always enables line numbers.
- *
- * Global setting, indicate that the parser should store the line number
- * in the content field of elements in the DOM tree.
- * Disabled by default since this may not be safe for old classes of
- * application.
- */
-pub(crate) static _XML_LINE_NUMBERS_DEFAULT_VALUE: AtomicI32 = AtomicI32::new(0);
-static mut XML_LINE_NUMBERS_DEFAULT_VALUE_THR_DEF: i32 = 0;
-
-/**
- * xmlLoadExtDtdDefaultValue:
- *
- * DEPRECATED: Use the modern options API with XML_PARSE_DTDLOAD.
- *
- * Global setting, indicate that the parser should load DTD while not
- * validating.
- * Disabled by default.
- */
-pub(crate) static _XML_LOAD_EXT_DTD_DEFAULT_VALUE: AtomicI32 = AtomicI32::new(0);
-static mut XML_LOAD_EXT_DTD_DEFAULT_VALUE_THR_DEF: i32 = 0;
-
-/**
- * xmlParserDebugEntities:
- *
- * DEPRECATED: Don't use
- *
- * Global setting, asking the parser to print out debugging information.
- * while handling entities.
- * Disabled by default
- */
-pub(crate) static _XML_PARSER_DEBUG_ENTITIES: AtomicI32 = AtomicI32::new(0);
-static mut XML_PARSER_DEBUG_ENTITIES_THR_DEF: i32 = 0;
-
-/**
- * xmlPedanticParserDefaultValue:
- *
- * DEPRECATED: Use the modern options API with XML_PARSE_PEDANTIC.
- *
- * Global setting, indicate that the parser be pedantic
- * Disabled by default.
- */
-pub(crate) static _XML_PEDANTIC_PARSER_DEFAULT_VALUE: AtomicI32 = AtomicI32::new(0);
-static mut XML_PEDANTIC_PARSER_DEFAULT_VALUE_THR_DEF: i32 = 0;
-
-/**
- * xmlSaveNoEmptyTags:
- *
- * Global setting, asking the serializer to not output empty tags
- * as <empty/> but <empty></empty>. those two forms are indistinguishable
- * once parsed.
- * Disabled by default
- */
-pub(crate) static _XML_SAVE_NO_EMPTY_TAGS: AtomicI32 = AtomicI32::new(0);
-
-/**
- * xmlSubstituteEntitiesDefaultValue:
- *
- * DEPRECATED: Use the modern options API with XML_PARSE_NOENT.
- *
- * Global setting, indicate that the parser should not generate entity
- * references but replace them with the actual content of the entity
- * Disabled by default, this should be activated when using XPath since
- * the XPath data model requires entities replacement and the XPath
- * engine does not handle entities references transparently.
- */
-pub(crate) static _XML_SUBSTITUTE_ENTITIES_DEFAULT_VALUE: AtomicI32 = AtomicI32::new(0);
-static mut XML_SUBSTITUTE_ENTITIES_DEFAULT_VALUE_THR_DEF: i32 = 0;
-
-/**
- * xmlGenericErrorContext:
- *
- * Global setting passed to generic error callbacks
- */
-pub(crate) static _XML_GENERIC_ERROR_CONTEXT: AtomicPtr<c_void> = AtomicPtr::new(null_mut());
-
-/**
- * xmlStructuredErrorContext:
- *
- * Global setting passed to structured error callbacks
- */
-pub(crate) static _XML_STRUCTURED_ERROR_CONTEXT: AtomicPtr<c_void> = AtomicPtr::new(null_mut());
-static XML_STRUCTURED_ERROR_CONTEXT_THR_DEF: AtomicPtr<c_void> = AtomicPtr::new(null_mut());
-
 /// xmlInitializeGlobalState() initialize a global state with all the
 /// default values of the library.
 #[doc(alias = "xmlInitializeGlobalState")]
@@ -255,31 +97,15 @@ pub unsafe extern "C" fn xml_initialize_global_state(gs: XmlGlobalStatePtr) {
         xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
 
         (*gs).old_xml_wd_compatibility = 0;
-        (*gs).xml_buffer_alloc_scheme = XML_BUFFER_ALLOC_SCHEME_THR_DEF;
-        (*gs).xml_default_buffer_size = XML_DEFAULT_BUFFER_SIZE_THR_DEF;
         (*gs).xml_default_sax_locator.get_public_id = xml_sax2_get_public_id;
         (*gs).xml_default_sax_locator.get_system_id = xml_sax2_get_system_id;
         (*gs).xml_default_sax_locator.get_line_number = xml_sax2_get_line_number;
         (*gs).xml_default_sax_locator.get_column_number = xml_sax2_get_column_number;
-        (*gs).xml_do_validity_checking_default_value =
-            XML_DO_VALIDITY_CHECKING_DEFAULT_VALUE_THR_DEF;
         (*gs).xml_free = Some(free as XmlFreeFunc);
         (*gs).xml_malloc = Some(malloc as XmlMallocFunc);
         (*gs).xml_malloc_atomic = Some(malloc as XmlMallocFunc);
         (*gs).xml_realloc = Some(realloc as XmlReallocFunc);
         (*gs).xml_mem_strdup = Some(xml_strdup as XmlStrdupFunc);
-        (*gs).xml_get_warnings_default_value = XML_GET_WARNINGS_DEFAULT_VALUE_THR_DEF;
-        (*gs).xml_indent_tree_output = XML_INDENT_TREE_OUTPUT_THR_DEF;
-        (*gs).xml_keep_blanks_default_value = XML_KEEP_BLANKS_DEFAULT_VALUE_THR_DEF;
-        (*gs).xml_line_numbers_default_value = XML_LINE_NUMBERS_DEFAULT_VALUE_THR_DEF;
-        (*gs).xml_load_ext_dtd_default_value = XML_LOAD_EXT_DTD_DEFAULT_VALUE_THR_DEF;
-        (*gs).xml_parser_debug_entities = XML_PARSER_DEBUG_ENTITIES_THR_DEF;
-        (*gs).xml_pedantic_parser_default_value = XML_PEDANTIC_PARSER_DEFAULT_VALUE_THR_DEF;
-        (*gs).xml_substitute_entities_default_value = XML_SUBSTITUTE_ENTITIES_DEFAULT_VALUE_THR_DEF;
-        (*gs).xml_structured_error_context.store(
-            XML_STRUCTURED_ERROR_CONTEXT_THR_DEF.load(Ordering::Relaxed),
-            Ordering::Relaxed,
-        );
 
         memset(
             addr_of_mut!((*gs).xml_last_error) as _,
@@ -289,15 +115,6 @@ pub unsafe extern "C" fn xml_initialize_global_state(gs: XmlGlobalStatePtr) {
 
         xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
     }
-}
-
-// Helpful Macro
-#[doc(hidden)]
-#[macro_export]
-macro_rules! IS_MAIN_THREAD {
-    () => {
-        $crate::libxml::threads::xml_is_main_thread()
-    };
 }
 
 /// The variable holding the libxml malloc() implementation
@@ -376,36 +193,6 @@ pub fn set_xml_mem_strdup(mem_strdup: Option<XmlStrdupFunc>) {
         _XML_MEM_STRDUP = mem_strdup;
         (*xml_get_global_state()).xml_mem_strdup = mem_strdup;
     }
-}
-
-#[deprecated]
-pub unsafe extern "C" fn __xml_default_sax_locator() -> *mut XmlSAXLocator {
-    unsafe {
-        if IS_MAIN_THREAD!() != 0 {
-            addr_of_mut!(_XML_DEFAULT_SAXLOCATOR)
-        } else {
-            addr_of_mut!((*xml_get_global_state()).xml_default_sax_locator)
-        }
-    }
-}
-
-/**
- * xmlDefaultSAXLocator:
- *
- * DEPRECATED: Don't use
- *
- * The default SAX Locator
- * { getPublicId, getSystemId, getLineNumber, getColumnNumber}
- */
-static mut _XML_DEFAULT_SAXLOCATOR: XmlSAXLocator = XmlSAXLocator {
-    get_public_id: xml_sax2_get_public_id,
-    get_system_id: xml_sax2_get_system_id,
-    get_line_number: xml_sax2_get_line_number,
-    get_column_number: xml_sax2_get_column_number,
-};
-
-pub unsafe extern "C" fn xml_default_sax_locator() -> *mut XmlSAXLocator {
-    unsafe { __xml_default_sax_locator() }
 }
 
 /**

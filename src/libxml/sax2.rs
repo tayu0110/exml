@@ -19,7 +19,7 @@
 //
 // Daniel Veillard <daniel@veillard.com>
 
-use std::{cell::RefCell, ffi::c_void, mem::replace, ptr::null, rc::Rc};
+use std::{cell::RefCell, ffi::c_void, mem::replace, rc::Rc};
 
 use crate::{
     encoding::{XmlCharEncoding, detect_encoding},
@@ -29,11 +29,11 @@ use crate::{
     },
     globals::{StructuredError, get_register_node_func},
     html::tree::html_new_doc_no_dtd,
-    libxml::{valid::xml_validate_document_final, xmlstring::XmlChar},
+    libxml::valid::xml_validate_document_final,
     parser::{
         XML_COMPLETE_ATTRS, XML_MAX_TEXT_LENGTH, XML_SAX2_MAGIC, XML_SKIP_IDS, XML_STRING_TEXT,
         XML_SUBSTITUTE_REF, XML_VCTXT_DTD_VALIDATED, XmlParserCtxt, XmlParserCtxtPtr,
-        XmlParserInput, XmlParserInputState, XmlParserOption, XmlSAXHandler, XmlSAXLocatorPtr,
+        XmlParserInput, XmlParserInputState, XmlParserOption, XmlSAXHandler, XmlSAXLocator,
         build_qname, split_qname, xml_err_memory, xml_load_external_entity,
     },
     tree::{
@@ -58,9 +58,9 @@ use super::valid::{
 ///
 /// Returns a xmlChar *
 #[doc(alias = "xmlSAX2GetPublicId")]
-pub unsafe fn xml_sax2_get_public_id(_ctx: *mut c_void) -> *const XmlChar {
+pub fn xml_sax2_get_public_id(_ctx: &XmlParserCtxt) -> Option<String> {
     /* let ctxt: xmlParserCtxtPtr = ctx as xmlParserCtxtPtr; */
-    null()
+    None
 }
 
 /// Provides the system ID, basically URL or filename e.g.  
@@ -68,20 +68,14 @@ pub unsafe fn xml_sax2_get_public_id(_ctx: *mut c_void) -> *const XmlChar {
 ///
 /// Returns a xmlChar *
 #[doc(alias = "xmlSAX2GetSystemId")]
-pub unsafe fn xml_sax2_get_system_id(ctx: *mut c_void) -> Option<String> {
-    unsafe {
-        let ctxt: XmlParserCtxtPtr = ctx as _;
-        if ctx.is_null() || (*ctxt).input().is_none() {
-            return None;
-        };
-        (*ctxt).input().unwrap().filename.clone()
-    }
+pub fn xml_sax2_get_system_id(ctx: &XmlParserCtxt) -> Option<String> {
+    ctx.input()?.filename.clone()
 }
 
 /// Receive the document locator at startup, actually xmlDefaultSAXLocator
 /// Everything is available on the context, so this is useless in our case.
 #[doc(alias = "xmlSAX2SetDocumentLocator")]
-pub fn xml_sax2_set_document_locator(_ctxt: &mut XmlParserCtxt, _loc: XmlSAXLocatorPtr) {
+pub fn xml_sax2_set_document_locator(_ctxt: &mut XmlParserCtxt, _loc: XmlSAXLocator) {
     /* let ctxt: xmlParserCtxtPtr = ctx as xmlParserCtxtPtr; */
 }
 
@@ -89,28 +83,22 @@ pub fn xml_sax2_set_document_locator(_ctxt: &mut XmlParserCtxt, _loc: XmlSAXLoca
 ///
 /// Returns an int
 #[doc(alias = "xmlSAX2GetLineNumber")]
-pub unsafe fn xml_sax2_get_line_number(ctx: *mut c_void) -> i32 {
-    unsafe {
-        let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
-        if ctx.is_null() || (*ctxt).input().is_none() {
-            return 0;
-        }
-        (*ctxt).input().unwrap().line
+pub fn xml_sax2_get_line_number(ctx: &XmlParserCtxt) -> i32 {
+    if ctx.input().is_none() {
+        return 0;
     }
+    ctx.input().unwrap().line
 }
 
 /// Provide the column number of the current parsing point.
 ///
 /// Returns an int
 #[doc(alias = "xmlSAX2GetColumnNumber")]
-pub unsafe fn xml_sax2_get_column_number(ctx: *mut c_void) -> i32 {
-    unsafe {
-        let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
-        if ctx.is_null() || (*ctxt).input().is_none() {
-            return 0;
-        }
-        (*ctxt).input().unwrap().col
+pub fn xml_sax2_get_column_number(ctx: &XmlParserCtxt) -> i32 {
+    if ctx.input().is_none() {
+        return 0;
     }
+    ctx.input().unwrap().col
 }
 
 /// Is this document tagged standalone ?
@@ -2620,93 +2608,6 @@ mod tests {
                     "{leaks} Leaks are found in xmlDefaultSAXHandlerInit()"
                 );
             }
-        }
-    }
-
-    #[test]
-    fn test_xml_sax2_get_column_number() {
-        let mut leaks = 0;
-
-        unsafe {
-            for n_ctx in 0..GEN_NB_VOID_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctx = gen_void_ptr(n_ctx, 0);
-
-                let ret_val = xml_sax2_get_column_number(ctx);
-                desret_int(ret_val);
-                des_void_ptr(n_ctx, ctx, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlSAX2GetColumnNumber",
-                        xml_mem_blocks() - mem_base
-                    );
-                    eprintln!(" {}", n_ctx);
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlSAX2GetColumnNumber()"
-            );
-        }
-    }
-
-    #[test]
-    fn test_xml_sax2_get_line_number() {
-        let mut leaks = 0;
-
-        unsafe {
-            for n_ctx in 0..GEN_NB_VOID_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctx = gen_void_ptr(n_ctx, 0);
-
-                let ret_val = xml_sax2_get_line_number(ctx);
-                desret_int(ret_val);
-                des_void_ptr(n_ctx, ctx, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlSAX2GetLineNumber",
-                        xml_mem_blocks() - mem_base
-                    );
-                    eprintln!(" {}", n_ctx);
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlSAX2GetLineNumber()"
-            );
-        }
-    }
-
-    #[test]
-    fn test_xml_sax2_get_public_id() {
-        let mut leaks = 0;
-
-        unsafe {
-            for n_ctx in 0..GEN_NB_VOID_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctx = gen_void_ptr(n_ctx, 0);
-
-                let ret_val = xml_sax2_get_public_id(ctx);
-                desret_const_xml_char_ptr(ret_val);
-                des_void_ptr(n_ctx, ctx, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlSAX2GetPublicId",
-                        xml_mem_blocks() - mem_base
-                    );
-                    eprintln!(" {}", n_ctx);
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlSAX2GetPublicId()"
-            );
         }
     }
 

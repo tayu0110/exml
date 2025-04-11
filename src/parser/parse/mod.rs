@@ -64,7 +64,7 @@ use crate::{
     error::XmlParserErrors,
     globals::GenericErrorContext,
     html::parser::{__html_parse_content, HtmlParserOption, html_create_memory_parser_ctxt},
-    libxml::{chvalid::xml_is_blank_char, globals::xml_default_sax_locator},
+    libxml::chvalid::xml_is_blank_char,
     parser::XmlParserOption,
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlDocProperties, XmlDocPtr, XmlElementType,
@@ -74,8 +74,8 @@ use crate::{
 };
 
 use super::{
-    XML_SKIP_IDS, XmlParserCtxt, XmlParserInputState, xml_fatal_err, xml_fatal_err_msg,
-    xml_init_parser,
+    XML_SKIP_IDS, XmlParserCtxt, XmlParserInputState, XmlSAXLocator, xml_fatal_err,
+    xml_fatal_err_msg, xml_init_parser,
 };
 
 /// The default version of XML used: 1.0
@@ -111,7 +111,7 @@ impl XmlParserCtxt {
             // SAX: beginning of the document processing.
             if let Some(sax) = self.sax.as_deref_mut() {
                 if let Some(set_document_locator) = sax.set_document_locator {
-                    set_document_locator(self, xml_default_sax_locator());
+                    set_document_locator(self, XmlSAXLocator::default());
                 }
             }
             if matches!(self.instate, XmlParserInputState::XmlParserEOF) {

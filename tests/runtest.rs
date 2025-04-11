@@ -60,7 +60,7 @@ use exml::{
     },
     parser::{
         XML_SAX2_MAGIC, XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput, XmlParserOption,
-        XmlSAXHandler, XmlSAXLocatorPtr, xml_cleanup_parser, xml_init_parser,
+        XmlSAXHandler, XmlSAXLocator, xml_cleanup_parser, xml_init_parser,
         xml_no_net_external_entity_loader, xml_parse_file, xml_read_file, xml_read_memory,
         xml_set_external_entity_loader,
     },
@@ -838,7 +838,7 @@ fn unparsed_entity_decl_debug(
 /// Receive the document locator at startup, actually xmlDefaultSAXLocator
 /// Everything is available on the context, so this is useless in our case.
 #[doc(alias = "setDocumentLocatorDebug")]
-fn set_document_locator_debug(_ctx: &mut XmlParserCtxt, _loc: XmlSAXLocatorPtr) {
+fn set_document_locator_debug(_ctx: &mut XmlParserCtxt, _loc: XmlSAXLocator) {
     increment_callbacks_counter();
     sax_debugln!("SAX.setDocumentLocator()");
 }

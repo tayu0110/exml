@@ -46,7 +46,10 @@ use std::{cell::RefCell, ffi::c_void, rc::Rc, sync::atomic::AtomicPtr};
 
 use crate::{
     globals::{GenericErrorContext, StructuredError},
-    libxml::xmlstring::XmlChar,
+    libxml::sax2::{
+        xml_sax2_get_column_number, xml_sax2_get_line_number, xml_sax2_get_public_id,
+        xml_sax2_get_system_id,
+    },
     parser::XmlParserInput,
     tree::{
         XmlAttributeDefault, XmlAttributeType, XmlElementContent, XmlElementTypeVal, XmlEntityPtr,
@@ -65,15 +68,25 @@ pub(crate) struct XmlStartTag {
     pub(crate) ns_nr: i32,
 }
 
-pub type XmlSAXLocatorPtr = *mut XmlSAXLocator;
 /// A SAX Locator.
 #[doc(alias = "xmlSAXLocator")]
 #[repr(C)]
 pub struct XmlSAXLocator {
-    pub(crate) get_public_id: unsafe fn(ctx: *mut c_void) -> *const XmlChar,
-    pub(crate) get_system_id: unsafe fn(ctx: *mut c_void) -> Option<String>,
-    pub(crate) get_line_number: unsafe fn(ctx: *mut c_void) -> i32,
-    pub(crate) get_column_number: unsafe fn(ctx: *mut c_void) -> i32,
+    pub(crate) get_public_id: fn(&XmlParserCtxt) -> Option<String>,
+    pub(crate) get_system_id: fn(&XmlParserCtxt) -> Option<String>,
+    pub(crate) get_line_number: fn(&XmlParserCtxt) -> i32,
+    pub(crate) get_column_number: fn(&XmlParserCtxt) -> i32,
+}
+
+impl Default for XmlSAXLocator {
+    fn default() -> Self {
+        Self {
+            get_public_id: xml_sax2_get_public_id,
+            get_system_id: xml_sax2_get_system_id,
+            get_line_number: xml_sax2_get_line_number,
+            get_column_number: xml_sax2_get_column_number,
+        }
+    }
 }
 
 /// Callback:
@@ -141,7 +154,7 @@ pub type UnparsedEntityDeclSAXFunc =
 /// Receive the document locator at startup, actually xmlDefaultSAXLocator.
 /// Everything is available on the context, so this is useless in our case.
 #[doc(alias = "setDocumentLocatorSAXFunc")]
-pub type SetDocumentLocatorSAXFunc = fn(&mut XmlParserCtxt, XmlSAXLocatorPtr);
+pub type SetDocumentLocatorSAXFunc = fn(&mut XmlParserCtxt, XmlSAXLocator);
 
 /// Called when the document start being processed.
 #[doc(alias = "startDocumentSAXFunc")]

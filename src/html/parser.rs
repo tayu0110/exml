@@ -48,15 +48,15 @@ use crate::{
             xml_is_blank_char, xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender,
             xml_is_pubid_char,
         },
-        globals::{xml_default_sax_locator, xml_free, xml_malloc_atomic, xml_realloc},
+        globals::{xml_free, xml_malloc_atomic, xml_realloc},
         sax2::{xml_sax2_ignorable_whitespace, xml_sax2_init_html_default_sax_handler},
         xmlstring::{XmlChar, xml_strndup},
     },
     parser::{
         INPUT_CHUNK, XML_MAX_HUGE_LENGTH, XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH,
         XML_VCTXT_USE_PCTXT, XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput, XmlParserInputState,
-        XmlParserOption, XmlSAXHandler, xml_free_parser_ctxt, xml_init_parser, xml_is_letter,
-        xml_load_external_entity,
+        XmlParserOption, XmlSAXHandler, XmlSAXLocator, xml_free_parser_ctxt, xml_init_parser,
+        xml_is_letter, xml_load_external_entity,
     },
     tree::{NodeCommon, XmlElementType, XmlNodePtr, xml_create_int_subset, xml_free_doc},
     uri::canonic_path,
@@ -3604,7 +3604,7 @@ pub unsafe fn html_parse_document(ctxt: HtmlParserCtxtPtr) -> i32 {
             .as_deref_mut()
             .and_then(|sax| sax.set_document_locator)
         {
-            set_document_locator(&mut *ctxt, xml_default_sax_locator());
+            set_document_locator(&mut *ctxt, XmlSAXLocator::default());
         }
 
         if (*ctxt).encoding.is_none() && (*ctxt).input().unwrap().remainder_len() >= 4 {
@@ -4387,7 +4387,7 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
                         .as_deref_mut()
                         .and_then(|sax| sax.set_document_locator)
                     {
-                        set_document_locator(&mut *ctxt, xml_default_sax_locator());
+                        set_document_locator(&mut *ctxt, XmlSAXLocator::default());
                     }
                     if (*ctxt).disable_sax == 0 {
                         if let Some(start_document) = (*ctxt)
