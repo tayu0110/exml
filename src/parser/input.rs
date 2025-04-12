@@ -307,7 +307,7 @@ impl XmlParserInput {
         Some(input)
     }
 
-    pub(crate) fn base_contents(&self) -> &[u8] {
+    pub fn base_contents(&self) -> &[u8] {
         if self.base == usize::MAX {
             return &[];
         }

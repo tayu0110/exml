@@ -7,7 +7,7 @@
 // See Copyright for the status of this software.
 //
 // daniel@veillard.com
-#![allow(unused)]
+// #![allow(unused)]
 
 use std::{
     borrow::Cow,
@@ -15,7 +15,7 @@ use std::{
     env::args,
     ffi::{CStr, CString, c_char, c_long, c_void},
     fs::File,
-    io::{stderr, stdin, stdout},
+    io::{Write, stderr, stdin, stdout},
     mem::zeroed,
     process::exit,
     ptr::{addr_of_mut, null, null_mut},
@@ -871,22 +871,16 @@ fn xmllint_external_entity_loader(
             if let Some(sax) = ctxt.sax.as_deref_mut() {
                 sax.warning = Some(warning);
             }
-            if url.is_some() {
-                todo!()
-                // xml_error_with_format!(
-                //     warning,
-                //     ctxt as _,
-                //     c"failed to load external entity \"%s\"\n".as_ptr(),
-                //     url
-                // );
-            } else if id.is_some() {
-                todo!()
-                // xml_error_with_format!(
-                //     warning,
-                //     ctxt as _,
-                //     c"failed to load external entity \"%s\"\n".as_ptr(),
-                //     id
-                // );
+            if let Some(url) = url {
+                warning(
+                    Some(GenericErrorContext::new(ctxt as *mut XmlParserCtxt)),
+                    format!("failed to load external entity \"{url}\"\n").as_str(),
+                );
+            } else if let Some(id) = id {
+                warning(
+                    Some(GenericErrorContext::new(ctxt as *mut XmlParserCtxt)),
+                    format!("failed to load external entity \"{id}\"\n").as_str(),
+                );
             }
         }
         None
@@ -947,7 +941,7 @@ unsafe extern "C" fn my_strdup_func(str: *const u8) -> *mut u8 {
 
 // HTML output
 thread_local! {
-    static BUFFER: RefCell<[i8; 50000]> = const { RefCell::new([0; 50000]) };
+    static BUFFER: RefCell<[u8; 50000]> = const { RefCell::new([0; 50000]) };
 }
 
 unsafe fn xml_htmlencode_send() {
@@ -959,7 +953,7 @@ unsafe fn xml_htmlencode_send() {
             memset(addr_of_mut!(buffer[buffer.len() - 4]) as _, 0, 4);
             let result = xml_encode_entities_reentrant(
                 None,
-                &CStr::from_ptr(buffer.as_ptr()).to_string_lossy(),
+                &CStr::from_ptr(buffer.as_ptr() as *const i8).to_string_lossy(),
             );
             generic_error!("{result}");
             buffer[0] = 0;
@@ -967,226 +961,237 @@ unsafe fn xml_htmlencode_send() {
     }
 }
 
-// /// Displays the associated file and line information for the current input
-// #[doc(alias = "xmlHTMLPrintFileInfo")]
-// unsafe fn xml_htmlprint_file_info(input: XmlParserInputPtr) {
-//     unsafe {
-//         generic_error!("<p>");
+/// Displays the associated file and line information for the current input
+#[doc(alias = "xmlHTMLPrintFileInfo")]
+unsafe fn xml_htmlprint_file_info(input: Option<&XmlParserInput>) {
+    unsafe {
+        generic_error!("<p>");
 
-//         BUFFER.with_borrow_mut(|buffer| {
-//             let len = strlen(buffer.as_ptr());
-//             if !input.is_null() {
-//                 if (*input).filename.is_some() {
-//                     let filename = CString::new((*input).filename.as_deref().unwrap()).unwrap();
-//                     snprintf(
-//                         addr_of_mut!(buffer[len]) as _,
-//                         buffer.len() - len,
-//                         c"%s:%d: ".as_ptr(),
-//                         filename.as_ptr(),
-//                         (*input).line,
-//                     );
-//                 } else {
-//                     snprintf(
-//                         addr_of_mut!(buffer[len]) as _,
-//                         buffer.len() - len,
-//                         c"Entity: line %d: ".as_ptr(),
-//                         (*input).line,
-//                     );
-//                 }
-//             }
-//             xml_htmlencode_send();
-//         });
-//     }
-// }
+        BUFFER.with_borrow_mut(|buffer| {
+            let len = buffer.iter().position(|b| *b == 0).unwrap_or(buffer.len());
+            if let Some(input) = input {
+                if let Some(filename) = input.filename.as_deref() {
+                    write!(&mut buffer[len..], "{filename}:{}: ", input.line).ok();
+                } else {
+                    write!(&mut buffer[len..], "Entity: line {}: ", input.line).ok();
+                }
+            }
+            xml_htmlencode_send();
+        });
+    }
+}
 
-// /// Displays current context within the input content for error tracking
-// #[doc(alias = "xmlHTMLPrintFileContext")]
-// unsafe fn xml_htmlprint_file_context(input: XmlParserInputPtr) {
-//     unsafe {
-//         let mut cur: *const XmlChar;
-//         let mut base: *const XmlChar;
-//         let mut n: i32;
+/// Displays current context within the input content for error tracking
+#[doc(alias = "xmlHTMLPrintFileContext")]
+unsafe fn xml_htmlprint_file_context(input: Option<&XmlParserInput>) {
+    unsafe {
+        const SIZE: usize = 80;
 
-//         if input.is_null() {
-//             return;
-//         }
-//         generic_error!("<pre>\n");
-//         cur = (*input).cur;
-//         base = (*input).base;
-//         while cur > base && (*cur == b'\n' || *cur == b'\r') {
-//             cur = cur.sub(1);
-//         }
-//         n = 0;
-//         while {
-//             n += 1;
-//             n - 1 < 80
-//         } && cur > base
-//             && *cur != b'\n'
-//             && *cur != b'\r'
-//         {
-//             cur = cur.sub(1);
-//         }
-//         if *cur == b'\n' || *cur == b'\r' {
-//             cur = cur.add(1);
-//         }
-//         base = cur;
-//         n = 0;
-//         BUFFER.with_borrow_mut(|buffer| {
-//             while *cur != 0 && *cur != b'\n' && *cur != b'\r' && n < 79 {
-//                 let len = strlen(buffer.as_ptr());
-//                 snprintf(
-//                     addr_of_mut!(buffer[len]) as _,
-//                     buffer.len() - len,
-//                     c"%c".as_ptr(),
-//                     *cur as i32,
-//                 );
-//                 cur = cur.add(1);
-//                 n += 1;
-//             }
-//             let len = strlen(buffer.as_ptr());
-//             snprintf(
-//                 addr_of_mut!(buffer[len]) as _,
-//                 buffer.len() - len,
-//                 c"\n".as_ptr(),
-//             );
-//             cur = (*input).cur;
-//             while cur > base && (*cur == b'\n' || *cur == b'\r') {
-//                 cur = cur.sub(1);
-//             }
-//             n = 0;
-//             while cur != base && {
-//                 n += 1;
-//                 n - 1 < 80
-//             } {
-//                 let len = strlen(buffer.as_ptr());
-//                 snprintf(
-//                     addr_of_mut!(buffer[len]) as _,
-//                     buffer.len() - len,
-//                     c" ".as_ptr(),
-//                 );
-//                 base = base.add(1);
-//             }
-//             let len = strlen(buffer.as_ptr());
-//             snprintf(
-//                 addr_of_mut!(buffer[len]) as _,
-//                 buffer.len() - len,
-//                 c"^\n".as_ptr(),
-//             );
-//             xml_htmlencode_send();
-//         });
-//         generic_error!("</pre>");
-//     }
-// }
+        let Some(input) = input else {
+            return;
+        };
+
+        let mut cur = input.cur;
+        // skip backwards over any end-of-lines
+        while 0 < cur
+            && cur < input.base_contents().len()
+            && matches!(input.base_contents()[cur], b'\n' | b'\r')
+        {
+            cur -= 1;
+        }
+        let mut n = 0;
+        if cur == input.base_contents().len() {
+            cur -= 1;
+            n += 1;
+        }
+        // search backwards for beginning-of-line (to max buff size)
+        while n < SIZE && cur > 0 && !matches!(input.base_contents()[cur], b'\n' | b'\r') {
+            cur -= 1;
+            n += 1;
+        }
+        let mut cur = &input.base_contents()[cur..];
+        if n > 0 && matches!(cur.first(), Some(&(b'\n' | b'\r'))) {
+            cur = &cur[1..];
+        } else {
+            // skip over continuation bytes
+            while cur.len() > input.base_contents().len() - input.cur && cur[0] & 0xC0 == 0x80 {
+                cur = &cur[1..];
+            }
+        }
+        let col = input.cur - (input.base_contents().len() - cur.len());
+        let mut content = String::with_capacity(SIZE);
+
+        // search forward for end-of-line (to max buff size)
+        let mut n = 0;
+        let chunk = {
+            let mut i = 0;
+            while i < SIZE.min(cur.len()) && cur[i] != b'\n' && cur[i] != b'\r' {
+                i += 1;
+            }
+            &cur[..i]
+        };
+        if let Some(chunk) = chunk.utf8_chunks().next() {
+            for c in chunk
+                .valid()
+                .chars()
+                .take_while(|&c| c != '\n' && c != '\r')
+            {
+                n += c.len_utf8();
+                if n > SIZE {
+                    break;
+                }
+                content.push(c);
+            }
+        }
+        generic_error!("<pre>\n");
+        BUFFER.with_borrow_mut(|buffer| {
+            let len = buffer.iter().position(|&b| b == 0).unwrap_or(buffer.len());
+            // print out the selected text
+            writeln!(&mut buffer[len..], "{content}").ok();
+            // create blank line with problem pointer
+            let mut ptr = content
+                .bytes()
+                .take(col)
+                .map(|c| if c == b'\t' { '\t' } else { ' ' })
+                .collect::<String>();
+            if ptr.len() == SIZE {
+                ptr.pop();
+            }
+            ptr.push_str("^\n");
+            write!(&mut buffer[len..], "{}", ptr).ok();
+            xml_htmlencode_send();
+        });
+        generic_error!("</pre>");
+    }
+}
 
 /// Display and format an error messages, gives file, line, position and
 /// extra parameters.
 #[doc(alias = "xmlHTMLError")]
-fn xml_html_error(_ctx: Option<GenericErrorContext>, _msg: &str) {
-    todo!()
-    // let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
-    // let mut input: XmlParserInputPtr;
+fn xml_html_error(ctx: Option<GenericErrorContext>, msg: &str) {
+    unsafe {
+        if let Some(ctx) = ctx {
+            let ctxt = ctx.lock();
+            let ctxt = *ctxt.downcast_ref::<*mut XmlParserCtxt>().unwrap();
 
-    // BUFFER[0] = 0;
-    // input = (*ctxt).input;
-    // if !input.is_null() && (*input).filename.is_null() && (*ctxt).input_nr > 1 {
-    //     input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
-    // }
+            BUFFER.with_borrow_mut(|buffer| {
+                buffer[0] = 0;
+                let mut input = (*ctxt).input();
+                if let Some(inp) = input {
+                    if inp.filename.is_none() && (*ctxt).input_tab.len() > 1 {
+                        input = Some(&(*ctxt).input_tab[(*ctxt).input_tab.len() - 2]);
+                    }
+                }
 
-    // xml_htmlprint_file_info(input);
+                xml_htmlprint_file_info(input);
 
-    // xml_generic_error!(xml_generic_error_context(), c"<b>error</b>: ".as_ptr());
-    // let len = strlen(BUFFER.as_ptr());
-    // snprintf(addr_of_mut!(BUFFER[len]) as _, BUFFER.len() - len, msg);
-    // xml_htmlencode_send();
-    // xml_generic_error!(xml_generic_error_context(), c"</p>\n".as_ptr());
-
-    // xml_htmlprint_file_context(input);
-    // xml_htmlencode_send();
+                generic_error!("<b>error</b>: ");
+                let len = buffer.iter().position(|&b| b == 0).unwrap_or(buffer.len());
+                write!(&mut buffer[len..], "{msg}").ok();
+                xml_htmlencode_send();
+                generic_error!("</p>\n");
+                xml_htmlprint_file_context(input);
+                xml_htmlencode_send();
+            });
+        }
+    }
 }
 
 /// Display and format a warning messages, gives file, line, position and
 /// extra parameters.
 #[doc(alias = "xmlHTMLWarning")]
-fn xml_html_warning(_ctx: Option<GenericErrorContext>, _msg: &str) {
-    todo!()
-    // let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
-    // let mut input: XmlParserInputPtr;
+fn xml_html_warning(ctx: Option<GenericErrorContext>, msg: &str) {
+    unsafe {
+        if let Some(ctx) = ctx {
+            let ctxt = ctx.lock();
+            let ctxt = *ctxt.downcast_ref::<*mut XmlParserCtxt>().unwrap();
 
-    // BUFFER[0] = 0;
-    // input = (*ctxt).input;
-    // if !input.is_null() && (*input).filename.is_null() && (*ctxt).input_nr > 1 {
-    //     input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
-    // }
+            BUFFER.with_borrow_mut(|buffer| {
+                buffer[0] = 0;
+                let mut input = (*ctxt).input();
+                if let Some(inp) = input {
+                    if inp.filename.is_none() && (*ctxt).input_tab.len() > 1 {
+                        input = Some(&(*ctxt).input_tab[(*ctxt).input_tab.len() - 2]);
+                    }
+                }
 
-    // xml_htmlprint_file_info(input);
+                xml_htmlprint_file_info(input);
 
-    // xml_generic_error!(xml_generic_error_context(), c"<b>warning</b>: ".as_ptr());
-    // let len = strlen(BUFFER.as_ptr());
-    // snprintf(addr_of_mut!(BUFFER[len]) as _, BUFFER.len() - len, msg);
-    // xml_htmlencode_send();
-    // xml_generic_error!(xml_generic_error_context(), c"</p>\n".as_ptr());
-
-    // xml_htmlprint_file_context(input);
-    // xml_htmlencode_send();
+                generic_error!("<b>warning</b>: ");
+                let len = buffer.iter().position(|&b| b == 0).unwrap_or(buffer.len());
+                write!(&mut buffer[len..], "{msg}").ok();
+                xml_htmlencode_send();
+                generic_error!("</p>\n");
+                xml_htmlprint_file_context(input);
+                xml_htmlencode_send();
+            });
+        }
+    }
 }
 
 /// Display and format an validity error messages, gives file,
 /// line, position and extra parameters.
 #[doc(alias = "xmlHTMLValidityError")]
-fn xml_html_validity_error(_ctx: Option<GenericErrorContext>, _msg: &str) {
-    todo!()
-    // let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
-    // let mut input: XmlParserInputPtr;
+fn xml_html_validity_error(ctx: Option<GenericErrorContext>, msg: &str) {
+    unsafe {
+        if let Some(ctx) = ctx {
+            let ctxt = ctx.lock();
+            let ctxt = *ctxt.downcast_ref::<*mut XmlParserCtxt>().unwrap();
 
-    // BUFFER[0] = 0;
-    // input = (*ctxt).input;
-    // if (*input).filename.is_null() && (*ctxt).input_nr > 1 {
-    //     input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
-    // }
+            BUFFER.with_borrow_mut(|buffer| {
+                buffer[0] = 0;
+                let mut input = (*ctxt).input();
+                if let Some(inp) = input {
+                    if inp.filename.is_none() && (*ctxt).input_tab.len() > 1 {
+                        input = Some(&(*ctxt).input_tab[(*ctxt).input_tab.len() - 2]);
+                    }
+                }
 
-    // xml_htmlprint_file_info(input);
+                xml_htmlprint_file_info(input);
 
-    // xml_generic_error!(
-    //     xml_generic_error_context(),
-    //     c"<b>validity error</b>: ".as_ptr()
-    // );
-    // let len = strlen(BUFFER.as_ptr());
-    // snprintf(addr_of_mut!(BUFFER[len]) as _, BUFFER.len() - len, msg);
-    // xml_htmlencode_send();
-    // xml_generic_error!(xml_generic_error_context(), c"</p>\n".as_ptr());
-
-    // xml_htmlprint_file_context(input);
-    // xml_htmlencode_send();
-    // PROGRESULT.store(ErrValid, Ordering::Relaxed);
+                generic_error!("<b>validity error</b>: ");
+                let len = buffer.iter().position(|&b| b == 0).unwrap_or(buffer.len());
+                write!(&mut buffer[len..], "{msg}").ok();
+                xml_htmlencode_send();
+                generic_error!("</p>\n");
+                xml_htmlprint_file_context(input);
+                xml_htmlencode_send();
+            });
+        }
+        PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
+    }
 }
 
 /// Display and format a validity warning messages, gives file, line,
 /// position and extra parameters.
 #[doc(alias = "xmlHTMLValidityWarning")]
-fn xml_html_validity_warning(_ctx: Option<GenericErrorContext>, _msg: &str) {
-    todo!()
-    // let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
-    // let mut input: XmlParserInputPtr;
+fn xml_html_validity_warning(ctx: Option<GenericErrorContext>, msg: &str) {
+    unsafe {
+        if let Some(ctx) = ctx {
+            let ctxt = ctx.lock();
+            let ctxt = *ctxt.downcast_ref::<*mut XmlParserCtxt>().unwrap();
 
-    // BUFFER[0] = 0;
-    // input = (*ctxt).input;
-    // if (*input).filename.is_null() && (*ctxt).input_nr > 1 {
-    //     input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
-    // }
+            BUFFER.with_borrow_mut(|buffer| {
+                buffer[0] = 0;
+                let mut input = (*ctxt).input();
+                if let Some(inp) = input {
+                    if inp.filename.is_none() && (*ctxt).input_tab.len() > 1 {
+                        input = Some(&(*ctxt).input_tab[(*ctxt).input_tab.len() - 2]);
+                    }
+                }
 
-    // xml_htmlprint_file_info(input);
+                xml_htmlprint_file_info(input);
 
-    // xml_generic_error!(
-    //     xml_generic_error_context(),
-    //     c"<b>validity warning</b>: ".as_ptr()
-    // );
-    // let len = strlen(BUFFER.as_ptr());
-    // snprintf(addr_of_mut!(BUFFER[len]) as _, BUFFER.len() - len, msg);
-    // xml_htmlencode_send();
-    // xml_generic_error!(xml_generic_error_context(), c"</p>\n".as_ptr());
-
-    // xml_htmlprint_file_context(input);
-    // xml_htmlencode_send();
+                generic_error!("<b>validity warning</b>: ");
+                let len = buffer.iter().position(|&b| b == 0).unwrap_or(buffer.len());
+                write!(&mut buffer[len..], "{msg}").ok();
+                xml_htmlencode_send();
+                generic_error!("</p>\n");
+                xml_htmlprint_file_context(input);
+                xml_htmlencode_send();
+            });
+        }
+    }
 }
 
 // Shell Interface
@@ -1212,7 +1217,7 @@ fn xml_shell_readline(prompt: &str) -> Option<String> {
 // SAX based tests
 
 // empty SAX block
-static mut EMPTY_SAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
+static EMPTY_SAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
     internal_subset: None,
     is_standalone: None,
     has_internal_subset: None,
@@ -1359,16 +1364,8 @@ fn resolve_entity_debug(
     // let ctxt: xmlParserCtxtPtr = ctx as xmlParserCtxtPtr;
 
     print!("SAX.resolveEntity(");
-    if let Some(public_id) = public_id {
-        print!("{public_id}");
-    } else {
-        print!(" ");
-    }
-    if let Some(system_id) = system_id {
-        println!(", {system_id})");
-    } else {
-        println!(", )");
-    }
+    print!("{}", public_id.unwrap_or(" "));
+    println!(", {})", system_id.unwrap_or(""));
     None
 }
 
@@ -1664,7 +1661,7 @@ fn fatal_error_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
     print!("SAX.fatalError: {msg}");
 }
 
-static mut DEBUG_SAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
+static DEBUG_SAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
     internal_subset: Some(internal_subset_debug),
     is_standalone: Some(is_standalone_debug),
     has_internal_subset: Some(has_internal_subset_debug),
@@ -1717,11 +1714,7 @@ fn start_element_ns_debug(
         return;
     }
     print!("SAX.startElementNs({localname}");
-    if let Some(prefix) = prefix {
-        print!(", {prefix}");
-    } else {
-        print!(", NULL");
-    }
+    print!(", {}", prefix.unwrap_or("NULL"));
     if let Some(uri) = uri {
         print!(", '{uri}'");
     } else {
@@ -1765,11 +1758,7 @@ fn end_element_ns_debug(
         return;
     }
     print!("SAX.endElementNs({localname}");
-    if let Some(prefix) = prefix {
-        print!(", {prefix}");
-    } else {
-        print!(", NULL");
-    }
+    print!(", {}", prefix.unwrap_or("NULL"));
     if let Some(uri) = uri {
         println!(", '{uri}')");
     } else {
@@ -1777,7 +1766,7 @@ fn end_element_ns_debug(
     }
 }
 
-static mut DEBUG_SAX2_HANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
+static DEBUG_SAX2_HANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
     internal_subset: Some(internal_subset_debug),
     is_standalone: Some(is_standalone_debug),
     has_internal_subset: Some(has_internal_subset_debug),
@@ -1821,17 +1810,17 @@ unsafe fn test_sax(filename: &str) {
         CALLBACKS.store(0, Ordering::Relaxed);
 
         let handler = if CMD_ARGS.noout {
-            &raw mut EMPTY_SAXHANDLER_STRUCT
+            &raw const EMPTY_SAXHANDLER_STRUCT
         } else {
             #[cfg(feature = "sax1")]
             if CMD_ARGS.sax1 {
-                &raw mut DEBUG_SAXHANDLER_STRUCT
+                &raw const DEBUG_SAXHANDLER_STRUCT
             } else {
-                &raw mut DEBUG_SAX2_HANDLER_STRUCT
+                &raw const DEBUG_SAX2_HANDLER_STRUCT
             }
             #[cfg(not(feature = "sax1"))]
             {
-                &raw mut DEBUG_SAX2_HANDLER_STRUCT
+                &raw const DEBUG_SAX2_HANDLER_STRUCT
             }
         };
 
