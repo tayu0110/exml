@@ -35,9 +35,7 @@ use std::{
     sync::atomic::{AtomicI32, Ordering},
 };
 
-#[cfg(feature = "libxml_push")]
-use libc::INT_MAX;
-use libc::{memcpy, size_t};
+use libc::size_t;
 
 use crate::{
     encoding::{EncodingError, XmlCharEncoding, detect_encoding, find_encoding_handler},
@@ -3531,7 +3529,7 @@ pub fn utf8_to_html(src: &str, dst: &mut [u8]) -> Result<(usize, usize), Encodin
             if write + len + 2 > dst.len() {
                 break;
             }
-            write!(&mut dst[write..], "&{cp};");
+            write!(&mut dst[write..], "&{cp};").ok();
             write += len + 2;
         }
         read += c.len_utf8();
@@ -3542,111 +3540,36 @@ pub fn utf8_to_html(src: &str, dst: &mut [u8]) -> Result<(usize, usize), Encodin
 /// Take a block of UTF-8 chars in and try to convert it to an ASCII
 /// plus HTML entities block of chars out.
 ///
-/// Returns 0 if success, -2 if the transcoding fails, or -1 otherwise.  
-/// The value of @inlen after return is the number of octets consumed
-/// as the return value is positive, else unpredictable.  
-/// The value of @outlen after return is the number of octets consumed.  
+/// Return `(read_bytes, wirte_bytes)`
 #[doc(alias = "htmlEncodeEntities")]
-pub unsafe fn html_encode_entities(
-    mut out: *mut u8,
-    outlen: *mut i32,
-    mut input: *const u8,
-    inlen: *mut i32,
-    quote_char: i32,
-) -> i32 {
-    unsafe {
-        let mut processed: *const u8 = input;
-        let outstart: *const u8 = out;
-        let instart: *const u8 = input;
-        let mut c: u32;
-        let mut d: u32;
-        let mut trailing: i32;
-
-        if out.is_null() || outlen.is_null() || inlen.is_null() || input.is_null() {
-            return -1;
-        }
-        let outend: *const u8 = out.add(*outlen as usize);
-        let inend: *const u8 = input.add(*inlen as usize);
-        while input < inend {
-            d = *input as _;
-            input = input.add(1);
-            if d < 0x80 {
-                c = d;
-                trailing = 0;
-            } else if d < 0xC0 {
-                // trailing byte in leading position
-                *outlen = out.offset_from(outstart) as _;
-                *inlen = processed.offset_from(instart) as _;
-                return -2;
-            } else if d < 0xE0 {
-                c = d & 0x1F;
-                trailing = 1;
-            } else if d < 0xF0 {
-                c = d & 0x0F;
-                trailing = 2;
-            } else if d < 0xF8 {
-                c = d & 0x07;
-                trailing = 3;
-            } else {
-                // no chance for this in Ascii
-                *outlen = out.offset_from(outstart) as _;
-                *inlen = processed.offset_from(instart) as _;
-                return -2;
-            }
-
-            if inend.offset_from(input) < trailing as isize {
+pub fn html_encode_entities(src: &str, dst: &mut [u8], quote_char: Option<char>) -> (usize, usize) {
+    let mut read = 0;
+    let mut write = 0;
+    for c in src.chars() {
+        // assertion: c is a single UTF-4 value
+        if c.len_utf8() == 1 && Some(c) != quote_char && c != '&' && c != '<' && c != '>' {
+            if write == dst.len() {
                 break;
             }
-
-            while trailing != 0 {
-                trailing -= 1;
-                d = *input as _;
-                input = input.add(1);
-                if d & 0xC0 != 0x80 {
-                    *outlen = out.offset_from(outstart) as _;
-                    *inlen = processed.offset_from(instart) as _;
-                    return -2;
-                }
-                c <<= 6;
-                c |= d & 0x3F;
-            }
-
-            // assertion: c is a single UTF-4 value
-            if c < 0x80
-                && c != quote_char as u32
-                && c != '&' as u32
-                && c != '<' as u32
-                && c != '>' as u32
-            {
-                if out >= outend as _ {
-                    break;
-                }
-                *out = c as _;
-                out = out.add(1);
+            dst[write] = c as u8;
+            write += 1;
+        } else {
+            // Try to lookup a predefined HTML entity for it
+            let cp = if let Some(ent) = html_entity_value_lookup(c as u32) {
+                Cow::Borrowed(ent.name)
             } else {
-                // Try to lookup a predefined HTML entity for it
-                let cp = if let Some(ent) = html_entity_value_lookup(c) {
-                    Cow::Borrowed(ent.name)
-                } else {
-                    Cow::Owned(format!("#{c}"))
-                };
-                let len = cp.len();
-                if outend.offset_from(out) < len as isize + 2 {
-                    break;
-                }
-                *out = b'&';
-                out = out.add(1);
-                memcpy(out as _, cp.as_ptr() as _, len as usize);
-                out = out.add(len as usize);
-                *out = b';';
-                out = out.add(1);
+                Cow::Owned(format!("#{}", c as u32))
+            };
+            let len = cp.len();
+            if write + len + 2 > dst.len() {
+                break;
             }
-            processed = input;
+            write!(&mut dst[write..], "&{cp};").ok();
+            write += len + 2;
         }
-        *outlen = out.offset_from(outstart) as _;
-        *inlen = processed.offset_from(instart) as _;
-        0
+        read += c.len_utf8();
     }
+    (read, write)
 }
 
 /// Check if an attribute is of content type Script
@@ -3799,7 +3722,7 @@ fn html_parse_lookup_sequence(
         len -= 1;
     }
     for base in base..len {
-        if base >= INT_MAX as usize / 2 {
+        if base >= i32::MAX as usize / 2 {
             ctxt.check_index = 0;
             ctxt.end_check_state = 0;
             return base as i32 - 2;
@@ -5034,62 +4957,6 @@ mod tests {
     use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
-
-    #[test]
-    fn test_html_encode_entities() {
-        #[cfg(feature = "html")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_out in 0..GEN_NB_UNSIGNED_CHAR_PTR {
-                for n_outlen in 0..GEN_NB_INT_PTR {
-                    for n_in in 0..GEN_NB_CONST_UNSIGNED_CHAR_PTR {
-                        for n_inlen in 0..GEN_NB_INT_PTR {
-                            for n_quote_char in 0..GEN_NB_INT {
-                                let mem_base = xml_mem_blocks();
-                                let out = gen_unsigned_char_ptr(n_out, 0);
-                                let outlen = gen_int_ptr(n_outlen, 1);
-                                let input = gen_const_unsigned_char_ptr(n_in, 2);
-                                let inlen = gen_int_ptr(n_inlen, 3);
-                                let quote_char = gen_int(n_quote_char, 4);
-
-                                let ret_val = html_encode_entities(
-                                    out,
-                                    outlen,
-                                    input as *const u8,
-                                    inlen,
-                                    quote_char,
-                                );
-                                desret_int(ret_val);
-                                des_unsigned_char_ptr(n_out, out, 0);
-                                des_int_ptr(n_outlen, outlen, 1);
-                                des_const_unsigned_char_ptr(n_in, input as *const u8, 2);
-                                des_int_ptr(n_inlen, inlen, 3);
-                                des_int(n_quote_char, quote_char, 4);
-                                reset_last_error();
-                                if mem_base != xml_mem_blocks() {
-                                    leaks += 1;
-                                    eprint!(
-                                        "Leak of {} blocks found in htmlEncodeEntities",
-                                        xml_mem_blocks() - mem_base
-                                    );
-                                    eprint!(" {}", n_out);
-                                    eprint!(" {}", n_outlen);
-                                    eprint!(" {}", n_in);
-                                    eprint!(" {}", n_inlen);
-                                    eprintln!(" {}", n_quote_char);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in htmlEncodeEntities()"
-            );
-        }
-    }
 
     #[test]
     fn test_html_handle_omitted_elem() {

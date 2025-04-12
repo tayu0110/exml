@@ -74,10 +74,6 @@ use exml::{
     uri::{XmlURI, build_uri, normalize_uri_path},
     xpath::XmlXPathObjectPtr,
 };
-#[cfg(feature = "libxml_push")]
-use libc::size_t;
-#[cfg(feature = "html")]
-use libc::strlen;
 use libc::{free, malloc, memcpy};
 
 /// pseudo flag for the unification of HTML and XML tests
@@ -1121,40 +1117,25 @@ fn htmlstart_element_debug(
     name: &str,
     atts: &[(String, Option<String>)],
 ) {
-    unsafe {
-        use exml::html::parser::html_encode_entities;
+    use exml::html::parser::html_encode_entities;
 
-        sax_debug!("SAX.startElement({name}");
-        for (key, value) in atts {
-            sax_debug!(", {key}");
-            if let Some(value) = value {
-                let value = CString::new(value.as_str()).unwrap();
-                let mut output: [u8; 40] = [0; 40];
-                let mut att = value.as_ptr() as *const u8;
-                let mut outlen: usize;
-                let mut attlen: usize;
-                sax_debug!("='");
-                while {
-                    attlen = strlen(att as *mut c_char);
-                    attlen > 0
-                } {
-                    outlen = output.len() - 1;
-                    html_encode_entities(
-                        output.as_mut_ptr(),
-                        addr_of_mut!(outlen) as _,
-                        att,
-                        addr_of_mut!(attlen) as _,
-                        b'\'' as _,
-                    );
-                    output[outlen] = 0;
-                    sax_debug!("{}", CStr::from_ptr(output.as_ptr() as _).to_string_lossy());
-                    att = att.add(attlen);
-                }
-                sax_debug!("'");
+    sax_debug!("SAX.startElement({name}");
+    for (key, value) in atts {
+        sax_debug!(", {key}");
+        if let Some(value) = value {
+            let mut output = [0; 40];
+            let mut att = value.as_str();
+
+            sax_debug!("='");
+            while !att.is_empty() {
+                let (read, write) = html_encode_entities(att, &mut output, Some('\''));
+                sax_debug!("{}", from_utf8(&output[..write]).unwrap());
+                att = &att[read..];
             }
+            sax_debug!("'");
         }
-        sax_debugln!(")");
     }
+    sax_debugln!(")");
 }
 
 /// receiving some chars from the parser.
@@ -1162,32 +1143,18 @@ fn htmlstart_element_debug(
 #[doc(alias = "htmlcharactersDebug")]
 #[cfg(feature = "html")]
 fn htmlcharacters_debug(_ctx: &mut XmlParserCtxt, ch: &str) {
-    unsafe {
-        use std::ffi::c_uchar;
+    use exml::html::parser::html_encode_entities;
 
-        use exml::html::parser::html_encode_entities;
+    let len = ch.len();
+    let mut output = [0; 30];
 
-        let len = ch.len();
-        let mut output: [c_uchar; 40] = [0; 40];
-        let mut inlen: i32 = len as i32;
-        let mut outlen: usize = 30;
-        let ch = CString::new(ch).unwrap();
+    let (_, write) = html_encode_entities(ch, &mut output, None);
 
-        html_encode_entities(
-            output.as_mut_ptr(),
-            addr_of_mut!(outlen) as _,
-            ch.as_ptr() as *const u8,
-            addr_of_mut!(inlen),
-            0,
-        );
-        output[outlen] = 0;
-
-        sax_debugln!(
-            "SAX.characters({}, {})",
-            CStr::from_ptr(output.as_ptr() as _).to_string_lossy(),
-            len
-        );
-    }
+    sax_debugln!(
+        "SAX.characters({}, {})",
+        from_utf8(&output[..write]).unwrap(),
+        len
+    );
 }
 
 /// receiving some cdata chars from the parser.
@@ -1195,32 +1162,18 @@ fn htmlcharacters_debug(_ctx: &mut XmlParserCtxt, ch: &str) {
 #[doc(alias = "htmlcdataDebug")]
 #[cfg(feature = "html")]
 fn htmlcdata_debug(_ctx: &mut XmlParserCtxt, ch: &str) {
-    unsafe {
-        use std::ffi::c_uchar;
+    use exml::html::parser::html_encode_entities;
 
-        use exml::html::parser::html_encode_entities;
+    let len = ch.len();
+    let mut output = [0; 30];
 
-        let len = ch.len();
-        let mut output: [c_uchar; 40] = [0; 40];
-        let mut inlen: i32 = len as i32;
-        let mut outlen: usize = 30;
-        let ch = CString::new(ch).unwrap();
+    let (_, write) = html_encode_entities(ch, &mut output, None);
 
-        html_encode_entities(
-            output.as_mut_ptr(),
-            addr_of_mut!(outlen) as _,
-            ch.as_ptr() as *const u8,
-            addr_of_mut!(inlen),
-            0,
-        );
-        output[outlen] = 0;
-
-        sax_debugln!(
-            "SAX.cdata({}, {})",
-            CStr::from_ptr(output.as_ptr() as _).to_string_lossy(),
-            len
-        );
-    }
+    sax_debugln!(
+        "SAX.cdata({}, {})",
+        from_utf8(&output[..write]).unwrap(),
+        len
+    );
 }
 
 #[cfg(feature = "html")]
@@ -2085,7 +2038,7 @@ unsafe fn push_boundary_test(
                 && consumed >= 4
                 && consumed != old_consumed
             {
-                let mut max: size_t = 0;
+                let mut max = 0;
 
                 avail = ctxt.content_bytes().len() as u64;
 
