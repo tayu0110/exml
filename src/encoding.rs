@@ -485,28 +485,9 @@ fn decode_html(_src: &[u8], _dst: &mut str) -> Result<(usize, usize), EncodingEr
 
 #[cfg(feature = "html")]
 fn encode_html(src: &str, dst: &mut [u8]) -> Result<(usize, usize), EncodingError> {
-    use std::ptr::addr_of_mut;
-
     use crate::html::parser::utf8_to_html;
 
-    let mut outlen = dst.len() as i32;
-    let out = dst.as_mut_ptr();
-    let mut inlen = src.len() as i32;
-    let input = src.as_ptr();
-
-    let res = unsafe { utf8_to_html(out, addr_of_mut!(outlen), input, addr_of_mut!(inlen)) };
-    match res {
-        0 => Ok((inlen as usize, outlen as usize)),
-        -2 => Err(EncodingError::Unmappable {
-            read: inlen as usize,
-            write: outlen as usize,
-            c: src[inlen as usize..].chars().next().unwrap(),
-        }),
-        -1 => Err(EncodingError::Other {
-            msg: "Unknown Error in encode_html".into(),
-        }),
-        _ => unreachable!(),
-    }
+    utf8_to_html(src, dst)
 }
 
 fn encode_utf16(src: &str, dst: &mut [u8]) -> Result<(usize, usize), EncodingError> {

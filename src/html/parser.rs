@@ -27,7 +27,7 @@ use std::{
     borrow::Cow,
     cell::RefCell,
     ffi::CStr,
-    io::Read,
+    io::{Read, Write},
     mem::take,
     ptr::{addr_of_mut, null_mut},
     rc::Rc,
@@ -40,7 +40,7 @@ use libc::INT_MAX;
 use libc::{memcpy, size_t};
 
 use crate::{
-    encoding::{XmlCharEncoding, detect_encoding, find_encoding_handler},
+    encoding::{EncodingError, XmlCharEncoding, detect_encoding, find_encoding_handler},
     error::{
         __xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors, parser_validity_error,
         parser_validity_warning,
@@ -3507,112 +3507,36 @@ pub unsafe fn html_parse_file(filename: &str, encoding: Option<&str>) -> Option<
 /// Take a block of UTF-8 chars in and try to convert it to an ASCII
 /// plus HTML entities block of chars out.
 ///
-/// Returns 0 if success, -2 if the transcoding fails, or -1 otherwise.  
-/// The value of @inlen after return is the number of octets consumed
-/// as the return value is positive, else unpredictable.  
-/// The value of @outlen after return is the number of octets consumed.
+/// This function always returns `Ok((read_bytes, write_bytes))`.
 #[doc(alias = "UTF8ToHtml")]
-pub unsafe fn utf8_to_html(
-    mut out: *mut u8,
-    outlen: *mut i32,
-    mut input: *const u8,
-    inlen: *mut i32,
-) -> i32 {
-    unsafe {
-        let mut processed: *const u8 = input;
-        let outstart: *const u8 = out;
-        let instart: *const u8 = input;
-        let mut c: u32;
-        let mut d: u32;
-        let mut trailing: i32;
-
-        if out.is_null() || outlen.is_null() || inlen.is_null() {
-            return -1;
-        }
-        if input.is_null() {
-            // initialization nothing to do
-            *outlen = 0;
-            *inlen = 0;
-            return 0;
-        }
-        let inend: *const u8 = input.add(*inlen as usize);
-        let outend: *const u8 = out.add(*outlen as usize);
-        while input < inend {
-            d = *input as _;
-            input = input.add(1);
-            if d < 0x80 {
-                c = d;
-                trailing = 0;
-            } else if d < 0xC0 {
-                // trailing byte in leading position
-                *outlen = out.offset_from(outstart) as _;
-                *inlen = processed.offset_from(instart) as _;
-                return -2;
-            } else if d < 0xE0 {
-                c = d & 0x1F;
-                trailing = 1;
-            } else if d < 0xF0 {
-                c = d & 0x0F;
-                trailing = 2;
-            } else if d < 0xF8 {
-                c = d & 0x07;
-                trailing = 3;
-            } else {
-                // no chance for this in Ascii
-                *outlen = out.offset_from(outstart) as _;
-                *inlen = processed.offset_from(instart) as _;
-                return -2;
-            }
-
-            if inend.offset_from(input) < trailing as isize {
+pub fn utf8_to_html(src: &str, dst: &mut [u8]) -> Result<(usize, usize), EncodingError> {
+    let mut read = 0;
+    let mut write = 0;
+    for c in src.chars() {
+        // assertion: c is a single UTF-4 value
+        if c.len_utf8() == 1 {
+            if write == dst.len() {
                 break;
             }
-
-            while trailing != 0 {
-                if input >= inend || {
-                    d = *input as _;
-                    input = input.add(1);
-                    d & 0xC0 != 0x80
-                } {
-                    break;
-                }
-                c <<= 6;
-                c |= d & 0x3F;
-                trailing -= 1;
-            }
-
-            // assertion: c is a single UTF-4 value
-            if c < 0x80 {
-                if out.add(1) >= outend as _ {
-                    break;
-                }
-                *out = c as _;
-                out = out.add(1);
+            dst[write] = c as u8;
+            write += 1;
+        } else {
+            // Try to lookup a predefined HTML entity for it
+            let cp = if let Some(ent) = html_entity_value_lookup(c as u32) {
+                Cow::Borrowed(ent.name)
             } else {
-                // Try to lookup a predefined HTML entity for it
-
-                let cp = if let Some(ent) = html_entity_value_lookup(c) {
-                    Cow::Borrowed(ent.name)
-                } else {
-                    Cow::Owned(format!("#{c}"))
-                };
-                let len = cp.len();
-                if out.add(2 + len as usize) >= outend as _ {
-                    break;
-                }
-                *out = b'&';
-                out = out.add(1);
-                memcpy(out as _, cp.as_ptr() as _, len as usize);
-                out = out.add(len as usize);
-                *out = b';';
-                out = out.add(1);
+                Cow::Owned(format!("#{}", c as u32))
+            };
+            let len = cp.len();
+            if write + len + 2 > dst.len() {
+                break;
             }
-            processed = input;
+            write!(&mut dst[write..], "&{cp};");
+            write += len + 2;
         }
-        *outlen = out.offset_from(outstart) as _;
-        *inlen = processed.offset_from(instart) as _;
-        0
+        read += c.len_utf8();
     }
+    Ok((read, write))
 }
 
 /// Take a block of UTF-8 chars in and try to convert it to an ASCII
