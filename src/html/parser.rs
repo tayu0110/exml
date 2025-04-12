@@ -502,162 +502,157 @@ fn html_current_char(ctxt: &mut XmlParserCtxt, len: &mut i32) -> i32 {
 }
 
 #[doc(alias = "htmlParseNameComplex")]
-unsafe fn html_parse_name_complex(ctxt: &mut XmlParserCtxt) -> Option<String> {
-    unsafe {
-        let mut l: i32 = 0;
-        let mut c: i32;
-        let max_length = if ctxt.options & XmlParserOption::XmlParseHuge as i32 != 0 {
-            XML_MAX_TEXT_LENGTH
-        } else {
-            XML_MAX_NAME_LENGTH
-        };
-        let charset = ctxt.charset;
+fn html_parse_name_complex(ctxt: &mut XmlParserCtxt) -> Option<String> {
+    let mut l: i32 = 0;
+    let mut c: i32;
+    let max_length = if ctxt.options & XmlParserOption::XmlParseHuge as i32 != 0 {
+        XML_MAX_TEXT_LENGTH
+    } else {
+        XML_MAX_NAME_LENGTH
+    };
+    let charset = ctxt.charset;
 
-        // Handler for more complex cases
-        c = html_current_char(ctxt, &mut l);
-        if c == b' ' as i32
-            || c == b'>' as i32
-            || c == b'/' as i32
-            || (!xml_is_letter(c as u32) && c != b'_' as i32 && c != b':' as i32)
-        {
-            return None;
-        }
-
-        let mut ret = String::new();
-        while c != b' ' as i32
-            && c != b'>' as i32
-            && c != b'/' as i32
-            && (xml_is_letter(c as u32)
-                || xml_is_digit(c as u32)
-                || c == b'.' as i32
-                || c == b'-' as i32
-                || c == b'_' as i32
-                || c == b':' as i32
-                || xml_is_combining(c as u32)
-                || xml_is_extender(c as u32))
-        {
-            ret.push(char::from_u32(c as u32).unwrap());
-            if ret.len() > max_length {
-                html_parse_err(
-                    Some(ctxt),
-                    XmlParserErrors::XmlErrNameTooLong,
-                    "name too long",
-                    None,
-                    None,
-                );
-                return None;
-            }
-            ctxt.advance_with_line_handling(l as usize);
-            ctxt.token = 0;
-            c = html_current_char(ctxt, &mut l);
-            if ctxt.charset != charset {
-                // I think this process is buggy, but I'll hold off on the original code...
-                // The pointer that has been advanced is not rewound and begins reading again,
-                // so the text read before reaching this point is ignored.
-
-                // We changed encoding from an unknown encoding
-                // Input buffer changed location, so we better start again
-                return html_parse_name_complex(ctxt);
-            }
-        }
-        if matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
-            return None;
-        }
-
-        Some(ret)
+    // Handler for more complex cases
+    c = html_current_char(ctxt, &mut l);
+    if c == b' ' as i32
+        || c == b'>' as i32
+        || c == b'/' as i32
+        || (!xml_is_letter(c as u32) && c != b'_' as i32 && c != b':' as i32)
+    {
+        return None;
     }
+
+    let mut ret = String::new();
+    while c != b' ' as i32
+        && c != b'>' as i32
+        && c != b'/' as i32
+        && (xml_is_letter(c as u32)
+            || xml_is_digit(c as u32)
+            || c == b'.' as i32
+            || c == b'-' as i32
+            || c == b'_' as i32
+            || c == b':' as i32
+            || xml_is_combining(c as u32)
+            || xml_is_extender(c as u32))
+    {
+        ret.push(char::from_u32(c as u32).unwrap());
+        if ret.len() > max_length {
+            html_parse_err(
+                Some(ctxt),
+                XmlParserErrors::XmlErrNameTooLong,
+                "name too long",
+                None,
+                None,
+            );
+            return None;
+        }
+        ctxt.advance_with_line_handling(l as usize);
+        ctxt.token = 0;
+        c = html_current_char(ctxt, &mut l);
+        if ctxt.charset != charset {
+            // I think this process is buggy, but I'll hold off on the original code...
+            // The pointer that has been advanced is not rewound and begins reading again,
+            // so the text read before reaching this point is ignored.
+
+            // We changed encoding from an unknown encoding
+            // Input buffer changed location, so we better start again
+            return html_parse_name_complex(ctxt);
+        }
+    }
+    if matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
+        return None;
+    }
+
+    Some(ret)
 }
 
 /// Parse an HTML name, this routine is case sensitive.
 ///
 /// Returns the Name parsed or NULL
 #[doc(alias = "htmlParseName")]
-unsafe fn html_parse_name(ctxt: &mut HtmlParserCtxt) -> Option<String> {
-    unsafe {
-        ctxt.grow();
+fn html_parse_name(ctxt: &mut HtmlParserCtxt) -> Option<String> {
+    ctxt.grow();
 
-        // Accelerator for simple ASCII names
-        let mut input = ctxt.content_bytes();
-        if !input.is_empty() && (input[0].is_ascii_alphabetic() || matches!(input[0], b'_' | b':'))
-        {
-            input = &input[1..];
-            // +1 : first character stripped the above
-            let count = input
-                .iter()
-                .position(|&b| {
-                    !b.is_ascii_alphanumeric() && !matches!(b, b'_' | b'-' | b':' | b'.')
-                })
-                .unwrap_or(input.len())
-                + 1;
+    // Accelerator for simple ASCII names
+    let mut input = ctxt.content_bytes();
+    if !input.is_empty() && (input[0].is_ascii_alphabetic() || matches!(input[0], b'_' | b':')) {
+        input = &input[1..];
+        // +1 : first character stripped the above
+        let count = input
+            .iter()
+            .position(|&b| !b.is_ascii_alphanumeric() && !matches!(b, b'_' | b'-' | b':' | b'.'))
+            .unwrap_or(input.len())
+            + 1;
 
-            if count == ctxt.content_bytes().len() {
-                return None;
-            }
+        if count == ctxt.content_bytes().len() {
+            return None;
+        }
 
-            if (0x01..0x80).contains(&ctxt.content_bytes()[count]) {
+        if (0x01..0x80).contains(&ctxt.content_bytes()[count]) {
+            let ret = unsafe {
                 // # Safety
                 // `ctxt.content_bytes()[..count]` only contains ASCII alphanumeric, '_', '-', ':' or '.'.
                 // Therefore, UTF-8 validation won't fail.
-                let ret = String::from_utf8_unchecked(ctxt.content_bytes()[..count].to_vec());
-                ctxt.input_mut().unwrap().cur += count;
-                ctxt.input_mut().unwrap().col += count as i32;
-                return Some(ret);
-            }
+                String::from_utf8_unchecked(ctxt.content_bytes()[..count].to_vec())
+            };
+            ctxt.input_mut().unwrap().cur += count;
+            ctxt.input_mut().unwrap().col += count as i32;
+            return Some(ret);
         }
-        html_parse_name_complex(ctxt)
     }
+    html_parse_name_complex(ctxt)
 }
 
 /// Parse an HTML ENTITY references
 ///
+/// ```text
 /// [68] EntityRef ::= b'&' Name ';'
+/// ```
 ///
 /// Returns the associated htmlEntityDescPtr if found, or NULL otherwise,
 ///         if non-NULL *str will have to be freed by the caller.
 #[doc(alias = "htmlParseEntityRef")]
-pub(crate) unsafe fn html_parse_entity_ref(
+pub(crate) fn html_parse_entity_ref(
     ctxt: &mut HtmlParserCtxt,
     str: &mut Option<String>,
 ) -> Option<&'static HtmlEntityDesc> {
-    unsafe {
-        *str = None;
-        ctxt.input()?;
+    *str = None;
+    ctxt.input()?;
 
-        let mut ent = None;
-        if ctxt.current_byte() == b'&' {
-            ctxt.skip_char();
-            if let Some(name) = html_parse_name(ctxt) {
-                ctxt.grow();
-                if ctxt.current_byte() == b';' {
-                    // Lookup the entity in the table.
-                    ent = html_entity_lookup(&name);
-                    if ent.is_some() {
-                        // OK that's ugly !!!
-                        ctxt.skip_char();
-                    }
-                    *str = Some(name);
-                } else {
-                    html_parse_err(
-                        Some(ctxt),
-                        XmlParserErrors::XmlErrEntityRefSemicolMissing,
-                        "htmlParseEntityRef: expecting ';'\n",
-                        None,
-                        None,
-                    );
-                    *str = Some(name);
+    let mut ent = None;
+    if ctxt.current_byte() == b'&' {
+        ctxt.skip_char();
+        if let Some(name) = html_parse_name(ctxt) {
+            ctxt.grow();
+            if ctxt.current_byte() == b';' {
+                // Lookup the entity in the table.
+                ent = html_entity_lookup(&name);
+                if ent.is_some() {
+                    // OK that's ugly !!!
+                    ctxt.skip_char();
                 }
+                *str = Some(name);
             } else {
                 html_parse_err(
                     Some(ctxt),
-                    XmlParserErrors::XmlErrNameRequired,
-                    "htmlParseEntityRef: no name\n",
+                    XmlParserErrors::XmlErrEntityRefSemicolMissing,
+                    "htmlParseEntityRef: expecting ';'\n",
                     None,
                     None,
                 );
+                *str = Some(name);
             }
+        } else {
+            html_parse_err(
+                Some(ctxt),
+                XmlParserErrors::XmlErrNameRequired,
+                "htmlParseEntityRef: no name\n",
+                None,
+                None,
+            );
         }
-        ent
     }
+    ent
 }
 
 /// Parse Reference declarations
@@ -2411,116 +2406,114 @@ fn html_skip_bogus_comment(ctxt: &mut HtmlParserCtxt) {
 ///
 /// `[16] PI ::= b'<?' PITarget (S (Char* - (Char* '?>' Char*)))? '?>'`
 #[doc(alias = "xmlParsePI")]
-unsafe fn html_parse_pi(ctxt: &mut HtmlParserCtxt) {
-    unsafe {
-        let mut cur: i32;
-        let mut l: i32 = 0;
-        let max_length = if ctxt.options & XmlParserOption::XmlParseHuge as i32 != 0 {
-            XML_MAX_HUGE_LENGTH
-        } else {
-            XML_MAX_TEXT_LENGTH
-        };
-        let state: XmlParserInputState;
+fn html_parse_pi(ctxt: &mut HtmlParserCtxt) {
+    let mut cur: i32;
+    let mut l: i32 = 0;
+    let max_length = if ctxt.options & XmlParserOption::XmlParseHuge as i32 != 0 {
+        XML_MAX_HUGE_LENGTH
+    } else {
+        XML_MAX_TEXT_LENGTH
+    };
+    let state: XmlParserInputState;
 
-        if ctxt.token == 0 && ctxt.content_bytes().starts_with(b"<?") {
-            state = ctxt.instate;
-            ctxt.instate = XmlParserInputState::XmlParserPI;
-            // this is a Processing Instruction.
-            ctxt.advance(2);
+    if ctxt.token == 0 && ctxt.content_bytes().starts_with(b"<?") {
+        state = ctxt.instate;
+        ctxt.instate = XmlParserInputState::XmlParserPI;
+        // this is a Processing Instruction.
+        ctxt.advance(2);
 
-            // Parse the target name and check for special support like namespace.
-            if let Some(target) = html_parse_name(ctxt) {
-                if ctxt.token == 0 && ctxt.current_byte() == b'>' {
-                    ctxt.advance(1);
+        // Parse the target name and check for special support like namespace.
+        if let Some(target) = html_parse_name(ctxt) {
+            if ctxt.token == 0 && ctxt.current_byte() == b'>' {
+                ctxt.advance(1);
 
-                    // SAX: PI detected.
-                    if ctxt.disable_sax == 0 {
-                        if let Some(processing_instruction) = ctxt
-                            .sax
-                            .as_deref_mut()
-                            .and_then(|sax| sax.processing_instruction)
-                        {
-                            processing_instruction(ctxt, &target, None);
-                        }
-                    }
-                    ctxt.instate = state;
-                    return;
-                }
-                let mut buf = String::new();
-                cur = ctxt.current_byte() as _;
-                if !xml_is_blank_char(cur as u32) {
-                    html_parse_err(
-                        Some(ctxt),
-                        XmlParserErrors::XmlErrSpaceRequired,
-                        format!("ParsePI: PI {target} space expected\n").as_str(),
-                        Some(&target),
-                        None,
-                    );
-                }
-                html_skip_blank_chars(ctxt);
-                cur = html_current_char(ctxt, &mut l);
-                while cur != 0 && cur != b'>' as i32 {
-                    if xml_is_char(cur as u32) {
-                        buf.push(char::from_u32(cur as u32).unwrap());
-                    } else {
-                        html_parse_err_int!(
-                            ctxt,
-                            XmlParserErrors::XmlErrInvalidChar,
-                            "Invalid char in processing instruction 0x{:X}\n",
-                            cur
-                        );
-                    }
-                    if buf.len() > max_length {
-                        html_parse_err(
-                            Some(ctxt),
-                            XmlParserErrors::XmlErrPINotFinished,
-                            format!("PI {target} too long").as_str(),
-                            Some(&target),
-                            None,
-                        );
-                        ctxt.instate = state;
-                        return;
-                    }
-                    ctxt.advance_with_line_handling(l as usize);
-                    ctxt.token = 0;
-                    cur = html_current_char(ctxt, &mut l);
-                }
-                if matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
-                    return;
-                }
-                if cur != b'>' as i32 {
-                    html_parse_err(
-                        Some(ctxt),
-                        XmlParserErrors::XmlErrPINotFinished,
-                        format!("ParsePI: PI {target} never end ...\n").as_str(),
-                        Some(&target),
-                        None,
-                    );
-                } else {
-                    ctxt.advance(1);
-
-                    // SAX: PI detected.
-                    if ctxt.disable_sax == 0 {
-                        if let Some(processing_instruction) = ctxt
-                            .sax
-                            .as_deref_mut()
-                            .and_then(|sax| sax.processing_instruction)
-                        {
-                            processing_instruction(ctxt, &target, Some(&buf));
-                        }
+                // SAX: PI detected.
+                if ctxt.disable_sax == 0 {
+                    if let Some(processing_instruction) = ctxt
+                        .sax
+                        .as_deref_mut()
+                        .and_then(|sax| sax.processing_instruction)
+                    {
+                        processing_instruction(ctxt, &target, None);
                     }
                 }
-            } else {
+                ctxt.instate = state;
+                return;
+            }
+            let mut buf = String::new();
+            cur = ctxt.current_byte() as _;
+            if !xml_is_blank_char(cur as u32) {
                 html_parse_err(
                     Some(ctxt),
-                    XmlParserErrors::XmlErrPINotStarted,
-                    "PI is not started correctly",
-                    None,
+                    XmlParserErrors::XmlErrSpaceRequired,
+                    format!("ParsePI: PI {target} space expected\n").as_str(),
+                    Some(&target),
                     None,
                 );
             }
-            ctxt.instate = state;
+            html_skip_blank_chars(ctxt);
+            cur = html_current_char(ctxt, &mut l);
+            while cur != 0 && cur != b'>' as i32 {
+                if xml_is_char(cur as u32) {
+                    buf.push(char::from_u32(cur as u32).unwrap());
+                } else {
+                    html_parse_err_int!(
+                        ctxt,
+                        XmlParserErrors::XmlErrInvalidChar,
+                        "Invalid char in processing instruction 0x{:X}\n",
+                        cur
+                    );
+                }
+                if buf.len() > max_length {
+                    html_parse_err(
+                        Some(ctxt),
+                        XmlParserErrors::XmlErrPINotFinished,
+                        format!("PI {target} too long").as_str(),
+                        Some(&target),
+                        None,
+                    );
+                    ctxt.instate = state;
+                    return;
+                }
+                ctxt.advance_with_line_handling(l as usize);
+                ctxt.token = 0;
+                cur = html_current_char(ctxt, &mut l);
+            }
+            if matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
+                return;
+            }
+            if cur != b'>' as i32 {
+                html_parse_err(
+                    Some(ctxt),
+                    XmlParserErrors::XmlErrPINotFinished,
+                    format!("ParsePI: PI {target} never end ...\n").as_str(),
+                    Some(&target),
+                    None,
+                );
+            } else {
+                ctxt.advance(1);
+
+                // SAX: PI detected.
+                if ctxt.disable_sax == 0 {
+                    if let Some(processing_instruction) = ctxt
+                        .sax
+                        .as_deref_mut()
+                        .and_then(|sax| sax.processing_instruction)
+                    {
+                        processing_instruction(ctxt, &target, Some(&buf));
+                    }
+                }
+            }
+        } else {
+            html_parse_err(
+                Some(ctxt),
+                XmlParserErrors::XmlErrPINotStarted,
+                "PI is not started correctly",
+                None,
+                None,
+            );
         }
+        ctxt.instate = state;
     }
 }
 
@@ -2566,22 +2559,66 @@ fn html_check_paragraph(ctxt: &mut HtmlParserCtxt) -> i32 {
 /// Parse and handle entity references in content,
 /// this will end-up in a call to character() since this is either a CharRef, or a predefined entity.
 #[doc(alias = "htmlParseReference")]
-unsafe fn html_parse_reference(ctxt: &mut HtmlParserCtxt) {
-    unsafe {
-        let mut out: [XmlChar; 6] = [0; 6];
-        if ctxt.current_byte() != b'&' {
+fn html_parse_reference(ctxt: &mut HtmlParserCtxt) {
+    let mut out: [XmlChar; 6] = [0; 6];
+    if ctxt.current_byte() != b'&' {
+        return;
+    }
+
+    if ctxt.nth_byte(1) == b'#' {
+        let mut bits: i32;
+        let mut i: i32 = 0;
+
+        let c: u32 = html_parse_char_ref(ctxt) as _;
+        if c == 0 {
             return;
         }
 
-        if ctxt.nth_byte(1) == b'#' {
+        if c < 0x80 {
+            out[i as usize] = c as _;
+            i += 1;
+            bits = -6;
+        } else if c < 0x800 {
+            out[i as usize] = ((c >> 6) & 0x1F) as u8 | 0xC0;
+            i += 1;
+            bits = 0;
+        } else if c < 0x10000 {
+            out[i as usize] = ((c >> 12) & 0x0F) as u8 | 0xE0;
+            i += 1;
+            bits = 6;
+        } else {
+            out[i as usize] = ((c >> 18) & 0x07) as u8 | 0xF0;
+            i += 1;
+            bits = 12;
+        }
+
+        while bits >= 0 {
+            out[i as usize] = ((c >> bits) & 0x3F) as u8 | 0x80;
+            i += 1;
+            bits -= 6;
+        }
+        out[i as usize] = 0;
+
+        html_check_paragraph(ctxt);
+        if let Some(characters) = ctxt.sax.as_deref_mut().and_then(|sax| sax.characters) {
+            let s = from_utf8(&out[..i as usize]).expect("Internal Error");
+            characters(&mut *ctxt, s);
+        }
+    } else {
+        let mut name = None;
+        let ent = html_parse_entity_ref(ctxt, &mut name);
+        let Some(name) = name else {
+            html_check_paragraph(ctxt);
+            if let Some(characters) = ctxt.sax.as_deref_mut().and_then(|sax| sax.characters) {
+                characters(&mut *ctxt, "&");
+            }
+            return;
+        };
+        if let Some(ent) = ent.filter(|ent| ent.value != 0) {
             let mut bits: i32;
             let mut i: i32 = 0;
 
-            let c: u32 = html_parse_char_ref(ctxt) as _;
-            if c == 0 {
-                return;
-            }
-
+            let c: u32 = ent.value;
             if c < 0x80 {
                 out[i as usize] = c as _;
                 i += 1;
@@ -2613,57 +2650,11 @@ unsafe fn html_parse_reference(ctxt: &mut HtmlParserCtxt) {
                 characters(&mut *ctxt, s);
             }
         } else {
-            let mut name = None;
-            let ent = html_parse_entity_ref(ctxt, &mut name);
-            let Some(name) = name else {
-                html_check_paragraph(ctxt);
-                if let Some(characters) = ctxt.sax.as_deref_mut().and_then(|sax| sax.characters) {
-                    characters(&mut *ctxt, "&");
-                }
-                return;
-            };
-            if let Some(ent) = ent.filter(|ent| ent.value != 0) {
-                let mut bits: i32;
-                let mut i: i32 = 0;
-
-                let c: u32 = ent.value;
-                if c < 0x80 {
-                    out[i as usize] = c as _;
-                    i += 1;
-                    bits = -6;
-                } else if c < 0x800 {
-                    out[i as usize] = ((c >> 6) & 0x1F) as u8 | 0xC0;
-                    i += 1;
-                    bits = 0;
-                } else if c < 0x10000 {
-                    out[i as usize] = ((c >> 12) & 0x0F) as u8 | 0xE0;
-                    i += 1;
-                    bits = 6;
-                } else {
-                    out[i as usize] = ((c >> 18) & 0x07) as u8 | 0xF0;
-                    i += 1;
-                    bits = 12;
-                }
-
-                while bits >= 0 {
-                    out[i as usize] = ((c >> bits) & 0x3F) as u8 | 0x80;
-                    i += 1;
-                    bits -= 6;
-                }
-                out[i as usize] = 0;
-
-                html_check_paragraph(ctxt);
-                if let Some(characters) = ctxt.sax.as_deref_mut().and_then(|sax| sax.characters) {
-                    let s = from_utf8(&out[..i as usize]).expect("Internal Error");
-                    characters(&mut *ctxt, s);
-                }
-            } else {
-                html_check_paragraph(ctxt);
-                if let Some(characters) = ctxt.sax.as_deref_mut().and_then(|sax| sax.characters) {
-                    characters(&mut *ctxt, "&");
-                    characters(&mut *ctxt, &name);
-                    // (*ctxt.sax).characters(ctxt.userData,  c";".as_ptr() as _, 1);
-                }
+            html_check_paragraph(ctxt);
+            if let Some(characters) = ctxt.sax.as_deref_mut().and_then(|sax| sax.characters) {
+                characters(&mut *ctxt, "&");
+                characters(&mut *ctxt, &name);
+                // (*ctxt.sax).characters(ctxt.userData,  c";".as_ptr() as _, 1);
             }
         }
     }
