@@ -37,11 +37,7 @@ use exml::debug_xml::{xml_debug_dump_document, xml_debug_dump_entities, xml_shel
 use exml::html::parser::{html_create_push_parser_ctxt, html_parse_chunk};
 #[cfg(feature = "html")]
 use exml::html::{
-    HtmlParserCtxtPtr,
-    parser::{
-        HtmlParserOption, html_ctxt_use_options, html_free_parser_ctxt, html_read_file,
-        html_read_memory,
-    },
+    parser::{HtmlParserOption, html_ctxt_use_options, html_read_file, html_read_memory},
     tree::{html_doc_dump, html_save_file_format},
 };
 #[cfg(feature = "catalog")]
@@ -87,10 +83,10 @@ use exml::{
     },
     parser::{
         XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SAX2_MAGIC, XmlExternalEntityLoader, XmlParserCtxt,
-        XmlParserCtxtPtr, XmlParserInput, XmlParserOption, XmlSAXHandler, XmlSAXLocator,
-        xml_cleanup_parser, xml_ctxt_read_file, xml_ctxt_read_io, xml_ctxt_read_memory,
-        xml_free_parser_ctxt, xml_get_external_entity_loader, xml_no_net_external_entity_loader,
-        xml_parse_dtd, xml_read_file, xml_read_io, xml_read_memory, xml_set_external_entity_loader,
+        XmlParserInput, XmlParserOption, XmlSAXHandler, XmlSAXLocator, xml_cleanup_parser,
+        xml_ctxt_read_file, xml_ctxt_read_io, xml_ctxt_read_memory, xml_get_external_entity_loader,
+        xml_no_net_external_entity_loader, xml_parse_dtd, xml_read_file, xml_read_io,
+        xml_read_memory, xml_set_external_entity_loader,
     },
     relaxng::{
         xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt, xml_relaxng_new_parser_ctxt,
@@ -98,11 +94,10 @@ use exml::{
     },
     save::{XmlSaveCtxt, XmlSaveOption},
     tree::{
-        NodeCommon, XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDoc,
-        XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElementContent, XmlElementPtr, XmlElementTypeVal,
-        XmlEntity, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlGenericNodePtr, XmlNode,
-        XmlNodePtr, XmlNsPtr, xml_copy_doc, xml_encode_entities_reentrant, xml_free_doc,
-        xml_free_dtd, xml_new_doc, xml_new_doc_node,
+        NodeCommon, XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDocPtr,
+        XmlDtdPtr, XmlElementContent, XmlElementPtr, XmlElementTypeVal, XmlEntityPtr,
+        XmlEntityType, XmlEnumeration, XmlGenericNodePtr, XmlNodePtr, XmlNsPtr, xml_copy_doc,
+        xml_encode_entities_reentrant, xml_free_doc, xml_free_dtd, xml_new_doc, xml_new_doc_node,
     },
     xmlschemas::{
         context::{
@@ -115,7 +110,7 @@ use exml::{
 };
 use libc::{
     FILE, MAP_FAILED, MAP_SHARED, O_RDONLY, PROT_READ, close, fclose, fopen, fread, free, malloc,
-    memset, mmap, munmap, open, snprintf, stat, strlen, write,
+    memset, mmap, munmap, open, stat, write,
 };
 
 // Error codes.
@@ -568,9 +563,7 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
     }
     if cmd_args.nonet {
         OPTIONS.fetch_or(XmlParserOption::XmlParseNoNet as i32, Ordering::Relaxed);
-        unsafe {
-            xml_set_external_entity_loader(xml_no_net_external_entity_loader);
-        }
+        xml_set_external_entity_loader(xml_no_net_external_entity_loader);
     }
     if cmd_args.nocompact {
         OPTIONS.fetch_and(
@@ -590,9 +583,7 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
 
     if !cmd_args.nocatalogs && cmd_args.catalogs {
         if let Some(catal) = option_env!("SGML_CATALOG_FILES") {
-            unsafe {
-                xml_load_catalogs(catal);
-            }
+            xml_load_catalogs(catal);
         } else {
             eprintln!("Variable $SGML_CATALOG_FILES not set");
         }
@@ -650,9 +641,7 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
             set_load_ext_dtd_default_value(load_ext);
             OPTIONS.fetch_or(XmlParserOption::XmlParseDTDLoad as i32, Ordering::Relaxed);
             if cmd_args.timing {
-                unsafe {
-                    start_timer();
-                }
+                start_timer();
             }
             unsafe {
                 let Some(mut ctxt) = XmlSchematronParserCtxt::new(s) else {
@@ -743,13 +732,11 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
     #[cfg(all(feature = "libxml_reader", feature = "libxml_pattern"))]
     if cmd_args.pattern.is_some() && !cmd_args.walker {
         if let Some(p) = cmd_args.pattern.as_deref() {
-            unsafe {
-                if let Some(pattern) = xml_pattern_compile(p, 0, None) {
-                    *PATTERNC.lock().unwrap() = Some(*pattern);
-                } else {
-                    generic_error!("Pattern {p} failed to compile\n");
-                    PROGRESULT.store(ERR_SCHEMAPAT, Ordering::Relaxed);
-                }
+            if let Some(pattern) = xml_pattern_compile(p, 0, None) {
+                *PATTERNC.lock().unwrap() = Some(*pattern);
+            } else {
+                generic_error!("Pattern {p} failed to compile\n");
+                PROGRESULT.store(ERR_SCHEMAPAT, Ordering::Relaxed);
             }
         }
     }
@@ -829,9 +816,8 @@ fn xmllint_external_entity_loader(
             err = sax.error.take();
         }
 
-        let mut ret = None;
         if let Some(loader) = DEFAULT_ENTITY_LOADER {
-            ret = loader(url, id, &mut *ctxt);
+            let mut ret = loader(url, id, &mut *ctxt);
             if ret.is_some() {
                 if let Some(sax) = ctxt.sax.as_deref_mut() {
                     if warning.is_some() {
@@ -1220,24 +1206,6 @@ fn xml_shell_readline(prompt: &str) -> Option<String> {
     match stdin().read_line(&mut line_read) {
         Ok(len) if len > 0 => Some(line_read),
         _ => None,
-    }
-}
-
-// I/O Interfaces
-
-unsafe fn my_read(f: *mut c_void, buf: *mut c_char, len: i32) -> i32 {
-    unsafe { fread(buf as _, 1, len as _, f as *mut FILE) as _ }
-}
-unsafe fn my_close(context: *mut c_void) -> i32 {
-    unsafe {
-        let f: *mut FILE = context as *mut FILE;
-        unsafe extern "C" {
-            static stdin: *mut FILE;
-        }
-        if f == stdin {
-            return 0;
-        }
-        fclose(f)
     }
 }
 
@@ -1667,11 +1635,9 @@ fn comment_debug(_ctx: &mut XmlParserCtxt, value: &str) {
 /// extra parameters.
 #[doc(alias = "warningDebug")]
 fn warning_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
-    unsafe {
-        CALLBACKS.fetch_add(1, Ordering::Relaxed);
-        if CMD_ARGS.noout {
-            return;
-        }
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
+    if CMD_ARGS.noout {
+        return;
     }
     print!("SAX.warning: {}", msg);
 }
@@ -1680,11 +1646,9 @@ fn warning_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
 /// extra parameters.
 #[doc(alias = "errorDebug")]
 fn error_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
-    unsafe {
-        CALLBACKS.fetch_add(1, Ordering::Relaxed);
-        if CMD_ARGS.noout {
-            return;
-        }
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
+    if CMD_ARGS.noout {
+        return;
     }
     print!("SAX.error: {}", msg);
 }
@@ -1693,11 +1657,9 @@ fn error_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
 /// extra parameters.
 #[doc(alias = "fatalErrorDebug")]
 fn fatal_error_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
-    unsafe {
-        CALLBACKS.fetch_add(1, Ordering::Relaxed);
-        if CMD_ARGS.noout {
-            return;
-        }
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
+    if CMD_ARGS.noout {
+        return;
     }
     print!("SAX.fatalError: {msg}");
 }
@@ -1896,7 +1858,6 @@ unsafe fn test_sax(filename: &str) {
                     Some(generic_error_default),
                     None,
                 );
-                let cfilename = CString::new(filename).unwrap();
                 (*vctxt).set_filename(Some(filename));
                 let handler = {
                     let mut hdl = XmlSAXHandler::default();
@@ -1959,10 +1920,7 @@ unsafe fn test_sax(filename: &str) {
 #[cfg(feature = "libxml_reader")]
 unsafe fn process_node(reader: XmlTextReaderPtr) {
     unsafe {
-        use exml::{libxml::xmlreader::XmlReaderTypes, tree::XmlGenericNodePtr};
-
-        let mut name: *const XmlChar;
-        let value: *const XmlChar;
+        use exml::libxml::xmlreader::XmlReaderTypes;
 
         let typ = (*reader).node_type();
         let empty = (*reader).is_empty_element();
@@ -2062,7 +2020,7 @@ unsafe fn stream_file(filename: *mut c_char) {
         let reader: XmlTextReaderPtr;
         let mut ret: i32;
         let mut fd: i32 = -1;
-        let mut info: stat = unsafe { zeroed() };
+        let mut info: stat = zeroed();
         let mut base: *const c_char = null();
 
         if CMD_ARGS.memory {
@@ -2238,7 +2196,7 @@ unsafe fn stream_file(filename: *mut c_char) {
 #[cfg(feature = "libxml_reader")]
 unsafe fn walk_doc(doc: XmlDocPtr) {
     unsafe {
-        use std::{ptr::null, sync::atomic::Ordering};
+        use std::sync::atomic::Ordering;
 
         use exml::libxml::xmlreader::{xml_free_text_reader, xml_reader_walker};
         #[cfg(feature = "libxml_pattern")]
@@ -2333,7 +2291,7 @@ unsafe fn walk_doc(doc: XmlDocPtr) {
 #[cfg(feature = "xpath")]
 unsafe fn do_xpath_dump(cur: XmlXPathObjectPtr) {
     unsafe {
-        use std::{cell::RefCell, io::stdout, rc::Rc};
+        use std::io::stdout;
 
         use exml::{
             io::XmlOutputBuffer,
@@ -2470,7 +2428,6 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: Option<XmlParserC
                 if !f.is_null() {
                     let mut res: i32;
                     let mut chars: [c_char; 4096] = [0; 4096];
-                    let ctxt: HtmlParserCtxtPtr;
 
                     res = fread(chars.as_mut_ptr() as _, 1, 4, f) as _;
                     if res > 0 {
@@ -2511,7 +2468,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: Option<XmlParserC
             }
             #[cfg(feature = "html")]
             _ if CMD_ARGS.html && CMD_ARGS.memory => {
-                let mut info: stat = unsafe { zeroed() };
+                let mut info: stat = zeroed();
                 let fname = CString::new(filename.unwrap()).unwrap();
                 if stat(fname.as_ptr(), addr_of_mut!(info)) < 0 {
                     return;
@@ -2564,7 +2521,6 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: Option<XmlParserC
                     let mut res: i32;
                     let size: i32 = 1024;
                     let mut chars: [u8; 1024] = [0; 1024];
-                    let ctxt: XmlParserCtxtPtr;
 
                     // if (repeat) size = 1024;
                     res = fread(chars.as_mut_ptr() as _, 1, 4, f) as _;
@@ -2623,8 +2579,6 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: Option<XmlParserC
                 }
             }
             _ if CMD_ARGS.htmlout => {
-                let ctxt: XmlParserCtxtPtr;
-
                 let mut ctxt = if let Some(rectxt) = rectxt {
                     rectxt
                 } else {
@@ -2650,7 +2604,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: Option<XmlParserC
                 )
             }
             _ if CMD_ARGS.memory => {
-                let mut info: stat = unsafe { zeroed() };
+                let mut info: stat = zeroed();
                 let fname = filename.map(|f| CString::new(f).unwrap());
 
                 if stat(
@@ -2692,8 +2646,6 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: Option<XmlParserC
             }
             #[cfg(feature = "libxml_valid")]
             _ if CMD_ARGS.valid => {
-                let ctxt: XmlParserCtxtPtr;
-
                 let mut ctxt = if let Some(rectxt) = rectxt {
                     rectxt
                 } else if let Some(ctxt) = XmlParserCtxt::new() {
@@ -3031,8 +2983,6 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: Option<XmlParserC
         // A posteriori validation test
         #[cfg(feature = "libxml_valid")]
         if CMD_ARGS.dtdvalid.is_some() || CMD_ARGS.dtdvalidfpi.is_some() {
-            let dtd: *mut XmlDtd;
-
             if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
                 start_timer();
             }
@@ -3285,21 +3235,21 @@ fn register_node(node: XmlGenericNodePtr) {
 
 fn deregister_node(node: XmlGenericNodePtr) {
     unsafe {
-        let private = if let Ok(mut node) = XmlNodePtr::try_from(node) {
+        let private = if let Ok(node) = XmlNodePtr::try_from(node) {
             node._private
-        } else if let Ok(mut node) = XmlAttrPtr::try_from(node) {
+        } else if let Ok(node) = XmlAttrPtr::try_from(node) {
             node._private
-        } else if let Ok(mut node) = XmlDocPtr::try_from(node) {
+        } else if let Ok(node) = XmlDocPtr::try_from(node) {
             node._private
-        } else if let Ok(mut node) = XmlNsPtr::try_from(node) {
+        } else if let Ok(node) = XmlNsPtr::try_from(node) {
             node._private
-        } else if let Ok(mut node) = XmlEntityPtr::try_from(node) {
+        } else if let Ok(node) = XmlEntityPtr::try_from(node) {
             node._private
-        } else if let Ok(mut node) = XmlDtdPtr::try_from(node) {
+        } else if let Ok(node) = XmlDtdPtr::try_from(node) {
             node._private
-        } else if let Ok(mut node) = XmlAttributePtr::try_from(node) {
+        } else if let Ok(node) = XmlAttributePtr::try_from(node) {
             node._private
-        } else if let Ok(mut node) = XmlElementPtr::try_from(node) {
+        } else if let Ok(node) = XmlElementPtr::try_from(node) {
             node._private
         } else {
             panic!("Unknown Node Type");
@@ -3393,9 +3343,7 @@ fn main() {
         }
     }
 
-    unsafe {
-        xml_cleanup_parser();
+    xml_cleanup_parser();
 
-        exit(PROGRESULT.load(Ordering::Relaxed))
-    }
+    exit(PROGRESULT.load(Ordering::Relaxed))
 }
