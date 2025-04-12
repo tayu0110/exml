@@ -2513,7 +2513,7 @@ pub unsafe fn xml_sax2_init_default_sax_handler(hdlr: &mut XmlSAXHandler, warnin
 /// Initialize the default HTML SAX2 handler
 #[doc(alias = "xmlSAX2InitHtmlDefaultSAXHandler")]
 #[cfg(feature = "html")]
-pub unsafe fn xml_sax2_init_html_default_sax_handler(hdlr: &mut XmlSAXHandler) {
+pub fn xml_sax2_init_html_default_sax_handler(hdlr: &mut XmlSAXHandler) {
     if hdlr.initialized != 0 {
         return;
     }

@@ -61,59 +61,51 @@ const HTML_PI_NODE: XmlElementType = XmlElementType::XmlPINode;
 ///
 /// Returns a new document
 #[doc(alias = "htmlNewDoc")]
-pub unsafe fn html_new_doc(uri: Option<&str>, external_id: Option<&str>) -> Option<HtmlDocPtr> {
-    unsafe {
-        if uri.is_some() && external_id.is_some() {
-            return html_new_doc_no_dtd(
-                Some("http://www.w3.org/TR/REC-html40/loose.dtd"),
-                Some("-//W3C//DTD HTML 4.0 Transitional//EN"),
-            );
-        }
-
-        html_new_doc_no_dtd(uri, external_id)
+pub fn html_new_doc(uri: Option<&str>, external_id: Option<&str>) -> Option<HtmlDocPtr> {
+    if uri.is_some() && external_id.is_some() {
+        return html_new_doc_no_dtd(
+            Some("http://www.w3.org/TR/REC-html40/loose.dtd"),
+            Some("-//W3C//DTD HTML 4.0 Transitional//EN"),
+        );
     }
+
+    html_new_doc_no_dtd(uri, external_id)
 }
 
 /// Creates a new HTML document without a DTD node if `uri` and `external_id` are NULL.
 ///
 /// Returns a new document, do not initialize the DTD if not provided
 #[doc(alias = "htmlNewDocNoDtD")]
-pub unsafe fn html_new_doc_no_dtd(
-    uri: Option<&str>,
-    external_id: Option<&str>,
-) -> Option<HtmlDocPtr> {
-    unsafe {
-        // Allocate a new document and fill the fields.
-        let Some(mut cur) = XmlDocPtr::new(XmlDoc {
-            typ: XmlElementType::XmlHTMLDocumentNode,
-            version: None,
-            int_subset: None,
-            children: None,
-            ext_subset: None,
-            old_ns: None,
-            encoding: None,
-            standalone: 1,
-            compression: 0,
-            ids: None,
-            refs: None,
-            _private: null_mut(),
-            charset: XmlCharEncoding::UTF8,
-            properties: XmlDocProperties::XmlDocHTML as i32
-                | XmlDocProperties::XmlDocUserbuilt as i32,
-            ..Default::default()
-        }) else {
-            html_err_memory(null_mut(), Some("HTML document creation failed\n"));
-            return None;
-        };
-        cur.doc = Some(cur);
-        if external_id.is_some() || uri.is_some() {
-            xml_create_int_subset(Some(cur), Some("html"), external_id, uri);
-        }
-        if let Some(register) = get_register_node_func() {
-            register(cur.into());
-        }
-        Some(cur)
+pub fn html_new_doc_no_dtd(uri: Option<&str>, external_id: Option<&str>) -> Option<HtmlDocPtr> {
+    // Allocate a new document and fill the fields.
+    let Some(mut cur) = XmlDocPtr::new(XmlDoc {
+        typ: XmlElementType::XmlHTMLDocumentNode,
+        version: None,
+        int_subset: None,
+        children: None,
+        ext_subset: None,
+        old_ns: None,
+        encoding: None,
+        standalone: 1,
+        compression: 0,
+        ids: None,
+        refs: None,
+        _private: null_mut(),
+        charset: XmlCharEncoding::UTF8,
+        properties: XmlDocProperties::XmlDocHTML as i32 | XmlDocProperties::XmlDocUserbuilt as i32,
+        ..Default::default()
+    }) else {
+        html_err_memory(None, Some("HTML document creation failed\n"));
+        return None;
+    };
+    cur.doc = Some(cur);
+    if external_id.is_some() || uri.is_some() {
+        xml_create_int_subset(Some(cur), Some("html"), external_id, uri);
     }
+    if let Some(register) = get_register_node_func() {
+        register(cur.into());
+    }
+    Some(cur)
 }
 
 /// Encoding definition lookup in the Meta tags

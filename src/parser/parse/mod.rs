@@ -60,7 +60,7 @@ pub use dtd::*;
 pub(crate) use entity::*;
 
 #[cfg(feature = "html")]
-use crate::html::parser::{__html_parse_content, HtmlParserOption, html_create_memory_parser_ctxt};
+use crate::html::parser::{HtmlParserOption, html_create_memory_parser_ctxt, html_parse_content};
 use crate::{
     encoding::{XmlCharEncoding, detect_encoding, find_encoding_handler},
     error::XmlParserErrors,
@@ -418,7 +418,7 @@ pub unsafe fn xml_parse_in_node_context(
         #[cfg(feature = "html")]
         {
             if doc.typ == XmlElementType::XmlHTMLDocumentNode {
-                __html_parse_content(&raw mut ctxt as _);
+                html_parse_content(&mut ctxt);
             } else {
                 ctxt.parse_content();
             }

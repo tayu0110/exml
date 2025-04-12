@@ -1676,32 +1676,28 @@ unsafe fn push_parse_test(
         chunk_size = 1024;
         'b: while {
             if cur + chunk_size >= size {
+                let chunk = from_raw_parts(
+                    base.add(cur as usize) as *const u8,
+                    size as usize - cur as usize,
+                );
                 #[cfg(feature = "html")]
                 if options & XML_PARSE_HTML != 0 {
-                    html_parse_chunk(&raw mut ctxt, base.add(cur as _), size - cur, 1);
+                    html_parse_chunk(&mut ctxt, chunk, 1);
                 } else {
-                    let chunk = from_raw_parts(
-                        base.add(cur as usize) as *const u8,
-                        size as usize - cur as usize,
-                    );
                     ctxt.parse_chunk(chunk, 1);
                 }
                 #[cfg(not(feature = "html"))]
                 {
-                    let chunk = from_raw_parts(
-                        base.add(cur as usize) as *const u8,
-                        size as usize - cur as usize,
-                    );
                     ctxt.parse_chunk(chunk, 1);
                 }
                 break 'b;
             } else {
+                let chunk =
+                    from_raw_parts(base.add(cur as usize) as *const u8, chunk_size as usize);
                 #[cfg(feature = "html")]
                 if options & XML_PARSE_HTML != 0 {
-                    html_parse_chunk(&raw mut ctxt, base.add(cur as _), chunk_size, 0);
+                    html_parse_chunk(&mut ctxt, chunk, 0);
                 } else {
-                    let chunk =
-                        from_raw_parts(base.add(cur as usize) as *const u8, chunk_size as usize);
                     ctxt.parse_chunk(chunk, 0);
                 }
                 #[cfg(not(feature = "html"))]
@@ -2049,7 +2045,7 @@ unsafe fn push_boundary_test(
 
             #[cfg(feature = "html")]
             if options & XML_PARSE_HTML != 0 {
-                html_parse_chunk(&raw mut ctxt, base.add(cur as _), 1, terminate);
+                html_parse_chunk(&mut ctxt, &[*base.add(cur as _) as u8], terminate);
             } else {
                 ctxt.parse_chunk(&[*base.add(cur as _) as u8], terminate);
             }

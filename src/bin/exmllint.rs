@@ -2377,16 +2377,11 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: Option<XmlParserC
                             PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
                             return;
                         };
-                        html_ctxt_use_options(&raw mut ctxt, OPTIONS.load(Ordering::Relaxed));
+                        html_ctxt_use_options(&mut ctxt, OPTIONS.load(Ordering::Relaxed));
                         while let Some(res) = f.read(&mut chars[..]).ok().filter(|&res| res > 0) {
-                            html_parse_chunk(
-                                &raw mut ctxt,
-                                chars.as_ptr() as *const i8,
-                                res as i32,
-                                0,
-                            );
+                            html_parse_chunk(&mut ctxt, &chars[..res], 0);
                         }
-                        html_parse_chunk(&raw mut ctxt, chars.as_ptr() as *const i8, 0, 1);
+                        html_parse_chunk(&mut ctxt, &[], 1);
                         doc = ctxt.my_doc;
                     }
                 }

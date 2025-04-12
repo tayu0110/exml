@@ -931,6 +931,13 @@ impl XmlParserCtxt {
         0
     }
 
+    /// Clear (release owned resources) and reinitialize a parser context
+    #[doc(alias = "xmlClearParserCtxt")]
+    pub fn clear(&mut self) {
+        self.node_seq.clear();
+        self.reset();
+    }
+
     pub(crate) fn advance(&mut self, nth: usize) {
         if self.content_bytes().len() < nth {
             self.force_grow();
@@ -2116,18 +2123,6 @@ impl Drop for XmlParserCtxt {
                 }
             }
         }
-    }
-}
-
-/// Clear (release owned resources) and reinitialize a parser context
-#[doc(alias = "xmlClearParserCtxt")]
-pub unsafe fn xml_clear_parser_ctxt(ctxt: XmlParserCtxtPtr) {
-    unsafe {
-        if ctxt.is_null() {
-            return;
-        }
-        (*ctxt).node_seq.clear();
-        (*ctxt).reset();
     }
 }
 
