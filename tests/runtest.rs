@@ -4168,7 +4168,7 @@ unsafe fn c14n_run_test(
         set_load_ext_dtd_default_value(XML_DETECT_IDS as i32 | XML_COMPLETE_ATTRS as i32);
         set_substitute_entities_default_value(1);
 
-        let Some(mut doc) = xml_read_file(
+        let Some(doc) = xml_read_file(
             xml_filename,
             None,
             XmlParserOption::XmlParseDTDAttr as i32 | XmlParserOption::XmlParseNoEnt as i32,
@@ -4212,7 +4212,7 @@ unsafe fn c14n_run_test(
         // fprintf(stderr,"File \"%s\" loaded: start canonization\n", xml_filename);
         let mut result = String::new();
         ret = xml_c14n_doc_dump_memory(
-            &mut doc,
+            doc,
             if !xpath.is_null() {
                 (*xpath).nodesetval.as_deref_mut()
             } else {
