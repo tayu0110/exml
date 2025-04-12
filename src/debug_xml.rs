@@ -2638,25 +2638,20 @@ const XML_SHELL_HELP_CONTENT: &str = r#"
     pwd          display current working directory
     whereis      display absolute path of [path] or current working directory
     quit         leave shell
-    grep string  search for a string in the subtree
-"#;
+    grep string  search for a string in the subtree"#;
 const XML_SHELL_HELP_CONTENT_XPATH: &str = r#"
     xpath expr   evaluate the XPath expression in that context and print the result
     setns nsreg  register a namespace to a prefix in the XPath evaluation context
                  format for nsreg is: prefix=[nsuri] (i.e. prefix= unsets a prefix)
     setrootns    register all namespace found on the root element
-                 the default namespace if any uses 'defaultns' prefix
-"#;
+                 the default namespace if any uses 'defaultns' prefix"#;
 const XML_SHELL_HELP_CONTENT_OUTPUT: &str = r#"
     save [name]  save this document to name or the original name
-    write [name] write the current node to the filename
-"#;
+    write [name] write the current node to the filename"#;
 const XML_SHELL_HELP_CONTENT_VALID: &str = r#"
-    validate     check the document for errors
-"#;
+    validate     check the document for errors"#;
 const XML_SHELL_HELP_CONTENT_SCHEMA: &str = r#"
-    relaxng rng  validate the document against the Relax-NG schemas
-"#;
+    relaxng rng  validate the document against the Relax-NG schemas"#;
 
 /// Implements the XML shell
 /// This allow to load, validate, view, modify and save a document
@@ -2747,23 +2742,24 @@ pub unsafe fn xml_shell<'a>(
                 "quit" => break,
                 "bye" => break,
                 "help" => {
-                    writeln!(ctxt.output, "{}", XML_SHELL_HELP_CONTENT).ok();
+                    write!(ctxt.output, "{}", XML_SHELL_HELP_CONTENT).ok();
                     #[cfg(feature = "xpath")]
                     {
-                        writeln!(ctxt.output, "{}", XML_SHELL_HELP_CONTENT_XPATH).ok();
+                        write!(ctxt.output, "{}", XML_SHELL_HELP_CONTENT_XPATH).ok();
                     }
                     #[cfg(feature = "libxml_output")]
                     {
-                        writeln!(ctxt.output, "{}", XML_SHELL_HELP_CONTENT_OUTPUT).ok();
+                        write!(ctxt.output, "{}", XML_SHELL_HELP_CONTENT_OUTPUT).ok();
                     }
                     #[cfg(feature = "libxml_valid")]
                     {
-                        writeln!(ctxt.output, "{}", XML_SHELL_HELP_CONTENT_VALID).ok();
+                        write!(ctxt.output, "{}", XML_SHELL_HELP_CONTENT_VALID).ok();
                     }
                     #[cfg(feature = "schema")]
                     {
-                        writeln!(ctxt.output, "{}", XML_SHELL_HELP_CONTENT_SCHEMA).ok();
+                        write!(ctxt.output, "{}", XML_SHELL_HELP_CONTENT_SCHEMA).ok();
                     }
+                    writeln!(ctxt.output).ok();
                 }
                 #[cfg(feature = "libxml_valid")]
                 "validate" => {

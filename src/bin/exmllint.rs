@@ -7,20 +7,17 @@
 // See Copyright for the status of this software.
 //
 // daniel@veillard.com
-// #![allow(unused)]
 
 use std::{
     borrow::Cow,
     cell::RefCell,
     env::args,
-    ffi::{CStr, CString, c_char, c_long, c_void},
+    ffi::{CStr, c_long, c_void},
     fs::File,
-    io::{Write, stderr, stdin, stdout},
-    mem::zeroed,
+    io::{Read, Write, stderr, stdin, stdout},
     process::exit,
-    ptr::{addr_of_mut, null, null_mut},
+    ptr::{addr_of_mut, null_mut},
     rc::Rc,
-    slice::from_raw_parts,
     sync::{
         LazyLock, Mutex,
         atomic::{AtomicI32, AtomicPtr, AtomicUsize, Ordering},
@@ -108,10 +105,7 @@ use exml::{
     },
     xpath::{XmlXPathObjectPtr, xml_xpath_order_doc_elems},
 };
-use libc::{
-    FILE, MAP_FAILED, MAP_SHARED, O_RDONLY, PROT_READ, close, fclose, fopen, fread, free, malloc,
-    memset, mmap, munmap, open, stat, write,
-};
+use libc::{free, malloc, memset, write};
 
 // Error codes.
 // These are similar to `xmllintReturnCode` in original xmllint.
@@ -1997,56 +1991,28 @@ unsafe fn process_node(reader: XmlTextReaderPtr) {
 }
 
 #[cfg(feature = "libxml_reader")]
-unsafe fn stream_file(filename: *mut c_char) {
+unsafe fn stream_file(filename: &str) {
     unsafe {
-        use std::{ptr::null, slice::from_raw_parts};
-
         use exml::libxml::xmlreader::{
             XmlParserProperties, xml_free_text_reader, xml_reader_for_file, xml_reader_for_memory,
         };
-        use libc::{MAP_FAILED, MAP_SHARED, PROT_READ, close, mmap, munmap, stat};
 
-        let reader: XmlTextReaderPtr;
         let mut ret: i32;
-        let mut fd: i32 = -1;
-        let mut info: stat = zeroed();
-        let mut base: *const c_char = null();
 
-        if CMD_ARGS.memory {
-            if stat(filename, addr_of_mut!(info)) < 0 {
+        let reader = if CMD_ARGS.memory {
+            let Ok(mut file) = File::open(filename) else {
                 return;
-            }
-            fd = open(filename, O_RDONLY);
-            if fd < 0 {
-                return;
-            }
-            base = mmap(null_mut(), info.st_size as _, PROT_READ, MAP_SHARED, fd, 0) as _;
-            if base == MAP_FAILED as _ {
-                close(fd);
-                eprintln!(
-                    "mmap failure for file {}",
-                    CStr::from_ptr(filename).to_string_lossy()
-                );
+            };
+            let mut mem = vec![];
+            if file.read_to_end(&mut mem).is_err() {
+                eprintln!("mmap failure for file {}", filename);
                 PROGRESULT.store(ERR_RDFILE, Ordering::Relaxed);
                 return;
             }
-
-            let mem = from_raw_parts(base as *const u8, info.st_size as usize).to_vec();
-            reader = xml_reader_for_memory(
-                mem,
-                (!filename.is_null())
-                    .then(|| CStr::from_ptr(filename as *const i8).to_string_lossy())
-                    .as_deref(),
-                None,
-                OPTIONS.load(Ordering::Relaxed),
-            );
+            xml_reader_for_memory(mem, Some(filename), None, OPTIONS.load(Ordering::Relaxed))
         } else {
-            reader = xml_reader_for_file(
-                &CStr::from_ptr(filename as *const i8).to_string_lossy(),
-                None,
-                OPTIONS.load(Ordering::Relaxed),
-            );
-        }
+            xml_reader_for_file(filename, None, OPTIONS.load(Ordering::Relaxed))
+        };
         #[cfg(feature = "libxml_pattern")]
         if let Some(pattern) = PATTERNC.lock().unwrap().as_ref() {
             *PATSTREAM.lock().unwrap() = pattern.get_stream_context().map(|pat| *pat);
@@ -2140,45 +2106,30 @@ unsafe fn stream_file(filename: *mut c_char) {
 
             #[cfg(feature = "libxml_valid")]
             if CMD_ARGS.valid && !(*reader).is_valid().unwrap_or(false) {
-                let filename = CStr::from_ptr(filename).to_string_lossy().into_owned();
                 generic_error!("Document {filename} does not validate\n");
                 PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
             }
             #[cfg(feature = "schema")]
             if CMD_ARGS.relaxng.is_some() || CMD_ARGS.schema.is_some() {
                 if !(*reader).is_valid().unwrap_or(false) {
-                    eprintln!(
-                        "{} fails to validate",
-                        CStr::from_ptr(filename).to_string_lossy()
-                    );
+                    eprintln!("{} fails to validate", filename);
                     PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
                 } else if !CMD_ARGS.quiet {
-                    eprintln!("{} validates", CStr::from_ptr(filename).to_string_lossy());
+                    eprintln!("{} validates", filename);
                 }
             }
             // Done, cleanup and status
             xml_free_text_reader(reader);
             if ret != 0 {
-                eprintln!(
-                    "{} : failed to parse",
-                    CStr::from_ptr(filename).to_string_lossy()
-                );
+                eprintln!("{} : failed to parse", filename);
                 PROGRESULT.store(ERR_UNCLASS, Ordering::Relaxed);
             }
         } else {
-            eprintln!(
-                "Unable to open {}",
-                CStr::from_ptr(filename).to_string_lossy()
-            );
+            eprintln!("Unable to open {}", filename);
             PROGRESULT.store(ERR_UNCLASS, Ordering::Relaxed);
         }
         #[cfg(feature = "libxml_pattern")]
         let _ = PATSTREAM.lock().unwrap().take();
-        if CMD_ARGS.memory {
-            // xml_free_parser_input_buffer(input);
-            munmap(base as _, info.st_size as _);
-            close(fd);
-        }
     }
 }
 
@@ -2403,84 +2354,57 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: Option<XmlParserC
             }
             #[cfg(all(feature = "html", feature = "libxml_push"))]
             _ if CMD_ARGS.html && CMD_ARGS.push => {
-                unsafe extern "C" {
-                    static stdin: *mut FILE;
-                }
-
-                let f = if filename == Some("-") {
-                    stdin
-                } else {
-                    let f = CString::new(filename.unwrap()).unwrap();
-                    fopen(f.as_ptr(), c"rb".as_ptr())
-                };
+                let filename = filename.unwrap();
+                let mut stdin = stdin();
+                let mut file = File::open(filename).ok();
+                let file = file
+                    .as_mut()
+                    .map(|f| f as &mut dyn Read)
+                    .or_else(|| (filename == "-").then_some(&mut stdin as &mut dyn Read));
                 let mut doc = None;
-                if !f.is_null() {
-                    let mut res: i32;
-                    let mut chars: [c_char; 4096] = [0; 4096];
+                if let Some(f) = file {
+                    let mut chars = [0; 4096];
 
-                    res = fread(chars.as_mut_ptr() as _, 1, 4, f) as _;
-                    if res > 0 {
+                    if let Some(res) = f.read(&mut chars[..4]).ok().filter(|&res| res > 0) {
                         let Some(mut ctxt) = html_create_push_parser_ctxt(
                             None,
                             None,
-                            chars.as_ptr(),
-                            res,
-                            filename,
+                            chars.as_ptr() as *const i8,
+                            res as i32,
+                            Some(filename),
                             XmlCharEncoding::None,
                         ) else {
                             PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
-                            if f != stdin {
-                                fclose(f);
-                            }
                             return;
                         };
                         html_ctxt_use_options(&raw mut ctxt, OPTIONS.load(Ordering::Relaxed));
-                        while {
-                            res = fread(
-                                chars.as_mut_ptr() as _,
-                                1,
-                                PUSHSIZE.load(Ordering::Relaxed),
-                                f,
-                            ) as _;
-                            res > 0
-                        } {
-                            html_parse_chunk(&raw mut ctxt, chars.as_ptr(), res, 0);
+                        while let Some(res) = f.read(&mut chars[..]).ok().filter(|&res| res > 0) {
+                            html_parse_chunk(
+                                &raw mut ctxt,
+                                chars.as_ptr() as *const i8,
+                                res as i32,
+                                0,
+                            );
                         }
-                        html_parse_chunk(&raw mut ctxt, chars.as_ptr(), 0, 1);
+                        html_parse_chunk(&raw mut ctxt, chars.as_ptr() as *const i8, 0, 1);
                         doc = ctxt.my_doc;
-                    }
-                    if f != stdin {
-                        fclose(f);
                     }
                 }
                 doc
             }
             #[cfg(feature = "html")]
             _ if CMD_ARGS.html && CMD_ARGS.memory => {
-                let mut info: stat = zeroed();
-                let fname = CString::new(filename.unwrap()).unwrap();
-                if stat(fname.as_ptr(), addr_of_mut!(info)) < 0 {
+                let Ok(mut file) = File::open(filename.unwrap()) else {
                     return;
-                }
-                let fd: i32 = open(fname.as_ptr(), O_RDONLY);
-                if fd < 0 {
-                    return;
-                }
-                let base: *const c_char =
-                    mmap(null_mut(), info.st_size as _, PROT_READ, MAP_SHARED, fd, 0) as _;
-                if base == MAP_FAILED as _ {
-                    close(fd);
+                };
+                let mut mem = vec![];
+                if file.read_to_end(&mut mem).is_err() {
                     eprintln!("mmap failure for file {}", filename.unwrap());
                     PROGRESULT.store(ERR_RDFILE, Ordering::Relaxed);
                     return;
                 }
 
-                let mem = from_raw_parts(base as *const u8, info.st_size as usize).to_vec();
-                let doc = html_read_memory(mem, filename, None, OPTIONS.load(Ordering::Relaxed));
-
-                munmap(base as _, info.st_size as _);
-                close(fd);
-                doc
+                html_read_memory(mem, filename, None, OPTIONS.load(Ordering::Relaxed))
             }
             #[cfg(feature = "html")]
             _ if CMD_ARGS.html => {
@@ -2490,60 +2414,40 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: Option<XmlParserC
             _ if CMD_ARGS.push => {
                 // build an XML tree from a string;
 
-                unsafe extern "C" {
-                    static stdin: *mut FILE;
-                }
-
-                let fname = filename.map(|f| CString::new(f).unwrap());
-                // '-' Usually means stdin -<sven@zen.org>
-                let f = if filename == Some("-") {
-                    stdin
-                } else {
-                    fopen(
-                        fname.as_ref().map_or(null(), |f| f.as_ptr()),
-                        c"rb".as_ptr(),
-                    )
-                };
+                let filename = filename.unwrap();
+                let mut stdin = stdin();
+                let mut file = File::open(filename).ok();
+                let file = file
+                    .as_mut()
+                    .map(|f| f as &mut dyn Read)
+                    .or_else(|| (filename == "-").then_some(&mut stdin as &mut dyn Read));
                 let mut doc = None;
-                if !f.is_null() {
-                    let ret: i32;
-                    let mut res: i32;
-                    let size: i32 = 1024;
-                    let mut chars: [u8; 1024] = [0; 1024];
+                if let Some(f) = file {
+                    let mut chars = [0; 1024];
 
                     // if (repeat) size = 1024;
-                    res = fread(chars.as_mut_ptr() as _, 1, 4, f) as _;
-                    if res > 0 {
+                    if let Some(res) = f.read(&mut chars[..4]).ok().filter(|&res| res > 0) {
                         let Some(mut ctxt) = XmlParserCtxt::new_push_parser(
                             None,
                             None,
-                            &chars[..res as usize],
-                            filename,
+                            &chars[..res],
+                            Some(filename),
                         ) else {
                             PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
-                            if f != stdin {
-                                fclose(f);
-                            }
                             return;
                         };
                         ctxt.use_options(OPTIONS.load(Ordering::Relaxed));
-                        while {
-                            res = fread(chars.as_mut_ptr() as _, 1, size as _, f) as i32;
-                            res > 0
-                        } {
-                            ctxt.parse_chunk(&chars[..res as usize], 0);
+                        while let Some(res) = f.read(&mut chars[..]).ok().filter(|&res| res > 0) {
+                            ctxt.parse_chunk(&chars[..res], 0);
                         }
                         ctxt.parse_chunk(b"", 1);
                         doc = ctxt.my_doc;
-                        ret = ctxt.well_formed;
+                        let ret = ctxt.well_formed;
                         if ret == 0 && !CMD_ARGS.recover {
                             if let Some(doc) = doc.take() {
                                 xml_free_doc(doc);
                             }
                         }
-                    }
-                    if f != stdin {
-                        fclose(f);
                     }
                 }
                 doc
@@ -2593,31 +2497,17 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: Option<XmlParserC
                 )
             }
             _ if CMD_ARGS.memory => {
-                let mut info: stat = zeroed();
-                let fname = filename.map(|f| CString::new(f).unwrap());
-
-                if stat(
-                    fname.as_ref().map_or(null(), |f| f.as_ptr()),
-                    addr_of_mut!(info),
-                ) < 0
-                {
+                let Ok(mut file) = File::open(filename.unwrap()) else {
                     return;
-                }
-                let fd: i32 = open(fname.map_or(null(), |f| f.as_ptr()), O_RDONLY);
-                if fd < 0 {
-                    return;
-                }
-                let base: *const c_char =
-                    mmap(null_mut(), info.st_size as _, PROT_READ, MAP_SHARED, fd, 0) as _;
-                if base == MAP_FAILED as _ {
-                    close(fd);
+                };
+                let mut mem = vec![];
+                if file.read_to_end(&mut mem).is_err() {
                     eprintln!("mmap failure for file {}", filename.unwrap());
                     PROGRESULT.store(ERR_RDFILE, Ordering::Relaxed);
                     return;
                 }
 
-                let mem = from_raw_parts(base as *const u8, info.st_size as usize).to_vec();
-                let doc = if let Some(mut rectxt) = rectxt {
+                if let Some(mut rectxt) = rectxt {
                     xml_ctxt_read_memory(
                         &mut rectxt,
                         mem,
@@ -2627,11 +2517,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: Option<XmlParserC
                     )
                 } else {
                     xml_read_memory(mem, filename, None, OPTIONS.load(Ordering::Relaxed))
-                };
-
-                munmap(base as _, info.st_size as _);
-                close(fd);
-                doc
+                }
             }
             #[cfg(feature = "libxml_valid")]
             _ if CMD_ARGS.valid => {
@@ -2886,23 +2772,23 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: Option<XmlParserC
 
                         if let Some(encoding) = CMD_ARGS.encode.as_deref() {
                             if CMD_ARGS.format {
-                                (*doc).dump_format_memory_enc(
+                                doc.dump_format_memory_enc(
                                     addr_of_mut!(result),
                                     addr_of_mut!(len),
                                     Some(encoding),
                                     1,
                                 );
                             } else {
-                                (*doc).dump_memory_enc(
+                                doc.dump_memory_enc(
                                     addr_of_mut!(result),
                                     addr_of_mut!(len),
                                     Some(encoding),
                                 );
                             }
                         } else if CMD_ARGS.format {
-                            (*doc).dump_format_memory(addr_of_mut!(result), addr_of_mut!(len), 1);
+                            doc.dump_format_memory(addr_of_mut!(result), addr_of_mut!(len), 1);
                         } else {
-                            (*doc).dump_memory(addr_of_mut!(result), addr_of_mut!(len));
+                            doc.dump_memory(addr_of_mut!(result), addr_of_mut!(len));
                         }
                         if result.is_null() {
                             eprintln!("Failed to save");
@@ -3263,10 +3149,8 @@ fn main() {
                     for _ in 0..REPEAT.load(Ordering::Relaxed) {
                         #[cfg(feature = "libxml_reader")]
                         {
-                            let carg =
-                                CString::new(arg.as_str()).expect("Failed to construct argument");
                             if CMD_ARGS.stream {
-                                stream_file(carg.as_ptr() as _);
+                                stream_file(arg.as_str());
                             } else if CMD_ARGS.sax {
                                 test_sax(arg.as_str());
                             } else {
@@ -3282,11 +3166,10 @@ fn main() {
                     }
                 } else {
                     NBREGISTER.store(0, Ordering::Relaxed);
-                    let carg = CString::new(arg.as_str()).expect("Failed to construct argument");
 
                     match () {
                         #[cfg(feature = "libxml_reader")]
-                        _ if CMD_ARGS.stream => stream_file(carg.as_ptr() as _),
+                        _ if CMD_ARGS.stream => stream_file(arg.as_str()),
                         _ if CMD_ARGS.sax => test_sax(arg.as_str()),
                         _ => parse_and_print_file(Some(&arg), None),
                     }
