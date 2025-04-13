@@ -26,33 +26,20 @@
 // Gary Pennington <Gary.Pennington@uk.sun.com>
 // daniel@veillard.com
 
-use std::{
-    ffi::c_void,
-    mem::{size_of, zeroed},
-    ptr::addr_of_mut,
-    sync::atomic::AtomicPtr,
-};
+use std::{ffi::c_void, sync::atomic::AtomicPtr};
 
-use libc::{free, malloc, memset, realloc};
+use libc::{free, malloc, realloc};
 
 use crate::{
     error::XmlError,
-    globals::reset_last_error,
     libxml::xmlmemory::{XmlFreeFunc, XmlMallocFunc, XmlReallocFunc, XmlStrdupFunc},
     parser::XmlSAXLocator,
     tree::XmlBufferAllocationScheme,
 };
 
 use super::{
-    sax2::{
-        xml_sax2_get_column_number, xml_sax2_get_line_number, xml_sax2_get_public_id,
-        xml_sax2_get_system_id,
-    },
-    threads::{
-        __xml_global_init_mutex_destroy, XmlMutex, xml_cleanup_mutex, xml_get_global_state,
-        xml_init_mutex, xml_mutex_lock, xml_mutex_unlock,
-    },
-    xmlstring::{XmlChar, xml_char_strdup, xml_strdup},
+    threads::xml_get_global_state,
+    xmlstring::{XmlChar, xml_char_strdup},
 };
 
 pub type XmlGlobalStatePtr = *mut XmlGlobalState;
@@ -84,37 +71,6 @@ pub struct XmlGlobalState {
     pub(crate) xml_last_error: XmlError,
 
     pub(crate) xml_structured_error_context: AtomicPtr<c_void>,
-}
-
-/// Mutex to protect "ForNewThreads" variables
-static mut XML_THR_DEF_MUTEX: XmlMutex = unsafe { zeroed() };
-
-/// xmlInitializeGlobalState() initialize a global state with all the
-/// default values of the library.
-#[doc(alias = "xmlInitializeGlobalState")]
-pub unsafe extern "C" fn xml_initialize_global_state(gs: XmlGlobalStatePtr) {
-    unsafe {
-        xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
-
-        (*gs).old_xml_wd_compatibility = 0;
-        (*gs).xml_default_sax_locator.get_public_id = xml_sax2_get_public_id;
-        (*gs).xml_default_sax_locator.get_system_id = xml_sax2_get_system_id;
-        (*gs).xml_default_sax_locator.get_line_number = xml_sax2_get_line_number;
-        (*gs).xml_default_sax_locator.get_column_number = xml_sax2_get_column_number;
-        (*gs).xml_free = Some(free as XmlFreeFunc);
-        (*gs).xml_malloc = Some(malloc as XmlMallocFunc);
-        (*gs).xml_malloc_atomic = Some(malloc as XmlMallocFunc);
-        (*gs).xml_realloc = Some(realloc as XmlReallocFunc);
-        (*gs).xml_mem_strdup = Some(xml_strdup as XmlStrdupFunc);
-
-        memset(
-            addr_of_mut!((*gs).xml_last_error) as _,
-            0,
-            size_of::<XmlError>(),
-        );
-
-        xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
-    }
 }
 
 /// The variable holding the libxml malloc() implementation
@@ -192,30 +148,5 @@ pub fn set_xml_mem_strdup(mem_strdup: Option<XmlStrdupFunc>) {
     unsafe {
         _XML_MEM_STRDUP = mem_strdup;
         (*xml_get_global_state()).xml_mem_strdup = mem_strdup;
-    }
-}
-
-/**
- * xmlInitGlobalsInternal:
- *
- * Additional initialisation for multi-threading
- */
-pub(crate) unsafe extern "C" fn xml_init_globals_internal() {
-    unsafe {
-        xml_init_mutex(addr_of_mut!(XML_THR_DEF_MUTEX));
-    }
-}
-
-/**
- * xmlCleanupGlobalsInternal:
- *
- * Additional cleanup for multi-threading
- */
-pub(crate) unsafe extern "C" fn xml_cleanup_globals_internal() {
-    unsafe {
-        reset_last_error();
-
-        xml_cleanup_mutex(addr_of_mut!(XML_THR_DEF_MUTEX));
-        __xml_global_init_mutex_destroy();
     }
 }

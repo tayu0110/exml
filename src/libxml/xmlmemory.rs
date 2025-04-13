@@ -416,60 +416,6 @@ pub unsafe extern "C" fn xml_realloc_loc(
     }
 }
 
-/// A malloc() equivalent, with logging of the allocation info.
-///
-/// Returns a pointer to the allocated area or NULL in case of lack of memory.
-#[doc(alias = "xmlMallocAtomicLoc")]
-pub unsafe extern "C" fn xml_malloc_atomic_loc(
-    size: usize,
-    file: *const c_char,
-    line: i32,
-) -> *mut c_void {
-    unsafe {
-        xml_init_parser();
-
-        if size > MAX_SIZE_T - RESERVE_SIZE {
-            generic_error!("xmlMallocAtomicLoc : Unsigned overflow\n");
-            return null_mut();
-        }
-
-        let p: *mut Memhdr = malloc(RESERVE_SIZE + size) as *mut Memhdr;
-
-        if p.is_null() {
-            generic_error!("xmlMallocAtomicLoc : Out of free space\n");
-            return null_mut();
-        }
-        (*p).mh_tag = MEMTAG as _;
-        (*p).mh_size = size;
-        (*p).mh_type = MALLOC_ATOMIC_TYPE as _;
-        (*p).mh_file = file;
-        (*p).mh_line = line as _;
-        xml_mutex_lock(addr_of_mut!(XML_MEM_MUTEX));
-        BLOCK += 1;
-        (*p).mh_number = BLOCK as _;
-        DEBUG_MEM_SIZE.set(DEBUG_MEM_SIZE.get() + size as i64);
-        DEBUG_MEM_BLOCKS.set(DEBUG_MEM_BLOCKS.get() + 1);
-        if DEBUG_MEM_SIZE.get() > DEBUG_MAX_MEM_SIZE.get() {
-            DEBUG_MAX_MEM_SIZE.set(DEBUG_MEM_SIZE.get());
-        }
-        xml_mutex_unlock(addr_of_mut!(XML_MEM_MUTEX));
-
-        if XML_MEM_STOP_AT_BLOCK == (*p).mh_number as _ {
-            xml_malloc_breakpoint();
-        }
-
-        let ret: *mut c_void = HDR_2_CLIENT!(p) as _;
-
-        if XML_MEM_TRACE_BLOCK_AT == ret {
-            let block = XML_MEM_TRACE_BLOCK_AT;
-            generic_error!("{:?} : Malloc({}) Ok\n", block, size as u64);
-            xml_malloc_breakpoint();
-        }
-
-        ret
-    }
-}
-
 /// A strdup() equivalent, with logging of the allocation info.
 ///
 /// Returns a pointer to the new string or NULL if allocation error occurred.

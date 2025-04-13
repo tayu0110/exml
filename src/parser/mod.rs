@@ -73,7 +73,6 @@ use crate::{
             xml_is_base_char, xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender,
             xml_is_ideographic,
         },
-        globals::{xml_cleanup_globals_internal, xml_init_globals_internal},
         threads::{
             __xml_global_init_mutex_lock, __xml_global_init_mutex_unlock,
             xml_cleanup_threads_internal, xml_init_threads_internal,
@@ -702,7 +701,6 @@ pub fn xml_init_parser() {
         __xml_global_init_mutex_lock();
         if !XML_PARSER_INITIALIZED.load(Ordering::Acquire) {
             xml_init_threads_internal();
-            xml_init_globals_internal();
             xml_init_memory_internal();
             register_default_input_callbacks();
             #[cfg(feature = "libxml_output")]
@@ -755,7 +753,6 @@ pub fn xml_cleanup_parser() {
             xml_schema_cleanup_types();
             xml_relaxng_cleanup_types();
         }
-        xml_cleanup_globals_internal();
         xml_cleanup_threads_internal();
         xml_cleanup_memory_internal();
         XML_PARSER_INITIALIZED.store(false, Ordering::Release);

@@ -231,8 +231,6 @@ unsafe extern "C" fn xml_new_global_state() -> XmlGlobalStatePtr {
     unsafe {
         use crate::generic_error;
 
-        use super::globals::xml_initialize_global_state;
-
         let gs: *mut XmlGlobalState = malloc(size_of::<XmlGlobalState>()) as _;
         if gs.is_null() {
             generic_error!("xmlGetGlobalState: out of memory\n");
@@ -240,7 +238,6 @@ unsafe extern "C" fn xml_new_global_state() -> XmlGlobalStatePtr {
         }
 
         memset(gs as _, 0, size_of::<XmlGlobalState>());
-        xml_initialize_global_state(gs);
         gs
     }
 }
