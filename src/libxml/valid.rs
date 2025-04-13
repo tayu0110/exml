@@ -24,14 +24,11 @@ use std::{
     borrow::Cow,
     cell::RefCell,
     collections::HashMap,
-    ffi::{CStr, CString, c_char},
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of_mut, null_mut},
     rc::Rc,
 };
-
-use libc::{strcat, strlen, strncat};
 
 #[cfg(feature = "libxml_regexp")]
 use crate::libxml::{xmlautomata::XmlAutomata, xmlregexp::XmlRegExecCtxt};
@@ -3549,98 +3546,89 @@ unsafe fn xml_validate_one_cdata_element(
 /// This will dump the list of elements to the buffer
 /// Intended just for the debug routine
 #[doc(alias = "xmlSnprintfElements")]
-pub(crate) unsafe fn xml_snprintf_elements(
-    buf: *mut c_char,
-    size: i32,
+pub(crate) fn xml_snprintf_elements(
+    buf: &mut String,
+    size: usize,
     node: Option<XmlGenericNodePtr>,
     glob: i32,
 ) {
-    unsafe {
-        let mut len: i32;
-
-        if node.is_none() {
+    if node.is_none() {
+        return;
+    }
+    if glob != 0 {
+        buf.push('(');
+    }
+    let mut cur = node;
+    while let Some(cur_node) = cur {
+        if size - buf.len() < 50 {
+            if size - buf.len() > 4 && !buf.ends_with('.') {
+                buf.push_str(" ...");
+            }
             return;
         }
-        if glob != 0 {
-            strcat(buf, c"(".as_ptr() as _);
-        }
-        let mut cur = node;
-        while let Some(cur_node) = cur {
-            len = strlen(buf) as _;
-            if size - len < 50 {
-                if size - len > 4 && *buf.add(len as usize - 1) != b'.' as i8 {
-                    strcat(buf, c" ...".as_ptr() as _);
-                }
-                return;
-            }
-            match cur_node.element_type() {
-                XmlElementType::XmlElementNode => {
-                    let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                    if let Some(prefix) = cur_node.ns.as_deref().and_then(|ns| ns.prefix()) {
-                        if size - len < prefix.len() as i32 + 10 {
-                            if size - len > 4 && *buf.add(len as usize - 1) != b'.' as i8 {
-                                strcat(buf, c" ...".as_ptr() as _);
-                            }
-                            return;
-                        }
-                        strncat(buf, prefix.as_ptr() as *const i8, prefix.len());
-                        strcat(buf, c":".as_ptr() as _);
-                    }
-                    if size - len < cur_node.name.len() as i32 + 10 {
-                        if size - len > 4 && *buf.add(len as usize - 1) != b'.' as i8 {
-                            strcat(buf, c" ...".as_ptr() as _);
+        match cur_node.element_type() {
+            XmlElementType::XmlElementNode => {
+                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                if let Some(prefix) = cur_node.ns.as_deref().and_then(|ns| ns.prefix()) {
+                    if size - buf.len() < prefix.len() + 10 {
+                        if size - buf.len() > 4 && !buf.ends_with('.') {
+                            buf.push_str(" ...");
                         }
                         return;
                     }
-                    strncat(
-                        buf,
-                        cur_node.name.as_ptr() as *const i8,
-                        cur_node.name.len(),
-                    );
-                    if cur_node.next.is_some() {
-                        strcat(buf, c" ".as_ptr() as _);
-                    }
+                    buf.push_str(&prefix);
+                    buf.push(':');
                 }
-                ty @ XmlElementType::XmlTextNode
-                | ty @ XmlElementType::XmlCDATASectionNode
-                | ty @ XmlElementType::XmlEntityRefNode => 'to_break: {
-                    let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                    if matches!(ty, XmlElementType::XmlTextNode) && cur_node.is_blank_node() {
-                        break 'to_break;
+                if size - buf.len() < cur_node.name.len() + 10 {
+                    if size - buf.len() > 4 && !buf.ends_with('.') {
+                        buf.push_str(" ...");
                     }
-                    strcat(buf, c"CDATA".as_ptr() as _);
-                    if cur_node.next.is_some() {
-                        strcat(buf, c" ".as_ptr() as _);
-                    }
+                    return;
                 }
-                XmlElementType::XmlAttributeNode
-                | XmlElementType::XmlDocumentNode
-                | XmlElementType::XmlHTMLDocumentNode
-                | XmlElementType::XmlDocumentTypeNode
-                | XmlElementType::XmlDocumentFragNode
-                | XmlElementType::XmlNotationNode
-                | XmlElementType::XmlNamespaceDecl => {
-                    strcat(buf, c"???".as_ptr() as _);
-                    if cur_node.next().is_some() {
-                        strcat(buf, c" ".as_ptr() as _);
-                    }
+                buf.push_str(&cur_node.name);
+                if cur_node.next.is_some() {
+                    buf.push(' ');
                 }
-                XmlElementType::XmlEntityNode
-                | XmlElementType::XmlPINode
-                | XmlElementType::XmlDTDNode
-                | XmlElementType::XmlCommentNode
-                | XmlElementType::XmlElementDecl
-                | XmlElementType::XmlAttributeDecl
-                | XmlElementType::XmlEntityDecl
-                | XmlElementType::XmlXIncludeStart
-                | XmlElementType::XmlXIncludeEnd => {}
-                _ => unreachable!(),
             }
-            cur = cur_node.next();
+            ty @ XmlElementType::XmlTextNode
+            | ty @ XmlElementType::XmlCDATASectionNode
+            | ty @ XmlElementType::XmlEntityRefNode => 'to_break: {
+                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                if matches!(ty, XmlElementType::XmlTextNode) && cur_node.is_blank_node() {
+                    break 'to_break;
+                }
+                buf.push_str("CDATA");
+                if cur_node.next.is_some() {
+                    buf.push(' ');
+                }
+            }
+            XmlElementType::XmlAttributeNode
+            | XmlElementType::XmlDocumentNode
+            | XmlElementType::XmlHTMLDocumentNode
+            | XmlElementType::XmlDocumentTypeNode
+            | XmlElementType::XmlDocumentFragNode
+            | XmlElementType::XmlNotationNode
+            | XmlElementType::XmlNamespaceDecl => {
+                buf.push_str("???");
+                if cur_node.next().is_some() {
+                    buf.push(' ');
+                }
+            }
+            XmlElementType::XmlEntityNode
+            | XmlElementType::XmlPINode
+            | XmlElementType::XmlDTDNode
+            | XmlElementType::XmlCommentNode
+            | XmlElementType::XmlElementDecl
+            | XmlElementType::XmlAttributeDecl
+            | XmlElementType::XmlEntityDecl
+            | XmlElementType::XmlXIncludeStart
+            | XmlElementType::XmlXIncludeEnd => {}
+            _ => unreachable!(),
         }
-        if glob != 0 {
-            strcat(buf, c")".as_ptr() as _);
-        }
+        cur = cur_node.next();
+    }
+    if glob != 0 {
+        buf.push(')');
     }
 }
 
@@ -3662,10 +3650,7 @@ unsafe fn xml_validate_element_content(
             return -1;
         }
         // let cont = elem_decl.content.clone();
-        let name = elem_decl
-            .name
-            .as_ref()
-            .map(|n| CString::new(n.as_str()).unwrap());
+        let name = elem_decl.name.as_deref();
 
         #[cfg(feature = "libxml_regexp")]
         {
@@ -3745,7 +3730,7 @@ unsafe fn xml_validate_element_content(
         if warn != 0 && (ret != 1 && ret != -3) {
             if !ctxt.is_null() {
                 let mut expr = String::with_capacity(5000);
-                let mut list: [c_char; 5000] = [0; 5000];
+                let mut list = String::with_capacity(5000);
 
                 xml_snprintf_element_content(
                     &mut expr,
@@ -3753,49 +3738,48 @@ unsafe fn xml_validate_element_content(
                     elem_decl.content.clone().unwrap(),
                     1,
                 );
-                list[0] = 0;
 
                 #[cfg(feature = "libxml_regexp")]
                 {
-                    xml_snprintf_elements(list.as_mut_ptr().add(0) as _, 5000, child, 1);
+                    xml_snprintf_elements(&mut list, 5000, child, 1);
                 }
 
-                if let Some(name) = name.as_deref() {
-                    let name = name.to_string_lossy();
-                    let list = CStr::from_ptr(list.as_ptr()).to_string_lossy();
+                if let Some(name) = name {
                     xml_err_valid_node(
-                    Some(&mut *ctxt),
-                    Some(parent.into()),
-                    XmlParserErrors::XmlDTDContentModel,
-                    format!(
-                        "Element {name} content does not follow the DTD, expecting {expr}, got {list}\n"
-                    )
-                    .as_str(),
-                    Some(&name),
-                    Some(&expr),
-                    Some(&list),
-                );
-                } else {
-                    let list = CStr::from_ptr(list.as_ptr()).to_string_lossy();
-                    xml_err_valid_node(
-                    Some(&mut *ctxt),
-                    Some(parent.into()),
-                    XmlParserErrors::XmlDTDContentModel,
-                    format!("Element content does not follow the DTD, expecting {expr}, got {list}\n")
+                        Some(&mut *ctxt),
+                        Some(parent.into()),
+                        XmlParserErrors::XmlDTDContentModel,
+                        format!(
+                            "Element {} content does not follow the DTD, expecting {}, got {}\n",
+                            name, expr, list
+                        )
                         .as_str(),
-                    Some(&expr),
-                    Some(&list),
-                    None,
-                );
+                        Some(name),
+                        Some(&expr),
+                        Some(&list),
+                    );
+                } else {
+                    xml_err_valid_node(
+                        Some(&mut *ctxt),
+                        Some(parent.into()),
+                        XmlParserErrors::XmlDTDContentModel,
+                        format!(
+                            "Element content does not follow the DTD, expecting {}, got {}\n",
+                            expr, list
+                        )
+                        .as_str(),
+                        Some(&expr),
+                        Some(&list),
+                        None,
+                    );
                 }
-            } else if let Some(name) = name.as_deref() {
-                let name = name.to_string_lossy();
+            } else if let Some(name) = name {
                 xml_err_valid_node(
                     Some(&mut *ctxt),
                     Some(parent.into()),
                     XmlParserErrors::XmlDTDContentModel,
                     format!("Element {name} content does not follow the DTD\n").as_str(),
-                    Some(&name),
+                    Some(name),
                     None,
                     None,
                 );

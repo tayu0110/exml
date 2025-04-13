@@ -5,13 +5,7 @@
 //! As a workaround, I decided to implement it as a method of `XmlParserCtxt`
 //! so that `XmlValidCtxt` does not own a pointer to the parent.
 
-use std::{
-    cell::RefCell,
-    collections::HashMap,
-    ffi::{CStr, CString},
-    ptr::null_mut,
-    rc::Rc,
-};
+use std::{cell::RefCell, collections::HashMap, ptr::null_mut, rc::Rc};
 
 use crate::{
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
@@ -1269,18 +1263,9 @@ impl XmlParserCtxt {
     ) -> i32 {
         unsafe {
             let mut ret: i32;
-            #[cfg(not(feature = "libxml_regexp"))]
-            let mut repl: Option<XmlGenericNodePtr> = None;
-            #[cfg(not(feature = "libxml_regexp"))]
-            let mut last: Option<XmlGenericNodePtr> = None;
-            #[cfg(not(feature = "libxml_regexp"))]
-            let mut tmp: Option<XmlGenericNodePtr>;
 
             // let cont: XmlElementContentPtr = elem_decl.content;
-            let name = elem_decl
-                .name
-                .as_ref()
-                .map(|n| CString::new(n.as_str()).unwrap());
+            let name = elem_decl.name.as_deref();
 
             #[cfg(feature = "libxml_regexp")]
             {
@@ -1358,221 +1343,52 @@ impl XmlParserCtxt {
                 }
             }
 
-            #[cfg_attr(feature = "libxml_regexp", allow(unused_labels))]
-            // label `'done` is used just only when 'regexp' is disabled.
-            'done: {
-                #[cfg(not(feature = "libxml_regexp"))]
+            if warn != 0 && (ret != 1 && ret != -3) {
+                let mut expr = String::with_capacity(5000);
+                let mut list = String::with_capacity(5000);
+
+                xml_snprintf_element_content(
+                    &mut expr,
+                    5000,
+                    elem_decl.content.clone().unwrap(),
+                    1,
+                );
+                #[cfg(feature = "libxml_regexp")]
                 {
-                    // Allocate the stack
-                    self.vctxt.vstateMax = 8;
-                    self.vctxt.vstate_tab = xml_malloc(
-                        self.vctxt.vstateMax as usize * size_of_val(&*self.vctxt.vstate_tab.add(0)),
-                    ) as *mut XmlValidState;
-                    if self.vctxt.vstate_tab.is_null() {
-                        xml_verr_memory(vctxt as _, c"malloc failed".as_ptr() as _);
-                        return -1;
-                    }
-                    // The first entry in the stack is reserved to the current state
-                    self.vctxt.nodeMax = 0;
-                    self.vctxt.nodeNr = 0;
-                    self.vctxt.nodeTab = null_mut();
-                    self.vctxt.vstate = self.vctxt.vstate_tab.add(0);
-                    self.vctxt.vstate_nr = 1;
-                    (*self.vctxt.vstate).cont = cont;
-                    (*self.vctxt.vstate).node = child;
-                    (*self.vctxt.vstate).depth = 0;
-                    (*self.vctxt.vstate).occurs = 0;
-                    (*self.vctxt.vstate).state = 0;
-                    ret = xmlValidateElementType(vctxt);
-                    if ret == -3 && warn != 0 {
-                        let mut expr: [c_char; 5000];
-                        expr[0] = 0;
-                        xml_snprintf_element_content(
-                            expr.as_mut_ptr() as _,
-                            5000,
-                            (*elem_decl).content,
-                            1,
-                        );
-                        xml_err_valid_node(
-                            Some(self),
-                            Some(elem_decl.into()),
-                            XmlParserErrors::XmlDTDContentNotDeterminist,
-                            c"Content model of %s is not deterministic: %s\n".as_ptr() as _,
-                            name,
-                            expr.as_ptr() as _,
-                            null_mut(),
-                        );
-                    } else if ret == -2 {
-                        // An entities reference appeared at this level.
-                        // Build a minimal representation of this node content
-                        // sufficient to run the validation process on it
-                        DEBUG_VALID_MSG!(c"Found an entity reference, linearizing".as_ptr());
-                        cur = child;
-                        while !cur.is_null() {
-                            match (*cur).element_type() {
-                                XmlElementType::XmlEntityRefNode => {
-                                    // Push the current node to be able to roll back
-                                    // and process within the entity
-                                    if !(*cur).children.is_null()
-                                        && !(*(*cur).children).children.is_null()
-                                    {
-                                        node_vpush(vctxt, cur);
-                                        cur = (*(*cur).children).children;
-                                        continue;
-                                    }
-                                }
-                                ty @ XmlElementType::XmlTextNode
-                                | ty @ XmlElementType::XmlCDATASectionNode
-                                | ty @ XmlElementType::XmlElementNode => {
-                                    if matches!(ty, XmlElementType::XmlTextNode)
-                                        && xml_is_blank_node(cur) != 0
-                                    {
-                                        // break;
-                                    } else {
-                                        // Allocate a new node and minimally fills in
-                                        // what's required
-                                        let Some(tmp) = XmlNodePtr::new(XmlNode {
-                                            typ: (*cur).typ,
-                                            name: (*cur).name,
-                                            ns: (*cur).ns,
-                                            next: null_mut(),
-                                            content: null_mut(),
-                                            ..Default::default()
-                                        }) else {
-                                            xml_verr_memory(
-                                                vctxt as _,
-                                                c"malloc failed".as_ptr() as _,
-                                            );
-                                            xmlFreeNodeList(repl);
-                                            ret = -1;
-                                            break 'done;
-                                        };
-                                        if repl.is_null() {
-                                            repl = tmp;
-                                            last = tmp;
-                                        } else {
-                                            (*last).next = tmp;
-                                            last = tmp;
-                                        }
-                                        if matches!((*cur).typ, XmlElementType::XmlCDATASectionNode)
-                                        {
-                                            // E59 spaces in CDATA does not match the nonterminal S
-                                            (*tmp).content = xml_strdup(c"CDATA".as_ptr() as _);
-                                        }
-                                    }
-                                }
-                                _ => {}
-                            }
-                            // Switch to next element
-                            cur = (*cur).next;
-                            while cur.is_null() {
-                                cur = node_vpop(vctxt);
-                                if cur.is_null() {
-                                    break;
-                                }
-                                cur = (*cur).next;
-                            }
-                        }
-
-                        // Relaunch the validation
-                        self.vctxt.vstate = self.vctxt.vstate_tab.add(0);
-                        self.vctxt.vstate_nr = 1;
-                        (*self.vctxt.vstate).cont = cont;
-                        (*self.vctxt.vstate).node = repl;
-                        (*self.vctxt.vstate).depth = 0;
-                        (*self.vctxt.vstate).occurs = 0;
-                        (*self.vctxt.vstate).state = 0;
-                        ret = xmlValidateElementType(vctxt);
-                    }
+                    xml_snprintf_elements(&mut list, 5000, child, 1);
                 }
 
-                if warn != 0 && (ret != 1 && ret != -3) {
-                    let mut expr = String::with_capacity(5000);
-                    let mut list: [i8; 5000] = [0; 5000];
-
-                    xml_snprintf_element_content(
-                        &mut expr,
-                        5000,
-                        elem_decl.content.clone().unwrap(),
-                        1,
+                if let Some(name) = name {
+                    xml_err_valid_node(
+                        Some(self),
+                        Some(parent.into()),
+                        XmlParserErrors::XmlDTDContentModel,
+                        format!(
+                            "Element {} content does not follow the DTD, expecting {}, got {}\n",
+                            name, expr, list
+                        )
+                        .as_str(),
+                        Some(name),
+                        Some(&expr),
+                        Some(&list),
                     );
-                    list[0] = 0;
-                    #[cfg(not(feature = "libxml_regexp"))]
-                    if !repl.is_null() {
-                        xml_snprintf_elements(
-                            list.as_mut_ptr().add(0) as _,
-                            5000,
-                            XmlGenericNodePtr::from_raw(repl),
-                            1,
-                        );
-                    } else {
-                        xml_snprintf_elements(list.as_mut_ptr().add(0) as _, 5000, child, 1);
-                    }
-                    #[cfg(feature = "libxml_regexp")]
-                    {
-                        xml_snprintf_elements(list.as_mut_ptr().add(0) as _, 5000, child, 1);
-                    }
-
-                    if let Some(name) = name.as_deref() {
-                        let name = name.to_string_lossy();
-                        let list = CStr::from_ptr(list.as_ptr()).to_string_lossy();
-                        xml_err_valid_node(
-                            Some(self),
-                            Some(parent.into()),
-                            XmlParserErrors::XmlDTDContentModel,
-                            format!(
-                                "Element {} content does not follow the DTD, expecting {}, got {}\n",
-                                name, expr, list
-                            )
-                            .as_str(),
-                            Some(&name),
-                            Some(&expr),
-                            Some(&list),
-                        );
-                    } else if let Some(name) = name.as_deref() {
-                        let name = name.to_string_lossy();
-                        xml_err_valid_node(
-                            Some(self),
-                            Some(parent.into()),
-                            XmlParserErrors::XmlDTDContentModel,
-                            format!("Element {name} content does not follow the DTD\n").as_str(),
-                            Some(&name),
-                            None,
-                            None,
-                        );
-                    } else {
-                        xml_err_valid_node(
-                            Some(self),
-                            Some(parent.into()),
-                            XmlParserErrors::XmlDTDContentModel,
-                            "Element content does not follow the DTD\n",
-                            None,
-                            None,
-                            None,
-                        );
-                    }
-                    ret = 0;
+                } else {
+                    xml_err_valid_node(
+                        Some(self),
+                        Some(parent.into()),
+                        XmlParserErrors::XmlDTDContentModel,
+                        "Element content does not follow the DTD\n",
+                        None,
+                        None,
+                        None,
+                    );
                 }
-                if ret == -3 {
-                    ret = 1;
-                }
+                ret = 0;
+            }
+            if ret == -3 {
+                ret = 1;
             }
 
-            #[cfg(not(feature = "libxml_regexp"))]
-            {
-                // done:
-                // Deallocate the copy if done, and free up the validation stack
-                while !repl.is_null() {
-                    tmp = (*repl).next;
-                    xml_free(repl as _);
-                    repl = tmp;
-                }
-                self.vctxt.vstateMax = 0;
-                if !self.vctxt.vstate_tab.is_null() {
-                    xml_free(self.vctxt.vstate_tab as _);
-                    self.vctxt.vstate_tab = null_mut();
-                }
-            }
             self.vctxt.node_tab.clear();
             ret
         }
