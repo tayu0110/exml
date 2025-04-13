@@ -27,6 +27,7 @@ pub(crate) mod item_list;
 pub mod items;
 pub mod parse;
 pub mod schema;
+pub mod valid;
 
 use items::XmlSchemaType;
 

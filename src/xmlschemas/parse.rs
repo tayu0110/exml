@@ -53,11 +53,10 @@ use crate::{
             xml_schema_get_prop_node_ns, xml_schema_get_qname_ref_name,
             xml_schema_get_qname_ref_target_ns, xml_schema_new_annot, xml_schema_new_qname_ref,
             xml_schema_new_wildcard_ns_constraint, xml_schema_pcheck_particle_correct_2,
-            xml_schema_pget_bool_node_value, xml_schema_pval_attr,
-            xml_schema_pval_attr_block_final, xml_schema_pval_attr_form_default,
-            xml_schema_pval_attr_id, xml_schema_pval_attr_node, xml_schema_pval_attr_node_id,
-            xml_schema_pval_attr_node_qname, xml_schema_pval_attr_node_qname_value,
-            xml_schema_pval_attr_node_value, xml_schema_pval_attr_qname,
+            xml_schema_pget_bool_node_value, xml_schema_pval_attr_block_final,
+            xml_schema_pval_attr_form_default, xml_schema_pval_attr_id,
+            xml_schema_pval_attr_node_id, xml_schema_pval_attr_node_qname,
+            xml_schema_pval_attr_node_qname_value, xml_schema_pval_attr_qname,
         },
         xmlschemastypes::{
             xml_schema_free_facet, xml_schema_get_built_in_type, xml_schema_get_predefined_type,
@@ -406,8 +405,7 @@ impl XmlSchemaParserCtxt {
                 // }
                 'exit: {
                     if let Some(attr) = xml_schema_get_prop_node(node, "targetNamespace") {
-                        res = xml_schema_pval_attr_node(
-                            self,
+                        res = self.validate_attr_node(
                             null_mut(),
                             attr,
                             xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnyURI),
@@ -759,8 +757,7 @@ impl XmlSchemaParserCtxt {
                         }
                         attr = now.next;
                     }
-                    xml_schema_pval_attr(
-                        self,
+                    self.validate_attribute(
                         null_mut(),
                         cur_node,
                         "source",
@@ -804,8 +801,7 @@ impl XmlSchemaParserCtxt {
                     if let Some(attr) =
                         xml_schema_get_prop_node_ns(cur_node, XML_XML_NAMESPACE, "lang")
                     {
-                        xml_schema_pval_attr_node(
-                            self,
+                        self.validate_attr_node(
                             null_mut(),
                             attr,
                             xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasLanguage),
@@ -881,8 +877,7 @@ impl XmlSchemaParserCtxt {
                 attr = cur_attr.next;
             }
             // Extract and validate attributes.
-            if xml_schema_pval_attr(
-                self,
+            if self.validate_attribute(
                 null_mut(),
                 node,
                 "namespace",
@@ -906,8 +901,7 @@ impl XmlSchemaParserCtxt {
                 return self.err;
             }
 
-            if xml_schema_pval_attr(
-                self,
+            if self.validate_attribute(
                 null_mut(),
                 node,
                 "schemaLocation",
@@ -1321,8 +1315,7 @@ impl XmlSchemaParserCtxt {
             // Preliminary step, extract the URI-Reference and make an URI from the base.
             // Attribute "schemaLocation" is mandatory.
             if let Some(attr) = xml_schema_get_prop_node(node, "schemaLocation") {
-                if xml_schema_pval_attr_node(
-                    self,
+                if self.validate_attr_node(
                     null_mut(),
                     attr,
                     xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnyURI),
@@ -1462,8 +1455,7 @@ impl XmlSchemaParserCtxt {
                     );
                     return null_mut();
                 };
-                if xml_schema_pval_attr_node(
-                    self,
+                if self.validate_attr_node(
                     null_mut(),
                     attr,
                     xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNCName),
@@ -1826,8 +1818,7 @@ impl XmlSchemaParserCtxt {
                     );
                     return null_mut();
                 };
-                if xml_schema_pval_attr_node(
-                    self,
+                if self.validate_attr_node(
                     null_mut(),
                     attr,
                     xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNCName),
@@ -2273,8 +2264,7 @@ impl XmlSchemaParserCtxt {
                 let mut cur_idc: XmlSchemaIDCPtr = null_mut();
                 let mut last_idc: XmlSchemaIDCPtr = null_mut();
 
-                if xml_schema_pval_attr_node(
-                    self,
+                if self.validate_attr_node(
                     null_mut(),
                     // Is this `unwrap` OK ???
                     name_attr.unwrap(),
@@ -2652,8 +2642,7 @@ impl XmlSchemaParserCtxt {
                 );
                 return null_mut();
             };
-            if xml_schema_pval_attr_node(
-                self,
+            if self.validate_attr_node(
                 null_mut(),
                 attr,
                 xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNCName),
@@ -3047,8 +3036,7 @@ impl XmlSchemaParserCtxt {
                     );
                     return null_mut();
                 };
-                if xml_schema_pval_attr_node(
-                    self,
+                if self.validate_attr_node(
                     null_mut(),
                     attr,
                     xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNCName),
@@ -3473,8 +3461,7 @@ impl XmlSchemaParserCtxt {
                 return null_mut();
             };
             // The name is crucial, exit if invalid.
-            if xml_schema_pval_attr_node(
-                self,
+            if self.validate_attr_node(
                 null_mut(),
                 attr,
                 xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNCName),
@@ -4395,8 +4382,7 @@ impl XmlSchemaParserCtxt {
                 );
                 return null_mut();
             };
-            if xml_schema_pval_attr_node(
-                self,
+            if self.validate_attr_node(
                 null_mut(),
                 attr,
                 xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNCName),
@@ -5531,8 +5517,7 @@ impl XmlSchemaParserCtxt {
                 );
                 return null_mut();
             };
-            if xml_schema_pval_attr_node(
-                self,
+            if self.validate_attr_node(
                 null_mut(),
                 attr,
                 xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNCName),
@@ -5856,8 +5841,7 @@ impl XmlSchemaParserCtxt {
                                     ns_item.as_ptr(),
                                     ns_item.len() as i32,
                                 );
-                                xml_schema_pval_attr_node_value(
-                                    self,
+                                self.validate_attr_node_value(
                                     null_mut(),
                                     attr,
                                     dictns_item,

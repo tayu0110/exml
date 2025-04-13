@@ -91,11 +91,10 @@ use crate::{
             xml_schema_free_value, xml_schema_get_built_in_type, xml_schema_get_canon_value,
             xml_schema_get_val_type, xml_schema_is_built_in_type_facet,
             xml_schema_new_notation_value, xml_schema_new_qname_value,
-            xml_schema_val_predef_type_node, xml_schema_val_predef_type_node_no_norm,
-            xml_schema_validate_facet_whtsp, xml_schema_validate_length_facet_whtsp,
-            xml_schema_validate_list_simple_type_facet, xml_schema_value_append,
-            xml_schema_value_get_as_boolean, xml_schema_value_get_as_string,
-            xml_schema_value_get_next,
+            xml_schema_val_predef_type_node_no_norm, xml_schema_validate_facet_whtsp,
+            xml_schema_validate_length_facet_whtsp, xml_schema_validate_list_simple_type_facet,
+            xml_schema_value_append, xml_schema_value_get_as_boolean,
+            xml_schema_value_get_as_string, xml_schema_value_get_next,
         },
         xmlstring::{
             XmlChar, xml_str_equal, xml_strcat, xml_strdup, xml_strlen, xml_strncat,
@@ -3639,118 +3638,6 @@ pub(crate) fn xml_schema_pval_attr_id(
     xml_schema_pval_attr_node_id(ctxt, Some(attr))
 }
 
-/// Validates a value against the given built-in type.
-/// This one is intended to be used internally for validation
-/// of schema attribute values during parsing of the schema.
-///
-/// Returns 0 if the value is valid, a positive error code
-/// number otherwise and -1 in case of an internal or API error.
-#[doc(alias = "xmlSchemaPValAttrNodeValue")]
-pub(crate) unsafe fn xml_schema_pval_attr_node_value(
-    pctxt: XmlSchemaParserCtxtPtr,
-    owner_item: XmlSchemaBasicItemPtr,
-    attr: XmlAttrPtr,
-    value: *const XmlChar,
-    typ: XmlSchemaTypePtr,
-) -> i32 {
-    unsafe {
-        let mut ret: i32;
-
-        // NOTE: Should we move this to xmlschematypes.c? Hmm, but this
-        // one is really meant to be used internally, so better not.
-        if pctxt.is_null() || typ.is_null() {
-            return -1;
-        }
-        if (*typ).typ != XmlSchemaTypeType::XmlSchemaTypeBasic {
-            PERROR_INT!(
-                pctxt,
-                "xmlSchemaPValAttrNodeValue",
-                "the given type is not a built-in type"
-            );
-            return -1;
-        }
-        match XmlSchemaValType::try_from((*typ).built_in_type) {
-            Ok(XmlSchemaValType::XmlSchemasNCName)
-            | Ok(XmlSchemaValType::XmlSchemasQName)
-            | Ok(XmlSchemaValType::XmlSchemasAnyURI)
-            | Ok(XmlSchemaValType::XmlSchemasToken)
-            | Ok(XmlSchemaValType::XmlSchemasLanguage) => {
-                ret = xml_schema_val_predef_type_node(typ, value, null_mut(), Some(attr.into()));
-            }
-            _ => {
-                PERROR_INT!(
-                    pctxt,
-                    "xmlSchemaPValAttrNodeValue",
-                    "validation using the given type is not supported while parsing a schema"
-                );
-                return -1;
-            }
-        }
-        // TODO: Should we use the S4S error codes instead?
-        match ret.cmp(&0) {
-            std::cmp::Ordering::Less => {
-                PERROR_INT!(
-                    pctxt,
-                    "xmlSchemaPValAttrNodeValue",
-                    "failed to validate a schema attribute value"
-                );
-                return -1;
-            }
-            std::cmp::Ordering::Greater => {
-                if (*typ).wxs_is_list() {
-                    ret = XmlParserErrors::XmlSchemavCvcDatatypeValid1_2_2 as i32;
-                } else {
-                    ret = XmlParserErrors::XmlSchemavCvcDatatypeValid1_2_1 as i32;
-                }
-                let value = CStr::from_ptr(value as *const i8).to_string_lossy();
-                xml_schema_psimple_type_err(
-                    pctxt,
-                    ret.try_into().unwrap(),
-                    owner_item,
-                    attr.into(),
-                    typ,
-                    None,
-                    Some(&value),
-                    None,
-                    None,
-                    None,
-                );
-            }
-            std::cmp::Ordering::Equal => {}
-        }
-        ret
-    }
-}
-
-/// Extracts and validates a value against the given built-in type.
-/// This one is intended to be used internally for validation
-/// of schema attribute values during parsing of the schema.
-///
-/// Returns 0 if the value is valid, a positive error code
-/// number otherwise and -1 in case of an internal or API error.
-#[doc(alias = "xmlSchemaPValAttrNode")]
-pub(crate) unsafe fn xml_schema_pval_attr_node(
-    ctxt: XmlSchemaParserCtxtPtr,
-    owner_item: XmlSchemaBasicItemPtr,
-    attr: XmlAttrPtr,
-    typ: XmlSchemaTypePtr,
-    value: *mut *const XmlChar,
-) -> i32 {
-    unsafe {
-        if ctxt.is_null() || typ.is_null() {
-            return -1;
-        }
-
-        let val = (*ctxt).get_node_content(Some(attr.into()));
-        if !value.is_null() {
-            *value = xml_dict_lookup((*ctxt).dict, val.as_ptr(), val.len() as i32);
-        }
-
-        let val = CString::new(val).unwrap();
-        xml_schema_pval_attr_node_value(ctxt, owner_item, attr, val.as_ptr() as *const u8, typ)
-    }
-}
-
 /// Returns 0 if the value is valid, 1 otherwise.
 #[doc(alias = "xmlSchemaPValAttrFormDefault")]
 pub(crate) unsafe fn xml_schema_pval_attr_form_default(
@@ -3914,53 +3801,6 @@ pub(crate) unsafe fn xml_schema_new_annot(
             },
         );
         ret
-    }
-}
-
-/// Extracts and validates a value against the given built-in type.
-/// This one is intended to be used internally for validation
-/// of schema attribute values during parsing of the schema.
-///
-/// Returns 0 if the value is valid, a positive error code
-/// number otherwise and -1 in case of an internal or API error.
-#[doc(alias = "xmlSchemaPValAttr")]
-pub(crate) unsafe fn xml_schema_pval_attr(
-    ctxt: XmlSchemaParserCtxtPtr,
-    owner_item: XmlSchemaBasicItemPtr,
-    owner_elem: XmlNodePtr,
-    name: &str,
-    typ: XmlSchemaTypePtr,
-    value: *mut *const XmlChar,
-) -> i32 {
-    unsafe {
-        if ctxt.is_null() || typ.is_null() {
-            if !value.is_null() {
-                *value = null_mut();
-            }
-            return -1;
-        }
-        if (*typ).typ != XmlSchemaTypeType::XmlSchemaTypeBasic {
-            if !value.is_null() {
-                *value = null_mut();
-            }
-            let name = CStr::from_ptr((*typ).name as *const i8).to_string_lossy();
-            xml_schema_perr(
-            ctxt,
-            Some(owner_elem.into()),
-            XmlParserErrors::XmlSchemapInternal,
-            format!("Internal error: xmlSchemaPValAttr, the given type '{name}' is not a built-in type.\n").as_str(),
-            Some(&name),
-            None,
-        );
-            return -1;
-        }
-        let Some(attr) = xml_schema_get_prop_node(owner_elem, name) else {
-            if !value.is_null() {
-                *value = null_mut();
-            }
-            return 0;
-        };
-        xml_schema_pval_attr_node(ctxt, owner_item, attr, typ, value)
     }
 }
 
