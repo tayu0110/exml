@@ -1741,21 +1741,19 @@ pub fn xml_sax2_start_element(
 #[doc(alias = "xmlSAX2EndElement")]
 #[cfg(any(feature = "sax1", feature = "html", feature = "libxml_writer",))]
 pub fn xml_sax2_end_element(ctxt: &mut XmlParserCtxt, _name: &str) {
-    unsafe {
-        let cur = ctxt.node;
+    let cur = ctxt.node;
 
-        ctxt.nodemem = -1;
+    ctxt.nodemem = -1;
 
-        #[cfg(feature = "libxml_valid")]
-        if ctxt.validate != 0 && ctxt.well_formed != 0 {
-            if let Some(my_doc) = ctxt.my_doc.filter(|doc| doc.int_subset.is_some()) {
-                ctxt.valid &= ctxt.validate_one_element(my_doc, cur.map(|cur| cur.into()));
-            }
+    #[cfg(feature = "libxml_valid")]
+    if ctxt.validate != 0 && ctxt.well_formed != 0 {
+        if let Some(my_doc) = ctxt.my_doc.filter(|doc| doc.int_subset.is_some()) {
+            ctxt.valid &= ctxt.validate_one_element(my_doc, cur.map(|cur| cur.into()));
         }
-
-        // end of parsing of this node.
-        ctxt.node_pop();
     }
+
+    // end of parsing of this node.
+    ctxt.node_pop();
 }
 
 /// SAX2 callback when an element start has been detected by the parser.
@@ -2198,19 +2196,17 @@ pub fn xml_sax2_end_element_ns(
     _prefix: Option<&str>,
     _uri: Option<&str>,
 ) {
-    unsafe {
-        ctxt.nodemem = -1;
+    ctxt.nodemem = -1;
 
-        #[cfg(feature = "libxml_valid")]
-        if ctxt.validate != 0 && ctxt.well_formed != 0 {
-            if let Some(my_doc) = ctxt.my_doc.filter(|doc| doc.int_subset.is_some()) {
-                ctxt.valid &= ctxt.validate_one_element(my_doc, ctxt.node.map(|node| node.into()));
-            }
+    #[cfg(feature = "libxml_valid")]
+    if ctxt.validate != 0 && ctxt.well_formed != 0 {
+        if let Some(my_doc) = ctxt.my_doc.filter(|doc| doc.int_subset.is_some()) {
+            ctxt.valid &= ctxt.validate_one_element(my_doc, ctxt.node.map(|node| node.into()));
         }
-
-        // end of parsing of this node.
-        ctxt.node_pop();
     }
+
+    // end of parsing of this node.
+    ctxt.node_pop();
 }
 
 /// Called when an entity xmlSAX2Reference is detected.

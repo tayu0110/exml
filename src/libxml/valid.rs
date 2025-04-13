@@ -666,50 +666,48 @@ impl XmlValidCtxt {
     /// Returns 1 if no validation problem was found or 0 otherwise
     #[doc(alias = "xmlValidatePopElement")]
     #[cfg(all(feature = "libxml_valid", feature = "libxml_regexp"))]
-    pub unsafe fn pop_element(
+    pub fn pop_element(
         &mut self,
         _doc: Option<XmlDocPtr>,
         _elem: Option<XmlNodePtr>,
         _qname: &str,
     ) -> i32 {
-        unsafe {
-            let mut ret: i32 = 1;
+        let mut ret: i32 = 1;
 
-            // printf("PopElem %s\n", qname);
-            if let Some(state) = self.vstate_tab.last_mut() {
-                // Check the new element against the content model of the new elem.
-                if let Some(elem_decl) = state.elem_decl {
-                    if matches!(elem_decl.etype, XmlElementTypeVal::XmlElementTypeElement)
-                        && state.exec.is_some()
-                    {
-                        ret = state.exec.as_mut().unwrap().push_string(None, null_mut());
-                        if ret <= 0 {
-                            let name = state.node.name().unwrap().into_owned();
-                            let node = state.node.into();
-                            xml_err_valid_node(
-                                Some(self),
-                                Some(node),
-                                XmlParserErrors::XmlDTDContentModel,
-                                format!(
-                                    "Element {} content does not follow the DTD, Expecting more children\n",
-                                    name
-                                )
-                                .as_str(),
-                                Some(&name),
-                                None,
-                                None,
-                            );
-                            ret = 0;
-                        } else {
-                            // previous validation errors should not generate a new one here
-                            ret = 1;
-                        }
+        // printf("PopElem %s\n", qname);
+        if let Some(state) = self.vstate_tab.last_mut() {
+            // Check the new element against the content model of the new elem.
+            if let Some(elem_decl) = state.elem_decl {
+                if matches!(elem_decl.etype, XmlElementTypeVal::XmlElementTypeElement)
+                    && state.exec.is_some()
+                {
+                    ret = state.exec.as_mut().unwrap().push_string(None, null_mut());
+                    if ret <= 0 {
+                        let name = state.node.name().unwrap().into_owned();
+                        let node = state.node.into();
+                        xml_err_valid_node(
+                            Some(self),
+                            Some(node),
+                            XmlParserErrors::XmlDTDContentModel,
+                            format!(
+                                "Element {} content does not follow the DTD, Expecting more children\n",
+                                name
+                            )
+                            .as_str(),
+                            Some(&name),
+                            None,
+                            None,
+                        );
+                        ret = 0;
+                    } else {
+                        // previous validation errors should not generate a new one here
+                        ret = 1;
                     }
                 }
-                self.vstate_vpop();
             }
-            ret
+            self.vstate_vpop();
         }
+        ret
     }
 
     /// Check the CData parsed for validation in the current stack

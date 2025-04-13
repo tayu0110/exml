@@ -2871,62 +2871,60 @@ impl XmlRegExecCtxt {
     /// Returns: 1 if the regexp reached a final state, 0 if non-final,
     /// and a negative value in case of error.
     #[doc(alias = "xmlRegCompactPushString")]
-    unsafe fn compact_push_string(
+    fn compact_push_string(
         &mut self,
         comp: Rc<XmlRegexp>,
         value: Option<&str>,
         data: *mut c_void,
     ) -> i32 {
-        unsafe {
-            let state = self.index;
+        let state = self.index;
 
-            if comp.compact.is_empty() {
-                return -1;
-            }
-
-            let Some(value) = value else {
-                // are we at a final state ?
-                if comp.compact[state][0] == XmlRegStateType::XmlRegexpFinalState as i32 {
-                    return 1;
-                }
-                return 0;
-            };
-
-            // Examine all outside transitions from current state
-            for i in 0..comp.string_map.len() {
-                let mut target = comp.compact[state][i + 1];
-                if target > 0 && target <= comp.nbstates {
-                    target -= 1; /* to avoid 0 */
-                    if xml_reg_str_equal_wildcard(Some(&comp.string_map[i]), Some(value)) != 0 {
-                        self.index = target as usize;
-                        if let Some(callback) = self.callback {
-                            if !comp.transdata.is_empty() {
-                                callback(self.data as _, value, comp.transdata[state][i], data);
-                            }
-                        }
-                        if comp.compact[target as usize][0]
-                            == XmlRegStateType::XmlRegexpSinkState as i32
-                        {
-                            // goto error;
-                            break;
-                        }
-
-                        if comp.compact[target as usize][0]
-                            == XmlRegStateType::XmlRegexpFinalState as i32
-                        {
-                            return 1;
-                        }
-                        return 0;
-                    }
-                }
-            }
-            // Failed to find an exit transition out from current state for the current token
-            // error:
-            self.err_string = Some(value.to_owned().into_boxed_str());
-            self.err_state_no = state as i32;
-            self.status = -1;
-            -1
+        if comp.compact.is_empty() {
+            return -1;
         }
+
+        let Some(value) = value else {
+            // are we at a final state ?
+            if comp.compact[state][0] == XmlRegStateType::XmlRegexpFinalState as i32 {
+                return 1;
+            }
+            return 0;
+        };
+
+        // Examine all outside transitions from current state
+        for i in 0..comp.string_map.len() {
+            let mut target = comp.compact[state][i + 1];
+            if target > 0 && target <= comp.nbstates {
+                target -= 1; /* to avoid 0 */
+                if xml_reg_str_equal_wildcard(Some(&comp.string_map[i]), Some(value)) != 0 {
+                    self.index = target as usize;
+                    if let Some(callback) = self.callback {
+                        if !comp.transdata.is_empty() {
+                            callback(self as _, value, comp.transdata[state][i], data);
+                        }
+                    }
+                    if comp.compact[target as usize][0]
+                        == XmlRegStateType::XmlRegexpSinkState as i32
+                    {
+                        // goto error;
+                        break;
+                    }
+
+                    if comp.compact[target as usize][0]
+                        == XmlRegStateType::XmlRegexpFinalState as i32
+                    {
+                        return 1;
+                    }
+                    return 0;
+                }
+            }
+        }
+        // Failed to find an exit transition out from current state for the current token
+        // error:
+        self.err_string = Some(value.to_owned().into_boxed_str());
+        self.err_state_no = state as i32;
+        self.status = -1;
+        -1
     }
 
     /// Push one input token in the execution context
@@ -2934,325 +2932,320 @@ impl XmlRegExecCtxt {
     /// Returns: 1 if the regexp reached a final state, 0 if non-final,
     /// and a negative value in case of error.
     #[doc(alias = "xmlRegExecPushStringInternal")]
-    unsafe fn push_string_internal(
+    fn push_string_internal(
         &mut self,
         value: Option<&str>,
         mut data: *mut c_void,
         compound: i32,
     ) -> i32 {
-        unsafe {
-            let mut ret: i32;
-            let mut is_final: i32 = 0;
-            let mut progress: i32 = 1;
+        let mut ret: i32;
+        let mut is_final: i32 = 0;
+        let mut progress: i32 = 1;
 
-            if self.status != 0 {
-                return self.status;
+        if self.status != 0 {
+            return self.status;
+        }
+
+        if !self.comp.compact.is_empty() {
+            return self.compact_push_string(self.comp.clone(), value, data);
+        }
+
+        if value.is_none() {
+            if matches!(
+                self.comp.states[self.state].as_ref().unwrap().typ,
+                XmlRegStateType::XmlRegexpFinalState
+            ) {
+                return 1;
             }
+            is_final = 1;
+        }
 
-            if !self.comp.compact.is_empty() {
-                return self.compact_push_string(self.comp.clone(), value, data);
-            }
+        let mut value = value.map(Rc::from);
 
-            if value.is_none() {
-                if matches!(
-                    self.comp.states[self.state].as_ref().unwrap().typ,
-                    XmlRegStateType::XmlRegexpFinalState
-                ) {
-                    return 1;
-                }
-                is_final = 1;
-            }
+        // If we have an active rollback stack push the new value there
+        // and get back to where we were left
+        if value.is_some() && !self.input_stack.is_empty() {
+            self.save_input_string(value, data);
+            value = self.input_stack[self.index].value.clone();
+            data = self.input_stack[self.index].data;
+        }
 
-            let mut value = value.map(Rc::from);
+        'b: while self.status == 0
+            && (value.is_some()
+                || (is_final == 1
+                    && !matches!(self.state_type(), XmlRegStateType::XmlRegexpFinalState)))
+        {
+            'rollback: {
+                'progress: {
+                    // End of input on non-terminal state, rollback, however we may
+                    // still have epsilon like transition for counted transitions
+                    // on counters, in that case don't break too early.
+                    if value.is_none() && self.counts.is_empty() {
+                        break 'rollback;
+                    }
 
-            // If we have an active rollback stack push the new value there
-            // and get back to where we were left
-            if value.is_some() && !self.input_stack.is_empty() {
-                self.save_input_string(value, data);
-                value = self.input_stack[self.index].value.clone();
-                data = self.input_stack[self.index].data;
-            }
-
-            'b: while self.status == 0
-                && (value.is_some()
-                    || (is_final == 1
-                        && !matches!(self.state_type(), XmlRegStateType::XmlRegexpFinalState)))
-            {
-                'rollback: {
-                    'progress: {
-                        // End of input on non-terminal state, rollback, however we may
-                        // still have epsilon like transition for counted transitions
-                        // on counters, in that case don't break too early.
-                        if value.is_none() && self.counts.is_empty() {
-                            break 'rollback;
+                    self.transcount = 0;
+                    self.transno -= 1;
+                    while {
+                        self.transno += 1;
+                        self.transno < self.num_transes() as i32
+                    } {
+                        if self.trans().to < 0 {
+                            continue;
                         }
+                        ret = 0;
+                        if self.trans().count as usize == REGEXP_ALL_LAX_COUNTER {
+                            let mut count: i32;
 
-                        self.transcount = 0;
-                        self.transno -= 1;
-                        while {
-                            self.transno += 1;
-                            self.transno < self.num_transes() as i32
-                        } {
-                            if self.trans().to < 0 {
-                                continue;
-                            }
                             ret = 0;
-                            if self.trans().count as usize == REGEXP_ALL_LAX_COUNTER {
-                                let mut count: i32;
 
-                                ret = 0;
-
-                                // Check all counted transitions from the current state
-                                if value.is_none() && is_final != 0 {
-                                    ret = 1;
-                                } else if let Some(value) = value.as_deref() {
-                                    for (i, t) in self.state().trans.iter().enumerate() {
-                                        if t.counter < 0 || i == self.transno as usize {
-                                            continue;
-                                        }
-                                        let counter = self.comp.counters[t.counter as usize];
-                                        count = self.counts[t.counter as usize];
-                                        if count < counter.max
-                                            && t.atom_index != usize::MAX
-                                            && Some(value)
-                                                == self.comp.atoms[t.atom_index].valuep.as_deref()
-                                        {
-                                            ret = 0;
-                                            break;
-                                        }
-                                        if count >= counter.min
-                                            && count < counter.max
-                                            && t.atom_index != usize::MAX
-                                            && Some(value)
-                                                == self.comp.atoms[t.atom_index].valuep.as_deref()
-                                        {
-                                            ret = 1;
-                                            break;
-                                        }
-                                    }
-                                }
-                            } else if self.trans().count as usize == REGEXP_ALL_COUNTER {
-                                let mut count: i32;
-
+                            // Check all counted transitions from the current state
+                            if value.is_none() && is_final != 0 {
                                 ret = 1;
-
-                                // Check all counted transitions from the current state
+                            } else if let Some(value) = value.as_deref() {
                                 for (i, t) in self.state().trans.iter().enumerate() {
                                     if t.counter < 0 || i == self.transno as usize {
                                         continue;
                                     }
                                     let counter = self.comp.counters[t.counter as usize];
                                     count = self.counts[t.counter as usize];
-                                    if count < counter.min || count > counter.max {
+                                    if count < counter.max
+                                        && t.atom_index != usize::MAX
+                                        && Some(value)
+                                            == self.comp.atoms[t.atom_index].valuep.as_deref()
+                                    {
                                         ret = 0;
                                         break;
                                     }
-                                }
-                            } else if self.trans().count >= 0 {
-                                // A counted transition.
-                                let count = self.counts[self.trans().count as usize];
-                                let counter = self.comp.counters[self.trans().count as usize];
-                                ret = (count >= counter.min && count <= counter.max) as _;
-                            } else if self.trans().atom_index == usize::MAX {
-                                eprintln!("epsilon transition left at runtime");
-                                self.status = -2;
-                                break;
-                            } else if value.is_some() {
-                                ret = xml_reg_str_equal_wildcard(
-                                    self.atom().valuep.as_deref(),
-                                    value.as_deref(),
-                                );
-                                if self.atom().neg != 0 {
-                                    ret = (ret == 0) as i32;
-                                    if compound == 0 {
-                                        ret = 0;
-                                    }
-                                }
-                                if ret == 1 && self.trans().counter >= 0 {
-                                    let count = self.counts[self.trans().counter as usize];
-                                    let counter = self.comp.counters[self.trans().counter as usize];
-                                    if count >= counter.max {
-                                        ret = 0;
-                                    }
-                                }
-
-                                if ret == 1 && self.atom().min > 0 && self.atom().max > 0 {
-                                    let to = self.trans().to as usize;
-
-                                    // this is a multiple input sequence
-                                    if self.num_transes() as i32 > self.transno + 1 {
-                                        if self.input_stack.is_empty() {
-                                            self.save_input_string(value.clone(), data);
-                                        }
-                                        self.save();
-                                    }
-                                    self.transcount = 1;
-                                    'inner: while {
-                                        // Try to progress as much as possible on the input
-                                        if self.transcount == self.atom().max {
-                                            break 'inner;
-                                        }
-                                        self.index += 1;
-                                        // End of input: stop here
-                                        if self.index == self.input_stack.len() {
-                                            self.index -= 1;
-                                            value = None;
-                                            data = null_mut();
-                                            break 'inner;
-                                        }
-                                        value = self.input_stack[self.index].value.clone();
-                                        data = self.input_stack[self.index].data;
-
-                                        // End of input: stop here
-                                        if value.is_none() {
-                                            self.index -= 1;
-                                            break 'inner;
-                                        }
-                                        if self.transcount >= self.atom().min {
-                                            let transno: i32 = self.transno;
-                                            let state = self.state;
-
-                                            // The transition is acceptable save it
-                                            self.transno = -1; /* trick */
-                                            self.state = to;
-                                            if self.input_stack.is_empty() {
-                                                self.save_input_string(value.clone(), data);
-                                            }
-                                            self.save();
-                                            self.transno = transno;
-                                            self.state = state;
-                                        }
-                                        ret = (value.as_deref() == self.atom().valuep.as_deref())
-                                            as i32;
-                                        self.transcount += 1;
-                                        ret == 1
-                                    } {}
-                                    if self.transcount < self.atom().min {
-                                        ret = 0;
-                                    }
-
-                                    // If the last check failed but one transition was found
-                                    // possible, rollback
-                                    if ret < 0 {
-                                        ret = 0;
-                                    }
-                                    if ret == 0 {
-                                        break 'rollback;
+                                    if count >= counter.min
+                                        && count < counter.max
+                                        && t.atom_index != usize::MAX
+                                        && Some(value)
+                                            == self.comp.atoms[t.atom_index].valuep.as_deref()
+                                    {
+                                        ret = 1;
+                                        break;
                                     }
                                 }
                             }
-                            if ret == 1 {
-                                if let Some(callback) = self.callback {
-                                    if !data.is_null() && self.trans().atom_index != usize::MAX {
-                                        callback(
-                                            self.data as _,
-                                            self.atom().valuep.as_deref().unwrap(),
-                                            self.atom().data as _,
-                                            data,
-                                        );
-                                    }
+                        } else if self.trans().count as usize == REGEXP_ALL_COUNTER {
+                            let mut count: i32;
+
+                            ret = 1;
+
+                            // Check all counted transitions from the current state
+                            for (i, t) in self.state().trans.iter().enumerate() {
+                                if t.counter < 0 || i == self.transno as usize {
+                                    continue;
                                 }
+                                let counter = self.comp.counters[t.counter as usize];
+                                count = self.counts[t.counter as usize];
+                                if count < counter.min || count > counter.max {
+                                    ret = 0;
+                                    break;
+                                }
+                            }
+                        } else if self.trans().count >= 0 {
+                            // A counted transition.
+                            let count = self.counts[self.trans().count as usize];
+                            let counter = self.comp.counters[self.trans().count as usize];
+                            ret = (count >= counter.min && count <= counter.max) as _;
+                        } else if self.trans().atom_index == usize::MAX {
+                            eprintln!("epsilon transition left at runtime");
+                            self.status = -2;
+                            break;
+                        } else if value.is_some() {
+                            ret = xml_reg_str_equal_wildcard(
+                                self.atom().valuep.as_deref(),
+                                value.as_deref(),
+                            );
+                            if self.atom().neg != 0 {
+                                ret = (ret == 0) as i32;
+                                if compound == 0 {
+                                    ret = 0;
+                                }
+                            }
+                            if ret == 1 && self.trans().counter >= 0 {
+                                let count = self.counts[self.trans().counter as usize];
+                                let counter = self.comp.counters[self.trans().counter as usize];
+                                if count >= counter.max {
+                                    ret = 0;
+                                }
+                            }
+
+                            if ret == 1 && self.atom().min > 0 && self.atom().max > 0 {
+                                let to = self.trans().to as usize;
+
+                                // this is a multiple input sequence
                                 if self.num_transes() as i32 > self.transno + 1 {
                                     if self.input_stack.is_empty() {
                                         self.save_input_string(value.clone(), data);
                                     }
                                     self.save();
                                 }
-                                if self.trans().counter >= 0 {
-                                    let counter = self.trans().counter as usize;
-                                    self.counts[counter] += 1;
-                                }
-                                if self.trans().count >= 0
-                                    && (self.trans().count as usize) < REGEXP_ALL_COUNTER
-                                {
-                                    let count = self.trans().count as usize;
-                                    self.counts[count] = 0;
-                                }
-                                if self.trans().to != -1
-                                    && self.comp.states[self.trans().to as usize].is_some()
-                                    && matches!(
-                                        self.state_type(),
-                                        XmlRegStateType::XmlRegexpSinkState
-                                    )
-                                {
-                                    // entering a sink state, save the current state as error state.
-                                    self.err_string = value
-                                        .as_deref()
-                                        .map(|value| value.to_owned().into_boxed_str());
-                                    self.err_state = self.state;
-                                    self.err_counts.copy_from_slice(&self.counts);
-                                }
-                                if self.trans().atom_index != usize::MAX {
-                                    if !self.input_stack.is_empty() {
-                                        self.index += 1;
-                                        if self.index < self.input_stack.len() {
-                                            value = self.input_stack[self.index].value.clone();
-                                            data = self.input_stack[self.index].data;
-                                        } else {
-                                            value = None;
-                                            data = null_mut();
+                                self.transcount = 1;
+                                'inner: while {
+                                    // Try to progress as much as possible on the input
+                                    if self.transcount == self.atom().max {
+                                        break 'inner;
+                                    }
+                                    self.index += 1;
+                                    // End of input: stop here
+                                    if self.index == self.input_stack.len() {
+                                        self.index -= 1;
+                                        value = None;
+                                        data = null_mut();
+                                        break 'inner;
+                                    }
+                                    value = self.input_stack[self.index].value.clone();
+                                    data = self.input_stack[self.index].data;
+
+                                    // End of input: stop here
+                                    if value.is_none() {
+                                        self.index -= 1;
+                                        break 'inner;
+                                    }
+                                    if self.transcount >= self.atom().min {
+                                        let transno: i32 = self.transno;
+                                        let state = self.state;
+
+                                        // The transition is acceptable save it
+                                        self.transno = -1; /* trick */
+                                        self.state = to;
+                                        if self.input_stack.is_empty() {
+                                            self.save_input_string(value.clone(), data);
                                         }
+                                        self.save();
+                                        self.transno = transno;
+                                        self.state = state;
+                                    }
+                                    ret =
+                                        (value.as_deref() == self.atom().valuep.as_deref()) as i32;
+                                    self.transcount += 1;
+                                    ret == 1
+                                } {}
+                                if self.transcount < self.atom().min {
+                                    ret = 0;
+                                }
+
+                                // If the last check failed but one transition was found
+                                // possible, rollback
+                                if ret < 0 {
+                                    ret = 0;
+                                }
+                                if ret == 0 {
+                                    break 'rollback;
+                                }
+                            }
+                        }
+                        if ret == 1 {
+                            if let Some(callback) = self.callback {
+                                if !data.is_null() && self.trans().atom_index != usize::MAX {
+                                    callback(
+                                        self as _,
+                                        self.atom().valuep.as_deref().unwrap(),
+                                        self.atom().data as _,
+                                        data,
+                                    );
+                                }
+                            }
+                            if self.num_transes() as i32 > self.transno + 1 {
+                                if self.input_stack.is_empty() {
+                                    self.save_input_string(value.clone(), data);
+                                }
+                                self.save();
+                            }
+                            if self.trans().counter >= 0 {
+                                let counter = self.trans().counter as usize;
+                                self.counts[counter] += 1;
+                            }
+                            if self.trans().count >= 0
+                                && (self.trans().count as usize) < REGEXP_ALL_COUNTER
+                            {
+                                let count = self.trans().count as usize;
+                                self.counts[count] = 0;
+                            }
+                            if self.trans().to != -1
+                                && self.comp.states[self.trans().to as usize].is_some()
+                                && matches!(self.state_type(), XmlRegStateType::XmlRegexpSinkState)
+                            {
+                                // entering a sink state, save the current state as error state.
+                                self.err_string = value
+                                    .as_deref()
+                                    .map(|value| value.to_owned().into_boxed_str());
+                                self.err_state = self.state;
+                                self.err_counts.copy_from_slice(&self.counts);
+                            }
+                            if self.trans().atom_index != usize::MAX {
+                                if !self.input_stack.is_empty() {
+                                    self.index += 1;
+                                    if self.index < self.input_stack.len() {
+                                        value = self.input_stack[self.index].value.clone();
+                                        data = self.input_stack[self.index].data;
                                     } else {
                                         value = None;
                                         data = null_mut();
                                     }
+                                } else {
+                                    value = None;
+                                    data = null_mut();
                                 }
-                                self.next_state();
-                                break 'progress;
-                            } else if ret < 0 {
-                                self.status = -4;
-                                break;
                             }
+                            self.next_state();
+                            break 'progress;
+                        } else if ret < 0 {
+                            self.status = -4;
+                            break;
                         }
-                        if self.transno != 0
-                            || self.comp.states[self.state]
-                                .as_ref()
-                                .unwrap()
-                                .trans
-                                .is_empty()
-                        {
-                            break 'rollback;
-                        }
-                        continue 'b;
                     }
-                    // progress:
-                    progress = 1;
+                    if self.transno != 0
+                        || self.comp.states[self.state]
+                            .as_ref()
+                            .unwrap()
+                            .trans
+                            .is_empty()
+                    {
+                        break 'rollback;
+                    }
                     continue 'b;
                 }
-                // if we didn't yet rollback on the current input
-                // store the current state as the error state.
-                if progress != 0
-                    && self.state != usize::MAX
-                    && !matches!(self.state_type(), XmlRegStateType::XmlRegexpSinkState)
-                {
-                    progress = 0;
-                    self.err_string = value
-                        .as_deref()
-                        .map(|value| value.to_owned().into_boxed_str());
-                    self.err_state = self.state;
-                    if !self.comp.counters.is_empty() {
-                        self.err_counts.copy_from_slice(&self.counts);
-                    }
+                // progress:
+                progress = 1;
+                continue 'b;
+            }
+            // if we didn't yet rollback on the current input
+            // store the current state as the error state.
+            if progress != 0
+                && self.state != usize::MAX
+                && !matches!(self.state_type(), XmlRegStateType::XmlRegexpSinkState)
+            {
+                progress = 0;
+                self.err_string = value
+                    .as_deref()
+                    .map(|value| value.to_owned().into_boxed_str());
+                self.err_state = self.state;
+                if !self.comp.counters.is_empty() {
+                    self.err_counts.copy_from_slice(&self.counts);
                 }
+            }
 
-                // Failed to find a way out
-                self.determinist = 0;
-                self.rollback();
-                if !self.input_stack.is_empty() && self.status == 0 {
-                    if self.index < self.input_stack.len() {
-                        value = self.input_stack[self.index].value.clone();
-                        data = self.input_stack[self.index].data;
-                    } else {
-                        value = None;
-                        data = null_mut();
-                    }
+            // Failed to find a way out
+            self.determinist = 0;
+            self.rollback();
+            if !self.input_stack.is_empty() && self.status == 0 {
+                if self.index < self.input_stack.len() {
+                    value = self.input_stack[self.index].value.clone();
+                    data = self.input_stack[self.index].data;
+                } else {
+                    value = None;
+                    data = null_mut();
                 }
             }
-            if self.status == 0 {
-                return matches!(self.state_type(), XmlRegStateType::XmlRegexpFinalState) as _;
-            }
-            self.status
         }
+        if self.status == 0 {
+            return matches!(self.state_type(), XmlRegStateType::XmlRegexpFinalState) as _;
+        }
+        self.status
     }
 
     /// Push one input token in the execution context
@@ -3260,8 +3253,8 @@ impl XmlRegExecCtxt {
     /// Returns: 1 if the regexp reached a final state, 0 if non-final,
     /// and a negative value in case of error.
     #[doc(alias = "xmlRegExecPushString")]
-    pub unsafe fn push_string(&mut self, value: Option<&str>, data: *mut c_void) -> i32 {
-        unsafe { self.push_string_internal(value, data, 0) }
+    pub fn push_string(&mut self, value: Option<&str>, data: *mut c_void) -> i32 {
+        self.push_string_internal(value, data, 0)
     }
 
     /// Push one input token in the execution context
@@ -3269,30 +3262,23 @@ impl XmlRegExecCtxt {
     /// Returns: 1 if the regexp reached a final state, 0 if non-final,
     /// and a negative value in case of error.
     #[doc(alias = "xmlRegExecPushString2")]
-    pub unsafe fn push_string2(
-        &mut self,
-        value: &str,
-        value2: Option<&str>,
-        data: *mut c_void,
-    ) -> i32 {
-        unsafe {
-            if self.status != 0 {
-                return self.status;
-            }
-
-            let Some(value2) = value2 else {
-                return self.push_string(Some(value), data);
-            };
-
-            let s = format!("{value}{}{value2}", XML_REG_STRING_SEPARATOR);
-            let ret = if !self.comp.compact.is_empty() {
-                self.compact_push_string(self.comp.clone(), Some(s.as_str()), data)
-            } else {
-                self.push_string_internal(Some(s.as_str()), data, 1)
-            };
-
-            ret
+    pub fn push_string2(&mut self, value: &str, value2: Option<&str>, data: *mut c_void) -> i32 {
+        if self.status != 0 {
+            return self.status;
         }
+
+        let Some(value2) = value2 else {
+            return self.push_string(Some(value), data);
+        };
+
+        let s = format!("{value}{}{value2}", XML_REG_STRING_SEPARATOR);
+        let ret = if !self.comp.compact.is_empty() {
+            self.compact_push_string(self.comp.clone(), Some(s.as_str()), data)
+        } else {
+            self.push_string_internal(Some(s.as_str()), data, 1)
+        };
+
+        ret
     }
 
     /// Extract information from the regexp execution, internal routine to
@@ -4587,7 +4573,7 @@ fn xml_fa_compare_atoms(atom1: &XmlRegAtom, atom2: &XmlRegAtom, deep: i32) -> i3
 /// Callback function when doing a transition in the automata
 #[doc(alias = "xmlRegExecCallbacks")]
 pub type XmlRegExecCallbacks =
-    unsafe fn(exec: XmlRegExecCtxtPtr, token: &str, transdata: *mut c_void, inputdata: *mut c_void);
+    fn(exec: XmlRegExecCtxtPtr, token: &str, transdata: *mut c_void, inputdata: *mut c_void);
 
 pub(crate) const REGEXP_ALL_LAX_COUNTER: usize = 0x123457;
 

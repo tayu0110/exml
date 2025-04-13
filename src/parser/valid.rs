@@ -657,148 +657,48 @@ impl XmlParserCtxt {
     /// returns 1 if no validation problem was found or 0 otherwise
     #[doc(alias = "xmlValidatePushElement")]
     #[cfg(all(feature = "libxml_valid", feature = "libxml_regexp"))]
-    pub unsafe fn vpush_element(&mut self, doc: XmlDocPtr, elem: XmlNodePtr, qname: &str) -> i32 {
-        unsafe {
-            let mut ret: i32 = 1;
-            let mut extsubset: i32 = 0;
+    pub fn vpush_element(&mut self, doc: XmlDocPtr, elem: XmlNodePtr, qname: &str) -> i32 {
+        let mut ret: i32 = 1;
+        let mut extsubset: i32 = 0;
 
-            if let Some(state) = self.vctxt.vstate_tab.last_mut() {
-                // Check the new element against the content model of the new elem.
-                if let Some(elem_decl) = state.elem_decl {
-                    match elem_decl.etype {
-                        XmlElementTypeVal::XmlElementTypeUndefined => {
-                            ret = 0;
-                        }
-                        XmlElementTypeVal::XmlElementTypeEmpty => {
-                            let name = state.node.name().unwrap().into_owned();
-                            let node = state.node.into();
-                            xml_err_valid_node(
-                                Some(self),
-                                Some(node),
-                                XmlParserErrors::XmlDTDNotEmpty,
-                                format!("Element {name} was declared EMPTY this one has content\n")
-                                    .as_str(),
-                                Some(&name),
-                                None,
-                                None,
-                            );
-                            ret = 0;
-                        }
-                        XmlElementTypeVal::XmlElementTypeAny => {
-                            // I don't think anything is required then
-                        }
-                        XmlElementTypeVal::XmlElementTypeMixed => {
-                            // simple case of declared as #PCDATA
-                            if elem_decl.content.as_deref().is_some_and(|content| {
-                                content.borrow().typ
-                                    == XmlElementContentType::XmlElementContentPCDATA
-                            }) {
-                                let name = state.node.name().unwrap().into_owned();
-                                let node = state.node.into();
-                                xml_err_valid_node(
-                                    Some(self),
-                                    Some(node),
-                                    XmlParserErrors::XmlDTDNotPCDATA,
-                                    format!(
-                                        "Element {} was declared #PCDATA but contains non text nodes\n",
-                                        name
-                                    )
-                                    .as_str(),
-                                    Some(&name),
-                                    None,
-                                    None,
-                                );
-                                ret = 0;
-                            } else {
-                                let name = state.node.name().unwrap().into_owned();
-                                let node = state.node.into();
-                                ret = self.validate_check_mixed(elem_decl.content.clone(), qname);
-                                if ret != 1 {
-                                    xml_err_valid_node(
-                                        Some(self),
-                                        Some(node),
-                                        XmlParserErrors::XmlDTDInvalidChild,
-                                        format!(
-                                            "Element {} is not declared in {} list of possible children\n",
-                                            qname,
-                                            name,
-                                        ).as_str(),
-                                        Some(qname),
-                                        Some(&name),
-                                        None,
-                                    );
-                                }
-                            }
-                        }
-                        XmlElementTypeVal::XmlElementTypeElement => {
-                            // TODO:
-                            // VC: Standalone Document Declaration
-                            //     - element types with element content, if white space
-                            //       occurs directly within any instance of those types.
-                            if state.exec.is_some() {
-                                ret = state
-                                    .exec
-                                    .as_mut()
-                                    .unwrap()
-                                    .push_string(Some(qname), null_mut());
-                                if ret < 0 {
-                                    let name = state.node.name().unwrap().into_owned();
-                                    let node = state.node.into();
-                                    xml_err_valid_node(
-                                        Some(self),
-                                        Some(node),
-                                        XmlParserErrors::XmlDTDContentModel,
-                                        format!("Element {} content does not follow the DTD, Misplaced {}\n", name, qname).as_str(),
-                                        Some(&name),
-                                        Some(qname),
-                                        None,
-                                    );
-                                    ret = 0;
-                                } else {
-                                    ret = 1;
-                                }
-                            }
-                        }
+        if let Some(state) = self.vctxt.vstate_tab.last_mut() {
+            // Check the new element against the content model of the new elem.
+            if let Some(elem_decl) = state.elem_decl {
+                match elem_decl.etype {
+                    XmlElementTypeVal::XmlElementTypeUndefined => {
+                        ret = 0;
                     }
-                }
-            }
-            let e_decl = self.get_elem_decl(doc, elem, &mut extsubset);
-            self.vstate_vpush(e_decl, elem);
-            ret
-        }
-    }
-
-    /// Pop the element end from the validation stack.
-    ///
-    /// Returns 1 if no validation problem was found or 0 otherwise
-    #[doc(alias = "xmlValidatePopElement")]
-    #[cfg(all(feature = "libxml_valid", feature = "libxml_regexp"))]
-    pub unsafe fn vpop_element(
-        &mut self,
-        _doc: Option<XmlDocPtr>,
-        _elem: Option<XmlNodePtr>,
-        _qname: &str,
-    ) -> i32 {
-        unsafe {
-            let mut ret: i32 = 1;
-
-            // printf("PopElem %s\n", qname);
-            if let Some(state) = self.vctxt.vstate_tab.last_mut() {
-                // Check the new element against the content model of the new elem.
-                if let Some(elem_decl) = state.elem_decl {
-                    if matches!(elem_decl.etype, XmlElementTypeVal::XmlElementTypeElement)
-                        && state.exec.is_some()
-                    {
-                        ret = state.exec.as_mut().unwrap().push_string(None, null_mut());
-                        if ret <= 0 {
+                    XmlElementTypeVal::XmlElementTypeEmpty => {
+                        let name = state.node.name().unwrap().into_owned();
+                        let node = state.node.into();
+                        xml_err_valid_node(
+                            Some(self),
+                            Some(node),
+                            XmlParserErrors::XmlDTDNotEmpty,
+                            format!("Element {name} was declared EMPTY this one has content\n")
+                                .as_str(),
+                            Some(&name),
+                            None,
+                            None,
+                        );
+                        ret = 0;
+                    }
+                    XmlElementTypeVal::XmlElementTypeAny => {
+                        // I don't think anything is required then
+                    }
+                    XmlElementTypeVal::XmlElementTypeMixed => {
+                        // simple case of declared as #PCDATA
+                        if elem_decl.content.as_deref().is_some_and(|content| {
+                            content.borrow().typ == XmlElementContentType::XmlElementContentPCDATA
+                        }) {
                             let name = state.node.name().unwrap().into_owned();
                             let node = state.node.into();
                             xml_err_valid_node(
                                 Some(self),
                                 Some(node),
-                                XmlParserErrors::XmlDTDContentModel,
+                                XmlParserErrors::XmlDTDNotPCDATA,
                                 format!(
-                                    "Element {} content does not follow the DTD, Expecting more children\n",
+                                    "Element {} was declared #PCDATA but contains non text nodes\n",
                                     name
                                 )
                                 .as_str(),
@@ -808,15 +708,110 @@ impl XmlParserCtxt {
                             );
                             ret = 0;
                         } else {
-                            // previous validation errors should not generate a new one here
-                            ret = 1;
+                            let name = state.node.name().unwrap().into_owned();
+                            let node = state.node.into();
+                            ret = self.validate_check_mixed(elem_decl.content.clone(), qname);
+                            if ret != 1 {
+                                xml_err_valid_node(
+                                    Some(self),
+                                    Some(node),
+                                    XmlParserErrors::XmlDTDInvalidChild,
+                                    format!(
+                                        "Element {} is not declared in {} list of possible children\n",
+                                        qname,
+                                        name,
+                                    ).as_str(),
+                                    Some(qname),
+                                    Some(&name),
+                                    None,
+                                );
+                            }
+                        }
+                    }
+                    XmlElementTypeVal::XmlElementTypeElement => {
+                        // TODO:
+                        // VC: Standalone Document Declaration
+                        //     - element types with element content, if white space
+                        //       occurs directly within any instance of those types.
+                        if state.exec.is_some() {
+                            ret = state
+                                .exec
+                                .as_mut()
+                                .unwrap()
+                                .push_string(Some(qname), null_mut());
+                            if ret < 0 {
+                                let name = state.node.name().unwrap().into_owned();
+                                let node = state.node.into();
+                                xml_err_valid_node(
+                                    Some(self),
+                                    Some(node),
+                                    XmlParserErrors::XmlDTDContentModel,
+                                    format!("Element {} content does not follow the DTD, Misplaced {}\n", name, qname).as_str(),
+                                    Some(&name),
+                                    Some(qname),
+                                    None,
+                                );
+                                ret = 0;
+                            } else {
+                                ret = 1;
+                            }
                         }
                     }
                 }
-                self.vstate_vpop();
             }
-            ret
         }
+        let e_decl = self.get_elem_decl(doc, elem, &mut extsubset);
+        self.vstate_vpush(e_decl, elem);
+        ret
+    }
+
+    /// Pop the element end from the validation stack.
+    ///
+    /// Returns 1 if no validation problem was found or 0 otherwise
+    #[doc(alias = "xmlValidatePopElement")]
+    #[cfg(all(feature = "libxml_valid", feature = "libxml_regexp"))]
+    pub fn vpop_element(
+        &mut self,
+        _doc: Option<XmlDocPtr>,
+        _elem: Option<XmlNodePtr>,
+        _qname: &str,
+    ) -> i32 {
+        let mut ret: i32 = 1;
+
+        // printf("PopElem %s\n", qname);
+        if let Some(state) = self.vctxt.vstate_tab.last_mut() {
+            // Check the new element against the content model of the new elem.
+            if let Some(elem_decl) = state.elem_decl {
+                if matches!(elem_decl.etype, XmlElementTypeVal::XmlElementTypeElement)
+                    && state.exec.is_some()
+                {
+                    ret = state.exec.as_mut().unwrap().push_string(None, null_mut());
+                    if ret <= 0 {
+                        let name = state.node.name().unwrap().into_owned();
+                        let node = state.node.into();
+                        xml_err_valid_node(
+                            Some(self),
+                            Some(node),
+                            XmlParserErrors::XmlDTDContentModel,
+                            format!(
+                                "Element {} content does not follow the DTD, Expecting more children\n",
+                                name
+                            )
+                            .as_str(),
+                            Some(&name),
+                            None,
+                            None,
+                        );
+                        ret = 0;
+                    } else {
+                        // previous validation errors should not generate a new one here
+                        ret = 1;
+                    }
+                }
+            }
+            self.vstate_vpop();
+        }
+        ret
     }
 
     /// Check the CData parsed for validation in the current stack
@@ -1254,144 +1249,136 @@ impl XmlParserCtxt {
     ///
     /// returns 1 if valid or 0 if not and -1 in case of error
     #[doc(alias = "xmlValidateElementContent")]
-    unsafe fn validate_element_content(
+    fn validate_element_content(
         &mut self,
         child: Option<XmlGenericNodePtr>,
         elem_decl: XmlElementPtr,
         warn: i32,
         parent: XmlNodePtr,
     ) -> i32 {
-        unsafe {
-            let mut ret: i32;
+        let mut ret: i32;
 
-            // let cont: XmlElementContentPtr = elem_decl.content;
-            let name = elem_decl.name.as_deref();
+        // let cont: XmlElementContentPtr = elem_decl.content;
+        let name = elem_decl.name.as_deref();
 
-            #[cfg(feature = "libxml_regexp")]
-            {
-                // Build the regexp associated to the content model
-                if elem_decl.cont_model.is_none() {
-                    self.build_content_model(elem_decl);
-                }
-                let Some(cont_model) = elem_decl.cont_model.clone() else {
-                    return -1;
-                };
-                if cont_model.is_determinist() == 0 {
-                    return -1;
-                }
-                self.vctxt.node_tab.clear();
-                let mut exec = XmlRegExecCtxt::new(cont_model, None, null_mut());
-                let mut cur = child;
-                'fail: {
-                    while let Some(cur_node) = cur {
-                        match cur_node.element_type() {
-                            XmlElementType::XmlEntityRefNode => {
-                                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                                // Push the current node to be able to roll back
-                                // and process within the entity
-                                if let Some(children) = cur_node
-                                    .children
-                                    .filter(|children| children.children().is_some())
-                                {
-                                    self.node_vpush(cur_node);
-                                    cur = children.children();
-                                    continue;
-                                }
+        #[cfg(feature = "libxml_regexp")]
+        {
+            // Build the regexp associated to the content model
+            if elem_decl.cont_model.is_none() {
+                self.build_content_model(elem_decl);
+            }
+            let Some(cont_model) = elem_decl.cont_model.clone() else {
+                return -1;
+            };
+            if cont_model.is_determinist() == 0 {
+                return -1;
+            }
+            self.vctxt.node_tab.clear();
+            let mut exec = XmlRegExecCtxt::new(cont_model, None, null_mut());
+            let mut cur = child;
+            'fail: {
+                while let Some(cur_node) = cur {
+                    match cur_node.element_type() {
+                        XmlElementType::XmlEntityRefNode => {
+                            let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                            // Push the current node to be able to roll back
+                            // and process within the entity
+                            if let Some(children) = cur_node
+                                .children
+                                .filter(|children| children.children().is_some())
+                            {
+                                self.node_vpush(cur_node);
+                                cur = children.children();
+                                continue;
                             }
-                            XmlElementType::XmlTextNode => {
-                                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                                if cur_node.is_blank_node() {
-                                    //  break;
-                                } else {
-                                    ret = 0;
-                                    break 'fail;
-                                }
-                            }
-                            XmlElementType::XmlCDATASectionNode => {
-                                // TODO
+                        }
+                        XmlElementType::XmlTextNode => {
+                            let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                            if cur_node.is_blank_node() {
+                                //  break;
+                            } else {
                                 ret = 0;
                                 break 'fail;
                             }
-                            XmlElementType::XmlElementNode => {
-                                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                                if let Some(prefix) =
-                                    cur_node.ns.as_deref().and_then(|ns| ns.prefix())
-                                {
-                                    let name = cur_node.name().unwrap();
-                                    let fullname = build_qname(&name, Some(&prefix));
-                                    // ret =
-                                    exec.push_string(Some(&fullname), null_mut());
-                                } else {
-                                    // ret =
-                                    exec.push_string(cur_node.name().as_deref(), null_mut());
-                                }
-                            }
-                            _ => {}
                         }
-                        // Switch to next element
-                        cur = cur_node.next();
-                        while cur.is_none() {
-                            cur = self.node_vpop().map(|node| node.into());
-                            if cur.is_none() {
-                                break;
-                            }
-                            cur = cur_node.next();
+                        XmlElementType::XmlCDATASectionNode => {
+                            // TODO
+                            ret = 0;
+                            break 'fail;
                         }
+                        XmlElementType::XmlElementNode => {
+                            let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                            if let Some(prefix) = cur_node.ns.as_deref().and_then(|ns| ns.prefix())
+                            {
+                                let name = cur_node.name().unwrap();
+                                let fullname = build_qname(&name, Some(&prefix));
+                                // ret =
+                                exec.push_string(Some(&fullname), null_mut());
+                            } else {
+                                // ret =
+                                exec.push_string(cur_node.name().as_deref(), null_mut());
+                            }
+                        }
+                        _ => {}
                     }
-
-                    ret = exec.push_string(None, null_mut());
-                }
-            }
-
-            if warn != 0 && (ret != 1 && ret != -3) {
-                let mut expr = String::with_capacity(5000);
-                let mut list = String::with_capacity(5000);
-
-                xml_snprintf_element_content(
-                    &mut expr,
-                    5000,
-                    elem_decl.content.clone().unwrap(),
-                    1,
-                );
-                #[cfg(feature = "libxml_regexp")]
-                {
-                    xml_snprintf_elements(&mut list, 5000, child, 1);
+                    // Switch to next element
+                    cur = cur_node.next();
+                    while cur.is_none() {
+                        cur = self.node_vpop().map(|node| node.into());
+                        if cur.is_none() {
+                            break;
+                        }
+                        cur = cur_node.next();
+                    }
                 }
 
-                if let Some(name) = name {
-                    xml_err_valid_node(
-                        Some(self),
-                        Some(parent.into()),
-                        XmlParserErrors::XmlDTDContentModel,
-                        format!(
-                            "Element {} content does not follow the DTD, expecting {}, got {}\n",
-                            name, expr, list
-                        )
-                        .as_str(),
-                        Some(name),
-                        Some(&expr),
-                        Some(&list),
-                    );
-                } else {
-                    xml_err_valid_node(
-                        Some(self),
-                        Some(parent.into()),
-                        XmlParserErrors::XmlDTDContentModel,
-                        "Element content does not follow the DTD\n",
-                        None,
-                        None,
-                        None,
-                    );
-                }
-                ret = 0;
+                ret = exec.push_string(None, null_mut());
             }
-            if ret == -3 {
-                ret = 1;
-            }
-
-            self.vctxt.node_tab.clear();
-            ret
         }
+
+        if warn != 0 && (ret != 1 && ret != -3) {
+            let mut expr = String::with_capacity(5000);
+            let mut list = String::with_capacity(5000);
+
+            xml_snprintf_element_content(&mut expr, 5000, elem_decl.content.clone().unwrap(), 1);
+            #[cfg(feature = "libxml_regexp")]
+            {
+                xml_snprintf_elements(&mut list, 5000, child, 1);
+            }
+
+            if let Some(name) = name {
+                xml_err_valid_node(
+                    Some(self),
+                    Some(parent.into()),
+                    XmlParserErrors::XmlDTDContentModel,
+                    format!(
+                        "Element {} content does not follow the DTD, expecting {}, got {}\n",
+                        name, expr, list
+                    )
+                    .as_str(),
+                    Some(name),
+                    Some(&expr),
+                    Some(&list),
+                );
+            } else {
+                xml_err_valid_node(
+                    Some(self),
+                    Some(parent.into()),
+                    XmlParserErrors::XmlDTDContentModel,
+                    "Element content does not follow the DTD\n",
+                    None,
+                    None,
+                    None,
+                );
+            }
+            ret = 0;
+        }
+        if ret == -3 {
+            ret = 1;
+        }
+
+        self.vctxt.node_tab.clear();
+        ret
     }
 
     /// Try to validate a single element and it's attributes,
@@ -1406,283 +1393,224 @@ impl XmlParserCtxt {
     /// returns 1 if valid or 0 otherwise
     #[doc(alias = "xmlValidateOneElement")]
     #[cfg(feature = "libxml_valid")]
-    pub unsafe fn validate_one_element(
-        &mut self,
-        doc: XmlDocPtr,
-        elem: Option<XmlGenericNodePtr>,
-    ) -> i32 {
+    pub fn validate_one_element(&mut self, doc: XmlDocPtr, elem: Option<XmlGenericNodePtr>) -> i32 {
         use crate::libxml::chvalid::xml_is_blank_char;
 
-        unsafe {
-            let mut ret: i32 = 1;
-            let tmp: i32;
-            let mut extsubset: i32 = 0;
+        let mut ret: i32 = 1;
+        let tmp: i32;
+        let mut extsubset: i32 = 0;
 
-            if doc.int_subset.is_none() && doc.ext_subset.is_none() {
-                return 0;
-            };
+        if doc.int_subset.is_none() && doc.ext_subset.is_none() {
+            return 0;
+        };
 
-            let Some(elem) = elem else {
+        let Some(elem) = elem else {
+            return 0;
+        };
+        match elem.element_type() {
+            XmlElementType::XmlAttributeNode => {
+                xml_err_valid_node(
+                    Some(self),
+                    Some(elem),
+                    XmlParserErrors::XmlErrInternalError,
+                    "Attribute element not expected\n",
+                    None,
+                    None,
+                    None,
+                );
                 return 0;
-            };
-            match elem.element_type() {
-                XmlElementType::XmlAttributeNode => {
-                    xml_err_valid_node(
-                        Some(self),
-                        Some(elem),
-                        XmlParserErrors::XmlErrInternalError,
-                        "Attribute element not expected\n",
-                        None,
-                        None,
-                        None,
-                    );
-                    return 0;
-                }
-                XmlElementType::XmlTextNode => {
-                    let elem = XmlNodePtr::try_from(elem).unwrap();
-                    if elem.children().is_some() {
-                        xml_err_valid_node(
-                            Some(self),
-                            Some(elem.into()),
-                            XmlParserErrors::XmlErrInternalError,
-                            "Text element has children !\n",
-                            None,
-                            None,
-                            None,
-                        );
-                        return 0;
-                    }
-                    if elem.ns.is_some() {
-                        xml_err_valid_node(
-                            Some(self),
-                            Some(elem.into()),
-                            XmlParserErrors::XmlErrInternalError,
-                            "Text element has namespace !\n",
-                            None,
-                            None,
-                            None,
-                        );
-                        return 0;
-                    }
-                    if elem.content.is_none() {
-                        xml_err_valid_node(
-                            Some(self),
-                            Some(elem.into()),
-                            XmlParserErrors::XmlErrInternalError,
-                            "Text element has no content !\n",
-                            None,
-                            None,
-                            None,
-                        );
-                        return 0;
-                    }
-                    return 1;
-                }
-                XmlElementType::XmlXIncludeStart | XmlElementType::XmlXIncludeEnd => {
-                    return 1;
-                }
-                XmlElementType::XmlCDATASectionNode
-                | XmlElementType::XmlEntityRefNode
-                | XmlElementType::XmlPINode
-                | XmlElementType::XmlCommentNode => {
-                    return 1;
-                }
-                XmlElementType::XmlEntityNode => {
-                    xml_err_valid_node(
-                        Some(self),
-                        Some(elem),
-                        XmlParserErrors::XmlErrInternalError,
-                        "Entity element not expected\n",
-                        None,
-                        None,
-                        None,
-                    );
-                    return 0;
-                }
-                XmlElementType::XmlNotationNode => {
-                    xml_err_valid_node(
-                        Some(self),
-                        Some(elem),
-                        XmlParserErrors::XmlErrInternalError,
-                        "Notation element not expected\n",
-                        None,
-                        None,
-                        None,
-                    );
-                    return 0;
-                }
-                XmlElementType::XmlDocumentNode
-                | XmlElementType::XmlDocumentTypeNode
-                | XmlElementType::XmlDocumentFragNode => {
-                    xml_err_valid_node(
-                        Some(self),
-                        Some(elem),
-                        XmlParserErrors::XmlErrInternalError,
-                        "Document element not expected\n",
-                        None,
-                        None,
-                        None,
-                    );
-                    return 0;
-                }
-                XmlElementType::XmlHTMLDocumentNode => {
-                    xml_err_valid_node(
-                        Some(self),
-                        Some(elem),
-                        XmlParserErrors::XmlErrInternalError,
-                        "HTML Document not expected\n",
-                        None,
-                        None,
-                        None,
-                    );
-                    return 0;
-                }
-                XmlElementType::XmlElementNode => {}
-                _ => {
-                    xml_err_valid_node(
-                        Some(self),
-                        Some(elem),
-                        XmlParserErrors::XmlErrInternalError,
-                        "unknown element type\n",
-                        None,
-                        None,
-                        None,
-                    );
-                    return 0;
-                }
             }
-
-            // At this point, `elem` is just `XmlElementNode`.
-            let elem = XmlNodePtr::try_from(elem).unwrap();
-
-            // Fetch the declaration
-            let Some(elem_decl) = self.get_elem_decl(doc, elem, &mut extsubset) else {
+            XmlElementType::XmlTextNode => {
+                let elem = XmlNodePtr::try_from(elem).unwrap();
+                if elem.children().is_some() {
+                    xml_err_valid_node(
+                        Some(self),
+                        Some(elem.into()),
+                        XmlParserErrors::XmlErrInternalError,
+                        "Text element has children !\n",
+                        None,
+                        None,
+                        None,
+                    );
+                    return 0;
+                }
+                if elem.ns.is_some() {
+                    xml_err_valid_node(
+                        Some(self),
+                        Some(elem.into()),
+                        XmlParserErrors::XmlErrInternalError,
+                        "Text element has namespace !\n",
+                        None,
+                        None,
+                        None,
+                    );
+                    return 0;
+                }
+                if elem.content.is_none() {
+                    xml_err_valid_node(
+                        Some(self),
+                        Some(elem.into()),
+                        XmlParserErrors::XmlErrInternalError,
+                        "Text element has no content !\n",
+                        None,
+                        None,
+                        None,
+                    );
+                    return 0;
+                }
+                return 1;
+            }
+            XmlElementType::XmlXIncludeStart | XmlElementType::XmlXIncludeEnd => {
+                return 1;
+            }
+            XmlElementType::XmlCDATASectionNode
+            | XmlElementType::XmlEntityRefNode
+            | XmlElementType::XmlPINode
+            | XmlElementType::XmlCommentNode => {
+                return 1;
+            }
+            XmlElementType::XmlEntityNode => {
+                xml_err_valid_node(
+                    Some(self),
+                    Some(elem),
+                    XmlParserErrors::XmlErrInternalError,
+                    "Entity element not expected\n",
+                    None,
+                    None,
+                    None,
+                );
                 return 0;
-            };
+            }
+            XmlElementType::XmlNotationNode => {
+                xml_err_valid_node(
+                    Some(self),
+                    Some(elem),
+                    XmlParserErrors::XmlErrInternalError,
+                    "Notation element not expected\n",
+                    None,
+                    None,
+                    None,
+                );
+                return 0;
+            }
+            XmlElementType::XmlDocumentNode
+            | XmlElementType::XmlDocumentTypeNode
+            | XmlElementType::XmlDocumentFragNode => {
+                xml_err_valid_node(
+                    Some(self),
+                    Some(elem),
+                    XmlParserErrors::XmlErrInternalError,
+                    "Document element not expected\n",
+                    None,
+                    None,
+                    None,
+                );
+                return 0;
+            }
+            XmlElementType::XmlHTMLDocumentNode => {
+                xml_err_valid_node(
+                    Some(self),
+                    Some(elem),
+                    XmlParserErrors::XmlErrInternalError,
+                    "HTML Document not expected\n",
+                    None,
+                    None,
+                    None,
+                );
+                return 0;
+            }
+            XmlElementType::XmlElementNode => {}
+            _ => {
+                xml_err_valid_node(
+                    Some(self),
+                    Some(elem),
+                    XmlParserErrors::XmlErrInternalError,
+                    "unknown element type\n",
+                    None,
+                    None,
+                    None,
+                );
+                return 0;
+            }
+        }
 
-            // If vstate_nr is not zero that means continuous validation is
-            // activated, do not try to check the content model at that level.
-            if self.vctxt.vstate_tab.is_empty() {
-                // Check that the element content matches the definition
-                match elem_decl.etype {
-                    XmlElementTypeVal::XmlElementTypeUndefined => {
+        // At this point, `elem` is just `XmlElementNode`.
+        let elem = XmlNodePtr::try_from(elem).unwrap();
+
+        // Fetch the declaration
+        let Some(elem_decl) = self.get_elem_decl(doc, elem, &mut extsubset) else {
+            return 0;
+        };
+
+        // If vstate_nr is not zero that means continuous validation is
+        // activated, do not try to check the content model at that level.
+        if self.vctxt.vstate_tab.is_empty() {
+            // Check that the element content matches the definition
+            match elem_decl.etype {
+                XmlElementTypeVal::XmlElementTypeUndefined => {
+                    let name = elem.name().unwrap();
+                    xml_err_valid_node(
+                        Some(self),
+                        Some(elem.into()),
+                        XmlParserErrors::XmlDTDUnknownElem,
+                        format!("No declaration for element {name}\n").as_str(),
+                        Some(&name),
+                        None,
+                        None,
+                    );
+                    return 0;
+                }
+                XmlElementTypeVal::XmlElementTypeEmpty => {
+                    if elem.children().is_some() {
                         let name = elem.name().unwrap();
                         xml_err_valid_node(
                             Some(self),
                             Some(elem.into()),
-                            XmlParserErrors::XmlDTDUnknownElem,
-                            format!("No declaration for element {name}\n").as_str(),
+                            XmlParserErrors::XmlDTDNotEmpty,
+                            format!("Element {name} was declared EMPTY this one has content\n")
+                                .as_str(),
                             Some(&name),
                             None,
                             None,
                         );
-                        return 0;
+                        ret = 0;
                     }
-                    XmlElementTypeVal::XmlElementTypeEmpty => {
-                        if elem.children().is_some() {
+                }
+                XmlElementTypeVal::XmlElementTypeAny => {
+                    // I don't think anything is required then
+                }
+                XmlElementTypeVal::XmlElementTypeMixed => {
+                    // simple case of declared as #PCDATA
+                    if elem_decl.content.as_deref().is_some_and(|cont| {
+                        cont.borrow().typ == XmlElementContentType::XmlElementContentPCDATA
+                    }) {
+                        ret = self.validate_one_cdata_element(doc, elem);
+                        if ret == 0 {
                             let name = elem.name().unwrap();
                             xml_err_valid_node(
-                                Some(self),
-                                Some(elem.into()),
-                                XmlParserErrors::XmlDTDNotEmpty,
-                                format!("Element {name} was declared EMPTY this one has content\n")
-                                    .as_str(),
-                                Some(&name),
-                                None,
-                                None,
-                            );
-                            ret = 0;
+                        Some(self),
+                        Some(elem.into()),
+                        XmlParserErrors::XmlDTDNotPCDATA,
+                        format!(
+                            "Element {name} was declared #PCDATA but contains non text nodes\n"
+                        )
+                        .as_str(),
+                        Some(&name),
+                        None,
+                        None,
+                    );
                         }
-                    }
-                    XmlElementTypeVal::XmlElementTypeAny => {
-                        // I don't think anything is required then
-                    }
-                    XmlElementTypeVal::XmlElementTypeMixed => {
-                        // simple case of declared as #PCDATA
-                        if elem_decl.content.as_deref().is_some_and(|cont| {
-                            cont.borrow().typ == XmlElementContentType::XmlElementContentPCDATA
-                        }) {
-                            ret = self.validate_one_cdata_element(doc, elem);
-                            if ret == 0 {
-                                let name = elem.name().unwrap();
-                                xml_err_valid_node(
-                            Some(self),
-                            Some(elem.into()),
-                            XmlParserErrors::XmlDTDNotPCDATA,
-                            format!(
-                                "Element {name} was declared #PCDATA but contains non text nodes\n"
-                            )
-                            .as_str(),
-                            Some(&name),
-                            None,
-                            None,
-                        );
-                            }
-                        } else {
-                            let mut child = elem.children;
-                            // Hum, this start to get messy
-                            while let Some(cur_node) = child {
-                                if matches!(cur_node.element_type(), XmlElementType::XmlElementNode)
+                    } else {
+                        let mut child = elem.children;
+                        // Hum, this start to get messy
+                        while let Some(cur_node) = child {
+                            if matches!(cur_node.element_type(), XmlElementType::XmlElementNode) {
+                                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                                let name = cur_node.name.clone();
+                                if let Some(prefix) =
+                                    cur_node.ns.as_deref().and_then(|ns| ns.prefix())
                                 {
-                                    let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                                    let name = cur_node.name.clone();
-                                    if let Some(prefix) =
-                                        cur_node.ns.as_deref().and_then(|ns| ns.prefix())
-                                    {
-                                        let fullname = build_qname(&cur_node.name, Some(&prefix));
-                                        let mut cont = elem_decl.content.clone();
-                                        while let Some(now) = cont.clone() {
-                                            let now = now.borrow();
-                                            if matches!(
-                                                now.typ,
-                                                XmlElementContentType::XmlElementContentElement
-                                            ) {
-                                                if now.name.as_deref() == Some(&fullname) {
-                                                    break;
-                                                }
-                                            } else if matches!(
-                                                now.typ,
-                                                XmlElementContentType::XmlElementContentOr
-                                            ) && now.c1.as_deref().is_some_and(|c1| {
-                                                c1.borrow().typ
-                                                == XmlElementContentType::XmlElementContentElement
-                                            }) {
-                                                if now
-                                                    .c1
-                                                    .as_deref()
-                                                    .unwrap()
-                                                    .borrow()
-                                                    .name
-                                                    .as_deref()
-                                                    == Some(&fullname)
-                                                {
-                                                    break;
-                                                }
-                                            } else if !matches!(
-                                                now.typ,
-                                                XmlElementContentType::XmlElementContentOr
-                                            ) || now.c1.as_deref().is_none_or(|c1| {
-                                                !matches!(
-                                                    c1.borrow().typ,
-                                                    XmlElementContentType::XmlElementContentPCDATA
-                                                )
-                                            }) {
-                                                xml_err_valid(
-                                                    None,
-                                                    XmlParserErrors::XmlDTDMixedCorrupt,
-                                                    "Internal: MIXED struct corrupted\n",
-                                                    None,
-                                                );
-                                                break;
-                                            }
-                                            cont = now.c2.clone();
-                                        }
-                                        if cont.is_some() {
-                                            child = cur_node.next();
-                                            continue;
-                                        }
-                                    }
-
+                                    let fullname = build_qname(&cur_node.name, Some(&prefix));
                                     let mut cont = elem_decl.content.clone();
                                     while let Some(now) = cont.clone() {
                                         let now = now.borrow();
@@ -1690,20 +1618,18 @@ impl XmlParserCtxt {
                                             now.typ,
                                             XmlElementContentType::XmlElementContentElement
                                         ) {
-                                            if now.name.as_deref() == Some(&name) {
+                                            if now.name.as_deref() == Some(&fullname) {
                                                 break;
                                             }
                                         } else if matches!(
                                             now.typ,
                                             XmlElementContentType::XmlElementContentOr
                                         ) && now.c1.as_deref().is_some_and(|c1| {
-                                            matches!(
-                                                c1.borrow().typ,
-                                                XmlElementContentType::XmlElementContentElement
-                                            )
+                                            c1.borrow().typ
+                                                == XmlElementContentType::XmlElementContentElement
                                         }) {
                                             if now.c1.as_deref().unwrap().borrow().name.as_deref()
-                                                == Some(&name)
+                                                == Some(&fullname)
                                             {
                                                 break;
                                             }
@@ -1717,7 +1643,7 @@ impl XmlParserCtxt {
                                             )
                                         }) {
                                             xml_err_valid(
-                                                Some(self),
+                                                None,
                                                 XmlParserErrors::XmlDTDMixedCorrupt,
                                                 "Internal: MIXED struct corrupted\n",
                                                 None,
@@ -1726,255 +1652,303 @@ impl XmlParserCtxt {
                                         }
                                         cont = now.c2.clone();
                                     }
-                                    if cont.is_none() {
-                                        let elem_name = elem.name().unwrap();
-                                        xml_err_valid_node(
-                                        Some(self),
-                                        Some(elem.into()),
-                                        XmlParserErrors::XmlDTDInvalidChild,
-                                        format!(
-                                            "Element {} is not declared in {} list of possible children\n",
-                                            name,
-                                            elem_name
-                                        ).as_str(),
-                                        Some(&name),
-                                        Some(&elem_name),
-                                        None
-                                    );
-                                        ret = 0;
+                                    if cont.is_some() {
+                                        child = cur_node.next();
+                                        continue;
                                     }
                                 }
-                                // child_ok:
-                                child = cur_node.next();
-                            }
-                        }
-                    }
-                    XmlElementTypeVal::XmlElementTypeElement => {
-                        if doc.standalone == 1 && extsubset == 1 {
-                            // VC: Standalone Document Declaration
-                            //     - element types with element content, if white space
-                            //       occurs directly within any instance of those types.
-                            let mut child = elem.children();
-                            while let Some(cur_node) = child {
-                                if matches!(cur_node.element_type(), XmlElementType::XmlTextNode) {
-                                    let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                                    let mut content = cur_node.content.as_deref().unwrap();
-                                    content = content
-                                        .trim_start_matches(|c: char| xml_is_blank_char(c as u32));
-                                    if content.is_empty() {
-                                        let name = elem.name().unwrap();
-                                        xml_err_valid_node(
-                                        Some(self),
-                                        Some(elem.into()),
-                                        XmlParserErrors::XmlDTDStandaloneWhiteSpace,
-                                        format!(
-                                            "standalone: {} declared in the external subset contains white spaces nodes\n",
-                                            name
-                                        ).as_str(),
-                                        Some(&name),
-                                        None,
-                                        None
-                                    );
-                                        ret = 0;
+
+                                let mut cont = elem_decl.content.clone();
+                                while let Some(now) = cont.clone() {
+                                    let now = now.borrow();
+                                    if matches!(
+                                        now.typ,
+                                        XmlElementContentType::XmlElementContentElement
+                                    ) {
+                                        if now.name.as_deref() == Some(&name) {
+                                            break;
+                                        }
+                                    } else if matches!(
+                                        now.typ,
+                                        XmlElementContentType::XmlElementContentOr
+                                    ) && now.c1.as_deref().is_some_and(|c1| {
+                                        matches!(
+                                            c1.borrow().typ,
+                                            XmlElementContentType::XmlElementContentElement
+                                        )
+                                    }) {
+                                        if now.c1.as_deref().unwrap().borrow().name.as_deref()
+                                            == Some(&name)
+                                        {
+                                            break;
+                                        }
+                                    } else if !matches!(
+                                        now.typ,
+                                        XmlElementContentType::XmlElementContentOr
+                                    ) || now.c1.as_deref().is_none_or(|c1| {
+                                        !matches!(
+                                            c1.borrow().typ,
+                                            XmlElementContentType::XmlElementContentPCDATA
+                                        )
+                                    }) {
+                                        xml_err_valid(
+                                            Some(self),
+                                            XmlParserErrors::XmlDTDMixedCorrupt,
+                                            "Internal: MIXED struct corrupted\n",
+                                            None,
+                                        );
                                         break;
                                     }
+                                    cont = now.c2.clone();
                                 }
-                                child = cur_node.next();
+                                if cont.is_none() {
+                                    let elem_name = elem.name().unwrap();
+                                    xml_err_valid_node(
+                                    Some(self),
+                                    Some(elem.into()),
+                                    XmlParserErrors::XmlDTDInvalidChild,
+                                    format!(
+                                        "Element {} is not declared in {} list of possible children\n",
+                                        name,
+                                        elem_name
+                                    ).as_str(),
+                                    Some(&name),
+                                    Some(&elem_name),
+                                    None
+                                );
+                                    ret = 0;
+                                }
                             }
-                        }
-                        let child = elem.children;
-                        // cont = (*elem_decl).content;
-                        tmp = self.validate_element_content(child, elem_decl, 1, elem);
-                        if tmp <= 0 {
-                            ret = tmp;
+                            // child_ok:
+                            child = cur_node.next();
                         }
                     }
                 }
-            }
-
-            // [ VC: Required Attribute ]
-            let mut attr = elem_decl.attributes;
-            while let Some(cur_attr) = attr {
-                'found: {
-                    if matches!(cur_attr.def, XmlAttributeDefault::XmlAttributeRequired) {
-                        let mut qualified: i32 = -1;
-
-                        if cur_attr.prefix.is_none() && cur_attr.name.as_deref() == Some("xmlns") {
-                            let mut ns = elem.ns_def;
-                            while let Some(now) = ns {
-                                if now.prefix().is_none() {
-                                    break 'found;
-                                }
-                                ns = now.next;
-                            }
-                        } else if cur_attr.prefix.as_deref() == Some("xmlns") {
-                            let mut ns = elem.ns_def;
-                            while let Some(now) = ns {
-                                if cur_attr.name() == now.prefix() {
-                                    break 'found;
-                                }
-                                ns = now.next;
-                            }
-                        } else {
-                            let mut attrib = elem.properties;
-                            while let Some(attr) = attrib {
-                                if attr.name().as_deref() == cur_attr.name.as_deref() {
-                                    if let Some(prefix) = cur_attr.prefix.as_deref() {
-                                        let name_space = attr.ns.or(elem.ns);
-
-                                        // qualified names handling is problematic, having a
-                                        // different prefix should be possible but DTDs don't
-                                        // allow to define the URI instead of the prefix :-(
-                                        if let Some(name_space) = name_space {
-                                            if (*name_space).prefix().as_deref() != Some(prefix) {
-                                                if qualified < 1 {
-                                                    qualified = 1;
-                                                }
-                                            } else {
-                                                break 'found;
-                                            }
-                                        } else if qualified < 0 {
-                                            qualified = 0;
-                                        }
-                                    } else {
-                                        // We should allow applications to define namespaces
-                                        // for their application even if the DTD doesn't
-                                        // carry one, otherwise, basically we would always break.
-                                        break 'found;
-                                    }
-                                }
-                                attrib = attr.next;
-                            }
-                        }
-                        if qualified == -1 {
-                            if cur_attr.prefix.is_none() {
-                                let elem_name = elem.name().unwrap();
-                                let attr_name = cur_attr.name().unwrap();
-                                xml_err_valid_node(
+                XmlElementTypeVal::XmlElementTypeElement => {
+                    if doc.standalone == 1 && extsubset == 1 {
+                        // VC: Standalone Document Declaration
+                        //     - element types with element content, if white space
+                        //       occurs directly within any instance of those types.
+                        let mut child = elem.children();
+                        while let Some(cur_node) = child {
+                            if matches!(cur_node.element_type(), XmlElementType::XmlTextNode) {
+                                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                                let mut content = cur_node.content.as_deref().unwrap();
+                                content = content
+                                    .trim_start_matches(|c: char| xml_is_blank_char(c as u32));
+                                if content.is_empty() {
+                                    let name = elem.name().unwrap();
+                                    xml_err_valid_node(
                                     Some(self),
                                     Some(elem.into()),
-                                    XmlParserErrors::XmlDTDMissingAttribute,
+                                    XmlParserErrors::XmlDTDStandaloneWhiteSpace,
                                     format!(
-                                        "Element {} does not carry attribute {}\n",
-                                        elem_name, attr_name
-                                    )
-                                    .as_str(),
-                                    Some(&elem_name),
-                                    Some(&attr_name),
-                                    None,
-                                );
-                                ret = 0;
-                            } else {
-                                let elem_name = elem.name().unwrap();
-                                let prefix = cur_attr.prefix.as_deref().unwrap();
-                                let attr_name = cur_attr.name().unwrap();
-                                xml_err_valid_node(
-                                    Some(self),
-                                    Some(elem.into()),
-                                    XmlParserErrors::XmlDTDMissingAttribute,
-                                    format!(
-                                        "Element {} does not carry attribute {}:{}\n",
-                                        elem_name, prefix, attr_name
-                                    )
-                                    .as_str(),
-                                    Some(&elem_name),
-                                    Some(prefix),
-                                    Some(&attr_name),
-                                );
-                                ret = 0;
-                            }
-                        } else if qualified == 0 {
-                            xml_err_valid_warning(
-                                Some(self),
-                                Some(elem.into()),
-                                XmlParserErrors::XmlDTDNoPrefix,
-                                format!(
-                                    "Element {} required attribute {}:{} has no prefix\n",
-                                    elem.name,
-                                    cur_attr.prefix.as_deref().unwrap(),
-                                    cur_attr.name.as_deref().unwrap()
-                                )
-                                .as_str(),
-                                Some(&elem.name),
-                                cur_attr.prefix.as_deref(),
-                                cur_attr.name.as_deref(),
-                            );
-                        } else if qualified == 1 {
-                            xml_err_valid_warning(
-                                Some(self),
-                                Some(elem.into()),
-                                XmlParserErrors::XmlDTDDifferentPrefix,
-                                format!(
-                                    "Element {} required attribute {}:{} has different prefix\n",
-                                    elem.name,
-                                    cur_attr.prefix.as_deref().unwrap(),
-                                    cur_attr.name.as_deref().unwrap()
-                                )
-                                .as_str(),
-                                Some(&elem.name),
-                                cur_attr.prefix.as_deref(),
-                                cur_attr.name.as_deref(),
-                            );
-                        }
-                    } else if matches!(cur_attr.def, XmlAttributeDefault::XmlAttributeFixed) {
-                        // Special tests checking #FIXED namespace declarations
-                        // have the right value since this is not done as an
-                        // attribute checking
-                        if cur_attr.prefix.is_none() && cur_attr.name.as_deref() == Some("xmlns") {
-                            let mut ns = elem.ns_def;
-                            while let Some(now) = ns {
-                                if now.prefix().is_none() {
-                                    if cur_attr.default_value.as_deref() != now.href.as_deref() {
-                                        let elem_name = elem.name().unwrap();
-                                        xml_err_valid_node(
-                                    Some(self),
-                                    Some(elem.into()),
-                                    XmlParserErrors::XmlDTDElemDefaultNamespace,
-                                    format!("Element {elem_name} namespace name for default namespace does not match the DTD\n").as_str(),
-                                    Some(&elem_name),
+                                        "standalone: {} declared in the external subset contains white spaces nodes\n",
+                                        name
+                                    ).as_str(),
+                                    Some(&name),
                                     None,
                                     None
                                 );
-                                        ret = 0;
+                                    ret = 0;
+                                    break;
+                                }
+                            }
+                            child = cur_node.next();
+                        }
+                    }
+                    let child = elem.children;
+                    // cont = (*elem_decl).content;
+                    tmp = self.validate_element_content(child, elem_decl, 1, elem);
+                    if tmp <= 0 {
+                        ret = tmp;
+                    }
+                }
+            }
+        }
+
+        // [ VC: Required Attribute ]
+        let mut attr = elem_decl.attributes;
+        while let Some(cur_attr) = attr {
+            'found: {
+                if matches!(cur_attr.def, XmlAttributeDefault::XmlAttributeRequired) {
+                    let mut qualified: i32 = -1;
+
+                    if cur_attr.prefix.is_none() && cur_attr.name.as_deref() == Some("xmlns") {
+                        let mut ns = elem.ns_def;
+                        while let Some(now) = ns {
+                            if now.prefix().is_none() {
+                                break 'found;
+                            }
+                            ns = now.next;
+                        }
+                    } else if cur_attr.prefix.as_deref() == Some("xmlns") {
+                        let mut ns = elem.ns_def;
+                        while let Some(now) = ns {
+                            if cur_attr.name() == now.prefix() {
+                                break 'found;
+                            }
+                            ns = now.next;
+                        }
+                    } else {
+                        let mut attrib = elem.properties;
+                        while let Some(attr) = attrib {
+                            if attr.name().as_deref() == cur_attr.name.as_deref() {
+                                if let Some(prefix) = cur_attr.prefix.as_deref() {
+                                    let name_space = attr.ns.or(elem.ns);
+
+                                    // qualified names handling is problematic, having a
+                                    // different prefix should be possible but DTDs don't
+                                    // allow to define the URI instead of the prefix :-(
+                                    if let Some(name_space) = name_space {
+                                        if (*name_space).prefix().as_deref() != Some(prefix) {
+                                            if qualified < 1 {
+                                                qualified = 1;
+                                            }
+                                        } else {
+                                            break 'found;
+                                        }
+                                    } else if qualified < 0 {
+                                        qualified = 0;
                                     }
+                                } else {
+                                    // We should allow applications to define namespaces
+                                    // for their application even if the DTD doesn't
+                                    // carry one, otherwise, basically we would always break.
                                     break 'found;
                                 }
-                                ns = now.next;
                             }
-                        } else if cur_attr.prefix.as_deref() == Some("xmlns") {
-                            let mut ns = elem.ns_def;
-                            while let Some(now) = ns {
-                                if cur_attr.name() == now.prefix() {
-                                    if cur_attr.default_value.as_deref() != now.href.as_deref() {
-                                        let elem_name = elem.name().unwrap();
-                                        let prefix = now.prefix().unwrap();
-                                        xml_err_valid_node(
-                                            Some(self),
-                                            Some(elem.into()),
-                                            XmlParserErrors::XmlDTDElemNamespace,
-                                            format!(
-                                                "Element {} namespace name for {} does not match the DTD\n",
-                                                elem_name, prefix
-                                            )
-                                            .as_str(),
-                                            Some(&elem_name),
-                                            Some(&prefix),
-                                            None,
-                                        );
-                                        ret = 0;
-                                    }
-                                    break 'found;
+                            attrib = attr.next;
+                        }
+                    }
+                    if qualified == -1 {
+                        if cur_attr.prefix.is_none() {
+                            let elem_name = elem.name().unwrap();
+                            let attr_name = cur_attr.name().unwrap();
+                            xml_err_valid_node(
+                                Some(self),
+                                Some(elem.into()),
+                                XmlParserErrors::XmlDTDMissingAttribute,
+                                format!(
+                                    "Element {} does not carry attribute {}\n",
+                                    elem_name, attr_name
+                                )
+                                .as_str(),
+                                Some(&elem_name),
+                                Some(&attr_name),
+                                None,
+                            );
+                            ret = 0;
+                        } else {
+                            let elem_name = elem.name().unwrap();
+                            let prefix = cur_attr.prefix.as_deref().unwrap();
+                            let attr_name = cur_attr.name().unwrap();
+                            xml_err_valid_node(
+                                Some(self),
+                                Some(elem.into()),
+                                XmlParserErrors::XmlDTDMissingAttribute,
+                                format!(
+                                    "Element {} does not carry attribute {}:{}\n",
+                                    elem_name, prefix, attr_name
+                                )
+                                .as_str(),
+                                Some(&elem_name),
+                                Some(prefix),
+                                Some(&attr_name),
+                            );
+                            ret = 0;
+                        }
+                    } else if qualified == 0 {
+                        xml_err_valid_warning(
+                            Some(self),
+                            Some(elem.into()),
+                            XmlParserErrors::XmlDTDNoPrefix,
+                            format!(
+                                "Element {} required attribute {}:{} has no prefix\n",
+                                elem.name,
+                                cur_attr.prefix.as_deref().unwrap(),
+                                cur_attr.name.as_deref().unwrap()
+                            )
+                            .as_str(),
+                            Some(&elem.name),
+                            cur_attr.prefix.as_deref(),
+                            cur_attr.name.as_deref(),
+                        );
+                    } else if qualified == 1 {
+                        xml_err_valid_warning(
+                            Some(self),
+                            Some(elem.into()),
+                            XmlParserErrors::XmlDTDDifferentPrefix,
+                            format!(
+                                "Element {} required attribute {}:{} has different prefix\n",
+                                elem.name,
+                                cur_attr.prefix.as_deref().unwrap(),
+                                cur_attr.name.as_deref().unwrap()
+                            )
+                            .as_str(),
+                            Some(&elem.name),
+                            cur_attr.prefix.as_deref(),
+                            cur_attr.name.as_deref(),
+                        );
+                    }
+                } else if matches!(cur_attr.def, XmlAttributeDefault::XmlAttributeFixed) {
+                    // Special tests checking #FIXED namespace declarations
+                    // have the right value since this is not done as an
+                    // attribute checking
+                    if cur_attr.prefix.is_none() && cur_attr.name.as_deref() == Some("xmlns") {
+                        let mut ns = elem.ns_def;
+                        while let Some(now) = ns {
+                            if now.prefix().is_none() {
+                                if cur_attr.default_value.as_deref() != now.href.as_deref() {
+                                    let elem_name = elem.name().unwrap();
+                                    xml_err_valid_node(
+                                Some(self),
+                                Some(elem.into()),
+                                XmlParserErrors::XmlDTDElemDefaultNamespace,
+                                format!("Element {elem_name} namespace name for default namespace does not match the DTD\n").as_str(),
+                                Some(&elem_name),
+                                None,
+                                None
+                            );
+                                    ret = 0;
                                 }
-                                ns = now.next;
+                                break 'found;
                             }
+                            ns = now.next;
+                        }
+                    } else if cur_attr.prefix.as_deref() == Some("xmlns") {
+                        let mut ns = elem.ns_def;
+                        while let Some(now) = ns {
+                            if cur_attr.name() == now.prefix() {
+                                if cur_attr.default_value.as_deref() != now.href.as_deref() {
+                                    let elem_name = elem.name().unwrap();
+                                    let prefix = now.prefix().unwrap();
+                                    xml_err_valid_node(
+                                        Some(self),
+                                        Some(elem.into()),
+                                        XmlParserErrors::XmlDTDElemNamespace,
+                                        format!(
+                                            "Element {} namespace name for {} does not match the DTD\n",
+                                            elem_name, prefix
+                                        )
+                                        .as_str(),
+                                        Some(&elem_name),
+                                        Some(&prefix),
+                                        None,
+                                    );
+                                    ret = 0;
+                                }
+                                break 'found;
+                            }
+                            ns = now.next;
                         }
                     }
                 }
-                // found:
-                attr = cur_attr.nexth;
             }
-            ret
+            // found:
+            attr = cur_attr.nexth;
         }
+        ret
     }
 
     /// Try to validate the subtree under an element
@@ -1982,80 +1956,66 @@ impl XmlParserCtxt {
     /// returns 1 if valid or 0 otherwise
     #[doc(alias = "xmlValidateElement")]
     #[cfg(feature = "libxml_valid")]
-    pub unsafe fn validate_element(
-        &mut self,
-        doc: XmlDocPtr,
-        root: Option<XmlGenericNodePtr>,
-    ) -> i32 {
-        unsafe {
-            let mut ret: i32 = 1;
+    pub fn validate_element(&mut self, doc: XmlDocPtr, root: Option<XmlGenericNodePtr>) -> i32 {
+        let mut ret: i32 = 1;
 
-            let Some(root) = root else {
-                return 0;
-            };
+        let Some(root) = root else {
+            return 0;
+        };
 
-            if doc.int_subset.is_none() && doc.ext_subset.is_none() {
-                return 0;
-            };
+        if doc.int_subset.is_none() && doc.ext_subset.is_none() {
+            return 0;
+        };
 
-            let mut elem = root;
-            loop {
-                ret &= self.validate_one_element(doc, Some(elem));
+        let mut elem = root;
+        loop {
+            ret &= self.validate_one_element(doc, Some(elem));
 
-                if let Some(node) = XmlNodePtr::try_from(elem)
-                    .ok()
-                    .filter(|elem| elem.element_type() == XmlElementType::XmlElementNode)
-                {
-                    let mut attr = node.properties;
-                    while let Some(now) = attr {
-                        let value = now.children().and_then(|c| c.get_string(Some(doc), 0));
-                        ret &= self.validate_one_attribute(doc, node, Some(now), &value.unwrap());
-                        attr = now.next;
-                    }
-
-                    let mut ns = node.ns_def;
-                    while let Some(now) = ns {
-                        if let Some(elem_ns) = node.ns {
-                            ret &= self.validate_one_namespace(
-                                doc,
-                                node,
-                                elem_ns.prefix().as_deref(),
-                                now,
-                                &now.href().unwrap(),
-                            );
-                        } else {
-                            ret &= self.validate_one_namespace(
-                                doc,
-                                node,
-                                None,
-                                now,
-                                &now.href().unwrap(),
-                            );
-                        }
-                        ns = now.next;
-                    }
-
-                    if let Some(children) = elem.children() {
-                        elem = children;
-                        continue;
-                    }
+            if let Some(node) = XmlNodePtr::try_from(elem)
+                .ok()
+                .filter(|elem| elem.element_type() == XmlElementType::XmlElementNode)
+            {
+                let mut attr = node.properties;
+                while let Some(now) = attr {
+                    let value = now.children().and_then(|c| c.get_string(Some(doc), 0));
+                    ret &= self.validate_one_attribute(doc, node, Some(now), &value.unwrap());
+                    attr = now.next;
                 }
 
-                loop {
-                    if elem == root {
-                        // goto done;
-                        return ret;
+                let mut ns = node.ns_def;
+                while let Some(now) = ns {
+                    if let Some(elem_ns) = node.ns {
+                        ret &= self.validate_one_namespace(
+                            doc,
+                            node,
+                            elem_ns.prefix().as_deref(),
+                            now,
+                            &now.href().unwrap(),
+                        );
+                    } else {
+                        ret &=
+                            self.validate_one_namespace(doc, node, None, now, &now.href().unwrap());
                     }
-                    if elem.next().is_some() {
-                        break;
-                    }
-                    elem = elem.parent().unwrap();
+                    ns = now.next;
                 }
-                elem = elem.next().unwrap();
+
+                if let Some(children) = elem.children() {
+                    elem = children;
+                    continue;
+                }
             }
 
-            // done:
-            // return ret;
+            loop {
+                if elem == root {
+                    // goto done;
+                    return ret;
+                }
+                if elem.next().is_some() {
+                    break;
+                }
+                elem = elem.parent().unwrap();
+            }
+            elem = elem.next().unwrap();
         }
     }
 

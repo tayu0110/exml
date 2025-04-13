@@ -7313,7 +7313,7 @@ unsafe fn xml_relaxng_validate_attribute_list(
 
 /// Handle the callback and if needed validate the element children.
 #[doc(alias = "xmlRelaxNGValidateCompiledCallback")]
-unsafe fn xml_relaxng_validate_compiled_callback(
+fn xml_relaxng_validate_compiled_callback(
     _exec: XmlRegExecCtxtPtr,
     token: &str,
     transdata: *mut c_void,
@@ -9110,7 +9110,7 @@ pub unsafe fn xml_relaxng_validate_doc(ctxt: XmlRelaxNGValidCtxtPtr, doc: XmlDoc
 /// Handle the callback and if needed validate the element children.
 /// some of the in/out information are passed via the context in @inputdata.
 #[doc(alias = "xmlRelaxNGValidateProgressiveCallback")]
-pub(crate) unsafe fn xml_relaxng_validate_progressive_callback(
+pub(crate) fn xml_relaxng_validate_progressive_callback(
     _exec: XmlRegExecCtxtPtr,
     token: &str,
     transdata: *mut c_void,

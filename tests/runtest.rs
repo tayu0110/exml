@@ -4447,205 +4447,204 @@ fn regexp_test(filename: &str, result: Option<String>, err: Option<String>, _opt
 }
 
 #[cfg(feature = "libxml_automata")]
-unsafe fn automata_test(
+fn automata_test(
     filename: &str,
     result: Option<String>,
     _err: Option<String>,
     _options: i32,
 ) -> i32 {
-    use exml::libxml::{xmlautomata::XmlAutomata, xmlregexp::XmlRegExecCtxt};
+    use exml::{
+        generic_error,
+        libxml::{xmlautomata::XmlAutomata, xmlregexp::XmlRegExecCtxt},
+    };
 
-    unsafe {
-        use std::io::BufReader;
+    use std::io::BufReader;
 
-        use exml::generic_error;
+    let mut ret: i32;
+    let mut res: i32 = 0;
+    let mut states: [usize; 1000] = [usize::MAX; 1000];
+    let mut regexp = None;
+    let mut exec = None;
 
-        let mut ret: i32;
-        let mut res: i32 = 0;
-        let mut states: [usize; 1000] = [usize::MAX; 1000];
-        let mut regexp = None;
-        let mut exec = None;
+    NB_TESTS.set(NB_TESTS.get() + 1);
 
-        NB_TESTS.set(NB_TESTS.get() + 1);
-
-        let mut input = match File::open(filename) {
-            Ok(file) => BufReader::new(file),
-            _ => {
-                generic_error!("Cannot open {filename} for reading\n");
-                return -1;
-            }
-        };
-        let temp = result_filename(filename, Some(""), Some(".res"));
-        let Ok(mut output) = File::options()
-            .write(true)
-            .truncate(true)
-            .create(true)
-            .open(temp.as_str())
-        else {
-            eprintln!("failed to open output file {temp}",);
-            return -1;
-        };
-
-        let mut nam = XmlAutomata::new();
-        if nam.is_none() {
-            generic_error!("Cannot create automata\n");
-            return -1;
-        };
-        states[0] = nam.as_ref().unwrap().get_init_state();
-        if states[0] == usize::MAX {
-            generic_error!("Cannot get start state\n");
+    let mut input = match File::open(filename) {
+        Ok(file) => BufReader::new(file),
+        _ => {
+            generic_error!("Cannot open {filename} for reading\n");
             return -1;
         }
-        ret = 0;
+    };
+    let temp = result_filename(filename, Some(""), Some(".res"));
+    let Ok(mut output) = File::options()
+        .write(true)
+        .truncate(true)
+        .create(true)
+        .open(temp.as_str())
+    else {
+        eprintln!("failed to open output file {temp}",);
+        return -1;
+    };
 
-        let mut expr = String::new();
-        input.read_to_string(&mut expr).ok();
-        for expr in expr.lines() {
-            if expr.starts_with('#') {
-                continue;
-            }
-            let expr = expr.trim_end_matches(['\n', '\t', '\r', ' ']);
-            if !expr.is_empty() {
-                if let Some(am) = nam.as_mut() {
-                    if let Some(rem) = expr.strip_prefix("t ") {
-                        let Some((from, rem)) = rem
-                            .split_once(' ')
-                            .and_then(|(from, rem)| from.parse::<usize>().ok().zip(Some(rem)))
-                        else {
-                            generic_error!("Bad line {expr}\n");
-                            break;
-                        };
-                        if states[from] == usize::MAX {
-                            states[from] = am.new_state();
-                        }
-                        let Some((to, rem)) = rem
-                            .split_once(' ')
-                            .and_then(|(to, rem)| to.parse::<usize>().ok().zip(Some(rem)))
-                        else {
-                            generic_error!("Bad line {expr}\n");
-                            break;
-                        };
-                        if states[to] == usize::MAX {
-                            states[to] = am.new_state();
-                        }
-                        am.new_transition(states[from], states[to], rem, null_mut());
-                    } else if let Some(rem) = expr.strip_prefix("e ") {
-                        let Some((from, rem)) = rem
-                            .split_once(' ')
-                            .and_then(|(from, rem)| from.parse::<usize>().ok().zip(Some(rem)))
-                        else {
-                            generic_error!("Bad line {expr}\n");
-                            break;
-                        };
-                        if states[from] == usize::MAX {
-                            states[from] = am.new_state();
-                        }
-                        let Ok(to) = rem.parse::<usize>() else {
-                            generic_error!("Bad line {expr}\n");
-                            break;
-                        };
-                        if states[to] == usize::MAX {
-                            states[to] = am.new_state();
-                        }
-                        am.new_epsilon(states[from], states[to]);
-                    } else if let Some(rem) = expr.strip_prefix("f ") {
-                        let Ok(state) = rem.parse::<usize>() else {
-                            generic_error!("Bad line {expr}\n");
-                            break;
-                        };
-                        if states[state] == usize::MAX {
-                            generic_error!("Bad state {state} : {expr}\n");
-                            break;
-                        }
-                        am.get_state_mut(states[state]).unwrap().set_final_state();
-                    } else if let Some(rem) = expr.strip_prefix("c ") {
-                        let Some((from, rem)) = rem
-                            .split_once(' ')
-                            .and_then(|(from, rem)| from.parse::<usize>().ok().zip(Some(rem)))
-                        else {
-                            generic_error!("Bad line {expr}\n");
-                            break;
-                        };
+    let mut nam = XmlAutomata::new();
+    if nam.is_none() {
+        generic_error!("Cannot create automata\n");
+        return -1;
+    };
+    states[0] = nam.as_ref().unwrap().get_init_state();
+    if states[0] == usize::MAX {
+        generic_error!("Cannot get start state\n");
+        return -1;
+    }
+    ret = 0;
 
-                        if states[from] == usize::MAX {
-                            states[from] = am.new_state();
-                        }
-
-                        let Some((to, rem)) = rem
-                            .split_once(' ')
-                            .and_then(|(to, rem)| to.parse::<usize>().ok().zip(Some(rem)))
-                        else {
-                            generic_error!("Bad line {expr}\n");
-                            break;
-                        };
-
-                        if states[to] == usize::MAX {
-                            states[to] = am.new_state();
-                        }
-
-                        let Some((min, rem)) = rem
-                            .split_once(' ')
-                            .and_then(|(min, rem)| min.parse::<i32>().ok().zip(Some(rem)))
-                        else {
-                            generic_error!("Bad line {expr}\n");
-                            break;
-                        };
-
-                        let Some((max, rem)) = rem
-                            .split_once(' ')
-                            .and_then(|(max, rem)| max.parse::<i32>().ok().zip(Some(rem)))
-                        else {
-                            generic_error!("Bad line {expr}\n");
-                            break;
-                        };
-                        am.new_count_trans(states[from], states[to], rem, min, max, null_mut());
-                    } else if expr.starts_with("--") {
-                        // end of the automata
-                        regexp = am.compile().map(Rc::new);
-                        nam = None;
-                        if regexp.is_none() {
-                            generic_error!("Failed to compile the automata");
-                            break;
-                        }
+    let mut expr = String::new();
+    input.read_to_string(&mut expr).ok();
+    for expr in expr.lines() {
+        if expr.starts_with('#') {
+            continue;
+        }
+        let expr = expr.trim_end_matches(['\n', '\t', '\r', ' ']);
+        if !expr.is_empty() {
+            if let Some(am) = nam.as_mut() {
+                if let Some(rem) = expr.strip_prefix("t ") {
+                    let Some((from, rem)) = rem
+                        .split_once(' ')
+                        .and_then(|(from, rem)| from.parse::<usize>().ok().zip(Some(rem)))
+                    else {
+                        generic_error!("Bad line {expr}\n");
+                        break;
+                    };
+                    if states[from] == usize::MAX {
+                        states[from] = am.new_state();
                     }
-                } else if expr.starts_with("=>") {
-                    if let Some(regexp) = regexp.clone() {
-                        let mut exec = exec.take();
-                        let exec = exec
-                            .get_or_insert_with(|| XmlRegExecCtxt::new(regexp, None, null_mut()));
-                        if ret == 0 {
-                            ret = exec.push_string(None, null_mut());
-                        }
-                        if ret == 1 {
-                            writeln!(output, "=> Passed").ok();
-                        } else if ret == 0 || ret == -1 {
-                            writeln!(output, "=> Failed").ok();
-                        } else if ret < 0 {
-                            writeln!(output, "=> Error").ok();
-                        }
-                    } else {
-                        writeln!(output, "=> failed not compiled").ok();
+                    let Some((to, rem)) = rem
+                        .split_once(' ')
+                        .and_then(|(to, rem)| to.parse::<usize>().ok().zip(Some(rem)))
+                    else {
+                        generic_error!("Bad line {expr}\n");
+                        break;
+                    };
+                    if states[to] == usize::MAX {
+                        states[to] = am.new_state();
                     }
-                    ret = 0;
-                } else if let Some(regexp) = regexp.clone() {
+                    am.new_transition(states[from], states[to], rem, null_mut());
+                } else if let Some(rem) = expr.strip_prefix("e ") {
+                    let Some((from, rem)) = rem
+                        .split_once(' ')
+                        .and_then(|(from, rem)| from.parse::<usize>().ok().zip(Some(rem)))
+                    else {
+                        generic_error!("Bad line {expr}\n");
+                        break;
+                    };
+                    if states[from] == usize::MAX {
+                        states[from] = am.new_state();
+                    }
+                    let Ok(to) = rem.parse::<usize>() else {
+                        generic_error!("Bad line {expr}\n");
+                        break;
+                    };
+                    if states[to] == usize::MAX {
+                        states[to] = am.new_state();
+                    }
+                    am.new_epsilon(states[from], states[to]);
+                } else if let Some(rem) = expr.strip_prefix("f ") {
+                    let Ok(state) = rem.parse::<usize>() else {
+                        generic_error!("Bad line {expr}\n");
+                        break;
+                    };
+                    if states[state] == usize::MAX {
+                        generic_error!("Bad state {state} : {expr}\n");
+                        break;
+                    }
+                    am.get_state_mut(states[state]).unwrap().set_final_state();
+                } else if let Some(rem) = expr.strip_prefix("c ") {
+                    let Some((from, rem)) = rem
+                        .split_once(' ')
+                        .and_then(|(from, rem)| from.parse::<usize>().ok().zip(Some(rem)))
+                    else {
+                        generic_error!("Bad line {expr}\n");
+                        break;
+                    };
+
+                    if states[from] == usize::MAX {
+                        states[from] = am.new_state();
+                    }
+
+                    let Some((to, rem)) = rem
+                        .split_once(' ')
+                        .and_then(|(to, rem)| to.parse::<usize>().ok().zip(Some(rem)))
+                    else {
+                        generic_error!("Bad line {expr}\n");
+                        break;
+                    };
+
+                    if states[to] == usize::MAX {
+                        states[to] = am.new_state();
+                    }
+
+                    let Some((min, rem)) = rem
+                        .split_once(' ')
+                        .and_then(|(min, rem)| min.parse::<i32>().ok().zip(Some(rem)))
+                    else {
+                        generic_error!("Bad line {expr}\n");
+                        break;
+                    };
+
+                    let Some((max, rem)) = rem
+                        .split_once(' ')
+                        .and_then(|(max, rem)| max.parse::<i32>().ok().zip(Some(rem)))
+                    else {
+                        generic_error!("Bad line {expr}\n");
+                        break;
+                    };
+                    am.new_count_trans(states[from], states[to], rem, min, max, null_mut());
+                } else if expr.starts_with("--") {
+                    // end of the automata
+                    regexp = am.compile().map(Rc::new);
+                    nam = None;
+                    if regexp.is_none() {
+                        generic_error!("Failed to compile the automata");
+                        break;
+                    }
+                }
+            } else if expr.starts_with("=>") {
+                if let Some(regexp) = regexp.clone() {
+                    let mut exec = exec.take();
                     let exec =
                         exec.get_or_insert_with(|| XmlRegExecCtxt::new(regexp, None, null_mut()));
-                    ret = exec.push_string(Some(expr), null_mut());
+                    if ret == 0 {
+                        ret = exec.push_string(None, null_mut());
+                    }
+                    if ret == 1 {
+                        writeln!(output, "=> Passed").ok();
+                    } else if ret == 0 || ret == -1 {
+                        writeln!(output, "=> Failed").ok();
+                    } else if ret < 0 {
+                        writeln!(output, "=> Error").ok();
+                    }
                 } else {
-                    generic_error!("Unexpected line {expr}\n");
+                    writeln!(output, "=> failed not compiled").ok();
                 }
+                ret = 0;
+            } else if let Some(regexp) = regexp.clone() {
+                let exec =
+                    exec.get_or_insert_with(|| XmlRegExecCtxt::new(regexp, None, null_mut()));
+                ret = exec.push_string(Some(expr), null_mut());
+            } else {
+                generic_error!("Unexpected line {expr}\n");
             }
         }
-
-        ret = compare_files(temp.as_str(), result.as_deref().unwrap());
-        if ret != 0 {
-            eprintln!("Result for {filename} failed in {}", result.unwrap());
-            res = 1;
-        }
-        remove_file(temp).ok();
-
-        res
     }
+
+    ret = compare_files(temp.as_str(), result.as_deref().unwrap());
+    if ret != 0 {
+        eprintln!("Result for {filename} failed in {}", result.unwrap());
+        res = 1;
+    }
+    remove_file(temp).ok();
+
+    res
 }
 
 unsafe fn launch_tests(tst: &TestDesc) -> i32 {

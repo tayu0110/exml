@@ -14586,7 +14586,7 @@ unsafe fn xml_schema_process_xsi_type(
     }
 }
 
-unsafe fn xml_schema_vcontent_model_callback(
+fn xml_schema_vcontent_model_callback(
     _exec: XmlRegExecCtxtPtr,
     _name: &str,
     transdata: *mut c_void,
