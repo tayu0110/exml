@@ -50,7 +50,7 @@ use crate::{
         },
         globals::{xml_free, xml_malloc_atomic, xml_realloc},
         sax2::{xml_sax2_ignorable_whitespace, xml_sax2_init_html_default_sax_handler},
-        xmlstring::{XmlChar, xml_strndup},
+        xmlstring::XmlChar,
     },
     parser::{
         INPUT_CHUNK, XML_MAX_HUGE_LENGTH, XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH,
@@ -1945,208 +1945,200 @@ fn html_parse_script(ctxt: &mut HtmlParserCtxt) {
 
 /// Parse an HTML Literal
 ///
-/// `[11] SystemLiteral ::= ('"' [^"]* '"') | ("'" [^']* "'")`
+/// ```text
+/// [11] SystemLiteral ::= ('"' [^"]* '"') | ("'" [^']* "'")
+/// ```
 ///
 /// Returns the SystemLiteral parsed or NULL
 #[doc(alias = "htmlParseSystemLiteral")]
-unsafe fn html_parse_system_literal(ctxt: &mut HtmlParserCtxt) -> *mut XmlChar {
-    unsafe {
-        let mut len: size_t = 0;
-        let mut err: i32 = 0;
+fn html_parse_system_literal(ctxt: &mut HtmlParserCtxt) -> Option<String> {
+    let mut len = 0;
+    let mut err = 0;
 
-        let mut ret: *mut XmlChar = null_mut();
+    if !matches!(ctxt.current_byte(), b'"' | b'\'') {
+        html_parse_err(
+            Some(ctxt),
+            XmlParserErrors::XmlErrLiteralNotStarted,
+            "SystemLiteral \" or ' expected\n",
+            None,
+            None,
+        );
+        return None;
+    }
+    let quote = ctxt.current_byte() as i32;
+    ctxt.skip_char();
 
-        if ctxt.current_byte() != b'"' && ctxt.current_byte() != b'\'' {
-            html_parse_err(
-                Some(ctxt),
-                XmlParserErrors::XmlErrLiteralNotStarted,
-                "SystemLiteral \" or ' expected\n",
-                None,
-                None,
+    let start_position = ctxt.input().unwrap().offset_from_base();
+
+    while ctxt.current_byte() != 0 && ctxt.current_byte() as i32 != quote {
+        // TODO: Handle UTF-8
+        if !xml_is_char(ctxt.current_byte() as u32) {
+            html_parse_err_int!(
+                &mut *ctxt,
+                XmlParserErrors::XmlErrInvalidChar,
+                "Invalid char in SystemLiteral 0x{:X}\n",
+                ctxt.current_byte() as i32
             );
-            return null_mut();
+            err = 1;
         }
-        let quote = ctxt.current_byte() as i32;
         ctxt.skip_char();
-
-        // if ctxt.input().unwrap().cur < ctxt.input().unwrap().base {
-        //     return ret;
-        // }
-        let start_position = ctxt.input().unwrap().offset_from_base();
-
-        while ctxt.current_byte() != 0 && ctxt.current_byte() as i32 != quote {
-            // TODO: Handle UTF-8
-            if !xml_is_char(ctxt.current_byte() as u32) {
-                html_parse_err_int!(
-                    &mut *ctxt,
-                    XmlParserErrors::XmlErrInvalidChar,
-                    "Invalid char in SystemLiteral 0x{:X}\n",
-                    ctxt.current_byte() as i32
-                );
-                err = 1;
-            }
-            ctxt.skip_char();
-            len += 1;
+        len += 1;
+    }
+    if ctxt.current_byte() as i32 != quote {
+        html_parse_err(
+            Some(ctxt),
+            XmlParserErrors::XmlErrLiteralNotFinished,
+            "Unfinished SystemLiteral\n",
+            None,
+            None,
+        );
+        None
+    } else {
+        let mut ret = None;
+        if err == 0 {
+            let content =
+                &ctxt.input().unwrap().base_contents()[start_position..start_position + len];
+            ret = Some(String::from_utf8(content.to_vec()).unwrap());
         }
-        if ctxt.current_byte() as i32 != quote {
-            html_parse_err(
-                Some(ctxt),
-                XmlParserErrors::XmlErrLiteralNotFinished,
-                "Unfinished SystemLiteral\n",
-                None,
-                None,
-            );
-        } else {
-            if err == 0 {
-                let content =
-                    &ctxt.input().unwrap().base_contents()[start_position..start_position + len];
-                ret = xml_strndup(content.as_ptr(), content.len() as i32);
-            }
-            ctxt.skip_char();
-        }
-
+        ctxt.skip_char();
         ret
     }
 }
 
 /// Parse an HTML public literal
 ///
-/// `[12] PubidLiteral ::= '"' PubidChar* '"' | "'" (PubidChar - "'")* "'"`
+/// ```text
+/// [12] PubidLiteral ::= '"' PubidChar* '"' | "'" (PubidChar - "'")* "'"
+/// ```
 ///
 /// Returns the PubidLiteral parsed or NULL.
 #[doc(alias = "htmlParsePubidLiteral")]
-unsafe fn html_parse_pubid_literal(ctxt: &mut HtmlParserCtxt) -> *mut XmlChar {
-    unsafe {
-        let mut len: size_t = 0;
-        let mut err: i32 = 0;
+fn html_parse_pubid_literal(ctxt: &mut HtmlParserCtxt) -> Option<String> {
+    let mut len: size_t = 0;
+    let mut err: i32 = 0;
 
-        let mut ret: *mut XmlChar = null_mut();
-
-        if ctxt.current_byte() != b'"' && ctxt.current_byte() != b'\'' {
-            html_parse_err(
-                Some(ctxt),
-                XmlParserErrors::XmlErrLiteralNotStarted,
-                "PubidLiteral \" or ' expected\n",
-                None,
-                None,
-            );
-            return null_mut();
-        }
-        let quote: i32 = ctxt.current_byte() as _;
-        ctxt.skip_char();
-
-        // Name ::= (Letter | '_') (NameChar)*
-        // if ctxt.input().unwrap().cur < ctxt.input().unwrap().base {
-        //     return ret;
-        // }
-        let start_position = ctxt.input().unwrap().offset_from_base();
-
-        while ctxt.current_byte() != 0 && ctxt.current_byte() as i32 != quote {
-            if !xml_is_pubid_char(ctxt.current_byte() as u32) {
-                html_parse_err_int!(
-                    &mut *ctxt,
-                    XmlParserErrors::XmlErrInvalidChar,
-                    "Invalid char in PubidLiteral 0x{:X}\n",
-                    ctxt.current_byte() as i32
-                );
-                err = 1;
-            }
-            len += 1;
-            ctxt.skip_char();
-        }
-
-        if ctxt.current_byte() as i32 != quote {
-            html_parse_err(
-                Some(ctxt),
-                XmlParserErrors::XmlErrLiteralNotFinished,
-                "Unfinished PubidLiteral\n",
-                None,
-                None,
-            );
-        } else {
-            if err == 0 {
-                let content =
-                    &ctxt.input().unwrap().base_contents()[start_position..start_position + len];
-                ret = xml_strndup(content.as_ptr(), content.len() as i32);
-            }
-            ctxt.skip_char();
-        }
-
-        ret
+    if ctxt.current_byte() != b'"' && ctxt.current_byte() != b'\'' {
+        html_parse_err(
+            Some(ctxt),
+            XmlParserErrors::XmlErrLiteralNotStarted,
+            "PubidLiteral \" or ' expected\n",
+            None,
+            None,
+        );
+        return None;
     }
+    let quote: i32 = ctxt.current_byte() as _;
+    ctxt.skip_char();
+
+    // Name ::= (Letter | '_') (NameChar)*
+
+    let start_position = ctxt.input().unwrap().offset_from_base();
+
+    while ctxt.current_byte() != 0 && ctxt.current_byte() as i32 != quote {
+        if !xml_is_pubid_char(ctxt.current_byte() as u32) {
+            html_parse_err_int!(
+                &mut *ctxt,
+                XmlParserErrors::XmlErrInvalidChar,
+                "Invalid char in PubidLiteral 0x{:X}\n",
+                ctxt.current_byte() as i32
+            );
+            err = 1;
+        }
+        len += 1;
+        ctxt.skip_char();
+    }
+
+    let mut ret = None;
+    if ctxt.current_byte() as i32 != quote {
+        html_parse_err(
+            Some(ctxt),
+            XmlParserErrors::XmlErrLiteralNotFinished,
+            "Unfinished PubidLiteral\n",
+            None,
+            None,
+        );
+    } else {
+        if err == 0 {
+            let content =
+                &ctxt.input().unwrap().base_contents()[start_position..start_position + len];
+            ret = Some(String::from_utf8(content.to_vec()).unwrap());
+        }
+        ctxt.skip_char();
+    }
+
+    ret
 }
 
 /// Parse an External ID or a Public ID
 ///
-/// `[75] ExternalID ::= b'SYSTEM' S SystemLiteral | 'PUBLIC' S PubidLiteral S SystemLiteral`
+/// ```text
+/// [75] ExternalID ::= b'SYSTEM' S SystemLiteral | 'PUBLIC' S PubidLiteral S SystemLiteral
+/// [83] PublicID ::= b'PUBLIC' S PubidLiteral
+/// ```
 ///
-/// `[83] PublicID ::= b'PUBLIC' S PubidLiteral`
-///
-/// Returns the function returns SystemLiteral and in the second
-/// case publicID receives PubidLiteral, is strict is off
-/// it is possible to return NULL and have publicID set.
+/// If ExternalID is parsed and PubidLiteral is found, return `(PubidLiteral, SystemLiteral)`,
+/// if ExternalID is parsed and PubidLiteral is not found, return `(None, SystemLiteral)`,
+/// if PublicID is parsed, return `(PubidLiteral, None)`,
+/// otherwise, return `(None, None)`.
 #[doc(alias = "htmlParseExternalID")]
-unsafe fn html_parse_external_id(
-    ctxt: &mut HtmlParserCtxt,
-    public_id: *mut *mut XmlChar,
-) -> *mut XmlChar {
-    unsafe {
-        let mut uri: *mut XmlChar = null_mut();
+fn html_parse_external_id(ctxt: &mut HtmlParserCtxt) -> (Option<String>, Option<String>) {
+    let mut uri = None;
 
-        if ctxt.content_bytes().len() >= 6
-            && ctxt.content_bytes()[..6].eq_ignore_ascii_case(b"SYSTEM")
-        {
-            ctxt.advance(6);
-            if !xml_is_blank_char(ctxt.current_byte() as u32) {
-                html_parse_err(
-                    Some(ctxt),
-                    XmlParserErrors::XmlErrSpaceRequired,
-                    "Space required after 'SYSTEM'\n",
-                    None,
-                    None,
-                );
-            }
-            html_skip_blank_chars(ctxt);
-            uri = html_parse_system_literal(ctxt);
-            if uri.is_null() {
-                html_parse_err(
-                    Some(ctxt),
-                    XmlParserErrors::XmlErrURIRequired,
-                    "htmlParseExternalID: SYSTEM, no URI\n",
-                    None,
-                    None,
-                );
-            }
-        } else if ctxt.content_bytes().len() >= 6
-            && ctxt.content_bytes()[..6].eq_ignore_ascii_case(b"PUBLIC")
-        {
-            ctxt.advance(6);
-            if !xml_is_blank_char(ctxt.current_byte() as u32) {
-                html_parse_err(
-                    Some(ctxt),
-                    XmlParserErrors::XmlErrSpaceRequired,
-                    "Space required after 'PUBLIC'\n",
-                    None,
-                    None,
-                );
-            }
-            html_skip_blank_chars(ctxt);
-            *public_id = html_parse_pubid_literal(ctxt);
-            if (*public_id).is_null() {
-                html_parse_err(
-                    Some(ctxt),
-                    XmlParserErrors::XmlErrPubidRequired,
-                    "htmlParseExternalID: PUBLIC, no Public Identifier\n",
-                    None,
-                    None,
-                );
-            }
-            html_skip_blank_chars(ctxt);
-            if ctxt.current_byte() == b'"' || ctxt.current_byte() == b'\'' {
-                uri = html_parse_system_literal(ctxt);
-            }
+    if ctxt.content_bytes().len() >= 6 && ctxt.content_bytes()[..6].eq_ignore_ascii_case(b"SYSTEM")
+    {
+        ctxt.advance(6);
+        if !xml_is_blank_char(ctxt.current_byte() as u32) {
+            html_parse_err(
+                Some(ctxt),
+                XmlParserErrors::XmlErrSpaceRequired,
+                "Space required after 'SYSTEM'\n",
+                None,
+                None,
+            );
         }
-        uri
+        html_skip_blank_chars(ctxt);
+        let uri = html_parse_system_literal(ctxt);
+        if uri.is_none() {
+            html_parse_err(
+                Some(ctxt),
+                XmlParserErrors::XmlErrURIRequired,
+                "htmlParseExternalID: SYSTEM, no URI\n",
+                None,
+                None,
+            );
+        }
+        (None, uri)
+    } else if ctxt.content_bytes().len() >= 6
+        && ctxt.content_bytes()[..6].eq_ignore_ascii_case(b"PUBLIC")
+    {
+        ctxt.advance(6);
+        if !xml_is_blank_char(ctxt.current_byte() as u32) {
+            html_parse_err(
+                Some(ctxt),
+                XmlParserErrors::XmlErrSpaceRequired,
+                "Space required after 'PUBLIC'\n",
+                None,
+                None,
+            );
+        }
+        html_skip_blank_chars(ctxt);
+        let public_id = html_parse_pubid_literal(ctxt);
+        if public_id.is_none() {
+            html_parse_err(
+                Some(ctxt),
+                XmlParserErrors::XmlErrPubidRequired,
+                "htmlParseExternalID: PUBLIC, no Public Identifier\n",
+                None,
+                None,
+            );
+        }
+        html_skip_blank_chars(ctxt);
+        if ctxt.current_byte() == b'"' || ctxt.current_byte() == b'\'' {
+            uri = html_parse_system_literal(ctxt);
+        }
+        (public_id, uri)
+    } else {
+        (None, None)
     }
 }
 
@@ -2154,79 +2146,61 @@ unsafe fn html_parse_external_id(
 ///
 /// `[28] doctypedecl ::= '<!DOCTYPE' S Name (S ExternalID)? S? ('[' (markupdecl | PEReference | S)* ']' S?)? '>'`
 #[doc(alias = "htmlParseDocTypeDecl")]
-unsafe fn html_parse_doc_type_decl(ctxt: &mut HtmlParserCtxt) {
-    unsafe {
-        let mut external_id: *mut XmlChar = null_mut();
+fn html_parse_doc_type_decl(ctxt: &mut HtmlParserCtxt) {
+    // We know that '<!DOCTYPE' has been detected.
+    ctxt.advance(9);
 
-        // We know that '<!DOCTYPE' has been detected.
-        ctxt.advance(9);
+    html_skip_blank_chars(ctxt);
 
-        html_skip_blank_chars(ctxt);
+    // Parse the DOCTYPE name.
+    let name = html_parse_name(ctxt);
+    if name.is_none() {
+        html_parse_err(
+            Some(ctxt),
+            XmlParserErrors::XmlErrNameRequired,
+            "htmlParseDocTypeDecl : no DOCTYPE name !\n",
+            None,
+            None,
+        );
+    }
+    // Check that upper(name) == "HTML" !!!!!!!!!!!!!
 
-        // Parse the DOCTYPE name.
-        let name = html_parse_name(ctxt);
-        if name.is_none() {
-            html_parse_err(
-                Some(ctxt),
-                XmlParserErrors::XmlErrNameRequired,
-                "htmlParseDocTypeDecl : no DOCTYPE name !\n",
-                None,
-                None,
-            );
-        }
-        // Check that upper(name) == "HTML" !!!!!!!!!!!!!
+    html_skip_blank_chars(ctxt);
 
-        html_skip_blank_chars(ctxt);
+    // Check for SystemID and ExternalID
+    let (external_id, uri) = html_parse_external_id(ctxt);
+    html_skip_blank_chars(ctxt);
 
-        // Check for SystemID and ExternalID
-        let uri: *mut XmlChar = html_parse_external_id(ctxt, addr_of_mut!(external_id));
-        html_skip_blank_chars(ctxt);
-
-        // We should be at the end of the DOCTYPE declaration.
-        if ctxt.current_byte() != b'>' {
-            html_parse_err(
-                Some(ctxt),
-                XmlParserErrors::XmlErrDoctypeNotFinished,
-                "DOCTYPE improperly terminated\n",
-                None,
-                None,
-            );
-            // Ignore bogus content
-            while !ctxt.content_bytes().is_empty()
-                && ctxt.current_byte() != b'>'
-                && !matches!(ctxt.instate, XmlParserInputState::XmlParserEOF)
-            {
-                ctxt.skip_char();
-            }
-        }
-        if ctxt.current_byte() == b'>' {
+    // We should be at the end of the DOCTYPE declaration.
+    if ctxt.current_byte() != b'>' {
+        html_parse_err(
+            Some(ctxt),
+            XmlParserErrors::XmlErrDoctypeNotFinished,
+            "DOCTYPE improperly terminated\n",
+            None,
+            None,
+        );
+        // Ignore bogus content
+        while !ctxt.content_bytes().is_empty()
+            && ctxt.current_byte() != b'>'
+            && !matches!(ctxt.instate, XmlParserInputState::XmlParserEOF)
+        {
             ctxt.skip_char();
         }
+    }
+    if ctxt.current_byte() == b'>' {
+        ctxt.skip_char();
+    }
 
-        // Create or update the document accordingly to the DOCTYPE
-        if ctxt.disable_sax == 0 {
-            if let Some(internal_subset) =
-                ctxt.sax.as_deref_mut().and_then(|sax| sax.internal_subset)
-            {
-                internal_subset(
-                    ctxt,
-                    name.as_deref(),
-                    (!external_id.is_null())
-                        .then(|| CStr::from_ptr(external_id as *const i8).to_string_lossy())
-                        .as_deref(),
-                    (!uri.is_null())
-                        .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
-                        .as_deref(),
-                );
-            }
-        }
-
-        // Cleanup, since we don't use all those identifiers
-        if !uri.is_null() {
-            xml_free(uri as _);
-        }
-        if !external_id.is_null() {
-            xml_free(external_id as _);
+    // Create or update the document accordingly to the DOCTYPE
+    if ctxt.disable_sax == 0 {
+        if let Some(internal_subset) = ctxt.sax.as_deref_mut().and_then(|sax| sax.internal_subset) {
+            internal_subset(
+                ctxt,
+                name.as_deref(),
+                external_id.as_deref(),
+                uri.as_deref(),
+            );
         }
     }
 }
