@@ -18,19 +18,12 @@
 //
 // daniel@veillard.com
 
-use std::{
-    cell::RefCell,
-    io::Write,
-    mem::take,
-    ptr::{null, null_mut},
-    rc::Rc,
-};
+use std::{cell::RefCell, io::Write, mem::take, rc::Rc};
 
 use crate::{
     encoding::find_encoding_handler,
     error::XmlParserErrors,
     io::XmlOutputBuffer,
-    libxml::xmlstring::{XmlChar, xml_strndup},
     parser::xml_init_parser,
     save::{
         XmlSaveCtxt, XmlSaveOption, xml_node_dump_output_internal, xml_save_err,
@@ -53,26 +46,12 @@ impl XmlDoc {
     #[doc(alias = "xmlDocDumpFormatMemoryEnc")]
     pub unsafe fn dump_format_memory_enc(
         &mut self,
-        doc_txt_ptr: *mut *mut XmlChar,
-        mut doc_txt_len: *mut i32,
+        txt: &mut Vec<u8>,
         txt_encoding: Option<&str>,
         format: i32,
     ) {
         unsafe {
             let mut ctxt = XmlSaveCtxt::default();
-            let mut dummy: i32 = 0;
-
-            if doc_txt_len.is_null() {
-                doc_txt_len = &raw mut dummy; /*  Continue, caller just won't get length */
-            }
-
-            if doc_txt_ptr.is_null() {
-                *doc_txt_len = 0;
-                return;
-            }
-
-            *doc_txt_ptr = null_mut();
-            *doc_txt_len = 0;
 
             // Validate the encoding value, if provided.
             // This logic is copied from xmlSaveFileEnc.
@@ -108,26 +87,9 @@ impl XmlDoc {
             ctxt.doc_content_dump_output(XmlDocPtr::from_raw(self).unwrap().unwrap());
             ctxt.buf.flush();
             if let Some(conv) = ctxt.buf.conv {
-                *doc_txt_len = conv.len() as i32;
-                *doc_txt_ptr = xml_strndup(
-                    if conv.is_ok() {
-                        conv.as_ref().as_ptr()
-                    } else {
-                        null()
-                    },
-                    *doc_txt_len,
-                );
+                txt.extend_from_slice(conv.as_ref());
             } else {
-                *doc_txt_len = ctxt.buf.buffer.map_or(0, |buf| buf.len() as i32);
-                *doc_txt_ptr = xml_strndup(
-                    ctxt.buf.buffer.map_or(null(), |buf| buf.as_ref().as_ptr()),
-                    *doc_txt_len,
-                );
-            }
-
-            if (*doc_txt_ptr).is_null() && *doc_txt_len > 0 {
-                *doc_txt_len = 0;
-                xml_save_err_memory("creating output");
+                txt.extend_from_slice(ctxt.buf.buffer.unwrap().as_ref());
             }
         }
     }
@@ -138,14 +100,9 @@ impl XmlDoc {
     /// Note that `format = 1` provide node indenting only if `xmlIndentTreeOutput = 1`
     /// or `xmlKeepBlanksDefault(0)` was called
     #[doc(alias = "xmlDocDumpFormatMemory")]
-    pub unsafe fn dump_format_memory(
-        &mut self,
-        mem: *mut *mut XmlChar,
-        size: *mut i32,
-        format: i32,
-    ) {
+    pub unsafe fn dump_format_memory(&mut self, mem: &mut Vec<u8>, format: i32) {
         unsafe {
-            self.dump_format_memory_enc(mem, size, None, format);
+            self.dump_format_memory_enc(mem, None, format);
         }
     }
 
@@ -155,9 +112,9 @@ impl XmlDoc {
     /// The resulting byte array is zero terminated, though the last 0 is not
     /// included in the returned size.
     #[doc(alias = "xmlDocDumpMemory")]
-    pub unsafe fn dump_memory(&mut self, mem: *mut *mut XmlChar, size: *mut i32) {
+    pub unsafe fn dump_memory(&mut self, mem: &mut Vec<u8>) {
         unsafe {
-            self.dump_format_memory_enc(mem, size, None, 0);
+            self.dump_format_memory_enc(mem, None, 0);
         }
     }
 
@@ -165,14 +122,9 @@ impl XmlDoc {
     ///
     /// Note it is up to the caller of this function to free the allocated memory with `xml_free()`.
     #[doc(alias = "xmlDocDumpMemoryEnc")]
-    pub unsafe fn dump_memory_enc(
-        &mut self,
-        doc_txt_ptr: *mut *mut XmlChar,
-        doc_txt_len: *mut i32,
-        txt_encoding: Option<&str>,
-    ) {
+    pub unsafe fn dump_memory_enc(&mut self, txt: &mut Vec<u8>, txt_encoding: Option<&str>) {
         unsafe {
-            self.dump_format_memory_enc(doc_txt_ptr, doc_txt_len, txt_encoding, 0);
+            self.dump_format_memory_enc(txt, txt_encoding, 0);
         }
     }
 

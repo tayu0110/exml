@@ -16,7 +16,7 @@ use std::{
     fs::File,
     io::{Read, Write, stderr, stdin, stdout},
     process::exit,
-    ptr::{addr_of_mut, null_mut},
+    ptr::null_mut,
     rc::Rc,
     sync::{
         LazyLock, Mutex,
@@ -76,7 +76,6 @@ use exml::{
             xml_mem_used, xml_memory_strdup,
         },
         xmlschemas::{xml_schema_validate_doc, xml_schema_validate_stream},
-        xmlstring::XmlChar,
     },
     parser::{
         XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SAX2_MAGIC, XmlExternalEntityLoader, XmlParserCtxt,
@@ -105,7 +104,6 @@ use exml::{
     },
     xpath::{XmlXPathObjectPtr, xml_xpath_order_doc_elems},
 };
-use libc::{free, malloc, memset, write};
 
 // Error codes.
 // These are similar to `xmllintReturnCode` in original xmllint.
@@ -944,7 +942,8 @@ unsafe fn xml_htmlencode_send() {
         // end with a truncated UTF-8 sequence. This is a hack to at least avoid
         // an out-of-bounds read.
         BUFFER.with_borrow_mut(|buffer| {
-            memset(addr_of_mut!(buffer[buffer.len() - 4]) as _, 0, 4);
+            let len = buffer.len();
+            buffer[len - 4..].fill(0);
             let result = xml_encode_entities_reentrant(
                 None,
                 &CStr::from_ptr(buffer.as_ptr() as *const i8).to_string_lossy(),
@@ -2761,37 +2760,21 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: Option<XmlParserC
                         }
                     }
                     _ if CMD_ARGS.memory => {
-                        let mut result: *mut XmlChar = null_mut();
-                        let mut len: i32 = 0;
+                        let mut result = vec![];
 
                         if let Some(encoding) = CMD_ARGS.encode.as_deref() {
                             if CMD_ARGS.format {
-                                doc.dump_format_memory_enc(
-                                    addr_of_mut!(result),
-                                    addr_of_mut!(len),
-                                    Some(encoding),
-                                    1,
-                                );
+                                doc.dump_format_memory_enc(&mut result, Some(encoding), 1);
                             } else {
-                                doc.dump_memory_enc(
-                                    addr_of_mut!(result),
-                                    addr_of_mut!(len),
-                                    Some(encoding),
-                                );
+                                doc.dump_memory_enc(&mut result, Some(encoding));
                             }
                         } else if CMD_ARGS.format {
-                            doc.dump_format_memory(addr_of_mut!(result), addr_of_mut!(len), 1);
+                            doc.dump_format_memory(&mut result, 1);
                         } else {
-                            doc.dump_memory(addr_of_mut!(result), addr_of_mut!(len));
+                            doc.dump_memory(&mut result);
                         }
-                        if result.is_null() {
-                            eprintln!("Failed to save");
-                            PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
-                        } else {
-                            if write(1, result as _, len as _) == -1 {
-                                eprintln!("Can't write data");
-                            }
-                            xml_free(result as _);
+                        if stdout().write_all(&result).is_err() {
+                            eprintln!("Can't write data");
                         }
                     }
                     _ => {
@@ -3072,33 +3055,26 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: Option<XmlParserC
 // Usage and Main
 
 fn register_node(node: XmlGenericNodePtr) {
-    unsafe {
-        let private = malloc(size_of::<c_long>());
-        if private.is_null() {
-            eprintln!("Out of memory in xmllint:registerNode()");
-            exit(ERR_MEM);
-        }
-        *(private as *mut u64) = 0x81726354;
-        NBREGISTER.fetch_add(1, Ordering::Relaxed);
-        if let Ok(mut node) = XmlNodePtr::try_from(node) {
-            node._private = private;
-        } else if let Ok(mut node) = XmlAttrPtr::try_from(node) {
-            node._private = private;
-        } else if let Ok(mut node) = XmlDocPtr::try_from(node) {
-            node._private = private;
-        } else if let Ok(mut node) = XmlNsPtr::try_from(node) {
-            node._private = private;
-        } else if let Ok(mut node) = XmlEntityPtr::try_from(node) {
-            node._private = private;
-        } else if let Ok(mut node) = XmlDtdPtr::try_from(node) {
-            node._private = private;
-        } else if let Ok(mut node) = XmlAttributePtr::try_from(node) {
-            node._private = private;
-        } else if let Ok(mut node) = XmlElementPtr::try_from(node) {
-            node._private = private;
-        } else {
-            panic!("Unknown Node Type");
-        }
+    let private = Box::leak(Box::new(0x81726354u64)) as *mut u64 as *mut c_void;
+    NBREGISTER.fetch_add(1, Ordering::Relaxed);
+    if let Ok(mut node) = XmlNodePtr::try_from(node) {
+        node._private = private;
+    } else if let Ok(mut node) = XmlAttrPtr::try_from(node) {
+        node._private = private;
+    } else if let Ok(mut node) = XmlDocPtr::try_from(node) {
+        node._private = private;
+    } else if let Ok(mut node) = XmlNsPtr::try_from(node) {
+        node._private = private;
+    } else if let Ok(mut node) = XmlEntityPtr::try_from(node) {
+        node._private = private;
+    } else if let Ok(mut node) = XmlDtdPtr::try_from(node) {
+        node._private = private;
+    } else if let Ok(mut node) = XmlAttributePtr::try_from(node) {
+        node._private = private;
+    } else if let Ok(mut node) = XmlElementPtr::try_from(node) {
+        node._private = private;
+    } else {
+        panic!("Unknown Node Type");
     }
 }
 
@@ -3125,7 +3101,7 @@ fn deregister_node(node: XmlGenericNodePtr) {
         };
         assert!(!private.is_null());
         assert!(*(private as *mut c_long) == 0x81726354);
-        free(private);
+        let _ = Box::from_raw(private as *mut u64);
         NBREGISTER.fetch_sub(1, Ordering::Relaxed);
     }
 }

@@ -9,9 +9,8 @@ use std::{
     io::{self, BufRead, BufReader, Read, Write},
     os::raw::c_void,
     path::Path,
-    ptr::{addr_of_mut, null, null_mut},
+    ptr::null_mut,
     rc::Rc,
-    slice::from_raw_parts,
     str::from_utf8,
     sync::{
         Condvar, Mutex, OnceLock,
@@ -51,7 +50,7 @@ use exml::{
     },
     io::{XmlInputCallback, pop_input_callbacks, register_input_callbacks},
     libxml::{
-        globals::{set_xml_free, set_xml_malloc, set_xml_mem_strdup, set_xml_realloc, xml_free},
+        globals::{set_xml_free, set_xml_malloc, set_xml_mem_strdup, set_xml_realloc},
         relaxng::XmlRelaxNGPtr,
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
@@ -1618,34 +1617,24 @@ unsafe fn push_parse_test(
             eprintln!("Failed to parse {filename}",);
             return -1;
         }
-        let mut base: *const c_char = null();
-        let mut size: i32 = 0;
+        let mut base = vec![];
         #[cfg(feature = "html")]
         if options & XML_PARSE_HTML != 0 {
             assert_eq!(
                 doc.unwrap().element_type(),
                 XmlElementType::XmlHTMLDocumentNode
             );
-            html_doc_dump_memory(
-                doc.unwrap(),
-                addr_of_mut!(base) as *mut *mut XmlChar,
-                addr_of_mut!(size),
-            );
+            html_doc_dump_memory(doc.unwrap(), &mut base);
         } else {
-            doc.unwrap()
-                .dump_memory(addr_of_mut!(base) as *mut *mut XmlChar, addr_of_mut!(size));
+            doc.unwrap().dump_memory(&mut base);
         }
         #[cfg(not(feature = "html"))]
         {
-            doc.unwrap()
-                .dump_memory(addr_of_mut!(base) as *mut *mut XmlChar, addr_of_mut!(size));
+            doc.unwrap().dump_memory(&mut base);
         }
         xml_free_doc(doc.unwrap());
-        let res = compare_file_mem(
-            result.as_deref().unwrap(),
-            from_raw_parts(base as _, size as usize),
-        );
-        if base.is_null() || res != 0 {
+        let res = compare_file_mem(result.as_deref().unwrap(), &base);
+        if res != 0 {
             eprintln!("Result for {filename} failed in {}", result.unwrap());
             if options & XML_PARSE_HTML != 0 {
                 if TEST_ERRORS_SIZE.get() > 0 {
@@ -1656,14 +1645,10 @@ unsafe fn push_parse_test(
                         )
                     });
                 }
-                if !base.is_null() {
-                    eprintln!("{}", CStr::from_ptr(base).to_string_lossy().as_ref());
-                    xml_free(base as _);
-                }
+                eprintln!("{}", from_utf8(&base).unwrap());
             }
             return -1;
         }
-        xml_free(base as _);
         if let Some(err) = err {
             let mut emsg = vec![];
             TEST_ERRORS.with_borrow(|errors| {
@@ -2032,33 +2017,24 @@ unsafe fn push_boundary_test(
             eprintln!("Failed to parse {filename}",);
             return -1;
         }
-        let mut base: *mut u8 = null_mut();
-        let mut size = 0;
+        let mut base = vec![];
         #[cfg(feature = "html")]
         if options & XML_PARSE_HTML != 0 {
-            html_doc_dump_memory(doc.unwrap(), &raw mut base, addr_of_mut!(size));
+            html_doc_dump_memory(doc.unwrap(), &mut base);
         } else {
-            doc.unwrap().dump_memory(&raw mut base, addr_of_mut!(size));
+            doc.unwrap().dump_memory(&mut base);
         }
         #[cfg(not(feature = "html"))]
         {
-            doc.unwrap()
-                .dump_memory(addr_of_mut!(base) as *mut *mut XmlChar, addr_of_mut!(size));
+            doc.unwrap().dump_memory(&mut base);
         }
         xml_free_doc(doc.unwrap());
-        res = compare_file_mem(
-            result.as_deref().unwrap(),
-            from_raw_parts(base as _, size as usize),
-        );
-        if base.is_null() || res != 0 {
+        res = compare_file_mem(result.as_deref().unwrap(), &base);
+        if res != 0 {
             eprintln!("Result for {filename} failed in {}", result.unwrap());
-            if !base.is_null() {
-                eprintln!("{}", CStr::from_ptr(base as *const i8).to_string_lossy());
-                xml_free(base as _);
-            }
+            eprintln!("{}", from_utf8(&base).unwrap());
             return -1;
         }
-        xml_free(base as _);
         if let Some(err) = err {
             res = TEST_ERRORS
                 .with_borrow(|errors| compare_file_mem(err, &errors[..TEST_ERRORS_SIZE.get()]));
@@ -2096,22 +2072,14 @@ unsafe fn mem_parse_test(
             return 1;
         };
 
-        let mut base: *const c_char = null();
-        let mut size: i32 = 0;
-        doc.dump_memory(addr_of_mut!(base) as *mut *mut XmlChar, addr_of_mut!(size));
+        let mut base = vec![];
+        doc.dump_memory(&mut base);
         xml_free_doc(doc);
-        let res: i32 = compare_file_mem(
-            result.as_deref().unwrap(),
-            from_raw_parts(base as _, size as _),
-        );
-        if base.is_null() || res != 0 {
-            if !base.is_null() {
-                xml_free(base as _);
-            }
+        let res: i32 = compare_file_mem(result.as_deref().unwrap(), &base);
+        if res != 0 {
             eprintln!("Result for {filename} failed in {}", result.unwrap());
             return -1;
         }
-        xml_free(base as _);
         0
     }
 }
@@ -2180,8 +2148,6 @@ unsafe fn err_parse_test(
     options: i32,
 ) -> i32 {
     unsafe {
-        let mut base: *const c_char = null_mut();
-        let mut size: i32 = 0;
         let mut res: i32 = 0;
         let cresult = result.as_deref().map(|s| CString::new(s).unwrap());
 
@@ -2200,35 +2166,28 @@ unsafe fn err_parse_test(
             }
             _ => xml_read_file(filename, None, options),
         };
+        let mut base = vec![];
         if let Some(result) = cresult {
             if let Some(mut doc) = doc {
                 #[cfg(feature = "html")]
                 if options & XML_PARSE_HTML != 0 {
-                    html_doc_dump_memory(
-                        doc,
-                        addr_of_mut!(base) as *mut *mut XmlChar,
-                        addr_of_mut!(size),
-                    );
+                    html_doc_dump_memory(doc, &mut base);
                 } else {
-                    doc.dump_memory(addr_of_mut!(base) as *mut *mut XmlChar, addr_of_mut!(size));
+                    doc.dump_memory(&mut base);
                 }
                 #[cfg(not(feature = "html"))]
                 {
-                    doc.dump_memory(addr_of_mut!(base) as *mut *mut XmlChar, addr_of_mut!(size));
+                    doc.dump_memory(&mut base);
                 }
             } else {
-                base = c"".as_ptr();
-                size = 0;
+                base = "".as_bytes().to_vec();
             }
             res = compare_file_mem(
                 CStr::from_ptr(result.as_ptr()).to_string_lossy().as_ref(),
-                from_raw_parts(base as _, size as _),
+                &base,
             );
         }
         if let Some(doc) = doc {
-            if !base.is_null() {
-                xml_free(base as _);
-            }
             xml_free_doc(doc);
         }
         if res != 0 {

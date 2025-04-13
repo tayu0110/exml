@@ -23,14 +23,13 @@
 use std::io::Write;
 use std::{
     ffi::{CString, c_char},
-    ptr::{null, null_mut},
+    ptr::null_mut,
 };
 
 use crate::{
     encoding::XmlCharEncoding,
     globals::get_register_node_func,
     html::parser::html_err_memory,
-    libxml::xmlstring::XmlChar,
     tree::{
         NodeCommon, XmlAttr, XmlAttrPtr, XmlDoc, XmlDocProperties, XmlDocPtr, XmlElementType,
         XmlNodePtr, xml_create_int_subset, xml_free_node, xml_new_doc_node, xml_new_prop,
@@ -385,9 +384,9 @@ pub unsafe fn html_set_meta_encoding(doc: XmlDocPtr, encoding: Option<&str>) -> 
 /// It's up to the caller to free the memory.
 #[doc(alias = "htmlDocDumpMemory")]
 #[cfg(feature = "libxml_output")]
-pub unsafe fn html_doc_dump_memory(cur: XmlDocPtr, mem: *mut *mut XmlChar, size: *mut i32) {
+pub unsafe fn html_doc_dump_memory(cur: XmlDocPtr, mem: &mut Vec<u8>) {
     unsafe {
-        html_doc_dump_memory_format(cur, mem, size, 1);
+        html_doc_dump_memory_format(cur, mem, 1);
     }
 }
 
@@ -417,26 +416,16 @@ fn html_save_err(code: XmlParserErrors, node: Option<XmlGenericNodePtr>, extra: 
 /// It's up to the caller to free the memory.
 #[doc(alias = "htmlDocDumpMemoryFormat")]
 #[cfg(feature = "libxml_output")]
-pub unsafe fn html_doc_dump_memory_format(
-    cur: XmlDocPtr,
-    mem: *mut *mut XmlChar,
-    size: *mut i32,
-    format: i32,
-) {
+pub unsafe fn html_doc_dump_memory_format(cur: XmlDocPtr, mem: &mut Vec<u8>, format: i32) {
     unsafe {
         use std::{cell::RefCell, rc::Rc};
 
         use crate::{
             encoding::{XmlCharEncoding, find_encoding_handler},
-            libxml::xmlstring::xml_strndup,
             parser::xml_init_parser,
         };
 
         xml_init_parser();
-
-        if mem.is_null() || size.is_null() {
-            return;
-        }
 
         let handler = if let Some(enc) = html_get_meta_encoding(cur) {
             let e = enc.parse::<XmlCharEncoding>();
@@ -458,8 +447,6 @@ pub unsafe fn html_doc_dump_memory_format(
         let Some(mut buf) =
             XmlOutputBuffer::from_wrapped_encoder(handler.map(|e| Rc::new(RefCell::new(e))))
         else {
-            *mem = null_mut();
-            *size = 0;
             return;
         };
 
@@ -467,27 +454,9 @@ pub unsafe fn html_doc_dump_memory_format(
 
         buf.flush();
         if let Some(conv) = buf.conv {
-            *size = conv.len() as i32;
-            *mem = xml_strndup(
-                if conv.is_ok() {
-                    conv.as_ref().as_ptr()
-                } else {
-                    null()
-                },
-                *size,
-            );
+            mem.extend_from_slice(conv.as_ref());
         } else {
-            *size = buf.buffer.map_or(0, |buf| buf.len() as i32);
-            *mem = xml_strndup(
-                buf.buffer.map_or(null(), |buf| {
-                    if buf.is_ok() {
-                        buf.as_ref().as_ptr()
-                    } else {
-                        null()
-                    }
-                }),
-                *size,
-            );
+            mem.extend_from_slice(buf.buffer.unwrap().as_ref());
         }
         buf.flush();
     }
