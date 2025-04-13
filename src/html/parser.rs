@@ -4447,7 +4447,7 @@ pub unsafe fn html_parse_chunk(ctxt: &mut HtmlParserCtxt, chunk: &[u8], terminat
             && ctxt.input().unwrap().buf.is_some()
             && !matches!(ctxt.instate, XmlParserInputState::XmlParserEOF)
         {
-            let base: size_t = ctxt.input().unwrap().get_base();
+            let base = ctxt.input().unwrap().get_base();
             let cur = ctxt.input().unwrap().offset_from_base();
 
             let res: i32 = ctxt

@@ -74,7 +74,7 @@ use exml::{
     uri::{XmlURI, build_uri, normalize_uri_path},
     xpath::XmlXPathObjectPtr,
 };
-use libc::{free, malloc, memcpy};
+use libc::memcpy;
 
 /// pseudo flag for the unification of HTML and XML tests
 const XML_PARSE_HTML: i32 = 1 << 24;
@@ -492,52 +492,11 @@ fn compare_file_mem(filename: impl AsRef<Path>, mem: &[u8]) -> i32 {
     _compare_file_mem(filename.as_ref(), mem)
 }
 
-unsafe fn load_mem(filename: &str, mem: *mut *const c_char, size: *mut i32) -> i32 {
-    unsafe {
-        match metadata(filename) {
-            Ok(meta) => {
-                let base: *mut c_char = malloc(meta.len() as usize + 1) as _;
-                if base.is_null() {
-                    return -1;
-                }
-                match File::open(filename) {
-                    Ok(mut file) => {
-                        let mut siz = 0;
-                        while let Some(res) = file
-                            .read(std::slice::from_raw_parts_mut(
-                                base.add(siz) as _,
-                                meta.len() as usize - siz,
-                            ))
-                            .ok()
-                            .filter(|&res| res > 0)
-                        {
-                            siz += res;
-                        }
-                        if siz != meta.len() as usize {
-                            free(base as _);
-                            return -1;
-                        }
-                        *base.add(siz) = 0;
-                        *mem = base;
-                        *size = siz as _;
-                        0
-                    }
-                    _ => {
-                        free(base as _);
-                        -1
-                    }
-                }
-            }
-            _ => -1,
-        }
-    }
-}
-
-unsafe extern "C" fn unload_mem(mem: *const c_char) -> i32 {
-    unsafe {
-        free(mem as _);
-        0
-    }
+fn load_mem(filename: &str) -> Result<Vec<u8>, std::io::Error> {
+    let mut file = File::open(filename)?;
+    let mut res = vec![];
+    file.read_to_end(&mut res)?;
+    Ok(res)
 }
 
 thread_local! {
@@ -1586,89 +1545,72 @@ unsafe fn push_parse_test(
     };
 
     unsafe {
-        let mut base: *const c_char = null();
-        let mut size: i32 = 0;
-        let mut res: i32;
-        let mut cur: i32 = 0;
-        let mut chunk_size: i32 = 4;
-
         NB_TESTS.set(NB_TESTS.get() + 1);
 
         // load the document in memory and work from there.
-        if load_mem(filename, addr_of_mut!(base), addr_of_mut!(size)) != 0 {
+        let Ok(base) = load_mem(filename) else {
             eprintln!("Failed to load {filename}",);
             return -1;
-        }
+        };
 
-        if chunk_size > size {
-            chunk_size = size;
-        }
-
+        let chunk_size = 4.min(base.len());
         #[cfg(feature = "html")]
         let mut ctxt = if options & XML_PARSE_HTML != 0 {
-            let chunk = from_raw_parts(base.add(cur as usize) as *const u8, chunk_size as usize);
-            html_create_push_parser_ctxt(None, None, chunk, Some(filename), XmlCharEncoding::None)
-                .unwrap()
+            html_create_push_parser_ctxt(
+                None,
+                None,
+                &base[..chunk_size],
+                Some(filename),
+                XmlCharEncoding::None,
+            )
+            .unwrap()
         } else {
-            let chunk = from_raw_parts(base.add(cur as usize) as *const u8, chunk_size as usize);
-            XmlParserCtxt::new_push_parser(None, None, chunk, Some(filename)).unwrap()
+            XmlParserCtxt::new_push_parser(None, None, &base[..chunk_size], Some(filename)).unwrap()
         };
         #[cfg(not(feature = "html"))]
-        let mut ctxt = {
-            let chunk = from_raw_parts(base.add(cur as usize) as *const u8, chunk_size as usize);
-            XmlParserCtxt::new_push_parser(None, None, chunk, Some(filename)).unwrap()
-        };
+        let mut ctxt =
+            XmlParserCtxt::new_push_parser(None, None, &base[..chunk_size], Some(filename))
+                .unwrap();
         ctxt.use_options(options);
-        cur += chunk_size;
-        chunk_size = 1024;
-        'b: while {
-            if cur + chunk_size >= size {
-                let chunk = from_raw_parts(
-                    base.add(cur as usize) as *const u8,
-                    size as usize - cur as usize,
-                );
-                #[cfg(feature = "html")]
-                if options & XML_PARSE_HTML != 0 {
-                    html_parse_chunk(&mut ctxt, chunk, 1);
-                } else {
-                    ctxt.parse_chunk(chunk, 1);
-                }
-                #[cfg(not(feature = "html"))]
-                {
-                    ctxt.parse_chunk(chunk, 1);
-                }
-                break 'b;
+        let len = base[chunk_size..].len();
+        let mut cur = 0;
+        for chunk in base[chunk_size..].chunks(1024) {
+            cur += chunk.len();
+            let terminate = (len == cur) as i32;
+            #[cfg(feature = "html")]
+            if options & XML_PARSE_HTML != 0 {
+                html_parse_chunk(&mut ctxt, chunk, terminate);
             } else {
-                let chunk =
-                    from_raw_parts(base.add(cur as usize) as *const u8, chunk_size as usize);
-                #[cfg(feature = "html")]
-                if options & XML_PARSE_HTML != 0 {
-                    html_parse_chunk(&mut ctxt, chunk, 0);
-                } else {
-                    ctxt.parse_chunk(chunk, 0);
-                }
-                #[cfg(not(feature = "html"))]
-                {
-                    let chunk =
-                        from_raw_parts(base.add(cur as usize) as *const u8, chunk_size as usize);
-                    ctxt.parse_chunk(chunk, 0);
-                }
-                cur += chunk_size;
+                ctxt.parse_chunk(chunk, terminate);
             }
-            cur < size
-        } {}
+            #[cfg(not(feature = "html"))]
+            {
+                ctxt.parse_chunk(chunk, terminate);
+            }
+            eprintln!("terminate: {terminate}");
+        }
+        if len == 0 {
+            #[cfg(feature = "html")]
+            if options & XML_PARSE_HTML != 0 {
+                html_parse_chunk(&mut ctxt, &[], 1);
+            } else {
+                ctxt.parse_chunk(&[], 1);
+            }
+            #[cfg(not(feature = "html"))]
+            {
+                ctxt.parse_chunk(&[], 1);
+            }
+        }
         let doc = ctxt.my_doc;
         #[cfg(feature = "html")]
-        if options & XML_PARSE_HTML != 0 {
-            res = 1;
+        let res = if options & XML_PARSE_HTML != 0 {
+            1
         } else {
-            res = ctxt.well_formed;
-        }
+            ctxt.well_formed
+        };
         #[cfg(not(feature = "html"))]
-        {
-            res = ctxt.well_formed;
-        }
-        free(base as _);
+        let res = ctxt.well_formed;
+
         if res == 0 {
             if let Some(doc) = doc {
                 xml_free_doc(doc);
@@ -1676,6 +1618,8 @@ unsafe fn push_parse_test(
             eprintln!("Failed to parse {filename}",);
             return -1;
         }
+        let mut base: *const c_char = null();
+        let mut size: i32 = 0;
         #[cfg(feature = "html")]
         if options & XML_PARSE_HTML != 0 {
             assert_eq!(
@@ -1697,7 +1641,7 @@ unsafe fn push_parse_test(
                 .dump_memory(addr_of_mut!(base) as *mut *mut XmlChar, addr_of_mut!(size));
         }
         xml_free_doc(doc.unwrap());
-        res = compare_file_mem(
+        let res = compare_file_mem(
             result.as_deref().unwrap(),
             from_raw_parts(base as _, size as usize),
         );
@@ -1725,7 +1669,7 @@ unsafe fn push_parse_test(
             TEST_ERRORS.with_borrow(|errors| {
                 emsg.extend_from_slice(&errors[..TEST_ERRORS_SIZE.get()]);
             });
-            res = compare_file_mem(err, &emsg);
+            let res = compare_file_mem(err, &emsg);
             if res != 0 {
                 eprintln!("Error for {filename} failed",);
                 return -1;
@@ -1886,14 +1830,8 @@ unsafe fn push_boundary_test(
         };
 
         let mut bnd_sax = XmlSAXHandler::default();
-        let mut base: *const c_char = null();
-        let mut size: i32 = 0;
         let mut res: i32;
-        let mut num_callbacks: i32;
-        let mut cur: i32;
-        let mut avail: u64;
         let mut old_consumed: u64 = 0;
-        let mut consumed: u64;
 
         // If the parser made progress, check that exactly one construct was
         // processed and that the input buffer is (almost) empty.
@@ -1927,17 +1865,17 @@ unsafe fn push_boundary_test(
         bnd_sax.comment = Some(comment_bnd);
 
         // load the document in memory and work from there.
-        if load_mem(filename, addr_of_mut!(base), addr_of_mut!(size)) != 0 {
+        let Ok(base) = load_mem(filename) else {
             eprintln!("Failed to load {filename}",);
             return -1;
-        }
+        };
 
         #[cfg(feature = "html")]
         let mut ctxt = if options & XML_PARSE_HTML != 0 {
             html_create_push_parser_ctxt(
                 Some(Box::new(bnd_sax)),
                 None,
-                &[*base as u8],
+                &base[..1],
                 Some(filename),
                 XmlCharEncoding::None,
             )
@@ -1946,7 +1884,7 @@ unsafe fn push_boundary_test(
             XmlParserCtxt::new_push_parser(
                 Some(Box::new(bnd_sax)),
                 None,
-                &[*base as u8],
+                &base[..1],
                 Some(filename),
             )
             .unwrap()
@@ -1960,10 +1898,11 @@ unsafe fn push_boundary_test(
         )
         .unwrap();
         ctxt.use_options(options);
-        cur = 1;
-        consumed = 0;
-        num_callbacks = 0;
-        avail = 0;
+        let mut cur = 1;
+        let size = base.len();
+        let mut consumed = 0;
+        let mut num_callbacks = 0;
+        let mut avail = 0;
         while cur < size && num_callbacks <= 1 && avail == 0 {
             let terminate = (cur + 1 >= size) as i32;
             let mut is_text: i32 = 0;
@@ -1972,7 +1911,7 @@ unsafe fn push_boundary_test(
                 let first_char: i32 = if !ctxt.content_bytes().is_empty() {
                     ctxt.content_bytes()[0] as i32
                 } else {
-                    *base.add(cur as usize) as i32
+                    base[cur] as i32
                 };
 
                 if first_char != b'<' as i32
@@ -1991,13 +1930,13 @@ unsafe fn push_boundary_test(
 
             #[cfg(feature = "html")]
             if options & XML_PARSE_HTML != 0 {
-                html_parse_chunk(&mut ctxt, &[*base.add(cur as _) as u8], terminate);
+                html_parse_chunk(&mut ctxt, &[base[cur]], terminate);
             } else {
-                ctxt.parse_chunk(&[*base.add(cur as _) as u8], terminate);
+                ctxt.parse_chunk(&[base[cur]], terminate);
             }
             #[cfg(not(feature = "html"))]
             {
-                ctxt.parse_chunk(&[*base.add(cur as _) as u8], terminate);
+                ctxt.parse_chunk(&[base[cur]], terminate);
             }
             cur += 1;
 
@@ -2070,7 +2009,6 @@ unsafe fn push_boundary_test(
         {
             res = ctxt.well_formed;
         }
-        free(base as _);
         if num_callbacks > 1 {
             if let Some(doc) = doc {
                 xml_free_doc(doc);
@@ -2094,16 +2032,13 @@ unsafe fn push_boundary_test(
             eprintln!("Failed to parse {filename}",);
             return -1;
         }
+        let mut base: *mut u8 = null_mut();
+        let mut size = 0;
         #[cfg(feature = "html")]
         if options & XML_PARSE_HTML != 0 {
-            html_doc_dump_memory(
-                doc.unwrap(),
-                addr_of_mut!(base) as *mut *mut XmlChar,
-                addr_of_mut!(size),
-            );
+            html_doc_dump_memory(doc.unwrap(), &raw mut base, addr_of_mut!(size));
         } else {
-            doc.unwrap()
-                .dump_memory(addr_of_mut!(base) as *mut *mut XmlChar, addr_of_mut!(size));
+            doc.unwrap().dump_memory(&raw mut base, addr_of_mut!(size));
         }
         #[cfg(not(feature = "html"))]
         {
@@ -2118,7 +2053,7 @@ unsafe fn push_boundary_test(
         if base.is_null() || res != 0 {
             eprintln!("Result for {filename} failed in {}", result.unwrap());
             if !base.is_null() {
-                eprintln!("{}", CStr::from_ptr(base).to_string_lossy());
+                eprintln!("{}", CStr::from_ptr(base as *const i8).to_string_lossy());
                 xml_free(base as _);
             }
             return -1;
@@ -2149,22 +2084,20 @@ unsafe fn mem_parse_test(
     _options: i32,
 ) -> i32 {
     unsafe {
-        let mut base: *const c_char = null();
-        let mut size: i32 = 0;
-
         NB_TESTS.set(NB_TESTS.get() + 1);
         // load and parse the memory
-        if load_mem(filename, &raw mut base, &raw mut size) != 0 {
+        let Ok(buffer) = load_mem(filename) else {
             eprintln!("Failed to load {filename}",);
             return -1;
-        }
+        };
 
-        let buffer = from_raw_parts(base as *const u8, size as usize).to_vec();
         let doc = xml_read_memory(buffer, Some(filename), None, 0);
-        unload_mem(base);
         let Some(mut doc) = doc else {
             return 1;
         };
+
+        let mut base: *const c_char = null();
+        let mut size: i32 = 0;
         doc.dump_memory(addr_of_mut!(base) as *mut *mut XmlChar, addr_of_mut!(size));
         xml_free_doc(doc);
         let res: i32 = compare_file_mem(
@@ -2510,18 +2443,13 @@ unsafe fn stream_mem_parse_test(
     unsafe {
         use exml::libxml::xmlreader::{xml_free_text_reader, xml_reader_for_memory};
 
-        let mut base: *const c_char = null();
-        let mut size: i32 = 0;
-
         // load and parse the memory
-        if load_mem(filename, addr_of_mut!(base), addr_of_mut!(size)) != 0 {
-            eprintln!("Failed to load {filename}",);
+        let Ok(buffer) = load_mem(filename) else {
+            eprintln!("Failed to load {filename}");
             return -1;
-        }
-        let buffer = from_raw_parts(base as *const u8, size as usize).to_vec();
+        };
         let reader: XmlTextReaderPtr = xml_reader_for_memory(buffer, Some(filename), None, options);
         let ret: i32 = stream_process_test(filename, result, err, reader, None, options);
-        free(base as _);
         xml_free_text_reader(reader);
         ret
     }
@@ -4102,8 +4030,6 @@ unsafe fn c14n_run_test(
         let mut xpath: XmlXPathObjectPtr = null_mut();
         let mut ret: i32;
         let mut inclusive_namespaces = None;
-        let mut nslist: *const c_char = null_mut();
-        let mut nssize: i32 = 0;
 
         // build an XML tree from a the file; we need to add default
         // attributes and resolve all character and entities references
@@ -4139,15 +4065,15 @@ unsafe fn c14n_run_test(
         }
 
         if let Some(ns_filename) = ns_filename {
-            if load_mem(ns_filename, addr_of_mut!(nslist), addr_of_mut!(nssize)) != 0 {
+            let Ok(nslist) = load_mem(ns_filename) else {
                 eprintln!("Error: unable to evaluate xpath expression");
                 if !xpath.is_null() {
                     xml_xpath_free_object(xpath);
                 }
                 xml_free_doc(doc);
                 return -1;
-            }
-            inclusive_namespaces = parse_list(&CStr::from_ptr(nslist).to_string_lossy());
+            };
+            inclusive_namespaces = parse_list(from_utf8(&nslist).unwrap());
         }
 
         // Canonical form
@@ -4182,9 +4108,6 @@ unsafe fn c14n_run_test(
         // Cleanup
         if !xpath.is_null() {
             xml_xpath_free_object(xpath);
-        }
-        if !nslist.is_null() {
-            free(nslist as _);
         }
         xml_free_doc(doc);
 
