@@ -24,10 +24,9 @@
 use std::{
     borrow::Cow,
     cell::RefCell,
-    ffi::CStr,
     io::{Read, Write},
     mem::take,
-    ptr::{addr_of_mut, null_mut},
+    ptr::null_mut,
     rc::Rc,
     str::{from_utf8, from_utf8_unchecked},
     sync::atomic::{AtomicI32, Ordering},
@@ -48,7 +47,6 @@ use crate::{
             xml_is_blank_char, xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender,
             xml_is_pubid_char,
         },
-        globals::{xml_free, xml_malloc_atomic, xml_realloc},
         sax2::{xml_sax2_ignorable_whitespace, xml_sax2_init_html_default_sax_handler},
         xmlstring::XmlChar,
     },
@@ -157,10 +155,8 @@ pub fn html_auto_close_tag(_doc: HtmlDocPtr, name: &str, elem: HtmlNodePtr) -> i
 /// Parse a content: comment, sub-element, reference or text.
 /// This is the entry point when called from parser.c
 #[doc(alias = "htmlParseContent")]
-pub(crate) unsafe fn html_parse_content(ctxt: &mut HtmlParserCtxt) {
-    unsafe {
-        html_parse_content_internal(ctxt);
-    }
+pub(crate) fn html_parse_content(ctxt: &mut HtmlParserCtxt) {
+    html_parse_content_internal(ctxt);
 }
 
 /// skip all blanks character found at that point in the input streams.
@@ -1029,187 +1025,66 @@ macro_rules! grow_buffer {
 ///
 /// Returns the attribute parsed or NULL
 #[doc(alias = "htmlParseHTMLAttribute")]
-unsafe fn html_parse_html_attribute(ctxt: &mut HtmlParserCtxt, stop: u8) -> *mut XmlChar {
-    unsafe {
-        let mut buffer: *mut XmlChar;
-        let mut buffer_size: i32;
-        let max_length: i32 = if ctxt.options & XmlParserOption::XmlParseHuge as i32 != 0 {
-            XML_MAX_HUGE_LENGTH as i32
-        } else {
-            XML_MAX_TEXT_LENGTH as i32
-        };
-        let mut out: *mut XmlChar;
+fn html_parse_html_attribute(ctxt: &mut HtmlParserCtxt, stop: u8) -> Option<String> {
+    let max_length = if ctxt.options & XmlParserOption::XmlParseHuge as i32 != 0 {
+        XML_MAX_HUGE_LENGTH
+    } else {
+        XML_MAX_TEXT_LENGTH
+    };
 
-        // allocate a translation buffer.
-        buffer_size = HTML_PARSER_BUFFER_SIZE as _;
-        buffer = xml_malloc_atomic(buffer_size as usize) as _;
-        if buffer.is_null() {
-            html_err_memory(Some(ctxt), Some("buffer allocation failed\n"));
-            return null_mut();
+    // allocate a translation buffer.
+    let mut out = String::new();
+
+    // Ok loop until we reach one of the ending chars
+    while ctxt.current_byte() != 0 && ctxt.current_byte() != stop {
+        if stop == 0 && ctxt.current_byte() == b'>' {
+            break;
         }
-        out = buffer;
-
-        // Ok loop until we reach one of the ending chars
-        while ctxt.current_byte() != 0 && ctxt.current_byte() != stop {
-            if stop == 0 && ctxt.current_byte() == b'>' {
-                break;
-            }
-            if stop == 0 && xml_is_blank_char(ctxt.current_byte() as u32) {
-                break;
-            }
-            if ctxt.current_byte() == b'&' {
-                if ctxt.nth_byte(1) == b'#' {
-                    let mut bits: i32;
-
-                    let c: u32 = html_parse_char_ref(ctxt) as _;
-                    if c < 0x80 {
-                        *out = c as _;
-                        out = out.add(1);
-                        bits = -6;
-                    } else if c < 0x800 {
-                        *out = ((c >> 6) & 0x1F) as u8 | 0xC0;
-                        out = out.add(1);
-                        bits = 0;
-                    } else if c < 0x10000 {
-                        *out = ((c >> 12) & 0x0F) as u8 | 0xE0;
-                        out = out.add(1);
-                        bits = 6;
-                    } else {
-                        *out = ((c >> 18) & 0x07) as u8 | 0xF0;
-                        out = out.add(1);
-                        bits = 12;
-                    }
-
-                    while bits >= 0 {
-                        *out = ((c >> bits) & 0x3F) as u8 | 0x80;
-                        out = out.add(1);
-                        bits -= 6;
-                    }
-
-                    if out.offset_from(buffer) > buffer_size as isize - 100 {
-                        let indx: i32 = out.offset_from(buffer) as _;
-
-                        grow_buffer!(Some(ctxt), buffer, buffer_size);
-                        out = buffer.add(indx as usize) as _;
-                    }
-                } else {
-                    let mut name = None;
-                    let ent = html_parse_entity_ref(ctxt, &mut name);
-                    if let Some(name) = name {
-                        if let Some(ent) = ent {
-                            let mut bits: i32;
-
-                            if out.offset_from(buffer) > buffer_size as isize - 100 {
-                                let indx: i32 = out.offset_from(buffer) as i32;
-
-                                grow_buffer!(Some(ctxt), buffer, buffer_size);
-                                out = buffer.add(indx as usize) as _;
-                            }
-                            let c: u32 = ent.value;
-                            if c < 0x80 {
-                                *out = c as _;
-                                out = out.add(1);
-                                bits = -6;
-                            } else if c < 0x800 {
-                                *out = ((c >> 6) & 0x1F) as u8 | 0xC0;
-                                out = out.add(1);
-                                bits = 0;
-                            } else if c < 0x10000 {
-                                *out = ((c >> 12) & 0x0F) as u8 | 0xE0;
-                                out = out.add(1);
-                                bits = 6;
-                            } else {
-                                *out = ((c >> 18) & 0x07) as u8 | 0xF0;
-                                out = out.add(1);
-                                bits = 12;
-                            }
-
-                            while bits >= 0 {
-                                *out = ((c >> bits) & 0x3F) as u8 | 0x80;
-                                out = out.add(1);
-                                bits -= 6;
-                            }
-                        } else {
-                            *out = b'&';
-                            out = out.add(1);
-                            for cur in name.bytes() {
-                                if out.offset_from(buffer) > buffer_size as isize - 100 {
-                                    let indx: i32 = out.offset_from(buffer) as i32;
-
-                                    grow_buffer!(Some(ctxt), buffer, buffer_size);
-                                    out = buffer.add(indx as usize) as _;
-                                }
-                                *out = cur;
-                                out = out.add(1);
-                            }
-                        }
-                    } else {
-                        *out = b'&';
-                        out = out.add(1);
-                        if out.offset_from(buffer) > buffer_size as isize - 100 {
-                            let indx: i32 = out.offset_from(buffer) as i32;
-
-                            grow_buffer!(Some(ctxt), buffer, buffer_size);
-                            out = buffer.add(indx as usize) as _;
-                        }
-                    }
-                }
+        if stop == 0 && xml_is_blank_char(ctxt.current_byte() as u32) {
+            break;
+        }
+        if ctxt.current_byte() == b'&' {
+            if ctxt.nth_byte(1) == b'#' {
+                let c = html_parse_char_ref(ctxt) as u32;
+                out.push(char::from_u32(c).unwrap());
             } else {
-                let mut bits: i32;
-                let mut l: i32 = 0;
-
-                if out.offset_from(buffer) > buffer_size as isize - 100 {
-                    let indx: i32 = out.offset_from(buffer) as i32;
-
-                    grow_buffer!(Some(ctxt), buffer, buffer_size);
-                    out = buffer.add(indx as usize) as _;
-                }
-                let c: u32 = html_current_char(&mut *ctxt, &mut l) as _;
-                if matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
-                    xml_free(buffer as _);
-                    return null_mut();
-                }
-                if c < 0x80 {
-                    *out = c as _;
-                    out = out.add(1);
-                    bits = -6;
-                } else if c < 0x800 {
-                    *out = ((c >> 6) & 0x1F) as u8 | 0xC0;
-                    out = out.add(1);
-                    bits = 0;
-                } else if c < 0x10000 {
-                    *out = ((c >> 12) & 0x0F) as u8 | 0xE0;
-                    out = out.add(1);
-                    bits = 6;
+                let mut name = None;
+                let ent = html_parse_entity_ref(ctxt, &mut name);
+                if let Some(name) = name {
+                    if let Some(ent) = ent {
+                        let c = ent.value;
+                        out.push(char::from_u32(c).unwrap());
+                    } else {
+                        out.push('&');
+                        out.push_str(&name);
+                    }
                 } else {
-                    *out = ((c >> 18) & 0x07) as u8 | 0xF0;
-                    out = out.add(1);
-                    bits = 12;
+                    out.push('&');
                 }
+            }
+        } else {
+            let mut l: i32 = 0;
 
-                while bits >= 0 {
-                    *out = ((c >> bits) & 0x3F) as u8 | 0x80;
-                    out = out.add(1);
-                    bits -= 6;
-                }
-                ctxt.advance_with_line_handling(l as usize);
-                ctxt.token = 0;
+            let c = html_current_char(&mut *ctxt, &mut l) as u32;
+            if matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
+                return None;
             }
-            if out.offset_from(buffer) > max_length as isize {
-                html_parse_err(
-                    Some(ctxt),
-                    XmlParserErrors::XmlErrAttributeNotFinished,
-                    "attribute value too long\n",
-                    None,
-                    None,
-                );
-                xml_free(buffer as _);
-                return null_mut();
-            }
+            out.push(char::from_u32(c).unwrap());
+            ctxt.advance_with_line_handling(l as usize);
+            ctxt.token = 0;
         }
-        *out = 0;
-        buffer
+        if out.len() > max_length {
+            html_parse_err(
+                Some(ctxt),
+                XmlParserErrors::XmlErrAttributeNotFinished,
+                "attribute value too long\n",
+                None,
+                None,
+            );
+            return None;
+        }
     }
+    Some(out)
 }
 
 /// parse a value for an attribute
@@ -1217,103 +1092,93 @@ unsafe fn html_parse_html_attribute(ctxt: &mut HtmlParserCtxt, stop: u8) -> *mut
 /// # Note
 /// The parser won't do substitution of entities here, this
 /// will be handled later in xmlStringGetNodeList, unless it was
-/// asked for (*ctxt).replaceEntities != 0
+/// asked for ctxt.replaceEntities != 0
 ///
 /// Returns the AttValue parsed or NULL.
 #[doc(alias = "htmlParseAttValue")]
-unsafe fn html_parse_att_value(ctxt: &mut HtmlParserCtxt) -> *mut XmlChar {
-    unsafe {
-        let ret: *mut XmlChar;
+fn html_parse_att_value(ctxt: &mut HtmlParserCtxt) -> Option<String> {
+    let ret;
 
-        if ctxt.current_byte() == b'"' {
-            ctxt.skip_char();
-            ret = html_parse_html_attribute(ctxt, b'"');
-            if ctxt.current_byte() != b'"' {
-                html_parse_err(
-                    Some(ctxt),
-                    XmlParserErrors::XmlErrAttributeNotFinished,
-                    "AttValue: \" expected\n",
-                    None,
-                    None,
-                );
-            } else {
-                ctxt.skip_char();
-            }
-        } else if ctxt.current_byte() == b'\'' {
-            ctxt.skip_char();
-            ret = html_parse_html_attribute(ctxt, b'\'');
-            if ctxt.current_byte() != b'\'' {
-                html_parse_err(
-                    Some(ctxt),
-                    XmlParserErrors::XmlErrAttributeNotFinished,
-                    "AttValue: ' expected\n",
-                    None,
-                    None,
-                );
-            } else {
-                ctxt.skip_char();
-            }
+    if ctxt.current_byte() == b'"' {
+        ctxt.skip_char();
+        ret = html_parse_html_attribute(ctxt, b'"');
+        if ctxt.current_byte() != b'"' {
+            html_parse_err(
+                Some(ctxt),
+                XmlParserErrors::XmlErrAttributeNotFinished,
+                "AttValue: \" expected\n",
+                None,
+                None,
+            );
         } else {
-            // That's an HTMLism, the attribute value may not be quoted
-            ret = html_parse_html_attribute(ctxt, 0);
-            if ret.is_null() {
-                html_parse_err(
-                    Some(ctxt),
-                    XmlParserErrors::XmlErrAttributeWithoutValue,
-                    "AttValue: no value found\n",
-                    None,
-                    None,
-                );
-            }
+            ctxt.skip_char();
         }
-        ret
+    } else if ctxt.current_byte() == b'\'' {
+        ctxt.skip_char();
+        ret = html_parse_html_attribute(ctxt, b'\'');
+        if ctxt.current_byte() != b'\'' {
+            html_parse_err(
+                Some(ctxt),
+                XmlParserErrors::XmlErrAttributeNotFinished,
+                "AttValue: ' expected\n",
+                None,
+                None,
+            );
+        } else {
+            ctxt.skip_char();
+        }
+    } else {
+        // That's an HTMLism, the attribute value may not be quoted
+        ret = html_parse_html_attribute(ctxt, 0);
+        if ret.is_none() {
+            html_parse_err(
+                Some(ctxt),
+                XmlParserErrors::XmlErrAttributeWithoutValue,
+                "AttValue: no value found\n",
+                None,
+                None,
+            );
+        }
     }
+    ret
 }
 
 /// Parse an attribute
 ///
-/// `[41] Attribute ::= Name Eq AttValue`
-///
-/// `[25] Eq ::= S? '=' S?`
+/// ```text
+/// [41] Attribute ::= Name Eq AttValue
+/// [25] Eq ::= S? '=' S?
 ///
 /// With namespace:
-///
-/// `[NS 11] Attribute ::= QName Eq AttValue`
+/// [NS 11] Attribute ::= QName Eq AttValue
+/// ```
 ///
 /// Also the case QName == xmlns:??? is handled independently as a namespace definition.
 ///
 /// Returns the attribute name, and the value in *value.
 #[doc(alias = "htmlParseAttribute")]
-unsafe fn html_parse_attribute(
-    ctxt: &mut HtmlParserCtxt,
-    value: *mut *mut XmlChar,
-) -> Option<String> {
-    unsafe {
-        let mut val: *mut XmlChar = null_mut();
+fn html_parse_attribute(ctxt: &mut HtmlParserCtxt) -> (Option<String>, Option<String>) {
+    let Some(name) = html_parse_html_name(ctxt) else {
+        html_parse_err(
+            Some(ctxt),
+            XmlParserErrors::XmlErrNameRequired,
+            "error parsing attribute name\n",
+            None,
+            None,
+        );
+        return (None, None);
+    };
 
-        *value = null_mut();
-        let Some(name) = html_parse_html_name(ctxt) else {
-            html_parse_err(
-                Some(ctxt),
-                XmlParserErrors::XmlErrNameRequired,
-                "error parsing attribute name\n",
-                None,
-                None,
-            );
-            return None;
-        };
-
-        // read the value
+    // read the value
+    html_skip_blank_chars(ctxt);
+    let mut val = None;
+    if ctxt.current_byte() == b'=' {
+        ctxt.skip_char();
         html_skip_blank_chars(ctxt);
-        if ctxt.current_byte() == b'=' {
-            ctxt.skip_char();
-            html_skip_blank_chars(ctxt);
-            val = html_parse_att_value(ctxt);
-        }
-
-        *value = val;
-        Some(name)
+        val = html_parse_att_value(ctxt);
     }
+
+    (Some(name), val)
 }
 
 /// Checks an attribute value to detect the encoding
@@ -1459,186 +1324,170 @@ fn html_check_meta(ctxt: &mut HtmlParserCtxt, atts: &[(String, Option<String>)])
 /// Parse a start of tag either for rule element or EmptyElement.  
 /// In both case we don't parse the tag closing chars.
 ///
-/// `[40] STag ::= b'<' Name (S Attribute)* S? '>'`
-///
-/// `[44] EmptyElemTag ::= b'<' Name (S Attribute)* S? '/>'`
+/// ```text
+/// [40] STag ::= b'<' Name (S Attribute)* S? '>'
+/// [44] EmptyElemTag ::= b'<' Name (S Attribute)* S? '/>'
 ///
 /// With namespace:
-///
-/// `[NS 8] STag ::= b'<' QName (S Attribute)* S? '>'`
-///
-/// `[NS 10] EmptyElement ::= b'<' QName (S Attribute)* S? '/>'`
+/// [NS 8] STag ::= b'<' QName (S Attribute)* S? '>'
+/// [NS 10] EmptyElement ::= b'<' QName (S Attribute)* S? '/>'
+/// ```
 ///
 /// Returns 0 in case of success, -1 in case of error and 1 if discarded
 #[doc(alias = "htmlParseStartTag")]
-unsafe fn html_parse_start_tag(ctxt: &mut HtmlParserCtxt) -> i32 {
-    unsafe {
-        let mut attvalue: *mut XmlChar = null_mut();
-        let mut meta: i32 = 0;
-        let mut discardtag: i32 = 0;
+fn html_parse_start_tag(ctxt: &mut HtmlParserCtxt) -> i32 {
+    let mut meta: i32 = 0;
+    let mut discardtag: i32 = 0;
 
-        if ctxt.input().is_none() {
-            html_parse_err(
-                Some(ctxt),
-                XmlParserErrors::XmlErrInternalError,
-                "htmlParseStartTag: context error\n",
-                None,
-                None,
-            );
-            return -1;
-        }
-        if matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
-            return -1;
-        }
-        if ctxt.current_byte() != b'<' {
-            return -1;
-        }
-        ctxt.skip_char();
+    if ctxt.input().is_none() {
+        html_parse_err(
+            Some(ctxt),
+            XmlParserErrors::XmlErrInternalError,
+            "htmlParseStartTag: context error\n",
+            None,
+            None,
+        );
+        return -1;
+    }
+    if matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
+        return -1;
+    }
+    if ctxt.current_byte() != b'<' {
+        return -1;
+    }
+    ctxt.skip_char();
 
+    ctxt.grow();
+    let Some(name) = html_parse_html_name(&mut *ctxt) else {
+        html_parse_err(
+            Some(ctxt),
+            XmlParserErrors::XmlErrNameRequired,
+            "htmlParseStartTag: invalid element name\n",
+            None,
+            None,
+        );
+        // Dump the bogus tag like browsers do
+        while ctxt.current_byte() != 0
+            && ctxt.current_byte() != b'>'
+            && !matches!(ctxt.instate, XmlParserInputState::XmlParserEOF)
+        {
+            ctxt.skip_char();
+        }
+        return -1;
+    };
+    if name == "meta" {
+        meta = 1;
+    }
+
+    // Check for auto-closure of HTML elements.
+    html_auto_close(ctxt, Some(&name));
+
+    // Check for implied HTML elements.
+    html_check_implied(ctxt, &name);
+
+    // Avoid html at any level > 0, head at any level != 1
+    // or any attempt to recurse body
+    if !ctxt.name_tab.is_empty() && name == "html" {
+        html_parse_err(
+            Some(ctxt),
+            XmlParserErrors::XmlHTMLStrucureError,
+            "htmlParseStartTag: misplaced <html> tag\n",
+            Some(&name),
+            None,
+        );
+        discardtag = 1;
+        ctxt.depth += 1;
+    }
+    if ctxt.name_tab.len() != 1 && name == "head" {
+        html_parse_err(
+            Some(ctxt),
+            XmlParserErrors::XmlHTMLStrucureError,
+            "htmlParseStartTag: misplaced <head> tag\n",
+            Some(&name),
+            None,
+        );
+        discardtag = 1;
+        ctxt.depth += 1;
+    }
+    if name == "body" {
+        for indx in 0..ctxt.name_tab.len() {
+            if ctxt.name_tab[indx].as_ref() == "body" {
+                html_parse_err(
+                    Some(ctxt),
+                    XmlParserErrors::XmlHTMLStrucureError,
+                    "htmlParseStartTag: misplaced <body> tag\n",
+                    Some(&name),
+                    None,
+                );
+                discardtag = 1;
+                ctxt.depth += 1;
+            }
+        }
+    }
+
+    // Now parse the attributes, it ends up with the ending
+    //
+    // (S Attribute)* S?
+    html_skip_blank_chars(ctxt);
+    'failed: while ctxt.current_byte() != 0
+        && ctxt.current_byte() != b'>'
+        && !ctxt.content_bytes().starts_with(b"/>")
+        && !matches!(ctxt.instate, XmlParserInputState::XmlParserEOF)
+    {
         ctxt.grow();
-        let Some(name) = html_parse_html_name(&mut *ctxt) else {
-            html_parse_err(
-                Some(ctxt),
-                XmlParserErrors::XmlErrNameRequired,
-                "htmlParseStartTag: invalid element name\n",
-                None,
-                None,
-            );
-            // Dump the bogus tag like browsers do
+        if let (Some(attname), attvalue) = html_parse_attribute(ctxt) {
+            // Well formedness requires at most one declaration of an attribute
+            for i in 0..ctxt.atts.len() {
+                let (name, _) = &ctxt.atts[i];
+                if name.as_str() == attname {
+                    html_parse_err(
+                        Some(ctxt),
+                        XmlParserErrors::XmlErrAttributeRedefined,
+                        format!("Attribute {attname} redefined\n").as_str(),
+                        Some(&attname),
+                        None,
+                    );
+                    // goto failed;
+                    html_skip_blank_chars(ctxt);
+                    continue 'failed;
+                }
+            }
+
+            // Add the pair to atts
+            ctxt.atts.push((attname, attvalue));
+        } else {
+            // Dump the bogus attribute string up to the next blank or the end of the tag.
             while ctxt.current_byte() != 0
+                && !xml_is_blank_char(ctxt.current_byte() as u32)
                 && ctxt.current_byte() != b'>'
+                && !ctxt.content_bytes().starts_with(b"/>")
                 && !matches!(ctxt.instate, XmlParserInputState::XmlParserEOF)
             {
                 ctxt.skip_char();
             }
-            return -1;
-        };
-        if name == "meta" {
-            meta = 1;
         }
-
-        // Check for auto-closure of HTML elements.
-        html_auto_close(ctxt, Some(&name));
-
-        // Check for implied HTML elements.
-        html_check_implied(ctxt, &name);
-
-        // Avoid html at any level > 0, head at any level != 1
-        // or any attempt to recurse body
-        if !ctxt.name_tab.is_empty() && name == "html" {
-            html_parse_err(
-                Some(ctxt),
-                XmlParserErrors::XmlHTMLStrucureError,
-                "htmlParseStartTag: misplaced <html> tag\n",
-                Some(&name),
-                None,
-            );
-            discardtag = 1;
-            ctxt.depth += 1;
-        }
-        if ctxt.name_tab.len() != 1 && name == "head" {
-            html_parse_err(
-                Some(ctxt),
-                XmlParserErrors::XmlHTMLStrucureError,
-                "htmlParseStartTag: misplaced <head> tag\n",
-                Some(&name),
-                None,
-            );
-            discardtag = 1;
-            ctxt.depth += 1;
-        }
-        if name == "body" {
-            for indx in 0..ctxt.name_tab.len() {
-                if ctxt.name_tab[indx].as_ref() == "body" {
-                    html_parse_err(
-                        Some(ctxt),
-                        XmlParserErrors::XmlHTMLStrucureError,
-                        "htmlParseStartTag: misplaced <body> tag\n",
-                        Some(&name),
-                        None,
-                    );
-                    discardtag = 1;
-                    ctxt.depth += 1;
-                }
-            }
-        }
-
-        // Now parse the attributes, it ends up with the ending
-        //
-        // (S Attribute)* S?
         html_skip_blank_chars(ctxt);
-        'failed: while ctxt.current_byte() != 0
-            && ctxt.current_byte() != b'>'
-            && !ctxt.content_bytes().starts_with(b"/>")
-            && !matches!(ctxt.instate, XmlParserInputState::XmlParserEOF)
-        {
-            ctxt.grow();
-            if let Some(attname) = html_parse_attribute(ctxt, addr_of_mut!(attvalue)) {
-                // Well formedness requires at most one declaration of an attribute
-                for i in 0..ctxt.atts.len() {
-                    let (name, _) = &ctxt.atts[i];
-                    if name.as_str() == attname {
-                        html_parse_err(
-                            Some(ctxt),
-                            XmlParserErrors::XmlErrAttributeRedefined,
-                            format!("Attribute {attname} redefined\n").as_str(),
-                            Some(&attname),
-                            None,
-                        );
-                        if !attvalue.is_null() {
-                            xml_free(attvalue as _);
-                        }
-                        // goto failed;
-                        html_skip_blank_chars(ctxt);
-                        continue 'failed;
-                    }
-                }
+    }
 
-                // Add the pair to atts
-                let value = (!attvalue.is_null()).then(|| {
-                    CStr::from_ptr(attvalue as *const i8)
-                        .to_string_lossy()
-                        .into_owned()
-                });
-                ctxt.atts.push((attname, value));
-                xml_free(attvalue as _);
-            } else {
-                if !attvalue.is_null() {
-                    xml_free(attvalue as _);
-                }
-                // Dump the bogus attribute string up to the next blank or the end of the tag.
-                while ctxt.current_byte() != 0
-                    && !xml_is_blank_char(ctxt.current_byte() as u32)
-                    && ctxt.current_byte() != b'>'
-                    && !ctxt.content_bytes().starts_with(b"/>")
-                    && !matches!(ctxt.instate, XmlParserInputState::XmlParserEOF)
-                {
-                    ctxt.skip_char();
-                }
-            }
-            html_skip_blank_chars(ctxt);
-        }
+    // Handle specific association to the META tag
+    if meta != 0 && !ctxt.atts.is_empty() {
+        let atts = take(&mut ctxt.atts);
+        html_check_meta(ctxt, &atts);
+        ctxt.atts = atts;
+    }
 
-        // Handle specific association to the META tag
-        if meta != 0 && !ctxt.atts.is_empty() {
+    // SAX: Start of Element !
+    if discardtag == 0 {
+        html_name_push(ctxt, &name);
+        if let Some(start_element) = ctxt.sax.as_deref_mut().and_then(|sax| sax.start_element) {
             let atts = take(&mut ctxt.atts);
-            html_check_meta(ctxt, &atts);
+            start_element(ctxt, &name, &atts);
             ctxt.atts = atts;
         }
-
-        // SAX: Start of Element !
-        if discardtag == 0 {
-            html_name_push(ctxt, &name);
-            if let Some(start_element) = ctxt.sax.as_deref_mut().and_then(|sax| sax.start_element) {
-                let atts = take(&mut ctxt.atts);
-                start_element(ctxt, &name, &atts);
-                ctxt.atts = atts;
-            }
-        }
-
-        ctxt.atts.clear();
-        discardtag
     }
+
+    ctxt.atts.clear();
+    discardtag
 }
 
 /// Return value: The "endtag" priority.
@@ -2144,7 +1993,9 @@ fn html_parse_external_id(ctxt: &mut HtmlParserCtxt) -> (Option<String>, Option<
 
 /// Parse a DOCTYPE declaration
 ///
-/// `[28] doctypedecl ::= '<!DOCTYPE' S Name (S ExternalID)? S? ('[' (markupdecl | PEReference | S)* ']' S?)? '>'`
+/// ```text
+/// [28] doctypedecl ::= '<!DOCTYPE' S Name (S ExternalID)? S? ('[' (markupdecl | PEReference | S)* ']' S?)? '>'
+/// ```
 #[doc(alias = "htmlParseDocTypeDecl")]
 fn html_parse_doc_type_decl(ctxt: &mut HtmlParserCtxt) {
     // We know that '<!DOCTYPE' has been detected.
@@ -2207,7 +2058,9 @@ fn html_parse_doc_type_decl(ctxt: &mut HtmlParserCtxt) {
 
 /// Parse an XML (SGML) comment <!-- .... -->
 ///
-/// `[15] Comment ::= b'<!--' ((Char - '-') | ('-' (Char - '-')))* '-->'`
+/// ```text
+/// [15] Comment ::= b'<!--' ((Char - '-') | ('-' (Char - '-')))* '-->'
+/// ```
 #[doc(alias = "htmlParseComment")]
 fn html_parse_comment(ctxt: &mut HtmlParserCtxt) {
     let mut q: i32;
@@ -2374,7 +2227,9 @@ fn html_skip_bogus_comment(ctxt: &mut HtmlParserCtxt) {
 
 /// Parse an XML Processing Instruction.
 ///
-/// `[16] PI ::= b'<?' PITarget (S (Char* - (Char* '?>' Char*)))? '?>'`
+/// ```text
+/// [16] PI ::= b'<?' PITarget (S (Char* - (Char* '?>' Char*)))? '?>'
+/// ```
 #[doc(alias = "xmlParsePI")]
 fn html_parse_pi(ctxt: &mut HtmlParserCtxt) {
     let mut cur: i32;
@@ -2530,14 +2385,14 @@ fn html_check_paragraph(ctxt: &mut HtmlParserCtxt) -> i32 {
 /// this will end-up in a call to character() since this is either a CharRef, or a predefined entity.
 #[doc(alias = "htmlParseReference")]
 fn html_parse_reference(ctxt: &mut HtmlParserCtxt) {
-    let mut out: [XmlChar; 6] = [0; 6];
+    let mut out = [0; 6];
     if ctxt.current_byte() != b'&' {
         return;
     }
 
     if ctxt.nth_byte(1) == b'#' {
         let mut bits: i32;
-        let mut i: i32 = 0;
+        let mut i = 0;
 
         let c: u32 = html_parse_char_ref(ctxt) as _;
         if c == 0 {
@@ -2545,34 +2400,34 @@ fn html_parse_reference(ctxt: &mut HtmlParserCtxt) {
         }
 
         if c < 0x80 {
-            out[i as usize] = c as _;
+            out[i] = c as _;
             i += 1;
             bits = -6;
         } else if c < 0x800 {
-            out[i as usize] = ((c >> 6) & 0x1F) as u8 | 0xC0;
+            out[i] = ((c >> 6) & 0x1F) as u8 | 0xC0;
             i += 1;
             bits = 0;
         } else if c < 0x10000 {
-            out[i as usize] = ((c >> 12) & 0x0F) as u8 | 0xE0;
+            out[i] = ((c >> 12) & 0x0F) as u8 | 0xE0;
             i += 1;
             bits = 6;
         } else {
-            out[i as usize] = ((c >> 18) & 0x07) as u8 | 0xF0;
+            out[i] = ((c >> 18) & 0x07) as u8 | 0xF0;
             i += 1;
             bits = 12;
         }
 
         while bits >= 0 {
-            out[i as usize] = ((c >> bits) & 0x3F) as u8 | 0x80;
+            out[i] = ((c >> bits) & 0x3F) as u8 | 0x80;
             i += 1;
             bits -= 6;
         }
-        out[i as usize] = 0;
+        out[i] = 0;
 
         html_check_paragraph(ctxt);
         if let Some(characters) = ctxt.sax.as_deref_mut().and_then(|sax| sax.characters) {
-            let s = from_utf8(&out[..i as usize]).expect("Internal Error");
-            characters(&mut *ctxt, s);
+            let s = from_utf8(&out[..i]).expect("Internal Error");
+            characters(ctxt, s);
         }
     } else {
         let mut name = None;
@@ -2580,7 +2435,7 @@ fn html_parse_reference(ctxt: &mut HtmlParserCtxt) {
         let Some(name) = name else {
             html_check_paragraph(ctxt);
             if let Some(characters) = ctxt.sax.as_deref_mut().and_then(|sax| sax.characters) {
-                characters(&mut *ctxt, "&");
+                characters(ctxt, "&");
             }
             return;
         };
@@ -2617,13 +2472,13 @@ fn html_parse_reference(ctxt: &mut HtmlParserCtxt) {
             html_check_paragraph(ctxt);
             if let Some(characters) = ctxt.sax.as_deref_mut().and_then(|sax| sax.characters) {
                 let s = from_utf8(&out[..i as usize]).expect("Internal Error");
-                characters(&mut *ctxt, s);
+                characters(ctxt, s);
             }
         } else {
             html_check_paragraph(ctxt);
             if let Some(characters) = ctxt.sax.as_deref_mut().and_then(|sax| sax.characters) {
-                characters(&mut *ctxt, "&");
-                characters(&mut *ctxt, &name);
+                characters(ctxt, "&");
+                characters(ctxt, &name);
                 // (*ctxt.sax).characters(ctxt.userData,  c";".as_ptr() as _, 1);
             }
         }
@@ -2634,84 +2489,80 @@ fn html_parse_reference(ctxt: &mut HtmlParserCtxt) {
 ///
 /// Returns 1 if ignorable 0 otherwise.
 #[doc(alias = "areBlanks")]
-unsafe fn are_blanks(ctxt: &mut HtmlParserCtxt, str: *const XmlChar, len: i32) -> i32 {
-    unsafe {
-        for j in 0..len {
-            if !xml_is_blank_char(*str.add(j as usize) as u32) {
-                return 0;
-            }
-        }
-
-        if ctxt.current_byte() == 0 {
-            return 1;
-        }
-        if ctxt.current_byte() != b'<' {
-            return 0;
-        }
-        let Some(name) = ctxt.name.as_deref() else {
-            return 1;
-        };
-        if name == "html" {
-            return 1;
-        }
-        if name == "head" {
-            return 1;
-        }
-
-        // Only strip CDATA children of the body tag for strict HTML DTDs
-        if name == "body" {
-            if let Some(my_doc) = ctxt.my_doc {
-                let dtd = my_doc.get_int_subset();
-                if dtd.is_some_and(|dtd| {
-                    dtd.external_id
-                        .as_deref()
-                        .filter(|e| {
-                            let e = e.to_ascii_uppercase();
-                            e == "-//W3C//DTD HTML 4.01//EN" || e == "-//W3C//DTD HTML 4//EN"
-                        })
-                        .is_some()
-                }) {
-                    return 1;
-                }
-            }
-        }
-
-        let Some(context_node) = ctxt.node else {
-            return 0;
-        };
-        let mut last_child = context_node.get_last_child();
-        while let Some(now) = last_child
-            .filter(|last_child| last_child.element_type() == XmlElementType::XmlCommentNode)
-        {
-            last_child = now.prev();
-        }
-        if let Some(last_child) = last_child {
-            if last_child.is_text_node() {
-                return 0;
-            }
-            // keep ws in constructs like <p><b>xy</b> <i>z</i><p>
-            // for all tags "p" allowing PCDATA
-            for &pcdata in ALLOW_PCDATA {
-                if last_child.name().as_deref() == Some(pcdata) {
-                    return 0;
-                }
-            }
-        } else {
-            if context_node.element_type() != XmlElementType::XmlElementNode
-                && context_node.content.is_some()
-            {
-                return 0;
-            }
-            // keep ws in constructs like ...<b> </b>...
-            // for all tags "b" allowing PCDATA
-            for &pcdata in ALLOW_PCDATA {
-                if name == pcdata {
-                    return 0;
-                }
-            }
-        }
-        1
+fn are_blanks(ctxt: &mut HtmlParserCtxt, s: &str) -> i32 {
+    if s.chars().any(|c| !xml_is_blank_char(c as u32)) {
+        return 0;
     }
+
+    if ctxt.current_byte() == 0 {
+        return 1;
+    }
+    if ctxt.current_byte() != b'<' {
+        return 0;
+    }
+    let Some(name) = ctxt.name.as_deref() else {
+        return 1;
+    };
+    if name == "html" {
+        return 1;
+    }
+    if name == "head" {
+        return 1;
+    }
+
+    // Only strip CDATA children of the body tag for strict HTML DTDs
+    if name == "body" {
+        if let Some(my_doc) = ctxt.my_doc {
+            let dtd = my_doc.get_int_subset();
+            if dtd.is_some_and(|dtd| {
+                dtd.external_id
+                    .as_deref()
+                    .filter(|e| {
+                        e.eq_ignore_ascii_case("-//W3C//DTD HTML 4.01//EN")
+                            || e.eq_ignore_ascii_case("-//W3C//DTD HTML 4//EN")
+                    })
+                    .is_some()
+            }) {
+                return 1;
+            }
+        }
+    }
+
+    let Some(context_node) = ctxt.node else {
+        return 0;
+    };
+    let mut last_child = context_node.get_last_child();
+    while let Some(now) =
+        last_child.filter(|last_child| last_child.element_type() == XmlElementType::XmlCommentNode)
+    {
+        last_child = now.prev();
+    }
+    if let Some(last_child) = last_child {
+        if last_child.is_text_node() {
+            return 0;
+        }
+        // keep ws in constructs like <p><b>xy</b> <i>z</i><p>
+        // for all tags "p" allowing PCDATA
+        for &pcdata in ALLOW_PCDATA {
+            if last_child.name().as_deref() == Some(pcdata) {
+                return 0;
+            }
+        }
+    } else {
+        if context_node.element_type() != XmlElementType::XmlElementNode
+            && context_node.content.is_some()
+        {
+            return 0;
+        }
+        // keep ws in constructs like ...<b> </b>...
+        // for all tags "b" allowing PCDATA
+        for &pcdata in ALLOW_PCDATA {
+            if name == pcdata {
+                return 0;
+            }
+        }
+    }
+    1
 }
 
 /// Parse a CharData section.
@@ -2719,76 +2570,43 @@ unsafe fn are_blanks(ctxt: &mut HtmlParserCtxt, str: *const XmlChar, len: i32) -
 ///
 /// `[14] CharData ::= [^<&]* - ([^<&]* ']]>' [^<&]*)`
 #[doc(alias = "htmlParseCharDataInternal")]
-unsafe fn html_parse_char_data_internal(ctxt: &mut HtmlParserCtxt, readahead: i32) {
-    unsafe {
-        let mut buf: [XmlChar; HTML_PARSER_BIG_BUFFER_SIZE + 6] =
-            [0; HTML_PARSER_BIG_BUFFER_SIZE + 6];
-        let mut nbchar: i32 = 0;
-        let mut cur: i32;
-        let mut l: i32 = 0;
+fn html_parse_char_data_internal(ctxt: &mut HtmlParserCtxt, readahead: i32) {
+    let mut buf = [0; HTML_PARSER_BIG_BUFFER_SIZE + 6];
+    let mut nbchar: i32 = 0;
+    let mut cur: i32;
+    let mut l: i32 = 0;
 
-        if readahead != 0 {
-            buf[nbchar as usize] = readahead as _;
-            nbchar += 1;
-        }
+    if readahead != 0 {
+        buf[nbchar as usize] = readahead as _;
+        nbchar += 1;
+    }
 
-        cur = html_current_char(ctxt, &mut l);
-        while (cur != b'<' as i32 || ctxt.token == b'<' as i32)
-            && (cur != b'&' as i32 || ctxt.token == b'&' as i32)
-            && cur != 0
-        {
-            if !xml_is_char(cur as u32) {
-                html_parse_err_int!(
-                    ctxt,
-                    XmlParserErrors::XmlErrInvalidChar,
-                    "Invalid char in CDATA 0x{:X}\n",
-                    cur
-                );
-            } else {
-                let c = char::from_u32(cur as u32).unwrap();
-                let s = c.encode_utf8(&mut buf[nbchar as usize..]);
-                nbchar += s.len() as i32;
-            }
-            ctxt.advance_with_line_handling(l as usize);
-            ctxt.token = 0;
-            if nbchar >= HTML_PARSER_BIG_BUFFER_SIZE as i32 {
-                buf[nbchar as usize] = 0;
-
-                // Ok the segment is to be consumed as chars.
-                if ctxt.disable_sax == 0 && ctxt.sax.is_some() {
-                    let s = from_utf8(&buf[..nbchar as usize]).expect("Internal Error");
-                    if are_blanks(ctxt, buf.as_ptr(), nbchar) != 0 {
-                        if ctxt.keep_blanks != 0 {
-                            if let Some(characters) = ctxt.sax.as_deref_mut().unwrap().characters {
-                                characters(ctxt, s);
-                            }
-                        } else if let Some(ignorable_whitespace) =
-                            ctxt.sax.as_deref_mut().unwrap().ignorable_whitespace
-                        {
-                            ignorable_whitespace(ctxt, s);
-                        }
-                    } else {
-                        html_check_paragraph(ctxt);
-                        if let Some(characters) = ctxt.sax.as_deref_mut().unwrap().characters {
-                            characters(ctxt, s);
-                        }
-                    }
-                }
-                nbchar = 0;
-                ctxt.shrink();
-            }
-            cur = html_current_char(ctxt, &mut l);
+    cur = html_current_char(ctxt, &mut l);
+    while (cur != b'<' as i32 || ctxt.token == b'<' as i32)
+        && (cur != b'&' as i32 || ctxt.token == b'&' as i32)
+        && cur != 0
+    {
+        if !xml_is_char(cur as u32) {
+            html_parse_err_int!(
+                ctxt,
+                XmlParserErrors::XmlErrInvalidChar,
+                "Invalid char in CDATA 0x{:X}\n",
+                cur
+            );
+        } else {
+            let c = char::from_u32(cur as u32).unwrap();
+            let s = c.encode_utf8(&mut buf[nbchar as usize..]);
+            nbchar += s.len() as i32;
         }
-        if matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
-            return;
-        }
-        if nbchar != 0 {
+        ctxt.advance_with_line_handling(l as usize);
+        ctxt.token = 0;
+        if nbchar >= HTML_PARSER_BIG_BUFFER_SIZE as i32 {
             buf[nbchar as usize] = 0;
 
             // Ok the segment is to be consumed as chars.
             if ctxt.disable_sax == 0 && ctxt.sax.is_some() {
                 let s = from_utf8(&buf[..nbchar as usize]).expect("Internal Error");
-                if are_blanks(ctxt, buf.as_ptr(), nbchar) != 0 {
+                if are_blanks(ctxt, s) != 0 {
                     if ctxt.keep_blanks != 0 {
                         if let Some(characters) = ctxt.sax.as_deref_mut().unwrap().characters {
                             characters(ctxt, s);
@@ -2805,6 +2623,36 @@ unsafe fn html_parse_char_data_internal(ctxt: &mut HtmlParserCtxt, readahead: i3
                     }
                 }
             }
+            nbchar = 0;
+            ctxt.shrink();
+        }
+        cur = html_current_char(ctxt, &mut l);
+    }
+    if matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
+        return;
+    }
+    if nbchar != 0 {
+        buf[nbchar as usize] = 0;
+
+        // Ok the segment is to be consumed as chars.
+        if ctxt.disable_sax == 0 && ctxt.sax.is_some() {
+            let s = from_utf8(&buf[..nbchar as usize]).expect("Internal Error");
+            if are_blanks(ctxt, s) != 0 {
+                if ctxt.keep_blanks != 0 {
+                    if let Some(characters) = ctxt.sax.as_deref_mut().unwrap().characters {
+                        characters(ctxt, s);
+                    }
+                } else if let Some(ignorable_whitespace) =
+                    ctxt.sax.as_deref_mut().unwrap().ignorable_whitespace
+                {
+                    ignorable_whitespace(ctxt, s);
+                }
+            } else {
+                html_check_paragraph(ctxt);
+                if let Some(characters) = ctxt.sax.as_deref_mut().unwrap().characters {
+                    characters(ctxt, s);
+                }
+            }
         }
     }
 }
@@ -2812,12 +2660,12 @@ unsafe fn html_parse_char_data_internal(ctxt: &mut HtmlParserCtxt, readahead: i3
 /// Parse a CharData section.
 /// if we are within a CDATA section ']]>' marks an end of section.
 ///
-/// `[14] CharData ::= [^<&]* - ([^<&]* ']]>' [^<&]*)`
+/// ```text
+/// [14] CharData ::= [^<&]* - ([^<&]* ']]>' [^<&]*)
+/// ```
 #[doc(alias = "htmlParseCharData")]
-unsafe fn html_parse_char_data(ctxt: &mut HtmlParserCtxt) {
-    unsafe {
-        html_parse_char_data_internal(ctxt, 0);
-    }
+fn html_parse_char_data(ctxt: &mut HtmlParserCtxt) {
+    html_parse_char_data_internal(ctxt, 0);
 }
 
 /// Allocate and initialize a new parser context.
@@ -2962,235 +2810,225 @@ fn html_node_info_push(ctxt: &mut HtmlParserCtxt, value: Rc<RefCell<HtmlParserNo
 
 /// Parse an HTML element, new version, non recursive
 ///
-/// `[39] element ::= EmptyElemTag | STag content ETag`
-///
-/// `[41] Attribute ::= Name Eq AttValue`
+/// ```text
+/// [39] element ::= EmptyElemTag | STag content ETag
+/// [41] Attribute ::= Name Eq AttValue
+/// ```
 #[doc(alias = "htmlParseElementInternal")]
-unsafe fn html_parse_element_internal(ctxt: &mut HtmlParserCtxt) {
-    unsafe {
-        let mut node_info = HtmlParserNodeInfo::default();
+fn html_parse_element_internal(ctxt: &mut HtmlParserCtxt) {
+    let mut node_info = HtmlParserNodeInfo::default();
 
-        if ctxt.input().is_none() {
-            html_parse_err(
-                Some(ctxt),
-                XmlParserErrors::XmlErrInternalError,
-                "htmlParseElementInternal: context error\n",
-                None,
-                None,
-            );
-            return;
-        }
+    if ctxt.input().is_none() {
+        html_parse_err(
+            Some(ctxt),
+            XmlParserErrors::XmlErrInternalError,
+            "htmlParseElementInternal: context error\n",
+            None,
+            None,
+        );
+        return;
+    }
 
-        if matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
-            return;
-        }
+    if matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
+        return;
+    }
 
-        // Capture start position
-        if ctxt.record_info != 0 {
-            node_info.begin_pos =
-                ctxt.input().unwrap().consumed + ctxt.input().unwrap().offset_from_base() as u64;
-            node_info.begin_line = ctxt.input().unwrap().line as _;
-        }
+    // Capture start position
+    if ctxt.record_info != 0 {
+        node_info.begin_pos =
+            ctxt.input().unwrap().consumed + ctxt.input().unwrap().offset_from_base() as u64;
+        node_info.begin_line = ctxt.input().unwrap().line as _;
+    }
 
-        let failed: i32 = html_parse_start_tag(ctxt);
-        let Some(name) = ctxt.name.clone().filter(|_| failed != -1) else {
-            if ctxt.current_byte() == b'>' {
-                ctxt.skip_char();
-            }
-            return;
-        };
-
-        // Lookup the info for that element.
-        let info = html_tag_lookup(&name);
-        if info.is_none() {
-            html_parse_err(
-                Some(ctxt),
-                XmlParserErrors::XmlHTMLUnknownTag,
-                format!("Tag {name} invalid\n").as_str(),
-                Some(&name),
-                None,
-            );
-        }
-
-        // Check for an Empty Element labeled the XML/SGML way
-        if ctxt.current_byte() == b'/' && ctxt.nth_byte(1) == b'>' {
-            ctxt.advance(2);
-            if let Some(end_element) = ctxt.sax.as_deref_mut().and_then(|sax| sax.end_element) {
-                end_element(&mut *ctxt, &name);
-            }
-            html_name_pop(ctxt);
-            return;
-        }
-
+    let failed: i32 = html_parse_start_tag(ctxt);
+    let Some(name) = ctxt.name.clone().filter(|_| failed != -1) else {
         if ctxt.current_byte() == b'>' {
             ctxt.skip_char();
-        } else {
-            html_parse_err(
-                Some(ctxt),
-                XmlParserErrors::XmlErrGtRequired,
-                format!("Couldn't find end of Start Tag {name}\n").as_str(),
-                Some(name.as_ref()),
-                None,
-            );
-
-            // end of parsing of this node.
-            if Some(name.as_ref()) == ctxt.name.as_deref() {
-                ctxt.node_pop();
-                html_name_pop(ctxt);
-            }
-
-            if ctxt.record_info != 0 {
-                html_node_info_push(ctxt, Rc::new(RefCell::new(node_info)));
-            }
-            html_parser_finish_element_parsing(ctxt);
-            return;
         }
+        return;
+    };
 
-        // Check for an Empty Element from DTD definition
-        if info.is_some_and(|info| info.empty != 0) {
-            if let Some(end_element) = ctxt.sax.as_deref_mut().and_then(|sax| sax.end_element) {
-                end_element(&mut *ctxt, &name);
-            }
+    // Lookup the info for that element.
+    let info = html_tag_lookup(&name);
+    if info.is_none() {
+        html_parse_err(
+            Some(ctxt),
+            XmlParserErrors::XmlHTMLUnknownTag,
+            format!("Tag {name} invalid\n").as_str(),
+            Some(&name),
+            None,
+        );
+    }
+
+    // Check for an Empty Element labeled the XML/SGML way
+    if ctxt.current_byte() == b'/' && ctxt.nth_byte(1) == b'>' {
+        ctxt.advance(2);
+        if let Some(end_element) = ctxt.sax.as_deref_mut().and_then(|sax| sax.end_element) {
+            end_element(&mut *ctxt, &name);
+        }
+        html_name_pop(ctxt);
+        return;
+    }
+
+    if ctxt.current_byte() == b'>' {
+        ctxt.skip_char();
+    } else {
+        html_parse_err(
+            Some(ctxt),
+            XmlParserErrors::XmlErrGtRequired,
+            format!("Couldn't find end of Start Tag {name}\n").as_str(),
+            Some(name.as_ref()),
+            None,
+        );
+
+        // end of parsing of this node.
+        if Some(name.as_ref()) == ctxt.name.as_deref() {
+            ctxt.node_pop();
             html_name_pop(ctxt);
-            return;
         }
 
         if ctxt.record_info != 0 {
             html_node_info_push(ctxt, Rc::new(RefCell::new(node_info)));
         }
+        html_parser_finish_element_parsing(ctxt);
+        return;
+    }
+
+    // Check for an Empty Element from DTD definition
+    if info.is_some_and(|info| info.empty != 0) {
+        if let Some(end_element) = ctxt.sax.as_deref_mut().and_then(|sax| sax.end_element) {
+            end_element(&mut *ctxt, &name);
+        }
+        html_name_pop(ctxt);
+        return;
+    }
+
+    if ctxt.record_info != 0 {
+        html_node_info_push(ctxt, Rc::new(RefCell::new(node_info)));
     }
 }
 
 /// Parse a content: comment, sub-element, reference or text.
 /// New version for non recursive htmlParseElementInternal
 #[doc(alias = "htmlParseContentInternal")]
-unsafe fn html_parse_content_internal(ctxt: &mut HtmlParserCtxt) {
-    unsafe {
-        let mut depth = ctxt.name_tab.len();
-        let mut current_node = if depth == 0 { None } else { ctxt.name.clone() };
-        loop {
-            ctxt.grow();
+fn html_parse_content_internal(ctxt: &mut HtmlParserCtxt) {
+    let mut depth = ctxt.name_tab.len();
+    let mut current_node = if depth == 0 { None } else { ctxt.name.clone() };
+    loop {
+        ctxt.grow();
 
-            if matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
-                break;
-            }
+        if matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
+            break;
+        }
 
-            // Our tag or one of it's parent or children is ending.
-            if ctxt.current_byte() == b'<' && ctxt.nth_byte(1) == b'/' {
-                if html_parse_end_tag(ctxt) != 0
-                    && (current_node.is_some() || ctxt.name_tab.is_empty())
-                {
-                    depth = ctxt.name_tab.len();
-                    if depth == 0 {
-                        current_node = None;
-                    } else {
-                        current_node = ctxt.name.clone();
-                    }
-                }
-                continue; /* while */
-            } else if ctxt.current_byte() == b'<'
-                && (ctxt.nth_byte(1).is_ascii_alphabetic()
-                    || ctxt.nth_byte(1) == b'_'
-                    || ctxt.nth_byte(1) == b':')
+        // Our tag or one of it's parent or children is ending.
+        if ctxt.current_byte() == b'<' && ctxt.nth_byte(1) == b'/' {
+            if html_parse_end_tag(ctxt) != 0 && (current_node.is_some() || ctxt.name_tab.is_empty())
             {
-                let Some(name) = html_parse_html_name_non_invasive(ctxt) else {
-                    html_parse_err(
-                        Some(ctxt),
-                        XmlParserErrors::XmlErrNameRequired,
-                        "htmlParseStartTag: invalid element name\n",
-                        None,
-                        None,
-                    );
-                    // Dump the bogus tag like browsers do
-                    while ctxt.current_byte() == 0 && ctxt.current_byte() != b'>' {
-                        ctxt.skip_char();
-                    }
-
-                    html_parser_finish_element_parsing(ctxt);
-
+                depth = ctxt.name_tab.len();
+                if depth == 0 {
+                    current_node = None;
+                } else {
                     current_node = ctxt.name.clone();
-                    depth = ctxt.name_tab.len();
-                    continue;
-                };
-
-                if ctxt.name.is_some()
-                    && html_check_auto_close(&name, ctxt.name.as_deref().unwrap())
-                {
-                    html_auto_close(ctxt, Some(&name));
-                    continue;
                 }
             }
+            continue; /* while */
+        } else if ctxt.current_byte() == b'<'
+            && (ctxt.nth_byte(1).is_ascii_alphabetic()
+                || ctxt.nth_byte(1) == b'_'
+                || ctxt.nth_byte(1) == b':')
+        {
+            let Some(name) = html_parse_html_name_non_invasive(ctxt) else {
+                html_parse_err(
+                    Some(ctxt),
+                    XmlParserErrors::XmlErrNameRequired,
+                    "htmlParseStartTag: invalid element name\n",
+                    None,
+                    None,
+                );
+                // Dump the bogus tag like browsers do
+                while ctxt.current_byte() == 0 && ctxt.current_byte() != b'>' {
+                    ctxt.skip_char();
+                }
 
-            // Has this node been popped out during parsing of the next element
-            if !ctxt.name_tab.is_empty()
-                && depth >= ctxt.name_tab.len()
-                && current_node != ctxt.name
-            {
                 html_parser_finish_element_parsing(ctxt);
 
                 current_node = ctxt.name.clone();
                 depth = ctxt.name_tab.len();
                 continue;
+            };
+
+            if ctxt.name.is_some() && html_check_auto_close(&name, ctxt.name.as_deref().unwrap()) {
+                html_auto_close(ctxt, Some(&name));
+                continue;
             }
-
-            if ctxt.current_byte() != 0
-                && (current_node.as_deref() == Some("script")
-                    || current_node.as_deref() == Some("style"))
-            {
-                // Handle SCRIPT/STYLE separately
-                html_parse_script(ctxt);
-            } else if ctxt.current_byte() == b'<' && ctxt.nth_byte(1) == b'!' {
-                // Sometimes DOCTYPE arrives in the middle of the document
-                if ctxt.content_bytes().len() >= 9
-                    && ctxt.content_bytes()[2..9].eq_ignore_ascii_case(b"DOCTYPE")
-                {
-                    html_parse_err(
-                        Some(ctxt),
-                        XmlParserErrors::XmlHTMLStrucureError,
-                        "Misplaced DOCTYPE declaration\n",
-                        Some("DOCTYPE"),
-                        None,
-                    );
-                    html_parse_doc_type_decl(ctxt);
-                } else if ctxt.nth_byte(2) == b'-' && ctxt.nth_byte(3) == b'-' {
-                    // First case :  a comment
-                    html_parse_comment(ctxt);
-                } else {
-                    html_skip_bogus_comment(ctxt);
-                }
-            } else if ctxt.current_byte() == b'<' && ctxt.nth_byte(1) == b'?' {
-                // Second case : a Processing Instruction.
-                html_parse_pi(ctxt);
-            } else if ctxt.current_byte() == b'<' && ctxt.nth_byte(1).is_ascii_alphabetic() {
-                // Third case :  a sub-element.
-                html_parse_element_internal(ctxt);
-
-                current_node = ctxt.name.clone();
-                depth = ctxt.name_tab.len();
-            } else if ctxt.current_byte() == b'<' {
-                if ctxt.disable_sax == 0 {
-                    if let Some(characters) = ctxt.sax.as_deref_mut().and_then(|sax| sax.characters)
-                    {
-                        characters(ctxt, "<");
-                    }
-                }
-                ctxt.skip_char();
-            } else if ctxt.current_byte() == b'&' {
-                // Fourth case : a reference. If if has not been resolved,
-                //    parsing returns it's Name, create the node
-                html_parse_reference(ctxt);
-            } else if ctxt.current_byte() == 0 {
-                // Fifth case : end of the resource
-                html_auto_close_on_end(ctxt);
-                break;
-            } else {
-                // Last case, text. Note that References are handled directly.
-                html_parse_char_data(ctxt);
-            }
-
-            ctxt.shrink();
-            ctxt.grow();
         }
+
+        // Has this node been popped out during parsing of the next element
+        if !ctxt.name_tab.is_empty() && depth >= ctxt.name_tab.len() && current_node != ctxt.name {
+            html_parser_finish_element_parsing(ctxt);
+
+            current_node = ctxt.name.clone();
+            depth = ctxt.name_tab.len();
+            continue;
+        }
+
+        if ctxt.current_byte() != 0
+            && (current_node.as_deref() == Some("script")
+                || current_node.as_deref() == Some("style"))
+        {
+            // Handle SCRIPT/STYLE separately
+            html_parse_script(ctxt);
+        } else if ctxt.current_byte() == b'<' && ctxt.nth_byte(1) == b'!' {
+            // Sometimes DOCTYPE arrives in the middle of the document
+            if ctxt.content_bytes().len() >= 9
+                && ctxt.content_bytes()[2..9].eq_ignore_ascii_case(b"DOCTYPE")
+            {
+                html_parse_err(
+                    Some(ctxt),
+                    XmlParserErrors::XmlHTMLStrucureError,
+                    "Misplaced DOCTYPE declaration\n",
+                    Some("DOCTYPE"),
+                    None,
+                );
+                html_parse_doc_type_decl(ctxt);
+            } else if ctxt.nth_byte(2) == b'-' && ctxt.nth_byte(3) == b'-' {
+                // First case :  a comment
+                html_parse_comment(ctxt);
+            } else {
+                html_skip_bogus_comment(ctxt);
+            }
+        } else if ctxt.current_byte() == b'<' && ctxt.nth_byte(1) == b'?' {
+            // Second case : a Processing Instruction.
+            html_parse_pi(ctxt);
+        } else if ctxt.current_byte() == b'<' && ctxt.nth_byte(1).is_ascii_alphabetic() {
+            // Third case :  a sub-element.
+            html_parse_element_internal(ctxt);
+
+            current_node = ctxt.name.clone();
+            depth = ctxt.name_tab.len();
+        } else if ctxt.current_byte() == b'<' {
+            if ctxt.disable_sax == 0 {
+                if let Some(characters) = ctxt.sax.as_deref_mut().and_then(|sax| sax.characters) {
+                    characters(ctxt, "<");
+                }
+            }
+            ctxt.skip_char();
+        } else if ctxt.current_byte() == b'&' {
+            // Fourth case : a reference. If if has not been resolved,
+            //    parsing returns it's Name, create the node
+            html_parse_reference(ctxt);
+        } else if ctxt.current_byte() == 0 {
+            // Fifth case : end of the resource
+            html_auto_close_on_end(ctxt);
+            break;
+        } else {
+            // Last case, text. Note that References are handled directly.
+            html_parse_char_data(ctxt);
+        }
+
+        ctxt.shrink();
+        ctxt.grow();
     }
 }
 
@@ -3198,114 +3036,111 @@ unsafe fn html_parse_content_internal(ctxt: &mut HtmlParserCtxt) {
 ///
 /// Returns 0, -1 in case of error. the parser context is augmented as a result of the parsing.
 #[doc(alias = "htmlParseDocument")]
-pub unsafe fn html_parse_document(ctxt: &mut HtmlParserCtxt) -> i32 {
-    unsafe {
-        xml_init_parser();
+pub fn html_parse_document(ctxt: &mut HtmlParserCtxt) -> i32 {
+    xml_init_parser();
 
-        if ctxt.input().is_none() {
-            html_parse_err(
-                Some(ctxt),
-                XmlParserErrors::XmlErrInternalError,
-                "htmlParseDocument: context error\n",
-                None,
-                None,
-            );
-            return XmlParserErrors::XmlErrInternalError as i32;
-        }
-        ctxt.grow();
-        // SAX: beginning of the document processing.
-        if let Some(set_document_locator) = ctxt
-            .sax
-            .as_deref_mut()
-            .and_then(|sax| sax.set_document_locator)
-        {
-            set_document_locator(ctxt, XmlSAXLocator::default());
-        }
-
-        if ctxt.encoding.is_none() && ctxt.input().unwrap().remainder_len() >= 4 {
-            // Get the 4 first bytes and decode the charset
-            // if enc != xmlCharEncoding::XML_CHAR_ENCODING_NONE
-            // plug some encoding conversion routines.
-            if ctxt.token == 0 {
-                let enc = detect_encoding(&ctxt.content_bytes()[..4]);
-                if !matches!(enc, XmlCharEncoding::None) {
-                    ctxt.switch_encoding(enc);
-                }
-            }
-        }
-
-        // Wipe out everything which is before the first '<'
-        html_skip_blank_chars(ctxt);
-        if ctxt.current_byte() == 0 {
-            html_parse_err(
-                Some(ctxt),
-                XmlParserErrors::XmlErrDocumentEmpty,
-                "Document is empty\n",
-                None,
-                None,
-            );
-        }
-
-        if ctxt.disable_sax == 0 {
-            if let Some(start_document) = ctxt.sax.as_deref_mut().and_then(|sax| sax.start_document)
-            {
-                start_document(ctxt);
-            }
-        }
-
-        // Parse possible comments and PIs before any content
-        while ctxt.content_bytes().starts_with(b"<!--") || ctxt.content_bytes().starts_with(b"<?") {
-            html_parse_comment(ctxt);
-            html_parse_pi(ctxt);
-            html_skip_blank_chars(ctxt);
-        }
-
-        // Then possibly doc type declaration(s) and more Misc (doctypedecl Misc*)?
-        if ctxt.content_bytes().len() >= 9
-            && ctxt.content_bytes()[..9].eq_ignore_ascii_case(b"<!DOCTYPE")
-        {
-            html_parse_doc_type_decl(ctxt);
-        }
-        html_skip_blank_chars(ctxt);
-
-        // Parse possible comments and PIs before any content
-        while ctxt.content_bytes().starts_with(b"<!--") || ctxt.content_bytes().starts_with(b"<?") {
-            html_parse_comment(ctxt);
-            html_parse_pi(ctxt);
-            html_skip_blank_chars(ctxt);
-        }
-
-        // Time to start parsing the tree itself
-        html_parse_content_internal(ctxt);
-
-        // autoclose
-        if ctxt.current_byte() == 0 {
-            html_auto_close_on_end(ctxt);
-        }
-
-        // SAX: end of the document processing.
-        if let Some(end_document) = ctxt.sax.as_deref_mut().and_then(|sax| sax.end_document) {
-            end_document(ctxt);
-        }
-
-        if ctxt.options & HtmlParserOption::HtmlParseNodefdtd as i32 == 0 {
-            if let Some(mut my_doc) = ctxt.my_doc {
-                let dtd = my_doc.get_int_subset();
-                if dtd.is_none() {
-                    my_doc.int_subset = xml_create_int_subset(
-                        Some(my_doc),
-                        Some("html"),
-                        Some("-//W3C//DTD HTML 4.0 Transitional//EN"),
-                        Some("http://www.w3.org/TR/REC-html40/loose.dtd"),
-                    );
-                }
-            }
-        }
-        if ctxt.well_formed == 0 {
-            return -1;
-        }
-        0
+    if ctxt.input().is_none() {
+        html_parse_err(
+            Some(ctxt),
+            XmlParserErrors::XmlErrInternalError,
+            "htmlParseDocument: context error\n",
+            None,
+            None,
+        );
+        return XmlParserErrors::XmlErrInternalError as i32;
     }
+    ctxt.grow();
+    // SAX: beginning of the document processing.
+    if let Some(set_document_locator) = ctxt
+        .sax
+        .as_deref_mut()
+        .and_then(|sax| sax.set_document_locator)
+    {
+        set_document_locator(ctxt, XmlSAXLocator::default());
+    }
+
+    if ctxt.encoding.is_none() && ctxt.input().unwrap().remainder_len() >= 4 {
+        // Get the 4 first bytes and decode the charset
+        // if enc != xmlCharEncoding::XML_CHAR_ENCODING_NONE
+        // plug some encoding conversion routines.
+        if ctxt.token == 0 {
+            let enc = detect_encoding(&ctxt.content_bytes()[..4]);
+            if !matches!(enc, XmlCharEncoding::None) {
+                ctxt.switch_encoding(enc);
+            }
+        }
+    }
+
+    // Wipe out everything which is before the first '<'
+    html_skip_blank_chars(ctxt);
+    if ctxt.current_byte() == 0 {
+        html_parse_err(
+            Some(ctxt),
+            XmlParserErrors::XmlErrDocumentEmpty,
+            "Document is empty\n",
+            None,
+            None,
+        );
+    }
+
+    if ctxt.disable_sax == 0 {
+        if let Some(start_document) = ctxt.sax.as_deref_mut().and_then(|sax| sax.start_document) {
+            start_document(ctxt);
+        }
+    }
+
+    // Parse possible comments and PIs before any content
+    while ctxt.content_bytes().starts_with(b"<!--") || ctxt.content_bytes().starts_with(b"<?") {
+        html_parse_comment(ctxt);
+        html_parse_pi(ctxt);
+        html_skip_blank_chars(ctxt);
+    }
+
+    // Then possibly doc type declaration(s) and more Misc (doctypedecl Misc*)?
+    if ctxt.content_bytes().len() >= 9
+        && ctxt.content_bytes()[..9].eq_ignore_ascii_case(b"<!DOCTYPE")
+    {
+        html_parse_doc_type_decl(ctxt);
+    }
+    html_skip_blank_chars(ctxt);
+
+    // Parse possible comments and PIs before any content
+    while ctxt.content_bytes().starts_with(b"<!--") || ctxt.content_bytes().starts_with(b"<?") {
+        html_parse_comment(ctxt);
+        html_parse_pi(ctxt);
+        html_skip_blank_chars(ctxt);
+    }
+
+    // Time to start parsing the tree itself
+    html_parse_content_internal(ctxt);
+
+    // autoclose
+    if ctxt.current_byte() == 0 {
+        html_auto_close_on_end(ctxt);
+    }
+
+    // SAX: end of the document processing.
+    if let Some(end_document) = ctxt.sax.as_deref_mut().and_then(|sax| sax.end_document) {
+        end_document(ctxt);
+    }
+
+    if ctxt.options & HtmlParserOption::HtmlParseNodefdtd as i32 == 0 {
+        if let Some(mut my_doc) = ctxt.my_doc {
+            let dtd = my_doc.get_int_subset();
+            if dtd.is_none() {
+                my_doc.int_subset = xml_create_int_subset(
+                    Some(my_doc),
+                    Some("html"),
+                    Some("-//W3C//DTD HTML 4.0 Transitional//EN"),
+                    Some("http://www.w3.org/TR/REC-html40/loose.dtd"),
+                );
+            }
+        }
+    }
+    if ctxt.well_formed == 0 {
+        return -1;
+    }
+    0
 }
 
 /// Create a parser context for an HTML document.
@@ -3358,39 +3193,37 @@ fn html_create_doc_parser_ctxt(cur: Vec<u8>, encoding: Option<&str>) -> Option<H
 /// Returns the resulting document tree unless SAX is NULL or the document is not well formed.
 #[doc(alias = "htmlSAXParseDoc")]
 #[deprecated = "Use htmlNewSAXParserCtxt and htmlCtxtReadDoc"]
-pub unsafe fn html_sax_parse_doc(
+pub fn html_sax_parse_doc(
     cur: Vec<u8>,
     encoding: Option<&str>,
     sax: Option<Box<HtmlSAXHandler>>,
     user_data: Option<GenericErrorContext>,
 ) -> Option<HtmlDocPtr> {
-    unsafe {
-        xml_init_parser();
+    xml_init_parser();
 
-        let mut ctxt = html_create_doc_parser_ctxt(cur, encoding)?;
-        let replaced = sax.is_some();
-        if let Some(sax) = sax {
-            ctxt.sax = Some(sax);
-            ctxt.user_data = user_data;
-        }
-
-        html_parse_document(&mut ctxt);
-        let ret = ctxt.my_doc;
-        if replaced {
-            ctxt.sax = None;
-            ctxt.user_data = None;
-        }
-
-        ret
+    let mut ctxt = html_create_doc_parser_ctxt(cur, encoding)?;
+    let replaced = sax.is_some();
+    if let Some(sax) = sax {
+        ctxt.sax = Some(sax);
+        ctxt.user_data = user_data;
     }
+
+    html_parse_document(&mut ctxt);
+    let ret = ctxt.my_doc;
+    if replaced {
+        ctxt.sax = None;
+        ctxt.user_data = None;
+    }
+
+    ret
 }
 
 /// Parse an HTML in-memory document and build a tree.
 ///
 /// Returns the resulting document tree
 #[doc(alias = "htmlParseDoc")]
-pub unsafe fn html_parse_doc(cur: Vec<u8>, encoding: Option<&str>) -> Option<HtmlDocPtr> {
-    unsafe { html_sax_parse_doc(cur, encoding, None, None) }
+pub fn html_parse_doc(cur: Vec<u8>, encoding: Option<&str>) -> Option<HtmlDocPtr> {
+    html_sax_parse_doc(cur, encoding, None, None)
 }
 
 /// Create a parser context for a file content.
@@ -3432,34 +3265,32 @@ pub fn html_create_file_parser_ctxt(
 /// Returns the resulting document tree unless SAX is NULL or the document is not well formed.
 #[doc(alias = "htmlSAXParseFile")]
 #[deprecated = "Use htmlNewSAXParserCtxt and htmlCtxtReadFile"]
-pub unsafe fn html_sax_parse_file(
+pub fn html_sax_parse_file(
     filename: &str,
     encoding: Option<&str>,
     sax: Option<Box<HtmlSAXHandler>>,
     user_data: Option<GenericErrorContext>,
 ) -> Option<HtmlDocPtr> {
-    unsafe {
-        let mut oldsax = None;
+    let mut oldsax = None;
 
-        xml_init_parser();
+    xml_init_parser();
 
-        let mut ctxt = html_create_file_parser_ctxt(filename, encoding)?;
-        let replaced = sax.is_some();
-        if let Some(sax) = sax {
-            oldsax = ctxt.sax.replace(sax);
-            ctxt.user_data = user_data;
-        }
-
-        html_parse_document(&mut ctxt);
-
-        let ret = ctxt.my_doc;
-        if replaced {
-            ctxt.sax = oldsax;
-            ctxt.user_data = None;
-        }
-
-        ret
+    let mut ctxt = html_create_file_parser_ctxt(filename, encoding)?;
+    let replaced = sax.is_some();
+    if let Some(sax) = sax {
+        oldsax = ctxt.sax.replace(sax);
+        ctxt.user_data = user_data;
     }
+
+    html_parse_document(&mut ctxt);
+
+    let ret = ctxt.my_doc;
+    if replaced {
+        ctxt.sax = oldsax;
+        ctxt.user_data = None;
+    }
+
+    ret
 }
 
 /// Parse an HTML file and build a tree.
@@ -3470,8 +3301,8 @@ pub unsafe fn html_sax_parse_file(
 ///
 /// Returns the resulting document tree
 #[doc(alias = "htmlParseFile")]
-pub unsafe fn html_parse_file(filename: &str, encoding: Option<&str>) -> Option<HtmlDocPtr> {
-    unsafe { html_sax_parse_file(filename, encoding, None, None) }
+pub fn html_parse_file(filename: &str, encoding: Option<&str>) -> Option<HtmlDocPtr> {
+    html_sax_parse_file(filename, encoding, None, None)
 }
 
 /// Take a block of UTF-8 chars in and try to convert it to an ASCII
@@ -3651,7 +3482,7 @@ pub fn html_create_push_parser_ctxt(
 
 /// Try to find if a sequence (first, next, third) or just (first next) or
 /// (first) is available in the input stream.
-/// This function has a side effect of (possibly) incrementing (*ctxt).checkIndex
+/// This function has a side effect of (possibly) incrementing ctxt.checkIndex
 /// to avoid rescanning sequences of bytes, it DOES change the state of the
 /// parser, do not use liberally.
 /// This is basically similar to xmlParseLookupSequence()
@@ -3723,7 +3554,7 @@ fn html_parse_lookup_sequence(
 /// Try to find a comment end tag in the input stream
 /// The search includes "-->" as well as WHATWG-recommended incorrectly-closed tags.
 /// (See https://html.spec.whatwg.org/multipage/parsing.html#parse-error-incorrectly-closed-comment)
-/// This function has a side effect of (possibly) incrementing (*ctxt).checkIndex
+/// This function has a side effect of (possibly) incrementing ctxt.checkIndex
 /// to avoid rescanning sequences of bytes,
 /// it DOES change the state of the parser, do not use liberally.  
 /// This wraps to htmlParseLookupSequence()
@@ -3765,604 +3596,15 @@ fn html_parse_lookup_comment_end(ctxt: &mut HtmlParserCtxt) -> i32 {
 /// Returns zero if no parsing was possible
 #[doc(alias = "htmlParseTryOrFinish")]
 #[cfg(feature = "libxml_push")]
-unsafe fn html_parse_try_or_finish(ctxt: &mut HtmlParserCtxt, terminate: i32) -> i32 {
-    unsafe {
-        let ret: i32 = 0;
-        let mut avail = 0;
+fn html_parse_try_or_finish(ctxt: &mut HtmlParserCtxt, terminate: i32) -> i32 {
+    let ret: i32 = 0;
+    let mut avail = 0;
 
-        'done: loop {
-            let Some(input) = ctxt.input() else {
-                break;
-            };
-            avail = input.remainder_len();
-            if avail == 0 && terminate != 0 {
-                html_auto_close_on_end(ctxt);
-                if ctxt.name_tab.is_empty()
-                    && !matches!(ctxt.instate, XmlParserInputState::XmlParserEOF)
-                {
-                    // SAX: end of the document processing.
-                    ctxt.instate = XmlParserInputState::XmlParserEOF;
-                    if let Some(end_document) =
-                        ctxt.sax.as_deref_mut().and_then(|sax| sax.end_document)
-                    {
-                        end_document(ctxt);
-                    }
-                }
-            }
-            let input = ctxt.input().unwrap();
-            if avail < 1 {
-                // goto done;
-                break 'done;
-            }
-            // This is done to make progress and avoid an infinite loop
-            // if a parsing attempt was aborted by hitting a NUL byte. After
-            // changing html_current_char, this probably isn't necessary anymore.
-            // We should consider removing this check.
-            if ctxt.current_byte() == 0 {
-                ctxt.advance(1);
-                continue;
-            }
-
-            match ctxt.instate {
-                XmlParserInputState::XmlParserEOF => {
-                    // Document parsing is done !
-                    // goto done;
-                    break 'done;
-                }
-                XmlParserInputState::XmlParserStart => {
-                    // Very first chars read from the document flow.
-                    let cur = ctxt.current_byte();
-                    if xml_is_blank_char(cur as u32) {
-                        html_skip_blank_chars(ctxt);
-                        avail = ctxt.input().unwrap().remainder_len();
-                    }
-                    if let Some(set_document_locator) = ctxt
-                        .sax
-                        .as_deref_mut()
-                        .and_then(|sax| sax.set_document_locator)
-                    {
-                        set_document_locator(&mut *ctxt, XmlSAXLocator::default());
-                    }
-                    if ctxt.disable_sax == 0 {
-                        if let Some(start_document) =
-                            ctxt.sax.as_deref_mut().and_then(|sax| sax.start_document)
-                        {
-                            start_document(&mut *ctxt);
-                        }
-                    }
-
-                    if ctxt.content_bytes().len() >= 9
-                        && ctxt.content_bytes().starts_with(b"<!")
-                        && ctxt.content_bytes()[2..9].eq_ignore_ascii_case(b"DOCTYPE")
-                    {
-                        if terminate == 0 && html_parse_lookup_sequence(ctxt, b'>', 0, 0, 1) < 0 {
-                            // goto done;
-                            break 'done;
-                        }
-                        html_parse_doc_type_decl(ctxt);
-                        ctxt.instate = XmlParserInputState::XmlParserProlog;
-                    } else {
-                        ctxt.instate = XmlParserInputState::XmlParserMisc;
-                    }
-                }
-                XmlParserInputState::XmlParserMisc => {
-                    html_skip_blank_chars(ctxt);
-                    avail = ctxt.input().unwrap().remainder_len();
-                    // no chars input buffer
-                    if avail < 1 {
-                        // goto done;
-                        break 'done;
-                    }
-                    // not enough chars input buffer
-                    if avail < 2 && terminate == 0 {
-                        // goto done;
-                        break 'done;
-                    }
-                    if ctxt.content_bytes().starts_with(b"<!--") {
-                        if terminate == 0 && html_parse_lookup_comment_end(ctxt) < 0 {
-                            // goto done;
-                            break 'done;
-                        }
-                        html_parse_comment(ctxt);
-                        ctxt.instate = XmlParserInputState::XmlParserMisc;
-                    } else if ctxt.content_bytes().starts_with(b"<?") {
-                        if terminate == 0 && html_parse_lookup_sequence(ctxt, b'>', 0, 0, 0) < 0 {
-                            // goto done;
-                            break 'done;
-                        }
-                        html_parse_pi(ctxt);
-                        ctxt.instate = XmlParserInputState::XmlParserMisc;
-                    } else if ctxt.content_bytes().len() >= 9
-                        && ctxt.content_bytes().starts_with(b"<!")
-                        && ctxt.content_bytes()[2..9].eq_ignore_ascii_case(b"DOCTYPE")
-                    {
-                        if terminate == 0 && html_parse_lookup_sequence(ctxt, b'>', 0, 0, 1) < 0 {
-                            // goto done;
-                            break 'done;
-                        }
-                        html_parse_doc_type_decl(ctxt);
-                        ctxt.instate = XmlParserInputState::XmlParserProlog;
-                    } else if ctxt.content_bytes().starts_with(b"<!") && avail < 9 {
-                        // goto done;
-                        break 'done;
-                    } else {
-                        ctxt.instate = XmlParserInputState::XmlParserContent;
-                    }
-                }
-                XmlParserInputState::XmlParserProlog => {
-                    html_skip_blank_chars(&mut *ctxt);
-                    avail = ctxt.input().unwrap().remainder_len();
-                    if avail < 2 {
-                        // goto done;
-                        break 'done;
-                    }
-                    if ctxt.content_bytes().starts_with(b"<!--") {
-                        if terminate == 0 && html_parse_lookup_comment_end(ctxt) < 0 {
-                            // goto done;
-                            break 'done;
-                        }
-                        html_parse_comment(ctxt);
-                        ctxt.instate = XmlParserInputState::XmlParserProlog;
-                    } else if ctxt.content_bytes().starts_with(b"<?") {
-                        if terminate == 0 && html_parse_lookup_sequence(ctxt, b'>', 0, 0, 0) < 0 {
-                            // goto done;
-                            break 'done;
-                        }
-                        html_parse_pi(ctxt);
-                        ctxt.instate = XmlParserInputState::XmlParserProlog;
-                    } else if ctxt.content_bytes().starts_with(b"<!") && avail < 4 {
-                        // goto done;
-                        break 'done;
-                    } else {
-                        ctxt.instate = XmlParserInputState::XmlParserContent;
-                    }
-                }
-                XmlParserInputState::XmlParserEpilog => {
-                    avail = input.remainder_len();
-                    if avail < 1 {
-                        // goto done;
-                        break 'done;
-                    }
-                    if xml_is_blank_char(ctxt.current_byte() as u32) {
-                        html_parse_char_data(ctxt);
-                        // goto done;
-                        break 'done;
-                    }
-                    if avail < 2 {
-                        // goto done;
-                        break 'done;
-                    }
-                    if ctxt.content_bytes().starts_with(b"<!--") {
-                        if terminate == 0 && html_parse_lookup_comment_end(ctxt) < 0 {
-                            // goto done;
-                            break 'done;
-                        }
-                        html_parse_comment(ctxt);
-                        ctxt.instate = XmlParserInputState::XmlParserEpilog;
-                    } else if ctxt.content_bytes().starts_with(b"<?") {
-                        if terminate == 0 && html_parse_lookup_sequence(ctxt, b'>', 0, 0, 0) < 0 {
-                            // goto done;
-                            break 'done;
-                        }
-                        html_parse_pi(ctxt);
-                        ctxt.instate = XmlParserInputState::XmlParserEpilog;
-                    } else if ctxt.content_bytes().starts_with(b"<!") && avail < 4 {
-                        // goto done;
-                        break 'done;
-                    } else {
-                        ctxt.err_no = XmlParserErrors::XmlErrDocumentEnd as i32;
-                        ctxt.well_formed = 0;
-                        ctxt.instate = XmlParserInputState::XmlParserEOF;
-                        if let Some(end_document) =
-                            ctxt.sax.as_deref_mut().and_then(|sax| sax.end_document)
-                        {
-                            end_document(&mut *ctxt);
-                        }
-                        // goto done;
-                        break 'done;
-                    }
-                }
-                XmlParserInputState::XmlParserStartTag => 'to_break: {
-                    // no chars in buffer
-                    if avail < 1 {
-                        // goto done;
-                        break 'done;
-                    }
-                    // not enough chars in buffer
-                    if avail < 2 && terminate == 0 {
-                        // goto done;
-                        break 'done;
-                    }
-                    if ctxt.current_byte() != b'<' {
-                        ctxt.instate = XmlParserInputState::XmlParserContent;
-                        break 'to_break;
-                    }
-                    if ctxt.nth_byte(1) == b'/' {
-                        ctxt.instate = XmlParserInputState::XmlParserEndTag;
-                        ctxt.check_index = 0;
-                        break 'to_break;
-                    }
-                    if terminate == 0 && html_parse_lookup_sequence(ctxt, b'>', 0, 0, 1) < 0 {
-                        // goto done;
-                        break 'done;
-                    }
-
-                    // Capture start position
-                    let mut node_info = HtmlParserNodeInfo::default();
-                    if ctxt.record_info != 0 {
-                        node_info.begin_pos = ctxt.input().unwrap().consumed
-                            + ctxt.input().unwrap().offset_from_base() as u64;
-                        node_info.begin_line = ctxt.input().unwrap().line as _;
-                    }
-
-                    let failed: i32 = html_parse_start_tag(ctxt);
-                    let Some(name) = ctxt.name.clone().filter(|_| failed != -1) else {
-                        if ctxt.current_byte() == b'>' {
-                            ctxt.skip_char();
-                        }
-                        break 'to_break;
-                    };
-
-                    // Lookup the info for that element.
-                    let info = html_tag_lookup(&name);
-                    if info.is_none() {
-                        html_parse_err(
-                            Some(ctxt),
-                            XmlParserErrors::XmlHTMLUnknownTag,
-                            format!("Tag {name} invalid\n").as_str(),
-                            Some(&name),
-                            None,
-                        );
-                    }
-
-                    // Check for an Empty Element labeled the XML/SGML way
-                    if ctxt.content_bytes().starts_with(b"/>") {
-                        ctxt.advance(2);
-                        if let Some(end_element) =
-                            ctxt.sax.as_deref_mut().and_then(|sax| sax.end_element)
-                        {
-                            end_element(&mut *ctxt, &name);
-                        }
-                        html_name_pop(ctxt);
-                        ctxt.instate = XmlParserInputState::XmlParserContent;
-                        break 'to_break;
-                    }
-
-                    if ctxt.current_byte() == b'>' {
-                        ctxt.skip_char();
-                    } else {
-                        html_parse_err(
-                            Some(ctxt),
-                            XmlParserErrors::XmlErrGtRequired,
-                            format!("Couldn't find end of Start Tag {name}\n").as_str(),
-                            Some(&name),
-                            None,
-                        );
-
-                        // end of parsing of this node.
-                        if Some(name.as_ref()) == ctxt.name.as_deref() {
-                            ctxt.node_pop();
-                            html_name_pop(ctxt);
-                        }
-
-                        if ctxt.record_info != 0 {
-                            html_node_info_push(ctxt, Rc::new(RefCell::new(node_info)));
-                        }
-
-                        ctxt.instate = XmlParserInputState::XmlParserContent;
-                        break 'to_break;
-                    }
-
-                    // Check for an Empty Element from DTD definition
-                    if info.is_some_and(|info| info.empty != 0) {
-                        if let Some(end_element) =
-                            ctxt.sax.as_deref_mut().and_then(|sax| sax.end_element)
-                        {
-                            end_element(&mut *ctxt, &name);
-                        }
-                        html_name_pop(ctxt);
-                    }
-
-                    if ctxt.record_info != 0 {
-                        html_node_info_push(ctxt, Rc::new(RefCell::new(node_info)));
-                    }
-
-                    ctxt.instate = XmlParserInputState::XmlParserContent;
-                }
-                XmlParserInputState::XmlParserContent => 'to_break: {
-                    let mut chr: [XmlChar; 2] = [0, 0];
-
-                    // Handle preparsed entities and charRef
-                    if ctxt.token != 0 {
-                        chr[0] = ctxt.token as _;
-                        html_check_paragraph(ctxt);
-                        if let Some(characters) =
-                            ctxt.sax.as_deref_mut().and_then(|sax| sax.characters)
-                        {
-                            let s = from_utf8(&chr[..1]).expect("Internal Error");
-                            characters(ctxt, s);
-                        }
-                        ctxt.token = 0;
-                        ctxt.check_index = 0;
-                    }
-                    if avail == 1 && terminate != 0 {
-                        let cur = ctxt.current_byte();
-                        if cur != b'<' && cur != b'&' {
-                            if let Some(sax) = ctxt.sax.as_deref_mut() {
-                                chr[0] = cur;
-                                let s = from_utf8(&chr[..1]).expect("Internal Error");
-                                if xml_is_blank_char(cur as u32) {
-                                    if ctxt.keep_blanks != 0 {
-                                        if let Some(characters) = sax.characters {
-                                            characters(ctxt, s);
-                                        }
-                                    } else if let Some(ignorable_whitespace) =
-                                        sax.ignorable_whitespace
-                                    {
-                                        ignorable_whitespace(ctxt, s);
-                                    }
-                                } else {
-                                    html_check_paragraph(ctxt);
-                                    if let Some(characters) =
-                                        ctxt.sax.as_deref_mut().unwrap().characters
-                                    {
-                                        characters(ctxt, s);
-                                    }
-                                }
-                            }
-                            ctxt.token = 0;
-                            ctxt.check_index = 0;
-                            ctxt.input_mut().unwrap().cur += 1;
-                            break 'to_break;
-                        }
-                    }
-                    if avail < 2 {
-                        // goto done;
-                        break 'done;
-                    }
-                    if ctxt.name.as_deref() == Some("script")
-                        || ctxt.name.as_deref() == Some("style")
-                    {
-                        // Handle SCRIPT/STYLE separately
-                        if terminate == 0 {
-                            let idx: i32 = html_parse_lookup_sequence(ctxt, b'<', b'/', 0, 0);
-                            if idx < 0 {
-                                // goto done;
-                                break 'done;
-                            }
-                            let val = ctxt.nth_byte(idx as usize + 2);
-                            if val == 0 {
-                                // bad cut of input
-                                // FIXME: htmlParseScript checks for additional characters after '</'.
-                                ctxt.check_index = idx as _;
-                                // goto done;
-                                break 'done;
-                            }
-                        }
-                        html_parse_script(ctxt);
-                        if ctxt.content_bytes().starts_with(b"</") {
-                            ctxt.instate = XmlParserInputState::XmlParserEndTag;
-                            ctxt.check_index = 0;
-                            break 'to_break;
-                        }
-                    } else if ctxt.content_bytes().starts_with(b"<!") {
-                        if avail < 4 {
-                            // goto done;
-                            break 'done;
-                        }
-                        // Sometimes DOCTYPE arrives in the middle of the document
-                        if ctxt.content_bytes().len() >= 9
-                            && ctxt.content_bytes()[2..9].eq_ignore_ascii_case(b"DOCTYPE")
-                        {
-                            if terminate == 0 && html_parse_lookup_sequence(ctxt, b'>', 0, 0, 1) < 0
-                            {
-                                // goto done;
-                                break 'done;
-                            }
-                            html_parse_err(
-                                Some(ctxt),
-                                XmlParserErrors::XmlHTMLStrucureError,
-                                "Misplaced DOCTYPE declaration\n",
-                                Some("DOCTYPE"),
-                                None,
-                            );
-                            html_parse_doc_type_decl(ctxt);
-                        } else if ctxt.content_bytes()[2..].starts_with(b"--") {
-                            if terminate == 0 && html_parse_lookup_comment_end(ctxt) < 0 {
-                                // goto done;
-                                break 'done;
-                            }
-                            html_parse_comment(ctxt);
-                            ctxt.instate = XmlParserInputState::XmlParserContent;
-                        } else {
-                            if terminate == 0 && html_parse_lookup_sequence(ctxt, b'>', 0, 0, 0) < 0
-                            {
-                                // goto done;
-                                break 'done;
-                            }
-                            html_skip_bogus_comment(ctxt);
-                        }
-                    } else if ctxt.content_bytes().starts_with(b"<?") {
-                        if terminate == 0 && html_parse_lookup_sequence(ctxt, b'>', 0, 0, 0) < 0 {
-                            // goto done;
-                            break 'done;
-                        }
-                        html_parse_pi(ctxt);
-                        ctxt.instate = XmlParserInputState::XmlParserContent;
-                    } else if ctxt.content_bytes().starts_with(b"</") {
-                        ctxt.instate = XmlParserInputState::XmlParserEndTag;
-                        ctxt.check_index = 0;
-                        break 'to_break;
-                    } else if ctxt.current_byte() == b'<' && ctxt.nth_byte(1).is_ascii_alphabetic()
-                    {
-                        if terminate == 0 && ctxt.nth_byte(1) == 0 {
-                            // goto done;
-                            break 'done;
-                        }
-                        ctxt.instate = XmlParserInputState::XmlParserStartTag;
-                        ctxt.check_index = 0;
-                        break 'to_break;
-                    } else if ctxt.current_byte() == b'<' {
-                        if ctxt.disable_sax == 0 {
-                            if let Some(characters) =
-                                ctxt.sax.as_deref_mut().and_then(|sax| sax.characters)
-                            {
-                                characters(&mut *ctxt, "<");
-                            }
-                        }
-                        ctxt.skip_char();
-                    } else {
-                        // check that the text sequence is complete
-                        // before handing out the data to the parser
-                        // to avoid problems with erroneous end of
-                        // data detection.
-                        if terminate == 0 && html_parse_lookup_sequence(ctxt, b'<', 0, 0, 0) < 0 {
-                            // goto done;
-                            break 'done;
-                        }
-                        ctxt.check_index = 0;
-                        while !matches!(ctxt.instate, XmlParserInputState::XmlParserEOF)
-                            && !ctxt.content_bytes().is_empty()
-                            && ctxt.current_byte() != b'<'
-                        {
-                            if ctxt.current_byte() == b'&' {
-                                html_parse_reference(ctxt);
-                            } else {
-                                html_parse_char_data(ctxt);
-                            }
-                        }
-                    }
-                }
-                XmlParserInputState::XmlParserEndTag => {
-                    if avail < 2 {
-                        // goto done;
-                        break 'done;
-                    }
-                    if terminate == 0 && html_parse_lookup_sequence(ctxt, b'>', 0, 0, 0) < 0 {
-                        // goto done;
-                        break 'done;
-                    }
-                    html_parse_end_tag(ctxt);
-                    if ctxt.name_tab.is_empty() {
-                        ctxt.instate = XmlParserInputState::XmlParserEpilog;
-                    } else {
-                        ctxt.instate = XmlParserInputState::XmlParserContent;
-                    }
-                    ctxt.check_index = 0;
-                }
-                XmlParserInputState::XmlParserCDATASection => {
-                    html_parse_err(
-                        Some(ctxt),
-                        XmlParserErrors::XmlErrInternalError,
-                        "HPP: internal error, state == CDATA\n",
-                        None,
-                        None,
-                    );
-                    ctxt.instate = XmlParserInputState::XmlParserContent;
-                    ctxt.check_index = 0;
-                }
-                XmlParserInputState::XmlParserDTD => {
-                    html_parse_err(
-                        Some(ctxt),
-                        XmlParserErrors::XmlErrInternalError,
-                        "HPP: internal error, state == DTD\n",
-                        None,
-                        None,
-                    );
-                    ctxt.instate = XmlParserInputState::XmlParserContent;
-                    ctxt.check_index = 0;
-                }
-                XmlParserInputState::XmlParserComment => {
-                    html_parse_err(
-                        Some(ctxt),
-                        XmlParserErrors::XmlErrInternalError,
-                        "HPP: internal error, state == COMMENT\n",
-                        None,
-                        None,
-                    );
-                    ctxt.instate = XmlParserInputState::XmlParserContent;
-                    ctxt.check_index = 0;
-                }
-                XmlParserInputState::XmlParserPI => {
-                    html_parse_err(
-                        Some(ctxt),
-                        XmlParserErrors::XmlErrInternalError,
-                        "HPP: internal error, state == PI\n",
-                        None,
-                        None,
-                    );
-                    ctxt.instate = XmlParserInputState::XmlParserContent;
-                    ctxt.check_index = 0;
-                }
-                XmlParserInputState::XmlParserEntityDecl => {
-                    html_parse_err(
-                        Some(ctxt),
-                        XmlParserErrors::XmlErrInternalError,
-                        "HPP: internal error, state == ENTITY_DECL\n",
-                        None,
-                        None,
-                    );
-                    ctxt.instate = XmlParserInputState::XmlParserContent;
-                    ctxt.check_index = 0;
-                }
-                XmlParserInputState::XmlParserEntityValue => {
-                    html_parse_err(
-                        Some(ctxt),
-                        XmlParserErrors::XmlErrInternalError,
-                        "HPP: internal error, state == ENTITY_VALUE\n",
-                        None,
-                        None,
-                    );
-                    ctxt.instate = XmlParserInputState::XmlParserContent;
-                    ctxt.check_index = 0;
-                }
-                XmlParserInputState::XmlParserAttributeValue => {
-                    html_parse_err(
-                        Some(ctxt),
-                        XmlParserErrors::XmlErrInternalError,
-                        "HPP: internal error, state == ATTRIBUTE_VALUE\n",
-                        None,
-                        None,
-                    );
-                    ctxt.instate = XmlParserInputState::XmlParserStartTag;
-                    ctxt.check_index = 0;
-                }
-                XmlParserInputState::XmlParserSystemLiteral => {
-                    html_parse_err(
-                        Some(ctxt),
-                        XmlParserErrors::XmlErrInternalError,
-                        "HPP: internal error, state == XML_PARSER_SYSTEM_LITERAL\n",
-                        None,
-                        None,
-                    );
-                    ctxt.instate = XmlParserInputState::XmlParserContent;
-                    ctxt.check_index = 0;
-                }
-                XmlParserInputState::XmlParserIgnore => {
-                    html_parse_err(
-                        Some(ctxt),
-                        XmlParserErrors::XmlErrInternalError,
-                        "HPP: internal error, state == XML_PARSER_IGNORE\n",
-                        None,
-                        None,
-                    );
-                    ctxt.instate = XmlParserInputState::XmlParserContent;
-                    ctxt.check_index = 0;
-                }
-                XmlParserInputState::XmlParserPublicLiteral => {
-                    html_parse_err(
-                        Some(ctxt),
-                        XmlParserErrors::XmlErrInternalError,
-                        "HPP: internal error, state == XML_PARSER_LITERAL\n",
-                        None,
-                        None,
-                    );
-                    ctxt.instate = XmlParserInputState::XmlParserContent;
-                    ctxt.check_index = 0;
-                }
-            }
-        }
-        // done:
+    'done: loop {
+        let Some(input) = ctxt.input() else {
+            break;
+        };
+        avail = input.remainder_len();
         if avail == 0 && terminate != 0 {
             html_auto_close_on_end(ctxt);
             if ctxt.name_tab.is_empty()
@@ -4376,27 +3618,603 @@ unsafe fn html_parse_try_or_finish(ctxt: &mut HtmlParserCtxt, terminate: i32) ->
                 }
             }
         }
-        if ctxt.options & HtmlParserOption::HtmlParseNodefdtd as i32 == 0
-            && (terminate != 0
-                || matches!(
-                    ctxt.instate,
-                    XmlParserInputState::XmlParserEOF | XmlParserInputState::XmlParserEpilog
-                ))
-        {
-            if let Some(mut my_doc) = ctxt.my_doc {
-                let dtd = my_doc.get_int_subset();
-                if dtd.is_none() {
-                    my_doc.int_subset = xml_create_int_subset(
-                        ctxt.my_doc,
-                        Some("html"),
-                        Some("-//W3C//DTD HTML 4.0 Transitional//EN"),
-                        Some("http://www.w3.org/TR/REC-html40/loose.dtd"),
-                    );
+        let input = ctxt.input().unwrap();
+        if avail < 1 {
+            // goto done;
+            break 'done;
+        }
+        // This is done to make progress and avoid an infinite loop
+        // if a parsing attempt was aborted by hitting a NUL byte. After
+        // changing html_current_char, this probably isn't necessary anymore.
+        // We should consider removing this check.
+        if ctxt.current_byte() == 0 {
+            ctxt.advance(1);
+            continue;
+        }
+
+        match ctxt.instate {
+            XmlParserInputState::XmlParserEOF => {
+                // Document parsing is done !
+                // goto done;
+                break 'done;
+            }
+            XmlParserInputState::XmlParserStart => {
+                // Very first chars read from the document flow.
+                let cur = ctxt.current_byte();
+                if xml_is_blank_char(cur as u32) {
+                    html_skip_blank_chars(ctxt);
+                    avail = ctxt.input().unwrap().remainder_len();
+                }
+                if let Some(set_document_locator) = ctxt
+                    .sax
+                    .as_deref_mut()
+                    .and_then(|sax| sax.set_document_locator)
+                {
+                    set_document_locator(&mut *ctxt, XmlSAXLocator::default());
+                }
+                if ctxt.disable_sax == 0 {
+                    if let Some(start_document) =
+                        ctxt.sax.as_deref_mut().and_then(|sax| sax.start_document)
+                    {
+                        start_document(&mut *ctxt);
+                    }
+                }
+
+                if ctxt.content_bytes().len() >= 9
+                    && ctxt.content_bytes().starts_with(b"<!")
+                    && ctxt.content_bytes()[2..9].eq_ignore_ascii_case(b"DOCTYPE")
+                {
+                    if terminate == 0 && html_parse_lookup_sequence(ctxt, b'>', 0, 0, 1) < 0 {
+                        // goto done;
+                        break 'done;
+                    }
+                    html_parse_doc_type_decl(ctxt);
+                    ctxt.instate = XmlParserInputState::XmlParserProlog;
+                } else {
+                    ctxt.instate = XmlParserInputState::XmlParserMisc;
                 }
             }
+            XmlParserInputState::XmlParserMisc => {
+                html_skip_blank_chars(ctxt);
+                avail = ctxt.input().unwrap().remainder_len();
+                // no chars input buffer
+                if avail < 1 {
+                    // goto done;
+                    break 'done;
+                }
+                // not enough chars input buffer
+                if avail < 2 && terminate == 0 {
+                    // goto done;
+                    break 'done;
+                }
+                if ctxt.content_bytes().starts_with(b"<!--") {
+                    if terminate == 0 && html_parse_lookup_comment_end(ctxt) < 0 {
+                        // goto done;
+                        break 'done;
+                    }
+                    html_parse_comment(ctxt);
+                    ctxt.instate = XmlParserInputState::XmlParserMisc;
+                } else if ctxt.content_bytes().starts_with(b"<?") {
+                    if terminate == 0 && html_parse_lookup_sequence(ctxt, b'>', 0, 0, 0) < 0 {
+                        // goto done;
+                        break 'done;
+                    }
+                    html_parse_pi(ctxt);
+                    ctxt.instate = XmlParserInputState::XmlParserMisc;
+                } else if ctxt.content_bytes().len() >= 9
+                    && ctxt.content_bytes().starts_with(b"<!")
+                    && ctxt.content_bytes()[2..9].eq_ignore_ascii_case(b"DOCTYPE")
+                {
+                    if terminate == 0 && html_parse_lookup_sequence(ctxt, b'>', 0, 0, 1) < 0 {
+                        // goto done;
+                        break 'done;
+                    }
+                    html_parse_doc_type_decl(ctxt);
+                    ctxt.instate = XmlParserInputState::XmlParserProlog;
+                } else if ctxt.content_bytes().starts_with(b"<!") && avail < 9 {
+                    // goto done;
+                    break 'done;
+                } else {
+                    ctxt.instate = XmlParserInputState::XmlParserContent;
+                }
+            }
+            XmlParserInputState::XmlParserProlog => {
+                html_skip_blank_chars(&mut *ctxt);
+                avail = ctxt.input().unwrap().remainder_len();
+                if avail < 2 {
+                    // goto done;
+                    break 'done;
+                }
+                if ctxt.content_bytes().starts_with(b"<!--") {
+                    if terminate == 0 && html_parse_lookup_comment_end(ctxt) < 0 {
+                        // goto done;
+                        break 'done;
+                    }
+                    html_parse_comment(ctxt);
+                    ctxt.instate = XmlParserInputState::XmlParserProlog;
+                } else if ctxt.content_bytes().starts_with(b"<?") {
+                    if terminate == 0 && html_parse_lookup_sequence(ctxt, b'>', 0, 0, 0) < 0 {
+                        // goto done;
+                        break 'done;
+                    }
+                    html_parse_pi(ctxt);
+                    ctxt.instate = XmlParserInputState::XmlParserProlog;
+                } else if ctxt.content_bytes().starts_with(b"<!") && avail < 4 {
+                    // goto done;
+                    break 'done;
+                } else {
+                    ctxt.instate = XmlParserInputState::XmlParserContent;
+                }
+            }
+            XmlParserInputState::XmlParserEpilog => {
+                avail = input.remainder_len();
+                if avail < 1 {
+                    // goto done;
+                    break 'done;
+                }
+                if xml_is_blank_char(ctxt.current_byte() as u32) {
+                    html_parse_char_data(ctxt);
+                    // goto done;
+                    break 'done;
+                }
+                if avail < 2 {
+                    // goto done;
+                    break 'done;
+                }
+                if ctxt.content_bytes().starts_with(b"<!--") {
+                    if terminate == 0 && html_parse_lookup_comment_end(ctxt) < 0 {
+                        // goto done;
+                        break 'done;
+                    }
+                    html_parse_comment(ctxt);
+                    ctxt.instate = XmlParserInputState::XmlParserEpilog;
+                } else if ctxt.content_bytes().starts_with(b"<?") {
+                    if terminate == 0 && html_parse_lookup_sequence(ctxt, b'>', 0, 0, 0) < 0 {
+                        // goto done;
+                        break 'done;
+                    }
+                    html_parse_pi(ctxt);
+                    ctxt.instate = XmlParserInputState::XmlParserEpilog;
+                } else if ctxt.content_bytes().starts_with(b"<!") && avail < 4 {
+                    // goto done;
+                    break 'done;
+                } else {
+                    ctxt.err_no = XmlParserErrors::XmlErrDocumentEnd as i32;
+                    ctxt.well_formed = 0;
+                    ctxt.instate = XmlParserInputState::XmlParserEOF;
+                    if let Some(end_document) =
+                        ctxt.sax.as_deref_mut().and_then(|sax| sax.end_document)
+                    {
+                        end_document(&mut *ctxt);
+                    }
+                    // goto done;
+                    break 'done;
+                }
+            }
+            XmlParserInputState::XmlParserStartTag => 'to_break: {
+                // no chars in buffer
+                if avail < 1 {
+                    // goto done;
+                    break 'done;
+                }
+                // not enough chars in buffer
+                if avail < 2 && terminate == 0 {
+                    // goto done;
+                    break 'done;
+                }
+                if ctxt.current_byte() != b'<' {
+                    ctxt.instate = XmlParserInputState::XmlParserContent;
+                    break 'to_break;
+                }
+                if ctxt.nth_byte(1) == b'/' {
+                    ctxt.instate = XmlParserInputState::XmlParserEndTag;
+                    ctxt.check_index = 0;
+                    break 'to_break;
+                }
+                if terminate == 0 && html_parse_lookup_sequence(ctxt, b'>', 0, 0, 1) < 0 {
+                    // goto done;
+                    break 'done;
+                }
+
+                // Capture start position
+                let mut node_info = HtmlParserNodeInfo::default();
+                if ctxt.record_info != 0 {
+                    node_info.begin_pos = ctxt.input().unwrap().consumed
+                        + ctxt.input().unwrap().offset_from_base() as u64;
+                    node_info.begin_line = ctxt.input().unwrap().line as _;
+                }
+
+                let failed: i32 = html_parse_start_tag(ctxt);
+                let Some(name) = ctxt.name.clone().filter(|_| failed != -1) else {
+                    if ctxt.current_byte() == b'>' {
+                        ctxt.skip_char();
+                    }
+                    break 'to_break;
+                };
+
+                // Lookup the info for that element.
+                let info = html_tag_lookup(&name);
+                if info.is_none() {
+                    html_parse_err(
+                        Some(ctxt),
+                        XmlParserErrors::XmlHTMLUnknownTag,
+                        format!("Tag {name} invalid\n").as_str(),
+                        Some(&name),
+                        None,
+                    );
+                }
+
+                // Check for an Empty Element labeled the XML/SGML way
+                if ctxt.content_bytes().starts_with(b"/>") {
+                    ctxt.advance(2);
+                    if let Some(end_element) =
+                        ctxt.sax.as_deref_mut().and_then(|sax| sax.end_element)
+                    {
+                        end_element(&mut *ctxt, &name);
+                    }
+                    html_name_pop(ctxt);
+                    ctxt.instate = XmlParserInputState::XmlParserContent;
+                    break 'to_break;
+                }
+
+                if ctxt.current_byte() == b'>' {
+                    ctxt.skip_char();
+                } else {
+                    html_parse_err(
+                        Some(ctxt),
+                        XmlParserErrors::XmlErrGtRequired,
+                        format!("Couldn't find end of Start Tag {name}\n").as_str(),
+                        Some(&name),
+                        None,
+                    );
+
+                    // end of parsing of this node.
+                    if Some(name.as_ref()) == ctxt.name.as_deref() {
+                        ctxt.node_pop();
+                        html_name_pop(ctxt);
+                    }
+
+                    if ctxt.record_info != 0 {
+                        html_node_info_push(ctxt, Rc::new(RefCell::new(node_info)));
+                    }
+
+                    ctxt.instate = XmlParserInputState::XmlParserContent;
+                    break 'to_break;
+                }
+
+                // Check for an Empty Element from DTD definition
+                if info.is_some_and(|info| info.empty != 0) {
+                    if let Some(end_element) =
+                        ctxt.sax.as_deref_mut().and_then(|sax| sax.end_element)
+                    {
+                        end_element(&mut *ctxt, &name);
+                    }
+                    html_name_pop(ctxt);
+                }
+
+                if ctxt.record_info != 0 {
+                    html_node_info_push(ctxt, Rc::new(RefCell::new(node_info)));
+                }
+
+                ctxt.instate = XmlParserInputState::XmlParserContent;
+            }
+            XmlParserInputState::XmlParserContent => 'to_break: {
+                let mut chr: [XmlChar; 2] = [0, 0];
+
+                // Handle preparsed entities and charRef
+                if ctxt.token != 0 {
+                    chr[0] = ctxt.token as _;
+                    html_check_paragraph(ctxt);
+                    if let Some(characters) = ctxt.sax.as_deref_mut().and_then(|sax| sax.characters)
+                    {
+                        let s = from_utf8(&chr[..1]).expect("Internal Error");
+                        characters(ctxt, s);
+                    }
+                    ctxt.token = 0;
+                    ctxt.check_index = 0;
+                }
+                if avail == 1 && terminate != 0 {
+                    let cur = ctxt.current_byte();
+                    if cur != b'<' && cur != b'&' {
+                        if let Some(sax) = ctxt.sax.as_deref_mut() {
+                            chr[0] = cur;
+                            let s = from_utf8(&chr[..1]).expect("Internal Error");
+                            if xml_is_blank_char(cur as u32) {
+                                if ctxt.keep_blanks != 0 {
+                                    if let Some(characters) = sax.characters {
+                                        characters(ctxt, s);
+                                    }
+                                } else if let Some(ignorable_whitespace) = sax.ignorable_whitespace
+                                {
+                                    ignorable_whitespace(ctxt, s);
+                                }
+                            } else {
+                                html_check_paragraph(ctxt);
+                                if let Some(characters) =
+                                    ctxt.sax.as_deref_mut().unwrap().characters
+                                {
+                                    characters(ctxt, s);
+                                }
+                            }
+                        }
+                        ctxt.token = 0;
+                        ctxt.check_index = 0;
+                        ctxt.input_mut().unwrap().cur += 1;
+                        break 'to_break;
+                    }
+                }
+                if avail < 2 {
+                    // goto done;
+                    break 'done;
+                }
+                if ctxt.name.as_deref() == Some("script") || ctxt.name.as_deref() == Some("style") {
+                    // Handle SCRIPT/STYLE separately
+                    if terminate == 0 {
+                        let idx: i32 = html_parse_lookup_sequence(ctxt, b'<', b'/', 0, 0);
+                        if idx < 0 {
+                            // goto done;
+                            break 'done;
+                        }
+                        let val = ctxt.nth_byte(idx as usize + 2);
+                        if val == 0 {
+                            // bad cut of input
+                            // FIXME: htmlParseScript checks for additional characters after '</'.
+                            ctxt.check_index = idx as _;
+                            // goto done;
+                            break 'done;
+                        }
+                    }
+                    html_parse_script(ctxt);
+                    if ctxt.content_bytes().starts_with(b"</") {
+                        ctxt.instate = XmlParserInputState::XmlParserEndTag;
+                        ctxt.check_index = 0;
+                        break 'to_break;
+                    }
+                } else if ctxt.content_bytes().starts_with(b"<!") {
+                    if avail < 4 {
+                        // goto done;
+                        break 'done;
+                    }
+                    // Sometimes DOCTYPE arrives in the middle of the document
+                    if ctxt.content_bytes().len() >= 9
+                        && ctxt.content_bytes()[2..9].eq_ignore_ascii_case(b"DOCTYPE")
+                    {
+                        if terminate == 0 && html_parse_lookup_sequence(ctxt, b'>', 0, 0, 1) < 0 {
+                            // goto done;
+                            break 'done;
+                        }
+                        html_parse_err(
+                            Some(ctxt),
+                            XmlParserErrors::XmlHTMLStrucureError,
+                            "Misplaced DOCTYPE declaration\n",
+                            Some("DOCTYPE"),
+                            None,
+                        );
+                        html_parse_doc_type_decl(ctxt);
+                    } else if ctxt.content_bytes()[2..].starts_with(b"--") {
+                        if terminate == 0 && html_parse_lookup_comment_end(ctxt) < 0 {
+                            // goto done;
+                            break 'done;
+                        }
+                        html_parse_comment(ctxt);
+                        ctxt.instate = XmlParserInputState::XmlParserContent;
+                    } else {
+                        if terminate == 0 && html_parse_lookup_sequence(ctxt, b'>', 0, 0, 0) < 0 {
+                            // goto done;
+                            break 'done;
+                        }
+                        html_skip_bogus_comment(ctxt);
+                    }
+                } else if ctxt.content_bytes().starts_with(b"<?") {
+                    if terminate == 0 && html_parse_lookup_sequence(ctxt, b'>', 0, 0, 0) < 0 {
+                        // goto done;
+                        break 'done;
+                    }
+                    html_parse_pi(ctxt);
+                    ctxt.instate = XmlParserInputState::XmlParserContent;
+                } else if ctxt.content_bytes().starts_with(b"</") {
+                    ctxt.instate = XmlParserInputState::XmlParserEndTag;
+                    ctxt.check_index = 0;
+                    break 'to_break;
+                } else if ctxt.current_byte() == b'<' && ctxt.nth_byte(1).is_ascii_alphabetic() {
+                    if terminate == 0 && ctxt.nth_byte(1) == 0 {
+                        // goto done;
+                        break 'done;
+                    }
+                    ctxt.instate = XmlParserInputState::XmlParserStartTag;
+                    ctxt.check_index = 0;
+                    break 'to_break;
+                } else if ctxt.current_byte() == b'<' {
+                    if ctxt.disable_sax == 0 {
+                        if let Some(characters) =
+                            ctxt.sax.as_deref_mut().and_then(|sax| sax.characters)
+                        {
+                            characters(&mut *ctxt, "<");
+                        }
+                    }
+                    ctxt.skip_char();
+                } else {
+                    // check that the text sequence is complete
+                    // before handing out the data to the parser
+                    // to avoid problems with erroneous end of
+                    // data detection.
+                    if terminate == 0 && html_parse_lookup_sequence(ctxt, b'<', 0, 0, 0) < 0 {
+                        // goto done;
+                        break 'done;
+                    }
+                    ctxt.check_index = 0;
+                    while !matches!(ctxt.instate, XmlParserInputState::XmlParserEOF)
+                        && !ctxt.content_bytes().is_empty()
+                        && ctxt.current_byte() != b'<'
+                    {
+                        if ctxt.current_byte() == b'&' {
+                            html_parse_reference(ctxt);
+                        } else {
+                            html_parse_char_data(ctxt);
+                        }
+                    }
+                }
+            }
+            XmlParserInputState::XmlParserEndTag => {
+                if avail < 2 {
+                    // goto done;
+                    break 'done;
+                }
+                if terminate == 0 && html_parse_lookup_sequence(ctxt, b'>', 0, 0, 0) < 0 {
+                    // goto done;
+                    break 'done;
+                }
+                html_parse_end_tag(ctxt);
+                if ctxt.name_tab.is_empty() {
+                    ctxt.instate = XmlParserInputState::XmlParserEpilog;
+                } else {
+                    ctxt.instate = XmlParserInputState::XmlParserContent;
+                }
+                ctxt.check_index = 0;
+            }
+            XmlParserInputState::XmlParserCDATASection => {
+                html_parse_err(
+                    Some(ctxt),
+                    XmlParserErrors::XmlErrInternalError,
+                    "HPP: internal error, state == CDATA\n",
+                    None,
+                    None,
+                );
+                ctxt.instate = XmlParserInputState::XmlParserContent;
+                ctxt.check_index = 0;
+            }
+            XmlParserInputState::XmlParserDTD => {
+                html_parse_err(
+                    Some(ctxt),
+                    XmlParserErrors::XmlErrInternalError,
+                    "HPP: internal error, state == DTD\n",
+                    None,
+                    None,
+                );
+                ctxt.instate = XmlParserInputState::XmlParserContent;
+                ctxt.check_index = 0;
+            }
+            XmlParserInputState::XmlParserComment => {
+                html_parse_err(
+                    Some(ctxt),
+                    XmlParserErrors::XmlErrInternalError,
+                    "HPP: internal error, state == COMMENT\n",
+                    None,
+                    None,
+                );
+                ctxt.instate = XmlParserInputState::XmlParserContent;
+                ctxt.check_index = 0;
+            }
+            XmlParserInputState::XmlParserPI => {
+                html_parse_err(
+                    Some(ctxt),
+                    XmlParserErrors::XmlErrInternalError,
+                    "HPP: internal error, state == PI\n",
+                    None,
+                    None,
+                );
+                ctxt.instate = XmlParserInputState::XmlParserContent;
+                ctxt.check_index = 0;
+            }
+            XmlParserInputState::XmlParserEntityDecl => {
+                html_parse_err(
+                    Some(ctxt),
+                    XmlParserErrors::XmlErrInternalError,
+                    "HPP: internal error, state == ENTITY_DECL\n",
+                    None,
+                    None,
+                );
+                ctxt.instate = XmlParserInputState::XmlParserContent;
+                ctxt.check_index = 0;
+            }
+            XmlParserInputState::XmlParserEntityValue => {
+                html_parse_err(
+                    Some(ctxt),
+                    XmlParserErrors::XmlErrInternalError,
+                    "HPP: internal error, state == ENTITY_VALUE\n",
+                    None,
+                    None,
+                );
+                ctxt.instate = XmlParserInputState::XmlParserContent;
+                ctxt.check_index = 0;
+            }
+            XmlParserInputState::XmlParserAttributeValue => {
+                html_parse_err(
+                    Some(ctxt),
+                    XmlParserErrors::XmlErrInternalError,
+                    "HPP: internal error, state == ATTRIBUTE_VALUE\n",
+                    None,
+                    None,
+                );
+                ctxt.instate = XmlParserInputState::XmlParserStartTag;
+                ctxt.check_index = 0;
+            }
+            XmlParserInputState::XmlParserSystemLiteral => {
+                html_parse_err(
+                    Some(ctxt),
+                    XmlParserErrors::XmlErrInternalError,
+                    "HPP: internal error, state == XML_PARSER_SYSTEM_LITERAL\n",
+                    None,
+                    None,
+                );
+                ctxt.instate = XmlParserInputState::XmlParserContent;
+                ctxt.check_index = 0;
+            }
+            XmlParserInputState::XmlParserIgnore => {
+                html_parse_err(
+                    Some(ctxt),
+                    XmlParserErrors::XmlErrInternalError,
+                    "HPP: internal error, state == XML_PARSER_IGNORE\n",
+                    None,
+                    None,
+                );
+                ctxt.instate = XmlParserInputState::XmlParserContent;
+                ctxt.check_index = 0;
+            }
+            XmlParserInputState::XmlParserPublicLiteral => {
+                html_parse_err(
+                    Some(ctxt),
+                    XmlParserErrors::XmlErrInternalError,
+                    "HPP: internal error, state == XML_PARSER_LITERAL\n",
+                    None,
+                    None,
+                );
+                ctxt.instate = XmlParserInputState::XmlParserContent;
+                ctxt.check_index = 0;
+            }
         }
-        ret
     }
+    // done:
+    if avail == 0 && terminate != 0 {
+        html_auto_close_on_end(ctxt);
+        if ctxt.name_tab.is_empty() && !matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
+            // SAX: end of the document processing.
+            ctxt.instate = XmlParserInputState::XmlParserEOF;
+            if let Some(end_document) = ctxt.sax.as_deref_mut().and_then(|sax| sax.end_document) {
+                end_document(ctxt);
+            }
+        }
+    }
+    if ctxt.options & HtmlParserOption::HtmlParseNodefdtd as i32 == 0
+        && (terminate != 0
+            || matches!(
+                ctxt.instate,
+                XmlParserInputState::XmlParserEOF | XmlParserInputState::XmlParserEpilog
+            ))
+    {
+        if let Some(mut my_doc) = ctxt.my_doc {
+            let dtd = my_doc.get_int_subset();
+            if dtd.is_none() {
+                my_doc.int_subset = xml_create_int_subset(
+                    ctxt.my_doc,
+                    Some("html"),
+                    Some("-//W3C//DTD HTML 4.0 Transitional//EN"),
+                    Some("http://www.w3.org/TR/REC-html40/loose.dtd"),
+                );
+            }
+        }
+    }
+    ret
 }
 
 /// Parse a Chunk of memory
@@ -4404,87 +4222,84 @@ unsafe fn html_parse_try_or_finish(ctxt: &mut HtmlParserCtxt, terminate: i32) ->
 /// Returns zero if no error, the xmlParserErrors otherwise.
 #[doc(alias = "htmlParseChunk")]
 #[cfg(feature = "libxml_push")]
-pub unsafe fn html_parse_chunk(ctxt: &mut HtmlParserCtxt, chunk: &[u8], terminate: i32) -> i32 {
-    unsafe {
-        if ctxt.input().is_none() {
-            html_parse_err(
-                Some(ctxt),
-                XmlParserErrors::XmlErrInternalError,
-                "htmlParseChunk: context error\n",
-                None,
-                None,
-            );
-            return XmlParserErrors::XmlErrInternalError as i32;
-        }
-        if !chunk.is_empty()
-            && ctxt.input().is_some()
-            && ctxt.input().unwrap().buf.is_some()
-            && !matches!(ctxt.instate, XmlParserInputState::XmlParserEOF)
-        {
-            let base = ctxt.input().unwrap().get_base();
-            let cur = ctxt.input().unwrap().offset_from_base();
+pub fn html_parse_chunk(ctxt: &mut HtmlParserCtxt, chunk: &[u8], terminate: i32) -> i32 {
+    if ctxt.input().is_none() {
+        html_parse_err(
+            Some(ctxt),
+            XmlParserErrors::XmlErrInternalError,
+            "htmlParseChunk: context error\n",
+            None,
+            None,
+        );
+        return XmlParserErrors::XmlErrInternalError as i32;
+    }
+    if !chunk.is_empty()
+        && ctxt.input().is_some()
+        && ctxt.input().unwrap().buf.is_some()
+        && !matches!(ctxt.instate, XmlParserInputState::XmlParserEOF)
+    {
+        let base = ctxt.input().unwrap().get_base();
+        let cur = ctxt.input().unwrap().offset_from_base();
 
-            let res: i32 = ctxt
+        let res: i32 = ctxt
+            .input_mut()
+            .unwrap()
+            .buf
+            .as_mut()
+            .unwrap()
+            .push_bytes(chunk);
+        ctxt.input_mut().unwrap().set_base_and_cursor(base, cur);
+        if res < 0 {
+            html_err_memory(Some(ctxt), None);
+            return ctxt.err_no;
+        }
+    } else if !matches!(ctxt.instate, XmlParserInputState::XmlParserEOF)
+        && (ctxt.input().is_some() && ctxt.input().unwrap().buf.is_some())
+    {
+        let input = ctxt.input_mut().unwrap().buf.as_mut().unwrap();
+        if input.encoder.is_some() && input.buffer.is_some() && input.raw.is_some() {
+            let base: size_t = ctxt.input().unwrap().get_base();
+            let current = ctxt.input().unwrap().offset_from_base();
+
+            let res = ctxt
                 .input_mut()
                 .unwrap()
                 .buf
                 .as_mut()
                 .unwrap()
-                .push_bytes(chunk);
-            ctxt.input_mut().unwrap().set_base_and_cursor(base, cur);
-            if res < 0 {
-                html_err_memory(Some(ctxt), None);
-                return ctxt.err_no;
-            }
-        } else if !matches!(ctxt.instate, XmlParserInputState::XmlParserEOF)
-            && (ctxt.input().is_some() && ctxt.input().unwrap().buf.is_some())
-        {
-            let input = ctxt.input_mut().unwrap().buf.as_mut().unwrap();
-            if input.encoder.is_some() && input.buffer.is_some() && input.raw.is_some() {
-                let base: size_t = ctxt.input().unwrap().get_base();
-                let current = ctxt.input().unwrap().offset_from_base();
-
-                let res = ctxt
-                    .input_mut()
-                    .unwrap()
-                    .buf
-                    .as_mut()
-                    .unwrap()
-                    .decode(terminate != 0);
-                ctxt.input_mut().unwrap().set_base_and_cursor(base, current);
-                if res.is_err() {
-                    html_parse_err(
-                        Some(ctxt),
-                        XmlParserErrors::XmlErrInvalidEncoding,
-                        "encoder error\n",
-                        None,
-                        None,
-                    );
-                    return XmlParserErrors::XmlErrInvalidEncoding as i32;
-                }
+                .decode(terminate != 0);
+            ctxt.input_mut().unwrap().set_base_and_cursor(base, current);
+            if res.is_err() {
+                html_parse_err(
+                    Some(ctxt),
+                    XmlParserErrors::XmlErrInvalidEncoding,
+                    "encoder error\n",
+                    None,
+                    None,
+                );
+                return XmlParserErrors::XmlErrInvalidEncoding as i32;
             }
         }
-        html_parse_try_or_finish(ctxt, terminate);
-        if terminate != 0 {
-            if !matches!(
-                ctxt.instate,
-                XmlParserInputState::XmlParserEOF
-                    | XmlParserInputState::XmlParserEpilog
-                    | XmlParserInputState::XmlParserMisc
-            ) {
-                ctxt.err_no = XmlParserErrors::XmlErrDocumentEnd as i32;
-                ctxt.well_formed = 0;
-            }
-            if !matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
-                if let Some(end_document) = ctxt.sax.as_deref_mut().and_then(|sax| sax.end_document)
-                {
-                    end_document(&mut *ctxt);
-                }
-            }
-            ctxt.instate = XmlParserInputState::XmlParserEOF;
-        }
-        ctxt.err_no
     }
+    html_parse_try_or_finish(ctxt, terminate);
+    if terminate != 0 {
+        if !matches!(
+            ctxt.instate,
+            XmlParserInputState::XmlParserEOF
+                | XmlParserInputState::XmlParserEpilog
+                | XmlParserInputState::XmlParserMisc
+        ) {
+            ctxt.err_no = XmlParserErrors::XmlErrDocumentEnd as i32;
+            ctxt.well_formed = 0;
+        }
+        if !matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
+            if let Some(end_document) = ctxt.sax.as_deref_mut().and_then(|sax| sax.end_document) {
+                end_document(&mut *ctxt);
+            }
+        }
+        ctxt.instate = XmlParserInputState::XmlParserEOF;
+    }
+    ctxt.err_no
 }
 
 /// This is the set of XML parser options that can be passed down
@@ -4506,64 +4321,61 @@ pub enum HtmlParserOption {
 
 /// Reset a parser context
 #[doc(alias = "htmlCtxtReset")]
-pub unsafe fn html_ctxt_reset(ctxt: &mut HtmlParserCtxt) {
-    unsafe {
-        xml_init_parser();
+pub fn html_ctxt_reset(ctxt: &mut HtmlParserCtxt) {
+    xml_init_parser();
 
-        while ctxt.input_pop().is_some() {
-            // drop input
-        }
-        ctxt.input_tab.clear();
-        ctxt.space_tab.clear();
-        ctxt.node_tab.clear();
-        ctxt.node = None;
-        ctxt.name_tab.clear();
-        ctxt.name = None;
-        ctxt.ns_tab.clear();
-        ctxt.version = None;
-        ctxt.encoding = None;
-        ctxt.directory = None;
-        ctxt.ext_sub_uri = None;
-        ctxt.ext_sub_system = None;
-        if let Some(my_doc) = ctxt.my_doc.take() {
+    ctxt.input_tab.clear();
+    ctxt.space_tab.clear();
+    ctxt.node_tab.clear();
+    ctxt.node = None;
+    ctxt.name_tab.clear();
+    ctxt.name = None;
+    ctxt.ns_tab.clear();
+    ctxt.version = None;
+    ctxt.encoding = None;
+    ctxt.directory = None;
+    ctxt.ext_sub_uri = None;
+    ctxt.ext_sub_system = None;
+    if let Some(my_doc) = ctxt.my_doc.take() {
+        unsafe {
             xml_free_doc(my_doc);
         }
-        ctxt.standalone = -1;
-        ctxt.has_external_subset = 0;
-        ctxt.has_perefs = 0;
-        ctxt.html = 1;
-        ctxt.external = 0;
-        ctxt.instate = XmlParserInputState::XmlParserStart;
-        ctxt.token = 0;
-        ctxt.well_formed = 1;
-        ctxt.ns_well_formed = 1;
-        ctxt.disable_sax = 0;
-        ctxt.valid = 1;
-        ctxt.vctxt.user_data = None;
-        ctxt.vctxt.flags = XML_VCTXT_USE_PCTXT as _;
-        ctxt.vctxt.error = Some(parser_validity_error);
-        ctxt.vctxt.warning = Some(parser_validity_warning);
-        ctxt.record_info = 0;
-        ctxt.check_index = 0;
-        ctxt.end_check_state = 0;
-        ctxt.in_subset = 0;
-        ctxt.err_no = XmlParserErrors::XmlErrOK as i32;
-        ctxt.depth = 0;
-        ctxt.charset = XmlCharEncoding::None;
-        #[cfg(feature = "catalog")]
-        {
-            ctxt.catalogs = None;
-        }
-        ctxt.node_seq.clear();
-        ctxt.atts_default.clear();
+    }
+    ctxt.standalone = -1;
+    ctxt.has_external_subset = 0;
+    ctxt.has_perefs = 0;
+    ctxt.html = 1;
+    ctxt.external = 0;
+    ctxt.instate = XmlParserInputState::XmlParserStart;
+    ctxt.token = 0;
+    ctxt.well_formed = 1;
+    ctxt.ns_well_formed = 1;
+    ctxt.disable_sax = 0;
+    ctxt.valid = 1;
+    ctxt.vctxt.user_data = None;
+    ctxt.vctxt.flags = XML_VCTXT_USE_PCTXT as _;
+    ctxt.vctxt.error = Some(parser_validity_error);
+    ctxt.vctxt.warning = Some(parser_validity_warning);
+    ctxt.record_info = 0;
+    ctxt.check_index = 0;
+    ctxt.end_check_state = 0;
+    ctxt.in_subset = 0;
+    ctxt.err_no = XmlParserErrors::XmlErrOK as i32;
+    ctxt.depth = 0;
+    ctxt.charset = XmlCharEncoding::None;
+    #[cfg(feature = "catalog")]
+    {
+        ctxt.catalogs = None;
+    }
+    ctxt.node_seq.clear();
+    ctxt.atts_default.clear();
 
-        let _ = ctxt.atts_special.take().map(|t| t.into_inner());
+    let _ = ctxt.atts_special.take().map(|t| t.into_inner());
 
-        ctxt.nb_errors = 0;
-        ctxt.nb_warnings = 0;
-        if ctxt.last_error.is_err() {
-            ctxt.last_error.reset();
-        }
+    ctxt.nb_errors = 0;
+    ctxt.nb_warnings = 0;
+    if ctxt.last_error.is_err() {
+        ctxt.last_error.reset();
     }
 }
 
@@ -4641,100 +4453,86 @@ pub fn html_ctxt_use_options(ctxt: &mut HtmlParserCtxt, mut options: i32) -> i32
 ///
 /// Returns the resulting document tree or NULL
 #[doc(alias = "htmlDoRead")]
-unsafe fn html_do_read(
+fn html_do_read(
     ctxt: &mut HtmlParserCtxt,
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
 ) -> Option<HtmlDocPtr> {
-    unsafe {
-        html_ctxt_use_options(ctxt, options);
-        ctxt.html = 1;
-        if let Some(encoding) = encoding {
-            if let Some(handler) = find_encoding_handler(encoding) {
-                ctxt.switch_to_encoding(handler);
-                ctxt.input_mut().unwrap().encoding = Some(encoding.to_owned());
-            }
+    html_ctxt_use_options(ctxt, options);
+    ctxt.html = 1;
+    if let Some(encoding) = encoding {
+        if let Some(handler) = find_encoding_handler(encoding) {
+            ctxt.switch_to_encoding(handler);
+            ctxt.input_mut().unwrap().encoding = Some(encoding.to_owned());
         }
-        if url.is_some() {
-            if let Some(input) = ctxt.input_mut().filter(|input| input.filename.is_none()) {
-                input.filename = url.map(|u| u.to_owned());
-            }
-        }
-        html_parse_document(ctxt);
-        ctxt.my_doc.take()
     }
+    if url.is_some() {
+        if let Some(input) = ctxt.input_mut().filter(|input| input.filename.is_none()) {
+            input.filename = url.map(|u| u.to_owned());
+        }
+    }
+    html_parse_document(ctxt);
+    ctxt.my_doc.take()
 }
 
 /// Parse an XML in-memory document and build a tree.
 ///
 /// Returns the resulting document tree
 #[doc(alias = "htmlReadDoc")]
-pub unsafe fn html_read_doc(
+pub fn html_read_doc(
     cur: Vec<u8>,
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
 ) -> Option<HtmlDocPtr> {
-    unsafe {
-        xml_init_parser();
-        let mut ctxt = html_create_doc_parser_ctxt(cur, None)?;
-        html_do_read(&mut ctxt, url, encoding, options)
-    }
+    xml_init_parser();
+    let mut ctxt = html_create_doc_parser_ctxt(cur, None)?;
+    html_do_read(&mut ctxt, url, encoding, options)
 }
 
 /// Parse an XML file from the filesystem or the network.
 ///
 /// Returns the resulting document tree
 #[doc(alias = "htmlReadFile")]
-pub unsafe fn html_read_file(
-    filename: &str,
-    encoding: Option<&str>,
-    options: i32,
-) -> Option<HtmlDocPtr> {
-    unsafe {
-        xml_init_parser();
-        let mut ctxt = html_create_file_parser_ctxt(filename, encoding)?;
-        html_do_read(&mut ctxt, None, None, options)
-    }
+pub fn html_read_file(filename: &str, encoding: Option<&str>, options: i32) -> Option<HtmlDocPtr> {
+    xml_init_parser();
+    let mut ctxt = html_create_file_parser_ctxt(filename, encoding)?;
+    html_do_read(&mut ctxt, None, None, options)
 }
 
 /// Parse an XML in-memory document and build a tree.
 ///
 /// Returns the resulting document tree
 #[doc(alias = "htmlReadMemory")]
-pub unsafe fn html_read_memory(
+pub fn html_read_memory(
     buffer: Vec<u8>,
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
 ) -> Option<HtmlDocPtr> {
-    unsafe {
-        xml_init_parser();
-        let mut ctxt = html_create_memory_parser_ctxt(buffer)?;
-        html_do_read(&mut ctxt, url, encoding, options)
-    }
+    xml_init_parser();
+    let mut ctxt = html_create_memory_parser_ctxt(buffer)?;
+    html_do_read(&mut ctxt, url, encoding, options)
 }
 
 /// Parse an HTML document from I/O functions and source and build a tree.
 ///
 /// Returns the resulting document tree
 #[doc(alias = "htmlReadIO")]
-pub unsafe fn html_read_io(
+pub fn html_read_io(
     ioctx: impl Read + 'static,
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
 ) -> Option<HtmlDocPtr> {
-    unsafe {
-        xml_init_parser();
+    xml_init_parser();
 
-        let input = XmlParserInputBuffer::from_reader(ioctx, XmlCharEncoding::None);
-        let mut ctxt = html_new_parser_ctxt()?;
-        let stream = XmlParserInput::from_io(&mut ctxt, input, XmlCharEncoding::None)?;
-        ctxt.input_push(stream);
-        html_do_read(&mut ctxt, url, encoding, options)
-    }
+    let input = XmlParserInputBuffer::from_reader(ioctx, XmlCharEncoding::None);
+    let mut ctxt = html_new_parser_ctxt()?;
+    let stream = XmlParserInput::from_io(&mut ctxt, input, XmlCharEncoding::None)?;
+    ctxt.input_push(stream);
+    html_do_read(&mut ctxt, url, encoding, options)
 }
 
 /// Parse an XML in-memory document and build a tree.
@@ -4742,14 +4540,14 @@ pub unsafe fn html_read_io(
 ///
 /// Returns the resulting document tree
 #[doc(alias = "htmlCtxtReadDoc")]
-pub unsafe fn html_ctxt_read_doc(
+pub fn html_ctxt_read_doc(
     ctxt: &mut XmlParserCtxt,
     cur: Vec<u8>,
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
 ) -> Option<HtmlDocPtr> {
-    unsafe { html_ctxt_read_memory(ctxt, cur, url, encoding, options) }
+    html_ctxt_read_memory(ctxt, cur, url, encoding, options)
 }
 
 /// Parse an XML file from the filesystem or the network.
@@ -4757,21 +4555,19 @@ pub unsafe fn html_ctxt_read_doc(
 ///
 /// Returns the resulting document tree
 #[doc(alias = "htmlCtxtReadFile")]
-pub unsafe fn html_ctxt_read_file(
+pub fn html_ctxt_read_file(
     ctxt: &mut XmlParserCtxt,
     filename: &str,
     encoding: Option<&str>,
     options: i32,
 ) -> Option<HtmlDocPtr> {
-    unsafe {
-        xml_init_parser();
+    xml_init_parser();
 
-        html_ctxt_reset(ctxt);
+    html_ctxt_reset(ctxt);
 
-        let stream = xml_load_external_entity(Some(filename), None, ctxt)?;
-        ctxt.input_push(stream);
-        html_do_read(ctxt, None, encoding, options)
-    }
+    let stream = xml_load_external_entity(Some(filename), None, ctxt)?;
+    ctxt.input_push(stream);
+    html_do_read(ctxt, None, encoding, options)
 }
 
 /// Parse an XML in-memory document and build a tree.
@@ -4779,24 +4575,22 @@ pub unsafe fn html_ctxt_read_file(
 ///
 /// Returns the resulting document tree
 #[doc(alias = "htmlCtxtReadMemory")]
-pub unsafe fn html_ctxt_read_memory(
+pub fn html_ctxt_read_memory(
     ctxt: &mut XmlParserCtxt,
     buffer: Vec<u8>,
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
 ) -> Option<HtmlDocPtr> {
-    unsafe {
-        xml_init_parser();
+    xml_init_parser();
 
-        html_ctxt_reset(ctxt);
+    html_ctxt_reset(ctxt);
 
-        let input = XmlParserInputBuffer::from_memory(buffer, XmlCharEncoding::None)?;
+    let input = XmlParserInputBuffer::from_memory(buffer, XmlCharEncoding::None)?;
 
-        let stream = XmlParserInput::from_io(ctxt, input, XmlCharEncoding::None)?;
-        (*ctxt).input_push(stream);
-        html_do_read(ctxt, url, encoding, options)
-    }
+    let stream = XmlParserInput::from_io(ctxt, input, XmlCharEncoding::None)?;
+    ctxt.input_push(stream);
+    html_do_read(ctxt, url, encoding, options)
 }
 
 /// Parse an HTML document from I/O functions and source and build a tree.
@@ -4804,23 +4598,21 @@ pub unsafe fn html_ctxt_read_memory(
 ///
 /// Returns the resulting document tree
 #[doc(alias = "htmlCtxtReadIO")]
-pub unsafe fn html_ctxt_read_io(
+pub fn html_ctxt_read_io(
     ctxt: &mut XmlParserCtxt,
     ioctx: impl Read + 'static,
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
 ) -> Option<HtmlDocPtr> {
-    unsafe {
-        xml_init_parser();
+    xml_init_parser();
 
-        html_ctxt_reset(ctxt);
+    html_ctxt_reset(ctxt);
 
-        let input = XmlParserInputBuffer::from_reader(ioctx, XmlCharEncoding::None);
-        let stream = XmlParserInput::from_io(ctxt, input, XmlCharEncoding::None)?;
-        (*ctxt).input_push(stream);
-        html_do_read(ctxt, url, encoding, options)
-    }
+    let input = XmlParserInputBuffer::from_reader(ioctx, XmlCharEncoding::None);
+    let stream = XmlParserInput::from_io(ctxt, input, XmlCharEncoding::None)?;
+    ctxt.input_push(stream);
+    html_do_read(ctxt, url, encoding, options)
 }
 
 // NRK/Jan2003: further knowledge of HTML structure
