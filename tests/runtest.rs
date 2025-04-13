@@ -1606,15 +1606,9 @@ unsafe fn push_parse_test(
 
         #[cfg(feature = "html")]
         let mut ctxt = if options & XML_PARSE_HTML != 0 {
-            html_create_push_parser_ctxt(
-                None,
-                None,
-                base.add(cur as _),
-                chunk_size,
-                Some(filename),
-                XmlCharEncoding::None,
-            )
-            .unwrap()
+            let chunk = from_raw_parts(base.add(cur as usize) as *const u8, chunk_size as usize);
+            html_create_push_parser_ctxt(None, None, chunk, Some(filename), XmlCharEncoding::None)
+                .unwrap()
         } else {
             let chunk = from_raw_parts(base.add(cur as usize) as *const u8, chunk_size as usize);
             XmlParserCtxt::new_push_parser(None, None, chunk, Some(filename)).unwrap()
@@ -1943,8 +1937,7 @@ unsafe fn push_boundary_test(
             html_create_push_parser_ctxt(
                 Some(Box::new(bnd_sax)),
                 None,
-                base,
-                1,
+                &[*base as u8],
                 Some(filename),
                 XmlCharEncoding::None,
             )

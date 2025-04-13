@@ -2369,8 +2369,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: Option<XmlParserC
                         let Some(mut ctxt) = html_create_push_parser_ctxt(
                             None,
                             None,
-                            chars.as_ptr() as *const i8,
-                            res as i32,
+                            &chars[..res],
                             Some(filename),
                             XmlCharEncoding::None,
                         ) else {

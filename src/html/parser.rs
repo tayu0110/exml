@@ -21,8 +21,6 @@
 //
 // daniel@veillard.com
 
-#[cfg(feature = "libxml_push")]
-use std::ffi::c_char;
 use std::{
     borrow::Cow,
     cell::RefCell,
@@ -3626,64 +3624,55 @@ fn html_new_input_stream(ctxt: &mut HtmlParserCtxt) -> HtmlParserInput {
 /// Returns the new parser context or NULL
 #[doc(alias = "htmlCreatePushParserCtxt")]
 #[cfg(feature = "libxml_push")]
-pub unsafe fn html_create_push_parser_ctxt(
+pub fn html_create_push_parser_ctxt(
     sax: Option<Box<XmlSAXHandler>>,
     user_data: Option<GenericErrorContext>,
-    chunk: *const c_char,
-    size: i32,
+    chunk: &[u8],
     filename: Option<&str>,
     enc: XmlCharEncoding,
 ) -> Option<HtmlParserCtxt> {
-    unsafe {
-        use std::slice::from_raw_parts;
+    use crate::io::{XmlParserInputBuffer, xml_parser_get_directory};
 
-        use crate::io::{XmlParserInputBuffer, xml_parser_get_directory};
+    xml_init_parser();
 
-        xml_init_parser();
-
-        let buf = XmlParserInputBuffer::new(enc);
-        let mut ctxt = html_new_sax_parser_ctxt(sax, user_data)?;
-        if matches!(enc, XmlCharEncoding::UTF8) || buf.encoder.is_some() {
-            ctxt.charset = XmlCharEncoding::UTF8;
-        }
-        if filename.is_none() {
-            ctxt.directory = None;
-        } else if let Some(dir) = filename.and_then(xml_parser_get_directory) {
-            ctxt.directory = Some(dir.to_string_lossy().into_owned());
-        }
-
-        let mut input_stream = html_new_input_stream(&mut ctxt);
-
-        if let Some(filename) = filename {
-            let canonic = canonic_path(filename);
-            input_stream.filename = Some(canonic.into_owned());
-        } else {
-            input_stream.filename = None;
-        }
-        input_stream.buf = Some(buf);
-        input_stream.reset_base();
-
-        ctxt.input_push(input_stream);
-
-        if size > 0
-            && !chunk.is_null()
-            && ctxt.input().is_some()
-            && ctxt.input().unwrap().buf.is_some()
-        {
-            let base: size_t = ctxt.input().unwrap().get_base();
-            let cur = ctxt.input().unwrap().offset_from_base();
-
-            ctxt.input_mut()
-                .unwrap()
-                .buf
-                .as_mut()
-                .unwrap()
-                .push_bytes(from_raw_parts(chunk as *const u8, size as usize));
-            ctxt.input_mut().unwrap().set_base_and_cursor(base, cur);
-        }
-        ctxt.progressive = 1;
-        Some(ctxt)
+    let buf = XmlParserInputBuffer::new(enc);
+    let mut ctxt = html_new_sax_parser_ctxt(sax, user_data)?;
+    if matches!(enc, XmlCharEncoding::UTF8) || buf.encoder.is_some() {
+        ctxt.charset = XmlCharEncoding::UTF8;
     }
+    if filename.is_none() {
+        ctxt.directory = None;
+    } else if let Some(dir) = filename.and_then(xml_parser_get_directory) {
+        ctxt.directory = Some(dir.to_string_lossy().into_owned());
+    }
+
+    let mut input_stream = html_new_input_stream(&mut ctxt);
+
+    if let Some(filename) = filename {
+        let canonic = canonic_path(filename);
+        input_stream.filename = Some(canonic.into_owned());
+    } else {
+        input_stream.filename = None;
+    }
+    input_stream.buf = Some(buf);
+    input_stream.reset_base();
+
+    ctxt.input_push(input_stream);
+
+    if !chunk.is_empty() && ctxt.input().is_some() && ctxt.input().unwrap().buf.is_some() {
+        let base: size_t = ctxt.input().unwrap().get_base();
+        let cur = ctxt.input().unwrap().offset_from_base();
+
+        ctxt.input_mut()
+            .unwrap()
+            .buf
+            .as_mut()
+            .unwrap()
+            .push_bytes(chunk);
+        ctxt.input_mut().unwrap().set_base_and_cursor(base, cur);
+    }
+    ctxt.progressive = 1;
+    Some(ctxt)
 }
 
 /// Try to find if a sequence (first, next, third) or just (first next) or
