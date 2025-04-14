@@ -1675,41 +1675,33 @@ unsafe fn xml_schema_validate_dates(
 #[doc(alias = "xmlSchemaValidateDuration")]
 unsafe fn xml_schema_validate_duration(
     _typ: XmlSchemaTypePtr,
-    duration: *const XmlChar,
+    duration: &str,
     val: *mut XmlSchemaValPtr,
     collapse: i32,
 ) -> i32 {
     unsafe {
-        let mut cur: *const XmlChar = duration;
+        let mut cur = duration;
         let mut isneg: i32 = 0;
         let mut seq: usize = 0;
         let mut days: i64;
         let mut secs: i64 = 0;
         let mut sec_frac: f64 = 0.0;
 
-        if duration.is_null() {
-            return -1;
-        }
-
         if collapse != 0 {
-            while IS_WSP_BLANK_CH!(*cur) {
-                cur = cur.add(1);
-            }
+            cur = cur.trim_start_matches(|c| IS_WSP_BLANK_CH!(c));
         }
 
-        if *cur == b'-' {
+        if let Some(rem) = cur.strip_prefix('-') {
+            cur = rem;
             isneg = 1;
-            cur = cur.add(1);
         }
 
         // duration must start with 'P' (after sign)
-        let f = *cur != b'P';
-        cur = cur.add(1);
-        if f {
+        let Some(mut cur) = cur.strip_prefix('P') else {
             return 1;
-        }
+        };
 
-        if *cur == 0 {
+        if cur.is_empty() {
             return 1;
         }
 
@@ -1719,11 +1711,11 @@ unsafe fn xml_schema_validate_duration(
         }
 
         'error: {
-            while *cur != 0 {
+            while !cur.is_empty() {
                 let mut num: i64 = 0;
                 let mut has_digits: usize = 0;
                 let mut has_frac: i32 = 0;
-                let desig: &[XmlChar] = b"YMDHMS";
+                let desig = b"YMDHMS";
 
                 // input string should be empty or invalid date/time item
                 if seq >= desig.len() {
@@ -1731,54 +1723,53 @@ unsafe fn xml_schema_validate_duration(
                 }
 
                 // T designator must be present for time items
-                if *cur == b'T' {
+                if let Some(rem) = cur.strip_prefix('T') {
                     if seq > 3 {
                         break 'error;
                     }
-                    cur = cur.add(1);
+                    cur = rem;
                     seq = 3;
                 } else if seq == 3 {
                     break 'error;
                 }
 
                 // Parse integral part.
-                while *cur >= b'0' && *cur <= b'9' {
-                    let digit: i64 = (*cur - b'0') as _;
-
-                    if num > i64::MAX / 10 {
-                        break 'error;
-                    }
-                    num *= 10;
-                    if num > i64::MAX - digit {
-                        break 'error;
-                    }
-                    num += digit;
-
-                    has_digits = 1;
-                    cur = cur.add(1);
-                }
-
-                if *cur == b'.' {
-                    // Parse fractional part.
-                    let mut mult: f64 = 1.0;
-                    cur = cur.add(1);
-                    has_frac = 1;
-                    while *cur >= b'0' && *cur <= b'9' {
-                        mult /= 10.0;
-                        sec_frac += (*cur - b'0') as f64 * mult;
+                if let Some((dig, _)) = cur.split_once(|c: char| !c.is_ascii_digit()) {
+                    cur = &cur[dig.len()..];
+                    if !dig.is_empty() {
                         has_digits = 1;
-                        cur = cur.add(1);
+                        match dig.parse::<i64>() {
+                            Ok(dig) => num = dig,
+                            Err(_) => break 'error,
+                        }
                     }
                 }
 
-                while *cur != desig[seq] {
+                if let Some(rem) = cur.strip_prefix('.') {
+                    cur = rem;
+                    // Parse fractional part.
+                    let mut mult = 1.0;
+                    let mut len = 0;
+                    has_frac = 1;
+                    for dig in cur.bytes().take_while(|&b| b.is_ascii_digit()) {
+                        mult /= 10.0;
+                        sec_frac += (dig - b'0') as f64 * mult;
+                        has_digits = 1;
+                        len += 1;
+                    }
+                    cur = &cur[len..];
+                }
+
+                while cur.starts_with(|b| b != desig[seq] as char) {
                     seq += 1;
-                    // No T designator or invalid c_char.
+                    // No T designator or invalid char.
                     if seq == 3 || seq == desig.len() {
                         break 'error;
                     }
                 }
-                cur = cur.add(1);
+                if !cur.is_empty() {
+                    cur = &cur[1..];
+                }
 
                 if has_digits == 0 || (has_frac != 0 && seq != 5) {
                     break 'error;
@@ -2378,7 +2369,7 @@ unsafe fn xml_schema_val_atomic_type(
                                 XmlSchemaValType::XmlSchemasDuration => {
                                     ret = xml_schema_validate_duration(
                                         typ,
-                                        value,
+                                        &CStr::from_ptr(value as *const i8).to_string_lossy(),
                                         val,
                                         norm_on_the_fly,
                                     );
