@@ -1168,7 +1168,7 @@ macro_rules! PARSE_FLOAT {
 ///
 /// Returns 0 or the error code
 #[doc(alias = "_xmlSchemaParseTimeZone")]
-unsafe fn _xml_schema_parse_time_zone(dt: XmlSchemaValDatePtr, str: *mut *const XmlChar) -> i32 {
+unsafe fn xml_schema_parse_time_zone(dt: XmlSchemaValDatePtr, str: *mut *const XmlChar) -> i32 {
     unsafe {
         let mut cur: *const XmlChar;
         let mut ret: i32 = 0;
@@ -1238,43 +1238,12 @@ unsafe fn _xml_schema_parse_time_zone(dt: XmlSchemaValDatePtr, str: *mut *const 
     }
 }
 
-macro_rules! RETURN_TYPE_IF_VALID {
-    ($cur:expr, $ret:expr, $dt:expr, $typ:expr, $val:expr, $t:expr) => {
-        if IS_TZO_CHAR!(*$cur) {
-            $ret = _xml_schema_parse_time_zone(addr_of_mut!((*$dt).value.date), addr_of_mut!($cur));
-            if $ret == 0 {
-                if *$cur != 0 {
-                    if !$dt.is_null() {
-                        xml_schema_free_value($dt);
-                    }
-                    return 1;
-                }
-                (*$dt).typ = $t;
-                if $typ != XmlSchemaValType::XmlSchemasUnknown && $typ != (*$dt).typ {
-                    if !$dt.is_null() {
-                        xml_schema_free_value($dt);
-                    }
-                    return 1;
-                }
-
-                if !$val.is_null() {
-                    *$val = $dt;
-                } else {
-                    xml_schema_free_value($dt);
-                }
-
-                return 0;
-            }
-        }
-    };
-}
-
 /// Parses a xs:gDay without time zone and fills in the appropriate
 /// field of the @dt structure. @str is updated to point just after the xs:gDay.
 ///
 /// Returns 0 or the error code
 #[doc(alias = "_xmlSchemaParseGDay")]
-unsafe fn _xml_schema_parse_gday(dt: XmlSchemaValDatePtr, str: *mut *const XmlChar) -> i32 {
+unsafe fn xml_schema_parse_gday(dt: XmlSchemaValDatePtr, str: *mut *const XmlChar) -> i32 {
     unsafe {
         let mut cur: *const XmlChar = *str;
         let mut ret: i32 = 0;
@@ -1482,12 +1451,38 @@ unsafe fn xml_schema_validate_dates(
                         break 'error;
                     }
                     cur = cur.add(1);
-                    ret = _xml_schema_parse_gday(addr_of_mut!((*dt).value.date), addr_of_mut!(cur));
+                    ret = xml_schema_parse_gday(addr_of_mut!((*dt).value.date), addr_of_mut!(cur));
                     if ret != 0 {
                         break 'error;
                     }
 
-                    RETURN_TYPE_IF_VALID!(cur, ret, dt, typ, val, XmlSchemaValType::XmlSchemasGDay);
+                    if IS_TZO_CHAR!(*cur) {
+                        ret = xml_schema_parse_time_zone(
+                            addr_of_mut!((*dt).value.date),
+                            addr_of_mut!(cur),
+                        );
+                        if ret == 0 {
+                            if *cur != 0 {
+                                if !dt.is_null() {
+                                    xml_schema_free_value(dt);
+                                }
+                                return 1;
+                            }
+                            (*dt).typ = XmlSchemaValType::XmlSchemasGDay;
+                            if typ != XmlSchemaValType::XmlSchemasUnknown && typ != (*dt).typ {
+                                if !dt.is_null() {
+                                    xml_schema_free_value(dt);
+                                }
+                                return 1;
+                            }
+                            if !val.is_null() {
+                                *val = dt;
+                            } else {
+                                xml_schema_free_value(dt);
+                            }
+                            return 0;
+                        }
+                    };
 
                     break 'error;
                 }
@@ -1508,7 +1503,7 @@ unsafe fn xml_schema_validate_dates(
                     let rewnd: *const XmlChar = cur;
                     cur = cur.add(1);
 
-                    ret = _xml_schema_parse_gday(addr_of_mut!((*dt).value.date), addr_of_mut!(cur));
+                    ret = xml_schema_parse_gday(addr_of_mut!((*dt).value.date), addr_of_mut!(cur));
                     if ret == 0 && (*cur == 0 || *cur != b':') {
                         // we can use the VALID_MDAY macro to validate the month
                         // and day because the leap year test will flag year zero
@@ -1516,14 +1511,35 @@ unsafe fn xml_schema_validate_dates(
                         // FUTURE TODO: Zero will become valid in XML Schema 1.1
                         // probably.
                         if VALID_MDAY!((addr_of_mut!((*dt).value.date))) {
-                            RETURN_TYPE_IF_VALID!(
-                                cur,
-                                ret,
-                                dt,
-                                typ,
-                                val,
-                                XmlSchemaValType::XmlSchemasGMonthDay
-                            );
+                            if IS_TZO_CHAR!(*cur) {
+                                ret = xml_schema_parse_time_zone(
+                                    addr_of_mut!((*dt).value.date),
+                                    addr_of_mut!(cur),
+                                );
+                                if ret == 0 {
+                                    if *cur != 0 {
+                                        if !dt.is_null() {
+                                            xml_schema_free_value(dt);
+                                        }
+                                        return 1;
+                                    }
+                                    (*dt).typ = XmlSchemaValType::XmlSchemasGMonthDay;
+                                    if typ != XmlSchemaValType::XmlSchemasUnknown
+                                        && typ != (*dt).typ
+                                    {
+                                        if !dt.is_null() {
+                                            xml_schema_free_value(dt);
+                                        }
+                                        return 1;
+                                    }
+                                    if !val.is_null() {
+                                        *val = dt;
+                                    } else {
+                                        xml_schema_free_value(dt);
+                                    }
+                                    return 0;
+                                }
+                            };
 
                             break 'error;
                         }
@@ -1534,7 +1550,33 @@ unsafe fn xml_schema_validate_dates(
                     cur = rewnd;
                 }
 
-                RETURN_TYPE_IF_VALID!(cur, ret, dt, typ, val, XmlSchemaValType::XmlSchemasGMonth);
+                if IS_TZO_CHAR!(*cur) {
+                    ret = xml_schema_parse_time_zone(
+                        addr_of_mut!((*dt).value.date),
+                        addr_of_mut!(cur),
+                    );
+                    if ret == 0 {
+                        if *cur != 0 {
+                            if !dt.is_null() {
+                                xml_schema_free_value(dt);
+                            }
+                            return 1;
+                        }
+                        (*dt).typ = XmlSchemaValType::XmlSchemasGMonth;
+                        if typ != XmlSchemaValType::XmlSchemasUnknown && typ != (*dt).typ {
+                            if !dt.is_null() {
+                                xml_schema_free_value(dt);
+                            }
+                            return 1;
+                        }
+                        if !val.is_null() {
+                            *val = dt;
+                        } else {
+                            xml_schema_free_value(dt);
+                        }
+                        return 0;
+                    }
+                };
 
                 break 'error;
             }
@@ -1545,7 +1587,33 @@ unsafe fn xml_schema_validate_dates(
                 ret = _xml_schema_parse_time(addr_of_mut!((*dt).value.date), addr_of_mut!(cur));
                 if ret == 0 {
                     // it's an xs:time
-                    RETURN_TYPE_IF_VALID!(cur, ret, dt, typ, val, XmlSchemaValType::XmlSchemasTime);
+                    if IS_TZO_CHAR!(*cur) {
+                        ret = xml_schema_parse_time_zone(
+                            addr_of_mut!((*dt).value.date),
+                            addr_of_mut!(cur),
+                        );
+                        if ret == 0 {
+                            if *cur != 0 {
+                                if !dt.is_null() {
+                                    xml_schema_free_value(dt);
+                                }
+                                return 1;
+                            }
+                            (*dt).typ = XmlSchemaValType::XmlSchemasTime;
+                            if typ != XmlSchemaValType::XmlSchemasUnknown && typ != (*dt).typ {
+                                if !dt.is_null() {
+                                    xml_schema_free_value(dt);
+                                }
+                                return 1;
+                            }
+                            if !val.is_null() {
+                                *val = dt;
+                            } else {
+                                xml_schema_free_value(dt);
+                            }
+                            return 0;
+                        }
+                    };
                 }
             }
 
@@ -1558,7 +1626,30 @@ unsafe fn xml_schema_validate_dates(
             }
 
             // is it an xs:gYear?
-            RETURN_TYPE_IF_VALID!(cur, ret, dt, typ, val, XmlSchemaValType::XmlSchemasGYear);
+            if IS_TZO_CHAR!(*cur) {
+                ret = xml_schema_parse_time_zone(addr_of_mut!((*dt).value.date), addr_of_mut!(cur));
+                if ret == 0 {
+                    if *cur != 0 {
+                        if !dt.is_null() {
+                            xml_schema_free_value(dt);
+                        }
+                        return 1;
+                    }
+                    (*dt).typ = XmlSchemaValType::XmlSchemasGYear;
+                    if typ != XmlSchemaValType::XmlSchemasUnknown && typ != (*dt).typ {
+                        if !dt.is_null() {
+                            xml_schema_free_value(dt);
+                        }
+                        return 1;
+                    }
+                    if !val.is_null() {
+                        *val = dt;
+                    } else {
+                        xml_schema_free_value(dt);
+                    }
+                    return 0;
+                }
+            };
 
             if *cur != b'-' {
                 break 'error;
@@ -1571,27 +1662,66 @@ unsafe fn xml_schema_validate_dates(
             }
 
             // is it an xs:gYearMonth?
-            RETURN_TYPE_IF_VALID!(
-                cur,
-                ret,
-                dt,
-                typ,
-                val,
-                XmlSchemaValType::XmlSchemasGYearMonth
-            );
+            if IS_TZO_CHAR!(*cur) {
+                ret = xml_schema_parse_time_zone(addr_of_mut!((*dt).value.date), addr_of_mut!(cur));
+                if ret == 0 {
+                    if *cur != 0 {
+                        if !dt.is_null() {
+                            xml_schema_free_value(dt);
+                        }
+                        return 1;
+                    }
+                    (*dt).typ = XmlSchemaValType::XmlSchemasGYearMonth;
+                    if typ != XmlSchemaValType::XmlSchemasUnknown && typ != (*dt).typ {
+                        if !dt.is_null() {
+                            xml_schema_free_value(dt);
+                        }
+                        return 1;
+                    }
+                    if !val.is_null() {
+                        *val = dt;
+                    } else {
+                        xml_schema_free_value(dt);
+                    }
+                    return 0;
+                }
+            };
 
             if *cur != b'-' {
                 break 'error;
             }
             cur = cur.add(1);
 
-            ret = _xml_schema_parse_gday(addr_of_mut!((*dt).value.date), addr_of_mut!(cur));
+            ret = xml_schema_parse_gday(addr_of_mut!((*dt).value.date), addr_of_mut!(cur));
             if ret != 0 || !VALID_DATE!((addr_of_mut!((*dt).value.date))) {
                 break 'error;
             }
 
             // is it an xs:date?
-            RETURN_TYPE_IF_VALID!(cur, ret, dt, typ, val, XmlSchemaValType::XmlSchemasDate);
+            if IS_TZO_CHAR!(*cur) {
+                ret = xml_schema_parse_time_zone(addr_of_mut!((*dt).value.date), addr_of_mut!(cur));
+                if ret == 0 {
+                    if *cur != 0 {
+                        if !dt.is_null() {
+                            xml_schema_free_value(dt);
+                        }
+                        return 1;
+                    }
+                    (*dt).typ = XmlSchemaValType::XmlSchemasDate;
+                    if typ != XmlSchemaValType::XmlSchemasUnknown && typ != (*dt).typ {
+                        if !dt.is_null() {
+                            xml_schema_free_value(dt);
+                        }
+                        return 1;
+                    }
+                    if !val.is_null() {
+                        *val = dt;
+                    } else {
+                        xml_schema_free_value(dt);
+                    }
+                    return 0;
+                }
+            };
 
             if *cur != b'T' {
                 break 'error;
@@ -1604,7 +1734,7 @@ unsafe fn xml_schema_validate_dates(
                 break 'error;
             }
 
-            ret = _xml_schema_parse_time_zone(addr_of_mut!((*dt).value.date), addr_of_mut!(cur));
+            ret = xml_schema_parse_time_zone(addr_of_mut!((*dt).value.date), addr_of_mut!(cur));
             if collapse != 0 {
                 while IS_WSP_BLANK_CH!(*cur) {
                     cur = cur.add(1);
@@ -1617,38 +1747,9 @@ unsafe fn xml_schema_validate_dates(
             (*dt).typ = XmlSchemaValType::XmlSchemasDatetime;
 
             // done:
-            // #if 1
             if typ != XmlSchemaValType::XmlSchemasUnknown && typ != (*dt).typ {
                 break 'error;
             }
-            // #else
-            //     /*
-            //      * insure the parsed type is equal to or less significant (right
-            //      * truncated) than the desired type.
-            //      */
-            //     if ((type != XmlSchemaValType::XmlSchemasUnknown) && (type != (*dt).typ)) {
-
-            //         /* time only matches time */
-            //         if ((type == XmlSchemaValType::XML_SCHEMAS_TIME) && ((*dt).typ == XmlSchemaValType::XML_SCHEMAS_TIME))
-            // goto error;
-            //         if ((type == XmlSchemaValType::XML_SCHEMAS_DATETIME) &&
-            //             (((*dt).typ != XmlSchemaValType::XML_SCHEMAS_DATE) ||
-            //              ((*dt).typ != XmlSchemaValType::XML_SCHEMAS_GYEARMONTH) ||
-            //              ((*dt).typ != XmlSchemaValType::XML_SCHEMAS_GYEAR)))
-            // goto error;
-
-            //         if ((type == XmlSchemaValType::XML_SCHEMAS_DATE) &&
-            //             (((*dt).typ != XmlSchemaValType::XML_SCHEMAS_GYEAR) ||
-            //              ((*dt).typ != XmlSchemaValType::XML_SCHEMAS_GYEARMONTH)))
-            // goto error;
-
-            //         if ((type == XmlSchemaValType::XML_SCHEMAS_GYEARMONTH) && ((*dt).typ != XmlSchemaValType::XML_SCHEMAS_GYEAR))
-            // goto error;
-
-            //         if ((type == XmlSchemaValType::XML_SCHEMAS_GMONTHDAY) && ((*dt).typ != XmlSchemaValType::XML_SCHEMAS_GMONTH))
-            // goto error;
-            //     }
-            // #endif
 
             if !val.is_null() {
                 *val = dt;
