@@ -19,6 +19,8 @@
 //
 // Daniel Veillard <veillard@redhat.com>
 
+pub mod parse;
+
 use std::{borrow::Cow, iter::once};
 
 use crate::libxml::chvalid::xml_is_blank_char;
