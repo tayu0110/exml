@@ -20,10 +20,19 @@
 // Daniel Veillard <veillard@redhat.com>
 
 pub mod parse;
+pub mod primitives;
 
 use std::{borrow::Cow, iter::once};
 
-use crate::libxml::chvalid::xml_is_blank_char;
+use primitives::XmlSchemaValPrimitives;
+
+use crate::libxml::{chvalid::xml_is_blank_char, schemas_internals::XmlSchemaValType};
+
+pub struct XmlSchemaVal {
+    typ: XmlSchemaValType,
+    next: Box<XmlSchemaVal>,
+    value: XmlSchemaValPrimitives,
+}
 
 /// Removes and normalize white spaces in the string
 ///
