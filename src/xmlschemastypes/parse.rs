@@ -2,6 +2,22 @@ use std::{fmt::Debug, str::FromStr};
 
 use super::primitives::XmlSchemaValDate;
 
+#[doc(alias = "VALID_YEAR")]
+fn validate_year(year: i64) -> bool {
+    year != 0
+}
+
+#[doc(alias = "VALID_MONTH")]
+fn validate_month(month: u8) -> bool {
+    (1..=12).contains(&month)
+}
+
+// VALID_DAY should only be used when month is unknown
+#[doc(alias = "VALID_DAY")]
+fn validate_day(day: u8) -> bool {
+    (1..=31).contains(&day)
+}
+
 #[doc(alias = "VALID_HOUR")]
 fn validate_hour(hour: u8) -> bool {
     (0..24).contains(&hour)
@@ -123,6 +139,75 @@ fn parse_uint(s: &mut &str) -> Option<(u64, u64, u64)> {
     }
 
     Some(res.into())
+}
+
+/// Parses a xs:gYear without time zone and fills in the appropriate
+/// field of the @dt structure. @str is updated to point just after the
+/// xs:gYear. It is supposed that @(*dt).year is big enough to contain the year.
+///
+/// Returns 0 or the error code
+#[doc(alias = "_xmlSchemaParseGYear")]
+fn parse_gyear(s: &mut &str, dt: &mut XmlSchemaValDate) -> Option<()> {
+    let mut cur = *s;
+    if !cur.starts_with(|c: char| c.is_ascii_digit() || c == '-' || c == '+') {
+        return None;
+    }
+
+    let mut isneg = false;
+    if let Some(rem) = cur.strip_prefix('-') {
+        isneg = true;
+        cur = rem;
+    } else if let Some(rem) = cur.strip_prefix('+') {
+        cur = rem;
+    }
+
+    let first_char = cur;
+    let pos = cur
+        .bytes()
+        .position(|b| !b.is_ascii_digit())
+        .unwrap_or(cur.len());
+    // year must be at least 4 digits (CCYY); over 4
+    // digits cannot have a leading zero.
+    if pos < 4 || (pos > 4 && first_char.starts_with('0')) {
+        return None;
+    }
+    let (dig, cur) = cur.split_at(pos);
+    dt.year = dig.parse().ok()?;
+
+    if isneg {
+        dt.year = -dt.year;
+    }
+
+    if !validate_year(dt.year) {
+        return None;
+    }
+
+    *s = cur;
+    Some(())
+}
+
+/// Parses a xs:gMonth without time zone and fills in the appropriate
+/// field of the @dt structure. @str is updated to point just after the xs:gMonth.
+///
+/// Returns 0 or the error code
+#[doc(alias = "_xmlSchemaParseGMonth")]
+fn parse_gmonth(s: &mut &str, dt: &mut XmlSchemaValDate) -> Option<()> {
+    let mut cur = *s;
+    dt.mon = parse_2digits::<u8>(&mut cur).filter(|mon| validate_month(*mon))?;
+    *s = cur;
+    Some(())
+}
+
+/// Parses a xs:gDay without time zone and fills in the appropriate
+/// field of the @dt structure. @str is updated to point just after the xs:gDay.
+///
+/// Returns 0 or the error code
+#[doc(alias = "_xmlSchemaParseGDay")]
+fn parse_gday(s: &mut &str, dt: &mut XmlSchemaValDate) -> Option<()> {
+    let mut cur = *s;
+    dt.day = parse_2digits::<u8>(&mut cur).filter(|day| validate_day(*day))?;
+    *s = cur;
+    Some(())
 }
 
 /// Parses a xs:time without time zone and fills in the appropriate
@@ -305,5 +390,40 @@ mod tests {
         // let mut s = "14:00.9Z";
         // assert!(parse_time(&mut s, &mut dt).is_some());
         // assert!(dt.hour == 14 && dt.min == 0 && dt.sec == )
+    }
+
+    #[test]
+    fn parse_gyear_test() {
+        let mut dt = XmlSchemaValDate::default();
+
+        let mut s = "2025";
+        assert!(parse_gyear(&mut s, &mut dt).is_some());
+        assert_eq!(dt.year, 2025);
+
+        let mut s = "0205";
+        assert!(parse_gyear(&mut s, &mut dt).is_some());
+        assert_eq!(dt.year, 205);
+
+        let mut s = "0025";
+        assert!(parse_gyear(&mut s, &mut dt).is_some());
+        assert_eq!(dt.year, 25);
+
+        let mut s = "0002";
+        assert!(parse_gyear(&mut s, &mut dt).is_some());
+        assert_eq!(dt.year, 2);
+
+        let mut s = "-2025";
+        assert!(parse_gyear(&mut s, &mut dt).is_some());
+        assert_eq!(dt.year, -2025);
+
+        let mut s = "20250205";
+        assert!(parse_gyear(&mut s, &mut dt).is_some());
+        assert_eq!(dt.year, 20250205);
+
+        let mut s = "02025";
+        assert!(parse_gyear(&mut s, &mut dt).is_none());
+
+        let mut s = "205";
+        assert!(parse_gyear(&mut s, &mut dt).is_none());
     }
 }

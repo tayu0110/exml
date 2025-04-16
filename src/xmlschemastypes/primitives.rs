@@ -26,9 +26,9 @@ pub(super) struct XmlSchemaValDuration {
 /// of [XML Schema Part 2: Datatypes](https://www.w3.org/TR/xmlschema-2)
 #[derive(Debug, Clone, Default)]
 pub(super) struct XmlSchemaValDate {
-    year: i64,
-    mon: u8,
-    day: u8,
+    pub(super) year: i64,
+    pub(super) mon: u8,
+    pub(super) day: u8,
     pub(super) hour: u8,
     pub(super) min: u8,
     pub(super) sec: f64,
