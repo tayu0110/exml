@@ -70,17 +70,13 @@ use crate::{
         },
     },
     xmlschemastypes::{
-        parse::{validate_dates, validate_duration},
+        parse::{check_language_type, validate_dates, validate_duration},
         xml_schema_collapse_string, xml_schema_white_space_replace,
     },
     xpath::{XML_XPATH_NAN, XML_XPATH_NINF, XML_XPATH_PINF, xml_xpath_is_nan},
 };
 
-use super::{
-    chvalid::{xml_is_blank_char, xml_is_digit},
-    hash::CVoidWrapper,
-    xmlregexp::XmlRegexp,
-};
+use super::{chvalid::xml_is_blank_char, hash::CVoidWrapper, xmlregexp::XmlRegexp};
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1127,48 +1123,6 @@ unsafe fn xml_schema_parse_uint(
     }
 }
 
-/// Check that a value conforms to the lexical space of the language datatype.
-/// Must conform to [a-zA-Z]{1,8}(-[a-zA-Z0-9]{1,8})*
-///
-/// Returns 1 if this validates, 0 otherwise.
-#[doc(alias = "xmlSchemaCheckLanguageType")]
-unsafe fn xml_schema_check_language_type(value: *const XmlChar) -> i32 {
-    unsafe {
-        let mut first: i32 = 1;
-        let mut len: i32 = 0;
-        let mut cur: *const XmlChar = value;
-
-        if value.is_null() {
-            return 0;
-        }
-
-        while *cur.add(0) != 0 {
-            if !((*cur.add(0) >= b'a' && *cur.add(0) <= b'z')
-                || (*cur.add(0) >= b'A' && *cur.add(0) <= b'Z')
-                || *cur.add(0) == b'-'
-                || (first == 0 && xml_is_digit(*cur.add(0) as u32)))
-            {
-                return 0;
-            }
-            if *cur.add(0) == b'-' {
-                if !(1..=8).contains(&len) {
-                    return 0;
-                }
-                len = 0;
-                first = 0;
-            } else {
-                len += 1;
-            }
-            cur = cur.add(1);
-        }
-        if !(1..=8).contains(&len) {
-            return 0;
-        }
-
-        1
-    }
-}
-
 /// Check that a value conforms to the lexical space of the predefined
 /// list type. if true a value is computed and returned in @ret.
 ///
@@ -1989,7 +1943,9 @@ unsafe fn xml_schema_val_atomic_type(
                                         }
                                     }
 
-                                    if xml_schema_check_language_type(value) == 1 {
+                                    if check_language_type(
+                                        &CStr::from_ptr(value as *const i8).to_string_lossy(),
+                                    ) {
                                         if !val.is_null() {
                                             v = xml_schema_new_value(
                                                 XmlSchemaValType::XmlSchemasLanguage,

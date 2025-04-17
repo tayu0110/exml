@@ -637,6 +637,25 @@ pub(crate) fn validate_duration(duration: &str, collapse: bool) -> Option<XmlSch
     })
 }
 
+/// Check that a value conforms to the lexical space of the language datatype.
+/// Must conform to [a-zA-Z]{1,8}(-[a-zA-Z0-9]{1,8})*
+///
+/// Returns `true` if this validates, `false` otherwise.
+#[doc(alias = "xmlSchemaCheckLanguageType")]
+pub(crate) fn check_language_type(value: &str) -> bool {
+    if value.is_empty() {
+        return false;
+    }
+    let mut tokens = value.split('-');
+    let first = tokens.next().unwrap();
+    if !(1..9).contains(&first.len()) || first.bytes().any(|b| !b.is_ascii_alphabetic()) {
+        return false;
+    }
+    tokens.all(|token| {
+        (1..9).contains(&token.len()) && token.bytes().all(|b| b.is_ascii_alphanumeric())
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
