@@ -2,7 +2,10 @@ use std::{fmt::Debug, str::FromStr};
 
 use crate::libxml::schemas_internals::XmlSchemaValType;
 
-use super::{XmlSchemaVal, XmlSchemaValPrimitives, is_wsp_blank_ch, primitives::XmlSchemaValDate};
+use super::{
+    XmlSchemaVal, XmlSchemaValPrimitives, is_wsp_blank_ch,
+    primitives::{XmlSchemaValDate, XmlSchemaValDuration},
+};
 
 #[doc(alias = "VALID_YEAR")]
 fn validate_year(year: i64) -> bool {
@@ -485,6 +488,155 @@ pub(crate) fn validate_dates(
     make_val(cur, dt, XmlSchemaValType::XmlSchemasDatetime)
 }
 
+const SECS_PER_MIN: i64 = 60;
+const MINS_PER_HOUR: i64 = 60;
+const HOURS_PER_DAY: i64 = 24;
+const SECS_PER_HOUR: i64 = MINS_PER_HOUR * SECS_PER_MIN;
+const SECS_PER_DAY: i64 = HOURS_PER_DAY * SECS_PER_HOUR;
+const MINS_PER_DAY: i64 = HOURS_PER_DAY * MINS_PER_HOUR;
+
+/// Check that @duration conforms to the lexical space of the duration type.
+/// if true a value is computed and returned in @val.
+///
+/// Returns 0 if this validates, a positive error code number otherwise
+/// and -1 in case of internal or API error.
+#[doc(alias = "xmlSchemaValidateDuration")]
+pub(crate) fn validate_duration(duration: &str, collapse: bool) -> Option<XmlSchemaVal> {
+    let mut cur = duration;
+    let mut isneg = false;
+    let mut seq = 0;
+    let mut days;
+    let mut secs = 0;
+    let mut sec_frac = 0.0;
+
+    if collapse {
+        cur = cur.trim_matches(is_wsp_blank_ch);
+    }
+
+    if let Some(rem) = cur.strip_prefix('-') {
+        cur = rem;
+        isneg = true;
+    }
+
+    // duration must start with 'P' (after sign)
+    let mut cur = cur.strip_prefix('P')?;
+
+    if cur.is_empty() {
+        return None;
+    }
+
+    let mut dur = XmlSchemaValDuration::default();
+
+    const DESIG: &[u8] = b"YMDHMS";
+    while !cur.is_empty() {
+        let mut num = 0i64;
+        let mut has_digits = false;
+        let mut has_frac = false;
+
+        // input string should be empty or invalid date/time item
+        if seq >= DESIG.len() {
+            return None;
+        }
+
+        // T designator must be present for time items
+        if let Some(rem) = cur.strip_prefix('T') {
+            if seq > 3 {
+                return None;
+            }
+            cur = rem;
+            seq = 3;
+        } else if seq == 3 {
+            return None;
+        }
+
+        // Parse integral part.
+        if let Some(pos) = cur
+            .find(|c: char| !c.is_ascii_digit())
+            .or(Some(cur.len()))
+            .filter(|&pos| pos > 0)
+        {
+            let (dig, rem) = cur.split_at(pos);
+            cur = rem;
+            has_digits = true;
+            num = dig.parse().ok()?;
+        }
+
+        if let Some(rem) = cur.strip_prefix('.') {
+            cur = rem;
+            // Parse fractional part.
+            let mut mult = 1.0;
+            let mut len = 0;
+            has_frac = true;
+            for dig in cur.bytes().take_while(|&b| b.is_ascii_digit()) {
+                mult /= 10.0;
+                sec_frac += (dig - b'0') as f64 * mult;
+                has_digits = true;
+                len += 1;
+            }
+            cur = &cur[len..];
+        }
+
+        while !cur.starts_with(|b| b == DESIG[seq] as char) {
+            seq += 1;
+            // No T designator or invalid char.
+            if seq == 3 || seq == DESIG.len() {
+                return None;
+            }
+        }
+        cur = &cur[1..];
+
+        if !has_digits || (has_frac && seq != 5) {
+            return None;
+        }
+
+        match seq {
+            // Year
+            0 => dur.mon = num.checked_mul(12)?,
+            // Month
+            1 => dur.mon = dur.mon.checked_add(num)?,
+            // Day
+            2 => dur.day = num,
+            // Hour
+            3 => {
+                days = num / HOURS_PER_DAY;
+                secs = (num % HOURS_PER_DAY) * SECS_PER_HOUR;
+                dur.day = dur.day.checked_add(days)?;
+            }
+            // Minute
+            4 => {
+                days = num / MINS_PER_DAY;
+                secs += (num % MINS_PER_DAY) * SECS_PER_MIN;
+                dur.day = dur.day.checked_add(days)?;
+            }
+            // Second
+            5 => {
+                days = num / SECS_PER_DAY;
+                secs += num % SECS_PER_DAY;
+                dur.day = dur.day.checked_add(days)?;
+            }
+            _ => {}
+        }
+
+        seq += 1;
+    }
+
+    let days = secs / SECS_PER_DAY;
+    dur.day = dur.day.checked_add(days)?;
+    dur.sec = (secs % SECS_PER_DAY) as f64 + sec_frac;
+
+    if isneg {
+        dur.mon = -dur.mon;
+        dur.day = -dur.day;
+        dur.sec = -dur.sec;
+    }
+
+    Some(XmlSchemaVal {
+        typ: XmlSchemaValType::XmlSchemasDuration,
+        next: None,
+        value: XmlSchemaValPrimitives::Duration(dur),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -628,5 +780,47 @@ mod tests {
                 && date.sec == 0.999
                 && date.tzo == 0
         );
+    }
+
+    #[test]
+    fn validate_duration_test() {
+        use XmlSchemaValPrimitives::*;
+        use XmlSchemaValType::*;
+
+        fn check(s: &str, mon: i64, day: i64, sec: f64) {
+            let val = validate_duration(s, false);
+            assert!(val.is_some());
+            let val = val.unwrap();
+            assert!(matches!(val.value, Duration(_)));
+            assert_eq!(val.typ, XmlSchemasDuration);
+            let Duration(dur) = val.value else {
+                unreachable!()
+            };
+            assert_eq!(dur.mon, mon);
+            assert_eq!(dur.day, day);
+            assert_eq!(dur.sec, sec);
+        }
+        // https://tc39.es/proposal-temporal/docs/duration.html
+        check("P1Y1M1DT1H1M1.1S", 13, 1, 3661.1);
+        check("P40D", 0, 40, 0.0);
+        check("P1Y1D", 12, 1, 0.0);
+        check("P3DT4H59M", 0, 3, 4. * 60. * 60. + 59. * 60.);
+        check("PT2H30M", 0, 0, 2. * 3600. + 30. * 60.);
+        check("P1M", 1, 0, 0.);
+        check("PT1M", 0, 0, 60.);
+        check("PT0.0021S", 0, 0, 0.0021);
+        check("PT0S", 0, 0, 0.);
+        check("P0D", 0, 0, 0.);
+
+        check("-P1Y1M1DT1H1M1.1S", -13, -1, -3661.1);
+        check("-P40D", 0, -40, 0.0);
+        check("-P1Y1D", -12, -1, 0.0);
+        check("-P3DT4H59M", 0, -3, -(4. * 60. * 60. + 59. * 60.));
+        check("-PT2H30M", 0, 0, -(2. * 3600. + 30. * 60.));
+        check("-P1M", -1, 0, 0.);
+        check("-PT1M", 0, 0, -60.);
+        check("-PT0.0021S", 0, 0, -0.0021);
+        check("-PT0S", 0, 0, 0.);
+        check("-P0D", 0, 0, 0.);
     }
 }
