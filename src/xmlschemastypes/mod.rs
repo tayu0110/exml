@@ -30,8 +30,23 @@ use crate::libxml::{chvalid::xml_is_blank_char, schemas_internals::XmlSchemaValT
 
 pub struct XmlSchemaVal {
     typ: XmlSchemaValType,
-    next: Box<XmlSchemaVal>,
+    next: Option<Box<XmlSchemaVal>>,
     value: XmlSchemaValPrimitives,
+}
+
+#[doc(alias = "IS_WSP_REPLACE_CH")]
+fn is_wsp_replace_ch(c: char) -> bool {
+    matches!(c, '\x09' | '\x0A' | '\x0D')
+}
+
+#[doc(alias = "IS_WSP_SPACE_CH")]
+fn is_wsp_space_ch(c: char) -> bool {
+    c == '\x20'
+}
+
+#[doc(alias = "IS_WSP_BLANK_CH")]
+fn is_wsp_blank_ch(c: char) -> bool {
+    xml_is_blank_char(c as u32)
 }
 
 /// Removes and normalize white spaces in the string

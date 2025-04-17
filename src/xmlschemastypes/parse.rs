@@ -1,6 +1,8 @@
 use std::{fmt::Debug, str::FromStr};
 
-use super::primitives::XmlSchemaValDate;
+use crate::libxml::schemas_internals::XmlSchemaValType;
+
+use super::{XmlSchemaVal, XmlSchemaValPrimitives, is_wsp_blank_ch, primitives::XmlSchemaValDate};
 
 #[doc(alias = "VALID_YEAR")]
 fn validate_year(year: i64) -> bool {
@@ -38,6 +40,14 @@ fn validate_end_of_day(dt: &XmlSchemaValDate) -> bool {
     dt.hour == 24 && dt.min == 0 && dt.sec == 0.0
 }
 
+#[doc(alias = "IS_TZO_CHAR")]
+fn is_tzo_char(c: char) -> bool {
+    matches!(c, 'Z' | '+' | '-')
+}
+fn starts_with_tzo_char(s: &str) -> bool {
+    s.chars().next().is_none_or(is_tzo_char)
+}
+
 #[doc(alias = "VALID_TZO")]
 fn validate_tzo(tzo: i16) -> bool {
     (-840..=840).contains(&tzo)
@@ -48,6 +58,33 @@ fn validate_time(dt: &XmlSchemaValDate) -> bool {
     ((validate_hour(dt.hour) && validate_minute(dt.min) && validate_second(dt.sec))
         || validate_end_of_day(dt))
         && validate_tzo(dt.tzo)
+}
+
+#[doc(alias = "IS_LEAP")]
+fn is_leap(year: i64) -> bool {
+    (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
+}
+
+const DAYS_IN_MONTH: [u8; 12] = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+const DAYS_IN_MONTH_LEAP: [u8; 12] = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+#[doc(alias = "VALID_MDAY")]
+fn validate_mday(dt: &XmlSchemaValDate) -> bool {
+    if is_leap(dt.year) {
+        dt.day <= DAYS_IN_MONTH_LEAP[dt.mon as usize - 1]
+    } else {
+        dt.day <= DAYS_IN_MONTH[dt.mon as usize - 1]
+    }
+}
+
+#[doc(alias = "VALID_DATE")]
+fn validate_date(dt: &XmlSchemaValDate) -> bool {
+    validate_year(dt.year) && validate_month(dt.mon) && validate_mday(dt)
+}
+
+#[doc(alias = "VALID_DATETIME")]
+fn validate_datetime(dt: &XmlSchemaValDate) -> bool {
+    validate_date(dt) && validate_time(dt)
 }
 
 /// Parse the first two digits of a string `s`.
@@ -306,6 +343,144 @@ fn parse_time_zone(s: &mut &str, dt: &mut XmlSchemaValDate) -> Option<()> {
     Some(())
 }
 
+/// Check that @dateTime conforms to the lexical space of one of the date types.
+/// if true a value is computed and returned in @val.
+///
+/// Returns 0 if this validates, a positive error code number otherwise
+/// and -1 in case of internal or API error.
+#[doc(alias = "xmlSchemaValidateDates")]
+fn validate_dates(typ: XmlSchemaValType, date_time: &str, collapse: bool) -> Option<XmlSchemaVal> {
+    let mut cur = date_time;
+
+    if collapse {
+        cur = cur.trim_matches(is_wsp_blank_ch);
+    }
+
+    if !cur.starts_with(|c: char| c == '-' || c.is_ascii_digit()) {
+        return None;
+    }
+
+    let mut dt = XmlSchemaValDate::default();
+    let make_val =
+        |remain: &str, dt: XmlSchemaValDate, expect: XmlSchemaValType| -> Option<XmlSchemaVal> {
+            if !remain.is_empty() || (typ != XmlSchemaValType::XmlSchemasUnknown && typ != expect) {
+                return None;
+            }
+            Some(XmlSchemaVal {
+                typ: expect,
+                next: None,
+                value: XmlSchemaValPrimitives::Date(dt),
+            })
+        };
+
+    if let Some(rem) = cur.strip_prefix("--") {
+        // It's an incomplete date (xs:gMonthDay, xs:gMonth or xs:gDay)
+        cur = rem;
+
+        // is it an xs:gDay?
+        if let Some(rem) = cur.strip_prefix('-') {
+            if typ == XmlSchemaValType::XmlSchemasGMonth {
+                return None;
+            }
+            cur = rem;
+            parse_gday(&mut cur, &mut dt)?;
+
+            if starts_with_tzo_char(cur) && parse_time_zone(&mut cur, &mut dt).is_some() {
+                return make_val(cur, dt, XmlSchemaValType::XmlSchemasGDay);
+            };
+
+            return None;
+        }
+
+        // it should be an xs:gMonthDay or xs:gMonth
+        parse_gmonth(&mut cur, &mut dt)?;
+
+        // a '-' c_char could indicate this type is xs:gMonthDay or
+        // a negative time zone offset. Check for xs:gMonthDay first.
+        // Also the first three c_char's of a negative tzo (-MM:SS) can
+        // appear to be a valid day; so even if the day portion
+        // of the xs:gMonthDay verifies, we must insure it was not
+        // a tzo.
+        if let Some(rem) = cur.strip_prefix('-') {
+            let rewnd = cur;
+            cur = rem;
+
+            if parse_gday(&mut cur, &mut dt).is_some() && (cur.is_empty() || !cur.starts_with(':'))
+            {
+                // we can use the VALID_MDAY macro to validate the month
+                // and day because the leap year test will flag year zero
+                // as a leap year (even though zero is an invalid year).
+                // FUTURE TODO: Zero will become valid in XML Schema 1.1
+                // probably.
+                if validate_mday(&dt) {
+                    if starts_with_tzo_char(cur) {
+                        parse_time_zone(&mut cur, &mut dt)?;
+                        return make_val(cur, dt, XmlSchemaValType::XmlSchemasGMonthDay);
+                    };
+
+                    return None;
+                }
+            }
+
+            // not xs:gMonthDay so rewind and check if just xs:gMonth
+            // with an optional time zone.
+            cur = rewnd;
+        }
+
+        if starts_with_tzo_char(cur) && parse_time_zone(&mut cur, &mut dt).is_some() {
+            return make_val(cur, dt, XmlSchemaValType::XmlSchemasGMonth);
+        };
+
+        return None;
+    }
+
+    // It's a right-truncated date or an xs:time.
+    // Try to parse an xs:time then fallback on right-truncated dates.
+    if cur.starts_with(|c: char| c.is_ascii_digit()) && parse_time(&mut cur, &mut dt).is_some() {
+        // it's an xs:time
+        if starts_with_tzo_char(cur) && parse_time_zone(&mut cur, &mut dt).is_some() {
+            return make_val(cur, dt, XmlSchemaValType::XmlSchemasTime);
+        };
+    }
+
+    // fallback on date parsing
+    cur = date_time;
+
+    parse_gyear(&mut cur, &mut dt)?;
+
+    // is it an xs:gYear?
+    if starts_with_tzo_char(cur) && parse_time_zone(&mut cur, &mut dt).is_some() {
+        return make_val(cur, dt, XmlSchemaValType::XmlSchemasGYear);
+    };
+
+    cur = cur.strip_prefix('-')?;
+
+    parse_gmonth(&mut cur, &mut dt)?;
+
+    // is it an xs:gYearMonth?
+    if starts_with_tzo_char(cur) && parse_time_zone(&mut cur, &mut dt).is_some() {
+        return make_val(cur, dt, XmlSchemaValType::XmlSchemasGYearMonth);
+    };
+
+    cur = cur.strip_prefix('-')?;
+
+    parse_gday(&mut cur, &mut dt).filter(|_| validate_date(&dt))?;
+
+    // is it an xs:date?
+    if starts_with_tzo_char(cur) && parse_time_zone(&mut cur, &mut dt).is_some() {
+        return make_val(cur, dt, XmlSchemaValType::XmlSchemasDate);
+    };
+
+    cur = cur.strip_prefix('T')?;
+
+    // it should be an xs:dateTime
+    parse_time(&mut cur, &mut dt)?;
+
+    parse_time_zone(&mut cur, &mut dt).filter(|_| validate_datetime(&dt))?;
+
+    make_val(cur, dt, XmlSchemaValType::XmlSchemasDatetime)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -425,5 +600,29 @@ mod tests {
 
         let mut s = "205";
         assert!(parse_gyear(&mut s, &mut dt).is_none());
+    }
+
+    #[test]
+    fn validate_dates_test() {
+        use XmlSchemaValPrimitives::*;
+        use XmlSchemaValType::*;
+        let s = "2019-03-26T14:00:00.999Z";
+        let val = validate_dates(XmlSchemasUnknown, s, false);
+        assert!(val.is_some());
+        let val = val.unwrap();
+        assert!(matches!(val.value, Date(_)));
+        assert_eq!(val.typ, XmlSchemasDatetime);
+        let Date(date) = val.value else {
+            unreachable!()
+        };
+        assert!(
+            date.year == 2019
+                && date.mon == 3
+                && date.day == 26
+                && date.hour == 14
+                && date.min == 0
+                && date.sec == 0.999
+                && date.tzo == 0
+        );
     }
 }
