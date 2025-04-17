@@ -17,9 +17,9 @@ pub(crate) struct XmlSchemaValDecimal {
 /// of [XML Schema Part 2: Datatypes](https://www.w3.org/TR/xmlschema-2)
 #[derive(Debug, Clone, Default)]
 pub(crate) struct XmlSchemaValDuration {
-    pub(super) mon: i64,
-    pub(super) day: i64,
-    pub(super) sec: f64,
+    pub(crate) mon: i64,
+    pub(crate) day: i64,
+    pub(crate) sec: f64,
 }
 
 /// Implement [3.2.9 date](https://www.w3.org/TR/xmlschema-2/#date)

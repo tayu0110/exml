@@ -70,7 +70,8 @@ use crate::{
         },
     },
     xmlschemastypes::{
-        parse::validate_dates, xml_schema_collapse_string, xml_schema_white_space_replace,
+        parse::{validate_dates, validate_duration},
+        xml_schema_collapse_string, xml_schema_white_space_replace,
     },
     xpath::{XML_XPATH_NAN, XML_XPATH_NINF, XML_XPATH_PINF, xml_xpath_is_nan},
 };
@@ -1126,196 +1127,6 @@ unsafe fn xml_schema_parse_uint(
     }
 }
 
-/// Check that @duration conforms to the lexical space of the duration type.
-/// if true a value is computed and returned in @val.
-///
-/// Returns 0 if this validates, a positive error code number otherwise
-/// and -1 in case of internal or API error.
-#[doc(alias = "xmlSchemaValidateDuration")]
-unsafe fn xml_schema_validate_duration(
-    _typ: XmlSchemaTypePtr,
-    duration: &str,
-    val: *mut XmlSchemaValPtr,
-    collapse: i32,
-) -> i32 {
-    unsafe {
-        let mut cur = duration;
-        let mut isneg: i32 = 0;
-        let mut seq: usize = 0;
-        let mut days: i64;
-        let mut secs: i64 = 0;
-        let mut sec_frac: f64 = 0.0;
-
-        if collapse != 0 {
-            cur = cur.trim_start_matches(|c| IS_WSP_BLANK_CH!(c));
-        }
-
-        if let Some(rem) = cur.strip_prefix('-') {
-            cur = rem;
-            isneg = 1;
-        }
-
-        // duration must start with 'P' (after sign)
-        let Some(mut cur) = cur.strip_prefix('P') else {
-            return 1;
-        };
-
-        if cur.is_empty() {
-            return 1;
-        }
-
-        let dur: XmlSchemaValPtr = xml_schema_new_value(XmlSchemaValType::XmlSchemasDuration);
-        if dur.is_null() {
-            return -1;
-        }
-
-        'error: {
-            while !cur.is_empty() {
-                let mut num: i64 = 0;
-                let mut has_digits: usize = 0;
-                let mut has_frac: i32 = 0;
-                let desig = b"YMDHMS";
-
-                // input string should be empty or invalid date/time item
-                if seq >= desig.len() {
-                    break 'error;
-                }
-
-                // T designator must be present for time items
-                if let Some(rem) = cur.strip_prefix('T') {
-                    if seq > 3 {
-                        break 'error;
-                    }
-                    cur = rem;
-                    seq = 3;
-                } else if seq == 3 {
-                    break 'error;
-                }
-
-                // Parse integral part.
-                if let Some((dig, _)) = cur.split_once(|c: char| !c.is_ascii_digit()) {
-                    cur = &cur[dig.len()..];
-                    if !dig.is_empty() {
-                        has_digits = 1;
-                        match dig.parse::<i64>() {
-                            Ok(dig) => num = dig,
-                            Err(_) => break 'error,
-                        }
-                    }
-                }
-
-                if let Some(rem) = cur.strip_prefix('.') {
-                    cur = rem;
-                    // Parse fractional part.
-                    let mut mult = 1.0;
-                    let mut len = 0;
-                    has_frac = 1;
-                    for dig in cur.bytes().take_while(|&b| b.is_ascii_digit()) {
-                        mult /= 10.0;
-                        sec_frac += (dig - b'0') as f64 * mult;
-                        has_digits = 1;
-                        len += 1;
-                    }
-                    cur = &cur[len..];
-                }
-
-                while cur.starts_with(|b| b != desig[seq] as char) {
-                    seq += 1;
-                    // No T designator or invalid char.
-                    if seq == 3 || seq == desig.len() {
-                        break 'error;
-                    }
-                }
-                if !cur.is_empty() {
-                    cur = &cur[1..];
-                }
-
-                if has_digits == 0 || (has_frac != 0 && seq != 5) {
-                    break 'error;
-                }
-
-                match seq {
-                    0 => {
-                        // Year
-                        if num > i64::MAX / 12 {
-                            break 'error;
-                        }
-                        (*dur).value.dur.mon = num * 12;
-                    }
-                    1 => {
-                        // Month
-                        if (*dur).value.dur.mon > i64::MAX - num {
-                            break 'error;
-                        }
-                        (*dur).value.dur.mon += num;
-                    }
-                    2 => {
-                        // Day
-                        (*dur).value.dur.day = num;
-                    }
-                    3 => {
-                        // Hour
-                        days = num / HOURS_PER_DAY as i64;
-                        if (*dur).value.dur.day > i64::MAX - days {
-                            break 'error;
-                        }
-                        (*dur).value.dur.day += days;
-                        secs = (num % HOURS_PER_DAY as i64) * SECS_PER_HOUR as i64;
-                    }
-                    4 => {
-                        // Minute
-                        days = num / MINS_PER_DAY as i64;
-                        if (*dur).value.dur.day > i64::MAX - days {
-                            break 'error;
-                        }
-                        (*dur).value.dur.day += days;
-                        secs += (num % MINS_PER_DAY as i64) * SECS_PER_MIN as i64;
-                    }
-                    5 => {
-                        // Second
-                        days = num / SECS_PER_DAY as i64;
-                        if (*dur).value.dur.day > i64::MAX - days {
-                            break 'error;
-                        }
-                        (*dur).value.dur.day += days;
-                        secs += num % SECS_PER_DAY as i64;
-                    }
-                    _ => {}
-                }
-
-                seq += 1;
-            }
-
-            days = secs / SECS_PER_DAY as i64;
-            if (*dur).value.dur.day > i64::MAX - days {
-                break 'error;
-            }
-            (*dur).value.dur.day += days;
-            (*dur).value.dur.sec = (secs % SECS_PER_DAY as i64) as f64 + sec_frac;
-
-            if isneg != 0 {
-                (*dur).value.dur.mon = -(*dur).value.dur.mon;
-                (*dur).value.dur.day = -(*dur).value.dur.day;
-                (*dur).value.dur.sec = -(*dur).value.dur.sec;
-            }
-
-            if !val.is_null() {
-                *val = dur;
-            } else {
-                xml_schema_free_value(dur);
-            }
-
-            return 0;
-        }
-
-        // error:
-        if !dur.is_null() {
-            xml_schema_free_value(dur);
-        }
-        1
-    }
-}
-
 /// Check that a value conforms to the lexical space of the language datatype.
 /// Must conform to [a-zA-Z]{1,8}(-[a-zA-Z0-9]{1,8})*
 ///
@@ -1838,12 +1649,18 @@ unsafe fn xml_schema_val_atomic_type(
                                     };
                                 }
                                 XmlSchemaValType::XmlSchemasDuration => {
-                                    ret = xml_schema_validate_duration(
-                                        typ,
-                                        &CStr::from_ptr(value as *const i8).to_string_lossy(),
-                                        val,
-                                        norm_on_the_fly,
-                                    );
+                                    ret = match validate_duration(&CStr::from_ptr(value as *const i8).to_string_lossy(), norm_on_the_fly != 0) {
+                                        Some(crate::xmlschemastypes::XmlSchemaVal { typ, value: crate::xmlschemastypes::primitives::XmlSchemaValPrimitives::Duration(dur), ..}) => {
+                                            if !val.is_null() {
+                                                *val = xml_schema_new_value(typ);
+                                                (**val).value.dur.mon = dur.mon;
+                                                (**val).value.dur.day = dur.day;
+                                                (**val).value.dur.sec = dur.sec;
+                                            }
+                                            0
+                                        }
+                                        _ => -1,
+                                    };
                                 }
                                 XmlSchemaValType::XmlSchemasFloat
                                 | XmlSchemaValType::XmlSchemasDouble => {
