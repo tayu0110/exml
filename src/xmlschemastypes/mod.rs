@@ -29,9 +29,9 @@ use primitives::XmlSchemaValPrimitives;
 use crate::libxml::{chvalid::xml_is_blank_char, schemas_internals::XmlSchemaValType};
 
 pub struct XmlSchemaVal {
-    typ: XmlSchemaValType,
+    pub(crate) typ: XmlSchemaValType,
     next: Option<Box<XmlSchemaVal>>,
-    value: XmlSchemaValPrimitives,
+    pub(crate) value: XmlSchemaValPrimitives,
 }
 
 #[doc(alias = "IS_WSP_REPLACE_CH")]

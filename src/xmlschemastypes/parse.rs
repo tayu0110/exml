@@ -349,7 +349,11 @@ fn parse_time_zone(s: &mut &str, dt: &mut XmlSchemaValDate) -> Option<()> {
 /// Returns 0 if this validates, a positive error code number otherwise
 /// and -1 in case of internal or API error.
 #[doc(alias = "xmlSchemaValidateDates")]
-fn validate_dates(typ: XmlSchemaValType, date_time: &str, collapse: bool) -> Option<XmlSchemaVal> {
+pub(crate) fn validate_dates(
+    typ: XmlSchemaValType,
+    date_time: &str,
+    collapse: bool,
+) -> Option<XmlSchemaVal> {
     let mut cur = date_time;
 
     if collapse {
