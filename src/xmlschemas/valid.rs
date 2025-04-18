@@ -136,12 +136,12 @@ impl XmlSchemaParserCtxt {
                 );
                 return -1;
             }
-            match XmlSchemaValType::try_from((*typ).built_in_type) {
-                Ok(XmlSchemaValType::XmlSchemasNCName)
-                | Ok(XmlSchemaValType::XmlSchemasQName)
-                | Ok(XmlSchemaValType::XmlSchemasAnyURI)
-                | Ok(XmlSchemaValType::XmlSchemasToken)
-                | Ok(XmlSchemaValType::XmlSchemasLanguage) => {
+            match (*typ).built_in_type {
+                XmlSchemaValType::XmlSchemasNCName
+                | XmlSchemaValType::XmlSchemasQName
+                | XmlSchemaValType::XmlSchemasAnyURI
+                | XmlSchemaValType::XmlSchemasToken
+                | XmlSchemaValType::XmlSchemasLanguage => {
                     ret =
                         xml_schema_val_predef_type_node(typ, value, null_mut(), Some(attr.into()));
                 }

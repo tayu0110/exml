@@ -1252,7 +1252,7 @@ unsafe fn xml_schema_get_primitive_type(mut typ: XmlSchemaTypePtr) -> XmlSchemaT
         while !typ.is_null() {
             // Note that anySimpleType is actually not a primitive type
             // but we need that here.
-            if (*typ).built_in_type == XmlSchemaValType::XmlSchemasAnySimpletype as i32
+            if (*typ).built_in_type == XmlSchemaValType::XmlSchemasAnySimpletype
                 || (*typ).flags & XML_SCHEMAS_TYPE_BUILTIN_PRIMITIVE != 0
             {
                 return typ;
@@ -1418,7 +1418,7 @@ unsafe fn xml_schema_are_values_equal(mut x: XmlSchemaValPtr, mut y: XmlSchemaVa
             }
             // We assume computed values to be normalized, so do a fast
             // string comparison for string based types.
-            if (*ptx).built_in_type == XmlSchemaValType::XmlSchemasString as i32
+            if (*ptx).built_in_type == XmlSchemaValType::XmlSchemasString
                 || wxs_is_any_simple_type(ptx)
             {
                 if !xml_str_equal(
@@ -1517,7 +1517,7 @@ unsafe fn xml_schema_validate_facets(
                 }
                 // Whitespace handling is only of importance for string-based types.
                 tmp_type = xml_schema_get_primitive_type(typ);
-                if (*tmp_type).built_in_type == XmlSchemaValType::XmlSchemasString as i32
+                if (*tmp_type).built_in_type == XmlSchemaValType::XmlSchemasString
                     || wxs_is_any_simple_type(tmp_type)
                 {
                     ws = (*typ).white_space_facet_value().unwrap();
@@ -1928,8 +1928,8 @@ pub(crate) unsafe fn xml_schema_vcheck_cvc_simple_type(
                 // NOTATIONs need to be processed here, since they need
                 // to lookup in the hashtable of NOTATION declarations of the schema.
                 if (*actxt).typ == XML_SCHEMA_CTXT_VALIDATOR {
-                    match XmlSchemaValType::try_from((*bi_type).built_in_type) {
-                        Ok(XmlSchemaValType::XmlSchemasNotation) => {
+                    match (*bi_type).built_in_type {
+                        XmlSchemaValType::XmlSchemasNotation => {
                             ret = xml_schema_validate_notation(
                                 actxt as XmlSchemaValidCtxtPtr,
                                 (*(actxt as XmlSchemaValidCtxtPtr)).schema,
@@ -1939,7 +1939,7 @@ pub(crate) unsafe fn xml_schema_vcheck_cvc_simple_type(
                                 val_needed,
                             );
                         }
-                        Ok(XmlSchemaValType::XmlSchemasQName) => {
+                        XmlSchemaValType::XmlSchemasQName => {
                             ret = xml_schema_validate_qname(
                                 actxt as XmlSchemaValidCtxtPtr,
                                 &CStr::from_ptr(value as *const i8).to_string_lossy(),
@@ -1967,8 +1967,8 @@ pub(crate) unsafe fn xml_schema_vcheck_cvc_simple_type(
                         }
                     }
                 } else if (*actxt).typ == XML_SCHEMA_CTXT_PARSER {
-                    match XmlSchemaValType::try_from((*bi_type).built_in_type) {
-                        Ok(XmlSchemaValType::XmlSchemasNotation) => {
+                    match (*bi_type).built_in_type {
+                        XmlSchemaValType::XmlSchemasNotation => {
                             ret = xml_schema_validate_notation(
                                 null_mut(),
                                 (*(actxt as XmlSchemaParserCtxtPtr)).schema,
@@ -2023,7 +2023,7 @@ pub(crate) unsafe fn xml_schema_vcheck_cvc_simple_type(
                         actxt,
                         node,
                         typ,
-                        XmlSchemaValType::try_from((*bi_type).built_in_type).unwrap(),
+                        (*bi_type).built_in_type,
                         value,
                         val,
                         0,
@@ -7936,7 +7936,10 @@ unsafe fn xml_schema_fixup_type_attribute_uses(
 
 /// Returns 1 if the type has the given value type, or is derived from such a type.
 #[doc(alias = "xmlSchemaIsDerivedFromBuiltInType")]
-unsafe fn xml_schema_is_derived_from_built_in_type(typ: XmlSchemaTypePtr, val_type: i32) -> i32 {
+unsafe fn xml_schema_is_derived_from_built_in_type(
+    typ: XmlSchemaTypePtr,
+    val_type: XmlSchemaValType,
+) -> i32 {
     unsafe {
         if typ.is_null() {
             return 0;
@@ -7948,8 +7951,8 @@ unsafe fn xml_schema_is_derived_from_built_in_type(typ: XmlSchemaTypePtr, val_ty
             if (*typ).built_in_type == val_type {
                 return 1;
             }
-            if (*typ).built_in_type == XmlSchemaValType::XmlSchemasAnySimpletype as i32
-                || (*typ).built_in_type == XmlSchemaValType::XmlSchemasAnytype as i32
+            if (*typ).built_in_type == XmlSchemaValType::XmlSchemasAnySimpletype
+                || (*typ).built_in_type == XmlSchemaValType::XmlSchemasAnytype
             {
                 return 0;
             }
@@ -8064,7 +8067,7 @@ unsafe fn xml_schema_check_ctprops_correct(
                 if !WXS_ATTRUSE_TYPEDEF!(using).is_null()
                     && xml_schema_is_derived_from_built_in_type(
                         WXS_ATTRUSE_TYPEDEF!(using),
-                        XmlSchemaValType::XmlSchemasID as i32,
+                        XmlSchemaValType::XmlSchemasID,
                     ) != 0
                 {
                     if has_id != 0 {
@@ -8895,7 +8898,7 @@ unsafe fn xml_schema_check_derivation_okrestriction(
             return -1;
         }
         // SPEC (5) "One of the following must be true:"
-        if (*base).built_in_type == XmlSchemaValType::XmlSchemasAnytype as i32 {
+        if (*base).built_in_type == XmlSchemaValType::XmlSchemasAnytype {
             // SPEC (5.1) "The {base type definition} must be the
             // `ur-type definition`."
             // PASS
@@ -9968,8 +9971,7 @@ unsafe fn xml_schema_check_cosstrestricts(
                 member = (*member).next;
             }
             // 3.3.1 If the {base type definition} is the `simple ur-type definition`
-            if (*(*typ).base_type).built_in_type == XmlSchemaValType::XmlSchemasAnySimpletype as i32
-            {
+            if (*(*typ).base_type).built_in_type == XmlSchemaValType::XmlSchemasAnySimpletype {
                 // 3.3.1.1 All of the {member type definitions} must have a
                 // {final} which does not contain union.
                 member = (*typ).member_types;
@@ -10243,14 +10245,12 @@ unsafe fn xml_schema_type_fixup_whitespace(typ: XmlSchemaTypePtr) -> i32 {
             let mut anc: XmlSchemaTypePtr;
 
             anc = (*typ).base_type;
-            while !anc.is_null()
-                && (*anc).built_in_type != XmlSchemaValType::XmlSchemasAnytype as i32
-            {
+            while !anc.is_null() && (*anc).built_in_type != XmlSchemaValType::XmlSchemasAnytype {
                 if (*anc).typ == XmlSchemaTypeType::XmlSchemaTypeBasic {
-                    if (*anc).built_in_type == XmlSchemaValType::XmlSchemasNormString as i32 {
+                    if (*anc).built_in_type == XmlSchemaValType::XmlSchemasNormString {
                         (*typ).flags |= XML_SCHEMAS_TYPE_WHITESPACE_REPLACE;
-                    } else if (*anc).built_in_type == XmlSchemaValType::XmlSchemasString as i32
-                        || (*anc).built_in_type == XmlSchemaValType::XmlSchemasAnySimpletype as i32
+                    } else if (*anc).built_in_type == XmlSchemaValType::XmlSchemasString
+                        || (*anc).built_in_type == XmlSchemaValType::XmlSchemasAnySimpletype
                     {
                         (*typ).flags |= XML_SCHEMAS_TYPE_WHITESPACE_PRESERVE;
                     } else {
@@ -10938,8 +10938,8 @@ unsafe fn xml_schema_type_fixup_optim_facets(typ: XmlSchemaTypePtr) {
         if has != 0 && need_val == 0 && (*typ).wxs_is_atomic() {
             let prim: XmlSchemaTypePtr = xml_schema_get_primitive_type(typ);
             // OPTIMIZE VAL TODO: Some facets need a computed value.
-            if (*prim).built_in_type != XmlSchemaValType::XmlSchemasAnySimpletype as i32
-                && (*prim).built_in_type != XmlSchemaValType::XmlSchemasString as i32
+            if (*prim).built_in_type != XmlSchemaValType::XmlSchemasAnySimpletype
+                && (*prim).built_in_type != XmlSchemaValType::XmlSchemasString
             {
                 (*typ).flags |= XML_SCHEMAS_TYPE_FACETSNEEDVALUE;
             }
@@ -11073,7 +11073,7 @@ unsafe fn xml_schema_check_attr_props_correct(
             // must not be a {value constraint}."
             if xml_schema_is_derived_from_built_in_type(
                 (*attr).subtypes,
-                XmlSchemaValType::XmlSchemasID as i32,
+                XmlSchemaValType::XmlSchemasID,
             ) != 0
             {
                 xml_schema_custom_err(
@@ -11174,7 +11174,7 @@ unsafe fn xml_schema_check_attr_use_props_correct(
             // SPEC a-props-correct (3)
             if xml_schema_is_derived_from_built_in_type(
                 WXS_ATTRUSE_TYPEDEF!(using),
-                XmlSchemaValType::XmlSchemasID as i32,
+                XmlSchemaValType::XmlSchemasID,
             ) != 0
             {
                 xml_schema_custom_err(
@@ -11325,7 +11325,7 @@ unsafe fn xml_schema_check_agprops_correct(
                 if !WXS_ATTRUSE_TYPEDEF!(using).is_null()
                     && xml_schema_is_derived_from_built_in_type(
                         WXS_ATTRUSE_TYPEDEF!(using),
-                        XmlSchemaValType::XmlSchemasID as i32,
+                        XmlSchemaValType::XmlSchemasID,
                     ) != 0
                 {
                     if has_id != 0 {
@@ -11745,13 +11745,13 @@ unsafe fn xml_schema_check_elem_props_correct(
             && ((wxs_is_simple(type_def)
                 && xml_schema_is_derived_from_built_in_type(
                     type_def,
-                    XmlSchemaValType::XmlSchemasID as i32,
+                    XmlSchemaValType::XmlSchemasID,
                 ) != 0)
                 || (wxs_is_complex(type_def)
                     && WXS_HAS_SIMPLE_CONTENT!(type_def)
                     && xml_schema_is_derived_from_built_in_type(
                         (*type_def).content_type_def,
-                        XmlSchemaValType::XmlSchemasID as i32,
+                        XmlSchemaValType::XmlSchemasID,
                     ) != 0))
         {
             ret = XmlParserErrors::XmlSchemapEPropsCorrect5 as i32;
@@ -14475,7 +14475,7 @@ unsafe fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
 
             let ptype: XmlSchemaTypePtr = (*pielem).type_def;
 
-            if (*ptype).built_in_type == XmlSchemaValType::XmlSchemasAnytype as i32 {
+            if (*ptype).built_in_type == XmlSchemaValType::XmlSchemasAnytype {
                 // Workaround for "anyType": we have currently no content model
                 // assigned for "anyType", so handle it explicitly.
                 // "anyType" has an unbounded, lax "any" wildcard.
@@ -16119,7 +16119,7 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                         (*iattr).type_def = (*((*iattr).decl)).subtypes;
                         if xml_schema_is_derived_from_built_in_type(
                             (*iattr).type_def,
-                            XmlSchemaValType::XmlSchemasID as i32,
+                            XmlSchemaValType::XmlSchemasID,
                         ) != 0
                         {
                             // SPEC (5.1) "There must be no more than one item in `wild IDs`."
@@ -16139,7 +16139,7 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                                 for j in 0..(*attr_use_list).items.len() {
                                     if xml_schema_is_derived_from_built_in_type(
                                         WXS_ATTRUSE_TYPEDEF!((*attr_use_list).items[j]),
-                                        XmlSchemaValType::XmlSchemasID as i32,
+                                        XmlSchemaValType::XmlSchemasID,
                                     ) != 0
                                     {
                                         // URGENT VAL TODO: implement
@@ -17742,7 +17742,7 @@ unsafe fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                         ) {
                             // Workaround for "anyType".
                             if (*(*inode).type_def).built_in_type
-                                == XmlSchemaValType::XmlSchemasAnytype as i32
+                                == XmlSchemaValType::XmlSchemasAnytype
                             {
                                 break 'character_content;
                             }

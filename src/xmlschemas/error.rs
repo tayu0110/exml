@@ -15,7 +15,7 @@ use crate::{
         schemas_internals::{
             XML_SCHEMAS_ANY_LAX, XML_SCHEMAS_ANY_SKIP, XML_SCHEMAS_ANY_STRICT,
             XML_SCHEMAS_ATTR_GLOBAL, XML_SCHEMAS_ELEM_GLOBAL, XML_SCHEMAS_TYPE_GLOBAL,
-            XmlSchemaFacetPtr, XmlSchemaTypeType, XmlSchemaWildcardPtr,
+            XmlSchemaFacetPtr, XmlSchemaTypeType, XmlSchemaValType, XmlSchemaWildcardPtr,
         },
         xmlschemas::{
             XML_SCHEMA_CTXT_PARSER, XML_SCHEMA_CTXT_VALIDATOR, XmlSchemaAbstractCtxtPtr,
@@ -1189,7 +1189,7 @@ pub(crate) unsafe fn xml_schema_simple_type_err(
 
         if xml_schema_is_global_item(typ) != 0 {
             msg.push_str(" '");
-            let mut str = if (*typ).built_in_type != 0 {
+            let mut str = if (*typ).built_in_type != XmlSchemaValType::XmlSchemasUnknown {
                 msg.push_str("xs:");
                 xml_strdup((*typ).name)
             } else {
@@ -1284,7 +1284,7 @@ pub(crate) unsafe fn xml_schema_psimple_type_err(
 
                 if xml_schema_is_global_item(typ) != 0 {
                     msg.push_str(" '");
-                    let mut str = if (*typ).built_in_type != 0 {
+                    let mut str = if (*typ).built_in_type != XmlSchemaValType::XmlSchemasUnknown {
                         msg.push_str("xs:");
                         xml_strdup((*typ).name)
                     } else {

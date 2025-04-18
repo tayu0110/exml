@@ -527,7 +527,7 @@ unsafe fn xml_schema_init_basic_type(
             XML_SCHEMAS_NAMESPACE_NAME.as_ptr() as _,
             ret as _,
         );
-        (*ret).built_in_type = typ as i32;
+        (*ret).built_in_type = typ;
         ret
     }
 }
@@ -1300,11 +1300,11 @@ unsafe fn xml_schema_val_atomic_type(
         }
         if flags == 0
             && !value.is_null()
-            && ((*typ).built_in_type != XmlSchemaValType::XmlSchemasString as i32
-                && (*typ).built_in_type != XmlSchemaValType::XmlSchemasAnytype as i32
-                && (*typ).built_in_type != XmlSchemaValType::XmlSchemasAnySimpletype as i32)
+            && ((*typ).built_in_type != XmlSchemaValType::XmlSchemasString
+                && (*typ).built_in_type != XmlSchemaValType::XmlSchemasAnytype
+                && (*typ).built_in_type != XmlSchemaValType::XmlSchemasAnySimpletype)
         {
-            if (*typ).built_in_type == XmlSchemaValType::XmlSchemasNormString as i32 {
+            if (*typ).built_in_type == XmlSchemaValType::XmlSchemasNormString {
                 norm = xml_schema_white_space_replace(
                     CStr::from_ptr(value as *const i8)
                         .to_string_lossy()
@@ -1330,7 +1330,7 @@ unsafe fn xml_schema_val_atomic_type(
                 'return1: {
                     'return3: {
                         'done: {
-                            match XmlSchemaValType::try_from((*typ).built_in_type).unwrap() {
+                            match (*typ).built_in_type {
                                 XmlSchemaValType::XmlSchemasUnknown => {
                                     break 'error;
                                 }
@@ -1583,7 +1583,7 @@ unsafe fn xml_schema_val_atomic_type(
                                 | XmlSchemaValType::XmlSchemasGYearMonth
                                 | XmlSchemaValType::XmlSchemasDate
                                 | XmlSchemaValType::XmlSchemasDatetime => {
-                                    ret = match validate_dates((*typ).built_in_type.try_into().unwrap(), &CStr::from_ptr(value as *const i8).to_string_lossy(), norm_on_the_fly != 0) {
+                                    ret = match validate_dates((*typ).built_in_type, &CStr::from_ptr(value as *const i8).to_string_lossy(), norm_on_the_fly != 0) {
                                         Some(crate::xmlschemastypes::XmlSchemaVal { typ, value: crate::xmlschemastypes::primitives::XmlSchemaValPrimitives::Date(date), ..}) => {
                                             if !val.is_null() {
                                                 *val = xml_schema_new_value(XmlSchemaValType::XmlSchemasUnknown);
@@ -2695,14 +2695,13 @@ unsafe fn xml_schema_val_atomic_type(
                                     if *cur != 0 {
                                         break 'return1;
                                     }
-                                    if (*typ).built_in_type
-                                        == XmlSchemaValType::XmlSchemasNPInteger as i32
+                                    if (*typ).built_in_type == XmlSchemaValType::XmlSchemasNPInteger
                                     {
                                         if sign == 0 && (hi != 0 || mi != 0 || lo != 0) {
                                             break 'return1;
                                         }
                                     } else if (*typ).built_in_type
-                                        == XmlSchemaValType::XmlSchemasPInteger as i32
+                                        == XmlSchemaValType::XmlSchemasPInteger
                                     {
                                         if sign == 1 {
                                             break 'return1;
@@ -2711,7 +2710,7 @@ unsafe fn xml_schema_val_atomic_type(
                                             break 'return1;
                                         }
                                     } else if (*typ).built_in_type
-                                        == XmlSchemaValType::XmlSchemasNInteger as i32
+                                        == XmlSchemaValType::XmlSchemasNInteger
                                     {
                                         if sign == 0 {
                                             break 'return1;
@@ -2720,15 +2719,13 @@ unsafe fn xml_schema_val_atomic_type(
                                             break 'return1;
                                         }
                                     } else if (*typ).built_in_type
-                                        == XmlSchemaValType::XmlSchemasNNInteger as i32
+                                        == XmlSchemaValType::XmlSchemasNNInteger
                                         && (sign == 1 && (hi != 0 || mi != 0 || lo != 0))
                                     {
                                         break 'return1;
                                     }
                                     if !val.is_null() {
-                                        v = xml_schema_new_value(
-                                            (*typ).built_in_type.try_into().unwrap(),
-                                        );
+                                        v = xml_schema_new_value((*typ).built_in_type);
                                         if !v.is_null() {
                                             if ret == 0 {
                                                 ret += 1;
@@ -2785,9 +2782,7 @@ unsafe fn xml_schema_val_atomic_type(
                                     if *cur != 0 {
                                         break 'return1;
                                     }
-                                    if (*typ).built_in_type
-                                        == XmlSchemaValType::XmlSchemasLong as i32
-                                    {
+                                    if (*typ).built_in_type == XmlSchemaValType::XmlSchemasLong {
                                         if hi >= 922 {
                                             if hi > 922 {
                                                 break 'return1;
@@ -2805,7 +2800,7 @@ unsafe fn xml_schema_val_atomic_type(
                                             }
                                         }
                                     } else if (*typ).built_in_type
-                                        == XmlSchemaValType::XmlSchemasInt as i32
+                                        == XmlSchemaValType::XmlSchemasInt
                                     {
                                         if hi != 0 {
                                             break 'return1;
@@ -2822,7 +2817,7 @@ unsafe fn xml_schema_val_atomic_type(
                                             }
                                         }
                                     } else if (*typ).built_in_type
-                                        == XmlSchemaValType::XmlSchemasShort as i32
+                                        == XmlSchemaValType::XmlSchemasShort
                                     {
                                         if mi != 0 || hi != 0 {
                                             break 'return1;
@@ -2834,7 +2829,7 @@ unsafe fn xml_schema_val_atomic_type(
                                             break 'return1;
                                         }
                                     } else if (*typ).built_in_type
-                                        == XmlSchemaValType::XmlSchemasByte as i32
+                                        == XmlSchemaValType::XmlSchemasByte
                                     {
                                         if mi != 0 || hi != 0 {
                                             break 'return1;
@@ -2847,9 +2842,7 @@ unsafe fn xml_schema_val_atomic_type(
                                         }
                                     }
                                     if !val.is_null() {
-                                        v = xml_schema_new_value(
-                                            (*typ).built_in_type.try_into().unwrap(),
-                                        );
+                                        v = xml_schema_new_value((*typ).built_in_type);
                                         if !v.is_null() {
                                             (*v).value.decimal.lo = lo;
                                             (*v).value.decimal.mi = mi;
@@ -2896,9 +2889,7 @@ unsafe fn xml_schema_val_atomic_type(
                                     if *cur != 0 {
                                         break 'return1;
                                     }
-                                    if (*typ).built_in_type
-                                        == XmlSchemaValType::XmlSchemasULong as i32
-                                    {
+                                    if (*typ).built_in_type == XmlSchemaValType::XmlSchemasULong {
                                         if hi >= 1844 {
                                             if hi > 1844 {
                                                 break 'return1;
@@ -2913,7 +2904,7 @@ unsafe fn xml_schema_val_atomic_type(
                                             }
                                         }
                                     } else if (*typ).built_in_type
-                                        == XmlSchemaValType::XmlSchemasUInt as i32
+                                        == XmlSchemaValType::XmlSchemasUInt
                                     {
                                         if hi != 0 {
                                             break 'return1;
@@ -2927,7 +2918,7 @@ unsafe fn xml_schema_val_atomic_type(
                                             }
                                         }
                                     } else if (*typ).built_in_type
-                                        == XmlSchemaValType::XmlSchemasUShort as i32
+                                        == XmlSchemaValType::XmlSchemasUShort
                                     {
                                         if mi != 0 || hi != 0 {
                                             break 'return1;
@@ -2936,7 +2927,7 @@ unsafe fn xml_schema_val_atomic_type(
                                             break 'return1;
                                         }
                                     } else if (*typ).built_in_type
-                                        == XmlSchemaValType::XmlSchemasUByte as i32
+                                        == XmlSchemaValType::XmlSchemasUByte
                                     {
                                         if mi != 0 || hi != 0 {
                                             break 'return1;
@@ -2946,9 +2937,7 @@ unsafe fn xml_schema_val_atomic_type(
                                         }
                                     }
                                     if !val.is_null() {
-                                        v = xml_schema_new_value(
-                                            (*typ).built_in_type.try_into().unwrap(),
-                                        );
+                                        v = xml_schema_new_value((*typ).built_in_type);
                                         if !v.is_null() {
                                             (*v).value.decimal.lo = lo;
                                             (*v).value.decimal.mi = mi;
@@ -4920,7 +4909,7 @@ pub unsafe fn xml_schema_validate_facet(
             return xml_schema_validate_facet_internal(
                 facet,
                 XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceUnknown,
-                (*base).built_in_type.try_into().unwrap(),
+                (*base).built_in_type,
                 value,
                 val,
                 XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceUnknown,
@@ -5362,10 +5351,10 @@ pub unsafe fn xml_schema_get_built_in_list_simple_type_item_type(
         if typ.is_null() || (*typ).typ != XmlSchemaTypeType::XmlSchemaTypeBasic {
             return null_mut();
         }
-        match XmlSchemaValType::try_from((*typ).built_in_type) {
-            Ok(XmlSchemaValType::XmlSchemasNmtokens) => XML_SCHEMA_TYPE_NMTOKEN_DEF.get(),
-            Ok(XmlSchemaValType::XmlSchemasIDREFS) => XML_SCHEMA_TYPE_IDREF_DEF.get(),
-            Ok(XmlSchemaValType::XmlSchemasEntities) => XML_SCHEMA_TYPE_ENTITY_DEF.get(),
+        match (*typ).built_in_type {
+            XmlSchemaValType::XmlSchemasNmtokens => XML_SCHEMA_TYPE_NMTOKEN_DEF.get(),
+            XmlSchemaValType::XmlSchemasIDREFS => XML_SCHEMA_TYPE_IDREF_DEF.get(),
+            XmlSchemaValType::XmlSchemasEntities => XML_SCHEMA_TYPE_ENTITY_DEF.get(),
             _ => null_mut(),
         }
     }
@@ -5495,8 +5484,8 @@ pub unsafe fn xml_schema_is_built_in_type_facet(typ: XmlSchemaTypePtr, facet_typ
         if (*typ).typ != XmlSchemaTypeType::XmlSchemaTypeBasic {
             return -1;
         }
-        match XmlSchemaValType::try_from((*typ).built_in_type) {
-            Ok(XmlSchemaValType::XmlSchemasBoolean) => {
+        match (*typ).built_in_type {
+            XmlSchemaValType::XmlSchemasBoolean => {
                 if facet_type == XmlSchemaTypeType::XmlSchemaFacetPattern as i32
                     || facet_type == XmlSchemaTypeType::XmlSchemaFacetWhitespace as i32
                 {
@@ -5505,12 +5494,12 @@ pub unsafe fn xml_schema_is_built_in_type_facet(typ: XmlSchemaTypePtr, facet_typ
                     return 0;
                 }
             }
-            Ok(XmlSchemaValType::XmlSchemasString)
-            | Ok(XmlSchemaValType::XmlSchemasNotation)
-            | Ok(XmlSchemaValType::XmlSchemasQName)
-            | Ok(XmlSchemaValType::XmlSchemasAnyURI)
-            | Ok(XmlSchemaValType::XmlSchemasBase64binary)
-            | Ok(XmlSchemaValType::XmlSchemasHexbinary) => {
+            XmlSchemaValType::XmlSchemasString
+            | XmlSchemaValType::XmlSchemasNotation
+            | XmlSchemaValType::XmlSchemasQName
+            | XmlSchemaValType::XmlSchemasAnyURI
+            | XmlSchemaValType::XmlSchemasBase64binary
+            | XmlSchemaValType::XmlSchemasHexbinary => {
                 if facet_type == XmlSchemaTypeType::XmlSchemaFacetLength as i32
                     || facet_type == XmlSchemaTypeType::XmlSchemaFacetMinLength as i32
                     || facet_type == XmlSchemaTypeType::XmlSchemaFacetMaxLength as i32
@@ -5523,7 +5512,7 @@ pub unsafe fn xml_schema_is_built_in_type_facet(typ: XmlSchemaTypePtr, facet_typ
                     return 0;
                 }
             }
-            Ok(XmlSchemaValType::XmlSchemasDecimal) => {
+            XmlSchemaValType::XmlSchemasDecimal => {
                 if facet_type == XmlSchemaTypeType::XmlSchemaFacetTotalDigits as i32
                     || facet_type == XmlSchemaTypeType::XmlSchemaFacetFractionDigits as i32
                     || facet_type == XmlSchemaTypeType::XmlSchemaFacetPattern as i32
@@ -5539,17 +5528,17 @@ pub unsafe fn xml_schema_is_built_in_type_facet(typ: XmlSchemaTypePtr, facet_typ
                     return 0;
                 }
             }
-            Ok(XmlSchemaValType::XmlSchemasTime)
-            | Ok(XmlSchemaValType::XmlSchemasGDay)
-            | Ok(XmlSchemaValType::XmlSchemasGMonth)
-            | Ok(XmlSchemaValType::XmlSchemasGMonthDay)
-            | Ok(XmlSchemaValType::XmlSchemasGYear)
-            | Ok(XmlSchemaValType::XmlSchemasGYearMonth)
-            | Ok(XmlSchemaValType::XmlSchemasDate)
-            | Ok(XmlSchemaValType::XmlSchemasDatetime)
-            | Ok(XmlSchemaValType::XmlSchemasDuration)
-            | Ok(XmlSchemaValType::XmlSchemasFloat)
-            | Ok(XmlSchemaValType::XmlSchemasDouble) => {
+            XmlSchemaValType::XmlSchemasTime
+            | XmlSchemaValType::XmlSchemasGDay
+            | XmlSchemaValType::XmlSchemasGMonth
+            | XmlSchemaValType::XmlSchemasGMonthDay
+            | XmlSchemaValType::XmlSchemasGYear
+            | XmlSchemaValType::XmlSchemasGYearMonth
+            | XmlSchemaValType::XmlSchemasDate
+            | XmlSchemaValType::XmlSchemasDatetime
+            | XmlSchemaValType::XmlSchemasDuration
+            | XmlSchemaValType::XmlSchemasFloat
+            | XmlSchemaValType::XmlSchemasDouble => {
                 if facet_type == XmlSchemaTypeType::XmlSchemaFacetPattern as i32
                     || facet_type == XmlSchemaTypeType::XmlSchemaFacetEnumeration as i32
                     || facet_type == XmlSchemaTypeType::XmlSchemaFacetWhitespace as i32
@@ -5711,7 +5700,7 @@ pub unsafe fn xml_schema_validate_length_facet(
         }
         xml_schema_validate_length_facet_internal(
             facet,
-            (*typ).built_in_type.try_into().unwrap(),
+            (*typ).built_in_type,
             value,
             val,
             length,

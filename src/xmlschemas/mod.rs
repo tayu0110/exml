@@ -53,7 +53,7 @@ pub(crate) fn is_schema(node: Option<XmlNodePtr>, r#type: &str) -> bool {
 pub(crate) unsafe fn wxs_is_anytype(r#type: *mut XmlSchemaType) -> bool {
     unsafe {
         (*r#type).typ == XmlSchemaTypeType::XmlSchemaTypeBasic
-            && (*r#type).built_in_type == XmlSchemaValType::XmlSchemasAnytype as i32
+            && (*r#type).built_in_type == XmlSchemaValType::XmlSchemasAnytype
     }
 }
 
@@ -61,20 +61,20 @@ pub(crate) unsafe fn wxs_is_simple(r#type: *mut XmlSchemaType) -> bool {
     unsafe {
         (*r#type).typ == XmlSchemaTypeType::XmlSchemaTypeSimple
             || ((*r#type).typ == XmlSchemaTypeType::XmlSchemaTypeBasic
-                && (*r#type).built_in_type != XmlSchemaValType::XmlSchemasAnytype as i32)
+                && (*r#type).built_in_type != XmlSchemaValType::XmlSchemasAnytype)
     }
 }
 
 pub(crate) unsafe fn wxs_is_complex(r#type: *mut XmlSchemaType) -> bool {
     unsafe {
         (*r#type).typ == XmlSchemaTypeType::XmlSchemaTypeComplex
-            || (*r#type).built_in_type == XmlSchemaValType::XmlSchemasAnytype as i32
+            || (*r#type).built_in_type == XmlSchemaValType::XmlSchemasAnytype
     }
 }
 
 pub(crate) unsafe fn wxs_is_any_simple_type(r#type: *mut XmlSchemaType) -> bool {
     unsafe {
         (*r#type).typ == XmlSchemaTypeType::XmlSchemaTypeBasic
-            && (*r#type).built_in_type == XmlSchemaValType::XmlSchemasAnySimpletype as i32
+            && (*r#type).built_in_type == XmlSchemaValType::XmlSchemasAnySimpletype
     }
 }

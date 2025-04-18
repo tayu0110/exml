@@ -631,11 +631,11 @@ pub struct XmlSchemaType {
     pub(crate) facets: XmlSchemaFacetPtr,   /* Local facets */
     pub(crate) recurse: i32,                /* Obsolete */
     pub(crate) attribute_wildcard: XmlSchemaWildcardPtr,
-    pub(crate) built_in_type: i32, /* Type of built-in types. */
+    pub(crate) built_in_type: XmlSchemaValType, /* Type of built-in types. */
     pub(crate) member_types: XmlSchemaTypeLinkPtr, /* member-types if a union type. */
     pub(crate) facet_set: XmlSchemaFacetLinkPtr, /* All facets (incl. inherited) */
     pub(crate) content_type_def: XmlSchemaTypePtr, /* Used for the simple content of complex types.
-                                   Could we use @subtypes for this? */
+                                                Could we use @subtypes for this? */
     pub(crate) cont_model: Option<Rc<XmlRegexp>>, /* Holds the automaton of the content model */
     pub(crate) target_namespace: *const u8,
     pub(crate) attr_uses: *mut c_void,
@@ -668,11 +668,11 @@ impl XmlSchemaType {
         // from xsd:string.
         if self.typ == XmlSchemaTypeType::XmlSchemaTypeBasic {
             // Note that we assume a whitespace of preserve for anySimpleType.
-            if self.built_in_type == XmlSchemaValType::XmlSchemasString as i32
-                || self.built_in_type == XmlSchemaValType::XmlSchemasAnySimpletype as i32
+            if self.built_in_type == XmlSchemaValType::XmlSchemasString
+                || self.built_in_type == XmlSchemaValType::XmlSchemasAnySimpletype
             {
                 Some(XmlSchemaWhitespaceValueType::XmlSchemaWhitespacePreserve)
-            } else if self.built_in_type == XmlSchemaValType::XmlSchemasNormString as i32 {
+            } else if self.built_in_type == XmlSchemaValType::XmlSchemasNormString {
                 Some(XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceReplace)
             } else {
                 // For all `atomic` datatypes other than string (and types `derived`

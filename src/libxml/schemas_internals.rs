@@ -20,7 +20,7 @@
 //
 // Daniel Veillard <veillard@redhat.com>
 
-use std::{any::type_name, ffi::c_void, ptr::drop_in_place, rc::Rc};
+use std::{ffi::c_void, ptr::drop_in_place, rc::Rc};
 
 #[cfg(feature = "libxml_regexp")]
 use crate::libxml::xmlregexp::XmlRegexp;
@@ -87,118 +87,6 @@ pub enum XmlSchemaValType {
     XmlSchemasBase64binary = 44,
     XmlSchemasAnytype = 45,
     XmlSchemasAnySimpletype = 46,
-}
-
-impl PartialEq<i32> for XmlSchemaValType {
-    fn eq(&self, other: &i32) -> bool {
-        *self as i32 == *other
-    }
-}
-
-impl TryFrom<i32> for XmlSchemaValType {
-    type Error = anyhow::Error;
-    fn try_from(value: i32) -> Result<Self, Self::Error> {
-        if value == Self::XmlSchemasUnknown as i32 {
-            Ok(Self::XmlSchemasUnknown)
-        } else if value == Self::XmlSchemasString as i32 {
-            Ok(Self::XmlSchemasString)
-        } else if value == Self::XmlSchemasNormString as i32 {
-            Ok(Self::XmlSchemasNormString)
-        } else if value == Self::XmlSchemasDecimal as i32 {
-            Ok(Self::XmlSchemasDecimal)
-        } else if value == Self::XmlSchemasTime as i32 {
-            Ok(Self::XmlSchemasTime)
-        } else if value == Self::XmlSchemasGDay as i32 {
-            Ok(Self::XmlSchemasGDay)
-        } else if value == Self::XmlSchemasGMonth as i32 {
-            Ok(Self::XmlSchemasGMonth)
-        } else if value == Self::XmlSchemasGMonthDay as i32 {
-            Ok(Self::XmlSchemasGMonthDay)
-        } else if value == Self::XmlSchemasGYear as i32 {
-            Ok(Self::XmlSchemasGYear)
-        } else if value == Self::XmlSchemasGYearMonth as i32 {
-            Ok(Self::XmlSchemasGYearMonth)
-        } else if value == Self::XmlSchemasDate as i32 {
-            Ok(Self::XmlSchemasDate)
-        } else if value == Self::XmlSchemasDatetime as i32 {
-            Ok(Self::XmlSchemasDatetime)
-        } else if value == Self::XmlSchemasDuration as i32 {
-            Ok(Self::XmlSchemasDuration)
-        } else if value == Self::XmlSchemasFloat as i32 {
-            Ok(Self::XmlSchemasFloat)
-        } else if value == Self::XmlSchemasDouble as i32 {
-            Ok(Self::XmlSchemasDouble)
-        } else if value == Self::XmlSchemasBoolean as i32 {
-            Ok(Self::XmlSchemasBoolean)
-        } else if value == Self::XmlSchemasToken as i32 {
-            Ok(Self::XmlSchemasToken)
-        } else if value == Self::XmlSchemasLanguage as i32 {
-            Ok(Self::XmlSchemasLanguage)
-        } else if value == Self::XmlSchemasNmtoken as i32 {
-            Ok(Self::XmlSchemasNmtoken)
-        } else if value == Self::XmlSchemasNmtokens as i32 {
-            Ok(Self::XmlSchemasNmtokens)
-        } else if value == Self::XmlSchemasName as i32 {
-            Ok(Self::XmlSchemasName)
-        } else if value == Self::XmlSchemasQName as i32 {
-            Ok(Self::XmlSchemasQName)
-        } else if value == Self::XmlSchemasNCName as i32 {
-            Ok(Self::XmlSchemasNCName)
-        } else if value == Self::XmlSchemasID as i32 {
-            Ok(Self::XmlSchemasID)
-        } else if value == Self::XmlSchemasIDREF as i32 {
-            Ok(Self::XmlSchemasIDREF)
-        } else if value == Self::XmlSchemasIDREFS as i32 {
-            Ok(Self::XmlSchemasIDREFS)
-        } else if value == Self::XmlSchemasEntity as i32 {
-            Ok(Self::XmlSchemasEntity)
-        } else if value == Self::XmlSchemasEntities as i32 {
-            Ok(Self::XmlSchemasEntities)
-        } else if value == Self::XmlSchemasNotation as i32 {
-            Ok(Self::XmlSchemasNotation)
-        } else if value == Self::XmlSchemasAnyURI as i32 {
-            Ok(Self::XmlSchemasAnyURI)
-        } else if value == Self::XmlSchemasInteger as i32 {
-            Ok(Self::XmlSchemasInteger)
-        } else if value == Self::XmlSchemasNPInteger as i32 {
-            Ok(Self::XmlSchemasNPInteger)
-        } else if value == Self::XmlSchemasNInteger as i32 {
-            Ok(Self::XmlSchemasNInteger)
-        } else if value == Self::XmlSchemasNNInteger as i32 {
-            Ok(Self::XmlSchemasNNInteger)
-        } else if value == Self::XmlSchemasPInteger as i32 {
-            Ok(Self::XmlSchemasPInteger)
-        } else if value == Self::XmlSchemasInt as i32 {
-            Ok(Self::XmlSchemasInt)
-        } else if value == Self::XmlSchemasUInt as i32 {
-            Ok(Self::XmlSchemasUInt)
-        } else if value == Self::XmlSchemasLong as i32 {
-            Ok(Self::XmlSchemasLong)
-        } else if value == Self::XmlSchemasULong as i32 {
-            Ok(Self::XmlSchemasULong)
-        } else if value == Self::XmlSchemasShort as i32 {
-            Ok(Self::XmlSchemasShort)
-        } else if value == Self::XmlSchemasUShort as i32 {
-            Ok(Self::XmlSchemasUShort)
-        } else if value == Self::XmlSchemasByte as i32 {
-            Ok(Self::XmlSchemasByte)
-        } else if value == Self::XmlSchemasUByte as i32 {
-            Ok(Self::XmlSchemasUByte)
-        } else if value == Self::XmlSchemasHexbinary as i32 {
-            Ok(Self::XmlSchemasHexbinary)
-        } else if value == Self::XmlSchemasBase64binary as i32 {
-            Ok(Self::XmlSchemasBase64binary)
-        } else if value == Self::XmlSchemasAnytype as i32 {
-            Ok(Self::XmlSchemasAnytype)
-        } else if value == Self::XmlSchemasAnySimpletype as i32 {
-            Ok(Self::XmlSchemasAnySimpletype)
-        } else {
-            Err(anyhow::anyhow!(
-                "Invalid convert from value '{value}' to {}",
-                type_name::<Self>()
-            ))
-        }
-    }
 }
 
 /// XML Schemas defines multiple type of types.
