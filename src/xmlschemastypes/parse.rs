@@ -1,6 +1,6 @@
 use std::{fmt::Debug, str::FromStr};
 
-use crate::libxml::schemas_internals::XmlSchemaValType;
+use crate::libxml::{chvalid::xml_is_blank_char, schemas_internals::XmlSchemaValType};
 
 use super::{
     XmlSchemaVal, XmlSchemaValPrimitives, is_wsp_blank_ch,
@@ -654,6 +654,37 @@ pub(crate) fn check_language_type(value: &str) -> bool {
     tokens.all(|token| {
         (1..9).contains(&token.len()) && token.bytes().all(|b| b.is_ascii_alphanumeric())
     })
+}
+
+/// Removes the leading and ending spaces of a string
+///
+/// Returns the stripped string or `None` if no change was required.
+#[doc(alias = "xmlSchemaStrip")]
+fn xml_schema_strip(value: &str) -> Option<&str> {
+    let stripped = value.trim_matches(|c: char| xml_is_blank_char(c as u32));
+    (value.len() != stripped.len()).then_some(stripped)
+}
+
+/// Converts a base64 encoded character to its base 64 value.
+///
+/// Returns 0-63 (value), 64 (pad), or -1 (not recognized)
+#[doc(alias = "_xmlSchemaBase64Decode")]
+fn base64_decode(ch: u8) -> Option<u8> {
+    if ch.is_ascii_uppercase() {
+        Some(ch - b'A')
+    } else if ch.is_ascii_lowercase() {
+        Some(ch - b'a' + 26)
+    } else if ch.is_ascii_digit() {
+        Some(ch - b'0' + 52)
+    } else if b'+' == ch {
+        Some(62)
+    } else if b'/' == ch {
+        Some(63)
+    } else if b'=' == ch {
+        Some(64)
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
