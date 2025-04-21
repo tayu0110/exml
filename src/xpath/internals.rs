@@ -2852,91 +2852,80 @@ pub(super) const MAX_FRAC: usize = 20;
 ///
 /// Returns the let value: f64.
 #[doc(alias = "xmlXPathStringEvalNumber")]
-pub unsafe fn xml_xpath_string_eval_number(str: *const XmlChar) -> f64 {
-    unsafe {
-        let mut cur: *const XmlChar = str;
-        let mut ret: f64;
-        let mut ok: i32 = 0;
-        let mut isneg: i32 = 0;
-        let mut exponent: i32 = 0;
-        let mut is_exponent_negative: i32 = 0;
-        if cur.is_null() {
-            return 0.;
-        }
-        while xml_is_blank_char(*cur as u32) {
-            cur = cur.add(1);
-        }
-        if *cur == b'-' {
-            isneg = 1;
-            cur = cur.add(1);
-        }
-        if *cur != b'.' && (*cur < b'0' || *cur > b'9') {
-            return XML_XPATH_NAN;
-        }
-
-        ret = 0.0;
-        while *cur >= b'0' && *cur <= b'9' {
-            ret = ret * 10. + (*cur - b'0') as f64;
-            ok = 1;
-            cur = cur.add(1);
-        }
-
-        if *cur == b'.' {
-            let mut v: i32;
-            let mut frac: i32 = 0;
-            let mut fraction: f64 = 0.0;
-
-            cur = cur.add(1);
-            if (*cur < b'0' || *cur > b'9') && ok == 0 {
-                return XML_XPATH_NAN;
-            }
-            while *cur == b'0' {
-                frac += 1;
-                cur = cur.add(1);
-            }
-            let max: i32 = frac + MAX_FRAC as i32;
-            while *cur >= b'0' && *cur <= b'9' && frac < max {
-                v = (*cur - b'0') as _;
-                fraction = fraction * 10. + v as f64;
-                frac += 1;
-                cur = cur.add(1);
-            }
-            fraction /= 10.0f64.powi(frac);
-            ret += fraction;
-            while *cur >= b'0' && *cur <= b'9' {
-                cur = cur.add(1);
-            }
-        }
-        if *cur == b'e' || *cur == b'E' {
-            cur = cur.add(1);
-            if *cur == b'-' {
-                is_exponent_negative = 1;
-                cur = cur.add(1);
-            } else if *cur == b'+' {
-                cur = cur.add(1);
-            }
-            while *cur >= b'0' && *cur <= b'9' {
-                if exponent < 1000000 {
-                    exponent = exponent * 10 + (*cur - b'0') as i32;
-                }
-                cur = cur.add(1);
-            }
-        }
-        while xml_is_blank_char(*cur as u32) {
-            cur = cur.add(1);
-        }
-        if *cur != 0 {
-            return XML_XPATH_NAN;
-        }
-        if isneg != 0 {
-            ret = -ret;
-        }
-        if is_exponent_negative != 0 {
-            exponent = -exponent;
-        }
-        ret *= 10.0f64.powi(exponent);
-        ret
+pub fn xml_xpath_string_eval_number(s: Option<&str>) -> f64 {
+    let Some(s) = s else {
+        return 0.0;
+    };
+    let mut ok = false;
+    let mut isneg = false;
+    let mut exponent = 0;
+    let mut cur = s.trim_matches(|c: char| xml_is_blank_char(c as u32));
+    if let Some(rem) = cur.strip_prefix('-') {
+        isneg = true;
+        cur = rem;
     }
+    if !cur.starts_with(|c: char| c == '.' || c.is_ascii_digit()) {
+        return XML_XPATH_NAN;
+    }
+
+    let mut ret = 0.0;
+    while let Some(b) = cur.as_bytes().first().copied().filter(u8::is_ascii_digit) {
+        ret = ret * 10. + (b - b'0') as f64;
+        cur = &cur[1..];
+        ok = true;
+    }
+
+    if let Some(rem) = cur.strip_prefix('.') {
+        if !ok && !cur.starts_with(|c: char| c.is_ascii_digit()) {
+            return XML_XPATH_NAN;
+        }
+
+        cur = rem.trim_start_matches('0');
+        let mut frac = rem.len() - cur.len();
+        let max = frac + MAX_FRAC;
+        let mut fraction = 0.0;
+        while let Some(b) = cur
+            .as_bytes()
+            .first()
+            .filter(|b| b.is_ascii_digit() && frac < max)
+        {
+            fraction = fraction * 10. + (b - b'0') as f64;
+            frac += 1;
+            cur = &cur[1..];
+        }
+        fraction /= 10.0f64.powi(frac as i32);
+        ret += fraction;
+        cur = cur.trim_start_matches(|c: char| c.is_ascii_digit());
+    }
+
+    let mut is_exponent_negative = false;
+    if let Some(rem) = cur.strip_prefix(['e', 'E']) {
+        if let Some(rem) = rem.strip_prefix('-') {
+            is_exponent_negative = true;
+            cur = rem;
+        } else {
+            cur = rem.strip_prefix('+').unwrap_or(rem);
+        }
+        while let Some(b) = cur
+            .as_bytes()
+            .first()
+            .filter(|b| b.is_ascii_digit() && exponent < 1000000)
+        {
+            exponent = exponent * 10 + (b - b'0') as i32;
+            cur = &cur[1..];
+        }
+        cur = cur.trim_start_matches(|c: char| c.is_ascii_digit());
+    }
+    if !cur.is_empty() {
+        return XML_XPATH_NAN;
+    }
+    if isneg {
+        ret = -ret;
+    }
+    if is_exponent_negative {
+        exponent = -exponent;
+    }
+    ret * 10.0f64.powi(exponent)
 }
 
 /// Evaluate a predicate result for the current node.

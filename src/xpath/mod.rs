@@ -467,8 +467,8 @@ pub fn xml_xpath_cast_boolean_to_number(val: bool) -> f64 {
 /// Returns the number value
 #[doc(alias = "xmlXPathCastStringToNumber")]
 #[cfg(feature = "xpath")]
-pub unsafe fn xml_xpath_cast_string_to_number(val: *const XmlChar) -> f64 {
-    unsafe { xml_xpath_string_eval_number(val) }
+pub fn xml_xpath_cast_string_to_number(val: Option<&str>) -> f64 {
+    xml_xpath_string_eval_number(val)
 }
 
 /// Converts a node to its number value
@@ -476,19 +476,14 @@ pub unsafe fn xml_xpath_cast_string_to_number(val: *const XmlChar) -> f64 {
 /// Returns the number value
 #[doc(alias = "xmlXPathCastNodeToNumber")]
 #[cfg(feature = "xpath")]
-pub unsafe fn xml_xpath_cast_node_to_number(node: Option<XmlGenericNodePtr>) -> f64 {
-    unsafe {
-        use std::ffi::CString;
-
-        if node.is_none() {
-            return XML_XPATH_NAN;
-        }
-        let strval = xml_xpath_cast_node_to_string(node);
-        let strval = CString::new(strval).unwrap();
-        let ret: f64 = xml_xpath_cast_string_to_number(strval.as_ptr() as *const u8);
-
-        ret
+pub fn xml_xpath_cast_node_to_number(node: Option<XmlGenericNodePtr>) -> f64 {
+    if node.is_none() {
+        return XML_XPATH_NAN;
     }
+    let strval = xml_xpath_cast_node_to_string(node);
+    let ret: f64 = xml_xpath_cast_string_to_number(Some(&strval));
+
+    ret
 }
 
 /// Converts a node-set to its number value
@@ -498,13 +493,11 @@ pub unsafe fn xml_xpath_cast_node_to_number(node: Option<XmlGenericNodePtr>) -> 
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_xpath_cast_node_set_to_number(ns: Option<&mut XmlNodeSet>) -> f64 {
     unsafe {
-        use std::ffi::CString;
-
         let Some(ns) = ns else {
             return XML_XPATH_NAN;
         };
-        let str = CString::new(xml_xpath_cast_node_set_to_string(Some(ns)).as_ref()).unwrap();
-        let ret: f64 = xml_xpath_cast_string_to_number(str.as_ptr() as *const u8);
+        let s = xml_xpath_cast_node_set_to_string(Some(ns));
+        let ret: f64 = xml_xpath_cast_string_to_number(Some(&s));
         ret
     }
 }
@@ -1652,36 +1645,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_xpath_cast_string_to_number() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_val in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                let mem_base = xml_mem_blocks();
-                let val = gen_const_xml_char_ptr(n_val, 0);
-
-                let ret_val = xml_xpath_cast_string_to_number(val as *const XmlChar);
-                desret_double(ret_val);
-                des_const_xml_char_ptr(n_val, val, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathCastStringToNumber",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlXPathCastStringToNumber()"
-                    );
-                    eprintln!(" {}", n_val);
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_xpath_cast_to_boolean() {
         #[cfg(feature = "xpath")]
         unsafe {
@@ -2729,36 +2692,6 @@ mod tests {
                     );
                     assert!(leaks == 0, "{leaks} Leaks are found in xmlXPathRoot()");
                     eprintln!(" {}", n_ctxt);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_string_eval_number() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_str in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                let mem_base = xml_mem_blocks();
-                let str = gen_const_xml_char_ptr(n_str, 0);
-
-                let ret_val = xml_xpath_string_eval_number(str as *const XmlChar);
-                desret_double(ret_val);
-                des_const_xml_char_ptr(n_str, str, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathStringEvalNumber",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlXPathStringEvalNumber()"
-                    );
-                    eprintln!(" {}", n_str);
                 }
             }
         }

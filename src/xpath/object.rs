@@ -1,8 +1,4 @@
-use std::{
-    borrow::Cow,
-    ffi::{CString, c_void},
-    ptr::null_mut,
-};
+use std::{borrow::Cow, ffi::c_void, ptr::null_mut};
 
 #[cfg(feature = "libxml_xptr_locs")]
 use crate::libxml::xpointer::{
@@ -416,15 +412,8 @@ pub unsafe fn xml_xpath_cast_to_number(val: XmlXPathObjectPtr) -> f64 {
                 xml_xpath_cast_node_set_to_number((*val).nodesetval.as_deref_mut())
             }
             XmlXPathObjectType::XPathString => {
-                let strval = (*val)
-                    .stringval
-                    .as_deref()
-                    .map(|s| CString::new(s).unwrap());
-                xml_xpath_cast_string_to_number(
-                    strval
-                        .as_deref()
-                        .map_or(null_mut(), |s| s.as_ptr() as *const u8),
-                )
+                let strval = (*val).stringval.as_deref();
+                xml_xpath_cast_string_to_number(strval)
             }
             XmlXPathObjectType::XPathNumber => (*val).floatval,
             XmlXPathObjectType::XPathBoolean => xml_xpath_cast_boolean_to_number((*val).boolval),

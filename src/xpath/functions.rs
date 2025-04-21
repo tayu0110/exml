@@ -765,11 +765,8 @@ pub unsafe fn xml_xpath_number_function(ctxt: &mut XmlXPathParserContext, nargs:
 
         if nargs == 0 {
             if let Some(context_node) = (*ctxt.context).node {
-                let content = context_node.get_content().map(|c| CString::new(c).unwrap());
-                let content = content
-                    .as_ref()
-                    .map_or(null_mut(), |c| c.as_ptr() as *mut u8);
-                res = xml_xpath_string_eval_number(content);
+                let content = context_node.get_content();
+                res = xml_xpath_string_eval_number(content.as_deref());
                 ctxt.value_push(xml_xpath_cache_new_float(ctxt.context, res));
             } else {
                 ctxt.value_push(xml_xpath_cache_new_float(ctxt.context, 0.0));
