@@ -9,12 +9,14 @@ use crate::{
     libxml::{
         globals::xml_free,
         schemas_internals::{
+            XML_SCHEMAS_ATTR_GLOBAL, XML_SCHEMAS_ELEM_GLOBAL,
             XML_SCHEMAS_TYPE_DERIVATION_METHOD_EXTENSION,
-            XML_SCHEMAS_TYPE_DERIVATION_METHOD_RESTRICTION, XML_SCHEMAS_TYPE_VARIETY_ATOMIC,
-            XML_SCHEMAS_TYPE_VARIETY_LIST, XML_SCHEMAS_TYPE_VARIETY_UNION,
-            XML_SCHEMAS_TYPE_WHITESPACE_PRESERVE, XML_SCHEMAS_TYPE_WHITESPACE_REPLACE,
-            XmlSchemaAnnotPtr, XmlSchemaContentType, XmlSchemaFacetLinkPtr, XmlSchemaFacetPtr,
-            XmlSchemaTypeLinkPtr, XmlSchemaTypeType, XmlSchemaValType, XmlSchemaWildcardPtr,
+            XML_SCHEMAS_TYPE_DERIVATION_METHOD_RESTRICTION, XML_SCHEMAS_TYPE_GLOBAL,
+            XML_SCHEMAS_TYPE_VARIETY_ATOMIC, XML_SCHEMAS_TYPE_VARIETY_LIST,
+            XML_SCHEMAS_TYPE_VARIETY_UNION, XML_SCHEMAS_TYPE_WHITESPACE_PRESERVE,
+            XML_SCHEMAS_TYPE_WHITESPACE_REPLACE, XmlSchemaAnnotPtr, XmlSchemaContentType,
+            XmlSchemaFacetLinkPtr, XmlSchemaFacetPtr, XmlSchemaTypeLinkPtr, XmlSchemaTypeType,
+            XmlSchemaValType, XmlSchemaWildcardPtr,
         },
         xmlregexp::XmlRegexp,
         xmlschemas::XmlSchemaIdcselectPtr,
@@ -560,6 +562,16 @@ pub struct XmlSchemaElement {
     pub(crate) idcs: *mut c_void,        /* The identity-constraint defs */
 }
 
+impl XmlSchemaElement {
+    pub(crate) fn is_global_item(&self) -> bool {
+        match self.typ {
+            XmlSchemaTypeType::XmlSchemaTypeElement => self.flags & XML_SCHEMAS_ELEM_GLOBAL != 0,
+            // Note that attribute groups are always global.
+            _ => true,
+        }
+    }
+}
+
 impl_xml_schema_item! {
     type: XmlSchemaElement,
     @expected: XmlSchemaTypeType::XmlSchemaTypeElement
@@ -583,6 +595,16 @@ pub struct XmlSchemaAttribute {
     pub(crate) target_namespace: *const u8,
     pub(crate) flags: i32,
     pub(crate) def_val: XmlSchemaValPtr, /* The compiled value constraint */
+}
+
+impl XmlSchemaAttribute {
+    pub(crate) fn is_global_item(&self) -> bool {
+        match self.typ {
+            XmlSchemaTypeType::XmlSchemaTypeAttribute => self.flags & XML_SCHEMAS_ATTR_GLOBAL != 0,
+            // Note that attribute groups are always global.
+            _ => true,
+        }
+    }
 }
 
 impl_xml_schema_item! {
@@ -660,6 +682,17 @@ impl XmlSchemaType {
 
     pub(crate) fn wxs_is_extension(&self) -> bool {
         self.flags & XML_SCHEMAS_TYPE_DERIVATION_METHOD_EXTENSION != 0
+    }
+
+    pub(crate) fn is_global_item(&self) -> bool {
+        match self.typ {
+            XmlSchemaTypeType::XmlSchemaTypeComplex | XmlSchemaTypeType::XmlSchemaTypeSimple => {
+                self.flags & XML_SCHEMAS_TYPE_GLOBAL != 0
+            }
+            XmlSchemaTypeType::XmlSchemaTypeGroup => true,
+            // Note that attribute groups are always global.
+            _ => true,
+        }
     }
 
     #[doc(alias = "xmlSchemaGetWhiteSpaceFacetValue")]

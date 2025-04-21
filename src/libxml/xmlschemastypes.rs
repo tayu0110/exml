@@ -5562,13 +5562,13 @@ pub unsafe fn xml_schema_is_built_in_type_facet(typ: XmlSchemaTypePtr, facet_typ
 ///
 /// Returns the value as a long
 #[doc(alias = "xmlSchemaGetFacetValueAsULong")]
-pub unsafe fn xml_schema_get_facet_value_as_ulong(facet: XmlSchemaFacetPtr) -> u64 {
+pub unsafe fn xml_schema_get_facet_value_as_ulong(facet: &XmlSchemaFacet) -> u64 {
     unsafe {
         // TODO: Check if this is a decimal.
-        if facet.is_null() || (*facet).val.is_null() {
+        if facet.val.is_null() {
             return 0;
         }
-        (*(*facet).val).value.decimal.lo
+        (*facet.val).value.decimal.lo
     }
 }
 
@@ -6899,36 +6899,6 @@ mod tests {
                             eprintln!(" {}", n_ws);
                         }
                     }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_schema_get_facet_value_as_ulong() {
-        #[cfg(feature = "schema")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_facet in 0..GEN_NB_XML_SCHEMA_FACET_PTR {
-                let mem_base = xml_mem_blocks();
-                let facet = gen_xml_schema_facet_ptr(n_facet, 0);
-
-                let ret_val = xml_schema_get_facet_value_as_ulong(facet);
-                desret_unsigned_long(ret_val);
-                des_xml_schema_facet_ptr(n_facet, facet, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlSchemaGetFacetValueAsULong",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlSchemaGetFacetValueAsULong()"
-                    );
-                    eprintln!(" {}", n_facet);
                 }
             }
         }

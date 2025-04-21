@@ -954,18 +954,9 @@ pub(crate) fn xml_schema_item_type_to_str(typ: XmlSchemaTypeType) -> &'static st
         XmlSchemaTypeType::XmlSchemaTypeChoice => "model group (choice)",
         XmlSchemaTypeType::XmlSchemaTypeAll => "model group (all)",
         XmlSchemaTypeType::XmlSchemaTypeParticle => "particle",
-        XmlSchemaTypeType::XmlSchemaTypeIDCUnique => {
-            "unique identity-constraint"
-            // return ("IDC (unique)");
-        }
-        XmlSchemaTypeType::XmlSchemaTypeIDCKey => {
-            "key identity-constraint"
-            // return ("IDC (key)");
-        }
-        XmlSchemaTypeType::XmlSchemaTypeIDCKeyref => {
-            "keyref identity-constraint"
-            // return ("IDC (keyref)");
-        }
+        XmlSchemaTypeType::XmlSchemaTypeIDCUnique => "unique identity-constraint",
+        XmlSchemaTypeType::XmlSchemaTypeIDCKey => "key identity-constraint",
+        XmlSchemaTypeType::XmlSchemaTypeIDCKeyref => "keyref identity-constraint",
         XmlSchemaTypeType::XmlSchemaTypeAny => "wildcard (any)",
         XmlSchemaTypeType::XmlSchemaExtraQNameRef => "[helper component] QName reference",
         XmlSchemaTypeType::XmlSchemaExtraAttrUseProhib => {
@@ -1585,8 +1576,8 @@ unsafe fn xml_schema_validate_facets(
                                         node,
                                         &value,
                                         len,
-                                        typ,
-                                        (*facet_link).facet,
+                                        &*typ,
+                                        &*(*facet_link).facet,
                                         None,
                                         None,
                                         None,
@@ -1648,8 +1639,8 @@ unsafe fn xml_schema_validate_facets(
                                     node,
                                     &value,
                                     length,
-                                    typ,
-                                    (*facet_link).facet,
+                                    &*typ,
+                                    &*(*facet_link).facet,
                                     None,
                                     None,
                                     None,
@@ -1725,8 +1716,8 @@ unsafe fn xml_schema_validate_facets(
                     node,
                     &value,
                     0,
-                    typ,
-                    null_mut(),
+                    &*typ,
+                    &*facet,
                     None,
                     None,
                     None,
@@ -1784,8 +1775,8 @@ unsafe fn xml_schema_validate_facets(
                         node,
                         &value,
                         0,
-                        typ,
-                        facet,
+                        &*typ,
+                        &*facet,
                         None,
                         None,
                         None,
@@ -2051,7 +2042,7 @@ pub(crate) unsafe fn xml_schema_vcheck_cvc_simple_type(
                         ret.try_into().unwrap(),
                         node,
                         &value,
-                        typ,
+                        &*typ,
                         1,
                     );
                 }
@@ -2174,7 +2165,7 @@ pub(crate) unsafe fn xml_schema_vcheck_cvc_simple_type(
                         ret.try_into().unwrap(),
                         node,
                         &value,
-                        typ,
+                        &*typ,
                         1,
                     );
                 }
@@ -2286,7 +2277,7 @@ pub(crate) unsafe fn xml_schema_vcheck_cvc_simple_type(
                         ret.try_into().unwrap(),
                         node,
                         &value,
-                        typ,
+                        &*typ,
                         1,
                     );
                 }
@@ -3259,7 +3250,7 @@ pub(crate) unsafe fn xml_schema_add_schema_doc(
                                         pctxt as XmlSchemaAbstractCtxtPtr,
                                         XmlParserErrors::XmlSchemapWarnSkipSchema,
                                         invoking_node,
-                                        null_mut(),
+                                        None,
                                         format!("Skipping import of schema located at '{schema_location}' for the namespace '{import_namespace}', since this namespace was already imported with the schema located at '{bkt_schema_location}'").as_str(),
                                         Some(&schema_location),
                                         Some(&import_namespace),
@@ -3586,7 +3577,9 @@ pub(crate) fn xml_schema_pval_attr_node_id(
                             XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
                             null_mut(),
                             attr.into(),
-                            xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasID),
+                            Some(&*xml_schema_get_built_in_type(
+                                XmlSchemaValType::XmlSchemasID,
+                            )),
                             None,
                             None,
                             Some(
@@ -3610,7 +3603,9 @@ pub(crate) fn xml_schema_pval_attr_node_id(
                 XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
                 null_mut(),
                 attr.into(),
-                xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasID),
+                Some(&*xml_schema_get_built_in_type(
+                    XmlSchemaValType::XmlSchemasID,
+                )),
                 None,
                 None,
                 Some(
@@ -3975,7 +3970,9 @@ pub(crate) unsafe fn xml_schema_pval_attr_node_qname_value(
                 XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
                 owner_item,
                 attr.into(),
-                xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasQName),
+                Some(&*xml_schema_get_built_in_type(
+                    XmlSchemaValType::XmlSchemasQName,
+                )),
                 None,
                 Some(&v),
                 None,
@@ -4017,7 +4014,7 @@ pub(crate) unsafe fn xml_schema_pval_attr_node_qname_value(
                 XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
                 owner_item,
                 attr.into(),
-                xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasQName),
+                Some(&*xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasQName)),
                 None,
                 Some(&value),
                 Some(
@@ -4263,7 +4260,7 @@ pub(crate) unsafe fn xml_get_min_occurs(
                 XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
                 null_mut(),
                 attr.into(),
-                null_mut(),
+                None,
                 Some(expected),
                 Some(&val),
                 None,
@@ -4289,7 +4286,7 @@ pub(crate) unsafe fn xml_get_min_occurs(
             XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
             null_mut(),
             attr.into(),
-            null_mut(),
+            None,
             Some(expected),
             Some(&val),
             None,
@@ -4326,7 +4323,7 @@ pub(crate) unsafe fn xml_get_max_occurs(
                     XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
                     null_mut(),
                     attr.into(),
-                    null_mut(),
+                    None,
                     Some(expected),
                     Some(&val),
                     None,
@@ -4349,7 +4346,7 @@ pub(crate) unsafe fn xml_get_max_occurs(
                 XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
                 null_mut(),
                 attr.into(),
-                null_mut(),
+                None,
                 Some(expected),
                 Some(&val),
                 None,
@@ -4375,7 +4372,7 @@ pub(crate) unsafe fn xml_get_max_occurs(
             XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
             null_mut(),
             attr.into(),
-            null_mut(),
+            None,
             Some(expected),
             Some(&val),
             None,
@@ -4629,7 +4626,9 @@ pub(crate) unsafe fn xml_schema_pget_bool_node_value(
                 XmlParserErrors::XmlSchemapInvalidBoolean,
                 owner_item,
                 node,
-                xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasBoolean),
+                Some(&*xml_schema_get_built_in_type(
+                    XmlSchemaValType::XmlSchemasBoolean,
+                )),
                 None,
                 value.as_deref(),
                 None,
@@ -4824,7 +4823,9 @@ pub(crate) unsafe fn xml_get_boolean_prop(
                 XmlParserErrors::XmlSchemapInvalidBoolean,
                 null_mut(),
                 xml_schema_get_prop_node(node, name).unwrap().into(),
-                xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasBoolean) as _,
+                Some(&*xml_schema_get_built_in_type(
+                    XmlSchemaValType::XmlSchemasBoolean,
+                )),
                 None,
                 Some(&val),
                 None,
@@ -7049,7 +7050,7 @@ unsafe fn xml_schema_expand_attribute_group_refs(
                             pctxt as XmlSchemaAbstractCtxtPtr,
                             XmlParserErrors::XmlSchemapWarnAttrPointlessProh,
                             (*prohib).node.map(|node| node.into()),
-                            null_mut(),
+                            None,
                             format!("Skipping pointless attribute use prohibition '{qname}', since a corresponding attribute use exists already in the type definition").as_str(),
                             Some(&qname),
                             None,
@@ -14034,8 +14035,12 @@ unsafe fn xml_schema_assemble_by_location(
                 vctxt as XmlSchemaAbstractCtxtPtr,
                 XmlParserErrors::XmlSchemavMisc,
                 node,
-                null_mut(),
-                format!("The document at location '{location}' could not be acquired").as_str(),
+                None,
+                format!(
+                    "The document at location '{}' could not be acquired",
+                    location
+                )
+                .as_str(),
                 Some(&location),
                 None,
                 None,
@@ -14159,7 +14164,7 @@ unsafe fn xml_schema_assemble_by_xsi(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                         vctxt as XmlSchemaAbstractCtxtPtr,
                         XmlParserErrors::XmlSchemavMisc,
                         (*iattr).node.map(|attr| attr.into()),
-                        null_mut(),
+                        None,
                         "The value must consist of tuples: the target namespace name and the document's URI",
                         None,
                         None,
@@ -14217,7 +14222,7 @@ unsafe fn xml_schema_vexpand_qname(
                 XmlParserErrors::XmlSchemavCvcDatatypeValid1_2_1,
                 None,
                 &value,
-                xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasQName),
+                &*xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasQName),
                 1,
             );
             return 1;
@@ -14601,7 +14606,7 @@ unsafe fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                                 vctxt as XmlSchemaAbstractCtxtPtr,
                                 XmlParserErrors::XmlSchemavElementContent,
                                 None,
-                                null_mut(),
+                                None,
                                 "This element is not expected",
                                 nbval,
                                 nbneg,
@@ -16539,14 +16544,14 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                                 xml_schema_illegal_attr_err(
                                     vctxt as XmlSchemaAbstractCtxtPtr,
                                     XmlParserErrors::XmlSchemavCvcComplexType3_2_1,
-                                    iattr,
+                                    Some(&*iattr),
                                     None,
                                 );
                             } else {
                                 xml_schema_illegal_attr_err(
                                     vctxt as XmlSchemaAbstractCtxtPtr,
                                     XmlParserErrors::XmlSchemavCvcComplexType3_2_2,
-                                    iattr,
+                                    Some(&*iattr),
                                     None,
                                 );
                             }
@@ -16585,7 +16590,7 @@ unsafe fn xml_schema_vattributes_simple(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                 xml_schema_illegal_attr_err(
                     vctxt as XmlSchemaAbstractCtxtPtr,
                     XmlParserErrors::XmlSchemavCvcType3_1_1,
-                    iattr,
+                    Some(&*iattr),
                     None,
                 );
                 ret = XmlParserErrors::XmlSchemavCvcType3_1_1 as i32;
@@ -17778,7 +17783,7 @@ unsafe fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                                             vctxt as XmlSchemaAbstractCtxtPtr,
                                             XmlParserErrors::XmlSchemavElementContent,
                                             None,
-                                            null_mut(),
+                                            None,
                                             "Missing child element(s)",
                                             nbval,
                                             nbneg,

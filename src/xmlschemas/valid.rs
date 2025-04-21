@@ -176,7 +176,7 @@ impl XmlSchemaParserCtxt {
                         ret.try_into().unwrap(),
                         owner_item,
                         attr.into(),
-                        typ,
+                        Some(&*typ),
                         None,
                         Some(&value),
                         None,
