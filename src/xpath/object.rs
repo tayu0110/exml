@@ -1,5 +1,4 @@
 use std::{
-    any::type_name,
     borrow::Cow,
     ffi::{CString, c_void},
     ptr::null_mut,
@@ -49,49 +48,6 @@ pub enum XmlXPathObjectType {
     XPathLocationset = 7,
     XPathUsers = 8,
     XPathXSLTTree = 9, /* An XSLT value tree, non modifiable */
-}
-
-impl TryFrom<i32> for XmlXPathObjectType {
-    type Error = anyhow::Error;
-    fn try_from(value: i32) -> Result<Self, Self::Error> {
-        if value == Self::XPathUndefined as i32 {
-            return Ok(Self::XPathUndefined);
-        }
-        if value == Self::XPathNodeset as i32 {
-            return Ok(Self::XPathNodeset);
-        }
-        if value == Self::XPathBoolean as i32 {
-            return Ok(Self::XPathBoolean);
-        }
-        if value == Self::XPathNumber as i32 {
-            return Ok(Self::XPathNumber);
-        }
-        if value == Self::XPathString as i32 {
-            return Ok(Self::XPathString);
-        }
-        #[cfg(feature = "libxml_xptr_locs")]
-        if value == Self::XPathPoint as i32 {
-            return Ok(Self::XPathPoint);
-        }
-        #[cfg(feature = "libxml_xptr_locs")]
-        if value == Self::XPathRange as i32 {
-            return Ok(Self::XPathRange);
-        }
-        #[cfg(feature = "libxml_xptr_locs")]
-        if value == Self::XPathLocationset as i32 {
-            return Ok(Self::XPathLocationset);
-        }
-        if value == Self::XPathUsers as i32 {
-            return Ok(Self::XPathUsers);
-        }
-        if value == Self::XPathXSLTTree as i32 {
-            return Ok(Self::XPathXSLTTree);
-        }
-        Err(anyhow::anyhow!(
-            "Invalid convert from value '{value}' to {}",
-            type_name::<Self>()
-        ))
-    }
 }
 
 // #[cfg(all(feature = "libxml_xptr_locs", feature = "xpath"))]

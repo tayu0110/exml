@@ -1,6 +1,6 @@
-//! Provide internal methods and data structures for processing XPath.  
-//! This module is based on `libxml/xpathInternals.h`, `xpath.c` and so on in `libxml2-v2.11.8`.
+//! Provide internal methods and data structures for processing XPath.
 //!
+//! This module is based on `libxml/xpathInternals.h`, `xpath.c` and so on in `libxml2-v2.11.8`.  
 //! Please refer to original libxml2 documents also.
 
 // Copyright of the original code is the following.
@@ -211,7 +211,7 @@ unsafe fn xml_pointer_list_add_size(
 ///
 /// Returns a xsltPointerList structure or NULL in case of an error.
 #[doc(alias = "xsltPointerListCreate")]
-unsafe extern "C" fn xml_pointer_list_create(initial_size: i32) -> XmlPointerListPtr {
+unsafe fn xml_pointer_list_create(initial_size: i32) -> XmlPointerListPtr {
     unsafe {
         let ret: XmlPointerListPtr = xml_malloc(size_of::<XmlPointerList>()) as _;
         if ret.is_null() {
