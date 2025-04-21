@@ -116,16 +116,16 @@ macro_rules! XP_ERROR0 {
     }};
 }
 
-/// Macro to check that the value on top of the XPath stack is of a given type.
-#[doc(hidden)]
-#[macro_export]
-macro_rules! CHECK_TYPE {
-    ($ctxt:expr, $typeval:expr) => {
-        if (*$ctxt).value.is_null() || (*(*$ctxt).value).typ != $typeval {
-            $crate::XP_ERROR!($ctxt, $crate::xpath::XmlXPathError::XPathInvalidType as i32)
-        }
-    };
-}
+// /// Macro to check that the value on top of the XPath stack is of a given type.
+// #[doc(hidden)]
+// #[macro_export]
+// macro_rules! CHECK_TYPE {
+//     ($ctxt:expr, $typeval:expr) => {
+//         if (*$ctxt).value.is_null() || (*(*$ctxt).value).typ != $typeval {
+//             $crate::XP_ERROR!($ctxt, $crate::xpath::XmlXPathError::XPathInvalidType as i32)
+//         }
+//     };
+// }
 
 /// Macro to check that the value on top of the XPath stack is of a given type.  
 /// Return(0) in case of failure
@@ -2234,7 +2234,12 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
         let next: Option<XmlXPathTraversalFunction>;
         let xpctxt: XmlXPathContextPtr = (*ctxt).context;
 
-        CHECK_TYPE0!(ctxt, XmlXPathObjectType::XPathNodeset);
+        if (*ctxt)
+            .value()
+            .is_none_or(|value| (*value).typ != (XmlXPathObjectType::XPathNodeset))
+        {
+            XP_ERROR0!(ctxt, XmlXPathError::XPathInvalidType as i32)
+        };
         // The popped object holding the context nodes
         let obj: XmlXPathObjectPtr = (*ctxt).value_pop();
         // Setup namespaces.
@@ -2678,8 +2683,9 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
             // QUESTION TODO: What does this do and why?
             // TODO: Do we have to do this also for the "error"
             // cleanup further down?
-            (*(*ctxt).value).boolval = true;
-            (*(*ctxt).value).user = (*obj).user;
+            let value = (*ctxt).value_mut().unwrap();
+            (**value).boolval = true;
+            (**value).user = (*obj).user;
             (*obj).user = null_mut();
             (*obj).boolval = false;
         }
@@ -4150,8 +4156,14 @@ pub unsafe fn xml_xpath_value_flip_sign(ctxt: XmlXPathParserContextPtr) {
             return;
         }
         cast_to_number(&mut *ctxt);
-        CHECK_TYPE!(ctxt, XmlXPathObjectType::XPathNumber);
-        (*(*ctxt).value).floatval = -(*(*ctxt).value).floatval;
+        if (*ctxt)
+            .value()
+            .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
+        {
+            crate::XP_ERROR!(ctxt, crate::xpath::XmlXPathError::XPathInvalidType as i32)
+        };
+        let val = &mut (**(*ctxt).value_mut().unwrap()).floatval;
+        *val = -*val;
     }
 }
 
@@ -4168,8 +4180,13 @@ pub unsafe fn xml_xpath_add_values(ctxt: XmlXPathParserContextPtr) {
         let val: f64 = xml_xpath_cast_to_number(arg);
         xml_xpath_release_object((*ctxt).context, arg);
         cast_to_number(&mut *ctxt);
-        CHECK_TYPE!(ctxt, XmlXPathObjectType::XPathNumber);
-        (*(*ctxt).value).floatval += val;
+        if (*ctxt)
+            .value()
+            .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
+        {
+            crate::XP_ERROR!(ctxt, crate::xpath::XmlXPathError::XPathInvalidType as i32)
+        };
+        (**(*ctxt).value_mut().unwrap()).floatval += val;
     }
 }
 
@@ -4186,8 +4203,13 @@ pub unsafe fn xml_xpath_sub_values(ctxt: XmlXPathParserContextPtr) {
         let val: f64 = xml_xpath_cast_to_number(arg);
         xml_xpath_release_object((*ctxt).context, arg);
         cast_to_number(&mut *ctxt);
-        CHECK_TYPE!(ctxt, XmlXPathObjectType::XPathNumber);
-        (*(*ctxt).value).floatval -= val;
+        if (*ctxt)
+            .value()
+            .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
+        {
+            crate::XP_ERROR!(ctxt, crate::xpath::XmlXPathError::XPathInvalidType as i32)
+        };
+        (**(*ctxt).value_mut().unwrap()).floatval -= val;
     }
 }
 
@@ -4204,8 +4226,13 @@ pub unsafe fn xml_xpath_mult_values(ctxt: XmlXPathParserContextPtr) {
         let val: f64 = xml_xpath_cast_to_number(arg);
         xml_xpath_release_object((*ctxt).context, arg);
         cast_to_number(&mut *ctxt);
-        CHECK_TYPE!(ctxt, XmlXPathObjectType::XPathNumber);
-        (*(*ctxt).value).floatval *= val;
+        if (*ctxt)
+            .value()
+            .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
+        {
+            crate::XP_ERROR!(ctxt, crate::xpath::XmlXPathError::XPathInvalidType as i32)
+        };
+        (**(*ctxt).value_mut().unwrap()).floatval *= val;
     }
 }
 
@@ -4222,8 +4249,13 @@ pub unsafe fn xml_xpath_div_values(ctxt: XmlXPathParserContextPtr) {
         let val: f64 = xml_xpath_cast_to_number(arg);
         xml_xpath_release_object((*ctxt).context, arg);
         cast_to_number(&mut *ctxt);
-        CHECK_TYPE!(ctxt, XmlXPathObjectType::XPathNumber);
-        (*(*ctxt).value).floatval /= val;
+        if (*ctxt)
+            .value()
+            .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
+        {
+            crate::XP_ERROR!(ctxt, crate::xpath::XmlXPathError::XPathInvalidType as i32)
+        };
+        (**(*ctxt).value_mut().unwrap()).floatval /= val;
     }
 }
 
@@ -4240,12 +4272,17 @@ pub unsafe fn xml_xpath_mod_values(ctxt: XmlXPathParserContextPtr) {
         let arg2: f64 = xml_xpath_cast_to_number(arg);
         xml_xpath_release_object((*ctxt).context, arg);
         cast_to_number(&mut *ctxt);
-        CHECK_TYPE!(ctxt, XmlXPathObjectType::XPathNumber);
-        let arg1: f64 = (*(*ctxt).value).floatval;
+        if (*ctxt)
+            .value()
+            .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
+        {
+            crate::XP_ERROR!(ctxt, crate::xpath::XmlXPathError::XPathInvalidType as i32)
+        };
+        let arg1 = &mut (**(*ctxt).value_mut().unwrap()).floatval;
         if arg2 == 0.0 {
-            (*(*ctxt).value).floatval = XML_XPATH_NAN;
+            *arg1 = XML_XPATH_NAN;
         } else {
-            (*(*ctxt).value).floatval = arg1 % arg2;
+            *arg1 %= arg2;
         }
     }
 }

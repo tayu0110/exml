@@ -54,7 +54,7 @@ use crate::xpath::{
     functions::xml_xpath_id_function, xml_xpath_free_parser_context, xml_xpath_new_parser_context,
 };
 use crate::{
-    CHECK_ERROR, CHECK_TYPE, XP_ERROR,
+    CHECK_ERROR, XP_ERROR,
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     libxml::{
         globals::{xml_free, xml_malloc},
@@ -799,12 +799,12 @@ unsafe fn xml_xptr_range_function(ctxt: &mut XmlXPathParserContext, nargs: usize
         if check_arity(ctxt, nargs, 1).is_err() {
             return;
         }
-        if ctxt.value.is_null()
-            || !matches!(
-                (*ctxt.value).typ,
+        if ctxt.value().is_none_or(|value| {
+            !matches!(
+                (*value).typ,
                 XmlXPathObjectType::XPathLocationset | XmlXPathObjectType::XPathNodeset
             )
-        {
+        }) {
             XP_ERROR!(ctxt, XmlXPathError::XPathInvalidType as i32);
         }
 
@@ -959,12 +959,12 @@ unsafe fn xml_xptr_range_inside_function(ctxt: &mut XmlXPathParserContext, nargs
         if check_arity(ctxt, nargs, 1).is_err() {
             return;
         }
-        if ctxt.value.is_null()
-            || !matches!(
-                (*ctxt.value).typ,
+        if ctxt.value().is_none_or(|value| {
+            !matches!(
+                (*value).typ,
                 XmlXPathObjectType::XPathLocationset | XmlXPathObjectType::XPathNodeset
             )
-        {
+        }) {
             XP_ERROR!(ctxt, XmlXPathError::XPathInvalidType as i32);
         }
 
@@ -1532,7 +1532,10 @@ unsafe fn xml_xptr_string_range_function(ctxt: &mut XmlXPathParserContext, nargs
 
         'goto_error: {
             if nargs >= 4 {
-                if ctxt.value.is_null() || (*ctxt.value).typ != XmlXPathObjectType::XPathNumber {
+                if ctxt
+                    .value()
+                    .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
+                {
                     xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
                     // goto error;
                     break 'goto_error;
@@ -1543,7 +1546,10 @@ unsafe fn xml_xptr_string_range_function(ctxt: &mut XmlXPathParserContext, nargs
                 }
             }
             if nargs >= 3 {
-                if ctxt.value.is_null() || (*ctxt.value).typ != XmlXPathObjectType::XPathNumber {
+                if ctxt
+                    .value()
+                    .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
+                {
                     xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
                     // goto error;
                     break 'goto_error;
@@ -1553,18 +1559,21 @@ unsafe fn xml_xptr_string_range_function(ctxt: &mut XmlXPathParserContext, nargs
                     pos = (*position).floatval as i32;
                 }
             }
-            if ctxt.value.is_null() || (*ctxt.value).typ != XmlXPathObjectType::XPathString {
+            if ctxt
+                .value()
+                .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathString)
+            {
                 xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
                 // goto error;
                 break 'goto_error;
             }
             string = ctxt.value_pop();
-            if ctxt.value.is_null()
-                || !matches!(
-                    (*ctxt.value).typ,
+            if ctxt.value().is_none_or(|value| {
+                !matches!(
+                    (*value).typ,
                     XmlXPathObjectType::XPathLocationset | XmlXPathObjectType::XPathNodeset
                 )
-            {
+            }) {
                 xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
                 // goto error;
                 break 'goto_error;
@@ -1743,12 +1752,12 @@ unsafe fn xml_xptr_start_point_function(ctxt: &mut XmlXPathParserContext, nargs:
         if check_arity(ctxt, nargs, 1).is_err() {
             return;
         }
-        if ctxt.value.is_null()
-            || !matches!(
-                (*ctxt.value).typ,
+        if ctxt.value().is_none_or(|value| {
+            !matches!(
+                (*value).typ,
                 XmlXPathObjectType::XPathLocationset | XmlXPathObjectType::XPathNodeset
             )
-        {
+        }) {
             XP_ERROR!(ctxt, XmlXPathError::XPathInvalidType as i32);
         }
 
@@ -1884,12 +1893,12 @@ unsafe fn xml_xptr_end_point_function(ctxt: &mut XmlXPathParserContext, nargs: u
         if check_arity(ctxt, nargs, 1).is_err() {
             return;
         }
-        if ctxt.value.is_null()
-            || !matches!(
-                (*ctxt.value).typ,
+        if ctxt.value().is_none_or(|value| {
+            !matches!(
+                (*value).typ,
                 XmlXPathObjectType::XPathLocationset | XmlXPathObjectType::XPathNodeset
             )
-        {
+        }) {
             XP_ERROR!(ctxt, XmlXPathError::XPathInvalidType as i32);
         }
 
@@ -2105,7 +2114,12 @@ macro_rules! xml_xptr_err {
 #[doc(alias = "xmlXPtrGetChildNo")]
 unsafe fn xml_xptr_get_child_no(ctxt: XmlXPathParserContextPtr, indx: i32) {
     unsafe {
-        CHECK_TYPE!(ctxt, XmlXPathObjectType::XPathNodeset);
+        if (*ctxt)
+            .value()
+            .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNodeset)
+        {
+            crate::XP_ERROR!(ctxt, crate::xpath::XmlXPathError::XPathInvalidType as i32)
+        };
         let obj: XmlXPathObjectPtr = (*ctxt).value_pop();
         let Some(oldset) = (*obj).nodesetval.as_deref_mut().filter(|_| indx > 0) else {
             xml_xpath_free_object(obj);
@@ -2377,19 +2391,17 @@ unsafe fn xml_xptr_eval_full_xptr(ctxt: XmlXPathParserContextPtr, mut name: *mut
             }
 
             // If the returned value is a non-empty nodeset or location set, return here.
-            if !(*ctxt).value.is_null() {
-                let mut obj: XmlXPathObjectPtr = (*ctxt).value;
-
+            if let Some(mut obj) = (*ctxt).value() {
                 match (*obj).typ {
                     #[cfg(feature = "libxml_xptr_locs")]
                     XmlXPathObjectType::XPathLocationset => {
-                        let loc: XmlLocationSetPtr = (*(*ctxt).value).user as _;
+                        let loc: XmlLocationSetPtr = (*obj).user as _;
                         if !loc.is_null() && !(*loc).loc_tab.is_empty() {
                             return;
                         }
                     }
                     XmlXPathObjectType::XPathNodeset => {
-                        let loc = (*(*ctxt).value).nodesetval.as_deref();
+                        let loc = (*obj).nodesetval.as_deref();
                         if loc.is_some_and(|l| !l.is_empty()) {
                             return;
                         }
@@ -2481,14 +2493,16 @@ pub unsafe fn xml_xptr_eval(xpath: &str, ctx: XmlXPathContextPtr) -> XmlXPathObj
         xml_xptr_eval_xpointer(ctxt);
 
         #[cfg(feature = "libxml_xptr_locs")]
-        let f = !(*ctxt).value.is_null()
-            && !matches!(
-                (*(*ctxt).value).typ,
+        let f = (*ctxt).value().is_some_and(|value| {
+            !matches!(
+                (*value).typ,
                 XmlXPathObjectType::XPathLocationset | XmlXPathObjectType::XPathNodeset
-            );
+            )
+        });
         #[cfg(not(feature = "libxml_xptr_locs"))]
-        let f =
-            !(*ctxt).value.is_null() && (*(*ctxt).value).typ != XmlXPathObjectType::XPathNodeset;
+        let f = (*ctxt)
+            .value()
+            .is_some_and(|value| (*value).typ != XmlXPathObjectType::XPathNodeset);
         if f {
             xml_xptr_err!(
                 ctxt,
@@ -2837,7 +2851,12 @@ pub unsafe fn xml_xptr_eval_range_predicate(ctxt: XmlXPathParserContextPtr) {
         // Extract the old set, and then evaluate the result of the
         // expression for all the element in the set. use it to grow
         // up a new set.
-        CHECK_TYPE!(ctxt, XmlXPathObjectType::XPathLocationset);
+        if (*ctxt)
+            .value()
+            .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathLocationset)
+        {
+            crate::XP_ERROR!(ctxt, crate::xpath::XmlXPathError::XPathInvalidType as i32)
+        };
         let obj: XmlXPathObjectPtr = (*ctxt).value_pop();
         let oldset: XmlLocationSetPtr = (*obj).user as _;
         (*(*ctxt).context).node = None;
@@ -2882,7 +2901,7 @@ pub unsafe fn xml_xptr_eval_range_predicate(ctxt: XmlXPathParserContextPtr) {
                 if !res.is_null() {
                     xml_xpath_free_object(res);
                 }
-                if (*ctxt).value == tmp {
+                if (*ctxt).value().unwrap() == tmp {
                     res = (*ctxt).value_pop();
                     xml_xpath_free_object(res);
                 }

@@ -198,7 +198,7 @@ impl XmlXPathParserContext {
                         return 0;
                     };
                     xml_xpath_boolean_function(self, 1);
-                    if self.value.is_null() || !(*self.value).boolval {
+                    if self.value().is_none_or(|value| !(*value).boolval) {
                         break 'to_break;
                     }
                     arg2 = self.value_pop();
@@ -209,8 +209,8 @@ impl XmlXPathParserContext {
                         break 'to_break;
                     }
                     xml_xpath_boolean_function(self, 1);
-                    if !self.value.is_null() {
-                        (*self.value).boolval &= (*arg2).boolval;
+                    if let Some(value) = self.value_mut() {
+                        (**value).boolval &= (*arg2).boolval;
                     }
                     xml_xpath_release_object(self.context, arg2);
                 }
@@ -221,7 +221,7 @@ impl XmlXPathParserContext {
                         return 0;
                     };
                     xml_xpath_boolean_function(self, 1);
-                    if self.value.is_null() || (*self.value).boolval {
+                    if self.value().is_none_or(|value| (*value).boolval) {
                         break 'to_break;
                     }
                     arg2 = self.value_pop();
@@ -232,8 +232,8 @@ impl XmlXPathParserContext {
                         break 'to_break;
                     }
                     xml_xpath_boolean_function(self, 1);
-                    if !self.value.is_null() {
-                        (*self.value).boolval |= (*arg2).boolval;
+                    if let Some(value) = self.value_mut() {
+                        (**value).boolval |= (*arg2).boolval;
                     }
                     xml_xpath_release_object(self.context, arg2);
                 }
@@ -290,13 +290,15 @@ impl XmlXPathParserContext {
                     } else if (*op).value == 2 {
                         xml_xpath_value_flip_sign(self);
                     } else if (*op).value == 3 {
-                        if !self.value.is_null()
-                            && (*self.value).typ != XmlXPathObjectType::XPathNumber
+                        if self
+                            .value()
+                            .is_some_and(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
                         {
                             xml_xpath_number_function(self, 1);
                         }
-                        if self.value.is_null()
-                            || (*self.value).typ != (XmlXPathObjectType::XPathNumber)
+                        if self
+                            .value()
+                            .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
                         {
                             xml_xpath_err(self, XmlXPathError::XPathInvalidType as i32);
                             return 0;
@@ -588,10 +590,10 @@ impl XmlXPathParserContext {
                                 return 0;
                             };
                             // The nodeset should be in document order, Keep only the first value
-                            if !self.value.is_null()
-                                && (*self.value).typ == XmlXPathObjectType::XPathNodeset
-                            {
-                                if let Some(nodeset) = (*self.value)
+                            if self.value().is_some_and(|value| {
+                                (*value).typ == XmlXPathObjectType::XPathNodeset
+                            }) {
+                                if let Some(nodeset) = (**self.value_mut().unwrap())
                                     .nodesetval
                                     .as_deref_mut()
                                     .filter(|n| n.len() > 1)
@@ -636,10 +638,10 @@ impl XmlXPathParserContext {
                                 return 0;
                             };
                             // The nodeset should be in document order, Keep only the last value
-                            if !self.value.is_null()
-                                && (*self.value).typ == XmlXPathObjectType::XPathNodeset
-                            {
-                                if let Some(nodeset) = (*self.value)
+                            if self.value().is_some_and(|value| {
+                                (*value).typ == XmlXPathObjectType::XPathNodeset
+                            }) {
+                                if let Some(nodeset) = (**self.value_mut().unwrap())
                                     .nodesetval
                                     .as_deref_mut()
                                     .filter(|n| n.len() > 1)
@@ -671,14 +673,14 @@ impl XmlXPathParserContext {
                         break 'to_break;
                     }
 
-                    if self.value.is_null() {
+                    if self.value().is_none() {
                         break 'to_break;
                     }
 
                     // Hum are we filtering the result of an XPointer expression
                     #[cfg(feature = "libxml_xptr_locs")]
-                    if (*self.value).typ == XmlXPathObjectType::XPathLocationset {
-                        let locset: XmlLocationSetPtr = (*self.value).user as _;
+                    if (*self.value().unwrap()).typ == XmlXPathObjectType::XPathLocationset {
+                        let locset: XmlLocationSetPtr = (*self.value().unwrap()).user as _;
                         xml_xpath_location_set_filter(
                             self,
                             locset,
@@ -692,8 +694,9 @@ impl XmlXPathParserContext {
                     // In xmlXPathOp::of errors, xmlXPathNodeSetFilter can pop additional
                     // nodes from the stack. We have to temporarily remove the
                     // nodeset object from the stack to avoid freeing it prematurely.
-                    if self.value.is_null()
-                        || (*self.value).typ != (XmlXPathObjectType::XPathNodeset)
+                    if self
+                        .value()
+                        .is_none_or(|value| (*value).typ != (XmlXPathObjectType::XPathNodeset))
                     {
                         {
                             xml_xpath_err(self, XmlXPathError::XPathInvalidType as i32);
@@ -716,10 +719,11 @@ impl XmlXPathParserContext {
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
-                    if !self.value.is_null()
-                        && (*self.value).typ == XmlXPathObjectType::XPathNodeset
+                    if self
+                        .value()
+                        .is_some_and(|value| (*value).typ == XmlXPathObjectType::XPathNodeset)
                     {
-                        if let Some(nodeset) = (*self.value)
+                        if let Some(nodeset) = (*self.value().unwrap())
                             .nodesetval
                             .as_deref_mut()
                             .filter(|n| n.len() > 1)
@@ -747,7 +751,7 @@ impl XmlXPathParserContext {
                             return 0;
                         };
                     }
-                    if self.value.is_null() {
+                    if self.value().is_none() {
                         xml_xpath_err(self, XmlXPathError::XPathInvalidOperand as i32);
                         return 0;
                     }
@@ -756,21 +760,21 @@ impl XmlXPathParserContext {
                     }
 
                     'rangeto_error: {
-                        if (*self.value).typ == XmlXPathObjectType::XPathLocationset {
+                        if (*self.value().unwrap()).typ == XmlXPathObjectType::XPathLocationset {
                             // Extract the old locset, and then evaluate the result of the
                             // expression for all the element in the locset. use it to grow
                             // up a new locset.
-                            if self.value.is_null()
-                                || (*self.value).typ != (XmlXPathObjectType::XPathLocationset)
-                            {
+                            if self.value().is_none_or(|value| {
+                                (*value).typ != XmlXPathObjectType::XPathLocationset
+                            }) {
                                 {
                                     xml_xpath_err(self, XmlXPathError::XPathInvalidType as i32);
                                     return 0;
                                 }
                             };
 
-                            if (*self.value).user.is_null()
-                                || (*((*self.value).user as XmlLocationSetPtr))
+                            if (*self.value().unwrap()).user.is_null()
+                                || (*((*self.value().unwrap()).user as XmlLocationSetPtr))
                                     .loc_tab
                                     .is_empty()
                             {
@@ -839,16 +843,16 @@ impl XmlXPathParserContext {
                                 if !res.is_null() {
                                     xml_xpath_release_object(self.context, res);
                                 }
-                                if self.value == tmp {
+                                if self.value().unwrap() == tmp {
                                     res = self.value_pop();
                                     xml_xpath_release_object(self.context, res);
                                 }
                             }
                         } else {
                             // Not a location set
-                            if self.value.is_null()
-                                || (*self.value).typ != (XmlXPathObjectType::XPathNodeset)
-                            {
+                            if self.value().is_none_or(|value| {
+                                (*value).typ != XmlXPathObjectType::XPathNodeset
+                            }) {
                                 xml_xpath_err(self, XmlXPathError::XPathInvalidType as i32);
                                 return 0;
                             };
@@ -887,7 +891,7 @@ impl XmlXPathParserContext {
                                     if !res.is_null() {
                                         xml_xpath_release_object(self.context, res);
                                     }
-                                    if self.value == tmp {
+                                    if self.value().unwrap() == tmp {
                                         res = self.value_pop();
                                         xml_xpath_release_object(self.context, res);
                                     }
@@ -949,10 +953,11 @@ impl XmlXPathParserContext {
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
-                    if !self.value.is_null()
-                        && (*self.value).typ == XmlXPathObjectType::XPathNodeset
+                    if self
+                        .value()
+                        .is_some_and(|value| (*value).typ == XmlXPathObjectType::XPathNodeset)
                     {
-                        if let Some(nodeset) = (*self.value)
+                        if let Some(nodeset) = (*self.value().unwrap())
                             .nodesetval
                             .as_deref_mut()
                             .filter(|n| !n.is_empty())
@@ -1070,10 +1075,11 @@ impl XmlXPathParserContext {
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
-                    if !self.value.is_null()
-                        && (*self.value).typ == XmlXPathObjectType::XPathNodeset
+                    if self
+                        .value()
+                        .is_some_and(|value| (*value).typ == XmlXPathObjectType::XPathNodeset)
                     {
-                        if let Some(nodeset) = (*self.value)
+                        if let Some(nodeset) = (*self.value().unwrap())
                             .nodesetval
                             .as_deref_mut()
                             .filter(|n| n.len() > 1)
@@ -1133,10 +1139,11 @@ impl XmlXPathParserContext {
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
-                    if !self.value.is_null()
-                        && (*self.value).typ == XmlXPathObjectType::XPathNodeset
+                    if self
+                        .value()
+                        .is_some_and(|value| (*value).typ == XmlXPathObjectType::XPathNodeset)
                     {
-                        if let Some(nodeset) = (*self.value).nodesetval.as_deref_mut() {
+                        if let Some(nodeset) = (*self.value().unwrap()).nodesetval.as_deref_mut() {
                             if !nodeset.is_empty() {
                                 // limit tree traversing to first node in the result
                                 if nodeset.node_tab.len() > 1 {
@@ -1153,10 +1160,10 @@ impl XmlXPathParserContext {
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
-                    if !self.value.is_null()
-                        && matches!((*self.value).typ, XmlXPathObjectType::XPathNodeset)
-                    {
-                        if let Some(_nodeset) = (*self.value)
+                    if self.value().is_some_and(|value| {
+                        matches!((*value).typ, XmlXPathObjectType::XPathNodeset)
+                    }) {
+                        if let Some(_nodeset) = (*self.value().unwrap())
                             .nodesetval
                             .as_deref()
                             .filter(|n| !n.is_empty())
@@ -1257,10 +1264,11 @@ impl XmlXPathParserContext {
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
-                    if !self.value.is_null()
-                        && (*self.value).typ == XmlXPathObjectType::XPathNodeset
+                    if self
+                        .value()
+                        .is_some_and(|value| (*value).typ == XmlXPathObjectType::XPathNodeset)
                     {
-                        if let Some(nodeset) = (*self.value)
+                        if let Some(nodeset) = (*self.value().unwrap())
                             .nodesetval
                             .as_deref_mut()
                             .filter(|n| n.len() > 1)
@@ -1324,10 +1332,11 @@ impl XmlXPathParserContext {
                     };
                     // The nodeset should be in document order,
                     // Keep only the last value
-                    if !self.value.is_null()
-                        && (*self.value).typ == XmlXPathObjectType::XPathNodeset
+                    if self
+                        .value()
+                        .is_some_and(|value| (*value).typ == XmlXPathObjectType::XPathNodeset)
                     {
-                        if let Some(nodeset) = (*self.value)
+                        if let Some(nodeset) = (*self.value().unwrap())
                             .nodesetval
                             .as_deref_mut()
                             .filter(|n| n.len() > 1)
@@ -1350,15 +1359,18 @@ impl XmlXPathParserContext {
             if (*op).ch2 == -1 {
                 return total;
             }
-            if self.value.is_null() {
+            if self.value().is_none() {
                 return total;
             }
 
             #[cfg(feature = "libxml_xptr_locs")]
             {
                 // Hum are we filtering the result of an XPointer expression
-                if matches!((*self.value).typ, XmlXPathObjectType::XPathLocationset) {
-                    let locset: XmlLocationSetPtr = (*self.value).user as _;
+                if matches!(
+                    (*self.value().unwrap()).typ,
+                    XmlXPathObjectType::XPathLocationset
+                ) {
+                    let locset: XmlLocationSetPtr = (*self.value().unwrap()).user as _;
 
                     if !locset.is_null() {
                         xml_xpath_location_set_filter(self, locset, (*op).ch2, 1, 1);
@@ -1376,7 +1388,10 @@ impl XmlXPathParserContext {
             // In case of errors, xmlXPathNodeSetFilter can pop additional nodes from the stack.
             // We have to temporarily remove the nodeset object from the
             // stack to avoid freeing it prematurely.
-            if self.value.is_null() || (*self.value).typ != (XmlXPathObjectType::XPathNodeset) {
+            if self
+                .value()
+                .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNodeset)
+            {
                 xml_xpath_err(self, XmlXPathError::XPathInvalidType as i32);
                 return 0;
             };

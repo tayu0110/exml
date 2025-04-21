@@ -74,7 +74,6 @@ pub struct XmlXPathParserContext {
     pub(crate) error: i32, /* error code */
 
     pub(crate) context: XmlXPathContextPtr, /* the evaluation context */
-    pub(crate) value: XmlXPathObjectPtr,    /* the current value */
     pub(crate) value_tab: Vec<XmlXPathObjectPtr>, /* stack of values */
 
     pub(crate) comp: XmlXPathCompExprPtr, /* the precompiled expression */
@@ -111,15 +110,24 @@ impl XmlXPathParserContext {
         self.cur += diff;
     }
 
+    pub(crate) fn value(&self) -> Option<XmlXPathObjectPtr> {
+        self.value_tab.last().copied()
+    }
+
+    pub(crate) fn value_mut(&mut self) -> Option<&mut XmlXPathObjectPtr> {
+        self.value_tab.last_mut()
+    }
+
     /// Check if the current value on the XPath stack is a node set or an XSLT value tree.
     ///
     /// Returns true if the current object on the stack is a node-set.
     #[doc(alias = "xmlXPathStackIsNodeSet")]
     unsafe fn xml_xpath_stack_is_node_set(&self) -> bool {
         unsafe {
-            !self.value.is_null()
-                && ((*self.value).typ == XmlXPathObjectType::XPathNodeset
-                    || (*self.value).typ == XmlXPathObjectType::XPathXSLTTree)
+            self.value().is_some_and(|value| {
+                (*value).typ == XmlXPathObjectType::XPathNodeset
+                    || (*value).typ == XmlXPathObjectType::XPathXSLTTree
+            })
         }
     }
 
@@ -144,7 +152,6 @@ impl XmlXPathParserContext {
                 return -1;
             }
             self.value_tab.push(value);
-            self.value = value;
             self.value_tab.len() as i32 - 1
         }
     }
@@ -159,9 +166,7 @@ impl XmlXPathParserContext {
             return null_mut();
         }
 
-        let res = self.value_tab.pop().unwrap();
-        self.value = self.value_tab.last().cloned().unwrap_or(null_mut());
-        res
+        self.value_tab.pop().unwrap()
     }
 
     /// Pops a number from the stack, handling conversion if needed.
@@ -240,7 +245,7 @@ impl XmlXPathParserContext {
     #[doc(alias = "xmlXPathPopNodeSet")]
     pub unsafe fn pop_node_set(&mut self) -> Option<Box<XmlNodeSet>> {
         unsafe {
-            if self.value.is_null() {
+            if self.value().is_none() {
                 xml_xpatherror(self, XmlXPathError::XPathInvalidOperand as i32);
                 self.error = XmlXPathError::XPathInvalidOperand as i32;
                 return None;
@@ -269,12 +274,12 @@ impl XmlXPathParserContext {
     #[doc(alias = "xmlXPathPopExternal")]
     pub unsafe fn pop_external(&mut self) -> *mut c_void {
         unsafe {
-            if self.value.is_null() {
+            let Some(value) = self.value() else {
                 xml_xpatherror(self, XmlXPathError::XPathInvalidOperand as i32);
                 self.error = XmlXPathError::XPathInvalidOperand as i32;
                 return null_mut();
-            }
-            if (*self.value).typ != XmlXPathObjectType::XPathUsers {
+            };
+            if (*value).typ != XmlXPathObjectType::XPathUsers {
                 xml_xpatherror(self, XmlXPathError::XPathInvalidType as i32);
                 self.error = XmlXPathError::XPathInvalidType as i32;
                 return null_mut();
@@ -292,10 +297,9 @@ impl Default for XmlXPathParserContext {
     fn default() -> Self {
         Self {
             cur: 0,
-            base: "".to_owned().into_boxed_str(),
+            base: "".into(),
             error: 0,
             context: null_mut(),
-            value: null_mut(),
             value_tab: vec![],
             comp: null_mut(),
             xptr: 0,
@@ -339,7 +343,6 @@ pub(super) unsafe fn xml_xpath_comp_parser_context(
 ) -> XmlXPathParserContextPtr {
     let ret = Box::new(XmlXPathParserContext {
         value_tab: Vec::with_capacity(10),
-        value: null_mut(),
         context: ctxt,
         comp,
         ..Default::default()
