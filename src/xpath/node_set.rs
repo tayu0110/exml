@@ -164,31 +164,29 @@ impl XmlNodeSet {
 
     /// Sort the node set in document order
     #[doc(alias = "xmlXPathNodeSetSort")]
-    pub unsafe fn sort(&mut self) {
-        unsafe {
-            // Use the old Shell's sort implementation to sort the node-set
-            // Timsort ought to be quite faster
-            let table = &mut self.node_tab;
-            // TODO: Use `sort_unstable` of Rust standard library.
-            //       When I tried to rewirte, it did not work fine
-            //       because `xml_xpath_cmp_nodes_ext` does not satisfy "total order" constraint.
-            let len = table.len();
-            let mut incr = len;
-            while {
-                incr /= 2;
-                incr > 0
-            } {
-                for i in incr..len {
-                    let mut j = i as i32 - incr as i32;
-                    while j >= 0 {
-                        if xml_xpath_cmp_nodes_ext(table[j as usize], table[j as usize + incr])
-                            .is_some_and(|f| f.is_gt())
-                        {
-                            table.swap(j as usize, j as usize + incr);
-                            j -= incr as i32;
-                        } else {
-                            break;
-                        }
+    pub fn sort(&mut self) {
+        // Use the old Shell's sort implementation to sort the node-set
+        // Timsort ought to be quite faster
+        let table = &mut self.node_tab;
+        // TODO: Use `sort_unstable` of Rust standard library.
+        //       When I tried to rewirte, it did not work fine
+        //       because `xml_xpath_cmp_nodes_ext` does not satisfy "total order" constraint.
+        let len = table.len();
+        let mut incr = len;
+        while {
+            incr /= 2;
+            incr > 0
+        } {
+            for i in incr..len {
+                let mut j = i as i32 - incr as i32;
+                while j >= 0 {
+                    if xml_xpath_cmp_nodes_ext(table[j as usize], table[j as usize + incr])
+                        .is_some_and(|f| f.is_gt())
+                    {
+                        table.swap(j as usize, j as usize + incr);
+                        j -= incr as i32;
+                    } else {
+                        break;
                     }
                 }
             }

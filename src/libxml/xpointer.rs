@@ -256,28 +256,26 @@ unsafe fn xml_xptr_new_range_internal(
 ///         that's the same point, -1 otherwise
 #[doc(alias = "xmlXPtrCmpPoints")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe fn xml_xptr_cmp_points(
+fn xml_xptr_cmp_points(
     node1: XmlGenericNodePtr,
     index1: i32,
     node2: XmlGenericNodePtr,
     index2: i32,
 ) -> i32 {
-    unsafe {
-        // if node1.is_null() || node2.is_null() {
-        //     return -2;
-        // }
-        // a couple of optimizations which will avoid computations in most cases
-        if node1 == node2 {
-            if index1 < index2 {
-                return 1;
-            }
-            if index1 > index2 {
-                return -1;
-            }
-            return 0;
+    // if node1.is_null() || node2.is_null() {
+    //     return -2;
+    // }
+    // a couple of optimizations which will avoid computations in most cases
+    if node1 == node2 {
+        if index1 < index2 {
+            return 1;
         }
-        xml_xpath_cmp_nodes(node1, node2)
+        if index1 > index2 {
+            return -1;
+        }
+        return 0;
     }
+    xml_xpath_cmp_nodes(node1, node2)
 }
 
 /// Make sure the points in the range are in the right order

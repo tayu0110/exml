@@ -306,10 +306,7 @@ pub const XML_XPATH_NINF: f64 = f64::NEG_INFINITY;
 /// it's the same node, -1 otherwise
 #[doc(alias = "xmlXPathCmpNodes")]
 #[cfg(feature = "xpath")]
-pub unsafe fn xml_xpath_cmp_nodes(
-    mut node1: XmlGenericNodePtr,
-    mut node2: XmlGenericNodePtr,
-) -> i32 {
+pub fn xml_xpath_cmp_nodes(mut node1: XmlGenericNodePtr, mut node2: XmlGenericNodePtr) -> i32 {
     use crate::tree::{NodeCommon, XmlAttrPtr};
 
     let mut depth1: i32;
@@ -449,7 +446,7 @@ pub fn xml_xpath_cast_string_to_boolean(val: Option<&str>) -> bool {
 /// Returns the boolean value
 #[doc(alias = "xmlXPathCastNodeSetToBoolean")]
 #[cfg(feature = "xpath")]
-pub unsafe fn xml_xpath_cast_node_set_to_boolean(ns: Option<&XmlNodeSet>) -> bool {
+pub fn xml_xpath_cast_node_set_to_boolean(ns: Option<&XmlNodeSet>) -> bool {
     ns.is_some_and(|n| !n.is_empty())
 }
 
@@ -491,15 +488,13 @@ pub fn xml_xpath_cast_node_to_number(node: Option<XmlGenericNodePtr>) -> f64 {
 /// Returns the number value
 #[doc(alias = "xmlXPathCastNodeSetToNumber")]
 #[cfg(feature = "xpath")]
-pub unsafe fn xml_xpath_cast_node_set_to_number(ns: Option<&mut XmlNodeSet>) -> f64 {
-    unsafe {
-        let Some(ns) = ns else {
-            return XML_XPATH_NAN;
-        };
-        let s = xml_xpath_cast_node_set_to_string(Some(ns));
-        let ret: f64 = xml_xpath_cast_string_to_number(Some(&s));
-        ret
-    }
+pub fn xml_xpath_cast_node_set_to_number(ns: Option<&mut XmlNodeSet>) -> f64 {
+    let Some(ns) = ns else {
+        return XML_XPATH_NAN;
+    };
+    let s = xml_xpath_cast_node_set_to_string(Some(ns));
+    let ret: f64 = xml_xpath_cast_string_to_number(Some(&s));
+    ret
 }
 
 /// Converts a boolean to its string value.
@@ -641,18 +636,16 @@ pub fn xml_xpath_cast_node_to_string(node: Option<XmlGenericNodePtr>) -> String 
 /// Returns a newly allocated string.
 #[doc(alias = "xmlXPathCastNodeSetToString")]
 #[cfg(feature = "xpath")]
-pub unsafe fn xml_xpath_cast_node_set_to_string(ns: Option<&mut XmlNodeSet>) -> Cow<'static, str> {
-    unsafe {
-        let Some(ns) = ns.filter(|n| !n.is_empty()) else {
-            return "".into();
-        };
+pub fn xml_xpath_cast_node_set_to_string(ns: Option<&mut XmlNodeSet>) -> Cow<'static, str> {
+    let Some(ns) = ns.filter(|n| !n.is_empty()) else {
+        return "".into();
+    };
 
-        if ns.len() > 1 {
-            ns.sort();
-        }
-
-        xml_xpath_cast_node_to_string(Some(ns.node_tab[0])).into()
+    if ns.len() > 1 {
+        ns.sort();
     }
+
+    xml_xpath_cast_node_to_string(Some(ns.node_tab[0])).into()
 }
 
 /// Frees the xsltPointerList structure. This does not free the content of the list.
@@ -793,7 +786,7 @@ pub unsafe fn xml_xpath_context_set_cache(
 /// Returns the number of elements found in the document or -1 in case of error.
 #[doc(alias = "xmlXPathOrderDocElems")]
 #[cfg(feature = "xpath")]
-pub unsafe fn xml_xpath_order_doc_elems(doc: XmlDocPtr) -> i64 {
+pub fn xml_xpath_order_doc_elems(doc: XmlDocPtr) -> i64 {
     use crate::tree::{NodeCommon, XmlNodePtr};
 
     let mut count = 0;
@@ -1164,7 +1157,7 @@ unsafe fn xml_xpath_compiled_eval_internal(
 /// The caller has to free the object.
 #[doc(alias = "xmlXPathCompiledEval")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_compiled_eval(
+pub unsafe fn xml_xpath_compiled_eval(
     comp: XmlXPathCompExprPtr,
     ctx: XmlXPathContextPtr,
 ) -> XmlXPathObjectPtr {
@@ -1231,7 +1224,7 @@ pub unsafe fn xml_xpath_free_comp_expr(comp: XmlXPathCompExprPtr) {
 /// Returns -2 in case of error 1 if first point < second point, 0
 /// if it's the same node, -1 otherwise
 #[doc(alias = "xmlXPathCmpNodesExt")]
-unsafe fn xml_xpath_cmp_nodes_ext(
+fn xml_xpath_cmp_nodes_ext(
     mut node1: XmlGenericNodePtr,
     mut node2: XmlGenericNodePtr,
 ) -> Option<std::cmp::Ordering> {

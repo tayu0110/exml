@@ -4725,7 +4725,7 @@ pub unsafe fn xml_xpath_next_attribute(
 ///
 /// returns 1 if @ancestor is a @node's ancestor, 0 otherwise.
 #[doc(alias = "xmlXPathIsAncestor")]
-unsafe fn xml_xpath_is_ancestor(
+fn xml_xpath_is_ancestor(
     ancestor: Option<XmlGenericNodePtr>,
     node: Option<XmlGenericNodePtr>,
 ) -> i32 {
