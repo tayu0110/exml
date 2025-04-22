@@ -2541,7 +2541,6 @@ pub unsafe fn xml_xptr_eval(xpath: &str, ctx: XmlXPathContextPtr) -> XmlXPathObj
             res = null_mut();
         }
 
-        // xml_xpath_free_parser_context(ctxt);
         res
     }
 }

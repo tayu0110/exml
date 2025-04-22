@@ -360,21 +360,12 @@ pub unsafe fn xml_xpath_new_parser_context(
 pub(super) fn xml_xpath_comp_parser_context(
     comp: XmlXPathCompExprPtr,
     ctxt: XmlXPathContextPtr,
-) -> XmlXPathParserContextPtr {
+) -> Option<XmlXPathParserContext> {
     let mut ret = XmlXPathParserContext::default();
     ret.value_tab.reserve(10);
     ret.context = ctxt;
     ret.comp = comp;
-
-    Box::leak(Box::new(ret))
-}
-
-/// Free up an xmlXPathParserContext
-#[doc(alias = "xmlXPathFreeParserContext")]
-pub unsafe fn xml_xpath_free_parser_context(ctxt: XmlXPathParserContextPtr) {
-    unsafe {
-        let _ = Box::from_raw(ctxt);
-    }
+    Some(ret)
 }
 
 pub type XmlXPathContextPtr = *mut XmlXPathContext;

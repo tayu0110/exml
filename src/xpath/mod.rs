@@ -927,7 +927,6 @@ pub unsafe fn xml_xpath_eval(xpath: &str, ctx: XmlXPathContextPtr) -> XmlXPathOb
             }
         }
 
-        // xml_xpath_free_parser_context(ctxt);
         res
     }
 }
@@ -1034,7 +1033,6 @@ pub unsafe fn xml_xpath_ctxt_compile(ctxt: XmlXPathContextPtr, xpath: &str) -> X
         }
 
         if pctxt.error != XmlXPathError::XPathExpressionOK as i32 {
-            // xml_xpath_free_parser_context(pctxt);
             return null_mut();
         }
 
@@ -1061,7 +1059,6 @@ pub unsafe fn xml_xpath_ctxt_compile(ctxt: XmlXPathContextPtr, xpath: &str) -> X
             }
             pctxt.comp = null_mut();
         }
-        // xml_xpath_free_parser_context(pctxt);
 
         if !comp.is_null() {
             (*comp).expr = xml_strndup(xpath.as_ptr(), xpath.len() as i32);
@@ -1118,24 +1115,23 @@ unsafe fn xml_xpath_compiled_eval_internal(
         }
         xml_init_parser();
 
-        let pctxt: XmlXPathParserContextPtr = xml_xpath_comp_parser_context(comp, ctxt);
-        if pctxt.is_null() {
+        let Some(mut pctxt) = xml_xpath_comp_parser_context(comp, ctxt) else {
             return -1;
-        }
-        let res: i32 = (*pctxt).run_evaluate(to_bool);
+        };
+        let res: i32 = pctxt.run_evaluate(to_bool);
 
-        if (*pctxt).error != XmlXPathError::XPathExpressionOK as i32 {
+        if pctxt.error != XmlXPathError::XPathExpressionOK as i32 {
             res_obj = null_mut();
         } else {
-            res_obj = (*pctxt).value_pop();
+            res_obj = pctxt.value_pop();
             if res_obj.is_null() {
                 if to_bool == 0 {
                     generic_error!("xmlXPathCompiledEval: No result on the stack.\n");
                 }
-            } else if !(*pctxt).value_tab.is_empty() {
+            } else if !pctxt.value_tab.is_empty() {
                 generic_error!(
                     "xmlXPathCompiledEval: {} object(s) left on the stack.\n",
-                    (*pctxt).value_tab.len() as i32
+                    pctxt.value_tab.len() as i32
                 );
             }
         }
@@ -1146,8 +1142,7 @@ unsafe fn xml_xpath_compiled_eval_internal(
             xml_xpath_release_object(ctxt, res_obj);
         }
 
-        (*pctxt).comp = null_mut();
-        xml_xpath_free_parser_context(pctxt);
+        pctxt.comp = null_mut();
 
         res
     }
