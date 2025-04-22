@@ -908,27 +908,26 @@ pub unsafe fn xml_xpath_eval(xpath: &str, ctx: XmlXPathContextPtr) -> XmlXPathOb
 
         xml_init_parser();
 
-        let ctxt: XmlXPathParserContextPtr = xml_xpath_new_parser_context(xpath, ctx);
-        if ctxt.is_null() {
+        let Some(mut ctxt) = xml_xpath_new_parser_context(xpath, ctx) else {
             return null_mut();
-        }
-        (*ctxt).evaluate_expression();
+        };
+        ctxt.evaluate_expression();
 
-        if (*ctxt).error != XmlXPathError::XPathExpressionOK as i32 {
+        if ctxt.error != XmlXPathError::XPathExpressionOK as i32 {
             res = null_mut();
         } else {
-            res = (*ctxt).value_pop();
+            res = ctxt.value_pop();
             if res.is_null() {
                 generic_error!("xmlXPathCompiledEval: No result on the stack.\n");
-            } else if !(*ctxt).value_tab.is_empty() {
+            } else if !ctxt.value_tab.is_empty() {
                 generic_error!(
                     "xmlXPathCompiledEval: {} object(s) left on the stack.\n",
-                    (*ctxt).value_tab.len() as i32
+                    ctxt.value_tab.len() as i32
                 );
             }
         }
 
-        xml_xpath_free_parser_context(ctxt);
+        // xml_xpath_free_parser_context(ctxt);
         res
     }
 }
@@ -1022,44 +1021,47 @@ pub unsafe fn xml_xpath_ctxt_compile(ctxt: XmlXPathContextPtr, xpath: &str) -> X
 
         xml_init_parser();
 
-        let pctxt: XmlXPathParserContextPtr = xml_xpath_new_parser_context(xpath, ctxt);
-        if pctxt.is_null() {
+        let Some(mut pctxt) = xml_xpath_new_parser_context(xpath, ctxt) else {
             return null_mut();
-        }
+        };
+
         if !ctxt.is_null() {
             old_depth = (*ctxt).depth;
         }
-        (*pctxt).compile_expr(true);
+        pctxt.compile_expr(true);
         if !ctxt.is_null() {
             (*ctxt).depth = old_depth;
         }
 
-        if (*pctxt).error != XmlXPathError::XPathExpressionOK as i32 {
-            xml_xpath_free_parser_context(pctxt);
+        if pctxt.error != XmlXPathError::XPathExpressionOK as i32 {
+            // xml_xpath_free_parser_context(pctxt);
             return null_mut();
         }
 
-        if (*pctxt).cur < (*pctxt).base.len() {
+        if pctxt.cur < pctxt.base.len() {
             // aleksey: in some cases this line prints *second* error message
             // (see bug #78858) and probably this should be fixed.
             // However, we are not sure that all error messages are printed
             // out in other places. It's not critical so we leave it as-is for now
-            xml_xpatherror(pctxt, XmlXPathError::XPathExprError as i32);
+            xml_xpatherror(&raw mut pctxt, XmlXPathError::XPathExprError as i32);
             comp = null_mut();
         } else {
-            comp = (*pctxt).comp;
+            comp = pctxt.comp;
             if (*comp).steps.len() > 1 && (*comp).last >= 0 {
                 if !ctxt.is_null() {
                     old_depth = (*ctxt).depth;
                 }
-                xml_xpath_optimize_expression(pctxt, &raw mut (*comp).steps[(*comp).last as usize]);
+                xml_xpath_optimize_expression(
+                    &raw mut pctxt,
+                    &raw mut (*comp).steps[(*comp).last as usize],
+                );
                 if !ctxt.is_null() {
                     (*ctxt).depth = old_depth;
                 }
             }
-            (*pctxt).comp = null_mut();
+            pctxt.comp = null_mut();
         }
-        xml_xpath_free_parser_context(pctxt);
+        // xml_xpath_free_parser_context(pctxt);
 
         if !comp.is_null() {
             (*comp).expr = xml_strndup(xpath.as_ptr(), xpath.len() as i32);

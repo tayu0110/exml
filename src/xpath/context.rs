@@ -339,7 +339,7 @@ impl Drop for XmlXPathParserContext {
 pub unsafe fn xml_xpath_new_parser_context(
     xpath: &str,
     ctxt: XmlXPathContextPtr,
-) -> XmlXPathParserContextPtr {
+) -> Option<XmlXPathParserContext> {
     unsafe {
         let mut ret = XmlXPathParserContext::default();
         ret.cur = 0;
@@ -347,10 +347,9 @@ pub unsafe fn xml_xpath_new_parser_context(
         ret.context = ctxt;
         ret.comp = xml_xpath_new_comp_expr();
         if ret.comp.is_null() {
-            return null_mut();
+            return None;
         }
-
-        Box::leak(Box::new(ret))
+        Some(ret)
     }
 }
 

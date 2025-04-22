@@ -50,9 +50,7 @@ use crate::xpath::{
     internals::{xml_xpath_err, xml_xpath_evaluate_predicate_result},
     xml_xpath_cmp_nodes, xml_xpath_object_copy,
 };
-use crate::xpath::{
-    functions::xml_xpath_id_function, xml_xpath_free_parser_context, xml_xpath_new_parser_context,
-};
+use crate::xpath::{functions::xml_xpath_id_function, xml_xpath_new_parser_context};
 use crate::{
     CHECK_ERROR, XP_ERROR,
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
@@ -2484,35 +2482,34 @@ pub unsafe fn xml_xptr_eval(xpath: &str, ctx: XmlXPathContextPtr) -> XmlXPathObj
             return null_mut();
         }
 
-        let ctxt: XmlXPathParserContextPtr = xml_xpath_new_parser_context(xpath, ctx);
-        if ctxt.is_null() {
+        let Some(mut ctxt) = xml_xpath_new_parser_context(xpath, ctx) else {
             return null_mut();
-        }
-        xml_xptr_eval_xpointer(ctxt);
+        };
+        xml_xptr_eval_xpointer(&raw mut ctxt);
 
         #[cfg(feature = "libxml_xptr_locs")]
-        let f = (*ctxt).value().is_some_and(|value| {
+        let f = ctxt.value().is_some_and(|value| {
             !matches!(
                 (*value).typ,
                 XmlXPathObjectType::XPathLocationset | XmlXPathObjectType::XPathNodeset
             )
         });
         #[cfg(not(feature = "libxml_xptr_locs"))]
-        let f = (*ctxt)
+        let f = ctxt
             .value()
             .is_some_and(|value| (*value).typ != XmlXPathObjectType::XPathNodeset);
         if f {
             xml_xptr_err!(
-                ctxt,
+                &raw mut ctxt,
                 XmlParserErrors::XmlXPtrEvalFailed,
                 "xmlXPtrEval: evaluation failed to return a node set\n"
             );
         } else {
-            res = (*ctxt).value_pop();
+            res = ctxt.value_pop();
         }
 
         while {
-            tmp = (*ctxt).value_pop();
+            tmp = ctxt.value_pop();
             if !tmp.is_null() {
                 if tmp != init {
                     if (*tmp).typ == XmlXPathObjectType::XPathNodeset {
@@ -2534,17 +2531,17 @@ pub unsafe fn xml_xptr_eval(xpath: &str, ctx: XmlXPathContextPtr) -> XmlXPathObj
         } {}
         if stack != 0 {
             xml_xptr_err!(
-                ctxt,
+                &raw mut ctxt,
                 XmlParserErrors::XmlXPtrExtraObjects,
                 "xmlXPtrEval: object(s) left on the eval stack\n"
             );
         }
-        if (*ctxt).error != XmlXPathError::XPathExpressionOK as i32 {
+        if ctxt.error != XmlXPathError::XPathExpressionOK as i32 {
             xml_xpath_free_object(res);
             res = null_mut();
         }
 
-        xml_xpath_free_parser_context(ctxt);
+        // xml_xpath_free_parser_context(ctxt);
         res
     }
 }
