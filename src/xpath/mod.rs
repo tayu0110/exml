@@ -273,11 +273,9 @@ pub type XmlXPathCompExprPtr = *mut XmlXPathCompExpr;
 #[cfg(feature = "xpath")]
 #[repr(C)]
 pub struct XmlXPathCompExpr {
-    // pub(crate) nb_step: i32,  /* Number of steps in this expression */
-    // pub(crate) max_step: i32, /* Maximum number of steps allocated */
     pub(crate) steps: Vec<XmlXPathStepOp>, /* ops for computation of this expression */
     pub(crate) last: i32,                  /* index of last step in expression */
-    pub(crate) expr: *mut XmlChar,         /* the expression being computed */
+    pub(crate) expr: Box<str>,             /* the expression being computed */
     #[cfg(feature = "libxml_pattern")]
     pub(crate) stream: Option<Box<XmlPattern>>,
 }
@@ -287,7 +285,7 @@ impl Default for XmlXPathCompExpr {
         Self {
             steps: vec![],
             last: 0,
-            expr: null_mut(),
+            expr: "".into(),
             stream: None,
         }
     }
@@ -1004,8 +1002,6 @@ pub unsafe fn xml_xpath_compile(xpath: &str) -> XmlXPathCompExprPtr {
 #[doc(alias = "xmlXPathCtxtCompile")]
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_xpath_ctxt_compile(ctxt: XmlXPathContextPtr, xpath: &str) -> XmlXPathCompExprPtr {
-    use crate::libxml::xmlstring::xml_strndup;
-
     unsafe {
         let mut comp: XmlXPathCompExprPtr;
         let mut old_depth: i32 = 0;
@@ -1061,7 +1057,7 @@ pub unsafe fn xml_xpath_ctxt_compile(ctxt: XmlXPathContextPtr, xpath: &str) -> X
         }
 
         if !comp.is_null() {
-            (*comp).expr = xml_strndup(xpath.as_ptr(), xpath.len() as i32);
+            (*comp).expr = xpath.into();
         }
         comp
     }
@@ -1201,13 +1197,6 @@ pub unsafe fn xml_xpath_free_comp_expr(comp: XmlXPathCompExprPtr) {
             if !op.value5.is_null() {
                 xml_free(op.value5 as _);
             }
-        }
-        #[cfg(feature = "libxml_pattern")]
-        {
-            (*comp).stream.take();
-        }
-        if !(*comp).expr.is_null() {
-            xml_free((*comp).expr as _);
         }
 
         drop_in_place(comp);
