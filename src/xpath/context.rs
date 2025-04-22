@@ -309,6 +309,29 @@ impl Default for XmlXPathParserContext {
     }
 }
 
+impl Drop for XmlXPathParserContext {
+    /// Free up an xmlXPathParserContext
+    #[doc(alias = "xmlXPathFreeParserContext")]
+    fn drop(&mut self) {
+        unsafe {
+            for value in self.value_tab.drain(..) {
+                if !self.context.is_null() {
+                    xml_xpath_release_object(self.context, value);
+                } else {
+                    xml_xpath_free_object(value);
+                }
+            }
+            if !self.comp.is_null() {
+                #[cfg(feature = "libxml_pattern")]
+                {
+                    (*self.comp).stream.take();
+                }
+                xml_xpath_free_comp_expr(self.comp);
+            }
+        }
+    }
+}
+
 /// Create a new xmlXPathParserContext
 ///
 /// Returns the xmlXPathParserContext just allocated.
@@ -318,13 +341,11 @@ pub unsafe fn xml_xpath_new_parser_context(
     ctxt: XmlXPathContextPtr,
 ) -> XmlXPathParserContextPtr {
     unsafe {
-        let ret = XmlXPathParserContext {
-            cur: 0,
-            base: xpath.to_owned().into_boxed_str(),
-            context: ctxt,
-            comp: xml_xpath_new_comp_expr(),
-            ..Default::default()
-        };
+        let mut ret = XmlXPathParserContext::default();
+        ret.cur = 0;
+        ret.base = xpath.into();
+        ret.context = ctxt;
+        ret.comp = xml_xpath_new_comp_expr();
         if ret.comp.is_null() {
             return null_mut();
         }
@@ -337,38 +358,22 @@ pub unsafe fn xml_xpath_new_parser_context(
 ///
 /// Returns the xmlXPathParserContext just allocated.
 #[doc(alias = "xmlXPathCompParserContext")]
-pub(super) unsafe fn xml_xpath_comp_parser_context(
+pub(super) fn xml_xpath_comp_parser_context(
     comp: XmlXPathCompExprPtr,
     ctxt: XmlXPathContextPtr,
 ) -> XmlXPathParserContextPtr {
-    let ret = Box::new(XmlXPathParserContext {
-        value_tab: Vec::with_capacity(10),
-        context: ctxt,
-        comp,
-        ..Default::default()
-    });
+    let mut ret = XmlXPathParserContext::default();
+    ret.value_tab.reserve(10);
+    ret.context = ctxt;
+    ret.comp = comp;
 
-    Box::leak(ret)
+    Box::leak(Box::new(ret))
 }
 
 /// Free up an xmlXPathParserContext
 #[doc(alias = "xmlXPathFreeParserContext")]
 pub unsafe fn xml_xpath_free_parser_context(ctxt: XmlXPathParserContextPtr) {
     unsafe {
-        for value in (*ctxt).value_tab.drain(..) {
-            if !(*ctxt).context.is_null() {
-                xml_xpath_release_object((*ctxt).context, value);
-            } else {
-                xml_xpath_free_object(value);
-            }
-        }
-        if !(*ctxt).comp.is_null() {
-            #[cfg(feature = "libxml_pattern")]
-            {
-                (*(*ctxt).comp).stream.take();
-            }
-            xml_xpath_free_comp_expr((*ctxt).comp);
-        }
         let _ = Box::from_raw(ctxt);
     }
 }
