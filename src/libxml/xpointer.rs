@@ -42,6 +42,7 @@ use std::{
 #[cfg(feature = "libxml_xptr_locs")]
 use libc::c_void;
 
+use crate::xpath::functions::xml_xpath_id_function;
 #[cfg(feature = "libxml_xptr_locs")]
 use crate::xpath::{XmlNodeSet, XmlXPathParserContext, functions::check_arity};
 #[cfg(feature = "libxml_xptr_locs")]
@@ -50,7 +51,6 @@ use crate::xpath::{
     internals::{xml_xpath_err, xml_xpath_evaluate_predicate_result},
     xml_xpath_cmp_nodes, xml_xpath_object_copy,
 };
-use crate::xpath::{functions::xml_xpath_id_function, xml_xpath_new_parser_context};
 use crate::{
     CHECK_ERROR, XP_ERROR,
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
@@ -2482,7 +2482,7 @@ pub unsafe fn xml_xptr_eval(xpath: &str, ctx: XmlXPathContextPtr) -> XmlXPathObj
             return null_mut();
         }
 
-        let Some(mut ctxt) = xml_xpath_new_parser_context(xpath, ctx) else {
+        let Some(mut ctxt) = XmlXPathParserContext::new(xpath, ctx) else {
             return null_mut();
         };
         xml_xptr_eval_xpointer(&raw mut ctxt);

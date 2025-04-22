@@ -84,6 +84,39 @@ pub struct XmlXPathParserContext {
 }
 
 impl XmlXPathParserContext {
+    /// Create a new xmlXPathParserContext
+    ///
+    /// Returns the xmlXPathParserContext just allocated.
+    #[doc(alias = "xmlXPathNewParserContext")]
+    pub unsafe fn new(xpath: &str, ctxt: XmlXPathContextPtr) -> Option<Self> {
+        unsafe {
+            let mut ret = XmlXPathParserContext::default();
+            ret.cur = 0;
+            ret.base = xpath.into();
+            ret.context = ctxt;
+            ret.comp = xml_xpath_new_comp_expr();
+            if ret.comp.is_null() {
+                return None;
+            }
+            Some(ret)
+        }
+    }
+
+    /// Create a new xmlXPathParserContext when processing a compiled expression
+    ///
+    /// Returns the xmlXPathParserContext just allocated.
+    #[doc(alias = "xmlXPathCompParserContext")]
+    pub(super) fn from_compiled_expression(
+        comp: XmlXPathCompExprPtr,
+        ctxt: XmlXPathContextPtr,
+    ) -> Option<Self> {
+        let mut ret = XmlXPathParserContext::default();
+        ret.value_tab.reserve(10);
+        ret.context = ctxt;
+        ret.comp = comp;
+        Some(ret)
+    }
+
     pub(crate) fn next_char(&mut self) -> Option<char> {
         let res = self.current_char()?;
         self.cur += res.len_utf8();
@@ -330,42 +363,6 @@ impl Drop for XmlXPathParserContext {
             }
         }
     }
-}
-
-/// Create a new xmlXPathParserContext
-///
-/// Returns the xmlXPathParserContext just allocated.
-#[doc(alias = "xmlXPathNewParserContext")]
-pub unsafe fn xml_xpath_new_parser_context(
-    xpath: &str,
-    ctxt: XmlXPathContextPtr,
-) -> Option<XmlXPathParserContext> {
-    unsafe {
-        let mut ret = XmlXPathParserContext::default();
-        ret.cur = 0;
-        ret.base = xpath.into();
-        ret.context = ctxt;
-        ret.comp = xml_xpath_new_comp_expr();
-        if ret.comp.is_null() {
-            return None;
-        }
-        Some(ret)
-    }
-}
-
-/// Create a new xmlXPathParserContext when processing a compiled expression
-///
-/// Returns the xmlXPathParserContext just allocated.
-#[doc(alias = "xmlXPathCompParserContext")]
-pub(super) fn xml_xpath_comp_parser_context(
-    comp: XmlXPathCompExprPtr,
-    ctxt: XmlXPathContextPtr,
-) -> Option<XmlXPathParserContext> {
-    let mut ret = XmlXPathParserContext::default();
-    ret.value_tab.reserve(10);
-    ret.context = ctxt;
-    ret.comp = comp;
-    Some(ret)
 }
 
 pub type XmlXPathContextPtr = *mut XmlXPathContext;

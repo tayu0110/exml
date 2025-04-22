@@ -908,7 +908,7 @@ pub unsafe fn xml_xpath_eval(xpath: &str, ctx: XmlXPathContextPtr) -> XmlXPathOb
 
         xml_init_parser();
 
-        let Some(mut ctxt) = xml_xpath_new_parser_context(xpath, ctx) else {
+        let Some(mut ctxt) = XmlXPathParserContext::new(xpath, ctx) else {
             return null_mut();
         };
         ctxt.evaluate_expression();
@@ -1020,7 +1020,7 @@ pub unsafe fn xml_xpath_ctxt_compile(ctxt: XmlXPathContextPtr, xpath: &str) -> X
 
         xml_init_parser();
 
-        let Some(mut pctxt) = xml_xpath_new_parser_context(xpath, ctxt) else {
+        let Some(mut pctxt) = XmlXPathParserContext::new(xpath, ctxt) else {
             return null_mut();
         };
 
@@ -1115,7 +1115,7 @@ unsafe fn xml_xpath_compiled_eval_internal(
         }
         xml_init_parser();
 
-        let Some(mut pctxt) = xml_xpath_comp_parser_context(comp, ctxt) else {
+        let Some(mut pctxt) = XmlXPathParserContext::from_compiled_expression(comp, ctxt) else {
             return -1;
         };
         let res: i32 = pctxt.run_evaluate(to_bool);
