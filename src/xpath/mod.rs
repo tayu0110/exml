@@ -714,7 +714,7 @@ unsafe fn xml_xpath_new_cache() -> XmlXPathContextCachePtr {
         let ret: XmlXPathContextCachePtr =
             xml_malloc(size_of::<XmlXPathContextCache>()) as XmlXPathContextCachePtr;
         if ret.is_null() {
-            xml_xpath_err_memory(null_mut(), Some("creating object cache\n"));
+            xml_xpath_err_memory(None, Some("creating object cache\n"));
             return null_mut();
         }
         memset(ret as _, 0, size_of::<XmlXPathContextCache>());

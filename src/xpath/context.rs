@@ -147,7 +147,7 @@ impl XmlXPathParserContext {
                 return -1;
             }
             if self.value_tab.len() == XPATH_MAX_STACK_DEPTH {
-                xml_xpath_perr_memory(self, Some("XPath stack depth limit reached\n"));
+                xml_xpath_perr_memory(Some(self), Some("XPath stack depth limit reached\n"));
                 xml_xpath_free_object(value);
                 return -1;
             }

@@ -132,7 +132,7 @@ pub unsafe fn xml_xpath_new_string(val: Option<&str>) -> XmlXPathObjectPtr {
     unsafe {
         let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
         if ret.is_null() {
-            xml_xpath_err_memory(null_mut(), Some("creating string object\n"));
+            xml_xpath_err_memory(None, Some("creating string object\n"));
             return null_mut();
         }
         std::ptr::write(&mut *ret, XmlXPathObject::from(val.unwrap_or("")));
@@ -150,7 +150,7 @@ pub unsafe fn xml_xpath_wrap_string(val: Option<&str>) -> XmlXPathObjectPtr {
     unsafe {
         let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
         if ret.is_null() {
-            xml_xpath_err_memory(null_mut(), Some("creating string object\n"));
+            xml_xpath_err_memory(None, Some("creating string object\n"));
             return null_mut();
         }
         std::ptr::write(&mut *ret, XmlXPathObject::default());
@@ -168,7 +168,7 @@ pub unsafe fn xml_xpath_new_float(val: f64) -> XmlXPathObjectPtr {
     unsafe {
         let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
         if ret.is_null() {
-            xml_xpath_err_memory(null_mut(), Some("creating float object\n"));
+            xml_xpath_err_memory(None, Some("creating float object\n"));
             return null_mut();
         }
         std::ptr::write(&mut *ret, XmlXPathObject::from(val));
@@ -184,7 +184,7 @@ pub unsafe fn xml_xpath_new_boolean(val: bool) -> XmlXPathObjectPtr {
     unsafe {
         let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
         if ret.is_null() {
-            xml_xpath_err_memory(null_mut(), Some("creating boolean object\n"));
+            xml_xpath_err_memory(None, Some("creating boolean object\n"));
             return null_mut();
         }
         std::ptr::write(&mut *ret, XmlXPathObject::from(val));
@@ -201,7 +201,7 @@ pub unsafe fn xml_xpath_new_node_set(val: Option<XmlGenericNodePtr>) -> XmlXPath
     unsafe {
         let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
         if ret.is_null() {
-            xml_xpath_err_memory(null_mut(), Some("creating nodeset\n"));
+            xml_xpath_err_memory(None, Some("creating nodeset\n"));
             return null_mut();
         }
         std::ptr::write(&mut *ret, XmlXPathObject::default());
@@ -224,7 +224,7 @@ pub unsafe fn xml_xpath_wrap_node_set(val: Option<Box<XmlNodeSet>>) -> XmlXPathO
     unsafe {
         let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
         if ret.is_null() {
-            xml_xpath_err_memory(null_mut(), Some("creating node set object\n"));
+            xml_xpath_err_memory(None, Some("creating node set object\n"));
             xml_xpath_free_node_set(val);
             return null_mut();
         }
@@ -244,7 +244,7 @@ pub unsafe fn xml_xpath_new_value_tree(val: Option<XmlGenericNodePtr>) -> XmlXPa
     unsafe {
         let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
         if ret.is_null() {
-            xml_xpath_err_memory(null_mut(), Some("creating result value tree\n"));
+            xml_xpath_err_memory(None, Some("creating result value tree\n"));
             return null_mut();
         }
         std::ptr::write(&mut *ret, XmlXPathObject::default());
@@ -264,7 +264,7 @@ pub unsafe fn xml_xpath_wrap_external(val: *mut c_void) -> XmlXPathObjectPtr {
     unsafe {
         let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
         if ret.is_null() {
-            xml_xpath_err_memory(null_mut(), Some("creating user object\n"));
+            xml_xpath_err_memory(None, Some("creating user object\n"));
             return null_mut();
         }
         std::ptr::write(&mut *ret, XmlXPathObject::default());
@@ -286,7 +286,7 @@ pub unsafe fn xml_xpath_object_copy(val: XmlXPathObjectPtr) -> XmlXPathObjectPtr
 
         let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
         if ret.is_null() {
-            xml_xpath_err_memory(null_mut(), Some("copying object\n"));
+            xml_xpath_err_memory(None, Some("copying object\n"));
             return null_mut();
         }
         std::ptr::write(&mut *ret, (*val).clone());

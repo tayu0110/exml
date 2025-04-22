@@ -70,9 +70,9 @@ use crate::{
 };
 
 use super::{
-    XmlNodeSet, functions::xml_xpath_boolean_function, xml_xpath_new_boolean, xml_xpath_new_float,
-    xml_xpath_new_node_set, xml_xpath_new_string, xml_xpath_node_set_merge,
-    xml_xpath_wrap_node_set, xml_xpath_wrap_string,
+    XmlNodeSet, XmlXPathContext, XmlXPathParserContext, functions::xml_xpath_boolean_function,
+    xml_xpath_new_boolean, xml_xpath_new_float, xml_xpath_new_node_set, xml_xpath_new_string,
+    xml_xpath_node_set_merge, xml_xpath_wrap_node_set, xml_xpath_wrap_string,
 };
 
 // Many of these macros may later turn into functions.
@@ -180,10 +180,7 @@ unsafe fn xml_pointer_list_add_size(
                 new_size = initial_size as _;
             } else {
                 if (*list).size > 50000000 {
-                    xml_xpath_err_memory(
-                        null_mut(),
-                        Some("xmlPointerListAddSize: re-allocating item\n"),
-                    );
+                    xml_xpath_err_memory(None, Some("xmlPointerListAddSize: re-allocating item\n"));
                     return -1;
                 }
                 new_size = (*list).size as usize * 2;
@@ -192,10 +189,7 @@ unsafe fn xml_pointer_list_add_size(
                 xml_realloc((*list).items as _, new_size * size_of::<*mut c_void>())
                     as *mut *mut c_void;
             if tmp.is_null() {
-                xml_xpath_err_memory(
-                    null_mut(),
-                    Some("xmlPointerListAddSize: re-allocating item\n"),
-                );
+                xml_xpath_err_memory(None, Some("xmlPointerListAddSize: re-allocating item\n"));
                 return -1;
             }
             (*list).items = tmp;
@@ -215,7 +209,7 @@ unsafe fn xml_pointer_list_create(initial_size: i32) -> XmlPointerListPtr {
     unsafe {
         let ret: XmlPointerListPtr = xml_malloc(size_of::<XmlPointerList>()) as _;
         if ret.is_null() {
-            xml_xpath_err_memory(null_mut(), Some("xmlPointerListCreate: allocating item\n"));
+            xml_xpath_err_memory(None, Some("xmlPointerListCreate: allocating item\n"));
             return null_mut();
         }
         memset(ret as _, 0, size_of::<XmlPointerList>());
@@ -791,63 +785,61 @@ pub(super) unsafe fn xml_xpath_cache_wrap_node_set(
 
 /// Handle a redefinition of attribute error
 #[doc(alias = "xmlXPathErrMemory")]
-pub unsafe fn xml_xpath_err_memory(ctxt: XmlXPathContextPtr, extra: Option<&str>) {
-    unsafe {
-        if !ctxt.is_null() {
-            (*ctxt).last_error.reset();
-            if let Some(extra) = extra {
-                let buf = format!("Memory allocation failed : {extra}\n",);
-                (*ctxt).last_error.message = Some(buf.into());
-                // (*ctxt).last_error.message = xml_strdup(buf.as_ptr()) as *mut c_char;
-            } else {
-                (*ctxt).last_error.message = Some("Memory allocation failed\n".into());
-                // xml_strdup(c"Memory allocation failed\n".as_ptr() as _) as *mut c_char;
-            }
-            (*ctxt).last_error.domain = XmlErrorDomain::XmlFromXPath;
-            (*ctxt).last_error.code = XmlParserErrors::XmlErrNoMemory;
-            if let Some(error) = (*ctxt).error {
-                error((*ctxt).user_data.clone(), &(*ctxt).last_error);
-            }
-        } else if let Some(extra) = extra {
-            __xml_raise_error!(
-                None,
-                None,
-                None,
-                null_mut(),
-                None,
-                XmlErrorDomain::XmlFromXPath,
-                XmlParserErrors::XmlErrNoMemory,
-                XmlErrorLevel::XmlErrFatal,
-                None,
-                0,
-                Some(extra.to_owned().into()),
-                None,
-                None,
-                0,
-                0,
-                "Memory allocation failed : {}\n",
-                extra
-            );
+pub fn xml_xpath_err_memory(ctxt: Option<&mut XmlXPathContext>, extra: Option<&str>) {
+    if let Some(ctxt) = ctxt {
+        ctxt.last_error.reset();
+        if let Some(extra) = extra {
+            let buf = format!("Memory allocation failed : {extra}\n",);
+            ctxt.last_error.message = Some(buf.into());
+            // (*ctxt).last_error.message = xml_strdup(buf.as_ptr()) as *mut c_char;
         } else {
-            __xml_raise_error!(
-                None,
-                None,
-                None,
-                null_mut(),
-                None,
-                XmlErrorDomain::XmlFromXPath,
-                XmlParserErrors::XmlErrNoMemory,
-                XmlErrorLevel::XmlErrFatal,
-                None,
-                0,
-                None,
-                None,
-                None,
-                0,
-                0,
-                "Memory allocation failed\n",
-            );
+            ctxt.last_error.message = Some("Memory allocation failed\n".into());
+            // xml_strdup(c"Memory allocation failed\n".as_ptr() as _) as *mut c_char;
         }
+        ctxt.last_error.domain = XmlErrorDomain::XmlFromXPath;
+        ctxt.last_error.code = XmlParserErrors::XmlErrNoMemory;
+        if let Some(error) = ctxt.error {
+            error(ctxt.user_data.clone(), &ctxt.last_error);
+        }
+    } else if let Some(extra) = extra {
+        __xml_raise_error!(
+            None,
+            None,
+            None,
+            null_mut(),
+            None,
+            XmlErrorDomain::XmlFromXPath,
+            XmlParserErrors::XmlErrNoMemory,
+            XmlErrorLevel::XmlErrFatal,
+            None,
+            0,
+            Some(extra.to_owned().into()),
+            None,
+            None,
+            0,
+            0,
+            "Memory allocation failed : {}\n",
+            extra
+        );
+    } else {
+        __xml_raise_error!(
+            None,
+            None,
+            None,
+            null_mut(),
+            None,
+            XmlErrorDomain::XmlFromXPath,
+            XmlParserErrors::XmlErrNoMemory,
+            XmlErrorLevel::XmlErrFatal,
+            None,
+            0,
+            None,
+            None,
+            None,
+            0,
+            0,
+            "Memory allocation failed\n",
+        );
     }
 }
 
@@ -1067,7 +1059,7 @@ pub(super) unsafe fn xml_xpath_new_comp_expr() -> XmlXPathCompExprPtr {
         let cur: XmlXPathCompExprPtr =
             xml_malloc(size_of::<XmlXPathCompExpr>()) as XmlXPathCompExprPtr;
         if cur.is_null() {
-            xml_xpath_err_memory(null_mut(), Some("allocating component\n"));
+            xml_xpath_err_memory(None, Some("allocating component\n"));
             return null_mut();
         }
         std::ptr::write(&mut *cur, XmlXPathCompExpr::default());
@@ -1079,13 +1071,16 @@ pub(super) unsafe fn xml_xpath_new_comp_expr() -> XmlXPathCompExprPtr {
 
 /// Handle a redefinition of attribute error
 #[doc(alias = "xmlXPathPErrMemory")]
-pub(super) unsafe fn xml_xpath_perr_memory(ctxt: XmlXPathParserContextPtr, extra: Option<&str>) {
+pub(super) unsafe fn xml_xpath_perr_memory(
+    ctxt: Option<&mut XmlXPathParserContext>,
+    extra: Option<&str>,
+) {
     unsafe {
-        if ctxt.is_null() {
-            xml_xpath_err_memory(null_mut(), extra);
+        if let Some(ctxt) = ctxt {
+            ctxt.error = XmlXPathError::XPathMemoryError as i32;
+            xml_xpath_err_memory(Some(&mut *ctxt.context), extra);
         } else {
-            (*ctxt).error = XmlXPathError::XPathMemoryError as i32;
-            xml_xpath_err_memory((*ctxt).context, extra);
+            xml_xpath_err_memory(None, extra);
         }
     }
 }
@@ -1098,32 +1093,30 @@ pub const XML_NODESET_DEFAULT: usize = 10;
 ///
 /// Returns the newly created object.
 #[doc(alias = "xmlXPathNodeSetDupNs")]
-pub unsafe fn xml_xpath_node_set_dup_ns(
+pub fn xml_xpath_node_set_dup_ns(
     node: Option<XmlGenericNodePtr>,
     mut ns: XmlNsPtr,
 ) -> Option<XmlGenericNodePtr> {
-    unsafe {
-        if node.is_none_or(|node| matches!(node.element_type(), XmlElementType::XmlNamespaceDecl)) {
-            if ns.node.is_none() {
-                ns.node = ns.next.map(|next| next.into());
-            }
-            return Some(ns.into());
+    if node.is_none_or(|node| matches!(node.element_type(), XmlElementType::XmlNamespaceDecl)) {
+        if ns.node.is_none() {
+            ns.node = ns.next.map(|next| next.into());
         }
-
-        // Allocate a new Namespace and fill the fields.
-        let Some(mut cur) = XmlNsPtr::new(XmlNs {
-            typ: XmlElementType::XmlNamespaceDecl,
-            ..Default::default()
-        }) else {
-            xml_xpath_err_memory(null_mut(), Some("duplicating namespace\n"));
-            return None;
-        };
-        cur.href = ns.href.clone();
-        cur.prefix = ns.prefix.clone();
-        // cur.next = node as *mut XmlNs;
-        cur.node = node;
-        Some(cur.into())
+        return Some(ns.into());
     }
+
+    // Allocate a new Namespace and fill the fields.
+    let Some(mut cur) = XmlNsPtr::new(XmlNs {
+        typ: XmlElementType::XmlNamespaceDecl,
+        ..Default::default()
+    }) else {
+        xml_xpath_err_memory(None, Some("duplicating namespace\n"));
+        return None;
+    };
+    cur.href = ns.href.clone();
+    cur.prefix = ns.prefix.clone();
+    // cur.next = node as *mut XmlNs;
+    cur.node = node;
+    Some(cur.into())
 }
 
 /// This is the cached version of xmlXPathNewNodeSet().
@@ -1258,7 +1251,10 @@ pub unsafe fn xml_xpath_try_stream_compile(
                 if stream.is_streamable() == 1 {
                     comp = xml_xpath_new_comp_expr();
                     if comp.is_null() {
-                        xml_xpath_err_memory(ctxt, Some("allocating streamable expression\n"));
+                        xml_xpath_err_memory(
+                            Some(&mut *ctxt),
+                            Some("allocating streamable expression\n"),
+                        );
                         return null_mut();
                     }
                     (*comp).stream = Some(stream);
@@ -3194,14 +3190,14 @@ unsafe fn xml_xpath_equal_node_sets(
         let hashs1: *mut u32 = xml_malloc(ns1.node_tab.len() * size_of::<u32>()) as *mut u32;
         if hashs1.is_null() {
             // TODO: Propagate memory error.
-            xml_xpath_err_memory(null_mut(), Some("comparing nodesets\n"));
+            xml_xpath_err_memory(None, Some("comparing nodesets\n"));
             return 0;
         }
         let mut values2 = vec![None; ns2.node_tab.len()];
         let hashs2: *mut u32 = xml_malloc(ns2.node_tab.len() * size_of::<u32>()) as *mut u32;
         if hashs2.is_null() {
             // TODO: Propagate memory error.
-            xml_xpath_err_memory(null_mut(), Some("comparing nodesets\n"));
+            xml_xpath_err_memory(None, Some("comparing nodesets\n"));
             xml_free(hashs1 as _);
             return 0;
         }
@@ -3787,7 +3783,7 @@ unsafe fn xml_xpath_compare_node_sets(
         let values2: *mut f64 = xml_malloc(ns2_table.len() * size_of::<f64>()) as *mut f64;
         if values2.is_null() {
             // TODO: Propagate memory error.
-            xml_xpath_err_memory(null_mut(), Some("comparing nodesets\n"));
+            xml_xpath_err_memory(None, Some("comparing nodesets\n"));
             xml_xpath_free_object(arg1);
             xml_xpath_free_object(arg2);
             return 0;

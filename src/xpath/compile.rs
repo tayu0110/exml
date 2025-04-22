@@ -46,7 +46,7 @@ impl XmlXPathParserContext {
         unsafe {
             let comp: XmlXPathCompExprPtr = self.comp;
             if (*comp).steps.len() == XPATH_MAX_STEPS {
-                xml_xpath_perr_memory(self, Some("adding step\n"));
+                xml_xpath_perr_memory(Some(self), Some("adding step\n"));
                 return -1;
             }
             (*comp).last = (*comp).steps.len() as i32;
@@ -1288,7 +1288,7 @@ impl XmlXPathParserContext {
                 return;
             }
             if ret.is_null() {
-                xml_xpath_perr_memory(self, None);
+                xml_xpath_perr_memory(Some(self), None);
                 return;
             }
             let lit: XmlXPathObjectPtr = xml_xpath_cache_new_string(
