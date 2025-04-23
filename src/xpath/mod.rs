@@ -1048,7 +1048,7 @@ pub unsafe fn xml_xpath_ctxt_compile(
             // (see bug #78858) and probably this should be fixed.
             // However, we are not sure that all error messages are printed
             // out in other places. It's not critical so we leave it as-is for now
-            xml_xpatherror(&raw mut pctxt, XmlXPathError::XPathExprError as i32);
+            xml_xpath_err(Some(&mut pctxt), XmlXPathError::XPathExprError as i32);
             None
         } else {
             // comp = pctxt.comp;
@@ -2213,37 +2213,6 @@ mod tests {
                         "{leaks} Leaks are found in xmlXPathEqualValues()"
                     );
                     eprintln!(" {}", n_ctxt);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_err() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_XPATH_PARSER_CONTEXT_PTR {
-                for n_error in 0..GEN_NB_INT {
-                    let mem_base = xml_mem_blocks();
-                    let ctxt = gen_xml_xpath_parser_context_ptr(n_ctxt, 0);
-                    let error = gen_int(n_error, 1);
-
-                    xml_xpath_err(ctxt, error);
-                    des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
-                    des_int(n_error, error, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlXPathErr",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlXPathErr()");
-                        eprint!(" {}", n_ctxt);
-                        eprintln!(" {}", n_error);
-                    }
                 }
             }
         }

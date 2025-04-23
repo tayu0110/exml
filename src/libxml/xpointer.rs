@@ -801,7 +801,7 @@ unsafe fn xml_xptr_range_function(ctxt: &mut XmlXPathParserContext, nargs: usize
                 XmlXPathObjectType::XPathLocationset | XmlXPathObjectType::XPathNodeset
             )
         }) {
-            XP_ERROR!(ctxt, XmlXPathError::XPathInvalidType as i32);
+            XP_ERROR!(Some(&mut *ctxt), XmlXPathError::XPathInvalidType as i32);
         }
 
         set = ctxt.value_pop();
@@ -811,7 +811,7 @@ unsafe fn xml_xptr_range_function(ctxt: &mut XmlXPathParserContext, nargs: usize
                 xml_xptr_new_location_set_node_set((*set).nodesetval.as_deref());
             xml_xpath_free_object(set);
             if tmp.is_null() {
-                XP_ERROR!(ctxt, XmlXPathError::XPathMemoryError as i32);
+                XP_ERROR!(Some(&mut *ctxt), XmlXPathError::XPathMemoryError as i32);
             }
             set = tmp;
         }
@@ -821,7 +821,7 @@ unsafe fn xml_xptr_range_function(ctxt: &mut XmlXPathParserContext, nargs: usize
         let newset: XmlLocationSetPtr = xml_xptr_location_set_create(null_mut());
         if newset.is_null() {
             xml_xpath_free_object(set);
-            XP_ERROR!(ctxt, XmlXPathError::XPathMemoryError as i32);
+            XP_ERROR!(Some(&mut *ctxt), XmlXPathError::XPathMemoryError as i32);
         }
         if !oldset.is_null() {
             for &loc in &(*oldset).loc_tab {
@@ -961,7 +961,7 @@ unsafe fn xml_xptr_range_inside_function(ctxt: &mut XmlXPathParserContext, nargs
                 XmlXPathObjectType::XPathLocationset | XmlXPathObjectType::XPathNodeset
             )
         }) {
-            XP_ERROR!(ctxt, XmlXPathError::XPathInvalidType as i32);
+            XP_ERROR!(Some(&mut *ctxt), XmlXPathError::XPathInvalidType as i32);
         }
 
         set = ctxt.value_pop();
@@ -971,7 +971,7 @@ unsafe fn xml_xptr_range_inside_function(ctxt: &mut XmlXPathParserContext, nargs
                 xml_xptr_new_location_set_node_set((*set).nodesetval.as_deref());
             xml_xpath_free_object(set);
             if tmp.is_null() {
-                XP_ERROR!(ctxt, XmlXPathError::XPathMemoryError as i32);
+                XP_ERROR!(Some(&mut *ctxt), XmlXPathError::XPathMemoryError as i32);
             }
             set = tmp;
         }
@@ -980,7 +980,7 @@ unsafe fn xml_xptr_range_inside_function(ctxt: &mut XmlXPathParserContext, nargs
         let newset: XmlLocationSetPtr = xml_xptr_location_set_create(null_mut());
         if newset.is_null() {
             xml_xpath_free_object(set);
-            XP_ERROR!(ctxt, XmlXPathError::XPathMemoryError as i32);
+            XP_ERROR!(Some(&mut *ctxt), XmlXPathError::XPathMemoryError as i32);
         }
         let oldset: XmlLocationSetPtr = (*set).user as XmlLocationSetPtr;
         if !oldset.is_null() {
@@ -1523,7 +1523,7 @@ unsafe fn xml_xptr_string_range_function(ctxt: &mut XmlXPathParserContext, nargs
 
         // Grab the arguments
         if !(2..=4).contains(&nargs) {
-            XP_ERROR!(ctxt, XmlXPathError::XPathInvalidArity as i32);
+            XP_ERROR!(Some(&mut *ctxt), XmlXPathError::XPathInvalidArity as i32);
         }
 
         'goto_error: {
@@ -1532,7 +1532,7 @@ unsafe fn xml_xptr_string_range_function(ctxt: &mut XmlXPathParserContext, nargs
                     .value()
                     .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
                 {
-                    xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
+                    xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
                     // goto error;
                     break 'goto_error;
                 }
@@ -1546,7 +1546,7 @@ unsafe fn xml_xptr_string_range_function(ctxt: &mut XmlXPathParserContext, nargs
                     .value()
                     .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
                 {
-                    xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
+                    xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
                     // goto error;
                     break 'goto_error;
                 }
@@ -1559,7 +1559,7 @@ unsafe fn xml_xptr_string_range_function(ctxt: &mut XmlXPathParserContext, nargs
                 .value()
                 .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathString)
             {
-                xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
+                xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
                 // goto error;
                 break 'goto_error;
             }
@@ -1570,14 +1570,14 @@ unsafe fn xml_xptr_string_range_function(ctxt: &mut XmlXPathParserContext, nargs
                     XmlXPathObjectType::XPathLocationset | XmlXPathObjectType::XPathNodeset
                 )
             }) {
-                xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
+                xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
                 // goto error;
                 break 'goto_error;
             }
             set = ctxt.value_pop();
             newset = xml_xptr_location_set_create(null_mut());
             if newset.is_null() {
-                xml_xpath_err(ctxt, XmlXPathError::XPathMemoryError as i32);
+                xml_xpath_err(Some(ctxt), XmlXPathError::XPathMemoryError as i32);
                 // goto error;
                 break 'goto_error;
             }
@@ -1593,7 +1593,7 @@ unsafe fn xml_xptr_string_range_function(ctxt: &mut XmlXPathParserContext, nargs
                 xml_xpath_free_object(set);
                 set = null_mut();
                 if tmp.is_null() {
-                    xml_xpath_err(ctxt, XmlXPathError::XPathMemoryError as i32);
+                    xml_xpath_err(Some(ctxt), XmlXPathError::XPathMemoryError as i32);
                     // goto error;
                     break 'goto_error;
                 }
@@ -1754,7 +1754,7 @@ unsafe fn xml_xptr_start_point_function(ctxt: &mut XmlXPathParserContext, nargs:
                 XmlXPathObjectType::XPathLocationset | XmlXPathObjectType::XPathNodeset
             )
         }) {
-            XP_ERROR!(ctxt, XmlXPathError::XPathInvalidType as i32);
+            XP_ERROR!(Some(&mut *ctxt), XmlXPathError::XPathInvalidType as i32);
         }
 
         obj = ctxt.value_pop();
@@ -1763,7 +1763,7 @@ unsafe fn xml_xptr_start_point_function(ctxt: &mut XmlXPathParserContext, nargs:
             let tmp = xml_xptr_new_location_set_node_set((*obj).nodesetval.as_deref());
             xml_xpath_free_object(obj);
             if tmp.is_null() {
-                XP_ERROR!(ctxt, XmlXPathError::XPathMemoryError as i32);
+                XP_ERROR!(Some(&mut *ctxt), XmlXPathError::XPathMemoryError as i32);
             }
             obj = tmp;
         }
@@ -1771,7 +1771,7 @@ unsafe fn xml_xptr_start_point_function(ctxt: &mut XmlXPathParserContext, nargs:
         let newset: XmlLocationSetPtr = xml_xptr_location_set_create(null_mut());
         if newset.is_null() {
             xml_xpath_free_object(obj);
-            XP_ERROR!(ctxt, XmlXPathError::XPathMemoryError as i32);
+            XP_ERROR!(Some(&mut *ctxt), XmlXPathError::XPathMemoryError as i32);
         }
         let oldset: XmlLocationSetPtr = (*obj).user as XmlLocationSetPtr;
         if !oldset.is_null() {
@@ -1796,7 +1796,7 @@ unsafe fn xml_xptr_start_point_function(ctxt: &mut XmlXPathParserContext, nargs:
                             ) {
                                 xml_xpath_free_object(obj);
                                 xml_xptr_free_location_set(newset);
-                                XP_ERROR!(ctxt, XmlXPathError::XPtrSyntaxError as i32);
+                                XP_ERROR!(Some(&mut *ctxt), XmlXPathError::XPtrSyntaxError as i32);
                             }
                             point = xml_xptr_new_point(node, (*tmp).index);
                         }
@@ -1805,7 +1805,7 @@ unsafe fn xml_xptr_start_point_function(ctxt: &mut XmlXPathParserContext, nargs:
                         /*** Should we raise an error ?
                         xmlXPathFreeObject(obj);
                         xmlXPathFreeObject(newset);
-                        XP_ERROR!(ctxt, xmlXPathError::XPATH_INVALID_TYPE as i32);
+                        XP_ERROR!(Some(&mut *ctxt), xmlXPathError::XPATH_INVALID_TYPE as i32);
                         ***/
                     }
                 }
@@ -1895,7 +1895,7 @@ unsafe fn xml_xptr_end_point_function(ctxt: &mut XmlXPathParserContext, nargs: u
                 XmlXPathObjectType::XPathLocationset | XmlXPathObjectType::XPathNodeset
             )
         }) {
-            XP_ERROR!(ctxt, XmlXPathError::XPathInvalidType as i32);
+            XP_ERROR!(Some(&mut *ctxt), XmlXPathError::XPathInvalidType as i32);
         }
 
         obj = ctxt.value_pop();
@@ -1904,7 +1904,7 @@ unsafe fn xml_xptr_end_point_function(ctxt: &mut XmlXPathParserContext, nargs: u
             let tmp = xml_xptr_new_location_set_node_set((*obj).nodesetval.as_deref());
             xml_xpath_free_object(obj);
             if tmp.is_null() {
-                XP_ERROR!(ctxt, XmlXPathError::XPathMemoryError as i32);
+                XP_ERROR!(Some(&mut *ctxt), XmlXPathError::XPathMemoryError as i32);
             }
             obj = tmp;
         }
@@ -1912,7 +1912,7 @@ unsafe fn xml_xptr_end_point_function(ctxt: &mut XmlXPathParserContext, nargs: u
         let newset: XmlLocationSetPtr = xml_xptr_location_set_create(null_mut());
         if newset.is_null() {
             xml_xpath_free_object(obj);
-            XP_ERROR!(ctxt, XmlXPathError::XPathMemoryError as i32);
+            XP_ERROR!(Some(&mut *ctxt), XmlXPathError::XPathMemoryError as i32);
         }
         let oldset: XmlLocationSetPtr = (*obj).user as XmlLocationSetPtr;
         if !oldset.is_null() {
@@ -1937,7 +1937,7 @@ unsafe fn xml_xptr_end_point_function(ctxt: &mut XmlXPathParserContext, nargs: u
                             ) {
                                 xml_xpath_free_object(obj);
                                 xml_xptr_free_location_set(newset);
-                                XP_ERROR!(ctxt, XmlXPathError::XPtrSyntaxError as i32);
+                                XP_ERROR!(Some(&mut *ctxt), XmlXPathError::XPtrSyntaxError as i32);
                             }
                             point = xml_xptr_new_point(node, (*tmp).index2);
                         } else if (*tmp).user.is_null() {
@@ -1950,7 +1950,7 @@ unsafe fn xml_xptr_end_point_function(ctxt: &mut XmlXPathParserContext, nargs: u
                         // Should we raise an error ?
                         // xmlXPathFreeObject(obj);
                         // xmlXPathFreeObject(newset);
-                        // XP_ERROR!(ctxt, xmlXPathError::XPATH_INVALID_TYPE as i32);
+                        // XP_ERROR!(Some(&mut *ctxt), xmlXPathError::XPATH_INVALID_TYPE as i32);
                     }
                 }
                 if !point.is_null() {
@@ -1973,7 +1973,7 @@ unsafe fn xml_xptr_here_function(ctxt: &mut XmlXPathParserContext, nargs: usize)
         }
 
         let Some(here) = (*ctxt.context).here else {
-            XP_ERROR!(ctxt, XmlXPathError::XPtrSyntaxError as i32);
+            XP_ERROR!(Some(&mut *ctxt), XmlXPathError::XPtrSyntaxError as i32);
         };
 
         (*ctxt).value_push(xml_xptr_new_location_set_nodes(here, None));
@@ -1991,7 +1991,7 @@ unsafe fn xml_xptr_origin_function(ctxt: &mut XmlXPathParserContext, nargs: usiz
         }
 
         let Some(origin) = (*ctxt.context).origin else {
-            XP_ERROR!(ctxt, XmlXPathError::XPtrSyntaxError as i32);
+            XP_ERROR!(Some(&mut *ctxt), XmlXPathError::XPtrSyntaxError as i32);
         };
 
         (*ctxt).value_push(xml_xptr_new_location_set_nodes(origin, None));
@@ -2114,7 +2114,10 @@ unsafe fn xml_xptr_get_child_no(ctxt: XmlXPathParserContextPtr, indx: i32) {
             .value()
             .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNodeset)
         {
-            crate::XP_ERROR!(ctxt, crate::xpath::XmlXPathError::XPathInvalidType as i32)
+            crate::XP_ERROR!(
+                Some(&mut *ctxt),
+                crate::xpath::XmlXPathError::XPathInvalidType as i32
+            )
         };
         let obj: XmlXPathObjectPtr = (*ctxt).value_pop();
         let Some(oldset) = (*obj).nodesetval.as_deref_mut().filter(|_| indx > 0) else {
@@ -2222,12 +2225,12 @@ unsafe fn xml_xptr_eval_xptr_part(ctxt: XmlXPathParserContextPtr, mut name: *mut
             });
         }
         if name.is_null() {
-            XP_ERROR!(ctxt, XmlXPathError::XPathExprError as i32);
+            XP_ERROR!(Some(&mut *ctxt), XmlXPathError::XPathExprError as i32);
         }
 
         if (*ctxt).current_char() != Some('(') {
             xml_free(name as _);
-            XP_ERROR!(ctxt, XmlXPathError::XPathExprError as i32);
+            XP_ERROR!(Some(&mut *ctxt), XmlXPathError::XPathExprError as i32);
         }
         (*ctxt).next_char();
         let mut level = 1;
@@ -2252,7 +2255,7 @@ unsafe fn xml_xptr_eval_xptr_part(ctxt: XmlXPathParserContextPtr, mut name: *mut
 
         if level != 0 && (*ctxt).current_char().is_none() {
             xml_free(name as _);
-            XP_ERROR!(ctxt, XmlXPathError::XPtrSyntaxError as i32);
+            XP_ERROR!(Some(&mut *ctxt), XmlXPathError::XPtrSyntaxError as i32);
         }
 
         if xml_str_equal(name, c"xpointer".as_ptr() as _)
@@ -2293,7 +2296,7 @@ unsafe fn xml_xptr_eval_xptr_part(ctxt: XmlXPathParserContextPtr, mut name: *mut
                     (*ctxt).base = old_base;
                     (*ctxt).cur = old_cur;
                     xml_free(name as _);
-                    XP_ERROR!(ctxt, XmlXPathError::XPathExprError as i32);
+                    XP_ERROR!(Some(&mut *ctxt), XmlXPathError::XPathExprError as i32);
                 }
                 xml_xptr_eval_child_seq(
                     ctxt,
@@ -2316,14 +2319,14 @@ unsafe fn xml_xptr_eval_xptr_part(ctxt: XmlXPathParserContextPtr, mut name: *mut
                 (*ctxt).base = old_base;
                 (*ctxt).cur = old_cur;
                 xml_free(name as _);
-                XP_ERROR!(ctxt, XmlXPathError::XPtrSyntaxError as i32);
+                XP_ERROR!(Some(&mut *ctxt), XmlXPathError::XPtrSyntaxError as i32);
             };
             (*ctxt).skip_blanks();
             if (*ctxt).current_char() != Some('=') {
                 (*ctxt).base = old_base;
                 (*ctxt).cur = old_cur;
                 xml_free(name as _);
-                XP_ERROR!(ctxt, XmlXPathError::XPtrSyntaxError as i32);
+                XP_ERROR!(Some(&mut *ctxt), XmlXPathError::XPtrSyntaxError as i32);
             }
             (*ctxt).next_char();
             (*ctxt).skip_blanks();
@@ -2373,7 +2376,7 @@ unsafe fn xml_xptr_eval_full_xptr(ctxt: XmlXPathParserContextPtr, mut name: *mut
             });
         }
         if name.is_null() {
-            XP_ERROR!(ctxt, XmlXPathError::XPathExprError as i32);
+            XP_ERROR!(Some(&mut *ctxt), XmlXPathError::XPathExprError as i32);
         }
         while !name.is_null() {
             (*ctxt).error = XmlXPathError::XPathExpressionOK as i32;
@@ -2441,7 +2444,7 @@ unsafe fn xml_xptr_eval_xpointer(ctxt: XmlXPathParserContextPtr) {
                 xml_strndup(name.as_ptr(), name.len() as i32)
             });
             if name.is_null() {
-                XP_ERROR!(ctxt, XmlXPathError::XPathExprError as i32);
+                XP_ERROR!(Some(&mut *ctxt), XmlXPathError::XPathExprError as i32);
             }
             if (*ctxt).current_char() == Some('(') {
                 xml_xptr_eval_full_xptr(ctxt, name);
@@ -2458,7 +2461,7 @@ unsafe fn xml_xptr_eval_xpointer(ctxt: XmlXPathParserContextPtr) {
         }
         (*ctxt).skip_blanks();
         if (*ctxt).current_char().is_some() {
-            XP_ERROR!(ctxt, XmlXPathError::XPathExprError as i32);
+            XP_ERROR!(Some(&mut *ctxt), XmlXPathError::XPathExprError as i32);
         }
     }
 }
@@ -2551,7 +2554,7 @@ pub unsafe fn xml_xptr_eval(xpath: &str, ctx: XmlXPathContextPtr) -> XmlXPathObj
 #[cfg(feature = "libxml_xptr_locs")]
 pub unsafe fn xml_xptr_range_to_function(ctxt: XmlXPathParserContextPtr, _nargs: i32) {
     unsafe {
-        XP_ERROR!(ctxt, XmlXPathError::XPathExprError as i32);
+        XP_ERROR!(Some(&mut *ctxt), XmlXPathError::XPathExprError as i32);
     }
 }
 
@@ -2835,7 +2838,10 @@ pub unsafe fn xml_xptr_eval_range_predicate(ctxt: XmlXPathParserContextPtr) {
 
         (*ctxt).skip_blanks();
         if (*ctxt).current_char() != Some('[') {
-            XP_ERROR!(ctxt, XmlXPathError::XPathInvalidPredicateError as i32);
+            XP_ERROR!(
+                Some(&mut *ctxt),
+                XmlXPathError::XPathInvalidPredicateError as i32
+            );
         }
         (*ctxt).next_char();
         (*ctxt).skip_blanks();
@@ -2847,7 +2853,10 @@ pub unsafe fn xml_xptr_eval_range_predicate(ctxt: XmlXPathParserContextPtr) {
             .value()
             .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathLocationset)
         {
-            crate::XP_ERROR!(ctxt, crate::xpath::XmlXPathError::XPathInvalidType as i32)
+            crate::XP_ERROR!(
+                Some(&mut *ctxt),
+                crate::xpath::XmlXPathError::XPathInvalidType as i32
+            )
         };
         let obj: XmlXPathObjectPtr = (*ctxt).value_pop();
         let oldset: XmlLocationSetPtr = (*obj).user as _;
@@ -2909,7 +2918,10 @@ pub unsafe fn xml_xptr_eval_range_predicate(ctxt: XmlXPathParserContextPtr) {
             (*ctxt).value_push(xml_xptr_wrap_location_set(newset));
         }
         if (*ctxt).current_char() != Some(']') {
-            XP_ERROR!(ctxt, XmlXPathError::XPathInvalidPredicateError as i32);
+            XP_ERROR!(
+                Some(&mut *ctxt),
+                XmlXPathError::XPathInvalidPredicateError as i32
+            );
         }
 
         (*ctxt).next_char();

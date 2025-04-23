@@ -28,13 +28,13 @@ pub(crate) fn check_arity(
 ) -> Result<(), XmlXPathError> {
     if nargs != x {
         unsafe {
-            xml_xpath_err(ctxt, XmlXPathError::XPathInvalidArity as i32);
+            xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidArity as i32);
         }
         return Err(XmlXPathError::XPathInvalidArity);
     }
     if (ctxt.value_tab.len() as i32) < ctxt.value_frame + x as i32 {
         unsafe {
-            xml_xpath_err(ctxt, XmlXPathError::XPathStackError as i32);
+            xml_xpath_err(Some(ctxt), XmlXPathError::XPathStackError as i32);
         }
         return Err(XmlXPathError::XPathInvalidArity);
     }
@@ -95,7 +95,7 @@ pub unsafe fn xml_xpath_boolean_function(ctxt: &mut XmlXPathParserContext, nargs
         }
         let cur = ctxt.value_pop();
         if cur.is_null() {
-            xml_xpath_err(ctxt, XmlXPathError::XPathInvalidOperand as i32);
+            xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidOperand as i32);
             return;
         }
         let cur = xml_xpath_cache_convert_boolean(ctxt.context, cur);
@@ -118,7 +118,7 @@ pub unsafe fn xml_xpath_ceiling_function(ctxt: &mut XmlXPathParserContext, nargs
             .value()
             .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
         {
-            xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
+            xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
         };
 
@@ -141,7 +141,7 @@ pub unsafe fn xml_xpath_count_function(ctxt: &mut XmlXPathParserContext, nargs: 
                 XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
             )
         }) {
-            xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
+            xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
         }
         let cur: XmlXPathObjectPtr = ctxt.value_pop();
@@ -186,7 +186,7 @@ pub unsafe fn xml_xpath_concat_function(ctxt: &mut XmlXPathParserContext, mut na
             if newobj.is_null() || (*newobj).typ != XmlXPathObjectType::XPathString {
                 xml_xpath_release_object(ctxt.context, newobj);
                 xml_xpath_release_object(ctxt.context, cur);
-                xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
+                xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
                 return;
             }
             let mut tmp = (*newobj).stringval.take();
@@ -217,7 +217,7 @@ pub unsafe fn xml_xpath_contains_function(ctxt: &mut XmlXPathParserContext, narg
             .value()
             .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathString)
         {
-            xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
+            xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
         };
         let needle: XmlXPathObjectPtr = ctxt.value_pop();
@@ -227,7 +227,7 @@ pub unsafe fn xml_xpath_contains_function(ctxt: &mut XmlXPathParserContext, narg
         if hay.is_null() || (*hay).typ != XmlXPathObjectType::XPathString {
             xml_xpath_release_object(ctxt.context, hay);
             xml_xpath_release_object(ctxt.context, needle);
-            xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
+            xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
         }
         if (*needle)
@@ -271,7 +271,7 @@ pub unsafe fn xml_xpath_id_function(ctxt: &mut XmlXPathParserContext, nargs: usi
         }
         let mut obj = ctxt.value_pop();
         if obj.is_null() {
-            xml_xpath_err(ctxt, XmlXPathError::XPathInvalidOperand as i32);
+            xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidOperand as i32);
             return;
         }
         if matches!(
@@ -344,7 +344,7 @@ pub unsafe fn xml_xpath_floor_function(ctxt: &mut XmlXPathParserContext, nargs: 
             .value()
             .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
         {
-            xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
+            xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
         };
 
@@ -368,7 +368,7 @@ pub unsafe fn xml_xpath_last_function(ctxt: &mut XmlXPathParserContext, nargs: u
                 (*ctxt.context).context_size as f64,
             ));
         } else {
-            xml_xpath_err(ctxt, XmlXPathError::XPathInvalidCtxtSize as i32);
+            xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidCtxtSize as i32);
         }
     }
 }
@@ -401,7 +401,7 @@ pub unsafe fn xml_xpath_lang_function(ctxt: &mut XmlXPathParserContext, nargs: u
             .value()
             .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathString)
         {
-            xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
+            xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
         };
         let val = ctxt.value_pop();
@@ -457,7 +457,7 @@ pub unsafe fn xml_xpath_local_name_function(ctxt: &mut XmlXPathParserContext, mu
                 XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
             )
         }) {
-            xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
+            xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
         }
         let cur: XmlXPathObjectPtr = ctxt.value_pop();
@@ -514,7 +514,7 @@ pub unsafe fn xml_xpath_not_function(ctxt: &mut XmlXPathParserContext, nargs: us
             .value()
             .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathBoolean)
         {
-            xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
+            xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
         };
         let val = &mut (**ctxt.value_mut().unwrap()).boolval;
@@ -557,7 +557,7 @@ pub(super) unsafe fn xml_xpath_name_function(ctxt: &mut XmlXPathParserContext, m
                 XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
             )
         }) {
-            xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
+            xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
         }
         let cur: XmlXPathObjectPtr = ctxt.value_pop();
@@ -650,7 +650,7 @@ pub unsafe fn xml_xpath_namespace_uri_function(ctxt: &mut XmlXPathParserContext,
                 XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
             )
         }) {
-            xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
+            xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
         }
         let cur: XmlXPathObjectPtr = ctxt.value_pop();
@@ -713,7 +713,7 @@ pub unsafe fn xml_xpath_normalize_function(ctxt: &mut XmlXPathParserContext, mut
             .value()
             .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathString)
         {
-            xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
+            xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
         };
         let Some(source) = (*ctxt.value().unwrap()).stringval.as_deref_mut() else {
@@ -799,7 +799,7 @@ pub unsafe fn xml_xpath_position_function(ctxt: &mut XmlXPathParserContext, narg
                 (*ctxt.context).proximity_position as f64,
             ));
         } else {
-            xml_xpath_err(ctxt, XmlXPathError::XPathInvalidCtxtPosition as i32);
+            xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidCtxtPosition as i32);
         }
     }
 }
@@ -820,7 +820,7 @@ pub unsafe fn xml_xpath_round_function(ctxt: &mut XmlXPathParserContext, nargs: 
             .value()
             .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
         {
-            xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
+            xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
         };
 
@@ -883,7 +883,7 @@ pub unsafe fn xml_xpath_string_function(ctxt: &mut XmlXPathParserContext, nargs:
         }
         let cur: XmlXPathObjectPtr = ctxt.value_pop();
         if cur.is_null() {
-            xml_xpath_err(ctxt, XmlXPathError::XPathInvalidOperand as i32);
+            xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidOperand as i32);
             return;
         }
         ctxt.value_push(xml_xpath_cache_convert_string(ctxt.context, cur));
@@ -922,7 +922,7 @@ pub unsafe fn xml_xpath_string_length_function(ctxt: &mut XmlXPathParserContext,
             .value()
             .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathString)
         {
-            xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
+            xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
         };
         let cur: XmlXPathObjectPtr = ctxt.value_pop();
@@ -949,7 +949,7 @@ pub unsafe fn xml_xpath_starts_with_function(ctxt: &mut XmlXPathParserContext, n
             .value()
             .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathString)
         {
-            xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
+            xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
         };
         let needle: XmlXPathObjectPtr = ctxt.value_pop();
@@ -959,7 +959,7 @@ pub unsafe fn xml_xpath_starts_with_function(ctxt: &mut XmlXPathParserContext, n
         if hay.is_null() || (*hay).typ != XmlXPathObjectType::XPathString {
             xml_xpath_release_object(ctxt.context, hay);
             xml_xpath_release_object(ctxt.context, needle);
-            xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
+            xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
         }
         let m = (*hay).stringval.as_deref().map_or(0, |s| s.len());
@@ -1019,7 +1019,7 @@ pub unsafe fn xml_xpath_substring_function(ctxt: &mut XmlXPathParserContext, nar
                 .value()
                 .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
             {
-                xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
+                xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
                 return;
             };
             len = ctxt.value_pop();
@@ -1032,7 +1032,7 @@ pub unsafe fn xml_xpath_substring_function(ctxt: &mut XmlXPathParserContext, nar
             .value()
             .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
         {
-            xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
+            xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
         };
         let start: XmlXPathObjectPtr = ctxt.value_pop();
@@ -1043,7 +1043,7 @@ pub unsafe fn xml_xpath_substring_function(ctxt: &mut XmlXPathParserContext, nar
             .value()
             .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathString)
         {
-            xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
+            xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
         };
         let str: XmlXPathObjectPtr = ctxt.value_pop();
@@ -1178,7 +1178,7 @@ pub unsafe fn xml_xpath_sum_function(ctxt: &mut XmlXPathParserContext, nargs: us
                 XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
             )
         }) {
-            xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
+            xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
         }
         let cur: XmlXPathObjectPtr = ctxt.value_pop();

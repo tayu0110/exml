@@ -56,10 +56,10 @@ use super::{
         xml_xpath_translate_function, xml_xpath_true_function,
     },
     xml_xpath_cast_to_boolean, xml_xpath_cast_to_number, xml_xpath_cast_to_string,
-    xml_xpath_context_set_cache, xml_xpath_free_cache, xml_xpath_free_object,
+    xml_xpath_context_set_cache, xml_xpath_err, xml_xpath_free_cache, xml_xpath_free_object,
     xml_xpath_new_comp_expr, xml_xpath_perr_memory, xml_xpath_registered_funcs_cleanup,
     xml_xpath_registered_ns_cleanup, xml_xpath_registered_variables_cleanup,
-    xml_xpath_release_object, xml_xpatherror,
+    xml_xpath_release_object,
 };
 
 pub type XmlXPathParserContextPtr = *mut XmlXPathParserContext;
@@ -206,7 +206,7 @@ impl XmlXPathParserContext {
         unsafe {
             let obj: XmlXPathObjectPtr = self.value_pop();
             if obj.is_null() {
-                xml_xpatherror(self, XmlXPathError::XPathInvalidOperand as i32);
+                xml_xpath_err(Some(self), XmlXPathError::XPathInvalidOperand as i32);
                 self.error = XmlXPathError::XPathInvalidOperand as i32;
                 return 0.0;
             }
@@ -229,7 +229,7 @@ impl XmlXPathParserContext {
         unsafe {
             let obj: XmlXPathObjectPtr = self.value_pop();
             if obj.is_null() {
-                xml_xpatherror(self, XmlXPathError::XPathInvalidOperand as i32);
+                xml_xpath_err(Some(self), XmlXPathError::XPathInvalidOperand as i32);
                 self.error = XmlXPathError::XPathInvalidOperand as i32;
                 return false;
             }
@@ -252,7 +252,7 @@ impl XmlXPathParserContext {
         unsafe {
             let obj: XmlXPathObjectPtr = self.value_pop();
             if obj.is_null() {
-                xml_xpatherror(self, XmlXPathError::XPathInvalidOperand as i32);
+                xml_xpath_err(Some(self), XmlXPathError::XPathInvalidOperand as i32);
                 self.error = XmlXPathError::XPathInvalidOperand as i32;
                 return None;
             }
@@ -274,12 +274,12 @@ impl XmlXPathParserContext {
     pub unsafe fn pop_node_set(&mut self) -> Option<Box<XmlNodeSet>> {
         unsafe {
             if self.value().is_none() {
-                xml_xpatherror(self, XmlXPathError::XPathInvalidOperand as i32);
+                xml_xpath_err(Some(self), XmlXPathError::XPathInvalidOperand as i32);
                 self.error = XmlXPathError::XPathInvalidOperand as i32;
                 return None;
             }
             if !self.xml_xpath_stack_is_node_set() {
-                xml_xpatherror(self, XmlXPathError::XPathInvalidType as i32);
+                xml_xpath_err(Some(self), XmlXPathError::XPathInvalidType as i32);
                 self.error = XmlXPathError::XPathInvalidType as i32;
                 return None;
             }
@@ -303,12 +303,12 @@ impl XmlXPathParserContext {
     pub unsafe fn pop_external(&mut self) -> *mut c_void {
         unsafe {
             let Some(value) = self.value() else {
-                xml_xpatherror(self, XmlXPathError::XPathInvalidOperand as i32);
+                xml_xpath_err(Some(self), XmlXPathError::XPathInvalidOperand as i32);
                 self.error = XmlXPathError::XPathInvalidOperand as i32;
                 return null_mut();
             };
             if (*value).typ != XmlXPathObjectType::XPathUsers {
-                xml_xpatherror(self, XmlXPathError::XPathInvalidType as i32);
+                xml_xpath_err(Some(self), XmlXPathError::XPathInvalidType as i32);
                 self.error = XmlXPathError::XPathInvalidType as i32;
                 return null_mut();
             }

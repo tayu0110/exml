@@ -79,7 +79,10 @@ impl XmlXPathParserContext {
 
             if !xpctxt.is_null() {
                 if (*xpctxt).depth >= XPATH_MAX_RECURSION_DEPTH as i32 {
-                    xml_xpath_err(self, XmlXPathError::XPathRecursionLimitExceeded as i32);
+                    xml_xpath_err(
+                        Some(self),
+                        XmlXPathError::XPathRecursionLimitExceeded as i32,
+                    );
                     return;
                 }
                 // Parsing a single '(' pushes about 10 functions on the call stack before recursing!
@@ -583,7 +586,7 @@ impl XmlXPathParserContext {
                     }
                 } else {
                     // make sure all cases are covered explicitly
-                    xml_xpath_err(self, XmlXPathError::XPathExprError as i32);
+                    xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
                     return;
                 }
             }
@@ -832,7 +835,7 @@ impl XmlXPathParserContext {
                             op2 = self.comp.borrow().last;
                             self.skip_blanks();
                             if self.current_char() != Some('(') {
-                                xml_xpath_err(self, XmlXPathError::XPathExprError as i32);
+                                xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
                                 return;
                             }
                             self.next_char();
@@ -846,7 +849,7 @@ impl XmlXPathParserContext {
 
                             self.skip_blanks();
                             if self.current_char() != Some(')') {
-                                xml_xpath_err(self, XmlXPathError::XPathExprError as i32);
+                                xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
                                 return;
                             }
                             self.next_char();
@@ -910,7 +913,7 @@ impl XmlXPathParserContext {
                             && xml_xpath_ns_lookup(self.context, prefix.as_ptr() as *const u8)
                                 .is_none()
                         {
-                            xml_xpath_err(self, XmlXPathError::XPathUndefPrefixError as i32);
+                            xml_xpath_err(Some(self), XmlXPathError::XPathUndefPrefixError as i32);
                         }
                     }
                 }
@@ -1006,7 +1009,7 @@ impl XmlXPathParserContext {
                 .map(|name| name.to_owned())
                 .or_else(|| self.parse_ncname())
             else {
-                xml_xpath_err(self, XmlXPathError::XPathExprError as i32);
+                xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
                 return None;
             };
 
@@ -1026,7 +1029,7 @@ impl XmlXPathParserContext {
                 } else if name == "text" {
                     *typ = XmlXPathTypeVal::NodeTypeText;
                 } else {
-                    xml_xpath_err(self, XmlXPathError::XPathExprError as i32);
+                    xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
                     return None;
                 }
 
@@ -1039,7 +1042,7 @@ impl XmlXPathParserContext {
                     name = None;
                     if self.current_char() != Some(')') {
                         let Some(lit) = self.parse_literal() else {
-                            xml_xpath_err(self, XmlXPathError::XPathExprError as i32);
+                            xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
                             return None;
                         };
                         name = Some(lit);
@@ -1048,7 +1051,7 @@ impl XmlXPathParserContext {
                     }
                 }
                 if self.current_char() != Some(')') {
-                    xml_xpath_err(self, XmlXPathError::XPathUnclosedError as i32);
+                    xml_xpath_err(Some(self), XmlXPathError::XPathUnclosedError as i32);
                     return None;
                 }
                 self.next_char();
@@ -1084,7 +1087,7 @@ impl XmlXPathParserContext {
                 }
 
                 let Some(ncname) = self.parse_ncname() else {
-                    xml_xpath_err(self, XmlXPathError::XPathExprError as i32);
+                    xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
                     return None;
                 };
                 name = ncname;
@@ -1140,7 +1143,7 @@ impl XmlXPathParserContext {
                     return;
                 };
                 if self.current_char() != Some(')') {
-                    xml_xpath_err(self, XmlXPathError::XPathExprError as i32);
+                    xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
                     return;
                 }
                 self.next_char();
@@ -1180,7 +1183,7 @@ impl XmlXPathParserContext {
             if self.current_char() != Some('.')
                 && self.current_char().is_none_or(|c| !c.is_ascii_digit())
             {
-                xml_xpath_err(self, XmlXPathError::XPathNumberError as i32);
+                xml_xpath_err(Some(self), XmlXPathError::XPathNumberError as i32);
                 return;
             }
             ret = 0.0;
@@ -1196,7 +1199,7 @@ impl XmlXPathParserContext {
 
                 self.next_char();
                 if self.current_char().is_none_or(|c| !c.is_ascii_digit()) && ok == 0 {
-                    xml_xpath_err(self, XmlXPathError::XPathNumberError as i32);
+                    xml_xpath_err(Some(self), XmlXPathError::XPathNumberError as i32);
                     return;
                 }
                 while self.current_char() == Some('0') {
@@ -1280,7 +1283,10 @@ impl XmlXPathParserContext {
                     self.next_char();
                 }
                 if self.current_char().is_none_or(|c| !xml_is_char(c as u32)) {
-                    xml_xpath_err(self, XmlXPathError::XPathUnfinishedLiteralError as i32);
+                    xml_xpath_err(
+                        Some(self),
+                        XmlXPathError::XPathUnfinishedLiteralError as i32,
+                    );
                     return;
                 } else {
                     ret = xml_strndup(self.base[q..].as_ptr(), self.cur as i32 - q as i32);
@@ -1296,14 +1302,17 @@ impl XmlXPathParserContext {
                     self.next_char();
                 }
                 if self.current_char().is_none_or(|c| !xml_is_char(c as u32)) {
-                    xml_xpath_err(self, XmlXPathError::XPathUnfinishedLiteralError as i32);
+                    xml_xpath_err(
+                        Some(self),
+                        XmlXPathError::XPathUnfinishedLiteralError as i32,
+                    );
                     return;
                 } else {
                     ret = xml_strndup(self.base[q..].as_ptr(), self.cur as i32 - q as i32);
                     self.next_char();
                 }
             } else {
-                xml_xpath_err(self, XmlXPathError::XPathStartLiteralError as i32);
+                xml_xpath_err(Some(self), XmlXPathError::XPathStartLiteralError as i32);
                 return;
             }
             if ret.is_null() {
@@ -1350,13 +1359,13 @@ impl XmlXPathParserContext {
             let mut sort = true;
 
             let Some((prefix, name)) = self.parse_qname() else {
-                xml_xpath_err(self, XmlXPathError::XPathExprError as i32);
+                xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
                 return;
             };
             self.skip_blanks();
 
             if self.current_char() != Some('(') {
-                xml_xpath_err(self, XmlXPathError::XPathExprError as i32);
+                xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
                 return;
             }
             self.next_char();
@@ -1391,7 +1400,7 @@ impl XmlXPathParserContext {
                         break;
                     }
                     if self.current_char() != Some(',') {
-                        xml_xpath_err(self, XmlXPathError::XPathExprError as i32);
+                        xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
                         return;
                     }
                     self.next_char();
@@ -1429,7 +1438,7 @@ impl XmlXPathParserContext {
 
             self.skip_blanks();
             if self.current_char() != Some('[') {
-                xml_xpath_err(self, XmlXPathError::XPathInvalidPredicateError as i32);
+                xml_xpath_err(Some(self), XmlXPathError::XPathInvalidPredicateError as i32);
                 return;
             }
             self.next_char();
@@ -1453,7 +1462,7 @@ impl XmlXPathParserContext {
             };
 
             if self.current_char() != Some(']') {
-                xml_xpath_err(self, XmlXPathError::XPathInvalidPredicateError as i32);
+                xml_xpath_err(Some(self), XmlXPathError::XPathInvalidPredicateError as i32);
                 return;
             }
 
@@ -1507,12 +1516,12 @@ impl XmlXPathParserContext {
         unsafe {
             self.skip_blanks();
             if self.current_char() != Some('$') {
-                xml_xpath_err(self, XmlXPathError::XPathVariableRefError as i32);
+                xml_xpath_err(Some(self), XmlXPathError::XPathVariableRefError as i32);
                 return;
             }
             self.next_char();
             let Some((prefix, name)) = self.parse_qname() else {
-                xml_xpath_err(self, XmlXPathError::XPathVariableRefError as i32);
+                xml_xpath_err(Some(self), XmlXPathError::XPathVariableRefError as i32);
                 return;
             };
             self.comp.borrow_mut().last = -1;
@@ -1531,7 +1540,7 @@ impl XmlXPathParserContext {
             );
             self.skip_blanks();
             if !self.context.is_null() && (*self.context).flags & XML_XPATH_NOVAR as i32 != 0 {
-                xml_xpath_err(self, XmlXPathError::XPathForbidVariableError as i32);
+                xml_xpath_err(Some(self), XmlXPathError::XPathForbidVariableError as i32);
             }
         }
     }
@@ -1597,7 +1606,7 @@ impl XmlXPathParserContext {
                 if count > XML_MAX_NAME_LENGTH {
                     self.cur += count;
                     unsafe {
-                        xml_xpath_err(self, XmlXPathError::XPathExprError as i32);
+                        xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
                     }
                     return None;
                 }
@@ -1719,20 +1728,26 @@ impl XmlXPathParserContext {
         let expr = self.current_str();
         let Some(sep) = expr.chars().next().filter(|&sep| sep == '"' || sep == '\'') else {
             unsafe {
-                xml_xpath_err(self, XmlXPathError::XPathStartLiteralError as i32);
+                xml_xpath_err(Some(self), XmlXPathError::XPathStartLiteralError as i32);
             }
             return None;
         };
         let Some((lit, _)) = expr.split_once(|c: char| !xml_is_char(c as u32) || c == sep) else {
             unsafe {
-                xml_xpath_err(self, XmlXPathError::XPathUnfinishedLiteralError as i32);
+                xml_xpath_err(
+                    Some(self),
+                    XmlXPathError::XPathUnfinishedLiteralError as i32,
+                );
             }
             return None;
         };
         let expr = &expr[1 + lit.len()..];
         if !expr.starts_with(sep) {
             unsafe {
-                xml_xpath_err(self, XmlXPathError::XPathUnfinishedLiteralError as i32);
+                xml_xpath_err(
+                    Some(self),
+                    XmlXPathError::XPathUnfinishedLiteralError as i32,
+                );
             }
             None
         } else {

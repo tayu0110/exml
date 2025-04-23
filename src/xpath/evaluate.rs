@@ -49,7 +49,7 @@ impl XmlXPathParserContext {
 
             if op_count > (*xpctxt).op_limit || (*xpctxt).op_count > (*xpctxt).op_limit - op_count {
                 (*xpctxt).op_count = (*xpctxt).op_limit;
-                xml_xpath_err(self, XmlXPathError::XPathOpLimitExceeded as i32);
+                xml_xpath_err(Some(self), XmlXPathError::XPathOpLimitExceeded as i32);
                 return -1;
             }
 
@@ -85,7 +85,7 @@ impl XmlXPathParserContext {
 
                     // Check for trailing characters.
                     if self.cur < self.base.len() {
-                        XP_ERROR!(self, XmlXPathError::XPathExprError as i32);
+                        XP_ERROR!(Some(self), XmlXPathError::XPathExprError as i32);
                     }
 
                     if self.comp.borrow().steps.len() > 1 && self.comp.borrow().last >= 0 {
@@ -192,7 +192,10 @@ impl XmlXPathParserContext {
                 return 0;
             }
             if (*self.context).depth >= XPATH_MAX_RECURSION_DEPTH as i32 {
-                xml_xpath_err(self, XmlXPathError::XPathRecursionLimitExceeded as i32);
+                xml_xpath_err(
+                    Some(self),
+                    XmlXPathError::XPathRecursionLimitExceeded as i32,
+                );
                 return 0;
             }
             (*self.context).depth += 1;
@@ -326,7 +329,7 @@ impl XmlXPathParserContext {
                             .value()
                             .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
                         {
-                            xml_xpath_err(self, XmlXPathError::XPathInvalidType as i32);
+                            xml_xpath_err(Some(self), XmlXPathError::XPathInvalidType as i32);
                             return 0;
                         }
                     }
@@ -379,7 +382,7 @@ impl XmlXPathParserContext {
                     {
                         xml_xpath_release_object(self.context, arg1);
                         xml_xpath_release_object(self.context, arg2);
-                        xml_xpath_err(self, XmlXPathError::XPathInvalidType as i32);
+                        xml_xpath_err(Some(self), XmlXPathError::XPathInvalidType as i32);
                         return 0;
                     }
                     if (*self.context).op_limit != 0
@@ -470,7 +473,10 @@ impl XmlXPathParserContext {
                     if (*op).value5.is_null() {
                         val = xml_xpath_variable_lookup(self.context, (*op).value4 as _);
                         if val.is_null() {
-                            xml_xpath_err(self, XmlXPathError::XPathUndefVariableError as i32);
+                            xml_xpath_err(
+                                Some(self),
+                                XmlXPathError::XPathUndefVariableError as i32,
+                            );
                             return 0;
                         }
                         self.value_push(val);
@@ -491,7 +497,10 @@ impl XmlXPathParserContext {
                             Some(&uri),
                         );
                         if val.is_null() {
-                            xml_xpath_err(self, XmlXPathError::XPathUndefVariableError as i32);
+                            xml_xpath_err(
+                                Some(self),
+                                XmlXPathError::XPathUndefVariableError as i32,
+                            );
                             return 0;
                         }
                         self.value_push(val);
@@ -553,7 +562,7 @@ impl XmlXPathParserContext {
                                 "xmlXPathCompOpEval: function {} not found\n",
                                 CStr::from_ptr((*op).value4 as *mut i8).to_string_lossy()
                             );
-                            xml_xpath_err(self, XmlXPathError::XPathUnknownFuncError as i32);
+                            xml_xpath_err(Some(self), XmlXPathError::XPathUnknownFuncError as i32);
                             return 0;
                         }
 
@@ -571,7 +580,7 @@ impl XmlXPathParserContext {
                     if self.error == XmlXPathError::XPathExpressionOK as i32
                         && self.value_tab.len() != frame + 1
                     {
-                        xml_xpath_err(self, XmlXPathError::XPathStackError as i32);
+                        xml_xpath_err(Some(self), XmlXPathError::XPathStackError as i32);
                         return 0;
                     }
                 }
@@ -747,7 +756,7 @@ impl XmlXPathParserContext {
                         .is_none_or(|value| (*value).typ != (XmlXPathObjectType::XPathNodeset))
                     {
                         {
-                            xml_xpath_err(self, XmlXPathError::XPathInvalidType as i32);
+                            xml_xpath_err(Some(self), XmlXPathError::XPathInvalidType as i32);
                             return 0;
                         }
                     };
@@ -802,7 +811,7 @@ impl XmlXPathParserContext {
                         };
                     }
                     if self.value().is_none() {
-                        xml_xpath_err(self, XmlXPathError::XPathInvalidOperand as i32);
+                        xml_xpath_err(Some(self), XmlXPathError::XPathInvalidOperand as i32);
                         return 0;
                     }
                     if (*op).ch2 == -1 {
@@ -818,7 +827,10 @@ impl XmlXPathParserContext {
                                 (*value).typ != XmlXPathObjectType::XPathLocationset
                             }) {
                                 {
-                                    xml_xpath_err(self, XmlXPathError::XPathInvalidType as i32);
+                                    xml_xpath_err(
+                                        Some(self),
+                                        XmlXPathError::XPathInvalidType as i32,
+                                    );
                                     return 0;
                                 }
                             };
@@ -904,7 +916,7 @@ impl XmlXPathParserContext {
                             if self.value().is_none_or(|value| {
                                 (*value).typ != XmlXPathObjectType::XPathNodeset
                             }) {
-                                xml_xpath_err(self, XmlXPathError::XPathInvalidType as i32);
+                                xml_xpath_err(Some(self), XmlXPathError::XPathInvalidType as i32);
                                 return 0;
                             };
                             obj = self.value_pop();
@@ -990,7 +1002,10 @@ impl XmlXPathParserContext {
                 return 0;
             }
             if (*self.context).depth >= XPATH_MAX_RECURSION_DEPTH as i32 {
-                xml_xpath_err(self, XmlXPathError::XPathRecursionLimitExceeded as i32);
+                xml_xpath_err(
+                    Some(self),
+                    XmlXPathError::XPathRecursionLimitExceeded as i32,
+                );
                 return 0;
             }
             (*self.context).depth += 1;
@@ -1042,7 +1057,7 @@ impl XmlXPathParserContext {
                     {
                         xml_xpath_release_object(self.context, arg1);
                         xml_xpath_release_object(self.context, arg2);
-                        xml_xpath_err(self, XmlXPathError::XPathInvalidType as i32);
+                        xml_xpath_err(Some(self), XmlXPathError::XPathInvalidType as i32);
                         return 0;
                     }
                     if (*self.context).op_limit != 0
@@ -1178,7 +1193,10 @@ impl XmlXPathParserContext {
                 return 0;
             }
             if (*self.context).depth >= XPATH_MAX_RECURSION_DEPTH as i32 {
-                xml_xpath_err(self, XmlXPathError::XPathRecursionLimitExceeded as i32);
+                xml_xpath_err(
+                    Some(self),
+                    XmlXPathError::XPathRecursionLimitExceeded as i32,
+                );
                 return 0;
             }
             (*self.context).depth += 1;
@@ -1232,7 +1250,7 @@ impl XmlXPathParserContext {
                     {
                         xml_xpath_release_object(self.context, arg1);
                         xml_xpath_release_object(self.context, arg2);
-                        xml_xpath_err(self, XmlXPathError::XPathInvalidType as i32);
+                        xml_xpath_err(Some(self), XmlXPathError::XPathInvalidType as i32);
                         return 0;
                     }
                     if (*self.context).op_limit != 0
@@ -1455,7 +1473,7 @@ impl XmlXPathParserContext {
                 .value()
                 .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNodeset)
             {
-                xml_xpath_err(self, XmlXPathError::XPathInvalidType as i32);
+                xml_xpath_err(Some(self), XmlXPathError::XPathInvalidType as i32);
                 return 0;
             };
             let obj: XmlXPathObjectPtr = self.value_pop();
