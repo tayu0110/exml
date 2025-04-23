@@ -54,9 +54,9 @@ use crate::{
         XmlGenericNodePtr, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
     },
     xpath::{
-        XML_XPATH_NAN, XmlXPathCompExpr, XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathError,
-        XmlXPathObject, XmlXPathObjectPtr, XmlXPathObjectType, XmlXPathOp,
-        XmlXPathParserContextPtr, XmlXPathStepOpPtr, XmlXPathVariableLookupFunc,
+        XML_XPATH_NAN, XmlXPathCompExpr, XmlXPathContextPtr, XmlXPathError, XmlXPathObject,
+        XmlXPathObjectPtr, XmlXPathObjectType, XmlXPathOp, XmlXPathParserContextPtr,
+        XmlXPathStepOpPtr, XmlXPathVariableLookupFunc,
         functions::{cast_to_number, xml_xpath_number_function},
         xml_xpath_cast_boolean_to_string, xml_xpath_cast_node_set_to_string,
         xml_xpath_cast_node_to_number, xml_xpath_cast_node_to_string,
@@ -1054,19 +1054,11 @@ pub unsafe fn xml_xpath_registered_variables_cleanup(ctxt: XmlXPathContextPtr) {
 ///
 /// Returns the newly allocated xmlXPathCompExprPtr or NULL in case of error
 #[doc(alias = "xmlXPathNewCompExpr")]
-pub(super) unsafe fn xml_xpath_new_comp_expr() -> XmlXPathCompExprPtr {
-    unsafe {
-        let cur: XmlXPathCompExprPtr =
-            xml_malloc(size_of::<XmlXPathCompExpr>()) as XmlXPathCompExprPtr;
-        if cur.is_null() {
-            xml_xpath_err_memory(None, Some("allocating component\n"));
-            return null_mut();
-        }
-        std::ptr::write(&mut *cur, XmlXPathCompExpr::default());
-        (*cur).steps.reserve(10);
-        (*cur).last = -1;
-        cur
-    }
+pub(super) fn xml_xpath_new_comp_expr() -> XmlXPathCompExpr {
+    let mut cur = XmlXPathCompExpr::default();
+    cur.steps.reserve(10);
+    cur.last = -1;
+    cur
 }
 
 /// Handle a redefinition of attribute error
@@ -1205,11 +1197,10 @@ pub unsafe fn xml_xpath_root(ctxt: XmlXPathParserContextPtr) {
 pub unsafe fn xml_xpath_try_stream_compile(
     ctxt: XmlXPathContextPtr,
     xpath: &str,
-) -> XmlXPathCompExprPtr {
+) -> Option<XmlXPathCompExpr> {
     unsafe {
         // Optimization: use streaming patterns when the XPath expression can
         // be compiled to a stream lookup
-        let comp: XmlXPathCompExprPtr;
 
         if !xpath.contains(['[', '(', '@']) {
             // We don't try to handle expressions using the verbose axis
@@ -1224,7 +1215,7 @@ pub unsafe fn xml_xpath_try_stream_compile(
                     || (*ctxt).namespaces.as_ref().map_or(0, |t| t.len()) == 0
                     || tmp.starts_with(':')
                 {
-                    return null_mut();
+                    return None;
                 }
             }
 
@@ -1249,20 +1240,13 @@ pub unsafe fn xml_xpath_try_stream_compile(
                 xml_pattern_compile(xpath, XmlPatternFlags::XmlPatternXPath as i32, namespaces)
             {
                 if stream.is_streamable() == 1 {
-                    comp = xml_xpath_new_comp_expr();
-                    if comp.is_null() {
-                        xml_xpath_err_memory(
-                            Some(&mut *ctxt),
-                            Some("allocating streamable expression\n"),
-                        );
-                        return null_mut();
-                    }
-                    (*comp).stream = Some(stream);
-                    return comp;
+                    let mut comp = xml_xpath_new_comp_expr();
+                    comp.stream = Some(stream);
+                    return Some(comp);
                 }
             }
         }
-        null_mut()
+        None
     }
 }
 
@@ -1386,12 +1370,10 @@ impl TryFrom<i32> for XmlXPathTypeVal {
 }
 
 pub unsafe fn xml_xpath_optimize_expression(
-    pctxt: XmlXPathParserContextPtr,
+    pctxt: &mut XmlXPathParserContext,
     op: XmlXPathStepOpPtr,
 ) {
     unsafe {
-        let comp: XmlXPathCompExprPtr = (*pctxt).comp;
-
         // Try to rewrite "descendant-or-self::node()/foo" to an optimized
         // internal representation.
 
@@ -1399,7 +1381,7 @@ pub unsafe fn xml_xpath_optimize_expression(
             && (*op).ch1 != -1
             && (*op).ch2 == -1
         {
-            let prevop = &(*comp).steps[(*op).ch1 as usize];
+            let prevop = &pctxt.comp.borrow().steps[(*op).ch1 as usize];
 
             if matches!(prevop.op, XmlXPathOp::XPathOpCollect /* 11 */)
                 && prevop.value == XmlXPathAxisVal::AxisDescendantOrSelf as i32
@@ -1436,7 +1418,7 @@ pub unsafe fn xml_xpath_optimize_expression(
         }
 
         // Recurse
-        let ctxt: XmlXPathContextPtr = (*pctxt).context;
+        let ctxt: XmlXPathContextPtr = pctxt.context;
         if !ctxt.is_null() {
             if (*ctxt).depth >= XPATH_MAX_RECURSION_DEPTH as i32 {
                 return;
@@ -1444,10 +1426,16 @@ pub unsafe fn xml_xpath_optimize_expression(
             (*ctxt).depth += 1;
         }
         if (*op).ch1 != -1 {
-            xml_xpath_optimize_expression(pctxt, &raw mut (*comp).steps[(*op).ch1 as usize]);
+            let mut comp = pctxt.comp.borrow_mut();
+            let ptr = &raw mut comp.steps[(*op).ch1 as usize];
+            drop(comp);
+            xml_xpath_optimize_expression(pctxt, ptr);
         }
         if (*op).ch2 != -1 {
-            xml_xpath_optimize_expression(pctxt, &raw mut (*comp).steps[(*op).ch2 as usize]);
+            let mut comp = pctxt.comp.borrow_mut();
+            let ptr = &raw mut comp.steps[(*op).ch2 as usize];
+            drop(comp);
+            xml_xpath_optimize_expression(pctxt, ptr);
         }
         if !ctxt.is_null() {
             (*ctxt).depth -= 1;
@@ -1870,7 +1858,7 @@ unsafe fn xml_xpath_next_preceding_internal(
 }
 
 unsafe fn xml_xpath_is_positional_predicate(
-    ctxt: XmlXPathParserContextPtr,
+    ctxt: &mut XmlXPathParserContext,
     op: XmlXPathStepOpPtr,
     max_pos: *mut i32,
 ) -> i32 {
@@ -1891,10 +1879,10 @@ unsafe fn xml_xpath_is_positional_predicate(
             return 0;
         }
 
-        if (*op).ch2 == -1 || (*op).ch2 >= (*(*ctxt).comp).steps.len() as i32 {
+        if (*op).ch2 == -1 || (*op).ch2 >= ctxt.comp.borrow().steps.len() as i32 {
             return 0;
         }
-        let expr_op = &(*(*ctxt).comp).steps[(*op).ch2 as usize];
+        let expr_op = &ctxt.comp.borrow().steps[(*op).ch2 as usize];
 
         if matches!(expr_op.op, XmlXPathOp::XPathOpValue)
             && !expr_op.value4.is_null()
@@ -1930,7 +1918,7 @@ unsafe fn xml_xpath_is_positional_predicate(
 /// filtered result.
 #[doc(alias = "xmlXPathNodeSetFilter")]
 pub(super) unsafe fn xml_xpath_node_set_filter(
-    ctxt: XmlXPathParserContextPtr,
+    ctxt: &mut XmlXPathParserContext,
     set: Option<&mut XmlNodeSet>,
     filter_op_index: i32,
     min_pos: i32,
@@ -1949,7 +1937,7 @@ pub(super) unsafe fn xml_xpath_node_set_filter(
             return;
         }
 
-        let xpctxt: XmlXPathContextPtr = (*ctxt).context;
+        let xpctxt: XmlXPathContextPtr = ctxt.context;
         let oldnode = (*xpctxt).node;
         let olddoc = (*xpctxt).doc;
         let oldcs: i32 = (*xpctxt).context_size;
@@ -1976,12 +1964,12 @@ pub(super) unsafe fn xml_xpath_node_set_filter(
                 (*xpctxt).doc = node.document();
             }
 
-            let res = (*ctxt).evaluate_precompiled_operation_to_boolean(
-                &raw mut (*(*ctxt).comp).steps[filter_op_index as usize],
-                1,
-            );
+            let mut comp = ctxt.comp.borrow_mut();
+            let op = &raw mut comp.steps[filter_op_index as usize];
+            drop(comp);
+            let res = ctxt.evaluate_precompiled_operation_to_boolean(op, 1);
 
-            if (*ctxt).error != XmlXPathError::XPathExpressionOK as i32 {
+            if ctxt.error != XmlXPathError::XPathExpressionOK as i32 {
                 break;
             }
             if res < 0 {
@@ -2043,7 +2031,7 @@ pub(super) unsafe fn xml_xpath_node_set_filter(
 /// in the filtered result.
 #[doc(alias = "xmlXPathCompOpEvalPredicate")]
 unsafe fn xml_xpath_comp_op_eval_predicate(
-    ctxt: XmlXPathParserContextPtr,
+    ctxt: &mut XmlXPathParserContext,
     op: XmlXPathStepOpPtr,
     set: &mut XmlNodeSet,
     min_pos: i32,
@@ -2052,28 +2040,30 @@ unsafe fn xml_xpath_comp_op_eval_predicate(
 ) {
     unsafe {
         if (*op).ch1 != -1 {
-            let comp: XmlXPathCompExprPtr = (*ctxt).comp;
             // Process inner predicates first.
             if !matches!(
-                (*comp).steps[(*op).ch1 as usize].op,
+                ctxt.comp.borrow().steps[(*op).ch1 as usize].op,
                 XmlXPathOp::XPathOpPredicate
             ) {
                 generic_error!("xmlXPathCompOpEvalPredicate: Expected a predicate\n");
                 XP_ERROR!(ctxt, XmlXPathError::XPathInvalidOperand as i32);
             }
-            if (*(*ctxt).context).depth >= XPATH_MAX_RECURSION_DEPTH as i32 {
+            if (*ctxt.context).depth >= XPATH_MAX_RECURSION_DEPTH as i32 {
                 XP_ERROR!(ctxt, XmlXPathError::XPathRecursionLimitExceeded as i32);
             }
-            (*(*ctxt).context).depth += 1;
+            (*ctxt.context).depth += 1;
+            let mut comp = ctxt.comp.borrow_mut();
+            let op = &raw mut comp.steps[(*op).ch1 as usize];
+            drop(comp);
             xml_xpath_comp_op_eval_predicate(
                 ctxt,
-                &raw mut (*comp).steps[(*op).ch1 as usize],
+                op,
                 set,
                 1,
                 set.node_tab.len() as i32,
                 has_ns_nodes,
             );
-            (*(*ctxt).context).depth -= 1;
+            (*ctxt.context).depth -= 1;
             CHECK_ERROR!(ctxt);
         }
 
@@ -2361,11 +2351,15 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
         has_axis_range = 0;
         if (*op).ch2 != -1 {
             // There's at least one predicate. 16 == XPATH_OP_PREDICATE
-            pred_op = &raw mut (*(*ctxt).comp).steps[(*op).ch2 as usize];
-            if xml_xpath_is_positional_predicate(ctxt, pred_op, addr_of_mut!(max_pos)) != 0 {
+            let mut comp = (*ctxt).comp.borrow_mut();
+            pred_op = &raw mut comp.steps[(*op).ch2 as usize];
+            drop(comp);
+            if xml_xpath_is_positional_predicate(&mut *ctxt, pred_op, addr_of_mut!(max_pos)) != 0 {
                 if (*pred_op).ch1 != -1 {
                     // Use the next inner predicate operator.
-                    pred_op = &raw mut (*(*ctxt).comp).steps[(*pred_op).ch1 as usize];
+                    let mut comp = (*ctxt).comp.borrow_mut();
+                    pred_op = &raw mut comp.steps[(*pred_op).ch1 as usize];
+                    drop(comp);
                     has_predicate_range = 1;
                 } else {
                     // There's no other predicate than the [n] predicate.
@@ -2632,7 +2626,7 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
                 // function: xmlXPathCompOpEvalPredicate().
                 if has_predicate_range != 0 {
                     xml_xpath_comp_op_eval_predicate(
-                        ctxt,
+                        &mut *ctxt,
                         pred_op,
                         seq.as_deref_mut().unwrap(),
                         max_pos,
@@ -2642,7 +2636,7 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
                 } else {
                     let max_pos = seq.as_deref().unwrap().node_tab.len() as i32;
                     xml_xpath_comp_op_eval_predicate(
-                        ctxt,
+                        &mut *ctxt,
                         pred_op,
                         seq.as_deref_mut().unwrap(),
                         1,
@@ -2777,10 +2771,9 @@ pub(super) unsafe fn xml_xpath_location_set_filter(
                 (*xpctxt).doc = context_node.document();
             }
 
-            let res: i32 = (*ctxt).evaluate_precompiled_operation_to_boolean(
-                &raw mut (*(*ctxt).comp).steps[filter_op_index as usize],
-                1,
-            );
+            let mut comp = (*ctxt).comp.borrow_mut();
+            let op = &raw mut comp.steps[filter_op_index as usize];
+            let res: i32 = (*ctxt).evaluate_precompiled_operation_to_boolean(op, 1);
 
             if (*ctxt).error != XmlXPathError::XPathExpressionOK as i32 {
                 break;

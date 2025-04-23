@@ -37,11 +37,11 @@ use crate::{
         xml_free_doc,
     },
     xpath::{
-        XML_XPATH_CHECKNS, XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathObjectPtr,
+        XML_XPATH_CHECKNS, XmlXPathCompExpr, XmlXPathContextPtr, XmlXPathObjectPtr,
         XmlXPathObjectType,
         internals::{xml_xpath_register_ns, xml_xpath_register_variable_ns},
-        xml_xpath_compiled_eval, xml_xpath_ctxt_compile, xml_xpath_eval, xml_xpath_free_comp_expr,
-        xml_xpath_free_context, xml_xpath_free_object, xml_xpath_is_nan, xml_xpath_new_context,
+        xml_xpath_compiled_eval, xml_xpath_ctxt_compile, xml_xpath_eval, xml_xpath_free_context,
+        xml_xpath_free_object, xml_xpath_is_nan, xml_xpath_new_context,
     },
 };
 
@@ -173,7 +173,7 @@ unsafe fn xml_schematron_register_variables(
         (*ctxt).doc = Some(instance);
         (*ctxt).node = cur;
         while let Some(now) = letr {
-            let_eval = xml_xpath_compiled_eval(now.comp, ctxt);
+            let_eval = xml_xpath_compiled_eval(now.comp.clone(), ctxt);
             if let_eval.is_null() {
                 generic_error!("Evaluation of compiled expression failed\n");
                 return -1;
@@ -277,21 +277,21 @@ enum XmlSchematronTestType {
 pub struct XmlSchematronLet {
     next: Option<Box<XmlSchematronLet>>, /* the next let variable in the list */
     name: String,                        /* the name of the variable */
-    comp: XmlXPathCompExprPtr,           /* the compiled expression */
+    comp: Rc<RefCell<XmlXPathCompExpr>>, /* the compiled expression */
 }
 
-impl Drop for XmlSchematronLet {
-    /// Free a list of let variables.
-    #[doc(alias = "xmlSchematronFreeLets")]
-    fn drop(&mut self) {
-        self.next.take();
-        unsafe {
-            if !self.comp.is_null() {
-                xml_xpath_free_comp_expr(self.comp);
-            }
-        }
-    }
-}
+// impl Drop for XmlSchematronLet {
+//     /// Free a list of let variables.
+//     #[doc(alias = "xmlSchematronFreeLets")]
+//     fn drop(&mut self) {
+//         self.next.take();
+//         unsafe {
+//             if !self.comp.is_null() {
+//                 xml_xpath_free_comp_expr(self.comp);
+//             }
+//         }
+//     }
+// }
 
 /// A Schematrons test, either an assert or a report
 #[doc(alias = "xmlSchematronTest")]
@@ -301,22 +301,22 @@ pub struct XmlSchematronTest {
     typ: XmlSchematronTestType,           /* the test type */
     node: XmlNodePtr,                     /* the node in the tree */
     test: String,                         /* the expression to test */
-    comp: XmlXPathCompExprPtr,            /* the compiled expression */
+    comp: Rc<RefCell<XmlXPathCompExpr>>,  /* the compiled expression */
     report: Option<String>,               /* the message to report */
 }
 
-impl Drop for XmlSchematronTest {
-    /// Free a list of tests.
-    #[doc(alias = "xmlSchematronFreeTests")]
-    fn drop(&mut self) {
-        self.next.take();
-        unsafe {
-            if !self.comp.is_null() {
-                xml_xpath_free_comp_expr(self.comp);
-            }
-        }
-    }
-}
+// impl Drop for XmlSchematronTest {
+//     /// Free a list of tests.
+//     #[doc(alias = "xmlSchematronFreeTests")]
+//     fn drop(&mut self) {
+//         self.next.take();
+//         unsafe {
+//             if !self.comp.is_null() {
+//                 xml_xpath_free_comp_expr(self.comp);
+//             }
+//         }
+//     }
+// }
 
 /// A Schematrons rule
 #[doc(alias = "xmlSchematronRule")]
@@ -513,7 +513,6 @@ impl<'a> XmlSchematronValidCtxt<'a> {
     unsafe fn format_report(&self, test: XmlNodePtr, cur: XmlNodePtr) -> Option<String> {
         unsafe {
             let mut ret: Option<String> = None;
-            let mut comp: XmlXPathCompExprPtr;
 
             let mut child = test.children().map(|c| XmlNodePtr::try_from(c).unwrap());
             while let Some(cur_node) = child {
@@ -548,11 +547,12 @@ impl<'a> XmlSchematronValidCtxt<'a> {
                     }
                     ret.push_str(&node.name().unwrap());
                 } else if is_schematron(cur_node, "value-of") {
-                    comp = cur_node
+                    let comp = cur_node
                         .get_no_ns_prop("select")
-                        .map(|select| xml_xpath_ctxt_compile(self.xctxt, &select))
-                        .unwrap_or(null_mut());
-                    let eval: XmlXPathObjectPtr = xml_xpath_compiled_eval(comp, self.xctxt);
+                        .and_then(|select| xml_xpath_ctxt_compile(self.xctxt, &select))
+                        .unwrap();
+                    let eval: XmlXPathObjectPtr =
+                        xml_xpath_compiled_eval(Rc::new(RefCell::new(comp)), self.xctxt);
 
                     match (*eval).typ {
                         XmlXPathObjectType::XPathNodeset => {
@@ -596,7 +596,6 @@ impl<'a> XmlSchematronValidCtxt<'a> {
                         }
                     }
                     xml_xpath_free_object(eval);
-                    xml_xpath_free_comp_expr(comp);
                 } else {
                     child = cur_node
                         .next
@@ -739,7 +738,7 @@ impl<'a> XmlSchematronValidCtxt<'a> {
             failed = 0;
             (*self.xctxt).doc = Some(instance);
             (*self.xctxt).node = Some(cur.into());
-            let ret: XmlXPathObjectPtr = xml_xpath_compiled_eval(test.comp, self.xctxt);
+            let ret: XmlXPathObjectPtr = xml_xpath_compiled_eval(test.comp.clone(), self.xctxt);
             if ret.is_null() {
                 failed = 1;
             } else {
@@ -1161,8 +1160,7 @@ impl<'a> XmlSchematronParserCtxt<'a> {
     ) {
         unsafe {
             // try first to compile the test expression
-            let comp: XmlXPathCompExprPtr = xml_xpath_ctxt_compile(self.xctxt, test);
-            if comp.is_null() {
+            let Some(comp) = xml_xpath_ctxt_compile(self.xctxt, test) else {
                 xml_schematron_perr!(
                     self,
                     Some(node.into()),
@@ -1171,14 +1169,14 @@ impl<'a> XmlSchematronParserCtxt<'a> {
                     test
                 );
                 return;
-            }
+            };
 
             let ret = Box::new(XmlSchematronTest {
                 typ,
                 next: None,
                 node,
                 test: test.to_owned(),
-                comp,
+                comp: Rc::new(RefCell::new(comp)),
                 report: report.map(|report| report.to_owned()),
             });
             if let Some(mut prev) = rule.tests.as_deref_mut() {
@@ -1277,8 +1275,7 @@ impl<'a> XmlSchematronParserCtxt<'a> {
                         }
                     };
 
-                    let var_comp: XmlXPathCompExprPtr = xml_xpath_ctxt_compile(self.xctxt, &value);
-                    if var_comp.is_null() {
+                    let Some(var_comp) = xml_xpath_ctxt_compile(self.xctxt, &value) else {
                         xml_schematron_perr!(
                             self,
                             Some(cur_node.into()),
@@ -1287,13 +1284,13 @@ impl<'a> XmlSchematronParserCtxt<'a> {
                             value
                         );
                         return;
-                    }
+                    };
 
                     // add new let variable to the beginning of the list
                     let letr = Box::new(XmlSchematronLet {
                         name,
                         next: ruleptr.borrow_mut().lets.take(),
-                        comp: var_comp,
+                        comp: Rc::new(RefCell::new(var_comp)),
                     });
                     ruleptr.borrow_mut().lets = Some(letr);
                 } else if is_schematron(cur_node, "assert") {
@@ -1433,8 +1430,6 @@ impl<'a> XmlSchematronParserCtxt<'a> {
     #[doc(alias = "xmlSchematronParseTestReportMsg")]
     unsafe fn parse_test_report_msg(&mut self, con: XmlNodePtr) {
         unsafe {
-            let mut comp: XmlXPathCompExprPtr;
-
             let mut child = con.children().map(|c| XmlNodePtr::try_from(c).unwrap());
             while let Some(cur_node) = child {
                 #[allow(clippy::if_same_then_else)]
@@ -1447,8 +1442,14 @@ impl<'a> XmlSchematronParserCtxt<'a> {
                 } else if is_schematron(cur_node, "value-of") {
                     if let Some(select) = cur_node.get_no_ns_prop("select") {
                         // try first to compile the test expression
-                        comp = xml_xpath_ctxt_compile(self.xctxt, &select);
-                        if comp.is_null() {
+                        if xml_xpath_ctxt_compile(self.xctxt, &select).is_some() {
+                            xml_schematron_perr!(
+                                self,
+                                Some(cur_node.into()),
+                                XmlParserErrors::XmlSchemavAttrInvalid,
+                                "value-of has no select attribute"
+                            );
+                        } else {
                             xml_schematron_perr!(
                                 self,
                                 Some(cur_node.into()),
@@ -1456,15 +1457,7 @@ impl<'a> XmlSchematronParserCtxt<'a> {
                                 "Failed to compile select expression {}",
                                 select
                             );
-                        } else {
-                            xml_schematron_perr!(
-                                self,
-                                Some(cur_node.into()),
-                                XmlParserErrors::XmlSchemavAttrInvalid,
-                                "value-of has no select attribute"
-                            );
                         }
-                        xml_xpath_free_comp_expr(comp);
                     }
                 }
                 child = cur_node

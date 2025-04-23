@@ -29,7 +29,7 @@
 //
 // Author: daniel@veillard.com
 
-use std::{borrow::Cow, collections::HashMap, ffi::c_void, ptr::null_mut};
+use std::{borrow::Cow, cell::RefCell, collections::HashMap, ffi::c_void, ptr::null_mut, rc::Rc};
 
 use crate::{
     error::XmlError,
@@ -40,9 +40,9 @@ use crate::{
 };
 
 use super::{
-    XPATH_MAX_STACK_DEPTH, XmlNodeSet, XmlXPathAxisPtr, XmlXPathCompExprPtr,
-    XmlXPathContextCachePtr, XmlXPathError, XmlXPathFuncLookup, XmlXPathFunction,
-    XmlXPathObjectPtr, XmlXPathObjectType, XmlXPathTypePtr, XmlXPathVariableLookupFunc,
+    XPATH_MAX_STACK_DEPTH, XmlNodeSet, XmlXPathAxisPtr, XmlXPathCompExpr, XmlXPathContextCachePtr,
+    XmlXPathError, XmlXPathFuncLookup, XmlXPathFunction, XmlXPathObjectPtr, XmlXPathObjectType,
+    XmlXPathTypePtr, XmlXPathVariableLookupFunc,
     functions::{
         xml_xpath_boolean_function, xml_xpath_ceiling_function, xml_xpath_concat_function,
         xml_xpath_contains_function, xml_xpath_count_function, xml_xpath_escape_uri_function,
@@ -56,10 +56,10 @@ use super::{
         xml_xpath_translate_function, xml_xpath_true_function,
     },
     xml_xpath_cast_to_boolean, xml_xpath_cast_to_number, xml_xpath_cast_to_string,
-    xml_xpath_context_set_cache, xml_xpath_free_cache, xml_xpath_free_comp_expr,
-    xml_xpath_free_object, xml_xpath_new_comp_expr, xml_xpath_perr_memory,
-    xml_xpath_registered_funcs_cleanup, xml_xpath_registered_ns_cleanup,
-    xml_xpath_registered_variables_cleanup, xml_xpath_release_object, xml_xpatherror,
+    xml_xpath_context_set_cache, xml_xpath_free_cache, xml_xpath_free_object,
+    xml_xpath_new_comp_expr, xml_xpath_perr_memory, xml_xpath_registered_funcs_cleanup,
+    xml_xpath_registered_ns_cleanup, xml_xpath_registered_variables_cleanup,
+    xml_xpath_release_object, xml_xpatherror,
 };
 
 pub type XmlXPathParserContextPtr = *mut XmlXPathParserContext;
@@ -76,8 +76,8 @@ pub struct XmlXPathParserContext {
     pub(crate) context: XmlXPathContextPtr, /* the evaluation context */
     pub(crate) value_tab: Vec<XmlXPathObjectPtr>, /* stack of values */
 
-    pub(crate) comp: XmlXPathCompExprPtr, /* the precompiled expression */
-    pub(crate) xptr: i32,                 /* it this an XPointer expression */
+    pub(crate) comp: Rc<RefCell<XmlXPathCompExpr>>, /* the precompiled expression */
+    pub(crate) xptr: i32,                           /* it this an XPointer expression */
     pub(crate) ancestor: Option<XmlGenericNodePtr>, /* used for walking preceding axis */
 
     pub(crate) value_frame: i32, /* unused */
@@ -88,18 +88,13 @@ impl XmlXPathParserContext {
     ///
     /// Returns the xmlXPathParserContext just allocated.
     #[doc(alias = "xmlXPathNewParserContext")]
-    pub unsafe fn new(xpath: &str, ctxt: XmlXPathContextPtr) -> Option<Self> {
-        unsafe {
-            let mut ret = XmlXPathParserContext::default();
-            ret.cur = 0;
-            ret.base = xpath.into();
-            ret.context = ctxt;
-            ret.comp = xml_xpath_new_comp_expr();
-            if ret.comp.is_null() {
-                return None;
-            }
-            Some(ret)
-        }
+    pub fn new(xpath: &str, ctxt: XmlXPathContextPtr) -> Self {
+        let mut ret = XmlXPathParserContext::default();
+        ret.cur = 0;
+        ret.base = xpath.into();
+        ret.context = ctxt;
+        ret.comp = Rc::new(RefCell::new(xml_xpath_new_comp_expr()));
+        ret
     }
 
     /// Create a new xmlXPathParserContext when processing a compiled expression
@@ -107,7 +102,7 @@ impl XmlXPathParserContext {
     /// Returns the xmlXPathParserContext just allocated.
     #[doc(alias = "xmlXPathCompParserContext")]
     pub(super) fn from_compiled_expression(
-        comp: XmlXPathCompExprPtr,
+        comp: Rc<RefCell<XmlXPathCompExpr>>,
         ctxt: XmlXPathContextPtr,
     ) -> Option<Self> {
         let mut ret = XmlXPathParserContext::default();
@@ -334,7 +329,7 @@ impl Default for XmlXPathParserContext {
             error: 0,
             context: null_mut(),
             value_tab: vec![],
-            comp: null_mut(),
+            comp: Rc::new(RefCell::new(Default::default())),
             xptr: 0,
             ancestor: None,
             value_frame: 0,
@@ -353,13 +348,6 @@ impl Drop for XmlXPathParserContext {
                 } else {
                     xml_xpath_free_object(value);
                 }
-            }
-            if !self.comp.is_null() {
-                #[cfg(feature = "libxml_pattern")]
-                {
-                    (*self.comp).stream.take();
-                }
-                xml_xpath_free_comp_expr(self.comp);
             }
         }
     }

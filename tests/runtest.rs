@@ -2430,10 +2430,9 @@ unsafe fn test_xpath(xpath: &str, xptr: i32, expr: i32) {
         use exml::{
             libxml::xpointer::{xml_xptr_eval, xml_xptr_new_context},
             xpath::{
-                XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathObjectPtr, xml_xpath_compile,
-                xml_xpath_compiled_eval, xml_xpath_debug_dump_object, xml_xpath_eval_expression,
-                xml_xpath_free_comp_expr, xml_xpath_free_context, xml_xpath_free_object,
-                xml_xpath_new_context,
+                XmlXPathContextPtr, XmlXPathObjectPtr, xml_xpath_compile, xml_xpath_compiled_eval,
+                xml_xpath_debug_dump_object, xml_xpath_eval_expression, xml_xpath_free_context,
+                xml_xpath_free_object, xml_xpath_new_context,
             },
         };
 
@@ -2461,10 +2460,8 @@ unsafe fn test_xpath(xpath: &str, xptr: i32, expr: i32) {
             } else {
                 /* res = xmlXPathEval(str, ctxt); */
 
-                let comp: XmlXPathCompExprPtr = xml_xpath_compile(xpath);
-                if !comp.is_null() {
-                    res = xml_xpath_compiled_eval(comp, ctxt);
-                    xml_xpath_free_comp_expr(comp);
+                if let Some(comp) = xml_xpath_compile(xpath) {
+                    res = xml_xpath_compiled_eval(Rc::new(RefCell::new(comp)), ctxt);
                 } else {
                     res = null_mut();
                 }

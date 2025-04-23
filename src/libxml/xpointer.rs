@@ -2482,9 +2482,7 @@ pub unsafe fn xml_xptr_eval(xpath: &str, ctx: XmlXPathContextPtr) -> XmlXPathObj
             return null_mut();
         }
 
-        let Some(mut ctxt) = XmlXPathParserContext::new(xpath, ctx) else {
-            return null_mut();
-        };
+        let mut ctxt = XmlXPathParserContext::new(xpath, ctx);
         xml_xptr_eval_xpointer(&raw mut ctxt);
 
         #[cfg(feature = "libxml_xptr_locs")]

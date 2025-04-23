@@ -53,9 +53,11 @@ pub mod object;
 
 use std::{
     borrow::Cow,
+    cell::RefCell,
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of_mut, null_mut},
+    rc::Rc,
 };
 
 use libc::memset;
@@ -272,6 +274,7 @@ pub struct XmlXPathStepOp {
 pub type XmlXPathCompExprPtr = *mut XmlXPathCompExpr;
 #[cfg(feature = "xpath")]
 #[repr(C)]
+#[derive(Default)]
 pub struct XmlXPathCompExpr {
     pub(crate) steps: Vec<XmlXPathStepOp>, /* ops for computation of this expression */
     pub(crate) last: i32,                  /* index of last step in expression */
@@ -280,13 +283,24 @@ pub struct XmlXPathCompExpr {
     pub(crate) stream: Option<Box<XmlPattern>>,
 }
 
-impl Default for XmlXPathCompExpr {
-    fn default() -> Self {
-        Self {
-            steps: vec![],
-            last: 0,
-            expr: "".into(),
-            stream: None,
+impl Drop for XmlXPathCompExpr {
+    /// Free up the memory allocated by @comp
+    #[doc(alias = "xmlXPathFreeCompExpr")]
+    #[cfg(feature = "xpath")]
+    fn drop(&mut self) {
+        unsafe {
+            for op in &self.steps {
+                if !op.value4.is_null() {
+                    if matches!(op.op, XmlXPathOp::XPathOpValue) {
+                        xml_xpath_free_object(op.value4 as _);
+                    } else {
+                        xml_free(op.value4 as _);
+                    }
+                }
+                if !op.value5.is_null() {
+                    xml_free(op.value5 as _);
+                }
+            }
         }
     }
 }
@@ -906,9 +920,7 @@ pub unsafe fn xml_xpath_eval(xpath: &str, ctx: XmlXPathContextPtr) -> XmlXPathOb
 
         xml_init_parser();
 
-        let Some(mut ctxt) = XmlXPathParserContext::new(xpath, ctx) else {
-            return null_mut();
-        };
+        let mut ctxt = XmlXPathParserContext::new(xpath, ctx);
         ctxt.evaluate_expression();
 
         if ctxt.error != XmlXPathError::XPathExpressionOK as i32 {
@@ -991,7 +1003,7 @@ pub unsafe fn xml_xpath_eval_predicate(ctxt: XmlXPathContextPtr, res: XmlXPathOb
 /// The caller has to free the object.
 #[doc(alias = "xmlXPathCompile")]
 #[cfg(feature = "xpath")]
-pub unsafe fn xml_xpath_compile(xpath: &str) -> XmlXPathCompExprPtr {
+pub unsafe fn xml_xpath_compile(xpath: &str) -> Option<XmlXPathCompExpr> {
     unsafe { xml_xpath_ctxt_compile(null_mut(), xpath) }
 }
 
@@ -1001,24 +1013,23 @@ pub unsafe fn xml_xpath_compile(xpath: &str) -> XmlXPathCompExprPtr {
 /// The caller has to free the object.
 #[doc(alias = "xmlXPathCtxtCompile")]
 #[cfg(feature = "xpath")]
-pub unsafe fn xml_xpath_ctxt_compile(ctxt: XmlXPathContextPtr, xpath: &str) -> XmlXPathCompExprPtr {
+pub unsafe fn xml_xpath_ctxt_compile(
+    ctxt: XmlXPathContextPtr,
+    xpath: &str,
+) -> Option<XmlXPathCompExpr> {
+    use std::{mem::take, rc::Rc};
+
     unsafe {
-        let mut comp: XmlXPathCompExprPtr;
         let mut old_depth: i32 = 0;
 
         #[cfg(feature = "libxml_pattern")]
-        {
-            comp = xml_xpath_try_stream_compile(ctxt, xpath);
-            if !comp.is_null() {
-                return comp;
-            }
+        if let Some(comp) = xml_xpath_try_stream_compile(ctxt, xpath) {
+            return Some(comp);
         }
 
         xml_init_parser();
 
-        let Some(mut pctxt) = XmlXPathParserContext::new(xpath, ctxt) else {
-            return null_mut();
-        };
+        let mut pctxt = XmlXPathParserContext::new(xpath, ctxt);
 
         if !ctxt.is_null() {
             old_depth = (*ctxt).depth;
@@ -1029,37 +1040,39 @@ pub unsafe fn xml_xpath_ctxt_compile(ctxt: XmlXPathContextPtr, xpath: &str) -> X
         }
 
         if pctxt.error != XmlXPathError::XPathExpressionOK as i32 {
-            return null_mut();
+            return None;
         }
 
-        if pctxt.cur < pctxt.base.len() {
+        let mut comp = if pctxt.cur < pctxt.base.len() {
             // aleksey: in some cases this line prints *second* error message
             // (see bug #78858) and probably this should be fixed.
             // However, we are not sure that all error messages are printed
             // out in other places. It's not critical so we leave it as-is for now
             xml_xpatherror(&raw mut pctxt, XmlXPathError::XPathExprError as i32);
-            comp = null_mut();
+            None
         } else {
-            comp = pctxt.comp;
-            if (*comp).steps.len() > 1 && (*comp).last >= 0 {
+            // comp = pctxt.comp;
+            if pctxt.comp.borrow().steps.len() > 1 && pctxt.comp.borrow().last >= 0 {
                 if !ctxt.is_null() {
                     old_depth = (*ctxt).depth;
                 }
-                xml_xpath_optimize_expression(
-                    &raw mut pctxt,
-                    &raw mut (*comp).steps[(*comp).last as usize],
-                );
+                let last = pctxt.comp.borrow().last as usize;
+                let mut comp = pctxt.comp.borrow_mut();
+                let op = &raw mut comp.steps[last];
+                drop(comp);
+                xml_xpath_optimize_expression(&mut pctxt, op);
                 if !ctxt.is_null() {
                     (*ctxt).depth = old_depth;
                 }
             }
-            pctxt.comp = null_mut();
-        }
+            Some(take(&mut pctxt.comp))
+            // pctxt.comp = null_mut();
+        };
 
-        if !comp.is_null() {
-            (*comp).expr = xpath.into();
+        if let Some(comp) = comp.as_mut() {
+            comp.borrow_mut().expr = xpath.into();
         }
-        comp
+        comp.map(|comp| Rc::into_inner(comp).unwrap().into_inner())
     }
 }
 
@@ -1096,7 +1109,7 @@ macro_rules! CHECK_CTXT_NEG {
 /// The caller has to free the object.
 #[doc(alias = "xmlXPathCompiledEvalInternal")]
 unsafe fn xml_xpath_compiled_eval_internal(
-    comp: XmlXPathCompExprPtr,
+    comp: Rc<RefCell<XmlXPathCompExpr>>,
     ctxt: XmlXPathContextPtr,
     res_obj_ptr: *mut XmlXPathObjectPtr,
     to_bool: i32,
@@ -1106,9 +1119,6 @@ unsafe fn xml_xpath_compiled_eval_internal(
 
         CHECK_CTXT_NEG!(ctxt);
 
-        if comp.is_null() {
-            return -1;
-        }
         xml_init_parser();
 
         let Some(mut pctxt) = XmlXPathParserContext::from_compiled_expression(comp, ctxt) else {
@@ -1138,7 +1148,7 @@ unsafe fn xml_xpath_compiled_eval_internal(
             xml_xpath_release_object(ctxt, res_obj);
         }
 
-        pctxt.comp = null_mut();
+        // pctxt.comp = null_mut();
 
         res
     }
@@ -1151,7 +1161,7 @@ unsafe fn xml_xpath_compiled_eval_internal(
 #[doc(alias = "xmlXPathCompiledEval")]
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_xpath_compiled_eval(
-    comp: XmlXPathCompExprPtr,
+    comp: Rc<RefCell<XmlXPathCompExpr>>,
     ctx: XmlXPathContextPtr,
 ) -> XmlXPathObjectPtr {
     unsafe {
@@ -1170,7 +1180,7 @@ pub unsafe fn xml_xpath_compiled_eval(
 #[doc(alias = "xmlXPathCompiledEvalToBoolean")]
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_xpath_compiled_eval_to_boolean(
-    comp: XmlXPathCompExprPtr,
+    comp: Rc<RefCell<XmlXPathCompExpr>>,
     ctxt: XmlXPathContextPtr,
 ) -> i32 {
     unsafe { xml_xpath_compiled_eval_internal(comp, ctxt, null_mut(), 1) }
@@ -1708,76 +1718,6 @@ mod tests {
                         "{leaks} Leaks are found in xmlXPathCastToString()"
                     );
                     eprintln!(" {}", n_val);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_compiled_eval() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_comp in 0..GEN_NB_XML_XPATH_COMP_EXPR_PTR {
-                for n_ctx in 0..GEN_NB_XML_XPATH_CONTEXT_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let comp = gen_xml_xpath_comp_expr_ptr(n_comp, 0);
-                    let ctx = gen_xml_xpath_context_ptr(n_ctx, 1);
-
-                    let ret_val = xml_xpath_compiled_eval(comp, ctx);
-                    desret_xml_xpath_object_ptr(ret_val);
-                    des_xml_xpath_comp_expr_ptr(n_comp, comp, 0);
-                    des_xml_xpath_context_ptr(n_ctx, ctx, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlXPathCompiledEval",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlXPathCompiledEval()"
-                        );
-                        eprint!(" {}", n_comp);
-                        eprintln!(" {}", n_ctx);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_compiled_eval_to_boolean() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_comp in 0..GEN_NB_XML_XPATH_COMP_EXPR_PTR {
-                for n_ctxt in 0..GEN_NB_XML_XPATH_CONTEXT_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let comp = gen_xml_xpath_comp_expr_ptr(n_comp, 0);
-                    let ctxt = gen_xml_xpath_context_ptr(n_ctxt, 1);
-
-                    let ret_val = xml_xpath_compiled_eval_to_boolean(comp, ctxt);
-                    desret_int(ret_val);
-                    des_xml_xpath_comp_expr_ptr(n_comp, comp, 0);
-                    des_xml_xpath_context_ptr(n_ctxt, ctxt, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlXPathCompiledEvalToBoolean",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlXPathCompiledEvalToBoolean()"
-                        );
-                        eprint!(" {}", n_comp);
-                        eprintln!(" {}", n_ctxt);
-                    }
                 }
             }
         }
