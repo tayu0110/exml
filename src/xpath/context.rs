@@ -57,9 +57,8 @@ use super::{
     },
     xml_xpath_cast_to_boolean, xml_xpath_cast_to_number, xml_xpath_cast_to_string,
     xml_xpath_context_set_cache, xml_xpath_err, xml_xpath_free_cache, xml_xpath_free_object,
-    xml_xpath_new_comp_expr, xml_xpath_perr_memory, xml_xpath_registered_funcs_cleanup,
-    xml_xpath_registered_ns_cleanup, xml_xpath_registered_variables_cleanup,
-    xml_xpath_release_object,
+    xml_xpath_perr_memory, xml_xpath_registered_funcs_cleanup, xml_xpath_registered_ns_cleanup,
+    xml_xpath_registered_variables_cleanup, xml_xpath_release_object,
 };
 
 pub type XmlXPathParserContextPtr = *mut XmlXPathParserContext;
@@ -93,7 +92,6 @@ impl XmlXPathParserContext {
         ret.cur = 0;
         ret.base = xpath.into();
         ret.context = ctxt;
-        ret.comp = Rc::new(RefCell::new(xml_xpath_new_comp_expr()));
         ret
     }
 

@@ -1042,17 +1042,6 @@ pub unsafe fn xml_xpath_registered_variables_cleanup(ctxt: XmlXPathContextPtr) {
     }
 }
 
-/// Create a new Xpath component
-///
-/// Returns the newly allocated xmlXPathCompExprPtr or NULL in case of error
-#[doc(alias = "xmlXPathNewCompExpr")]
-pub(super) fn xml_xpath_new_comp_expr() -> XmlXPathCompExpr {
-    let mut cur = XmlXPathCompExpr::default();
-    cur.steps.reserve(10);
-    cur.last = -1;
-    cur
-}
-
 /// Handle a redefinition of attribute error
 #[doc(alias = "xmlXPathPErrMemory")]
 pub(super) unsafe fn xml_xpath_perr_memory(
@@ -1232,7 +1221,7 @@ pub unsafe fn xml_xpath_try_stream_compile(
                 xml_pattern_compile(xpath, XmlPatternFlags::XmlPatternXPath as i32, namespaces)
             {
                 if stream.is_streamable() == 1 {
-                    let mut comp = xml_xpath_new_comp_expr();
+                    let mut comp = XmlXPathCompExpr::default();
                     comp.stream = Some(stream);
                     return Some(comp);
                 }

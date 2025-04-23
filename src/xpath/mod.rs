@@ -274,13 +274,28 @@ pub struct XmlXPathStepOp {
 pub type XmlXPathCompExprPtr = *mut XmlXPathCompExpr;
 #[cfg(feature = "xpath")]
 #[repr(C)]
-#[derive(Default)]
 pub struct XmlXPathCompExpr {
     pub(crate) steps: Vec<XmlXPathStepOp>, /* ops for computation of this expression */
     pub(crate) last: i32,                  /* index of last step in expression */
     pub(crate) expr: Box<str>,             /* the expression being computed */
     #[cfg(feature = "libxml_pattern")]
     pub(crate) stream: Option<Box<XmlPattern>>,
+}
+
+impl Default for XmlXPathCompExpr {
+    /// Create a new Xpath component
+    ///
+    /// Returns the newly allocated xmlXPathCompExprPtr or NULL in case of error
+    #[doc(alias = "xmlXPathNewCompExpr")]
+    fn default() -> Self {
+        Self {
+            steps: Vec::with_capacity(10),
+            last: -1,
+            expr: Default::default(),
+            #[cfg(feature = "libxml_pattern")]
+            stream: None,
+        }
+    }
 }
 
 impl Drop for XmlXPathCompExpr {
