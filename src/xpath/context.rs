@@ -29,20 +29,13 @@
 //
 // Author: daniel@veillard.com
 
-use std::{
-    borrow::Cow,
-    cell::RefCell,
-    collections::HashMap,
-    ffi::{CStr, c_void},
-    ptr::null_mut,
-    rc::Rc,
-};
+use std::{borrow::Cow, cell::RefCell, collections::HashMap, ffi::c_void, ptr::null_mut, rc::Rc};
 
 use crate::{
     error::XmlError,
     globals::{GenericErrorContext, StructuredError},
     hash::XmlHashTableRef,
-    libxml::{chvalid::xml_is_blank_char, globals::xml_free, xmlstring::xml_strndup},
+    libxml::chvalid::xml_is_blank_char,
     tree::{XML_XML_NAMESPACE, XmlDocPtr, XmlGenericNodePtr, XmlNsPtr},
 };
 
@@ -421,7 +414,7 @@ pub struct XmlXPathContext {
 
     // the set of namespace declarations in scope for the expression
     // The namespaces hash table
-    pub(crate) ns_hash: Option<XmlHashTableRef<'static, *mut u8>>,
+    pub(crate) ns_hash: HashMap<Cow<'static, str>, Rc<str>>,
     // variable lookup func
     pub(crate) var_lookup_func: Option<XmlXPathVariableLookupFunc>,
     // variable lookup data
@@ -433,7 +426,7 @@ pub struct XmlXPathContext {
 
     // The function name and URI when calling a function
     pub(crate) function: *const u8,
-    pub(crate) function_uri: Option<String>,
+    pub(crate) function_uri: Option<Rc<str>>,
 
     // function lookup function and data
     // function lookup func
@@ -502,44 +495,21 @@ impl XmlXPathContext {
     ///
     /// Returns 0 in case of success, -1 in case of error
     #[doc(alias = "xmlXPathRegisterNs")]
-    pub unsafe fn register_ns(&mut self, prefix: &str, ns_uri: Option<&str>) -> i32 {
-        unsafe {
-            if prefix.is_empty() {
-                return -1;
-            }
-
-            let mut ns_hash = if let Some(table) = self.ns_hash {
-                table
-            } else {
-                let Some(table) = XmlHashTableRef::with_capacity(10) else {
-                    return -1;
-                };
-                self.ns_hash = Some(table);
-                table
-            };
-            let Some(ns_uri) = ns_uri else {
-                return match ns_hash.remove_entry(prefix, |data, _| {
-                    xml_free(data as _);
-                }) {
-                    Ok(_) => 0,
-                    Err(_) => -1,
-                };
-            };
-
-            let copy: *mut u8 = xml_strndup(ns_uri.as_ptr(), ns_uri.len() as i32);
-            if copy.is_null() {
-                return -1;
-            }
-            match ns_hash.update_entry(prefix, copy, |data, _| {
-                xml_free(data as _);
-            }) {
-                Ok(_) => 0,
-                Err(_) => {
-                    xml_free(copy as _);
-                    -1
-                }
-            }
+    pub fn register_ns(&mut self, prefix: &str, ns_uri: Option<&str>) -> i32 {
+        if prefix.is_empty() {
+            return -1;
         }
+
+        let Some(ns_uri) = ns_uri else {
+            return if self.ns_hash.remove(prefix).is_some() {
+                0
+            } else {
+                -1
+            };
+        };
+
+        self.ns_hash.insert(prefix.to_owned().into(), ns_uri.into());
+        0
     }
 
     /// Registers all default XPath functions in this context
@@ -637,42 +607,26 @@ impl XmlXPathContext {
     ///
     /// Returns the value or NULL if not found
     #[doc(alias = "xmlXPathNsLookup")]
-    pub unsafe fn lookup_ns(&self, prefix: &str) -> Option<String> {
-        unsafe {
-            if prefix == "xml" {
-                return Some(XML_XML_NAMESPACE.into());
-            }
+    pub fn lookup_ns(&self, prefix: &str) -> Option<Rc<str>> {
+        if prefix == "xml" {
+            return Some(XML_XML_NAMESPACE.into());
+        }
 
-            if let Some(namespaces) = self.namespaces.as_deref() {
-                for &ns in namespaces {
-                    if ns.prefix().as_deref() == Some(prefix) {
-                        return ns.href.as_deref().map(|href| href.to_owned());
-                    }
+        if let Some(namespaces) = self.namespaces.as_deref() {
+            for &ns in namespaces {
+                if ns.prefix().as_deref() == Some(prefix) {
+                    return ns.href.as_deref().map(|href| href.into());
                 }
             }
-
-            let res = self
-                .ns_hash
-                .and_then(|table| table.lookup(prefix).copied())
-                .unwrap_or(null_mut());
-            (!res.is_null()).then(|| {
-                CStr::from_ptr(res as *const i8)
-                    .to_string_lossy()
-                    .into_owned()
-            })
         }
+
+        self.ns_hash.get(prefix).cloned()
     }
 
     /// Cleanup the XPath context data associated to registered variables
     #[doc(alias = "xmlXPathRegisteredNsCleanup")]
-    pub unsafe fn cleanup_registered_ns(&mut self) {
-        unsafe {
-            if let Some(mut table) = self.ns_hash.take().map(|t| t.into_inner()) {
-                table.clear_with(|data, _| {
-                    xml_free(data as _);
-                });
-            }
-        }
+    pub fn cleanup_registered_ns(&mut self) {
+        self.ns_hash.clear();
     }
 }
 
@@ -696,7 +650,7 @@ impl Default for XmlXPathContext {
             xptr: 0,
             here: None,
             origin: None,
-            ns_hash: None,
+            ns_hash: HashMap::default(),
             var_lookup_func: None,
             var_lookup_data: null_mut(),
             extra: null_mut(),
@@ -734,7 +688,6 @@ pub unsafe fn xml_xpath_new_context(doc: Option<XmlDocPtr>) -> XmlXPathContextPt
         nb_axis: 0,
         max_axis: 0,
         axis: null_mut(),
-        ns_hash: None,
         user: null_mut(),
         context_size: -1,
         proximity_position: -1,

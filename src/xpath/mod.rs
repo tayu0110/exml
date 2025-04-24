@@ -266,7 +266,7 @@ pub struct XmlXPathStepOp {
     pub(crate) value4: *mut c_void,
     pub(crate) value5: *mut c_void,
     pub(crate) cache: Option<XmlXPathFunction>,
-    pub(crate) cache_uri: Option<String>,
+    pub(crate) cache_uri: Option<Rc<str>>,
 }
 
 // The structure of a compiled expression form is not public.
