@@ -26,7 +26,7 @@ use super::{
     xml_xpath_div_values, xml_xpath_equal_values, xml_xpath_err,
     xml_xpath_evaluate_predicate_result, xml_xpath_free_object, xml_xpath_mod_values,
     xml_xpath_mult_values, xml_xpath_node_collect_and_test, xml_xpath_node_set_merge,
-    xml_xpath_not_equal_values, xml_xpath_ns_lookup, xml_xpath_release_object, xml_xpath_root,
+    xml_xpath_not_equal_values, xml_xpath_release_object, xml_xpath_root,
     xml_xpath_run_stream_eval, xml_xpath_sub_values, xml_xpath_try_stream_compile,
     xml_xpath_value_flip_sign, xml_xpath_variable_lookup, xml_xpath_variable_lookup_ns,
 };
@@ -104,19 +104,19 @@ impl XmlXPathParserContext {
                 }
             }
 
-            self.run_evaluate(0);
+            self.run_evaluate(false);
         }
     }
 
     /// Evaluate the Precompiled XPath expression in the given context.
     #[doc(alias = "xmlXPathRunEval")]
-    pub(crate) unsafe fn run_evaluate(&mut self, to_bool: i32) -> i32 {
+    pub(crate) unsafe fn run_evaluate(&mut self, to_bool: bool) -> i32 {
         unsafe {
             #[cfg(feature = "libxml_pattern")]
             if self.comp.borrow().stream.is_some() {
                 let res: i32;
 
-                if to_bool != 0 {
+                if to_bool {
                     // Evaluation to boolean result.
                     res = xml_xpath_run_stream_eval(
                         self.context,
@@ -155,12 +155,12 @@ impl XmlXPathParserContext {
                 return -1;
             }
             let old_depth: i32 = (*self.context).depth;
-            if to_bool != 0 {
+            if to_bool {
                 let last = self.comp.borrow().last as usize;
                 let mut comp = self.comp.borrow_mut();
                 let op = &raw mut comp.steps[last];
                 drop(comp);
-                return self.evaluate_precompiled_operation_to_boolean(op, 0);
+                return self.evaluate_precompiled_operation_to_boolean(op, false);
             } else {
                 let last = self.comp.borrow().last as usize;
                 let mut comp = self.comp.borrow_mut();
@@ -481,7 +481,9 @@ impl XmlXPathParserContext {
                         }
                         self.value_push(val);
                     } else {
-                        let uri = xml_xpath_ns_lookup(self.context, (*op).value5 as _);
+                        let uri = (*self.context).lookup_ns(
+                            &CStr::from_ptr((*op).value5 as *const i8).to_string_lossy(),
+                        );
                         let Some(uri) = uri else {
                             generic_error!(
                                 "xmlXPathCompOpEval: variable {} bound to undefined prefix {}\n",
@@ -540,7 +542,9 @@ impl XmlXPathParserContext {
                                 CStr::from_ptr((*op).value4 as _).to_string_lossy().as_ref(),
                             )
                         } else {
-                            uri = xml_xpath_ns_lookup(self.context, (*op).value5 as _);
+                            uri = (*self.context).lookup_ns(
+                                &CStr::from_ptr((*op).value5 as *const i8).to_string_lossy(),
+                            );
                             let Some(uri) = uri.as_deref() else {
                                 generic_error!(
                                     "xmlXPathCompOpEval: function {} bound to undefined prefix {}\n",
@@ -1496,7 +1500,7 @@ impl XmlXPathParserContext {
     pub(super) unsafe fn evaluate_precompiled_operation_to_boolean(
         &mut self,
         mut op: XmlXPathStepOpPtr,
-        is_predicate: i32,
+        is_predicate: bool,
     ) -> i32 {
         unsafe {
             let res_obj: XmlXPathObjectPtr;
@@ -1513,7 +1517,7 @@ impl XmlXPathParserContext {
                     }
                     XmlXPathOp::XPathOpValue => {
                         res_obj = (*op).value4 as XmlXPathObjectPtr;
-                        if is_predicate != 0 {
+                        if is_predicate {
                             return xml_xpath_evaluate_predicate_result(self, res_obj);
                         }
                         return xml_xpath_cast_to_boolean(res_obj) as i32;
@@ -1569,7 +1573,7 @@ impl XmlXPathParserContext {
             if !res_obj.is_null() {
                 let res = if (*res_obj).typ == XmlXPathObjectType::XPathBoolean {
                     (*res_obj).boolval as i32
-                } else if is_predicate != 0 {
+                } else if is_predicate {
                     // For predicates a result of type "number" is handled
                     // differently:
                     // SPEC XPath 1.0:

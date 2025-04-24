@@ -2416,8 +2416,6 @@ impl XmlShellCtxt<'_> {
         _node2: Option<XmlGenericNodePtr>,
     ) -> i32 {
         unsafe {
-            use crate::xpath::internals::xml_xpath_register_ns;
-
             let Some(mut arg) = arg else {
                 return 0;
             };
@@ -2432,7 +2430,7 @@ impl XmlShellCtxt<'_> {
                 arg = rem.trim_start();
 
                 // do register namespace
-                if xml_xpath_register_ns(self.pctxt, prefix, Some(href)) != 0 {
+                if (*self.pctxt).register_ns(prefix, Some(href)) != 0 {
                     writeln!(
                         self.output,
                         "Error: unable to register NS with prefix=\"{prefix}\" and href=\"{href}\""
@@ -2458,8 +2456,6 @@ impl XmlShellCtxt<'_> {
         _node2: Option<XmlGenericNodePtr>,
     ) -> i32 {
         unsafe {
-            use crate::xpath::internals::xml_xpath_register_ns;
-
             if root.element_type() != XmlElementType::XmlElementNode
                 || root.ns_def.is_none()
                 || self.pctxt.is_null()
@@ -2469,9 +2465,9 @@ impl XmlShellCtxt<'_> {
             let mut ns = root.ns_def;
             while let Some(now) = ns {
                 if let Some(prefix) = now.prefix() {
-                    xml_xpath_register_ns(self.pctxt, &prefix, now.href().as_deref());
+                    (*self.pctxt).register_ns(&prefix, now.href().as_deref());
                 } else {
-                    xml_xpath_register_ns(self.pctxt, "defaultns", now.href().as_deref());
+                    (*self.pctxt).register_ns("defaultns", now.href().as_deref());
                 }
                 ns = now.next;
             }

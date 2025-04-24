@@ -38,10 +38,9 @@ use crate::{
     },
     xpath::{
         XML_XPATH_CHECKNS, XmlXPathCompExpr, XmlXPathContextPtr, XmlXPathObjectPtr,
-        XmlXPathObjectType,
-        internals::{xml_xpath_register_ns, xml_xpath_register_variable_ns},
-        xml_xpath_compiled_eval, xml_xpath_ctxt_compile, xml_xpath_eval, xml_xpath_free_context,
-        xml_xpath_free_object, xml_xpath_is_nan, xml_xpath_new_context,
+        XmlXPathObjectType, internals::xml_xpath_register_variable_ns, xml_xpath_compiled_eval,
+        xml_xpath_ctxt_compile, xml_xpath_eval, xml_xpath_free_context, xml_xpath_free_object,
+        xml_xpath_is_nan, xml_xpath_new_context,
     },
 };
 
@@ -178,7 +177,7 @@ unsafe fn xml_schematron_register_variables(
                 generic_error!("Evaluation of compiled expression failed\n");
                 return -1;
             }
-            if xml_xpath_register_variable_ns(ctxt, &now.name, null_mut(), let_eval) != 0 {
+            if xml_xpath_register_variable_ns(ctxt, &now.name, None, let_eval) != 0 {
                 generic_error!("Registering a let variable failed\n");
                 return -1;
             }
@@ -198,7 +197,7 @@ unsafe fn xml_schematron_unregister_variables(
 ) -> i32 {
     unsafe {
         while let Some(now) = letr {
-            if xml_xpath_register_variable_ns(ctxt, &now.name, null_mut(), null_mut()) != 0 {
+            if xml_xpath_register_variable_ns(ctxt, &now.name, None, null_mut()) != 0 {
                 generic_error!("Unregistering a let variable failed\n");
                 return -1;
             }
@@ -458,7 +457,7 @@ impl<'a> XmlSchematronValidCtxt<'a> {
                 let Some(pref) = pref.as_deref() else {
                     break;
                 };
-                xml_xpath_register_ns(ret.xctxt, pref, Some(href.as_str()));
+                (*ret.xctxt).register_ns(pref, Some(href.as_str()));
             }
             Some(ret)
         }
@@ -1587,7 +1586,7 @@ impl<'a> XmlSchematronParserCtxt<'a> {
                     );
                 }
                 if let (Some(prefix), Some(uri)) = (prefix, uri) {
-                    xml_xpath_register_ns(self.xctxt, &prefix, Some(&uri));
+                    (*self.xctxt).register_ns(&prefix, Some(&uri));
                     self.add_namespace(Some(&prefix), &uri);
                     ret.nb_ns += 1;
                 }

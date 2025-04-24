@@ -30,7 +30,7 @@ use std::{
     ffi::{CStr, CString},
     mem::size_of,
     os::raw::c_void,
-    ptr::{addr_of_mut, null, null_mut},
+    ptr::{addr_of_mut, null_mut},
 };
 
 use libc::{INT_MAX, INT_MIN, memset};
@@ -524,115 +524,6 @@ pub unsafe fn xml_xpath_err(ctxt: Option<&mut XmlXPathParserContext>, mut error:
     }
 }
 
-/// Register a new namespace. If @ns_uri is NULL it unregisters the namespace
-///
-/// Returns 0 in case of success, -1 in case of error
-#[doc(alias = "xmlXPathRegisterNs")]
-pub unsafe fn xml_xpath_register_ns(
-    ctxt: XmlXPathContextPtr,
-    prefix: &str,
-    ns_uri: Option<&str>,
-) -> i32 {
-    unsafe {
-        if ctxt.is_null() {
-            return -1;
-        }
-        if prefix.is_empty() {
-            return -1;
-        }
-
-        let mut ns_hash = if let Some(table) = (*ctxt).ns_hash {
-            table
-        } else {
-            let Some(table) = XmlHashTableRef::with_capacity(10) else {
-                return -1;
-            };
-            (*ctxt).ns_hash = Some(table);
-            table
-        };
-        let Some(ns_uri) = ns_uri else {
-            return match ns_hash.remove_entry(prefix, |data, _| {
-                xml_free(data as _);
-            }) {
-                Ok(_) => 0,
-                Err(_) => -1,
-            };
-        };
-
-        let copy: *mut XmlChar = xml_strndup(ns_uri.as_ptr(), ns_uri.len() as i32);
-        if copy.is_null() {
-            return -1;
-        }
-        match ns_hash.update_entry(prefix, copy, |data, _| {
-            xml_free(data as _);
-        }) {
-            Ok(_) => 0,
-            Err(_) => {
-                xml_free(copy as _);
-                -1
-            }
-        }
-    }
-}
-
-/// Search in the namespace declaration array of the context for the given
-/// namespace name associated to the given prefix
-///
-/// Returns the value or NULL if not found
-#[doc(alias = "xmlXPathNsLookup")]
-pub unsafe fn xml_xpath_ns_lookup(
-    ctxt: XmlXPathContextPtr,
-    prefix: *const XmlChar,
-) -> Option<String> {
-    unsafe {
-        if ctxt.is_null() {
-            return None;
-        }
-        if prefix.is_null() {
-            return None;
-        }
-
-        let prefix = CStr::from_ptr(prefix as *const i8).to_string_lossy();
-        if prefix == "xml" {
-            return Some(XML_XML_NAMESPACE.into());
-        }
-
-        if let Some(namespaces) = (*ctxt).namespaces.as_deref() {
-            for &ns in namespaces {
-                if ns.prefix().as_deref() == Some(prefix.as_ref()) {
-                    return ns.href.as_deref().map(|href| href.to_owned());
-                }
-            }
-        }
-
-        let res = (*ctxt)
-            .ns_hash
-            .and_then(|table| table.lookup(&prefix).copied())
-            .unwrap_or(null_mut());
-        (!res.is_null()).then(|| {
-            CStr::from_ptr(res as *const i8)
-                .to_string_lossy()
-                .into_owned()
-        })
-    }
-}
-
-/// Cleanup the XPath context data associated to registered variables
-#[doc(alias = "xmlXPathRegisteredNsCleanup")]
-pub unsafe fn xml_xpath_registered_ns_cleanup(ctxt: XmlXPathContextPtr) {
-    unsafe {
-        if ctxt.is_null() {
-            return;
-        }
-
-        if let Some(mut table) = (*ctxt).ns_hash.take().map(|t| t.into_inner()) {
-            table.clear_with(|data, _| {
-                xml_free(data as _);
-            });
-        }
-    }
-}
-
 /// Register a new variable value. If @value is NULL it unregisters the variable
 ///
 /// Returns 0 in case of success, -1 in case of error
@@ -642,7 +533,7 @@ pub unsafe fn xml_xpath_register_variable(
     name: &str,
     value: XmlXPathObjectPtr,
 ) -> i32 {
-    unsafe { xml_xpath_register_variable_ns(ctxt, name, null(), value) }
+    unsafe { xml_xpath_register_variable_ns(ctxt, name, None, value) }
 }
 
 extern "C" fn xml_xpath_free_object_entry(obj: XmlXPathObjectPtr) {
@@ -658,7 +549,7 @@ extern "C" fn xml_xpath_free_object_entry(obj: XmlXPathObjectPtr) {
 pub unsafe fn xml_xpath_register_variable_ns(
     ctxt: XmlXPathContextPtr,
     name: &str,
-    ns_uri: *const XmlChar,
+    ns_uri: Option<&str>,
     value: XmlXPathObjectPtr,
 ) -> i32 {
     unsafe {
@@ -676,30 +567,17 @@ pub unsafe fn xml_xpath_register_variable_ns(
             table
         };
         if value.is_null() {
-            return match var_hash.remove_entry2(
-                name,
-                (!ns_uri.is_null())
-                    .then(|| CStr::from_ptr(ns_uri as *const i8).to_string_lossy())
-                    .as_deref(),
-                |data, _| {
-                    xml_xpath_free_object_entry(data);
-                },
-            ) {
+            return match var_hash.remove_entry2(name, ns_uri, |data, _| {
+                xml_xpath_free_object_entry(data);
+            }) {
                 Ok(_) => 0,
                 Err(_) => -1,
             };
         }
 
-        match var_hash.update_entry2(
-            name,
-            (!ns_uri.is_null())
-                .then(|| CStr::from_ptr(ns_uri as *const i8).to_string_lossy())
-                .as_deref(),
-            value,
-            |data, _| {
-                xml_xpath_free_object_entry(data);
-            },
-        ) {
+        match var_hash.update_entry2(name, ns_uri, value, |data, _| {
+            xml_xpath_free_object_entry(data);
+        }) {
             Ok(_) => 0,
             Err(_) => -1,
         }
@@ -1948,7 +1826,7 @@ pub(super) unsafe fn xml_xpath_node_set_filter(
             let mut comp = ctxt.comp.borrow_mut();
             let op = &raw mut comp.steps[filter_op_index as usize];
             drop(comp);
-            let res = ctxt.evaluate_precompiled_operation_to_boolean(op, 1);
+            let res = ctxt.evaluate_precompiled_operation_to_boolean(op, true);
 
             if ctxt.error != XmlXPathError::XPathExpressionOK as i32 {
                 break;
@@ -2214,7 +2092,7 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
         let obj: XmlXPathObjectPtr = (*ctxt).value_pop();
         // Setup namespaces.
         if !prefix.is_null() {
-            uri = xml_xpath_ns_lookup(xpctxt, prefix);
+            uri = (*xpctxt).lookup_ns(&CStr::from_ptr(prefix as *const i8).to_string_lossy());
             if uri.is_none() {
                 xml_xpath_release_object(xpctxt, obj);
                 XP_ERROR0!(
@@ -2760,7 +2638,7 @@ pub(super) unsafe fn xml_xpath_location_set_filter(
 
             let mut comp = (*ctxt).comp.borrow_mut();
             let op = &raw mut comp.steps[filter_op_index as usize];
-            let res: i32 = (*ctxt).evaluate_precompiled_operation_to_boolean(op, 1);
+            let res: i32 = (*ctxt).evaluate_precompiled_operation_to_boolean(op, true);
 
             if (*ctxt).error != XmlXPathError::XPathExpressionOK as i32 {
                 break;

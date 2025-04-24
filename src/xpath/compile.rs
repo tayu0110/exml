@@ -1,10 +1,9 @@
 use std::{
-    ffi::{CStr, CString, c_void},
+    ffi::{CStr, c_void},
     ptr::null_mut,
 };
 
 use crate::{
-    generic_error,
     libxml::{
         chvalid::{
             xml_is_blank_char, xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender,
@@ -16,7 +15,7 @@ use crate::{
     xpath::{
         XML_XPATH_CHECKNS, XPATH_MAX_RECURSION_DEPTH, XmlXPathAxisVal, XmlXPathContextPtr,
         XmlXPathError, XmlXPathObjectPtr, XmlXPathOp, xml_xpath_cache_new_float, xml_xpath_err,
-        xml_xpath_ns_lookup, xml_xpath_release_object,
+        xml_xpath_release_object,
     },
 };
 
@@ -95,7 +94,7 @@ impl XmlXPathParserContext {
             };
             self.skip_blanks();
             while self.current_char() == Some('o') && self.nth_byte(1) == Some(b'r') {
-                let op1: i32 = (*self.comp).borrow().last;
+                let op1: i32 = self.comp.borrow().last;
                 self.cur += 2;
                 self.skip_blanks();
                 self.compile_and_expr();
@@ -144,7 +143,9 @@ impl XmlXPathParserContext {
         }
     }
 
-    /// `[22]   AndExpr ::=   EqualityExpr | AndExpr 'and' EqualityExpr`
+    /// ```text
+    /// [22]   AndExpr ::=   EqualityExpr | AndExpr 'and' EqualityExpr
+    /// ```
     ///
     /// Compile an AND expression.
     #[doc(alias = "xmlXPathCompAndExpr")]
@@ -385,7 +386,9 @@ impl XmlXPathParserContext {
         }
     }
 
-    /// `[27]   UnaryExpr ::=   UnionExpr | '-' UnaryExpr`
+    /// ```text
+    /// [27]   UnaryExpr ::=   UnionExpr | '-' UnaryExpr
+    /// ```
     ///
     /// Compile an unary expression.
     #[doc(alias = "xmlXPathCompUnaryExpr")]
@@ -436,7 +439,9 @@ impl XmlXPathParserContext {
         }
     }
 
-    /// `[18]   UnionExpr ::=   PathExpr | UnionExpr '|' PathExpr`
+    /// ```text
+    /// [18]   UnionExpr ::=   PathExpr | UnionExpr '|' PathExpr
+    /// ```
     ///
     /// Compile an union expression.
     #[doc(alias = "xmlXPathCompUnionExpr")]
@@ -498,7 +503,7 @@ impl XmlXPathParserContext {
     #[doc(alias = "xmlXPathCompPathExpr")]
     unsafe fn compile_path_expr(&mut self) {
         unsafe {
-            let mut lc: i32 = 1; /* Should we branch to LocationPath ?         */
+            let mut lc: i32 = 1; /* Should we branch to LocationPath ? */
 
             self.skip_blanks();
             if self.current_char() == Some('$')
@@ -630,9 +635,9 @@ impl XmlXPathParserContext {
                         last,
                         -1,
                         XmlXPathOp::XPathOpCollect,
-                        (XmlXPathAxisVal::AxisDescendantOrSelf) as i32,
-                        (XmlXPathTestVal::NodeTestType) as i32,
-                        (XmlXPathTypeVal::NodeTypeNode) as i32,
+                        XmlXPathAxisVal::AxisDescendantOrSelf as i32,
+                        XmlXPathTestVal::NodeTestType as i32,
+                        XmlXPathTypeVal::NodeTypeNode as i32,
                         null_mut(),
                         null_mut(),
                     );
@@ -680,9 +685,9 @@ impl XmlXPathParserContext {
                             last,
                             -1,
                             XmlXPathOp::XPathOpCollect,
-                            (XmlXPathAxisVal::AxisDescendantOrSelf) as i32,
-                            (XmlXPathTestVal::NodeTestType) as i32,
-                            (XmlXPathTypeVal::NodeTypeNode) as i32,
+                            XmlXPathAxisVal::AxisDescendantOrSelf as i32,
+                            XmlXPathTestVal::NodeTestType as i32,
+                            XmlXPathTypeVal::NodeTypeNode as i32,
                             null_mut(),
                             null_mut(),
                         );
@@ -724,9 +729,9 @@ impl XmlXPathParserContext {
                     last,
                     -1,
                     XmlXPathOp::XPathOpCollect,
-                    (XmlXPathAxisVal::AxisDescendantOrSelf) as i32,
-                    (XmlXPathTestVal::NodeTestType) as i32,
-                    (XmlXPathTypeVal::NodeTypeNode) as i32,
+                    XmlXPathAxisVal::AxisDescendantOrSelf as i32,
+                    XmlXPathTestVal::NodeTestType as i32,
+                    XmlXPathTypeVal::NodeTypeNode as i32,
                     null_mut(),
                     null_mut(),
                 );
@@ -748,9 +753,9 @@ impl XmlXPathParserContext {
                         last,
                         -1,
                         XmlXPathOp::XPathOpCollect,
-                        (XmlXPathAxisVal::AxisDescendantOrSelf) as i32,
-                        (XmlXPathTestVal::NodeTestType) as i32,
-                        (XmlXPathTypeVal::NodeTypeNode) as i32,
+                        XmlXPathAxisVal::AxisDescendantOrSelf as i32,
+                        XmlXPathTestVal::NodeTestType as i32,
+                        XmlXPathTypeVal::NodeTypeNode as i32,
                         null_mut(),
                         null_mut(),
                     );
@@ -806,9 +811,9 @@ impl XmlXPathParserContext {
                     last,
                     -1,
                     XmlXPathOp::XPathOpCollect,
-                    (XmlXPathAxisVal::AxisParent) as i32,
-                    (XmlXPathTestVal::NodeTestType) as i32,
-                    (XmlXPathTypeVal::NodeTypeNode) as i32,
+                    XmlXPathAxisVal::AxisParent as i32,
+                    XmlXPathTestVal::NodeTestType as i32,
+                    XmlXPathTypeVal::NodeTypeNode as i32,
                     null_mut(),
                     null_mut(),
                 );
@@ -892,7 +897,7 @@ impl XmlXPathParserContext {
                         return;
                     }
 
-                    match self.compile_node_test(&raw mut test, &raw mut typ, name.as_deref()) {
+                    match self.compile_node_test(&mut test, &mut typ, name.as_deref()) {
                         Some((pref, local)) => {
                             prefix = pref;
                             name = Some(local);
@@ -907,11 +912,9 @@ impl XmlXPathParserContext {
                     }
 
                     if let Some(prefix) = prefix.as_deref() {
-                        let prefix = CString::new(prefix).unwrap();
                         if !self.context.is_null()
                             && (*self.context).flags & XML_XPATH_CHECKNS as i32 != 0
-                            && xml_xpath_ns_lookup(self.context, prefix.as_ptr() as *const u8)
-                                .is_none()
+                            && (*self.context).lookup_ns(prefix).is_none()
                         {
                             xml_xpath_err(Some(self), XmlXPathError::XPathUndefPrefixError as i32);
                         }
@@ -985,15 +988,11 @@ impl XmlXPathParserContext {
     #[doc(alias = "xmlXPathCompNodeTest")]
     unsafe fn compile_node_test(
         &mut self,
-        test: *mut XmlXPathTestVal,
-        typ: *mut XmlXPathTypeVal,
+        test: &mut XmlXPathTestVal,
+        typ: &mut XmlXPathTypeVal,
         name: Option<&str>,
     ) -> Option<(Option<String>, String)> {
         unsafe {
-            if test.is_null() || typ.is_null() {
-                generic_error!("Internal error at {}:{}\n", file!(), line!());
-                return None;
-            }
             *typ = XmlXPathTypeVal::NodeTypeNode;
             *test = XmlXPathTestVal::NodeTestNone;
             self.skip_blanks();
@@ -1331,7 +1330,7 @@ impl XmlXPathParserContext {
                     last,
                     -1,
                     XmlXPathOp::XPathOpValue,
-                    (XmlXPathObjectType::XPathString) as i32,
+                    XmlXPathObjectType::XPathString as i32,
                     0_i32,
                     0_i32,
                     lit as _,

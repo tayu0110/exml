@@ -29,14 +29,21 @@
 //
 // Author: daniel@veillard.com
 
-use std::{borrow::Cow, cell::RefCell, collections::HashMap, ffi::c_void, ptr::null_mut, rc::Rc};
+use std::{
+    borrow::Cow,
+    cell::RefCell,
+    collections::HashMap,
+    ffi::{CStr, c_void},
+    ptr::null_mut,
+    rc::Rc,
+};
 
 use crate::{
     error::XmlError,
     globals::{GenericErrorContext, StructuredError},
     hash::XmlHashTableRef,
-    libxml::chvalid::xml_is_blank_char,
-    tree::{XmlDocPtr, XmlGenericNodePtr, XmlNsPtr},
+    libxml::{chvalid::xml_is_blank_char, globals::xml_free, xmlstring::xml_strndup},
+    tree::{XML_XML_NAMESPACE, XmlDocPtr, XmlGenericNodePtr, XmlNsPtr},
 };
 
 use super::{
@@ -57,7 +64,7 @@ use super::{
     },
     xml_xpath_cast_to_boolean, xml_xpath_cast_to_number, xml_xpath_cast_to_string,
     xml_xpath_context_set_cache, xml_xpath_err, xml_xpath_free_cache, xml_xpath_free_object,
-    xml_xpath_perr_memory, xml_xpath_registered_funcs_cleanup, xml_xpath_registered_ns_cleanup,
+    xml_xpath_perr_memory, xml_xpath_registered_funcs_cleanup,
     xml_xpath_registered_variables_cleanup, xml_xpath_release_object,
 };
 
@@ -148,7 +155,7 @@ impl XmlXPathParserContext {
     ///
     /// Returns true if the current object on the stack is a node-set.
     #[doc(alias = "xmlXPathStackIsNodeSet")]
-    unsafe fn xml_xpath_stack_is_node_set(&self) -> bool {
+    unsafe fn stack_is_node_set(&self) -> bool {
         unsafe {
             self.value().is_some_and(|value| {
                 (*value).typ == XmlXPathObjectType::XPathNodeset
@@ -276,7 +283,7 @@ impl XmlXPathParserContext {
                 self.error = XmlXPathError::XPathInvalidOperand as i32;
                 return None;
             }
-            if !self.xml_xpath_stack_is_node_set() {
+            if !self.stack_is_node_set() {
                 xml_xpath_err(Some(self), XmlXPathError::XPathInvalidType as i32);
                 self.error = XmlXPathError::XPathInvalidType as i32;
                 return None;
@@ -491,6 +498,50 @@ impl XmlXPathContext {
         -(res as i32)
     }
 
+    /// Register a new namespace. If @ns_uri is NULL it unregisters the namespace
+    ///
+    /// Returns 0 in case of success, -1 in case of error
+    #[doc(alias = "xmlXPathRegisterNs")]
+    pub unsafe fn register_ns(&mut self, prefix: &str, ns_uri: Option<&str>) -> i32 {
+        unsafe {
+            if prefix.is_empty() {
+                return -1;
+            }
+
+            let mut ns_hash = if let Some(table) = self.ns_hash {
+                table
+            } else {
+                let Some(table) = XmlHashTableRef::with_capacity(10) else {
+                    return -1;
+                };
+                self.ns_hash = Some(table);
+                table
+            };
+            let Some(ns_uri) = ns_uri else {
+                return match ns_hash.remove_entry(prefix, |data, _| {
+                    xml_free(data as _);
+                }) {
+                    Ok(_) => 0,
+                    Err(_) => -1,
+                };
+            };
+
+            let copy: *mut u8 = xml_strndup(ns_uri.as_ptr(), ns_uri.len() as i32);
+            if copy.is_null() {
+                return -1;
+            }
+            match ns_hash.update_entry(prefix, copy, |data, _| {
+                xml_free(data as _);
+            }) {
+                Ok(_) => 0,
+                Err(_) => {
+                    xml_free(copy as _);
+                    -1
+                }
+            }
+        }
+    }
+
     /// Registers all default XPath functions in this context
     #[doc(alias = "xmlXPathRegisterAllFunctions")]
     pub fn register_all_functions(&mut self) {
@@ -580,6 +631,49 @@ impl XmlXPathContext {
     pub fn register_func_lookup(&mut self, f: impl XmlXPathFuncLookup + 'static) {
         self.func_lookup = Some(Box::new(f));
     }
+
+    /// Search in the namespace declaration array of the context for the given
+    /// namespace name associated to the given prefix
+    ///
+    /// Returns the value or NULL if not found
+    #[doc(alias = "xmlXPathNsLookup")]
+    pub unsafe fn lookup_ns(&self, prefix: &str) -> Option<String> {
+        unsafe {
+            if prefix == "xml" {
+                return Some(XML_XML_NAMESPACE.into());
+            }
+
+            if let Some(namespaces) = self.namespaces.as_deref() {
+                for &ns in namespaces {
+                    if ns.prefix().as_deref() == Some(prefix) {
+                        return ns.href.as_deref().map(|href| href.to_owned());
+                    }
+                }
+            }
+
+            let res = self
+                .ns_hash
+                .and_then(|table| table.lookup(prefix).copied())
+                .unwrap_or(null_mut());
+            (!res.is_null()).then(|| {
+                CStr::from_ptr(res as *const i8)
+                    .to_string_lossy()
+                    .into_owned()
+            })
+        }
+    }
+
+    /// Cleanup the XPath context data associated to registered variables
+    #[doc(alias = "xmlXPathRegisteredNsCleanup")]
+    pub unsafe fn cleanup_registered_ns(&mut self) {
+        unsafe {
+            if let Some(mut table) = self.ns_hash.take().map(|t| t.into_inner()) {
+                table.clear_with(|data, _| {
+                    xml_free(data as _);
+                });
+            }
+        }
+    }
 }
 
 impl Default for XmlXPathContext {
@@ -666,7 +760,7 @@ pub unsafe fn xml_xpath_free_context(ctxt: XmlXPathContextPtr) {
         if !(*ctxt).cache.is_null() {
             xml_xpath_free_cache((*ctxt).cache as XmlXPathContextCachePtr);
         }
-        xml_xpath_registered_ns_cleanup(ctxt);
+        (*ctxt).cleanup_registered_ns();
         xml_xpath_registered_funcs_cleanup(ctxt);
         xml_xpath_registered_variables_cleanup(ctxt);
         (*ctxt).last_error.reset();

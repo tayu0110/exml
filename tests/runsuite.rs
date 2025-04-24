@@ -53,9 +53,9 @@ use exml::{
         schema::{XmlSchemaPtr, xml_schema_free},
     },
     xpath::{
-        XmlXPathContext, XmlXPathObjectPtr, XmlXPathObjectType, internals::xml_xpath_register_ns,
-        xml_xpath_compile, xml_xpath_compiled_eval, xml_xpath_context_set_cache,
-        xml_xpath_free_context, xml_xpath_free_object, xml_xpath_new_context,
+        XmlXPathContext, XmlXPathObjectPtr, XmlXPathObjectType, xml_xpath_compile,
+        xml_xpath_compiled_eval, xml_xpath_context_set_cache, xml_xpath_free_context,
+        xml_xpath_free_object, xml_xpath_new_context,
     },
 };
 use libc::strstr;
@@ -217,12 +217,9 @@ unsafe fn initialize_libxml2() {
             xml_xpath_context_set_cache(CTXT_XPATH.load(Ordering::Relaxed), 0, -1, 0);
         }
         // used as default namespace in xstc tests
-        xml_xpath_register_ns(CTXT_XPATH.load(Ordering::Relaxed), "ts", Some("TestSuite"));
-        xml_xpath_register_ns(
-            CTXT_XPATH.load(Ordering::Relaxed),
-            "xlink",
-            Some("http://www.w3.org/1999/xlink"),
-        );
+        (*CTXT_XPATH.load(Ordering::Relaxed)).register_ns("ts", Some("TestSuite"));
+        (*CTXT_XPATH.load(Ordering::Relaxed))
+            .register_ns("xlink", Some("http://www.w3.org/1999/xlink"));
         set_generic_error(Some(test_error_handler), None);
         #[cfg(feature = "schema")]
         {

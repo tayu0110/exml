@@ -62,9 +62,8 @@ use crate::{
     tree::{NodeCommon, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNode},
     xpath::{
         XmlXPathContextPtr, XmlXPathError, XmlXPathObjectPtr, XmlXPathObjectType,
-        XmlXPathParserContextPtr,
-        internals::{xml_xpath_register_ns, xml_xpath_root},
-        xml_xpath_free_object, xml_xpath_new_context, xml_xpath_new_node_set, xml_xpath_new_string,
+        XmlXPathParserContextPtr, internals::xml_xpath_root, xml_xpath_free_object,
+        xml_xpath_new_context, xml_xpath_new_node_set, xml_xpath_new_string,
     },
 };
 
@@ -2331,7 +2330,7 @@ unsafe fn xml_xptr_eval_xptr_part(ctxt: XmlXPathParserContextPtr, mut name: *mut
             (*ctxt).next_char();
             (*ctxt).skip_blanks();
 
-            xml_xpath_register_ns((*ctxt).context, &prefix, Some((*ctxt).current_str()));
+            (*(*ctxt).context).register_ns(&prefix, Some((*ctxt).current_str()));
             (*ctxt).base = old_base;
             (*ctxt).cur = old_cur;
         } else {

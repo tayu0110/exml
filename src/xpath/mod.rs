@@ -1127,7 +1127,7 @@ unsafe fn xml_xpath_compiled_eval_internal(
     comp: Rc<RefCell<XmlXPathCompExpr>>,
     ctxt: XmlXPathContextPtr,
     res_obj_ptr: *mut XmlXPathObjectPtr,
-    to_bool: i32,
+    to_bool: bool,
 ) -> i32 {
     unsafe {
         let res_obj: XmlXPathObjectPtr;
@@ -1146,7 +1146,7 @@ unsafe fn xml_xpath_compiled_eval_internal(
         } else {
             res_obj = pctxt.value_pop();
             if res_obj.is_null() {
-                if to_bool == 0 {
+                if !to_bool {
                     generic_error!("xmlXPathCompiledEval: No result on the stack.\n");
                 }
             } else if !pctxt.value_tab.is_empty() {
@@ -1182,7 +1182,7 @@ pub unsafe fn xml_xpath_compiled_eval(
     unsafe {
         let mut res: XmlXPathObjectPtr = null_mut();
 
-        xml_xpath_compiled_eval_internal(comp, ctx, addr_of_mut!(res), 0);
+        xml_xpath_compiled_eval_internal(comp, ctx, addr_of_mut!(res), false);
         res
     }
 }
@@ -1198,7 +1198,7 @@ pub unsafe fn xml_xpath_compiled_eval_to_boolean(
     comp: Rc<RefCell<XmlXPathCompExpr>>,
     ctxt: XmlXPathContextPtr,
 ) -> i32 {
-    unsafe { xml_xpath_compiled_eval_internal(comp, ctxt, null_mut(), 1) }
+    unsafe { xml_xpath_compiled_eval_internal(comp, ctxt, null_mut(), true) }
 }
 
 /// Free up the memory allocated by @comp
@@ -2509,35 +2509,6 @@ mod tests {
                     assert!(
                         leaks == 0,
                         "{leaks} Leaks are found in xmlXPathRegisteredFuncsCleanup()"
-                    );
-                    eprintln!(" {}", n_ctxt);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_registered_ns_cleanup() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_XPATH_CONTEXT_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctxt = gen_xml_xpath_context_ptr(n_ctxt, 0);
-
-                xml_xpath_registered_ns_cleanup(ctxt);
-                des_xml_xpath_context_ptr(n_ctxt, ctxt, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathRegisteredNsCleanup",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlXPathRegisteredNsCleanup()"
                     );
                     eprintln!(" {}", n_ctxt);
                 }

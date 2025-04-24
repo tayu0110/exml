@@ -3876,8 +3876,8 @@ unsafe fn load_xpath_expr(parent_doc: XmlDocPtr, filename: &str) -> XmlXPathObje
             parser::{XML_COMPLETE_ATTRS, XML_DETECT_IDS},
             tree::NodeCommon,
             xpath::{
-                XmlXPathContextPtr, internals::xml_xpath_register_ns, xml_xpath_eval_expression,
-                xml_xpath_free_context, xml_xpath_new_context,
+                XmlXPathContextPtr, xml_xpath_eval_expression, xml_xpath_free_context,
+                xml_xpath_new_context,
             },
         };
 
@@ -3929,9 +3929,7 @@ unsafe fn load_xpath_expr(parent_doc: XmlDocPtr, filename: &str) -> XmlXPathObje
         let node = XmlNodePtr::try_from(node).unwrap();
         let mut ns = node.ns_def;
         while let Some(now) = ns {
-            if xml_xpath_register_ns(ctx, now.prefix().as_deref().unwrap(), now.href().as_deref())
-                != 0
-            {
+            if (*ctx).register_ns(now.prefix().as_deref().unwrap(), now.href().as_deref()) != 0 {
                 eprintln!(
                     "Error: unable to register NS with prefix=\"{}\" and href=\"{}\"",
                     now.prefix.as_deref().unwrap(),
