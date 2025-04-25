@@ -961,49 +961,6 @@ pub unsafe fn xml_xpath_eval_expression(
     unsafe { xml_xpath_eval(xpath, ctxt) }
 }
 
-/// Evaluate a predicate result for the current node.
-/// A PredicateExpr is evaluated by evaluating the Expr and converting
-/// the result to a boolean. If the result is a number, the result will
-/// be converted to true if the number is equal to the position of the
-/// context node in the context node list (as returned by the position
-/// function) and will be converted to false otherwise; if the result
-/// is not a number, then the result will be converted as if by a call
-/// to the boolean function.
-///
-/// Returns `true` if predicate is true, `false` otherwise
-#[doc(alias = "xmlXPathEvalPredicate")]
-#[cfg(feature = "xpath")]
-pub unsafe fn xml_xpath_eval_predicate(ctxt: XmlXPathContextPtr, res: XmlXPathObjectPtr) -> bool {
-    unsafe {
-        use crate::generic_error;
-
-        if ctxt.is_null() || res.is_null() {
-            return false;
-        }
-        match (*res).typ {
-            XmlXPathObjectType::XPathBoolean => {
-                return (*res).boolval;
-            }
-            XmlXPathObjectType::XPathNumber => {
-                return (*res).floatval == (*ctxt).proximity_position as _;
-            }
-            XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
-                let Some(nodeset) = (*res).nodesetval.as_deref() else {
-                    return false;
-                };
-                return !nodeset.node_tab.is_empty();
-            }
-            XmlXPathObjectType::XPathString => {
-                return (*res).stringval.as_deref().is_some_and(|s| !s.is_empty());
-            }
-            _ => {
-                generic_error!("Internal error at {}:{}\n", file!(), line!());
-            }
-        }
-        false
-    }
-}
-
 /// Compile an XPath expression
 ///
 /// Returns the xmlXPathCompExprPtr resulting from the compilation or NULL.
@@ -1085,32 +1042,6 @@ pub unsafe fn xml_xpath_ctxt_compile(
     }
 }
 
-macro_rules! CHECK_CTXT_NEG {
-    ($ctxt:expr) => {
-        if $ctxt.is_null() {
-            $crate::error::__xml_raise_error!(
-                None,
-                None,
-                None,
-                null_mut(),
-                None,
-                $crate::error::XmlErrorDomain::XmlFromXPath,
-                $crate::error::XmlParserErrors::XmlErrInternalError,
-                $crate::error::XmlErrorLevel::XmlErrFatal,
-                Some(file!().into()),
-                line!() as i32,
-                None,
-                None,
-                None,
-                0,
-                0,
-                "NULL context pointer\n",
-            );
-            return -1;
-        }
-    };
-}
-
 /// Evaluate the Precompiled XPath expression in the given context.
 /// The caller has to free @resObj.
 ///
@@ -1126,7 +1057,27 @@ unsafe fn xml_xpath_compiled_eval_internal(
     unsafe {
         let res_obj: XmlXPathObjectPtr;
 
-        CHECK_CTXT_NEG!(ctxt);
+        if ctxt.is_null() {
+            crate::error::__xml_raise_error!(
+                None,
+                None,
+                None,
+                null_mut(),
+                None,
+                crate::error::XmlErrorDomain::XmlFromXPath,
+                crate::error::XmlParserErrors::XmlErrInternalError,
+                crate::error::XmlErrorLevel::XmlErrFatal,
+                Some(file!().into()),
+                line!() as i32,
+                None,
+                None,
+                None,
+                0,
+                0,
+                "NULL context pointer\n",
+            );
+            return -1;
+        };
 
         xml_init_parser();
 
@@ -1837,41 +1788,6 @@ mod tests {
                         "{leaks} Leaks are found in xmlXPathConvertString()"
                     );
                     eprintln!(" {}", n_val);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_eval_predicate() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_XPATH_CONTEXT_PTR {
-                for n_res in 0..GEN_NB_XML_XPATH_OBJECT_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let ctxt = gen_xml_xpath_context_ptr(n_ctxt, 0);
-                    let res = gen_xml_xpath_object_ptr(n_res, 1);
-
-                    let _ = xml_xpath_eval_predicate(ctxt, res);
-                    // desret_int(ret_val);
-                    des_xml_xpath_context_ptr(n_ctxt, ctxt, 0);
-                    des_xml_xpath_object_ptr(n_res, res, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlXPathEvalPredicate",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlXPathEvalPredicate()"
-                        );
-                        eprint!(" {}", n_ctxt);
-                        eprintln!(" {}", n_res);
-                    }
                 }
             }
         }

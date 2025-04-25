@@ -21,7 +21,8 @@ use crate::{
 
 use super::{
     XPATH_MAX_RECURSION_DEPTH, XmlXPathContext, XmlXPathContextPtr, XmlXPathFunction,
-    XmlXPathObjectPtr, XmlXPathObjectType, XmlXPathParserContext, XmlXPathStepOpPtr,
+    XmlXPathObject, XmlXPathObjectPtr, XmlXPathObjectType, XmlXPathParserContext,
+    XmlXPathStepOpPtr,
     functions::{xml_xpath_boolean_function, xml_xpath_number_function},
     xml_xpath_add_values, xml_xpath_cache_new_boolean, xml_xpath_cache_new_node_set,
     xml_xpath_cache_object_copy, xml_xpath_cast_to_boolean, xml_xpath_compare_values,
@@ -1867,5 +1868,40 @@ impl XmlXPathContext {
 
             0
         }
+    }
+
+    /// Evaluate a predicate result for the current node.
+    /// A PredicateExpr is evaluated by evaluating the Expr and converting
+    /// the result to a boolean. If the result is a number, the result will
+    /// be converted to true if the number is equal to the position of the
+    /// context node in the context node list (as returned by the position
+    /// function) and will be converted to false otherwise; if the result
+    /// is not a number, then the result will be converted as if by a call
+    /// to the boolean function.
+    ///
+    /// Returns `true` if predicate is true, `false` otherwise
+    #[doc(alias = "xmlXPathEvalPredicate")]
+    pub fn evaluate_predicate(&mut self, res: &XmlXPathObject) -> bool {
+        match res.typ {
+            XmlXPathObjectType::XPathBoolean => {
+                return res.boolval;
+            }
+            XmlXPathObjectType::XPathNumber => {
+                return res.floatval == self.proximity_position as _;
+            }
+            XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
+                let Some(nodeset) = res.nodesetval.as_deref() else {
+                    return false;
+                };
+                return !nodeset.node_tab.is_empty();
+            }
+            XmlXPathObjectType::XPathString => {
+                return res.stringval.as_deref().is_some_and(|s| !s.is_empty());
+            }
+            _ => {
+                generic_error!("Internal error at {}:{}\n", file!(), line!());
+            }
+        }
+        false
     }
 }

@@ -114,17 +114,6 @@ macro_rules! XP_ERROR0 {
     }};
 }
 
-// /// Macro to check that the value on top of the XPath stack is of a given type.
-// #[doc(hidden)]
-// #[macro_export]
-// macro_rules! CHECK_TYPE {
-//     ($ctxt:expr, $typeval:expr) => {
-//         if (*$ctxt).value.is_null() || (*(*$ctxt).value).typ != $typeval {
-//             $crate::XP_ERROR!($ctxt, $crate::xpath::XmlXPathError::XPathInvalidType as i32)
-//         }
-//     };
-// }
-
 /// Macro to check that the value on top of the XPath stack is of a given type.  
 /// Return(0) in case of failure
 macro_rules! CHECK_TYPE0 {
