@@ -84,43 +84,70 @@ impl Default for XmlXPathObject {
     }
 }
 
+impl Drop for XmlXPathObject {
+    /// Free up an object: xmlXPathObjectPtr.
+    #[doc(alias = "xmlXPathFreeObject")]
+    fn drop(&mut self) {
+        unsafe {
+            if matches!(
+                self.typ,
+                XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
+            ) {
+                if self.boolval {
+                    self.typ = XmlXPathObjectType::XPathXSLTTree; // TODO: Just for debugging. 
+                    xml_xpath_free_value_tree(self.nodesetval.take());
+                } else if let Some(set) = self.nodesetval.take() {
+                    xml_xpath_free_node_set(Some(set));
+                }
+            } else if matches!(self.typ, XmlXPathObjectType::XPathString)
+                && self.stringval.is_some()
+            {
+                let _ = self.stringval.take();
+            } else {
+                #[cfg(feature = "libxml_xptr_locs")]
+                if let Some(loc) = self.user.take() {
+                    if let Some(&loc) = loc.as_location_set() {
+                        xml_xptr_free_location_set(loc);
+                    }
+                }
+            }
+        }
+    }
+}
+
 impl From<&str> for XmlXPathObject {
     fn from(value: &str) -> Self {
-        Self {
-            typ: XmlXPathObjectType::XPathString,
-            stringval: Some(value.to_owned()),
-            ..Default::default()
-        }
+        let mut ret = Self::default();
+        ret.typ = XmlXPathObjectType::XPathString;
+        ret.stringval = Some(value.to_owned());
+        ret
     }
 }
 
 impl From<String> for XmlXPathObject {
     fn from(value: String) -> Self {
-        Self {
-            typ: XmlXPathObjectType::XPathString,
-            stringval: Some(value),
-            ..Default::default()
-        }
+        let mut ret = Self::default();
+        ret.typ = XmlXPathObjectType::XPathString;
+        ret.stringval = Some(value);
+        ret
     }
 }
 
 impl From<f64> for XmlXPathObject {
     fn from(value: f64) -> Self {
-        Self {
-            typ: XmlXPathObjectType::XPathNumber,
-            floatval: value,
-            ..Default::default()
-        }
+        let mut ret = Self::default();
+        ret.typ = XmlXPathObjectType::XPathNumber;
+        ret.floatval = value;
+        ret
     }
 }
 
 impl From<bool> for XmlXPathObject {
     fn from(value: bool) -> Self {
-        Self {
-            typ: XmlXPathObjectType::XPathBoolean,
-            boolval: value,
-            ..Default::default()
-        }
+        let mut ret = Self::default();
+        ret.typ = XmlXPathObjectType::XPathBoolean;
+        ret.boolval = value;
+        ret
     }
 }
 

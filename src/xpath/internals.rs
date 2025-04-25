@@ -337,10 +337,8 @@ pub(crate) unsafe fn xml_xpath_release_object(ctxt: XmlXPathContextPtr, obj: Xml
                         xml_xpath_node_set_free_ns(ns);
                     }
                     nodeset.node_tab.clear();
-                    *obj = XmlXPathObject {
-                        nodesetval: Some(nodeset),
-                        ..Default::default()
-                    };
+                    *obj = XmlXPathObject::default();
+                    (*obj).nodesetval = Some(nodeset);
                 } else {
                     std::ptr::write(&mut *obj, XmlXPathObject::default());
                 }
