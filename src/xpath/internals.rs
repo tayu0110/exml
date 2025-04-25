@@ -575,10 +575,7 @@ pub unsafe fn xml_xpath_register_variable_ns(
 ///
 /// Returns a copy of the value or NULL if not found
 #[doc(alias = "xmlXPathVariableLookup")]
-pub unsafe fn xml_xpath_variable_lookup(
-    ctxt: XmlXPathContextPtr,
-    name: *const XmlChar,
-) -> XmlXPathObjectPtr {
+pub unsafe fn xml_xpath_variable_lookup(ctxt: XmlXPathContextPtr, name: &str) -> XmlXPathObjectPtr {
     unsafe {
         if ctxt.is_null() {
             return null_mut();
@@ -846,7 +843,7 @@ pub(super) unsafe fn xml_xpath_cache_object_copy(
 #[doc(alias = "xmlXPathVariableLookupNS")]
 pub unsafe fn xml_xpath_variable_lookup_ns(
     ctxt: XmlXPathContextPtr,
-    name: *const XmlChar,
+    name: &str,
     ns_uri: Option<&str>,
 ) -> XmlXPathObjectPtr {
     unsafe {
@@ -864,15 +861,9 @@ pub unsafe fn xml_xpath_variable_lookup_ns(
         let Some(var_hash) = (*ctxt).var_hash else {
             return null_mut();
         };
-        if name.is_null() {
-            return null_mut();
-        }
 
         let obj = var_hash
-            .lookup2(
-                CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
-                ns_uri,
-            )
+            .lookup2(name, ns_uri)
             .copied()
             .unwrap_or(null_mut());
         xml_xpath_cache_object_copy(ctxt, obj)
@@ -1576,8 +1567,8 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
         let axis: XmlXPathAxisVal = (*op).value.try_into().unwrap();
         let test: XmlXPathTestVal = (*op).value2.try_into().unwrap();
         let typ: XmlXPathTypeVal = (*op).value3.try_into().unwrap();
-        let prefix: *const XmlChar = (*op).value4 as _;
-        let name: *const XmlChar = (*op).value5 as _;
+        let prefix = (*op).value4.as_ref().and_then(|val| val.as_str());
+        let name = (*op).value5.as_ref().and_then(|val| val.as_str());
         let mut uri = None;
         let mut total: i32 = 0;
         let mut has_ns_nodes: bool;
@@ -1601,8 +1592,8 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
         // The popped object holding the context nodes
         let obj: XmlXPathObjectPtr = (*ctxt).value_pop();
         // Setup namespaces.
-        if !prefix.is_null() {
-            uri = (*xpctxt).lookup_ns(&CStr::from_ptr(prefix as *const i8).to_string_lossy());
+        if let Some(prefix) = prefix {
+            uri = (*xpctxt).lookup_ns(prefix);
             if uri.is_none() {
                 xml_xpath_release_object(xpctxt, obj);
                 XP_ERROR0!(
@@ -1858,9 +1849,8 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
                     }
                     XmlXPathTestVal::NodeTestPI => {
                         if matches!(cur.element_type(), XmlElementType::XmlPINode)
-                            && (name.is_null()
-                                || CStr::from_ptr(name as *const i8).to_string_lossy()
-                                    == XmlNodePtr::try_from(cur).unwrap().name)
+                            && (name
+                                .is_none_or(|name| name == XmlNodePtr::try_from(cur).unwrap().name))
                         {
                             xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                         }
@@ -1868,7 +1858,7 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
                     XmlXPathTestVal::NodeTestAll => {
                         if matches!(axis, XmlXPathAxisVal::AxisAttribute) {
                             if matches!(cur.element_type(), XmlElementType::XmlAttributeNode)
-                                && (prefix.is_null()
+                                && (prefix.is_none()
                                     || XmlAttrPtr::try_from(cur)
                                         .unwrap()
                                         .ns
@@ -1883,7 +1873,7 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
                                 xp_test_hit_ns!(has_axis_range, pos, max_pos, has_ns_nodes, seq, xpctxt, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                             }
                         } else if matches!(cur.element_type(), XmlElementType::XmlElementNode)
-                            && (prefix.is_null()
+                            && (prefix.is_none()
                                 || XmlNodePtr::try_from(cur)
                                     .unwrap()
                                     .ns
@@ -1912,9 +1902,8 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
                         match cur.element_type() {
                             XmlElementType::XmlElementNode => {
                                 let node = XmlNodePtr::try_from(cur).unwrap();
-                                if CStr::from_ptr(name as *const i8).to_string_lossy() == node.name
-                                {
-                                    if prefix.is_null() {
+                                if name == Some(&node.name) {
+                                    if prefix.is_none() {
                                         if node.ns.is_none() {
                                             xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                                         }
@@ -1931,10 +1920,8 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
                             XmlElementType::XmlAttributeNode => {
                                 let attr = XmlAttrPtr::try_from(cur).unwrap();
 
-                                if CStr::from_ptr(name as *const i8).to_string_lossy().as_ref()
-                                    == attr.name.as_ref()
-                                {
-                                    if prefix.is_null() {
+                                if name == Some(attr.name.as_ref()) {
+                                    if prefix.is_none() {
                                         if attr.ns.is_none_or(|ns| ns.prefix().is_none()) {
                                             xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                                         }
@@ -1950,11 +1937,11 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
                             }
                             XmlElementType::XmlNamespaceDecl => {
                                 let ns = XmlNsPtr::try_from(cur).unwrap();
-                                if ns.prefix().is_some_and(|prefix| {
-                                    !name.is_null()
-                                        && prefix
-                                            == CStr::from_ptr(name as *const i8).to_string_lossy()
-                                }) {
+                                if ns
+                                    .prefix
+                                    .as_deref()
+                                    .is_some_and(|prefix| name.is_some_and(|name| prefix == name))
+                                {
                                     xp_test_hit_ns!(has_axis_range, pos, max_pos, has_ns_nodes, seq, xpctxt, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                                 }
                             }

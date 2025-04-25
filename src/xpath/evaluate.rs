@@ -1,16 +1,13 @@
-use std::{cell::RefCell, ffi::CStr, mem::replace, ptr::null_mut, rc::Rc};
+use std::{cell::RefCell, mem::replace, ptr::null_mut, rc::Rc};
 
 #[cfg(feature = "libxml_pattern")]
 use crate::pattern::XmlPattern;
 use crate::{
     CHECK_ERROR, XP_ERROR, generic_error,
-    libxml::{
-        xmlstring::xml_str_equal,
-        xpointer::{
-            XmlLocationSetPtr, xml_xptr_free_location_set, xml_xptr_location_set_add,
-            xml_xptr_location_set_create, xml_xptr_new_range, xml_xptr_new_range_node_object,
-            xml_xptr_wrap_location_set,
-        },
+    libxml::xpointer::{
+        XmlLocationSetPtr, xml_xptr_free_location_set, xml_xptr_location_set_add,
+        xml_xptr_location_set_create, xml_xptr_new_range, xml_xptr_new_range_node_object,
+        xml_xptr_wrap_location_set,
     },
     tree::{XmlGenericNodePtr, XmlNode},
     xpath::{
@@ -451,7 +448,7 @@ impl XmlXPathParserContext {
                 XmlXPathOp::XPathOpValue => {
                     self.value_push(xml_xpath_cache_object_copy(
                         self.context,
-                        (*op).value4 as XmlXPathObjectPtr,
+                        *(*op).value4.as_ref().unwrap().as_object().unwrap(),
                     ));
                 }
                 XmlXPathOp::XPathOpVariable => 'to_break: {
@@ -462,8 +459,19 @@ impl XmlXPathParserContext {
                         drop(comp);
                         total += self.evaluate_precompiled_operation(op1);
                     }
-                    if (*op).value5.is_null() {
-                        val = xml_xpath_variable_lookup(self.context, (*op).value4 as _);
+                    if let Some(value5) = (*op).value5.as_ref().and_then(|val| val.as_str()) {
+                        let uri = (*self.context).lookup_ns(value5);
+                        let value4 = (*op).value4.as_ref().and_then(|val| val.as_str()).unwrap();
+                        let Some(uri) = uri else {
+                            generic_error!(
+                                "xmlXPathCompOpEval: variable {} bound to undefined prefix {}\n",
+                                value4,
+                                value5
+                            );
+                            self.error = XmlXPathError::XPathUndefPrefixError as _;
+                            break 'to_break;
+                        };
+                        val = xml_xpath_variable_lookup_ns(self.context, value4, Some(&uri));
                         if val.is_null() {
                             xml_xpath_err(
                                 Some(self),
@@ -473,23 +481,8 @@ impl XmlXPathParserContext {
                         }
                         self.value_push(val);
                     } else {
-                        let uri = (*self.context).lookup_ns(
-                            &CStr::from_ptr((*op).value5 as *const i8).to_string_lossy(),
-                        );
-                        let Some(uri) = uri else {
-                            generic_error!(
-                                "xmlXPathCompOpEval: variable {} bound to undefined prefix {}\n",
-                                CStr::from_ptr((*op).value4 as *const i8).to_string_lossy(),
-                                CStr::from_ptr((*op).value5 as *const i8).to_string_lossy()
-                            );
-                            self.error = XmlXPathError::XPathUndefPrefixError as _;
-                            break 'to_break;
-                        };
-                        val = xml_xpath_variable_lookup_ns(
-                            self.context,
-                            (*op).value4 as _,
-                            Some(&uri),
-                        );
+                        let value4 = (*op).value4.as_ref().and_then(|val| val.as_str()).unwrap();
+                        val = xml_xpath_variable_lookup(self.context, value4);
                         if val.is_null() {
                             xml_xpath_err(
                                 Some(self),
@@ -529,35 +522,28 @@ impl XmlXPathParserContext {
                     } else {
                         let mut uri = None;
 
-                        let f = if (*op).value5.is_null() {
-                            (*self.context).lookup_function(
-                                CStr::from_ptr((*op).value4 as _).to_string_lossy().as_ref(),
-                            )
-                        } else {
-                            uri = (*self.context).lookup_ns(
-                                &CStr::from_ptr((*op).value5 as *const i8).to_string_lossy(),
-                            );
+                        let value4 = (*op).value4.as_ref().and_then(|val| val.as_str()).unwrap();
+                        let f = if let Some(value5) =
+                            (*op).value5.as_ref().and_then(|val| val.as_str())
+                        {
+                            uri = (*self.context).lookup_ns(value5);
                             let Some(uri) = uri.as_deref() else {
                                 generic_error!(
                                     "xmlXPathCompOpEval: function {} bound to undefined prefix {}\n",
-                                    CStr::from_ptr((*op).value4 as *const i8).to_string_lossy(),
-                                    CStr::from_ptr((*op).value5 as *const i8).to_string_lossy()
+                                    value4,
+                                    value5
                                 );
                                 self.error = XmlXPathError::XPathUndefPrefixError as i32;
                                 break 'to_break;
                             };
-                            (*self.context).lookup_function_ns(
-                                CStr::from_ptr((*op).value4 as _).to_string_lossy().as_ref(),
-                                Some(uri),
-                            )
+                            (*self.context).lookup_function_ns(value4, Some(uri))
+                        } else {
+                            (*self.context).lookup_function(value4)
                         };
                         if let Some(f) = f {
                             func = f;
                         } else {
-                            generic_error!(
-                                "xmlXPathCompOpEval: function {} not found\n",
-                                CStr::from_ptr((*op).value4 as *mut i8).to_string_lossy()
-                            );
+                            generic_error!("xmlXPathCompOpEval: function {} not found\n", value4);
                             xml_xpath_err(Some(self), XmlXPathError::XPathUnknownFuncError as i32);
                             return 0;
                         }
@@ -566,10 +552,11 @@ impl XmlXPathParserContext {
                         (*op).cache_uri = uri;
                     }
 
-                    let old_func: *const u8 = (*self.context).function;
+                    let old_func = (*self.context).function.take();
                     let old_func_uri =
                         replace(&mut (*self.context).function_uri, (*op).cache_uri.clone());
-                    (*self.context).function = (*op).value4 as _;
+                    (*self.context).function =
+                        Some((*op).value4.as_ref().unwrap().as_str().unwrap().into());
                     func(self, (*op).value as usize);
                     (*self.context).function = old_func;
                     (*self.context).function_uri = old_func_uri;
@@ -623,8 +610,11 @@ impl XmlXPathParserContext {
                             XmlXPathOp::XPathOpValue // 12
                         )
                     {
-                        let val: XmlXPathObjectPtr =
-                            self.comp.borrow().steps[(*op).ch2 as usize].value4 as _;
+                        let val: XmlXPathObjectPtr = self.comp.borrow().steps[(*op).ch2 as usize]
+                            .value4
+                            .as_ref()
+                            .and_then(|val| val.as_object())
+                            .map_or(null_mut(), |val| *val);
                         if !val.is_null()
                             && (*val).typ == XmlXPathObjectType::XPathNumber
                             && (*val).floatval == 1.0
@@ -672,13 +662,13 @@ impl XmlXPathParserContext {
                                 self.comp.borrow().steps[f as usize].op,
                                 XmlXPathOp::XPathOpFunction
                             )
-                            && self.comp.borrow().steps[f as usize].value5.is_null()
+                            && self.comp.borrow().steps[f as usize].value5.is_none()
                             && self.comp.borrow().steps[f as usize].value == 0
-                            && !self.comp.borrow().steps[f as usize].value4.is_null()
-                            && xml_str_equal(
-                                self.comp.borrow().steps[f as usize].value4 as _,
-                                c"last".as_ptr() as _,
-                            )
+                            && self.comp.borrow().steps[f as usize]
+                                .value4
+                                .as_ref()
+                                .and_then(|val| val.as_str())
+                                .is_some_and(|s| s == "last")
                         {
                             let mut last = None;
 
@@ -1127,7 +1117,11 @@ impl XmlXPathParserContext {
                 XmlXPathOp::XPathOpValue => {
                     self.value_push(xml_xpath_cache_object_copy(
                         self.context,
-                        (*op).value4 as XmlXPathObjectPtr,
+                        (*op)
+                            .value4
+                            .as_ref()
+                            .and_then(|val| val.as_object())
+                            .map_or(null_mut(), |obj| *obj),
                     ));
                 }
                 XmlXPathOp::XPathOpSort => {
@@ -1321,7 +1315,11 @@ impl XmlXPathParserContext {
                 XmlXPathOp::XPathOpValue => {
                     self.value_push(xml_xpath_cache_object_copy(
                         self.context,
-                        (*op).value4 as XmlXPathObjectPtr,
+                        (*op)
+                            .value4
+                            .as_ref()
+                            .and_then(|val| val.as_object())
+                            .map_or(null_mut(), |obj| *obj),
                     ));
                 }
                 XmlXPathOp::XPathOpSort => {
@@ -1388,13 +1386,13 @@ impl XmlXPathParserContext {
                         self.comp.borrow().steps[f as usize].op,
                         XmlXPathOp::XPathOpFunction
                     )
-                    && self.comp.borrow().steps[f as usize].value5.is_null()
+                    && self.comp.borrow().steps[f as usize].value5.is_none()
                     && self.comp.borrow().steps[f as usize].value == 0
-                    && !self.comp.borrow().steps[f as usize].value4.is_null()
-                    && xml_str_equal(
-                        self.comp.borrow().steps[f as usize].value4 as _,
-                        c"last".as_ptr() as _,
-                    )
+                    && self.comp.borrow().steps[f as usize]
+                        .value4
+                        .as_ref()
+                        .and_then(|val| val.as_str())
+                        .is_some_and(|s| s == "last")
                 {
                     let mut last = None;
 
@@ -1508,7 +1506,11 @@ impl XmlXPathParserContext {
                         return 0;
                     }
                     XmlXPathOp::XPathOpValue => {
-                        res_obj = (*op).value4 as XmlXPathObjectPtr;
+                        let res_obj = (*op)
+                            .value4
+                            .as_ref()
+                            .and_then(|val| val.as_object())
+                            .map_or(null_mut(), |obj| *obj);
                         if is_predicate {
                             return xml_xpath_evaluate_predicate_result(self, res_obj);
                         }

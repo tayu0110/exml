@@ -185,14 +185,16 @@ impl XmlXPathParserContext {
             }
             let expr_op = &self.comp.borrow().steps[op.ch2 as usize];
 
-            if matches!(expr_op.op, XmlXPathOp::XPathOpValue)
-                && !expr_op.value4.is_null()
-                && matches!(
-                    (*(expr_op.value4 as XmlXPathObjectPtr)).typ,
-                    XmlXPathObjectType::XPathNumber
-                )
+            if let Some(obj) = expr_op
+                .value4
+                .as_ref()
+                .and_then(|val| val.as_object())
+                .filter(|&obj| {
+                    matches!(expr_op.op, XmlXPathOp::XPathOpValue)
+                        && matches!((**obj).typ, XmlXPathObjectType::XPathNumber)
+                })
             {
-                let floatval: f64 = (*(expr_op.value4 as XmlXPathObjectPtr)).floatval;
+                let floatval: f64 = (**obj).floatval;
 
                 // We have a "[n]" predicate here.
                 // TODO: Unfortunately this simplistic test here is not
@@ -482,7 +484,7 @@ pub struct XmlXPathContext {
     pub(crate) extra: *mut c_void,
 
     // The function name and URI when calling a function
-    pub(crate) function: *const u8,
+    pub(crate) function: Option<Rc<str>>,
     pub(crate) function_uri: Option<Rc<str>>,
 
     // function lookup function and data
@@ -717,7 +719,7 @@ impl Default for XmlXPathContext {
             var_lookup_func: None,
             var_lookup_data: null_mut(),
             extra: null_mut(),
-            function: null_mut(),
+            function: None,
             function_uri: None,
             func_lookup: None,
             tmp_ns_list: None,

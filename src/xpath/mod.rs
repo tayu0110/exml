@@ -209,7 +209,7 @@ pub type XmlXPathFunction = unsafe fn(ctxt: &mut XmlXPathParserContext, nargs: u
 #[doc(alias = "xmlXPathVariableLookupFunc")]
 #[cfg(feature = "xpath")]
 pub type XmlXPathVariableLookupFunc =
-    unsafe fn(ctxt: *mut c_void, name: *const XmlChar, ns_uri: Option<&str>) -> XmlXPathObjectPtr;
+    unsafe fn(ctxt: *mut c_void, name: &str, ns_uri: Option<&str>) -> XmlXPathObjectPtr;
 
 /// Prototype for callbacks used to plug function lookup in the XPath engine.
 ///
@@ -285,17 +285,15 @@ impl Drop for XmlXPathCompExpr {
     #[doc(alias = "xmlXPathFreeCompExpr")]
     #[cfg(feature = "xpath")]
     fn drop(&mut self) {
+        use compile::XmlXPathStepOpValue;
+
         unsafe {
-            for op in &self.steps {
-                if !op.value4.is_null() {
-                    if matches!(op.op, XmlXPathOp::XPathOpValue) {
-                        xml_xpath_free_object(op.value4 as _);
-                    } else {
-                        xml_free(op.value4 as _);
-                    }
+            for XmlXPathStepOp { value4, value5, .. } in self.steps.drain(..) {
+                if let Some(XmlXPathStepOpValue::Object(value)) = value4 {
+                    xml_xpath_free_object(value);
                 }
-                if !op.value5.is_null() {
-                    xml_free(op.value5 as _);
+                if let Some(XmlXPathStepOpValue::Object(value)) = value5 {
+                    xml_free(value as _);
                 }
             }
         }
@@ -2426,41 +2424,6 @@ mod tests {
                         "{leaks} Leaks are found in xmlXPathValueFlipSign()"
                     );
                     eprintln!(" {}", n_ctxt);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_variable_lookup() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_XPATH_CONTEXT_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let ctxt = gen_xml_xpath_context_ptr(n_ctxt, 0);
-                    let name = gen_const_xml_char_ptr(n_name, 1);
-
-                    let ret_val = xml_xpath_variable_lookup(ctxt, name);
-                    desret_xml_xpath_object_ptr(ret_val);
-                    des_xml_xpath_context_ptr(n_ctxt, ctxt, 0);
-                    des_const_xml_char_ptr(n_name, name, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlXPathVariableLookup",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlXPathVariableLookup()"
-                        );
-                        eprint!(" {}", n_ctxt);
-                        eprintln!(" {}", n_name);
-                    }
                 }
             }
         }

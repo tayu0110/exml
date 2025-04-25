@@ -1,8 +1,4 @@
-use std::{
-    ffi::{CStr, c_void},
-    ptr::null_mut,
-    rc::Rc,
-};
+use std::{ffi::CStr, rc::Rc};
 
 use crate::{
     libxml::{
@@ -39,8 +35,8 @@ pub struct XmlXPathStepOp {
     pub(crate) value: i32,
     pub(crate) value2: i32,
     pub(crate) value3: i32,
-    pub(crate) value4: *mut c_void,
-    pub(crate) value5: *mut c_void,
+    pub(crate) value4: Option<XmlXPathStepOpValue>,
+    pub(crate) value5: Option<XmlXPathStepOpValue>,
     pub(crate) cache: Option<XmlXPathFunction>,
     pub(crate) cache_uri: Option<Rc<str>>,
 }
@@ -50,6 +46,28 @@ impl XmlXPathStepOp {
     #[doc(alias = "xmlXPathCompSwap")]
     pub(super) fn swap_children(&mut self) {
         (self.ch1, self.ch2) = (self.ch2, self.ch1);
+    }
+}
+
+#[derive(Clone)]
+pub(crate) enum XmlXPathStepOpValue {
+    Object(XmlXPathObjectPtr),
+    String(Rc<str>),
+}
+
+impl XmlXPathStepOpValue {
+    pub(crate) fn as_object(&self) -> Option<&XmlXPathObjectPtr> {
+        match self {
+            Self::Object(obj) => Some(obj),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn as_str(&self) -> Option<&str> {
+        match self {
+            Self::String(s) => Some(s.as_ref()),
+            _ => None,
+        }
     }
 }
 
@@ -67,8 +85,8 @@ impl XmlXPathParserContext {
         value: i32,
         value2: i32,
         value3: i32,
-        value4: *mut c_void,
-        value5: *mut c_void,
+        value4: Option<XmlXPathStepOpValue>,
+        value5: Option<XmlXPathStepOpValue>,
     ) -> i32 {
         unsafe {
             if self.comp.borrow().steps.len() == XPATH_MAX_STEPS {
@@ -130,16 +148,7 @@ impl XmlXPathParserContext {
                     return;
                 };
                 let last = self.comp.borrow().last;
-                self.add_compiled_expression(
-                    op1,
-                    last,
-                    XmlXPathOp::XPathOpOr,
-                    0,
-                    0,
-                    0,
-                    null_mut(),
-                    null_mut(),
-                );
+                self.add_compiled_expression(op1, last, XmlXPathOp::XPathOpOr, 0, 0, 0, None, None);
                 self.skip_blanks();
             }
             if sort
@@ -160,8 +169,8 @@ impl XmlXPathParserContext {
                     0,
                     0,
                     0,
-                    null_mut(),
-                    null_mut(),
+                    None,
+                    None,
                 );
             }
 
@@ -200,8 +209,8 @@ impl XmlXPathParserContext {
                     0,
                     0,
                     0,
-                    null_mut(),
-                    null_mut(),
+                    None,
+                    None,
                 );
                 self.skip_blanks();
             }
@@ -252,8 +261,8 @@ impl XmlXPathParserContext {
                     eq,
                     0,
                     0,
-                    null_mut(),
-                    null_mut(),
+                    None,
+                    None,
                 );
                 self.skip_blanks();
             }
@@ -303,8 +312,8 @@ impl XmlXPathParserContext {
                     inf,
                     strict,
                     0,
-                    null_mut(),
-                    null_mut(),
+                    None,
+                    None,
                 );
                 self.skip_blanks();
             }
@@ -344,8 +353,8 @@ impl XmlXPathParserContext {
                     plus,
                     0,
                     0,
-                    null_mut(),
-                    null_mut(),
+                    None,
+                    None,
                 );
                 self.skip_blanks();
             }
@@ -399,8 +408,8 @@ impl XmlXPathParserContext {
                     op,
                     0,
                     0,
-                    null_mut(),
-                    null_mut(),
+                    None,
+                    None,
                 );
                 self.skip_blanks();
             }
@@ -440,8 +449,8 @@ impl XmlXPathParserContext {
                         2,
                         0,
                         0,
-                        null_mut(),
-                        null_mut(),
+                        None,
+                        None,
                     );
                 } else {
                     let last = self.comp.borrow().last;
@@ -452,8 +461,8 @@ impl XmlXPathParserContext {
                         3,
                         0,
                         0,
-                        null_mut(),
-                        null_mut(),
+                        None,
+                        None,
                     );
                 }
             }
@@ -475,16 +484,7 @@ impl XmlXPathParserContext {
             self.skip_blanks();
             while self.current_char() == Some('|') {
                 let op1: i32 = self.comp.borrow().last;
-                self.add_compiled_expression(
-                    -1,
-                    -1,
-                    XmlXPathOp::XPathOpNode,
-                    0,
-                    0,
-                    0,
-                    null_mut(),
-                    null_mut(),
-                );
+                self.add_compiled_expression(-1, -1, XmlXPathOp::XPathOpNode, 0, 0, 0, None, None);
 
                 self.next_char();
                 self.skip_blanks();
@@ -498,8 +498,8 @@ impl XmlXPathParserContext {
                     0,
                     0,
                     0,
-                    null_mut(),
-                    null_mut(),
+                    None,
+                    None,
                 );
 
                 self.skip_blanks();
@@ -626,8 +626,8 @@ impl XmlXPathParserContext {
                         0,
                         0,
                         0,
-                        null_mut(),
-                        null_mut(),
+                        None,
+                        None,
                     );
                 } else {
                     self.add_compiled_expression(
@@ -637,8 +637,8 @@ impl XmlXPathParserContext {
                         0,
                         0,
                         0,
-                        null_mut(),
-                        null_mut(),
+                        None,
+                        None,
                     );
                 }
                 self.compile_location_path();
@@ -659,8 +659,8 @@ impl XmlXPathParserContext {
                         XmlXPathAxisVal::AxisDescendantOrSelf as i32,
                         XmlXPathTestVal::NodeTestType as i32,
                         XmlXPathTypeVal::NodeTypeNode as i32,
-                        null_mut(),
-                        null_mut(),
+                        None,
+                        None,
                     );
 
                     self.compile_relative_location_path();
@@ -709,8 +709,8 @@ impl XmlXPathParserContext {
                             XmlXPathAxisVal::AxisDescendantOrSelf as i32,
                             XmlXPathTestVal::NodeTestType as i32,
                             XmlXPathTypeVal::NodeTypeNode as i32,
-                            null_mut(),
-                            null_mut(),
+                            None,
+                            None,
                         );
                         self.compile_relative_location_path();
                     } else if self.current_char() == Some('/') {
@@ -753,8 +753,8 @@ impl XmlXPathParserContext {
                     XmlXPathAxisVal::AxisDescendantOrSelf as i32,
                     XmlXPathTestVal::NodeTestType as i32,
                     XmlXPathTypeVal::NodeTypeNode as i32,
-                    null_mut(),
-                    null_mut(),
+                    None,
+                    None,
                 );
             } else if self.current_char() == Some('/') {
                 self.next_char();
@@ -777,8 +777,8 @@ impl XmlXPathParserContext {
                         XmlXPathAxisVal::AxisDescendantOrSelf as i32,
                         XmlXPathTestVal::NodeTestType as i32,
                         XmlXPathTypeVal::NodeTypeNode as i32,
-                        null_mut(),
-                        null_mut(),
+                        None,
+                        None,
                     );
                     self.compile_step();
                 } else if self.current_char() == Some('/') {
@@ -835,8 +835,8 @@ impl XmlXPathParserContext {
                     XmlXPathAxisVal::AxisParent as i32,
                     XmlXPathTestVal::NodeTestType as i32,
                     XmlXPathTypeVal::NodeTypeNode as i32,
-                    null_mut(),
-                    null_mut(),
+                    None,
+                    None,
                 );
             } else if self.current_char() == Some('.') {
                 self.next_char();
@@ -959,8 +959,8 @@ impl XmlXPathParserContext {
                         0,
                         0,
                         0,
-                        null_mut(),
-                        null_mut(),
+                        None,
+                        None,
                     );
                     return;
                 }
@@ -979,12 +979,8 @@ impl XmlXPathParserContext {
                     })) as i32,
                     test as i32,
                     typ as i32,
-                    prefix.map_or(null_mut(), |prefix| {
-                        xml_strndup(prefix.as_ptr(), prefix.len() as i32) as _
-                    }),
-                    name.map_or(null_mut(), |name| {
-                        xml_strndup(name.as_ptr(), name.len() as i32) as _
-                    }),
+                    prefix.map(Rc::from).map(XmlXPathStepOpValue::String),
+                    name.map(Rc::from).map(XmlXPathStepOpValue::String),
                 );
             }
         }
@@ -1272,8 +1268,8 @@ impl XmlXPathParserContext {
                     XmlXPathObjectType::XPathNumber as i32,
                     0_i32,
                     0_i32,
-                    num as _,
-                    null_mut(),
+                    Some(XmlXPathStepOpValue::Object(num)),
+                    None,
                 ) == -1
                 {
                     xml_xpath_release_object(self.context, num);
@@ -1353,8 +1349,8 @@ impl XmlXPathParserContext {
                     XmlXPathObjectType::XPathString as i32,
                     0_i32,
                     0_i32,
-                    lit as _,
-                    null_mut(),
+                    Some(XmlXPathStepOpValue::Object(lit)),
+                    None,
                 ) == -1
                 {
                     xml_xpath_release_object(self.context, lit);
@@ -1411,8 +1407,8 @@ impl XmlXPathParserContext {
                         0,
                         0,
                         0,
-                        null_mut(),
-                        null_mut(),
+                        None,
+                        None,
                     );
                     nbargs += 1;
                     if self.current_char() == Some(')') {
@@ -1434,10 +1430,8 @@ impl XmlXPathParserContext {
                 nbargs,
                 0_i32,
                 0_i32,
-                xml_strndup(name.as_ptr(), name.len() as i32) as _,
-                prefix.map_or(null_mut(), |prefix| {
-                    xml_strndup(prefix.as_ptr(), prefix.len() as i32) as _
-                }),
+                Some(XmlXPathStepOpValue::String(name.into())),
+                prefix.map(Rc::from).map(XmlXPathStepOpValue::String),
             );
             self.next_char();
             self.skip_blanks();
@@ -1494,8 +1488,8 @@ impl XmlXPathParserContext {
                     0,
                     0,
                     0,
-                    null_mut(),
-                    null_mut(),
+                    None,
+                    None,
                 );
             } else {
                 let last = self.comp.borrow().last;
@@ -1506,8 +1500,8 @@ impl XmlXPathParserContext {
                     0,
                     0,
                     0,
-                    null_mut(),
-                    null_mut(),
+                    None,
+                    None,
                 );
             }
 
@@ -1552,10 +1546,8 @@ impl XmlXPathParserContext {
                 0_i32,
                 0_i32,
                 0_i32,
-                xml_strndup(name.as_ptr(), name.len() as i32) as _,
-                prefix.map_or(null_mut(), |prefix| {
-                    xml_strndup(prefix.as_ptr(), prefix.len() as i32) as _
-                }),
+                Some(XmlXPathStepOpValue::String(name.into())),
+                prefix.map(Rc::from).map(XmlXPathStepOpValue::String),
             );
             self.skip_blanks();
             if !self.context.is_null() && (*self.context).flags & XML_XPATH_NOVAR as i32 != 0 {

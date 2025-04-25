@@ -1,8 +1,7 @@
-use std::{ffi::CStr, io::Write};
+use std::{io::Write, ptr::null_mut};
 
 use crate::{
     debug_xml::{xml_debug_dump_attr, xml_debug_dump_one_node, xml_debug_dump_string},
-    libxml::xmlstring::XmlChar,
     tree::{XmlAttrPtr, XmlElementType, XmlGenericNodePtr},
     xpath::{
         XmlXPathAxisVal, XmlXPathObjectType, XmlXPathOp, XmlXPathTestVal, XmlXPathTypeVal,
@@ -316,8 +315,8 @@ unsafe fn xml_xpath_debug_dump_step_op<'a>(
                 write!(output, "SORT").ok();
             }
             XmlXPathOp::XPathOpCollect => {
-                let prefix: *const XmlChar = (*op).value4 as _;
-                let name: *const XmlChar = (*op).value5 as _;
+                let prefix = (*op).value4.as_ref().and_then(|val| val.as_str());
+                let name = (*op).value5.as_ref().and_then(|val| val.as_str());
 
                 write!(output, "COLLECT ").ok();
                 match XmlXPathAxisVal::try_from((*op).value) {
@@ -398,17 +397,19 @@ unsafe fn xml_xpath_debug_dump_step_op<'a>(
                     }
                     _ => unreachable!(),
                 }
-                if !prefix.is_null() {
-                    let prefix = CStr::from_ptr(prefix as *const i8).to_string_lossy();
+                if let Some(prefix) = prefix {
                     write!(output, "{}:", prefix).ok();
                 }
-                if !name.is_null() {
-                    let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+                if let Some(name) = name {
                     write!(output, "{}", name).ok();
                 }
             }
             XmlXPathOp::XPathOpValue => {
-                let object: XmlXPathObjectPtr = (*op).value4 as XmlXPathObjectPtr;
+                let object = (*op)
+                    .value4
+                    .as_ref()
+                    .and_then(|val| val.as_object())
+                    .map_or(null_mut(), |obj| *obj);
 
                 write!(output, "ELEM ").ok();
                 xml_xpath_debug_dump_object(output, object, 0);
@@ -432,12 +433,10 @@ unsafe fn xml_xpath_debug_dump_step_op<'a>(
                 return;
             }
             XmlXPathOp::XPathOpVariable => {
-                let prefix: *const XmlChar = (*op).value5 as _;
-                let name: *const XmlChar = (*op).value4 as _;
-                let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+                let prefix = (*op).value5.as_ref().and_then(|val| val.as_str());
+                let name = (*op).value4.as_ref().and_then(|val| val.as_str()).unwrap();
 
-                if !prefix.is_null() {
-                    let prefix = CStr::from_ptr(prefix as *const i8).to_string_lossy();
+                if let Some(prefix) = prefix {
                     write!(output, "VARIABLE {prefix}:{name}").ok();
                 } else {
                     write!(output, "VARIABLE {name}").ok();
@@ -445,12 +444,10 @@ unsafe fn xml_xpath_debug_dump_step_op<'a>(
             }
             XmlXPathOp::XPathOpFunction => {
                 let nbargs: i32 = (*op).value;
-                let prefix: *const XmlChar = (*op).value5 as _;
-                let name: *const XmlChar = (*op).value4 as _;
-                let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+                let prefix = (*op).value5.as_ref().and_then(|val| val.as_str());
+                let name = (*op).value4.as_ref().and_then(|val| val.as_str()).unwrap();
 
-                if !prefix.is_null() {
-                    let prefix = CStr::from_ptr(prefix as *const i8).to_string_lossy();
+                if let Some(prefix) = prefix {
                     write!(output, "FUNCTION {prefix}:{name}({nbargs} args)").ok();
                 } else {
                     write!(output, "FUNCTION {name}({nbargs} args)").ok();
