@@ -57,8 +57,7 @@ use super::{
     },
     xml_xpath_cast_to_boolean, xml_xpath_cast_to_number, xml_xpath_cast_to_string,
     xml_xpath_context_set_cache, xml_xpath_err, xml_xpath_free_cache, xml_xpath_free_object,
-    xml_xpath_perr_memory, xml_xpath_registered_funcs_cleanup,
-    xml_xpath_registered_variables_cleanup, xml_xpath_release_object,
+    xml_xpath_perr_memory, xml_xpath_registered_variables_cleanup, xml_xpath_release_object,
 };
 
 pub type XmlXPathParserContextPtr = *mut XmlXPathParserContext;
@@ -623,6 +622,12 @@ impl XmlXPathContext {
         self.ns_hash.get(prefix).cloned()
     }
 
+    /// Cleanup the XPath context data associated to registered functions
+    #[doc(alias = "xmlXPathRegisteredFuncsCleanup")]
+    pub fn cleanup_registered_func(&mut self) {
+        self.func_hash.clear();
+    }
+
     /// Cleanup the XPath context data associated to registered variables
     #[doc(alias = "xmlXPathRegisteredNsCleanup")]
     pub fn cleanup_registered_ns(&mut self) {
@@ -714,7 +719,7 @@ pub unsafe fn xml_xpath_free_context(ctxt: XmlXPathContextPtr) {
             xml_xpath_free_cache((*ctxt).cache as XmlXPathContextCachePtr);
         }
         (*ctxt).cleanup_registered_ns();
-        xml_xpath_registered_funcs_cleanup(ctxt);
+        (*ctxt).cleanup_registered_func();
         xml_xpath_registered_variables_cleanup(ctxt);
         (*ctxt).last_error.reset();
         let _ = Box::from_raw(ctxt);

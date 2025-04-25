@@ -1,5 +1,7 @@
 use std::{cell::RefCell, ffi::CStr, mem::replace, ptr::null_mut, rc::Rc};
 
+#[cfg(feature = "libxml_pattern")]
+use crate::pattern::XmlPattern;
 use crate::{
     CHECK_ERROR, XP_ERROR, generic_error,
     libxml::{
@@ -13,21 +15,20 @@ use crate::{
     tree::{XmlGenericNodePtr, XmlNode},
     xpath::{
         XmlXPathError, XmlXPathOp, xml_xpath_location_set_filter, xml_xpath_node_set_filter,
-        xml_xpath_node_set_keep_last, xml_xpath_optimize_expression,
+        xml_xpath_node_set_keep_last,
     },
 };
 
 use super::{
-    XPATH_MAX_RECURSION_DEPTH, XmlXPathContextPtr, XmlXPathFunction, XmlXPathObjectPtr,
-    XmlXPathObjectType, XmlXPathParserContext, XmlXPathStepOpPtr,
+    XPATH_MAX_RECURSION_DEPTH, XmlXPathContext, XmlXPathContextPtr, XmlXPathFunction,
+    XmlXPathObjectPtr, XmlXPathObjectType, XmlXPathParserContext, XmlXPathStepOpPtr,
     functions::{xml_xpath_boolean_function, xml_xpath_number_function},
     xml_xpath_add_values, xml_xpath_cache_new_boolean, xml_xpath_cache_new_node_set,
     xml_xpath_cache_object_copy, xml_xpath_cast_to_boolean, xml_xpath_compare_values,
     xml_xpath_div_values, xml_xpath_equal_values, xml_xpath_err,
     xml_xpath_evaluate_predicate_result, xml_xpath_free_object, xml_xpath_mod_values,
     xml_xpath_mult_values, xml_xpath_node_collect_and_test, xml_xpath_node_set_merge,
-    xml_xpath_not_equal_values, xml_xpath_release_object, xml_xpath_root,
-    xml_xpath_run_stream_eval, xml_xpath_sub_values, xml_xpath_try_stream_compile,
+    xml_xpath_not_equal_values, xml_xpath_release_object, xml_xpath_root, xml_xpath_sub_values,
     xml_xpath_value_flip_sign, xml_xpath_variable_lookup, xml_xpath_variable_lookup_ns,
 };
 
@@ -66,7 +67,7 @@ impl XmlXPathParserContext {
             let mut old_depth: i32 = 0;
 
             #[cfg(feature = "libxml_pattern")]
-            let comp = xml_xpath_try_stream_compile(self.context, &self.base);
+            let comp = (*self.context).try_stream_compile(&self.base);
 
             match () {
                 #[cfg(feature = "libxml_pattern")]
@@ -96,7 +97,7 @@ impl XmlXPathParserContext {
                         let mut comp = self.comp.borrow_mut();
                         let op = &raw mut comp.steps[last];
                         drop(comp);
-                        xml_xpath_optimize_expression(self, op);
+                        self.optimize_expression(op);
                         if !self.context.is_null() {
                             (*self.context).depth = old_depth;
                         }
@@ -118,8 +119,7 @@ impl XmlXPathParserContext {
 
                 if to_bool {
                     // Evaluation to boolean result.
-                    res = xml_xpath_run_stream_eval(
-                        self.context,
+                    res = (*self.context).run_stream_eval(
                         self.comp.borrow().stream.as_deref().unwrap(),
                         null_mut(),
                         1,
@@ -131,8 +131,7 @@ impl XmlXPathParserContext {
                     let mut res_obj: XmlXPathObjectPtr = null_mut();
 
                     // Evaluation to a sequence.
-                    res = xml_xpath_run_stream_eval(
-                        self.context,
+                    res = (*self.context).run_stream_eval(
                         self.comp.borrow().stream.as_deref().unwrap(),
                         &raw mut res_obj,
                         0,
@@ -1587,6 +1586,284 @@ impl XmlXPathParserContext {
                 xml_xpath_release_object(self.context, res_obj);
                 return res;
             }
+
+            0
+        }
+    }
+}
+
+impl XmlXPathContext {
+    /// Evaluate the Precompiled Streamable XPath expression in the given context.
+    #[doc(alias = "xmlXPathRunStreamEval")]
+    #[cfg(feature = "libxml_pattern")]
+    unsafe fn run_stream_eval(
+        &mut self,
+        comp: &XmlPattern,
+        result_seq: *mut XmlXPathObjectPtr,
+        to_bool: i32,
+    ) -> i32 {
+        use crate::{
+            error::{XmlErrorDomain, XmlParserErrors},
+            tree::{XmlElementType, XmlNodePtr},
+        };
+
+        unsafe {
+            let mut ret: i32;
+
+            let mut max_depth = comp.max_depth();
+            if max_depth == -1 {
+                return -1;
+            }
+            if max_depth == -2 {
+                max_depth = 10000;
+            }
+            let min_depth: i32 = comp.min_depth();
+            if min_depth == -1 {
+                return -1;
+            }
+            let from_root: i32 = comp.is_from_root();
+            if from_root < 0 {
+                return -1;
+            }
+
+            if to_bool == 0 {
+                if result_seq.is_null() {
+                    return -1;
+                }
+                *result_seq = xml_xpath_cache_new_node_set(self, None);
+                if (*result_seq).is_null() {
+                    return -1;
+                }
+            }
+
+            // handle the special cases of "/" amd "." being matched
+            if min_depth == 0 {
+                if from_root != 0 {
+                    // Select "/"
+                    if to_bool != 0 {
+                        return 1;
+                    }
+                    // TODO: Check memory error.
+                    if let Some(nodeset) = (*(*result_seq)).nodesetval.as_deref_mut() {
+                        nodeset.add_unique(self.doc.unwrap().into());
+                    }
+                } else {
+                    // Select "self::node()"
+                    if to_bool != 0 {
+                        return 1;
+                    }
+                    // TODO: Check memory error.
+                    if let Some(nodeset) = (*(*result_seq)).nodesetval.as_deref_mut() {
+                        nodeset.add_unique(self.node.unwrap());
+                    }
+                }
+            }
+            if max_depth == 0 {
+                return 0;
+            }
+
+            let mut limit = None;
+            let cur = if from_root != 0 {
+                self.doc.map(|doc| doc.into())
+            } else if let Some(node) = self.node {
+                match node.element_type() {
+                    XmlElementType::XmlElementNode
+                    | XmlElementType::XmlDocumentNode
+                    | XmlElementType::XmlDocumentFragNode
+                    | XmlElementType::XmlHTMLDocumentNode => {
+                        limit = Some(node);
+                    }
+                    XmlElementType::XmlAttributeNode
+                    | XmlElementType::XmlTextNode
+                    | XmlElementType::XmlCDATASectionNode
+                    | XmlElementType::XmlEntityRefNode
+                    | XmlElementType::XmlEntityNode
+                    | XmlElementType::XmlPINode
+                    | XmlElementType::XmlCommentNode
+                    | XmlElementType::XmlNotationNode
+                    | XmlElementType::XmlDTDNode
+                    | XmlElementType::XmlDocumentTypeNode
+                    | XmlElementType::XmlElementDecl
+                    | XmlElementType::XmlAttributeDecl
+                    | XmlElementType::XmlEntityDecl
+                    | XmlElementType::XmlNamespaceDecl
+                    | XmlElementType::XmlXIncludeStart
+                    | XmlElementType::XmlXIncludeEnd => {}
+                    _ => unreachable!(),
+                }
+                limit
+            } else {
+                None
+            };
+            let Some(mut cur) = cur else {
+                return 0;
+            };
+
+            let Some(mut patstream) = comp.get_stream_context() else {
+                // QUESTION TODO: Is this an error?
+                return 0;
+            };
+
+            let eval_all_nodes: i32 = patstream.wants_any_node();
+
+            if from_root != 0 {
+                ret = patstream.push(None, None);
+                if ret < 0 {
+                    // no op
+                } else if ret == 1 {
+                    if to_bool != 0 {
+                        return 1;
+                    }
+                    // TODO: Check memory error.
+                    if let Some(nodeset) = (*(*result_seq)).nodesetval.as_deref_mut() {
+                        nodeset.add_unique(cur);
+                    }
+                }
+            }
+            let mut depth = 0;
+            let mut goto_scan_children = true;
+            // goto scan_children;
+            // next_node:
+            'main: while {
+                'to_continue_main: {
+                    'next_node: loop {
+                        if !goto_scan_children {
+                            if self.op_limit != 0 {
+                                if self.op_count >= self.op_limit {
+                                    generic_error!("XPath operation limit exceeded\n");
+                                    return -1;
+                                }
+                                self.op_count += 1;
+                            }
+
+                            match cur.element_type() {
+                                XmlElementType::XmlElementNode
+                                | XmlElementType::XmlTextNode
+                                | XmlElementType::XmlCDATASectionNode
+                                | XmlElementType::XmlCommentNode
+                                | XmlElementType::XmlPINode => 'to_break: {
+                                    ret = if matches!(
+                                        cur.element_type(),
+                                        XmlElementType::XmlElementNode
+                                    ) {
+                                        let node = XmlNodePtr::try_from(cur).unwrap();
+                                        patstream.push(
+                                            Some(&node.name),
+                                            node.ns.as_deref().and_then(|ns| ns.href()).as_deref(),
+                                        )
+                                    } else if eval_all_nodes != 0 {
+                                        patstream.push_node(None, None, cur.element_type() as i32)
+                                    } else {
+                                        break 'to_break;
+                                    };
+                                    if ret < 0 {
+                                        // NOP.
+                                    } else if ret == 1 {
+                                        if to_bool != 0 {
+                                            return 1;
+                                        }
+                                        if let Some(nodeset) =
+                                            (*(*result_seq)).nodesetval.as_deref_mut()
+                                        {
+                                            if nodeset.add_unique(cur) < 0 {
+                                                self.last_error.domain =
+                                                    XmlErrorDomain::XmlFromXPath;
+                                                self.last_error.code =
+                                                    XmlParserErrors::XmlErrNoMemory;
+                                            }
+                                        }
+                                    }
+                                    if cur.children().is_none() || depth >= max_depth {
+                                        // ret =
+                                        patstream.pop();
+                                        while let Some(next) = cur.next() {
+                                            cur = next;
+                                            if !matches!(
+                                                cur.element_type(),
+                                                XmlElementType::XmlEntityDecl
+                                                    | XmlElementType::XmlDTDNode
+                                            ) {
+                                                // goto next_node;
+                                                continue 'next_node;
+                                            }
+                                        }
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                        goto_scan_children = false;
+
+                        // scan_children:
+                        if matches!((*cur).element_type(), XmlElementType::XmlNamespaceDecl) {
+                            break 'main;
+                        }
+                        if let Some(children) = cur.children().filter(|_| depth < max_depth) {
+                            // Do not descend on entities declarations
+                            if !matches!(children.element_type(), XmlElementType::XmlEntityDecl) {
+                                cur = children;
+                                depth += 1;
+                                // Skip DTDs
+                                if !matches!(cur.element_type(), XmlElementType::XmlDTDNode) {
+                                    break 'to_continue_main;
+                                }
+                            }
+                        }
+
+                        if Some(cur) == limit {
+                            break 'main;
+                        }
+
+                        while let Some(next) = cur.next() {
+                            cur = next;
+                            if !matches!(
+                                cur.element_type(),
+                                XmlElementType::XmlEntityDecl | XmlElementType::XmlDTDNode
+                            ) {
+                                // goto next_node;
+                                continue 'next_node;
+                            }
+                        }
+
+                        break 'next_node;
+                    }
+
+                    'inner: loop {
+                        let Some(parent) = cur.parent() else {
+                            break 'main;
+                        };
+                        depth -= 1;
+                        cur = parent;
+                        if Some(cur) == limit
+                            || matches!(cur.element_type(), XmlElementType::XmlDocumentNode)
+                        {
+                            // goto done;
+                            break 'main;
+                        }
+                        if matches!(cur.element_type(), XmlElementType::XmlElementNode)
+                            || (eval_all_nodes != 0
+                                && matches!(
+                                    cur.element_type(),
+                                    XmlElementType::XmlTextNode
+                                        | XmlElementType::XmlCDATASectionNode
+                                        | XmlElementType::XmlCommentNode
+                                        | XmlElementType::XmlPINode
+                                ))
+                        {
+                            // ret =
+                            patstream.pop();
+                        };
+                        if let Some(next) = cur.next() {
+                            cur = next;
+                            break 'inner;
+                        }
+                    }
+                }
+
+                depth >= 0
+            } {}
+
+            // done:
 
             0
         }

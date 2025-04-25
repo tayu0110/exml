@@ -19,10 +19,12 @@ use crate::{
     },
 };
 
+#[cfg(feature = "libxml_pattern")]
+use super::XmlXPathCompExpr;
 use super::{
-    MAX_FRAC, XML_XPATH_NOVAR, XPATH_MAX_STEPS, XmlXPathObjectType, XmlXPathParserContext,
-    XmlXPathStepOp, XmlXPathTestVal, XmlXPathTypeVal, xml_xpath_cache_new_string,
-    xml_xpath_perr_memory,
+    MAX_FRAC, XML_XPATH_NOVAR, XPATH_MAX_STEPS, XmlXPathContext, XmlXPathObjectType,
+    XmlXPathParserContext, XmlXPathStepOp, XmlXPathStepOpPtr, XmlXPathTestVal, XmlXPathTypeVal,
+    xml_xpath_cache_new_string, xml_xpath_perr_memory,
 };
 
 impl XmlXPathParserContext {
@@ -93,7 +95,7 @@ impl XmlXPathParserContext {
                 return;
             };
             self.skip_blanks();
-            while self.current_char() == Some('o') && self.nth_byte(1) == Some(b'r') {
+            while self.current_str().starts_with("or") {
                 let op1: i32 = self.comp.borrow().last;
                 self.cur += 2;
                 self.skip_blanks();
@@ -156,10 +158,7 @@ impl XmlXPathParserContext {
                 return;
             };
             self.skip_blanks();
-            while self.current_char() == Some('a')
-                && self.nth_byte(1) == Some(b'n')
-                && self.nth_byte(2) == Some(b'd')
-            {
+            while self.current_str().starts_with("and") {
                 let op1: i32 = self.comp.borrow().last;
                 self.cur += 3;
                 self.skip_blanks();
@@ -345,12 +344,8 @@ impl XmlXPathParserContext {
             };
             self.skip_blanks();
             while self.current_char() == Some('*')
-                || (self.current_char() == Some('d')
-                    && self.nth_byte(1) == Some(b'i')
-                    && self.nth_byte(2) == Some(b'v'))
-                || (self.current_char() == Some('m')
-                    && self.nth_byte(1) == Some(b'o')
-                    && self.nth_byte(2) == Some(b'd'))
+                || self.current_str().starts_with("div")
+                || self.current_str().starts_with("mod")
             {
                 let mut op: i32 = -1;
                 let op1: i32 = self.comp.borrow().last;
@@ -677,7 +672,7 @@ impl XmlXPathParserContext {
                 self.compile_relative_location_path();
             } else {
                 while self.current_char() == Some('/') {
-                    if self.current_char() == Some('/') && self.nth_byte(1) == Some(b'/') {
+                    if self.current_str().starts_with("//") {
                         self.cur += 2;
                         self.skip_blanks();
                         let last = self.comp.borrow().last;
@@ -721,7 +716,7 @@ impl XmlXPathParserContext {
     unsafe fn compile_relative_location_path(&mut self) {
         unsafe {
             self.skip_blanks();
-            if self.current_char() == Some('/') && self.nth_byte(1) == Some(b'/') {
+            if self.current_str().starts_with("//") {
                 self.cur += 2;
                 self.skip_blanks();
                 let last = self.comp.borrow().last;
@@ -745,7 +740,7 @@ impl XmlXPathParserContext {
             };
             self.skip_blanks();
             while self.current_char() == Some('/') {
-                if self.current_char() == Some('/') && self.nth_byte(1) == Some(b'/') {
+                if self.current_str().starts_with("//") {
                     self.cur += 2;
                     self.skip_blanks();
                     let last = self.comp.borrow().last;
@@ -803,7 +798,7 @@ impl XmlXPathParserContext {
             let mut op2: i32 = -1;
 
             self.skip_blanks();
-            if self.current_char() == Some('.') && self.nth_byte(1) == Some(b'.') {
+            if self.current_str().starts_with("..") {
                 self.cur += 2;
                 self.skip_blanks();
                 let last = self.comp.borrow().last;
@@ -925,7 +920,6 @@ impl XmlXPathParserContext {
                 self.comp.borrow_mut().last = -1;
 
                 self.skip_blanks();
-                #[allow(clippy::while_immutable_condition)]
                 while self.current_char() == Some('[') {
                     self.compile_predicate(false);
                 }
@@ -1544,6 +1538,78 @@ impl XmlXPathParserContext {
         }
     }
 
+    #[doc(alias = "xmlXPathOptimizeExpression")]
+    pub unsafe fn optimize_expression(&mut self, op: XmlXPathStepOpPtr) {
+        unsafe {
+            // Try to rewrite "descendant-or-self::node()/foo" to an optimized
+            // internal representation.
+
+            if matches!((*op).op, XmlXPathOp::XPathOpCollect /* 11 */)
+                && (*op).ch1 != -1
+                && (*op).ch2 == -1
+            {
+                let prevop = &self.comp.borrow().steps[(*op).ch1 as usize];
+
+                if matches!(prevop.op, XmlXPathOp::XPathOpCollect /* 11 */)
+                    && prevop.value == XmlXPathAxisVal::AxisDescendantOrSelf as i32
+                    && prevop.ch2 == -1
+                    && prevop.value2 == XmlXPathTestVal::NodeTestType as i32
+                    && prevop.value3 == XmlXPathTypeVal::NodeTypeNode as i32
+                {
+                    // This is a "descendant-or-self::node()" without predicates.
+                    // Try to eliminate it.
+
+                    if (*op).value == XmlXPathAxisVal::AxisChild as i32
+                        || (*op).value == XmlXPathAxisVal::AxisDescendant as i32
+                    {
+                        // Convert "descendant-or-self::node()/child::" or
+                        // "descendant-or-self::node()/descendant::" to
+                        // "descendant::"
+                        (*op).ch1 = prevop.ch1;
+                        (*op).value = XmlXPathAxisVal::AxisDescendant as i32;
+                    } else if (*op).value == XmlXPathAxisVal::AxisSelf as i32
+                        || (*op).value == XmlXPathAxisVal::AxisDescendantOrSelf as i32
+                    {
+                        // Convert "descendant-or-self::node()/self::" or
+                        // "descendant-or-self::node()/descendant-or-self::" to
+                        // to "descendant-or-self::"
+                        (*op).ch1 = prevop.ch1;
+                        (*op).value = XmlXPathAxisVal::AxisDescendantOrSelf as i32;
+                    }
+                }
+            }
+
+            // OP_VALUE has invalid ch1.
+            if matches!((*op).op, XmlXPathOp::XPathOpValue) {
+                return;
+            }
+
+            // Recurse
+            let ctxt: XmlXPathContextPtr = self.context;
+            if !ctxt.is_null() {
+                if (*ctxt).depth >= XPATH_MAX_RECURSION_DEPTH as i32 {
+                    return;
+                }
+                (*ctxt).depth += 1;
+            }
+            if (*op).ch1 != -1 {
+                let mut comp = self.comp.borrow_mut();
+                let ptr = &raw mut comp.steps[(*op).ch1 as usize];
+                drop(comp);
+                self.optimize_expression(ptr);
+            }
+            if (*op).ch2 != -1 {
+                let mut comp = self.comp.borrow_mut();
+                let ptr = &raw mut comp.steps[(*op).ch2 as usize];
+                drop(comp);
+                self.optimize_expression(ptr);
+            }
+            if !ctxt.is_null() {
+                (*ctxt).depth -= 1;
+            }
+        }
+    }
+
     /// Trickery: parse an XML name but without consuming the input flow
     /// Needed to avoid insanity in the parser state.
     ///
@@ -1614,11 +1680,11 @@ impl XmlXPathParserContext {
                 return Some(ret);
             }
         }
-        self.parse_name_complex(1)
+        self.parse_name_complex(true)
     }
 
     #[doc(alias = "xmlXPathParseNameComplex")]
-    fn parse_name_complex(&mut self, qualified: i32) -> Option<String> {
+    fn parse_name_complex(&mut self, qualified: bool) -> Option<String> {
         // Handler for more complex cases
         let mut c = self.current_char()?;
         if c == ' '
@@ -1628,7 +1694,7 @@ impl XmlXPathParserContext {
             || c == ']'
             || c == '@'
             || c == '*'
-            || (!xml_is_letter(c as u32) && c != '_' && (qualified == 0 || c != ':'))
+            || (!xml_is_letter(c as u32) && c != '_' && (!qualified || c != ':'))
         {
             return None;
         }
@@ -1642,7 +1708,7 @@ impl XmlXPathParserContext {
                 || c == '.'
                 || c == '-'
                 || c == '_'
-                || (qualified != 0 && c == ':')
+                || (qualified && c == ':')
                 || xml_is_combining(c as u32)
                 || xml_is_extender(c as u32))
         {
@@ -1689,7 +1755,7 @@ impl XmlXPathParserContext {
                 return Some(ret);
             }
         }
-        self.parse_name_complex(0)
+        self.parse_name_complex(false)
     }
 
     /// parse an XML qualified name
@@ -1754,6 +1820,61 @@ impl XmlXPathParserContext {
             self.cur += 2 + lit.len();
             Some(lit)
         }
+    }
+}
+
+impl XmlXPathContext {
+    /// Try to compile the XPath expression as a streamable subset.
+    ///
+    /// Returns the compiled expression or NULL if failed to compile.
+    #[doc(alias = "xmlXPathTryStreamCompile")]
+    #[cfg(feature = "libxml_pattern")]
+    pub fn try_stream_compile(&mut self, xpath: &str) -> Option<XmlXPathCompExpr> {
+        use crate::pattern::{XmlPatternFlags, xml_pattern_compile};
+
+        // Optimization: use streaming patterns when the XPath expression can
+        // be compiled to a stream lookup
+
+        if !xpath.contains(['[', '(', '@']) {
+            // We don't try to handle expressions using the verbose axis
+            // specifiers ("::"), just the simplified form at this point.
+            // Additionally, if there is no list of namespaces available and
+            //  there's a ":" in the expression, indicating a prefixed QName,
+            //  then we won't try to compile either. xmlPatterncompile() needs
+            //  to have a list of namespaces at compilation time in order to
+            //  compile prefixed name tests.
+            if let Some((_, tmp)) = xpath.split_once(':') {
+                if self.namespaces.as_ref().map_or(0, |t| t.len()) == 0 || tmp.starts_with(':') {
+                    return None;
+                }
+            }
+
+            let mut namespaces = None;
+            if let Some(table) = self.namespaces.as_deref().filter(|t| !t.is_empty()) {
+                namespaces = Some(
+                    table
+                        .iter()
+                        .map(|ns| {
+                            (
+                                ns.href().unwrap().into_owned(),
+                                ns.prefix().map(|pref| pref.into_owned()),
+                            )
+                        })
+                        .collect(),
+                );
+            }
+
+            if let Some(stream) =
+                xml_pattern_compile(xpath, XmlPatternFlags::XmlPatternXPath as i32, namespaces)
+            {
+                if stream.is_streamable() == 1 {
+                    let mut comp = XmlXPathCompExpr::default();
+                    comp.stream = Some(stream);
+                    return Some(comp);
+                }
+            }
+        }
+        None
     }
 }
 

@@ -1038,8 +1038,10 @@ pub unsafe fn xml_xpath_ctxt_compile(
         let mut old_depth: i32 = 0;
 
         #[cfg(feature = "libxml_pattern")]
-        if let Some(comp) = xml_xpath_try_stream_compile(ctxt, xpath) {
-            return Some(comp);
+        if !ctxt.is_null() {
+            if let Some(comp) = (*ctxt).try_stream_compile(xpath) {
+                return Some(comp);
+            }
         }
 
         xml_init_parser();
@@ -1075,7 +1077,7 @@ pub unsafe fn xml_xpath_ctxt_compile(
                 let mut comp = pctxt.comp.borrow_mut();
                 let op = &raw mut comp.steps[last];
                 drop(comp);
-                xml_xpath_optimize_expression(&mut pctxt, op);
+                pctxt.optimize_expression(op);
                 if !ctxt.is_null() {
                     (*ctxt).depth = old_depth;
                 }
@@ -2480,35 +2482,6 @@ mod tests {
                     assert!(
                         leaks == 0,
                         "{leaks} Leaks are found in xmlXPathNotEqualValues()"
-                    );
-                    eprintln!(" {}", n_ctxt);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_registered_funcs_cleanup() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_XPATH_CONTEXT_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctxt = gen_xml_xpath_context_ptr(n_ctxt, 0);
-
-                xml_xpath_registered_funcs_cleanup(ctxt);
-                des_xml_xpath_context_ptr(n_ctxt, ctxt, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathRegisteredFuncsCleanup",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlXPathRegisteredFuncsCleanup()"
                     );
                     eprintln!(" {}", n_ctxt);
                 }
