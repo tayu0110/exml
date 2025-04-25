@@ -22,7 +22,7 @@ use crate::{
 use super::{
     XPATH_MAX_RECURSION_DEPTH, XmlXPathContext, XmlXPathContextPtr, XmlXPathFunction,
     XmlXPathObject, XmlXPathObjectPtr, XmlXPathObjectType, XmlXPathParserContext,
-    XmlXPathStepOpPtr,
+    compile::XmlXPathStepOpPtr,
     functions::{xml_xpath_boolean_function, xml_xpath_number_function},
     xml_xpath_add_values, xml_xpath_cache_new_boolean, xml_xpath_cache_new_node_set,
     xml_xpath_cache_object_copy, xml_xpath_cast_to_boolean, xml_xpath_compare_values,
@@ -32,14 +32,6 @@ use super::{
     xml_xpath_not_equal_values, xml_xpath_release_object, xml_xpath_root, xml_xpath_sub_values,
     xml_xpath_value_flip_sign, xml_xpath_variable_lookup, xml_xpath_variable_lookup_ns,
 };
-
-/// Swaps 2 operations in the compiled expression
-#[doc(alias = "xmlXPathCompSwap")]
-unsafe fn xml_xpath_comp_swap(op: XmlXPathStepOpPtr) {
-    unsafe {
-        std::mem::swap(&mut (*op).ch1, &mut (*op).ch2);
-    }
-}
 
 impl XmlXPathParserContext {
     /// Adds opCount to the running total of operations and returns -1 if the
@@ -1086,7 +1078,7 @@ impl XmlXPathParserContext {
                         xml_xpath_release_object(self.context, arg2);
                         // optimizer
                         if total > cur {
-                            xml_xpath_comp_swap(op);
+                            (*op).swap_children();
                         }
                         total += cur;
                     }
@@ -1280,7 +1272,7 @@ impl XmlXPathParserContext {
                         xml_xpath_release_object(self.context, arg2);
                         // optimizer
                         if total > cur {
-                            xml_xpath_comp_swap(op);
+                            (*op).swap_children();
                         }
                         total += cur;
                     }

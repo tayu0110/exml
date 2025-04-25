@@ -60,6 +60,7 @@ use std::{
     rc::Rc,
 };
 
+use compile::XmlXPathStepOp;
 use libc::memset;
 
 #[cfg(feature = "libxml_pattern")]
@@ -250,23 +251,6 @@ pub enum XmlXPathOp {
     XPathOpSort,   /* 17 */
     #[cfg(feature = "libxml_xptr_locs")]
     XPathOpRangeto,
-}
-
-#[cfg(feature = "xpath")]
-pub type XmlXPathStepOpPtr = *mut XmlXPathStepOp;
-#[cfg(feature = "xpath")]
-#[repr(C)]
-pub struct XmlXPathStepOp {
-    pub(crate) op: XmlXPathOp, /* The identifier of the operation */
-    pub(crate) ch1: i32,       /* First child */
-    pub(crate) ch2: i32,       /* Second child */
-    pub(crate) value: i32,
-    pub(crate) value2: i32,
-    pub(crate) value3: i32,
-    pub(crate) value4: *mut c_void,
-    pub(crate) value5: *mut c_void,
-    pub(crate) cache: Option<XmlXPathFunction>,
-    pub(crate) cache_uri: Option<Rc<str>>,
 }
 
 /// The structure of a compiled expression form is not public.

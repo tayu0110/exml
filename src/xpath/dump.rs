@@ -12,7 +12,7 @@ use crate::{
 #[cfg(feature = "libxml_xptr_locs")]
 use crate::{libxml::xpointer::XmlLocationSetPtr, tree::XmlNode};
 
-use super::{XmlNodeSet, XmlXPathCompExpr, XmlXPathObjectPtr, XmlXPathStepOpPtr};
+use super::{XmlNodeSet, XmlXPathCompExpr, XmlXPathObjectPtr, compile::XmlXPathStepOpPtr};
 
 unsafe fn xml_xpath_debug_dump_node<'a>(
     output: &mut (impl Write + 'a),

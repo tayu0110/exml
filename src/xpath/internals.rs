@@ -30,10 +30,10 @@ use std::{
     ffi::{CStr, CString},
     mem::size_of,
     os::raw::c_void,
-    ptr::{addr_of_mut, null_mut},
+    ptr::null_mut,
 };
 
-use libc::{INT_MAX, INT_MIN, memset};
+use libc::memset;
 
 #[cfg(feature = "libxml_xptr_locs")]
 use crate::libxml::xpointer::{XmlLocationSetPtr, xml_xptr_free_location_set};
@@ -53,8 +53,7 @@ use crate::{
     },
     xpath::{
         XML_XPATH_NAN, XmlXPathContextPtr, XmlXPathError, XmlXPathObject, XmlXPathObjectPtr,
-        XmlXPathObjectType, XmlXPathOp, XmlXPathParserContextPtr, XmlXPathStepOpPtr,
-        XmlXPathVariableLookupFunc,
+        XmlXPathObjectType, XmlXPathOp, XmlXPathParserContextPtr, XmlXPathVariableLookupFunc,
         functions::{cast_to_number, xml_xpath_number_function},
         xml_xpath_cast_boolean_to_string, xml_xpath_cast_node_set_to_string,
         xml_xpath_cast_node_to_number, xml_xpath_cast_node_to_string,
@@ -68,9 +67,10 @@ use crate::{
 };
 
 use super::{
-    XmlNodeSet, XmlXPathContext, XmlXPathParserContext, functions::xml_xpath_boolean_function,
-    xml_xpath_new_boolean, xml_xpath_new_float, xml_xpath_new_node_set, xml_xpath_new_string,
-    xml_xpath_node_set_merge, xml_xpath_wrap_node_set, xml_xpath_wrap_string,
+    XmlNodeSet, XmlXPathContext, XmlXPathParserContext, compile::XmlXPathStepOpPtr,
+    functions::xml_xpath_boolean_function, xml_xpath_new_boolean, xml_xpath_new_float,
+    xml_xpath_new_node_set, xml_xpath_new_string, xml_xpath_node_set_merge,
+    xml_xpath_wrap_node_set, xml_xpath_wrap_string,
 };
 
 // Many of these macros may later turn into functions.
@@ -1282,62 +1282,6 @@ unsafe fn xml_xpath_next_preceding_internal(
     }
 }
 
-unsafe fn xml_xpath_is_positional_predicate(
-    ctxt: &mut XmlXPathParserContext,
-    op: XmlXPathStepOpPtr,
-    max_pos: *mut i32,
-) -> i32 {
-    unsafe {
-        // BIG NOTE: This is not intended for XPATH_OP_FILTER yet!
-
-        // If not -1, then ch1 will point to:
-        // 1) For predicates (XPATH_OP_PREDICATE):
-        //    - an inner predicate operator
-        // 2) For filters (XPATH_OP_FILTER):
-        //    - an inner filter operator OR
-        //    - an expression selecting the node set.
-        //      E.g. "key('a', 'b')" or "(//foo | //bar)".
-        if !matches!(
-            (*op).op,
-            XmlXPathOp::XPathOpPredicate | XmlXPathOp::XPathOpFilter
-        ) {
-            return 0;
-        }
-
-        if (*op).ch2 == -1 || (*op).ch2 >= ctxt.comp.borrow().steps.len() as i32 {
-            return 0;
-        }
-        let expr_op = &ctxt.comp.borrow().steps[(*op).ch2 as usize];
-
-        if matches!(expr_op.op, XmlXPathOp::XPathOpValue)
-            && !expr_op.value4.is_null()
-            && matches!(
-                (*(expr_op.value4 as XmlXPathObjectPtr)).typ,
-                XmlXPathObjectType::XPathNumber
-            )
-        {
-            let floatval: f64 = (*(expr_op.value4 as XmlXPathObjectPtr)).floatval;
-
-            // We have a "[n]" predicate here.
-            // TODO: Unfortunately this simplistic test here is not
-            // able to detect a position() predicate in compound
-            // expressions like "[@attr = 'a" and position() = 1],
-            // and even not the usage of position() in
-            // "[position() = 1]"; thus - obviously - a position-range,
-            // like it "[position() < 5]", is also not detected.
-            // Maybe we could rewrite the AST to ease the optimization.
-
-            if floatval > INT_MIN as f64 && floatval < INT_MAX as f64 {
-                *max_pos = floatval as i32;
-                if floatval == *max_pos as f64 {
-                    return 1;
-                }
-            }
-        }
-        0
-    }
-}
-
 /// Filter a node set, keeping only nodes for which the predicate expression
 /// matches. Afterwards, keep only nodes between minPos and maxPos in the
 /// filtered result.
@@ -1785,7 +1729,7 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
             let mut comp = (*ctxt).comp.borrow_mut();
             pred_op = &raw mut comp.steps[(*op).ch2 as usize];
             drop(comp);
-            if xml_xpath_is_positional_predicate(&mut *ctxt, pred_op, addr_of_mut!(max_pos)) != 0 {
+            if (*ctxt).is_positional_predicate(&*pred_op, &mut max_pos) != 0 {
                 if (*pred_op).ch1 != -1 {
                     // Use the next inner predicate operator.
                     let mut comp = (*ctxt).comp.borrow_mut();

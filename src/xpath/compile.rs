@@ -1,6 +1,7 @@
 use std::{
     ffi::{CStr, c_void},
     ptr::null_mut,
+    rc::Rc,
 };
 
 use crate::{
@@ -22,10 +23,35 @@ use crate::{
 #[cfg(feature = "libxml_pattern")]
 use super::XmlXPathCompExpr;
 use super::{
-    MAX_FRAC, XML_XPATH_NOVAR, XPATH_MAX_STEPS, XmlXPathContext, XmlXPathObjectType,
-    XmlXPathParserContext, XmlXPathStepOp, XmlXPathStepOpPtr, XmlXPathTestVal, XmlXPathTypeVal,
+    MAX_FRAC, XML_XPATH_NOVAR, XPATH_MAX_STEPS, XmlXPathContext, XmlXPathFunction,
+    XmlXPathObjectType, XmlXPathParserContext, XmlXPathTestVal, XmlXPathTypeVal,
     xml_xpath_cache_new_string, xml_xpath_perr_memory,
 };
+
+#[cfg(feature = "xpath")]
+pub type XmlXPathStepOpPtr = *mut XmlXPathStepOp;
+#[cfg(feature = "xpath")]
+#[repr(C)]
+pub struct XmlXPathStepOp {
+    pub(crate) op: XmlXPathOp, /* The identifier of the operation */
+    pub(crate) ch1: i32,       /* First child */
+    pub(crate) ch2: i32,       /* Second child */
+    pub(crate) value: i32,
+    pub(crate) value2: i32,
+    pub(crate) value3: i32,
+    pub(crate) value4: *mut c_void,
+    pub(crate) value5: *mut c_void,
+    pub(crate) cache: Option<XmlXPathFunction>,
+    pub(crate) cache_uri: Option<Rc<str>>,
+}
+
+impl XmlXPathStepOp {
+    /// Swaps 2 operations in the compiled expression
+    #[doc(alias = "xmlXPathCompSwap")]
+    pub(super) fn swap_children(&mut self) {
+        (self.ch1, self.ch2) = (self.ch2, self.ch1);
+    }
+}
 
 impl XmlXPathParserContext {
     /// Add a step to an XPath Compiled Expression
