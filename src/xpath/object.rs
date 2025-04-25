@@ -50,8 +50,8 @@ pub enum XmlXPathObjectType {
 // const XPATH_POINT: usize = 5;
 // #[cfg(all(feature = "libxml_xptr_locs", feature = "xpath"))]
 // const XPATH_RANGE: usize = 6;
-#[cfg(all(feature = "libxml_xptr_locs", feature = "xpath"))]
-const XPATH_LOCATIONSET: usize = 7;
+// #[cfg(all(feature = "libxml_xptr_locs", feature = "xpath"))]
+// const XPATH_LOCATIONSET: usize = 7;
 
 pub type XmlXPathObjectPtr = *mut XmlXPathObject;
 #[repr(C)]
