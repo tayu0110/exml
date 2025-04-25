@@ -12,7 +12,7 @@ use crate::{
 #[cfg(feature = "libxml_xptr_locs")]
 use crate::{libxml::xpointer::XmlLocationSetPtr, tree::XmlNode};
 
-use super::{XmlNodeSet, XmlXPathCompExprPtr, XmlXPathObjectPtr, XmlXPathStepOpPtr};
+use super::{XmlNodeSet, XmlXPathCompExpr, XmlXPathObjectPtr, XmlXPathStepOpPtr};
 
 unsafe fn xml_xpath_debug_dump_node<'a>(
     output: &mut (impl Write + 'a),
@@ -244,7 +244,7 @@ pub unsafe fn xml_xpath_debug_dump_object<'a>(
 
 unsafe fn xml_xpath_debug_dump_step_op<'a>(
     output: &mut (impl Write + 'a),
-    comp: XmlXPathCompExprPtr,
+    comp: &XmlXPathCompExpr,
     op: XmlXPathStepOpPtr,
     depth: i32,
 ) {
@@ -417,7 +417,7 @@ unsafe fn xml_xpath_debug_dump_step_op<'a>(
                     xml_xpath_debug_dump_step_op(
                         output,
                         comp,
-                        &raw mut (*comp).steps[(*op).ch1 as usize],
+                        &raw const comp.steps[(*op).ch1 as usize] as _,
                         depth + 1,
                     );
                 }
@@ -425,7 +425,7 @@ unsafe fn xml_xpath_debug_dump_step_op<'a>(
                     xml_xpath_debug_dump_step_op(
                         output,
                         comp,
-                        &raw mut (*comp).steps[(*op).ch2 as usize],
+                        &raw const comp.steps[(*op).ch2 as usize] as _,
                         depth + 1,
                     );
                 }
@@ -479,7 +479,7 @@ unsafe fn xml_xpath_debug_dump_step_op<'a>(
             xml_xpath_debug_dump_step_op(
                 output,
                 comp,
-                &raw mut (*comp).steps[(*op).ch1 as usize],
+                &raw const comp.steps[(*op).ch1 as usize] as _,
                 depth + 1,
             );
         }
@@ -487,7 +487,7 @@ unsafe fn xml_xpath_debug_dump_step_op<'a>(
             xml_xpath_debug_dump_step_op(
                 output,
                 comp,
-                &raw mut (*comp).steps[(*op).ch2 as usize],
+                &raw const comp.steps[(*op).ch2 as usize] as _,
                 depth + 1,
             );
         }
@@ -498,31 +498,27 @@ unsafe fn xml_xpath_debug_dump_step_op<'a>(
 #[doc(alias = "xmlXPathDebugDumpCompExpr")]
 pub unsafe fn xml_xpath_debug_dump_comp_expr<'a>(
     output: &mut (impl Write + 'a),
-    comp: XmlXPathCompExprPtr,
+    comp: &XmlXPathCompExpr,
     depth: i32,
 ) {
     unsafe {
-        if comp.is_null() {
-            return;
-        }
-
         let shift = "  ".repeat(depth.clamp(0, 25) as usize);
 
         write!(output, "{}", shift).ok();
 
-        if (*comp).stream.is_some() {
+        if comp.stream.is_some() {
             writeln!(output, "Streaming Expression").ok();
         } else {
             writeln!(
                 output,
                 "Compiled Expression : {} elements",
-                (*comp).steps.len(),
+                comp.steps.len(),
             )
             .ok();
             xml_xpath_debug_dump_step_op(
                 output,
                 comp,
-                &raw mut (*comp).steps[(*comp).last as usize],
+                &raw const comp.steps[comp.last as usize] as _,
                 depth + 1,
             );
         }

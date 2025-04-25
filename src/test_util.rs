@@ -27,10 +27,7 @@ use crate::{
         xmlstring::XmlChar,
     },
     tree::{XmlAttr, XmlDoc, XmlDtd, XmlNode, XmlNs},
-    xpath::{
-        XmlNodeSet, XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathObjectPtr,
-        XmlXPathParserContextPtr,
-    },
+    xpath::{XmlNodeSet, XmlXPathContextPtr, XmlXPathObjectPtr, XmlXPathParserContextPtr},
 };
 
 pub(crate) static TEST_CATALOG_LOCK: Mutex<()> = Mutex::new(());
@@ -188,14 +185,6 @@ pub(crate) unsafe fn des_xml_xpath_object_ptr(_no: i32, val: XmlXPathObjectPtr, 
 
 #[cfg(feature = "xpath")]
 pub(crate) fn desret_double(_val: f64) {}
-
-#[cfg(feature = "xpath")]
-pub(crate) fn gen_xml_xpath_comp_expr_ptr(_no: i32, _nr: i32) -> XmlXPathCompExprPtr {
-    null_mut()
-}
-
-#[cfg(feature = "xpath")]
-pub(crate) fn des_xml_xpath_comp_expr_ptr(_no: i32, _val: XmlXPathCompExprPtr, _nr: i32) {}
 
 #[cfg(feature = "xpath")]
 pub(crate) fn gen_xml_xpath_context_ptr(_no: i32, _nr: i32) -> XmlXPathContextPtr {

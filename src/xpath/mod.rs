@@ -269,9 +269,7 @@ pub struct XmlXPathStepOp {
     pub(crate) cache_uri: Option<Rc<str>>,
 }
 
-// The structure of a compiled expression form is not public.
-#[cfg(feature = "xpath")]
-pub type XmlXPathCompExprPtr = *mut XmlXPathCompExpr;
+/// The structure of a compiled expression form is not public.
 #[cfg(feature = "xpath")]
 #[repr(C)]
 pub struct XmlXPathCompExpr {
@@ -893,32 +891,6 @@ pub unsafe fn xml_xpath_node_eval(
     }
 }
 
-macro_rules! CHECK_CTXT {
-    ($ctxt:expr) => {
-        if $ctxt.is_null() {
-            $crate::error::__xml_raise_error!(
-                None,
-                None,
-                None,
-                std::ptr::null_mut(),
-                None,
-                $crate::error::XmlErrorDomain::XmlFromXPath,
-                $crate::error::XmlParserErrors::XmlErrInternalError,
-                $crate::error::XmlErrorLevel::XmlErrFatal,
-                Some(file!().into()),
-                line!() as i32,
-                None,
-                None,
-                None,
-                0,
-                0,
-                "NULL context pointer\n",
-            );
-            return null_mut();
-        }
-    };
-}
-
 /// Evaluate the XPath Location Path in the given context.
 ///
 /// Returns the let resulting: xmlXPathObjectPtr from the evaluation or NULL.
@@ -931,7 +903,27 @@ pub unsafe fn xml_xpath_eval(xpath: &str, ctx: XmlXPathContextPtr) -> XmlXPathOb
 
         let res: XmlXPathObjectPtr;
 
-        CHECK_CTXT!(ctx);
+        if ctx.is_null() {
+            crate::error::__xml_raise_error!(
+                None,
+                None,
+                None,
+                std::ptr::null_mut(),
+                None,
+                crate::error::XmlErrorDomain::XmlFromXPath,
+                crate::error::XmlParserErrors::XmlErrInternalError,
+                crate::error::XmlErrorLevel::XmlErrFatal,
+                Some(file!().into()),
+                line!() as i32,
+                None,
+                None,
+                None,
+                0,
+                0,
+                "NULL context pointer\n",
+            );
+            return null_mut();
+        };
 
         xml_init_parser();
 
@@ -1201,34 +1193,6 @@ pub unsafe fn xml_xpath_compiled_eval_to_boolean(
     ctxt: XmlXPathContextPtr,
 ) -> i32 {
     unsafe { xml_xpath_compiled_eval_internal(comp, ctxt, null_mut(), true) }
-}
-
-/// Free up the memory allocated by @comp
-#[doc(alias = "xmlXPathFreeCompExpr")]
-#[cfg(feature = "xpath")]
-pub unsafe fn xml_xpath_free_comp_expr(comp: XmlXPathCompExprPtr) {
-    unsafe {
-        use std::ptr::drop_in_place;
-
-        if comp.is_null() {
-            return;
-        }
-        for op in &(*comp).steps {
-            if !op.value4.is_null() {
-                if matches!(op.op, XmlXPathOp::XPathOpValue) {
-                    xml_xpath_free_object(op.value4 as _);
-                } else {
-                    xml_free(op.value4 as _);
-                }
-            }
-            if !op.value5.is_null() {
-                xml_free(op.value5 as _);
-            }
-        }
-
-        drop_in_place(comp);
-        xml_free(comp as _);
-    }
 }
 
 /// Compare two nodes w.r.t document order.
@@ -2030,44 +1994,6 @@ mod tests {
                             eprint!(" {}", n_ctxt);
                             eprint!(" {}", n_inf);
                             eprintln!(" {}", n_strict);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_debug_dump_comp_expr() {
-        #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_output in 0..GEN_NB_FILE_PTR {
-                for n_comp in 0..GEN_NB_XML_XPATH_COMP_EXPR_PTR {
-                    for n_depth in 0..GEN_NB_INT {
-                        let mem_base = xml_mem_blocks();
-                        let mut output = gen_file_ptr(n_output, 0).unwrap();
-                        let comp = gen_xml_xpath_comp_expr_ptr(n_comp, 1);
-                        let depth = gen_int(n_depth, 2);
-
-                        xml_xpath_debug_dump_comp_expr(&mut output, comp, depth);
-                        des_xml_xpath_comp_expr_ptr(n_comp, comp, 1);
-                        des_int(n_depth, depth, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlXPathDebugDumpCompExpr",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlXPathDebugDumpCompExpr()"
-                            );
-                            eprint!(" {}", n_output);
-                            eprint!(" {}", n_comp);
-                            eprintln!(" {}", n_depth);
                         }
                     }
                 }
