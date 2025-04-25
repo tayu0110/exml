@@ -36,7 +36,7 @@ use std::{
 use libc::memset;
 
 #[cfg(feature = "libxml_xptr_locs")]
-use crate::libxml::xpointer::{XmlLocationSetPtr, xml_xptr_free_location_set};
+use crate::libxml::xpointer::XmlLocationSet;
 use crate::{
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     generic_error,
@@ -295,11 +295,12 @@ pub(crate) unsafe fn xml_xpath_release_object(ctxt: XmlXPathContextPtr, obj: Xml
                         }
                         #[cfg(feature = "libxml_xptr_locs")]
                         XmlXPathObjectType::XPathLocationset => {
-                            if let Some(loc) = (*obj).user.take() {
-                                if let Some(&loc) = loc.as_location_set() {
-                                    xml_xptr_free_location_set(loc);
-                                }
-                            }
+                            let _ = (*obj).user.take();
+                            // if let Some(loc) = (*obj).user.take() {
+                            //     if let Some(&loc) = loc.as_location_set() {
+                            //         xml_xptr_free_location_set(loc);
+                            //     }
+                            // }
                             break 'free_obj;
                         }
                         _ => {
@@ -2092,13 +2093,13 @@ pub(super) unsafe fn xml_xpath_node_set_keep_last(set: Option<&mut XmlNodeSet>) 
 #[cfg(feature = "libxml_xptr_locs")]
 pub(super) unsafe fn xml_xpath_location_set_filter(
     ctxt: XmlXPathParserContextPtr,
-    locset: XmlLocationSetPtr,
+    locset: &mut XmlLocationSet,
     filter_op_index: i32,
     min_pos: i32,
     max_pos: i32,
 ) {
     unsafe {
-        if locset.is_null() || (*locset).loc_tab.is_empty() || filter_op_index == -1 {
+        if locset.loc_tab.is_empty() || filter_op_index == -1 {
             return;
         }
 
@@ -2108,13 +2109,13 @@ pub(super) unsafe fn xml_xpath_location_set_filter(
         let oldcs: i32 = (*xpctxt).context_size;
         let oldpp: i32 = (*xpctxt).proximity_position;
 
-        (*xpctxt).context_size = (*locset).loc_tab.len() as i32;
+        (*xpctxt).context_size = locset.loc_tab.len() as i32;
 
         let mut i = 0;
         let mut j = 0;
         let mut pos = 1;
-        while i < (*locset).loc_tab.len() {
-            let context_node = (*(*locset).loc_tab[i])
+        while i < locset.loc_tab.len() {
+            let context_node = (*locset.loc_tab[i])
                 .user
                 .as_ref()
                 .and_then(|user| user.as_node())
@@ -2151,15 +2152,15 @@ pub(super) unsafe fn xml_xpath_location_set_filter(
 
             if res != 0 && (pos >= min_pos && pos <= max_pos) {
                 if i != j {
-                    (*locset).loc_tab[j] = (*locset).loc_tab[i];
-                    (*locset).loc_tab[i] = null_mut();
+                    locset.loc_tab[j] = locset.loc_tab[i];
+                    locset.loc_tab[i] = null_mut();
                 }
 
                 j += 1;
             } else {
                 /* Remove the entry from the initial location set. */
-                xml_xpath_free_object((*locset).loc_tab[i]);
-                (*locset).loc_tab[i] = null_mut();
+                xml_xpath_free_object(locset.loc_tab[i]);
+                locset.loc_tab[i] = null_mut();
             }
 
             if res != 0 {
@@ -2175,14 +2176,14 @@ pub(super) unsafe fn xml_xpath_location_set_filter(
         }
 
         // Free remaining nodes.
-        while i < (*locset).loc_tab.len() {
-            xml_xpath_free_object((*locset).loc_tab[i]);
+        while i < locset.loc_tab.len() {
+            xml_xpath_free_object(locset.loc_tab[i]);
             i += 1;
         }
 
-        (*locset).loc_tab.truncate(j);
+        locset.loc_tab.truncate(j);
         // If too many elements were removed, shrink table to preserve memory.
-        (*locset).loc_tab.shrink_to(XML_NODESET_DEFAULT);
+        locset.loc_tab.shrink_to(XML_NODESET_DEFAULT);
 
         (*xpctxt).node = oldnode;
         (*xpctxt).doc = olddoc;
@@ -2320,16 +2321,11 @@ pub unsafe fn xml_xpath_evaluate_predicate_result(
             }
             #[cfg(feature = "libxml_xptr_locs")]
             XmlXPathObjectType::XPathLocationset => {
-                let &loc = (*res)
-                    .user
-                    .as_ref()
-                    .and_then(|user| user.as_location_set())
-                    .unwrap();
-
-                if loc.is_null() {
+                let Some(loc) = (*res).user.as_ref().and_then(|user| user.as_location_set()) else {
                     return 0;
-                }
-                return (!(*loc).loc_tab.is_empty()) as i32;
+                };
+
+                return (!loc.loc_tab.is_empty()) as i32;
             }
             _ => {
                 generic_error!("Internal error at {}:{}\n", file!(), line!());

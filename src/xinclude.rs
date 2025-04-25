@@ -31,8 +31,6 @@ use std::{
     ptr::{addr_of_mut, null_mut},
 };
 
-#[cfg(feature = "libxml_xptr_locs")]
-use crate::libxml::xpointer::XmlLocationSetPtr;
 use crate::{
     encoding::{XmlCharEncoding, get_encoding_handler},
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
@@ -896,18 +894,13 @@ impl XmlXIncludeCtxt {
                 }
                 #[cfg(feature = "libxml_xptr_locs")]
                 XmlXPathObjectType::XPathLocationset => {
-                    let set: XmlLocationSetPtr = (*obj)
+                    let set = (*obj)
                         .user
                         .as_ref()
-                        .and_then(|user| user.as_location_set())
-                        .copied()
-                        .unwrap_or(null_mut());
+                        .and_then(|user| user.as_location_set())?;
 
-                    if set.is_null() {
-                        return None;
-                    }
                     let mut last: Option<XmlNodePtr> = None;
-                    for &loc in &(*set).loc_tab {
+                    for &loc in &set.loc_tab {
                         if let Some(mut last) = last {
                             last.add_next_sibling(self.copy_xpointer(loc).unwrap().into());
                         } else {

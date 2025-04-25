@@ -1,12 +1,11 @@
 use std::{borrow::Cow, ffi::c_void, ptr::null_mut};
 
-#[cfg(feature = "libxml_xptr_locs")]
-use crate::libxml::xpointer::{
-    XmlLocationSetPtr, xml_xptr_free_location_set, xml_xptr_location_set_merge,
-};
 use crate::{
     generic_error,
-    libxml::globals::{xml_free, xml_malloc},
+    libxml::{
+        globals::{xml_free, xml_malloc},
+        xpointer::XmlLocationSet,
+    },
     tree::XmlGenericNodePtr,
 };
 
@@ -105,11 +104,13 @@ impl Drop for XmlXPathObject {
                 let _ = self.stringval.take();
             } else {
                 #[cfg(feature = "libxml_xptr_locs")]
-                if let Some(loc) = self.user.take() {
-                    if let Some(&loc) = loc.as_location_set() {
-                        xml_xptr_free_location_set(loc);
-                    }
-                }
+                let _ = self.user.take();
+                // #[cfg(feature = "libxml_xptr_locs")]
+                // if let Some(loc) = self.user.take() {
+                //     if let Some(&loc) = loc.as_location_set() {
+                //         xml_xptr_free_location_set(loc);
+                //     }
+                // }
             }
         }
     }
@@ -154,7 +155,7 @@ impl From<bool> for XmlXPathObject {
 #[derive(Clone, PartialEq)]
 pub enum XmlXPathObjectUserData {
     Node(XmlGenericNodePtr),
-    LocationSet(XmlLocationSetPtr),
+    LocationSet(XmlLocationSet),
     External(*mut c_void),
 }
 
@@ -166,7 +167,14 @@ impl XmlXPathObjectUserData {
         }
     }
 
-    pub fn as_location_set(&self) -> Option<&XmlLocationSetPtr> {
+    pub fn as_location_set(&self) -> Option<&XmlLocationSet> {
+        match self {
+            Self::LocationSet(loc) => Some(loc),
+            _ => None,
+        }
+    }
+
+    pub fn as_location_set_mut(&mut self) -> Option<&mut XmlLocationSet> {
         match self {
             Self::LocationSet(loc) => Some(loc),
             _ => None,
@@ -360,11 +368,13 @@ pub unsafe fn xml_xpath_object_copy(val: XmlXPathObjectPtr) -> XmlXPathObjectPtr
             }
             #[cfg(feature = "libxml_xptr_locs")]
             XmlXPathObjectType::XPathLocationset => {
-                if let Some(&loc) = (*val).user.as_ref().and_then(|user| user.as_location_set()) {
-                    let loc = xml_xptr_location_set_merge(null_mut(), loc);
-                    (*ret).user =
-                        (!loc.is_null()).then_some(XmlXPathObjectUserData::LocationSet(loc));
-                }
+                // What is this ????
+                // It seems that `xml_xptr_location_set_merge` always returns `null_mut()`...
+                // if let Some(loc) = (*val).user.as_ref().and_then(|user| user.as_location_set()) {
+                //     let loc = xml_xptr_location_set_merge(null_mut(), loc);
+                //     (*ret).user =
+                //         (!loc.is_null()).then_some(XmlXPathObjectUserData::LocationSet(loc));
+                // }
             }
             XmlXPathObjectType::XPathUsers => {
                 (*ret).user = (*val).user.clone();
@@ -403,11 +413,13 @@ pub unsafe fn xml_xpath_free_object(obj: XmlXPathObjectPtr) {
             let _ = (*obj).stringval.take();
         } else {
             #[cfg(feature = "libxml_xptr_locs")]
-            if let Some(loc) = (*obj).user.take() {
-                if let Some(&loc) = loc.as_location_set() {
-                    xml_xptr_free_location_set(loc);
-                }
-            }
+            let _ = (*obj).user.take();
+            // #[cfg(feature = "libxml_xptr_locs")]
+            // if let Some(loc) = (*obj).user.take() {
+            //     if let Some(&loc) = loc.as_location_set() {
+            //         xml_xptr_free_location_set(loc);
+            //     }
+            // }
         }
         xml_free(obj as _);
     }

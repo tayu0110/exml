@@ -1,7 +1,7 @@
 use std::{io::Write, ptr::null_mut};
 
 #[cfg(feature = "libxml_xptr_locs")]
-use crate::libxml::xpointer::XmlLocationSetPtr;
+use crate::libxml::xpointer::XmlLocationSet;
 use crate::{
     debug_xml::{xml_debug_dump_attr, xml_debug_dump_one_node, xml_debug_dump_string},
     tree::{XmlAttrPtr, XmlElementType, XmlGenericNodePtr},
@@ -107,18 +107,18 @@ unsafe fn xml_xpath_debug_dump_value_tree<'a>(
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe fn xml_xpath_debug_dump_location_set<'a>(
     output: &mut (impl Write + 'a),
-    cur: XmlLocationSetPtr,
+    cur: Option<&XmlLocationSet>,
     depth: i32,
 ) {
     unsafe {
         let shift = "  ".repeat(depth.clamp(0, 25) as usize);
-        if cur.is_null() {
+        let Some(cur) = cur else {
             write!(output, "{}", shift).ok();
             writeln!(output, "LocationSet is NULL !").ok();
             return;
-        }
+        };
 
-        for (i, &loc) in (*cur).loc_tab.iter().enumerate() {
+        for (i, &loc) in cur.loc_tab.iter().enumerate() {
             write!(output, "{}", shift).ok();
             write!(output, "{} : ", i + 1).ok();
             xml_xpath_debug_dump_object(output, loc, depth + 1);
@@ -248,12 +248,7 @@ pub unsafe fn xml_xpath_debug_dump_object<'a>(
             #[cfg(feature = "libxml_xptr_locs")]
             XmlXPathObjectType::XPathLocationset => {
                 writeln!(output, "Object is a Location Set:").ok();
-                let loc = (*cur)
-                    .user
-                    .as_ref()
-                    .and_then(|user| user.as_location_set())
-                    .copied()
-                    .unwrap();
+                let loc = (*cur).user.as_ref().and_then(|user| user.as_location_set());
                 xml_xpath_debug_dump_location_set(output, loc, depth);
             }
             XmlXPathObjectType::XPathUsers => {
