@@ -39,9 +39,6 @@ use std::{
     ptr::null_mut,
 };
 
-#[cfg(feature = "libxml_xptr_locs")]
-use libc::c_void;
-
 use crate::xpath::functions::xml_xpath_id_function;
 #[cfg(feature = "libxml_xptr_locs")]
 use crate::xpath::{XmlNodeSet, XmlXPathParserContext, functions::check_arity};
@@ -59,7 +56,7 @@ use crate::{
         xmlstring::{XmlChar, xml_str_equal},
     },
     parser::xml_init_parser,
-    tree::{NodeCommon, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNode},
+    tree::{NodeCommon, XmlDocPtr, XmlElementType, XmlGenericNodePtr},
     xpath::{
         XmlXPathContextPtr, XmlXPathError, XmlXPathObjectPtr, XmlXPathObjectType,
         XmlXPathParserContextPtr, internals::xml_xpath_root, xml_xpath_free_object,
@@ -122,6 +119,8 @@ unsafe fn xml_xptr_new_location_set_nodes(
     start: XmlGenericNodePtr,
     end: Option<XmlGenericNodePtr>,
 ) -> XmlXPathObjectPtr {
+    use crate::xpath::XmlXPathObjectUserData;
+
     unsafe {
         let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
         if ret.is_null() {
@@ -130,11 +129,12 @@ unsafe fn xml_xptr_new_location_set_nodes(
         }
         std::ptr::write(&mut *ret, XmlXPathObject::default());
         (*ret).typ = XmlXPathObjectType::XPathLocationset;
-        if let Some(end) = end {
-            (*ret).user = xml_xptr_location_set_create(xml_xptr_new_range_nodes(start, end)) as _;
+        let loc = if let Some(end) = end {
+            xml_xptr_location_set_create(xml_xptr_new_range_nodes(start, end))
         } else {
-            (*ret).user = xml_xptr_location_set_create(xml_xptr_new_collapsed_range(start)) as _;
-        }
+            xml_xptr_location_set_create(xml_xptr_new_collapsed_range(start))
+        };
+        (*ret).user = (!loc.is_null()).then_some(XmlXPathObjectUserData::LocationSet(loc));
         ret
     }
 }
@@ -220,6 +220,8 @@ unsafe fn xml_xptr_new_range_internal(
     end: Option<XmlGenericNodePtr>,
     endindex: i32,
 ) -> XmlXPathObjectPtr {
+    use crate::xpath::XmlXPathObjectUserData;
+
     unsafe {
         // Namespace nodes must be copied (see xmlXPathNodeSetDupNs).
         // Disallow them for now.
@@ -239,9 +241,9 @@ unsafe fn xml_xptr_new_range_internal(
         }
         std::ptr::write(&mut *ret, XmlXPathObject::default());
         (*ret).typ = XmlXPathObjectType::XPathRange;
-        (*ret).user = start.map_or(null_mut(), |node| node.as_ptr()) as _;
+        (*ret).user = start.map(XmlXPathObjectUserData::Node);
         (*ret).index = startindex;
-        (*ret).user2 = end.map_or(null_mut(), |node| node.as_ptr()) as _;
+        (*ret).user2 = end.map(XmlXPathObjectUserData::Node);
         (*ret).index2 = endindex;
         ret
     }
@@ -286,13 +288,23 @@ unsafe fn xml_xptr_range_check_order(range: XmlXPathObjectPtr) {
         if !matches!((*range).typ, XmlXPathObjectType::XPathRange) {
             return;
         }
-        if (*range).user2.is_null() {
+        if (*range).user2.is_none() {
             return;
         }
         let tmp = xml_xptr_cmp_points(
-            XmlGenericNodePtr::from_raw((*range).user as *mut XmlNode).unwrap(),
+            (*range)
+                .user
+                .as_ref()
+                .and_then(|user| user.as_node())
+                .copied()
+                .unwrap(),
             (*range).index,
-            XmlGenericNodePtr::from_raw((*range).user2 as *mut XmlNode).unwrap(),
+            (*range)
+                .user2
+                .as_ref()
+                .and_then(|user| user.as_node())
+                .copied()
+                .unwrap(),
             (*range).index2,
         );
         if tmp == -1 {
@@ -358,9 +370,17 @@ pub unsafe fn xml_xptr_new_range_points(
         }
 
         let ret: XmlXPathObjectPtr = xml_xptr_new_range_internal(
-            XmlGenericNodePtr::from_raw((*start).user as *mut XmlNode),
+            (*start)
+                .user
+                .as_ref()
+                .and_then(|user| user.as_node())
+                .copied(),
             (*start).index,
-            XmlGenericNodePtr::from_raw((*end).user as *mut XmlNode),
+            (*end)
+                .user
+                .as_ref()
+                .and_then(|user| user.as_node())
+                .copied(),
             (*end).index,
         );
         xml_xptr_range_check_order(ret);
@@ -455,6 +475,8 @@ pub(crate) unsafe fn xml_xptr_new_range_nodes(
 pub(crate) unsafe fn xml_xptr_new_location_set_node_set(
     set: Option<&XmlNodeSet>,
 ) -> XmlXPathObjectPtr {
+    use crate::xpath::XmlXPathObjectUserData;
+
     unsafe {
         let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
         if ret.is_null() {
@@ -473,7 +495,7 @@ pub(crate) unsafe fn xml_xptr_new_location_set_node_set(
                 xml_xptr_location_set_add(newset, xml_xptr_new_collapsed_range(node));
             }
 
-            (*ret).user = newset as _;
+            (*ret).user = Some(XmlXPathObjectUserData::LocationSet(newset));
         }
         ret
     }
@@ -500,11 +522,19 @@ pub(crate) unsafe fn xml_xptr_new_range_node_object(
         let end_node = match (*end).typ {
             XmlXPathObjectType::XPathPoint => {
                 end_index = (*end).index;
-                XmlGenericNodePtr::from_raw((*end).user as *mut XmlNode)
+                (*end)
+                    .user
+                    .as_ref()
+                    .and_then(|user| user.as_node())
+                    .copied()
             }
             XmlXPathObjectType::XPathRange => {
                 end_index = (*end).index2;
-                XmlGenericNodePtr::from_raw((*end).user2 as *mut XmlNode)
+                (*end)
+                    .user2
+                    .as_ref()
+                    .and_then(|user| user.as_node())
+                    .copied()
             }
             XmlXPathObjectType::XPathNodeset => {
                 // Empty set ...
@@ -606,6 +636,8 @@ pub(crate) unsafe fn xml_xptr_location_set_add(cur: XmlLocationSetPtr, val: XmlX
 #[doc(alias = "xmlXPtrWrapLocationSet")]
 #[cfg(feature = "libxml_xptr_locs")]
 pub(crate) unsafe fn xml_xptr_wrap_location_set(val: XmlLocationSetPtr) -> XmlXPathObjectPtr {
+    use crate::xpath::XmlXPathObjectUserData;
+
     unsafe {
         let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
         if ret.is_null() {
@@ -614,7 +646,7 @@ pub(crate) unsafe fn xml_xptr_wrap_location_set(val: XmlLocationSetPtr) -> XmlXP
         }
         std::ptr::write(&mut *ret, XmlXPathObject::default());
         (*ret).typ = XmlXPathObjectType::XPathLocationset;
-        (*ret).user = val as _;
+        (*ret).user = (!val.is_null()).then_some(XmlXPathObjectUserData::LocationSet(val));
         ret
     }
 }
@@ -726,23 +758,48 @@ unsafe fn xml_xptr_covering_range(
         match (*loc).typ {
             XmlXPathObjectType::XPathPoint => {
                 return xml_xptr_new_range(
-                    XmlGenericNodePtr::from_raw((*loc).user as *mut XmlNode).unwrap(),
+                    (*loc)
+                        .user
+                        .as_ref()
+                        .and_then(|user| user.as_node())
+                        .copied()
+                        .unwrap(),
                     (*loc).index,
-                    XmlGenericNodePtr::from_raw((*loc).user as *mut XmlNode).unwrap(),
+                    (*loc)
+                        .user
+                        .as_ref()
+                        .and_then(|user| user.as_node())
+                        .copied()
+                        .unwrap(),
                     (*loc).index,
                 );
             }
             XmlXPathObjectType::XPathRange => {
-                if !(*loc).user2.is_null() {
+                if (*loc).user2.is_some() {
                     return xml_xptr_new_range(
-                        XmlGenericNodePtr::from_raw((*loc).user as *mut XmlNode).unwrap(),
+                        (*loc)
+                            .user
+                            .as_ref()
+                            .and_then(|user| user.as_node())
+                            .copied()
+                            .unwrap(),
                         (*loc).index,
-                        XmlGenericNodePtr::from_raw((*loc).user2 as *mut XmlNode).unwrap(),
+                        (*loc)
+                            .user2
+                            .as_ref()
+                            .and_then(|user| user.as_node())
+                            .copied()
+                            .unwrap(),
                         (*loc).index2,
                     );
                 } else {
-                    let mut node =
-                        XmlGenericNodePtr::from_raw((*loc).user as *mut XmlNode).unwrap();
+                    let mut node = (*loc)
+                        .user
+                        .as_ref()
+                        .and_then(|user| user.as_node())
+                        .copied()
+                        .unwrap();
+
                     if node == XmlGenericNodePtr::from(doc) {
                         return xml_xptr_new_range(node, 0, node, xml_xptr_get_arity(node));
                     } else {
@@ -814,7 +871,12 @@ unsafe fn xml_xptr_range_function(ctxt: &mut XmlXPathParserContext, nargs: usize
             }
             set = tmp;
         }
-        let oldset: XmlLocationSetPtr = (*set).user as XmlLocationSetPtr;
+        let oldset: XmlLocationSetPtr = (*set)
+            .user
+            .as_ref()
+            .and_then(|user| user.as_location_set())
+            .copied()
+            .unwrap_or(null_mut());
 
         // The loop is to compute the covering range for each item and add it
         let newset: XmlLocationSetPtr = xml_xptr_location_set_create(null_mut());
@@ -854,7 +916,13 @@ unsafe fn xml_xptr_inside_range(
         }
         match (*loc).typ {
             XmlXPathObjectType::XPathPoint => {
-                let node = XmlGenericNodePtr::from_raw((*loc).user as *mut XmlNode).unwrap();
+                let node = (*loc)
+                    .user
+                    .as_ref()
+                    .and_then(|user| user.as_node())
+                    .copied()
+                    .unwrap();
+
                 match node.element_type() {
                     XmlElementType::XmlPINode
                     | XmlElementType::XmlCommentNode
@@ -885,12 +953,23 @@ unsafe fn xml_xptr_inside_range(
                 return null_mut();
             }
             XmlXPathObjectType::XPathRange => {
-                let node = XmlGenericNodePtr::from_raw((*loc).user as *mut XmlNode).unwrap();
-                if !(*loc).user2.is_null() {
+                let node = (*loc)
+                    .user
+                    .as_ref()
+                    .and_then(|user| user.as_node())
+                    .copied()
+                    .unwrap();
+
+                if (*loc).user2.is_some() {
                     return xml_xptr_new_range(
                         node,
                         (*loc).index,
-                        XmlGenericNodePtr::from_raw((*loc).user2 as *mut XmlNode).unwrap(),
+                        (*loc)
+                            .user2
+                            .as_ref()
+                            .and_then(|user| user.as_node())
+                            .copied()
+                            .unwrap(),
                         (*loc).index2,
                     );
                 } else {
@@ -981,7 +1060,13 @@ unsafe fn xml_xptr_range_inside_function(ctxt: &mut XmlXPathParserContext, nargs
             xml_xpath_free_object(set);
             XP_ERROR!(Some(&mut *ctxt), XmlXPathError::XPathMemoryError as i32);
         }
-        let oldset: XmlLocationSetPtr = (*set).user as XmlLocationSetPtr;
+        let oldset: XmlLocationSetPtr = (*set)
+            .user
+            .as_ref()
+            .and_then(|user| user.as_location_set())
+            .copied()
+            .unwrap_or(null_mut());
+
         if !oldset.is_null() {
             for &loc in &(*oldset).loc_tab {
                 xml_xptr_location_set_add(newset, xml_xptr_inside_range(ctxt, loc));
@@ -1011,7 +1096,12 @@ unsafe fn xml_xptr_get_start_point(
 
         match (*obj).typ {
             XmlXPathObjectType::XPathPoint => {
-                *node = XmlGenericNodePtr::from_raw((*obj).user as *mut XmlNode);
+                *node = (*obj)
+                    .user
+                    .as_ref()
+                    .and_then(|user| user.as_node())
+                    .copied();
+
                 if (*obj).index <= 0 {
                     *indx = 0;
                 } else {
@@ -1020,7 +1110,12 @@ unsafe fn xml_xptr_get_start_point(
                 return 0;
             }
             XmlXPathObjectType::XPathRange => {
-                *node = XmlGenericNodePtr::from_raw((*obj).user as *mut XmlNode);
+                *node = (*obj)
+                    .user
+                    .as_ref()
+                    .and_then(|user| user.as_node())
+                    .copied();
+
                 if (*obj).index <= 0 {
                     *indx = 0;
                 } else {
@@ -1051,7 +1146,12 @@ unsafe fn xml_xptr_get_end_point(
 
         match (*obj).typ {
             XmlXPathObjectType::XPathPoint => {
-                *node = XmlGenericNodePtr::from_raw((*obj).user as *mut XmlNode);
+                *node = (*obj)
+                    .user
+                    .as_ref()
+                    .and_then(|user| user.as_node())
+                    .copied();
+
                 if (*obj).index <= 0 {
                     *indx = 0;
                 } else {
@@ -1060,7 +1160,12 @@ unsafe fn xml_xptr_get_end_point(
                 return 0;
             }
             XmlXPathObjectType::XPathRange => {
-                *node = XmlGenericNodePtr::from_raw((*obj).user as *mut XmlNode);
+                *node = (*obj)
+                    .user
+                    .as_ref()
+                    .and_then(|user| user.as_node())
+                    .copied();
+
                 if (*obj).index <= 0 {
                     *indx = 0;
                 } else {
@@ -1598,7 +1703,12 @@ unsafe fn xml_xptr_string_range_function(ctxt: &mut XmlXPathParserContext, nargs
                 }
                 set = tmp;
             }
-            oldset = (*set).user as XmlLocationSetPtr;
+            oldset = (*set)
+                .user
+                .as_ref()
+                .and_then(|user| user.as_location_set())
+                .copied()
+                .unwrap_or(null_mut());
 
             // The loop is to search for each element in the location set
             // the list of location set corresponding to that search
@@ -1700,10 +1810,9 @@ unsafe fn xml_xptr_string_range_function(ctxt: &mut XmlXPathParserContext, nargs
 #[doc(alias = "xmlXPtrNewPoint")]
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe fn xml_xptr_new_point(node: XmlGenericNodePtr, indx: i32) -> XmlXPathObjectPtr {
+    use crate::xpath::XmlXPathObjectUserData;
+
     unsafe {
-        // if node.is_null() {
-        //     return null_mut();
-        // }
         if indx < 0 {
             return null_mut();
         }
@@ -1715,7 +1824,7 @@ unsafe fn xml_xptr_new_point(node: XmlGenericNodePtr, indx: i32) -> XmlXPathObje
         }
         std::ptr::write(&mut *ret, XmlXPathObject::default());
         (*ret).typ = XmlXPathObjectType::XPathPoint;
-        (*ret).user = node.as_ptr() as *mut c_void;
+        (*ret).user = Some(XmlXPathObjectUserData::Node(node));
         (*ret).index = indx;
         ret
     }
@@ -1772,7 +1881,13 @@ unsafe fn xml_xptr_start_point_function(ctxt: &mut XmlXPathParserContext, nargs:
             xml_xpath_free_object(obj);
             XP_ERROR!(Some(&mut *ctxt), XmlXPathError::XPathMemoryError as i32);
         }
-        let oldset: XmlLocationSetPtr = (*obj).user as XmlLocationSetPtr;
+        let oldset: XmlLocationSetPtr = (*obj)
+            .user
+            .as_ref()
+            .and_then(|user| user.as_location_set())
+            .copied()
+            .unwrap_or(null_mut());
+
         if !oldset.is_null() {
             for &tmp in &(*oldset).loc_tab {
                 if tmp.is_null() {
@@ -1782,12 +1897,22 @@ unsafe fn xml_xptr_start_point_function(ctxt: &mut XmlXPathParserContext, nargs:
                 match (*tmp).typ {
                     XmlXPathObjectType::XPathPoint => {
                         point = xml_xptr_new_point(
-                            XmlGenericNodePtr::from_raw((*tmp).user as *mut XmlNode).unwrap(),
+                            (*tmp)
+                                .user
+                                .as_ref()
+                                .and_then(|user| user.as_node())
+                                .copied()
+                                .unwrap(),
                             (*tmp).index,
                         )
                     }
                     XmlXPathObjectType::XPathRange => {
-                        let node = XmlGenericNodePtr::from_raw((*tmp).user as *mut XmlNode);
+                        let node = (*tmp)
+                            .user
+                            .as_ref()
+                            .and_then(|user| user.as_node())
+                            .copied();
+
                         if let Some(node) = node {
                             if matches!(
                                 node.element_type(),
@@ -1913,7 +2038,13 @@ unsafe fn xml_xptr_end_point_function(ctxt: &mut XmlXPathParserContext, nargs: u
             xml_xpath_free_object(obj);
             XP_ERROR!(Some(&mut *ctxt), XmlXPathError::XPathMemoryError as i32);
         }
-        let oldset: XmlLocationSetPtr = (*obj).user as XmlLocationSetPtr;
+        let oldset: XmlLocationSetPtr = (*obj)
+            .user
+            .as_ref()
+            .and_then(|user| user.as_location_set())
+            .copied()
+            .unwrap_or(null_mut());
+
         if !oldset.is_null() {
             for &tmp in &(*oldset).loc_tab {
                 if tmp.is_null() {
@@ -1923,12 +2054,22 @@ unsafe fn xml_xptr_end_point_function(ctxt: &mut XmlXPathParserContext, nargs: u
                 match (*tmp).typ {
                     XmlXPathObjectType::XPathPoint => {
                         point = xml_xptr_new_point(
-                            XmlGenericNodePtr::from_raw((*tmp).user as *mut XmlNode).unwrap(),
+                            (*tmp)
+                                .user
+                                .as_ref()
+                                .and_then(|user| user.as_node())
+                                .copied()
+                                .unwrap(),
                             (*tmp).index,
                         )
                     }
                     XmlXPathObjectType::XPathRange => {
-                        let node = XmlGenericNodePtr::from_raw((*tmp).user2 as *mut XmlNode);
+                        let node = (*tmp)
+                            .user2
+                            .as_ref()
+                            .and_then(|user| user.as_node())
+                            .copied();
+
                         if let Some(node) = node {
                             if matches!(
                                 node.element_type(),
@@ -1939,7 +2080,7 @@ unsafe fn xml_xptr_end_point_function(ctxt: &mut XmlXPathParserContext, nargs: u
                                 XP_ERROR!(Some(&mut *ctxt), XmlXPathError::XPtrSyntaxError as i32);
                             }
                             point = xml_xptr_new_point(node, (*tmp).index2);
-                        } else if (*tmp).user.is_null() {
+                        } else if (*tmp).user.is_none() {
                             // The following code seems that always fails...
                             // point = xml_xptr_new_point(node, xml_xptr_nb_loc_children(node));
                             point = null_mut();
@@ -2393,7 +2534,13 @@ unsafe fn xml_xptr_eval_full_xptr(ctxt: XmlXPathParserContextPtr, mut name: *mut
                 match (*obj).typ {
                     #[cfg(feature = "libxml_xptr_locs")]
                     XmlXPathObjectType::XPathLocationset => {
-                        let loc: XmlLocationSetPtr = (*obj).user as _;
+                        let loc: XmlLocationSetPtr = (*obj)
+                            .user
+                            .as_ref()
+                            .and_then(|user| user.as_location_set())
+                            .copied()
+                            .unwrap_or(null_mut());
+
                         if !loc.is_null() && !(*loc).loc_tab.is_empty() {
                             return;
                         }
@@ -2858,7 +3005,13 @@ pub unsafe fn xml_xptr_eval_range_predicate(ctxt: XmlXPathParserContextPtr) {
             )
         };
         let obj: XmlXPathObjectPtr = (*ctxt).value_pop();
-        let oldset: XmlLocationSetPtr = (*obj).user as _;
+        let oldset: XmlLocationSetPtr = (*obj)
+            .user
+            .as_ref()
+            .and_then(|user| user.as_location_set())
+            .copied()
+            .unwrap_or(null_mut());
+
         (*(*ctxt).context).node = None;
 
         if oldset.is_null() || (*oldset).loc_tab.is_empty() {
@@ -2881,7 +3034,12 @@ pub unsafe fn xml_xptr_eval_range_predicate(ctxt: XmlXPathParserContextPtr) {
                 (*ctxt).cur = cur;
 
                 // Run the evaluation with a node list made of a single item in the nodeset.
-                (*(*ctxt).context).node = XmlGenericNodePtr::from_raw((*loc).user as *mut XmlNode);
+                (*(*ctxt).context).node = (*loc)
+                    .user
+                    .as_ref()
+                    .and_then(|user| user.as_node())
+                    .copied();
+
                 tmp = xml_xpath_new_node_set((*(*ctxt).context).node);
                 (*ctxt).value_push(tmp);
                 (*(*ctxt).context).context_size = (*oldset).loc_tab.len() as i32;

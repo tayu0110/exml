@@ -49,7 +49,7 @@ use crate::{
     },
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlAttrPtr, XmlDocPtr, XmlDtdPtr, XmlElementType,
-        XmlGenericNodePtr, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
+        XmlGenericNodePtr, XmlNodePtr, XmlNs, XmlNsPtr,
     },
     xpath::{
         XML_XPATH_NAN, XmlXPathContextPtr, XmlXPathError, XmlXPathObject, XmlXPathObjectPtr,
@@ -295,8 +295,10 @@ pub(crate) unsafe fn xml_xpath_release_object(ctxt: XmlXPathContextPtr, obj: Xml
                         }
                         #[cfg(feature = "libxml_xptr_locs")]
                         XmlXPathObjectType::XPathLocationset => {
-                            if !(*obj).user.is_null() {
-                                xml_xptr_free_location_set((*obj).user as _);
+                            if let Some(loc) = (*obj).user.take() {
+                                if let Some(&loc) = loc.as_location_set() {
+                                    xml_xptr_free_location_set(loc);
+                                }
                             }
                             break 'free_obj;
                         }
@@ -2031,14 +2033,13 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
         }
 
         // error:
-        if (*obj).boolval && !(*obj).user.is_null() {
+        if (*obj).boolval && (*obj).user.is_some() {
             // QUESTION TODO: What does this do and why?
             // TODO: Do we have to do this also for the "error"
             // cleanup further down?
             let value = (*ctxt).value_mut().unwrap();
             (**value).boolval = true;
-            (**value).user = (*obj).user;
-            (*obj).user = null_mut();
+            (**value).user = (*obj).user.take();
             (*obj).boolval = false;
         }
         xml_xpath_release_object(xpctxt, obj);
@@ -2115,8 +2116,12 @@ pub(super) unsafe fn xml_xpath_location_set_filter(
         let mut j = 0;
         let mut pos = 1;
         while i < (*locset).loc_tab.len() {
-            let context_node =
-                XmlGenericNodePtr::from_raw((*(*locset).loc_tab[i]).user as *mut XmlNode).unwrap();
+            let context_node = (*(*locset).loc_tab[i])
+                .user
+                .as_ref()
+                .and_then(|user| user.as_node())
+                .copied()
+                .unwrap();
 
             (*xpctxt).node = Some(context_node);
             (*xpctxt).proximity_position = i as i32 + 1;
@@ -2317,11 +2322,16 @@ pub unsafe fn xml_xpath_evaluate_predicate_result(
             }
             #[cfg(feature = "libxml_xptr_locs")]
             XmlXPathObjectType::XPathLocationset => {
-                let ptr: XmlLocationSetPtr = (*res).user as XmlLocationSetPtr;
-                if ptr.is_null() {
+                let &loc = (*res)
+                    .user
+                    .as_ref()
+                    .and_then(|user| user.as_location_set())
+                    .unwrap();
+
+                if loc.is_null() {
                     return 0;
                 }
-                return (!(*ptr).loc_tab.is_empty()) as i32;
+                return (!(*loc).loc_tab.is_empty()) as i32;
             }
             _ => {
                 generic_error!("Internal error at {}:{}\n", file!(), line!());

@@ -62,9 +62,9 @@ pub struct XmlXPathObject {
     pub boolval: bool,
     pub floatval: f64,
     pub stringval: Option<String>,
-    pub(crate) user: *mut c_void,
+    pub(crate) user: Option<XmlXPathObjectUserData>,
     pub(crate) index: i32,
-    pub(crate) user2: *mut c_void,
+    pub(crate) user2: Option<XmlXPathObjectUserData>,
     pub(crate) index2: i32,
 }
 
@@ -76,9 +76,9 @@ impl Default for XmlXPathObject {
             boolval: false,
             floatval: 0.0,
             stringval: None,
-            user: null_mut(),
+            user: None,
             index: 0,
-            user2: null_mut(),
+            user2: None,
             index2: 0,
         }
     }
@@ -120,6 +120,36 @@ impl From<bool> for XmlXPathObject {
             typ: XmlXPathObjectType::XPathBoolean,
             boolval: value,
             ..Default::default()
+        }
+    }
+}
+
+#[derive(Clone, PartialEq)]
+pub enum XmlXPathObjectUserData {
+    Node(XmlGenericNodePtr),
+    LocationSet(XmlLocationSetPtr),
+    External(*mut c_void),
+}
+
+impl XmlXPathObjectUserData {
+    pub fn as_node(&self) -> Option<&XmlGenericNodePtr> {
+        match self {
+            Self::Node(node) => Some(node),
+            _ => None,
+        }
+    }
+
+    pub fn as_location_set(&self) -> Option<&XmlLocationSetPtr> {
+        match self {
+            Self::LocationSet(loc) => Some(loc),
+            _ => None,
+        }
+    }
+
+    pub fn as_external(&self) -> Option<&*mut c_void> {
+        match self {
+            Self::External(external) => Some(external),
+            _ => None,
         }
     }
 }
@@ -250,7 +280,7 @@ pub unsafe fn xml_xpath_new_value_tree(val: Option<XmlGenericNodePtr>) -> XmlXPa
         std::ptr::write(&mut *ret, XmlXPathObject::default());
         (*ret).typ = XmlXPathObjectType::XPathXSLTTree;
         (*ret).boolval = true;
-        (*ret).user = val.map_or(null_mut(), |node| node.as_ptr()) as *mut c_void;
+        (*ret).user = val.map(XmlXPathObjectUserData::Node);
         (*ret).nodesetval = xml_xpath_node_set_create(val);
         ret
     }
@@ -269,7 +299,7 @@ pub unsafe fn xml_xpath_wrap_external(val: *mut c_void) -> XmlXPathObjectPtr {
         }
         std::ptr::write(&mut *ret, XmlXPathObject::default());
         (*ret).typ = XmlXPathObjectType::XPathUsers;
-        (*ret).user = val;
+        (*ret).user = (!val.is_null()).then_some(XmlXPathObjectUserData::External(val));
         ret
     }
 }
@@ -303,11 +333,14 @@ pub unsafe fn xml_xpath_object_copy(val: XmlXPathObjectPtr) -> XmlXPathObjectPtr
             }
             #[cfg(feature = "libxml_xptr_locs")]
             XmlXPathObjectType::XPathLocationset => {
-                let loc: XmlLocationSetPtr = (*val).user as _;
-                (*ret).user = xml_xptr_location_set_merge(null_mut(), loc) as *mut c_void;
+                if let Some(&loc) = (*val).user.as_ref().and_then(|user| user.as_location_set()) {
+                    let loc = xml_xptr_location_set_merge(null_mut(), loc);
+                    (*ret).user =
+                        (!loc.is_null()).then_some(XmlXPathObjectUserData::LocationSet(loc));
+                }
             }
             XmlXPathObjectType::XPathUsers => {
-                (*ret).user = (*val).user;
+                (*ret).user = (*val).user.clone();
             }
             XmlXPathObjectType::XPathUndefined => {
                 generic_error!(
@@ -343,8 +376,10 @@ pub unsafe fn xml_xpath_free_object(obj: XmlXPathObjectPtr) {
             let _ = (*obj).stringval.take();
         } else {
             #[cfg(feature = "libxml_xptr_locs")]
-            if (*obj).typ as usize == XPATH_LOCATIONSET && !(*obj).user.is_null() {
-                xml_xptr_free_location_set((*obj).user as _);
+            if let Some(loc) = (*obj).user.take() {
+                if let Some(&loc) = loc.as_location_set() {
+                    xml_xptr_free_location_set(loc);
+                }
             }
         }
         xml_free(obj as _);

@@ -1,5 +1,7 @@
 use std::{io::Write, ptr::null_mut};
 
+#[cfg(feature = "libxml_xptr_locs")]
+use crate::libxml::xpointer::XmlLocationSetPtr;
 use crate::{
     debug_xml::{xml_debug_dump_attr, xml_debug_dump_one_node, xml_debug_dump_string},
     tree::{XmlAttrPtr, XmlElementType, XmlGenericNodePtr},
@@ -8,8 +10,6 @@ use crate::{
         xml_xpath_is_inf, xml_xpath_is_nan,
     },
 };
-#[cfg(feature = "libxml_xptr_locs")]
-use crate::{libxml::xpointer::XmlLocationSetPtr, tree::XmlNode};
 
 use super::{XmlNodeSet, XmlXPathCompExpr, XmlXPathObjectPtr, compile::XmlXPathStepOpPtr};
 
@@ -191,22 +191,30 @@ pub unsafe fn xml_xpath_debug_dump_object<'a>(
             #[cfg(feature = "libxml_xptr_locs")]
             XmlXPathObjectType::XPathPoint => {
                 write!(output, "Object is a point : index {} in node", (*cur).index,).ok();
-                let node = XmlGenericNodePtr::from_raw((*cur).user as *mut XmlNode);
+                let node = (*cur)
+                    .user
+                    .as_ref()
+                    .and_then(|user| user.as_node())
+                    .copied();
                 xml_xpath_debug_dump_node(output, node, depth + 1);
                 writeln!(output).ok();
             }
             #[cfg(feature = "libxml_xptr_locs")]
             XmlXPathObjectType::XPathRange => {
-                if (*cur).user2.is_null()
-                    || ((*cur).user2 == (*cur).user && (*cur).index == (*cur).index2)
-                {
+                if (*cur).user2.as_ref().is_none_or(|user| {
+                    Some(user) == (*cur).user.as_ref() && (*cur).index == (*cur).index2
+                }) {
                     writeln!(output, "Object is a collapsed range :").ok();
                     write!(output, "{}", shift).ok();
                     if (*cur).index >= 0 {
                         write!(output, "index {} in ", (*cur).index).ok();
                     }
                     writeln!(output, "node").ok();
-                    let node = XmlGenericNodePtr::from_raw((*cur).user as *mut XmlNode);
+                    let node = (*cur)
+                        .user
+                        .as_ref()
+                        .and_then(|user| user.as_node())
+                        .copied();
                     xml_xpath_debug_dump_node(output, node, depth + 1);
                 } else {
                     writeln!(output, "Object is a range :").ok();
@@ -216,7 +224,11 @@ pub unsafe fn xml_xpath_debug_dump_object<'a>(
                         write!(output, "index {} in ", (*cur).index).ok();
                     }
                     writeln!(output, "node").ok();
-                    let node = XmlGenericNodePtr::from_raw((*cur).user as *mut XmlNode);
+                    let node = (*cur)
+                        .user
+                        .as_ref()
+                        .and_then(|user| user.as_node())
+                        .copied();
                     xml_xpath_debug_dump_node(output, node, depth + 1);
                     write!(output, "{}", shift).ok();
                     write!(output, "To ").ok();
@@ -224,7 +236,11 @@ pub unsafe fn xml_xpath_debug_dump_object<'a>(
                         write!(output, "index {} in ", (*cur).index2).ok();
                     }
                     writeln!(output, "node").ok();
-                    let node = XmlGenericNodePtr::from_raw((*cur).user2 as *mut XmlNode);
+                    let node = (*cur)
+                        .user2
+                        .as_ref()
+                        .and_then(|user| user.as_node())
+                        .copied();
                     xml_xpath_debug_dump_node(output, node, depth + 1);
                     writeln!(output).ok();
                 }
@@ -232,7 +248,13 @@ pub unsafe fn xml_xpath_debug_dump_object<'a>(
             #[cfg(feature = "libxml_xptr_locs")]
             XmlXPathObjectType::XPathLocationset => {
                 writeln!(output, "Object is a Location Set:").ok();
-                xml_xpath_debug_dump_location_set(output, (*cur).user as XmlLocationSetPtr, depth);
+                let loc = (*cur)
+                    .user
+                    .as_ref()
+                    .and_then(|user| user.as_location_set())
+                    .copied()
+                    .unwrap();
+                xml_xpath_debug_dump_location_set(output, loc, depth);
             }
             XmlXPathObjectType::XPathUsers => {
                 writeln!(output, "Object is user defined").ok();

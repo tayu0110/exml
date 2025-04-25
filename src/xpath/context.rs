@@ -370,10 +370,10 @@ impl XmlXPathParserContext {
                 return null_mut();
             }
             let obj: XmlXPathObjectPtr = self.value_pop();
-            let ret: *mut c_void = (*obj).user;
-            (*obj).user = null_mut();
+            let ret = (*obj).user.take();
             xml_xpath_release_object(self.context, obj);
-            ret
+            ret.and_then(|ret| ret.as_external().copied())
+                .unwrap_or(null_mut())
         }
     }
 }

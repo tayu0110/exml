@@ -46,7 +46,7 @@ use crate::{
     },
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlDocPtr, XmlElementType, XmlEntityPtr, XmlEntityType,
-        XmlGenericNodePtr, XmlNode, XmlNodePtr, xml_add_doc_entity, xml_create_int_subset,
+        XmlGenericNodePtr, XmlNodePtr, xml_add_doc_entity, xml_create_int_subset,
         xml_doc_copy_node, xml_free_doc, xml_free_node, xml_free_node_list, xml_get_doc_entity,
         xml_new_doc_node, xml_new_doc_text, xml_static_copy_node, xml_static_copy_node_list,
     },
@@ -896,7 +896,13 @@ impl XmlXIncludeCtxt {
                 }
                 #[cfg(feature = "libxml_xptr_locs")]
                 XmlXPathObjectType::XPathLocationset => {
-                    let set: XmlLocationSetPtr = (*obj).user as XmlLocationSetPtr;
+                    let set: XmlLocationSetPtr = (*obj)
+                        .user
+                        .as_ref()
+                        .and_then(|user| user.as_location_set())
+                        .copied()
+                        .unwrap_or(null_mut());
+
                     if set.is_null() {
                         return None;
                     }
@@ -957,10 +963,19 @@ impl XmlXIncludeCtxt {
             if (*range).typ != XmlXPathObjectType::XPathRange {
                 return None;
             }
-            let start = XmlGenericNodePtr::from_raw((*range).user as *mut XmlNode)
+            let start = (*range)
+                .user
+                .as_ref()
+                .and_then(|user| user.as_node())
+                .copied()
                 .filter(|node| node.element_type() != XmlElementType::XmlNamespaceDecl)?;
 
-            let Some(mut end) = XmlGenericNodePtr::from_raw((*range).user2 as *mut XmlNode) else {
+            let Some(mut end) = (*range)
+                .user2
+                .as_ref()
+                .and_then(|user| user.as_node())
+                .copied()
+            else {
                 return xml_doc_copy_node(start, Some(self.doc), 1);
             };
             if end.element_type() == XmlElementType::XmlNamespaceDecl {
