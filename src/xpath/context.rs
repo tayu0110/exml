@@ -58,7 +58,6 @@ use super::{
     },
     xml_xpath_cast_to_boolean, xml_xpath_cast_to_number, xml_xpath_cast_to_string, xml_xpath_err,
     xml_xpath_free_object, xml_xpath_perr_memory, xml_xpath_registered_variables_cleanup,
-    xml_xpath_release_object,
 };
 
 pub type XmlXPathParserContextPtr = *mut XmlXPathParserContext;
@@ -266,7 +265,7 @@ impl XmlXPathParserContext {
             } else {
                 (*obj).floatval
             };
-            xml_xpath_release_object(self.context, obj);
+            xml_xpath_free_object(obj);
             ret
         }
     }
@@ -289,7 +288,7 @@ impl XmlXPathParserContext {
             } else {
                 (*obj).boolval
             };
-            xml_xpath_release_object(self.context, obj);
+            xml_xpath_free_object(obj);
             ret
         }
     }
@@ -312,7 +311,7 @@ impl XmlXPathParserContext {
             // if (*obj).stringval == ret {
             //     (*obj).stringval = null_mut();
             // }
-            xml_xpath_release_object(self.context, obj);
+            xml_xpath_free_object(obj);
             Some(ret)
         }
     }
@@ -341,7 +340,7 @@ impl XmlXPathParserContext {
             // if ((*obj).boolval && !(*obj).user.is_null())
             //     xmlFreeNodeList((xmlNodePtr) (*obj).user);
             // #endif
-            xml_xpath_release_object(self.context, obj);
+            xml_xpath_free_object(obj);
             ret
         }
     }
@@ -365,7 +364,7 @@ impl XmlXPathParserContext {
             }
             let obj: XmlXPathObjectPtr = self.value_pop();
             let ret = (*obj).user.take();
-            xml_xpath_release_object(self.context, obj);
+            xml_xpath_free_object(obj);
             ret.and_then(|ret| ret.as_external().copied())
                 .unwrap_or(null_mut())
         }
@@ -394,11 +393,7 @@ impl Drop for XmlXPathParserContext {
     fn drop(&mut self) {
         unsafe {
             for value in self.value_tab.drain(..) {
-                if !self.context.is_null() {
-                    xml_xpath_release_object(self.context, value);
-                } else {
-                    xml_xpath_free_object(value);
-                }
+                xml_xpath_free_object(value);
             }
         }
     }

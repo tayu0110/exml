@@ -930,7 +930,7 @@ unsafe fn xml_xpath_compiled_eval_internal(
         if !res_obj_ptr.is_null() {
             *res_obj_ptr = res_obj;
         } else {
-            xml_xpath_release_object(ctxt, res_obj);
+            xml_xpath_free_object(res_obj);
         }
 
         // pctxt.comp = null_mut();

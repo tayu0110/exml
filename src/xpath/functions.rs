@@ -4,16 +4,17 @@ use crate::{
     libxml::chvalid::xml_is_blank_char,
     parser::build_qname,
     tree::{NodeCommon, XmlAttrPtr, XmlElementType, XmlNodePtr, XmlNsPtr},
-    xpath::{XmlXPathObjectPtr, XmlXPathObjectType, xml_xpath_cache_convert_boolean},
+    xpath::{XmlXPathObjectPtr, XmlXPathObjectType},
 };
 
 use super::{
-    XmlXPathError, XmlXPathParserContext, xml_xpath_cache_convert_number,
-    xml_xpath_cache_convert_string, xml_xpath_cast_node_to_number, xml_xpath_cast_node_to_string,
-    xml_xpath_err, xml_xpath_free_node_set, xml_xpath_get_elements_by_ids, xml_xpath_new_boolean,
-    xml_xpath_new_float, xml_xpath_new_node_set, xml_xpath_new_string, xml_xpath_node_set_create,
-    xml_xpath_node_set_merge, xml_xpath_release_object, xml_xpath_string_eval_number,
-    xml_xpath_wrap_node_set, xml_xpath_wrap_string,
+    XmlXPathError, XmlXPathParserContext, xml_xpath_cast_node_to_number,
+    xml_xpath_cast_node_to_string, xml_xpath_convert_boolean, xml_xpath_convert_number,
+    xml_xpath_convert_string, xml_xpath_err, xml_xpath_free_node_set, xml_xpath_free_object,
+    xml_xpath_get_elements_by_ids, xml_xpath_new_boolean, xml_xpath_new_float,
+    xml_xpath_new_node_set, xml_xpath_new_string, xml_xpath_node_set_create,
+    xml_xpath_node_set_merge, xml_xpath_string_eval_number, xml_xpath_wrap_node_set,
+    xml_xpath_wrap_string,
 };
 
 /// Macro to check that the number of args passed to an XPath function matches.
@@ -95,7 +96,7 @@ pub unsafe fn xml_xpath_boolean_function(ctxt: &mut XmlXPathParserContext, nargs
             xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidOperand as i32);
             return;
         }
-        let cur = xml_xpath_cache_convert_boolean(ctxt.context, cur);
+        let cur = xml_xpath_convert_boolean(cur);
         ctxt.value_push(cur);
     }
 }
@@ -150,7 +151,7 @@ pub unsafe fn xml_xpath_count_function(ctxt: &mut XmlXPathParserContext, nargs: 
         } else {
             ctxt.value_push(xml_xpath_new_float(0.0));
         }
-        xml_xpath_release_object(ctxt.context, cur);
+        xml_xpath_free_object(cur);
     }
 }
 
@@ -169,7 +170,7 @@ pub unsafe fn xml_xpath_concat_function(ctxt: &mut XmlXPathParserContext, mut na
         cast_to_string(ctxt);
         let cur: XmlXPathObjectPtr = ctxt.value_pop();
         if cur.is_null() || !matches!((*cur).typ, XmlXPathObjectType::XPathString) {
-            xml_xpath_release_object(ctxt.context, cur);
+            xml_xpath_free_object(cur);
             return;
         }
         nargs -= 1;
@@ -178,8 +179,8 @@ pub unsafe fn xml_xpath_concat_function(ctxt: &mut XmlXPathParserContext, mut na
             cast_to_string(ctxt);
             newobj = ctxt.value_pop();
             if newobj.is_null() || (*newobj).typ != XmlXPathObjectType::XPathString {
-                xml_xpath_release_object(ctxt.context, newobj);
-                xml_xpath_release_object(ctxt.context, cur);
+                xml_xpath_free_object(newobj);
+                xml_xpath_free_object(cur);
                 xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
                 return;
             }
@@ -189,7 +190,7 @@ pub unsafe fn xml_xpath_concat_function(ctxt: &mut XmlXPathParserContext, mut na
                 (*newobj).stringval = Some(curstr);
             }
             (*cur).stringval = tmp;
-            xml_xpath_release_object(ctxt.context, newobj);
+            xml_xpath_free_object(newobj);
             nargs -= 1;
         }
         ctxt.value_push(cur);
@@ -219,8 +220,8 @@ pub unsafe fn xml_xpath_contains_function(ctxt: &mut XmlXPathParserContext, narg
         let hay: XmlXPathObjectPtr = ctxt.value_pop();
 
         if hay.is_null() || (*hay).typ != XmlXPathObjectType::XPathString {
-            xml_xpath_release_object(ctxt.context, hay);
-            xml_xpath_release_object(ctxt.context, needle);
+            xml_xpath_free_object(hay);
+            xml_xpath_free_object(needle);
             xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
         }
@@ -240,8 +241,8 @@ pub unsafe fn xml_xpath_contains_function(ctxt: &mut XmlXPathParserContext, narg
         } else {
             ctxt.value_push(xml_xpath_new_boolean(false));
         }
-        xml_xpath_release_object(ctxt.context, hay);
-        xml_xpath_release_object(ctxt.context, needle);
+        xml_xpath_free_object(hay);
+        xml_xpath_free_object(needle);
     }
 }
 
@@ -288,11 +289,11 @@ pub unsafe fn xml_xpath_id_function(ctxt: &mut XmlXPathParserContext, nargs: usi
                     xml_xpath_free_node_set(ns);
                 }
             }
-            xml_xpath_release_object(ctxt.context, obj);
+            xml_xpath_free_object(obj);
             ctxt.value_push(xml_xpath_wrap_node_set(ret));
             return;
         }
-        obj = xml_xpath_cache_convert_string(ctxt.context, obj);
+        obj = xml_xpath_convert_string(obj);
         if obj.is_null() {
             return;
         }
@@ -307,7 +308,7 @@ pub unsafe fn xml_xpath_id_function(ctxt: &mut XmlXPathParserContext, nargs: usi
                 .map_or(null_mut(), |s| s.as_ptr() as *const u8),
         );
         ctxt.value_push(xml_xpath_wrap_node_set(ret));
-        xml_xpath_release_object(ctxt.context, obj);
+        xml_xpath_free_object(obj);
     }
 }
 
@@ -416,7 +417,7 @@ pub unsafe fn xml_xpath_lang_function(ctxt: &mut XmlXPathParserContext, nargs: u
         }
         // not_equal:
 
-        xml_xpath_release_object(ctxt.context, val);
+        xml_xpath_free_object(val);
         ctxt.value_push(xml_xpath_new_boolean(ret != 0));
     }
 }
@@ -480,7 +481,7 @@ pub unsafe fn xml_xpath_local_name_function(ctxt: &mut XmlXPathParserContext, mu
         } else {
             ctxt.value_push(xml_xpath_new_string(Some("")));
         }
-        xml_xpath_release_object(ctxt.context, cur);
+        xml_xpath_free_object(cur);
     }
 }
 
@@ -589,7 +590,7 @@ pub(super) unsafe fn xml_xpath_name_function(ctxt: &mut XmlXPathParserContext, m
         } else {
             ctxt.value_push(xml_xpath_new_string(Some("")));
         }
-        xml_xpath_release_object(ctxt.context, cur);
+        xml_xpath_free_object(cur);
     }
 }
 
@@ -647,7 +648,7 @@ pub unsafe fn xml_xpath_namespace_uri_function(ctxt: &mut XmlXPathParserContext,
         } else {
             ctxt.value_push(xml_xpath_new_string(Some("")));
         }
-        xml_xpath_release_object(ctxt.context, cur);
+        xml_xpath_free_object(cur);
     }
 }
 
@@ -742,7 +743,7 @@ pub unsafe fn xml_xpath_number_function(ctxt: &mut XmlXPathParserContext, nargs:
             return;
         }
         let cur: XmlXPathObjectPtr = ctxt.value_pop();
-        ctxt.value_push(xml_xpath_cache_convert_number(ctxt.context, cur));
+        ctxt.value_push(xml_xpath_convert_number(cur));
     }
 }
 
@@ -849,7 +850,7 @@ pub unsafe fn xml_xpath_string_function(ctxt: &mut XmlXPathParserContext, nargs:
             xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidOperand as i32);
             return;
         }
-        ctxt.value_push(xml_xpath_cache_convert_string(ctxt.context, cur));
+        ctxt.value_push(xml_xpath_convert_string(cur));
     }
 }
 
@@ -889,7 +890,7 @@ pub unsafe fn xml_xpath_string_length_function(ctxt: &mut XmlXPathParserContext,
         ctxt.value_push(xml_xpath_new_float(
             (*cur).stringval.as_deref().map_or(0, |s| s.chars().count()) as _,
         ));
-        xml_xpath_release_object(ctxt.context, cur);
+        xml_xpath_free_object(cur);
     }
 }
 
@@ -916,8 +917,8 @@ pub unsafe fn xml_xpath_starts_with_function(ctxt: &mut XmlXPathParserContext, n
         let hay: XmlXPathObjectPtr = ctxt.value_pop();
 
         if hay.is_null() || (*hay).typ != XmlXPathObjectType::XPathString {
-            xml_xpath_release_object(ctxt.context, hay);
-            xml_xpath_release_object(ctxt.context, needle);
+            xml_xpath_free_object(hay);
+            xml_xpath_free_object(needle);
             xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
         }
@@ -930,8 +931,8 @@ pub unsafe fn xml_xpath_starts_with_function(ctxt: &mut XmlXPathParserContext, n
         } else {
             ctxt.value_push(xml_xpath_new_boolean(true));
         }
-        xml_xpath_release_object(ctxt.context, hay);
-        xml_xpath_release_object(ctxt.context, needle);
+        xml_xpath_free_object(hay);
+        xml_xpath_free_object(needle);
     }
 }
 
@@ -983,7 +984,7 @@ pub unsafe fn xml_xpath_substring_function(ctxt: &mut XmlXPathParserContext, nar
             };
             len = ctxt.value_pop();
             le = (*len).floatval;
-            xml_xpath_release_object(ctxt.context, len);
+            xml_xpath_free_object(len);
         }
 
         cast_to_number(ctxt);
@@ -996,7 +997,7 @@ pub unsafe fn xml_xpath_substring_function(ctxt: &mut XmlXPathParserContext, nar
         };
         let start: XmlXPathObjectPtr = ctxt.value_pop();
         let input: f64 = (*start).floatval;
-        xml_xpath_release_object(ctxt.context, start);
+        xml_xpath_free_object(start);
         cast_to_string(ctxt);
         if ctxt
             .value()
@@ -1060,7 +1061,7 @@ pub unsafe fn xml_xpath_substring_function(ctxt: &mut XmlXPathParserContext, nar
             ctxt.value_push(xml_xpath_new_string(Some("")));
         }
 
-        xml_xpath_release_object(ctxt.context, str);
+        xml_xpath_free_object(str);
     }
 }
 
@@ -1086,8 +1087,8 @@ pub unsafe fn xml_xpath_substring_before_function(ctxt: &mut XmlXPathParserConte
         let fs = (*find).stringval.as_deref().unwrap();
         let target = ss.find(fs).map(|pos| ss[..pos].to_owned());
         ctxt.value_push(xml_xpath_new_string(target.as_deref()));
-        xml_xpath_release_object(ctxt.context, str);
-        xml_xpath_release_object(ctxt.context, find);
+        xml_xpath_free_object(str);
+        xml_xpath_free_object(find);
     }
 }
 
@@ -1114,8 +1115,8 @@ pub unsafe fn xml_xpath_substring_after_function(ctxt: &mut XmlXPathParserContex
         let fs = (*find).stringval.as_deref().unwrap();
         let target = ss.find(fs).map(|pos| ss[pos..].to_owned());
         ctxt.value_push(xml_xpath_new_string(target.as_deref()));
-        xml_xpath_release_object(ctxt.context, str);
-        xml_xpath_release_object(ctxt.context, find);
+        xml_xpath_free_object(str);
+        xml_xpath_free_object(find);
     }
 }
 
@@ -1150,7 +1151,7 @@ pub unsafe fn xml_xpath_sum_function(ctxt: &mut XmlXPathParserContext, nargs: us
             }
         }
         ctxt.value_push(xml_xpath_new_float(res));
-        xml_xpath_release_object(ctxt.context, cur);
+        xml_xpath_free_object(cur);
     }
 }
 
@@ -1213,9 +1214,9 @@ pub unsafe fn xml_xpath_translate_function(ctxt: &mut XmlXPathParserContext, nar
             }
         }
         ctxt.value_push(xml_xpath_new_string(Some(&target)));
-        xml_xpath_release_object(ctxt.context, str);
-        xml_xpath_release_object(ctxt.context, from);
-        xml_xpath_release_object(ctxt.context, to);
+        xml_xpath_free_object(str);
+        xml_xpath_free_object(from);
+        xml_xpath_free_object(to);
     }
 }
 
@@ -1326,6 +1327,6 @@ pub(super) unsafe fn xml_xpath_escape_uri_function(ctxt: &mut XmlXPathParserCont
             }
         }
         ctxt.value_push(xml_xpath_new_string(Some(&target)));
-        xml_xpath_release_object(ctxt.context, str);
+        xml_xpath_free_object(str);
     }
 }

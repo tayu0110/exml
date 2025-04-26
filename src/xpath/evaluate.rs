@@ -33,8 +33,8 @@ use super::{
     xml_xpath_next_preceding_sibling, xml_xpath_next_self, xml_xpath_node_set_create,
     xml_xpath_node_set_merge, xml_xpath_node_set_merge_and_clear,
     xml_xpath_node_set_merge_and_clear_no_dupls, xml_xpath_not_equal_values, xml_xpath_object_copy,
-    xml_xpath_release_object, xml_xpath_root, xml_xpath_sub_values, xml_xpath_value_flip_sign,
-    xml_xpath_variable_lookup, xml_xpath_variable_lookup_ns, xml_xpath_wrap_node_set,
+    xml_xpath_root, xml_xpath_sub_values, xml_xpath_value_flip_sign, xml_xpath_variable_lookup,
+    xml_xpath_variable_lookup_ns, xml_xpath_wrap_node_set,
 };
 
 type StepOpIndex = usize;
@@ -142,7 +142,7 @@ impl XmlXPathParserContext {
                         return 0;
                     }
                     if !res_obj.is_null() {
-                        xml_xpath_release_object(self.context, res_obj);
+                        xml_xpath_free_object(res_obj);
                     }
                 }
                 // QUESTION TODO: This falls back to normal XPath evaluation
@@ -212,7 +212,7 @@ impl XmlXPathParserContext {
                     if let Some(value) = self.value_mut() {
                         (**value).boolval &= (*arg2).boolval;
                     }
-                    xml_xpath_release_object(self.context, arg2);
+                    xml_xpath_free_object(arg2);
                 }
                 XmlXPathOp::XPathOpOr => 'to_break: {
                     total += self.evaluate_precompiled_operation(self.comp.steps[op].ch1 as usize);
@@ -233,7 +233,7 @@ impl XmlXPathParserContext {
                     if let Some(value) = self.value_mut() {
                         (**value).boolval |= (*arg2).boolval;
                     }
-                    xml_xpath_release_object(self.context, arg2);
+                    xml_xpath_free_object(arg2);
                 }
                 XmlXPathOp::XPathOpEqual => {
                     total += self.evaluate_precompiled_operation(self.comp.steps[op].ch1 as usize);
@@ -335,8 +335,8 @@ impl XmlXPathParserContext {
                         || arg2.is_null()
                         || (*arg2).typ != XmlXPathObjectType::XPathNodeset
                     {
-                        xml_xpath_release_object(self.context, arg1);
-                        xml_xpath_release_object(self.context, arg2);
+                        xml_xpath_free_object(arg1);
+                        xml_xpath_free_object(arg2);
                         xml_xpath_err(Some(self), XmlXPathError::XPathInvalidType as i32);
                         return 0;
                     }
@@ -350,8 +350,8 @@ impl XmlXPathParserContext {
                                 .as_deref()
                                 .is_some_and(|n| self.check_operation_limit(n.len() as _) < 0))
                     {
-                        xml_xpath_release_object(self.context, arg1);
-                        xml_xpath_release_object(self.context, arg2);
+                        xml_xpath_free_object(arg1);
+                        xml_xpath_free_object(arg2);
                         break 'to_break;
                     }
                     if (*arg1).nodesetval.is_none()
@@ -368,7 +368,7 @@ impl XmlXPathParserContext {
                     }
 
                     self.value_push(arg1);
-                    xml_xpath_release_object(self.context, arg2);
+                    xml_xpath_free_object(arg2);
                 }
                 XmlXPathOp::XPathOpRoot => {
                     xml_xpath_root(self);
@@ -873,11 +873,11 @@ impl XmlXPathParserContext {
 
                                 // Cleanup
                                 if !res.is_null() {
-                                    xml_xpath_release_object(self.context, res);
+                                    xml_xpath_free_object(res);
                                 }
                                 if self.value().unwrap() == tmp {
                                     res = self.value_pop();
-                                    xml_xpath_release_object(self.context, res);
+                                    xml_xpath_free_object(res);
                                 }
                             }
                         } else {
@@ -916,11 +916,11 @@ impl XmlXPathParserContext {
 
                                     // Cleanup
                                     if !res.is_null() {
-                                        xml_xpath_release_object(self.context, res);
+                                        xml_xpath_free_object(res);
                                     }
                                     if self.value().unwrap() == tmp {
                                         res = self.value_pop();
-                                        xml_xpath_release_object(self.context, res);
+                                        xml_xpath_free_object(res);
                                     }
                                 }
                             }
@@ -930,7 +930,7 @@ impl XmlXPathParserContext {
                         self.value_push(xml_xptr_wrap_location_set(newlocset));
                     }
                     // rangeto_error:
-                    xml_xpath_release_object(self.context, obj);
+                    xml_xpath_free_object(obj);
                     (*self.context).node = oldnode;
                     (*self.context).context_size = oldcs;
                     (*self.context).proximity_position = oldpp;
@@ -1019,8 +1019,8 @@ impl XmlXPathParserContext {
                         || arg2.is_null()
                         || (*arg2).typ != XmlXPathObjectType::XPathNodeset
                     {
-                        xml_xpath_release_object(self.context, arg1);
-                        xml_xpath_release_object(self.context, arg2);
+                        xml_xpath_free_object(arg1);
+                        xml_xpath_free_object(arg2);
                         xml_xpath_err(Some(self), XmlXPathError::XPathInvalidType as i32);
                         return 0;
                     }
@@ -1034,8 +1034,8 @@ impl XmlXPathParserContext {
                                 .as_deref()
                                 .is_some_and(|n| self.check_operation_limit(n.len() as _) < 0))
                     {
-                        xml_xpath_release_object(self.context, arg1);
-                        xml_xpath_release_object(self.context, arg2);
+                        xml_xpath_free_object(arg1);
+                        xml_xpath_free_object(arg2);
                     } else {
                         // TODO: Check memory error.
                         (*arg1).nodesetval = xml_xpath_node_set_merge(
@@ -1043,7 +1043,7 @@ impl XmlXPathParserContext {
                             (*arg2).nodesetval.as_deref(),
                         );
                         self.value_push(arg1);
-                        xml_xpath_release_object(self.context, arg2);
+                        xml_xpath_free_object(arg2);
                         // optimizer
                         if total > cur {
                             self.comp.steps[op].swap_children();
@@ -1207,8 +1207,8 @@ impl XmlXPathParserContext {
                         || arg2.is_null()
                         || (*arg2).typ != XmlXPathObjectType::XPathNodeset
                     {
-                        xml_xpath_release_object(self.context, arg1);
-                        xml_xpath_release_object(self.context, arg2);
+                        xml_xpath_free_object(arg1);
+                        xml_xpath_free_object(arg2);
                         xml_xpath_err(Some(self), XmlXPathError::XPathInvalidType as i32);
                         return 0;
                     }
@@ -1222,8 +1222,8 @@ impl XmlXPathParserContext {
                                 .as_deref()
                                 .is_some_and(|n| self.check_operation_limit(n.len() as _) < 0))
                     {
-                        xml_xpath_release_object(self.context, arg1);
-                        xml_xpath_release_object(self.context, arg2);
+                        xml_xpath_free_object(arg1);
+                        xml_xpath_free_object(arg2);
                         // break;
                     } else {
                         // TODO: Check memory error.
@@ -1232,7 +1232,7 @@ impl XmlXPathParserContext {
                             (*arg2).nodesetval.as_deref(),
                         );
                         self.value_push(arg1);
-                        xml_xpath_release_object(self.context, arg2);
+                        xml_xpath_free_object(arg2);
                         // optimizer
                         if total > cur {
                             self.comp.steps[op].swap_children();
@@ -1532,7 +1532,7 @@ impl XmlXPathParserContext {
                 } else {
                     xml_xpath_cast_to_boolean(&*res_obj) as i32
                 };
-                xml_xpath_release_object(self.context, res_obj);
+                xml_xpath_free_object(res_obj);
                 return res;
             }
 
@@ -2020,7 +2020,7 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
         if let Some(prefix) = prefix.as_deref() {
             uri = (*xpctxt).lookup_ns(prefix);
             if uri.is_none() {
-                xml_xpath_release_object(xpctxt, obj);
+                xml_xpath_free_object(obj);
                 xml_xpath_err(Some(ctxt), XmlXPathError::XPathUndefPrefixError as i32);
                 return 0;
             }
@@ -2109,12 +2109,12 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
         }
 
         let Some(next) = next else {
-            xml_xpath_release_object(xpctxt, obj);
+            xml_xpath_free_object(obj);
             return 0;
         };
         // The set of context nodes for the node tests
         let Some(context_seq) = (*obj).nodesetval.as_deref().filter(|n| !n.is_empty()) else {
-            xml_xpath_release_object(xpctxt, obj);
+            xml_xpath_free_object(obj);
             ctxt.value_push(xml_xpath_wrap_node_set(None));
             return 0;
         };
@@ -2459,7 +2459,7 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
             (**value).user = (*obj).user.take();
             (*obj).boolval = false;
         }
-        xml_xpath_release_object(xpctxt, obj);
+        xml_xpath_free_object(obj);
 
         // Ensure we return at least an empty set.
         if out_seq.is_none() {

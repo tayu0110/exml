@@ -393,7 +393,7 @@ pub unsafe fn xml_xpath_object_copy(val: &XmlXPathObject) -> XmlXPathObjectPtr {
 }
 
 /// Free up an object: xmlXPathObjectPtr.
-#[doc(alias = "xmlXPathFreeObject")]
+#[doc(alias = "xmlXPathFreeObject", alias = "xmlXPathReleaseObject")]
 pub unsafe fn xml_xpath_free_object(obj: XmlXPathObjectPtr) {
     unsafe {
         if obj.is_null() {
@@ -540,7 +540,10 @@ pub unsafe fn xml_xpath_cast_to_string(val: XmlXPathObjectPtr) -> Cow<'static, s
 /// Converts an existing object to its boolean() equivalent
 ///
 /// Returns the new object, the old one is freed (or the operation is done directly on @val)
-#[doc(alias = "xmlXPathConvertBoolean")]
+#[doc(
+    alias = "xmlXPathConvertBoolean",
+    alias = "xmlXPathCacheConvertBoolean"
+)]
 pub unsafe fn xml_xpath_convert_boolean(val: XmlXPathObjectPtr) -> XmlXPathObjectPtr {
     unsafe {
         if val.is_null() {
@@ -558,7 +561,7 @@ pub unsafe fn xml_xpath_convert_boolean(val: XmlXPathObjectPtr) -> XmlXPathObjec
 /// Converts an existing object to its number() equivalent
 ///
 /// Returns the new object, the old one is freed (or the operation is done directly on @val)
-#[doc(alias = "xmlXPathConvertNumber")]
+#[doc(alias = "xmlXPathConvertNumber", alias = "xmlXPathCacheConvertNumber")]
 pub unsafe fn xml_xpath_convert_number(val: XmlXPathObjectPtr) -> XmlXPathObjectPtr {
     unsafe {
         if val.is_null() {
@@ -576,7 +579,7 @@ pub unsafe fn xml_xpath_convert_number(val: XmlXPathObjectPtr) -> XmlXPathObject
 /// Converts an existing object to its string() equivalent
 ///
 /// Returns the new object, the old one is freed (or the operation is done directly on @val)
-#[doc(alias = "xmlXPathConvertString")]
+#[doc(alias = "xmlXPathConvertString", alias = "xmlXPathCacheConvertString")]
 pub unsafe fn xml_xpath_convert_string(val: XmlXPathObjectPtr) -> XmlXPathObjectPtr {
     unsafe {
         if val.is_null() {
