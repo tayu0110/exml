@@ -5,7 +5,7 @@ use crate::libxml::xpointer::XmlLocationSet;
 #[cfg(feature = "libxml_pattern")]
 use crate::pattern::XmlPattern;
 use crate::{
-    CHECK_ERROR, XP_ERROR, generic_error,
+    generic_error,
     libxml::xpointer::{
         xml_xptr_new_range, xml_xptr_new_range_node_object, xml_xptr_wrap_location_set,
     },
@@ -17,26 +17,25 @@ use crate::{
 };
 
 use super::{
-    XPATH_MAX_RECURSION_DEPTH, XmlXPathAxisVal, XmlXPathContext, XmlXPathContextPtr,
+    XPATH_MAX_RECURSION_DEPTH, XmlNodeSet, XmlXPathAxisVal, XmlXPathContext, XmlXPathContextPtr,
     XmlXPathFunction, XmlXPathNodeSetMergeFunction, XmlXPathObject, XmlXPathObjectPtr,
-    XmlXPathObjectType, XmlXPathParserContext, XmlXPathParserContextPtr, XmlXPathTestVal,
-    XmlXPathTraversalFunction, XmlXPathTypeVal,
-    compile::XmlXPathStepOpPtr,
+    XmlXPathObjectType, XmlXPathParserContext, XmlXPathTestVal, XmlXPathTraversalFunction,
+    XmlXPathTypeVal,
     functions::{xml_xpath_boolean_function, xml_xpath_number_function},
     xml_xpath_add_values, xml_xpath_cache_new_boolean, xml_xpath_cache_new_node_set,
     xml_xpath_cache_object_copy, xml_xpath_cache_wrap_node_set, xml_xpath_cast_to_boolean,
-    xml_xpath_cmp_nodes_ext, xml_xpath_comp_op_eval_predicate, xml_xpath_compare_values,
-    xml_xpath_div_values, xml_xpath_equal_values, xml_xpath_err,
-    xml_xpath_evaluate_predicate_result, xml_xpath_free_node_set, xml_xpath_free_object,
-    xml_xpath_mod_values, xml_xpath_mult_values, xml_xpath_next_ancestor,
-    xml_xpath_next_ancestor_or_self, xml_xpath_next_attribute, xml_xpath_next_child,
-    xml_xpath_next_child_element, xml_xpath_next_descendant, xml_xpath_next_descendant_or_self,
-    xml_xpath_next_following, xml_xpath_next_following_sibling, xml_xpath_next_namespace,
-    xml_xpath_next_parent, xml_xpath_next_preceding_internal, xml_xpath_next_preceding_sibling,
-    xml_xpath_next_self, xml_xpath_node_set_create, xml_xpath_node_set_merge,
-    xml_xpath_node_set_merge_and_clear, xml_xpath_node_set_merge_and_clear_no_dupls,
-    xml_xpath_not_equal_values, xml_xpath_release_object, xml_xpath_root, xml_xpath_sub_values,
-    xml_xpath_value_flip_sign, xml_xpath_variable_lookup, xml_xpath_variable_lookup_ns,
+    xml_xpath_cmp_nodes_ext, xml_xpath_compare_values, xml_xpath_div_values,
+    xml_xpath_equal_values, xml_xpath_err, xml_xpath_evaluate_predicate_result,
+    xml_xpath_free_node_set, xml_xpath_free_object, xml_xpath_mod_values, xml_xpath_mult_values,
+    xml_xpath_next_ancestor, xml_xpath_next_ancestor_or_self, xml_xpath_next_attribute,
+    xml_xpath_next_child, xml_xpath_next_child_element, xml_xpath_next_descendant,
+    xml_xpath_next_descendant_or_self, xml_xpath_next_following, xml_xpath_next_following_sibling,
+    xml_xpath_next_namespace, xml_xpath_next_parent, xml_xpath_next_preceding_internal,
+    xml_xpath_next_preceding_sibling, xml_xpath_next_self, xml_xpath_node_set_create,
+    xml_xpath_node_set_merge, xml_xpath_node_set_merge_and_clear,
+    xml_xpath_node_set_merge_and_clear_no_dupls, xml_xpath_not_equal_values,
+    xml_xpath_release_object, xml_xpath_root, xml_xpath_sub_values, xml_xpath_value_flip_sign,
+    xml_xpath_variable_lookup, xml_xpath_variable_lookup_ns,
 };
 
 type StepOpIndex = usize;
@@ -83,11 +82,14 @@ impl XmlXPathParserContext {
                     if !self.context.is_null() {
                         (*self.context).depth = old_depth;
                     }
-                    CHECK_ERROR!(self);
+                    if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
+                        return;
+                    };
 
                     // Check for trailing characters.
                     if self.cur < self.base.len() {
-                        XP_ERROR!(Some(self), XmlXPathError::XPathExprError as i32);
+                        xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
+                        return;
                     }
 
                     if self.comp.steps.len() > 1 && self.comp.last >= 0 {
@@ -1992,56 +1994,53 @@ macro_rules! xp_test_hit_ns {
 
 #[doc(alias = "xmlXPathNodeCollectAndTest")]
 pub(super) unsafe fn xml_xpath_node_collect_and_test(
-    ctxt: XmlXPathParserContextPtr,
+    ctxt: &mut XmlXPathParserContext,
     op: StepOpIndex,
     mut first: Option<&mut Option<XmlGenericNodePtr>>,
     mut last: Option<&mut Option<XmlGenericNodePtr>>,
     to_bool: i32,
 ) -> i32 {
     unsafe {
-        let axis: XmlXPathAxisVal = (*ctxt).comp.steps[op].value.try_into().unwrap();
-        let test: XmlXPathTestVal = (*ctxt).comp.steps[op].value2.try_into().unwrap();
-        let typ: XmlXPathTypeVal = (*ctxt).comp.steps[op].value3.try_into().unwrap();
-        let prefix = (*ctxt).comp.steps[op]
+        let axis: XmlXPathAxisVal = ctxt.comp.steps[op].value.try_into().unwrap();
+        let test: XmlXPathTestVal = ctxt.comp.steps[op].value2.try_into().unwrap();
+        let typ: XmlXPathTypeVal = ctxt.comp.steps[op].value3.try_into().unwrap();
+        let prefix = ctxt.comp.steps[op]
             .value4
             .as_ref()
-            .and_then(|val| val.as_str());
-        let name = (*ctxt).comp.steps[op]
+            .and_then(|val| val.as_str())
+            .map(|pre| pre.to_owned());
+        let name = ctxt.comp.steps[op]
             .value5
             .as_ref()
-            .and_then(|val| val.as_str());
+            .and_then(|val| val.as_str())
+            .map(|name| name.to_owned());
         let mut uri = None;
         let mut total: i32 = 0;
         let mut has_ns_nodes: bool;
 
-        // First predicate operator
-        let mut pred_op: XmlXPathStepOpPtr;
         let mut max_pos: i32; /* The requested position() (when a "[n]" predicate) */
         let mut has_predicate_range: i32;
         let mut has_axis_range: i32;
         let mut pos: i32;
 
         let next: Option<XmlXPathTraversalFunction>;
-        let xpctxt: XmlXPathContextPtr = (*ctxt).context;
+        let xpctxt: XmlXPathContextPtr = ctxt.context;
 
-        if (*ctxt)
+        if ctxt
             .value()
             .is_none_or(|value| (*value).typ != (XmlXPathObjectType::XPathNodeset))
         {
-            xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathInvalidType as i32);
+            xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return 0;
         };
         // The popped object holding the context nodes
-        let obj: XmlXPathObjectPtr = (*ctxt).value_pop();
+        let obj: XmlXPathObjectPtr = ctxt.value_pop();
         // Setup namespaces.
-        if let Some(prefix) = prefix {
+        if let Some(prefix) = prefix.as_deref() {
             uri = (*xpctxt).lookup_ns(prefix);
             if uri.is_none() {
                 xml_xpath_release_object(xpctxt, obj);
-                xml_xpath_err(
-                    Some(&mut *ctxt),
-                    XmlXPathError::XPathUndefPrefixError as i32,
-                );
+                xml_xpath_err(Some(ctxt), XmlXPathError::XPathUndefPrefixError as i32);
                 return 0;
             }
         }
@@ -2135,7 +2134,7 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
         // The set of context nodes for the node tests
         let Some(context_seq) = (*obj).nodesetval.as_deref().filter(|n| !n.is_empty()) else {
             xml_xpath_release_object(xpctxt, obj);
-            (*ctxt).value_push(xml_xpath_cache_wrap_node_set(xpctxt, None));
+            ctxt.value_push(xml_xpath_cache_wrap_node_set(xpctxt, None));
             return 0;
         };
         // Predicate optimization ---------------------------------------------
@@ -2146,8 +2145,8 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
         // Example - expression "/foo[parent::bar][1]":
         //
         // COLLECT 'child' 'name' 'node' foo    -- op (we are here)
-        //   ROOT                               -- (*ctxt).comp.steps[op].ch1
-        //   PREDICATE                          -- (*ctxt).comp.steps[op].ch2 (predOp)
+        //   ROOT                               -- ctxt.comp.steps[op].ch1
+        //   PREDICATE                          -- ctxt.comp.steps[op].ch2 (predOp)
         //     PREDICATE                          -- (*predOp).ch1 = [parent::bar]
         //       SORT
         //         COLLECT  'parent' 'name' 'node' bar
@@ -2155,25 +2154,26 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
         //     ELEM Object is a number : 1        -- (*predOp).ch2 = [1]
         //
         max_pos = 0;
-        pred_op = null_mut();
+        // First predicate operator
+        let mut pred_op = StepOpIndex::MAX;
         has_predicate_range = 0;
         has_axis_range = 0;
-        if (*ctxt).comp.steps[op].ch2 != -1 {
+        if ctxt.comp.steps[op].ch2 != -1 {
             // There's at least one predicate. 16 == XPATH_OP_PREDICATE
-            pred_op = &raw mut (*ctxt).comp.steps[(*ctxt).comp.steps[op].ch2 as usize];
-            if (*ctxt).is_positional_predicate(&*pred_op, &mut max_pos) != 0 {
-                if (*pred_op).ch1 != -1 {
+            pred_op = ctxt.comp.steps[op].ch2 as usize;
+            if ctxt.is_positional_predicate(&ctxt.comp.steps[pred_op], &mut max_pos) != 0 {
+                if ctxt.comp.steps[pred_op].ch1 != -1 {
                     // Use the next inner predicate operator.
-                    pred_op = &raw mut (*ctxt).comp.steps[(*pred_op).ch1 as usize];
+                    pred_op = ctxt.comp.steps[pred_op].ch1 as usize;
                     has_predicate_range = 1;
                 } else {
                     // There's no other predicate than the [n] predicate.
-                    pred_op = null_mut();
+                    pred_op = StepOpIndex::MAX;
                     has_axis_range = 1;
                 }
             }
         }
-        let break_on_first_hit: i32 = (to_bool != 0 && pred_op.is_null()) as i32;
+        let break_on_first_hit: i32 = (to_bool != 0 && pred_op == StepOpIndex::MAX) as i32;
         // Axis traversal -----------------------------------------------------
         // 2.3 Node Tests
         //  - For the attribute axis, the principal node type is attribute.
@@ -2191,7 +2191,7 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
         let mut context_idx = 0;
 
         'main: while context_idx < context_seq.node_tab.len()
-            && (*ctxt).error == XmlXPathError::XPathExpressionOK as i32
+            && ctxt.error == XmlXPathError::XPathExpressionOK as i32
         {
             (*xpctxt).node = Some(context_seq.node_tab[context_idx]);
             context_idx += 1;
@@ -2210,7 +2210,7 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
             let mut cur = None;
             has_ns_nodes = false;
             while let Some(cur) = {
-                if (*(*ctxt).context).op_limit != 0 && (*ctxt).check_operation_limit(1) < 0 {
+                if (*ctxt.context).op_limit != 0 && ctxt.check_operation_limit(1) < 0 {
                     // goto error;
                     break 'main;
                 }
@@ -2289,6 +2289,7 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
                     XmlXPathTestVal::NodeTestPI => {
                         if matches!(cur.element_type(), XmlElementType::XmlPINode)
                             && (name
+                                .as_deref()
                                 .is_none_or(|name| name == XmlNodePtr::try_from(cur).unwrap().name))
                         {
                             xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
@@ -2341,7 +2342,7 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
                         match cur.element_type() {
                             XmlElementType::XmlElementNode => {
                                 let node = XmlNodePtr::try_from(cur).unwrap();
-                                if name == Some(&node.name) {
+                                if name.as_deref() == Some(&node.name) {
                                     if prefix.is_none() {
                                         if node.ns.is_none() {
                                             xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
@@ -2359,7 +2360,7 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
                             XmlElementType::XmlAttributeNode => {
                                 let attr = XmlAttrPtr::try_from(cur).unwrap();
 
-                                if name == Some(attr.name.as_ref()) {
+                                if name.as_deref() == Some(attr.name.as_ref()) {
                                     if prefix.is_none() {
                                         if attr.ns.is_none_or(|ns| ns.prefix().is_none()) {
                                             xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
@@ -2376,11 +2377,9 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
                             }
                             XmlElementType::XmlNamespaceDecl => {
                                 let ns = XmlNsPtr::try_from(cur).unwrap();
-                                if ns
-                                    .prefix
-                                    .as_deref()
-                                    .is_some_and(|prefix| name.is_some_and(|name| prefix == name))
-                                {
+                                if ns.prefix.as_deref().is_some_and(|prefix| {
+                                    name.as_deref().is_some_and(|name| prefix == name)
+                                }) {
                                     xp_test_hit_ns!(has_axis_range, pos, max_pos, has_ns_nodes, seq, xpctxt, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                                 }
                             }
@@ -2389,7 +2388,7 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
                     }
                 }
 
-                if (*ctxt).error != XmlXPathError::XPathExpressionOK as i32 {
+                if ctxt.error != XmlXPathError::XPathExpressionOK as i32 {
                     break;
                 }
             }
@@ -2397,17 +2396,17 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
             // goto apply_predicates;
 
             // apply_predicates: /* --------------------------------------------------- */
-            if (*ctxt).error != XmlXPathError::XPathExpressionOK as i32 {
+            if ctxt.error != XmlXPathError::XPathExpressionOK as i32 {
                 // goto error;
                 break 'main;
             }
 
             // Apply predicates.
-            if !pred_op.is_null() && !seq.as_deref().unwrap().node_tab.is_empty() {
+            if pred_op < StepOpIndex::MAX && !seq.as_deref().unwrap().node_tab.is_empty() {
                 // E.g. when we have a "/foo[some expression][n]".
                 // QUESTION TODO: The old predicate evaluation took into
                 // account location-sets.
-                // (E.g. (*(*ctxt).value).typ == XPATH_LOCATIONSET)
+                // (E.g. (*ctxt.value).typ == XPATH_LOCATIONSET)
                 // Do we expect such a set here?
                 // All what I learned now from the evaluation semantics
                 // does not indicate that a location-set will be processed
@@ -2446,7 +2445,7 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
                     );
                 }
 
-                if (*ctxt).error != XmlXPathError::XPathExpressionOK as i32 {
+                if ctxt.error != XmlXPathError::XPathExpressionOK as i32 {
                     total = 0;
                     // goto error;
                     break 'main;
@@ -2474,7 +2473,7 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
             // QUESTION TODO: What does this do and why?
             // TODO: Do we have to do this also for the "error"
             // cleanup further down?
-            let value = (*ctxt).value_mut().unwrap();
+            let value = ctxt.value_mut().unwrap();
             (**value).boolval = true;
             (**value).user = (*obj).user.take();
             (*obj).boolval = false;
@@ -2494,7 +2493,7 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
             xml_xpath_free_node_set(seq);
         }
         // Hand over the result. Better to push the set also in case of errors.
-        (*ctxt).value_push(xml_xpath_cache_wrap_node_set(xpctxt, out_seq));
+        ctxt.value_push(xml_xpath_cache_wrap_node_set(xpctxt, out_seq));
         // Reset the context node.
         (*xpctxt).node = old_context_node;
         // When traversing the namespace axis in "toBool" mode, it's
@@ -2502,5 +2501,63 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
         (*xpctxt).tmp_ns_list = None;
 
         total
+    }
+}
+
+/// Filter a node set, keeping only nodes for which the sequence of predicate
+/// expressions matches. Afterwards, keep only nodes between minPos and maxPos
+/// in the filtered result.
+#[doc(alias = "xmlXPathCompOpEvalPredicate")]
+pub(super) unsafe fn xml_xpath_comp_op_eval_predicate(
+    ctxt: &mut XmlXPathParserContext,
+    op: StepOpIndex,
+    set: &mut XmlNodeSet,
+    min_pos: i32,
+    max_pos: i32,
+    has_ns_nodes: bool,
+) {
+    unsafe {
+        if ctxt.comp.steps[op].ch1 != -1 {
+            // Process inner predicates first.
+            if !matches!(
+                ctxt.comp.steps[ctxt.comp.steps[op].ch1 as usize].op,
+                XmlXPathOp::XPathOpPredicate
+            ) {
+                generic_error!("xmlXPathCompOpEvalPredicate: Expected a predicate\n");
+                xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidOperand as i32);
+                return;
+            }
+            if (*ctxt.context).depth >= XPATH_MAX_RECURSION_DEPTH as i32 {
+                xml_xpath_err(
+                    Some(ctxt),
+                    XmlXPathError::XPathRecursionLimitExceeded as i32,
+                );
+                return;
+            }
+            (*ctxt.context).depth += 1;
+            xml_xpath_comp_op_eval_predicate(
+                ctxt,
+                ctxt.comp.steps[op].ch1 as usize,
+                set,
+                1,
+                set.node_tab.len() as i32,
+                has_ns_nodes,
+            );
+            (*ctxt.context).depth -= 1;
+            if ctxt.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
+                return;
+            };
+        }
+
+        if ctxt.comp.steps[op].ch2 != -1 {
+            xml_xpath_node_set_filter(
+                ctxt,
+                Some(set),
+                ctxt.comp.steps[op].ch2,
+                min_pos,
+                max_pos,
+                has_ns_nodes,
+            );
+        }
     }
 }

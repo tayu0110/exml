@@ -53,7 +53,7 @@ use crate::{
     },
     xpath::{
         XML_XPATH_NAN, XmlXPathContextPtr, XmlXPathError, XmlXPathObject, XmlXPathObjectPtr,
-        XmlXPathObjectType, XmlXPathOp, XmlXPathParserContextPtr, XmlXPathVariableLookupFunc,
+        XmlXPathObjectType, XmlXPathParserContextPtr, XmlXPathVariableLookupFunc,
         functions::{cast_to_number, xml_xpath_number_function},
         xml_xpath_cast_boolean_to_string, xml_xpath_cast_node_set_to_string,
         xml_xpath_cast_node_to_number, xml_xpath_cast_node_to_string,
@@ -65,10 +65,9 @@ use crate::{
 };
 
 use super::{
-    XmlNodeSet, XmlXPathContext, XmlXPathParserContext, compile::XmlXPathStepOpPtr,
-    functions::xml_xpath_boolean_function, xml_xpath_new_boolean, xml_xpath_new_float,
-    xml_xpath_new_node_set, xml_xpath_new_string, xml_xpath_node_set_merge,
-    xml_xpath_wrap_node_set, xml_xpath_wrap_string,
+    XmlNodeSet, XmlXPathContext, XmlXPathParserContext, functions::xml_xpath_boolean_function,
+    xml_xpath_new_boolean, xml_xpath_new_float, xml_xpath_new_node_set, xml_xpath_new_string,
+    xml_xpath_node_set_merge, xml_xpath_wrap_node_set, xml_xpath_wrap_string,
 };
 
 // Many of these macros may later turn into functions.
@@ -1376,54 +1375,6 @@ pub(super) unsafe fn xml_xpath_node_set_filter(
         (*xpctxt).doc = olddoc;
         (*xpctxt).context_size = oldcs;
         (*xpctxt).proximity_position = oldpp;
-    }
-}
-
-/// Filter a node set, keeping only nodes for which the sequence of predicate
-/// expressions matches. Afterwards, keep only nodes between minPos and maxPos
-/// in the filtered result.
-#[doc(alias = "xmlXPathCompOpEvalPredicate")]
-pub(super) unsafe fn xml_xpath_comp_op_eval_predicate(
-    ctxt: &mut XmlXPathParserContext,
-    op: XmlXPathStepOpPtr,
-    set: &mut XmlNodeSet,
-    min_pos: i32,
-    max_pos: i32,
-    has_ns_nodes: bool,
-) {
-    unsafe {
-        if (*op).ch1 != -1 {
-            // Process inner predicates first.
-            if !matches!(
-                ctxt.comp.steps[(*op).ch1 as usize].op,
-                XmlXPathOp::XPathOpPredicate
-            ) {
-                generic_error!("xmlXPathCompOpEvalPredicate: Expected a predicate\n");
-                XP_ERROR!(Some(ctxt), XmlXPathError::XPathInvalidOperand as i32);
-            }
-            if (*ctxt.context).depth >= XPATH_MAX_RECURSION_DEPTH as i32 {
-                XP_ERROR!(
-                    Some(ctxt),
-                    XmlXPathError::XPathRecursionLimitExceeded as i32
-                );
-            }
-            (*ctxt.context).depth += 1;
-            let op = &raw mut ctxt.comp.steps[(*op).ch1 as usize];
-            xml_xpath_comp_op_eval_predicate(
-                ctxt,
-                op,
-                set,
-                1,
-                set.node_tab.len() as i32,
-                has_ns_nodes,
-            );
-            (*ctxt.context).depth -= 1;
-            CHECK_ERROR!(ctxt);
-        }
-
-        if (*op).ch2 != -1 {
-            xml_xpath_node_set_filter(ctxt, Some(set), (*op).ch2, min_pos, max_pos, has_ns_nodes);
-        }
     }
 }
 
