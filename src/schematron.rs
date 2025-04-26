@@ -38,8 +38,8 @@ use crate::{
     },
     xpath::{
         XML_XPATH_CHECKNS, XmlXPathCompExpr, XmlXPathContextPtr, XmlXPathObjectType,
-        internals::xml_xpath_register_variable_ns, xml_xpath_compiled_eval, xml_xpath_ctxt_compile,
-        xml_xpath_eval, xml_xpath_free_context, xml_xpath_is_nan, xml_xpath_new_context,
+        xml_xpath_compiled_eval, xml_xpath_ctxt_compile, xml_xpath_eval, xml_xpath_free_context,
+        xml_xpath_is_nan, xml_xpath_new_context,
     },
 };
 
@@ -174,7 +174,7 @@ unsafe fn xml_schematron_register_variables(
                 return -1;
             };
 
-            if xml_xpath_register_variable_ns(ctxt, &now.name, None, Some(let_eval)) != 0 {
+            if (*ctxt).register_variable_ns(&now.name, None, Some(let_eval)) != 0 {
                 generic_error!("Registering a let variable failed\n");
                 return -1;
             }
@@ -194,7 +194,7 @@ unsafe fn xml_schematron_unregister_variables(
 ) -> i32 {
     unsafe {
         while let Some(now) = letr {
-            if xml_xpath_register_variable_ns(ctxt, &now.name, None, None) != 0 {
+            if (*ctxt).register_variable_ns(&now.name, None, None) != 0 {
                 generic_error!("Unregistering a let variable failed\n");
                 return -1;
             }

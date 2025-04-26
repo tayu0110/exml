@@ -121,12 +121,10 @@ pub(crate) unsafe fn desret_xml_xpath_object_ptr(val: XmlXPathObjectPtr) {
 }
 
 #[cfg(feature = "xpath")]
-pub(crate) unsafe fn desret_xml_node_set_ptr(val: Option<Box<crate::xpath::XmlNodeSet>>) {
-    unsafe {
-        use crate::xpath::xml_xpath_free_node_set;
+pub(crate) fn desret_xml_node_set_ptr(val: Option<Box<crate::xpath::XmlNodeSet>>) {
+    use crate::xpath::xml_xpath_free_node_set;
 
-        xml_xpath_free_node_set(val);
-    }
+    xml_xpath_free_node_set(val);
 }
 
 #[cfg(any(feature = "xpath", feature = "schema"))]

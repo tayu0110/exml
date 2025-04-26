@@ -198,7 +198,7 @@ pub type XmlXPathFunction = unsafe fn(ctxt: &mut XmlXPathParserContext, nargs: u
 #[doc(alias = "xmlXPathVariableLookupFunc")]
 #[cfg(feature = "xpath")]
 pub type XmlXPathVariableLookupFunc =
-    unsafe fn(ctxt: *mut c_void, name: &str, ns_uri: Option<&str>) -> Option<XmlXPathObject>;
+    fn(ctxt: *mut c_void, name: &str, ns_uri: Option<&str>) -> Option<XmlXPathObject>;
 
 /// Prototype for callbacks used to plug function lookup in the XPath engine.
 ///
@@ -1714,35 +1714,6 @@ mod tests {
                     assert!(
                         leaks == 0,
                         "{leaks} Leaks are found in xmlXPathNotEqualValues()"
-                    );
-                    eprintln!(" {}", n_ctxt);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_registered_variables_cleanup() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_XPATH_CONTEXT_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctxt = gen_xml_xpath_context_ptr(n_ctxt, 0);
-
-                xml_xpath_registered_variables_cleanup(ctxt);
-                des_xml_xpath_context_ptr(n_ctxt, ctxt, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathRegisteredVariablesCleanup",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlXPathRegisteredVariablesCleanup()"
                     );
                     eprintln!(" {}", n_ctxt);
                 }

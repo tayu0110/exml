@@ -56,7 +56,7 @@ use super::{
         xml_xpath_translate_function, xml_xpath_true_function,
     },
     xml_xpath_cast_to_boolean, xml_xpath_cast_to_number, xml_xpath_cast_to_string, xml_xpath_err,
-    xml_xpath_perr_memory, xml_xpath_registered_variables_cleanup,
+    xml_xpath_object_copy, xml_xpath_perr_memory,
 };
 
 pub type XmlXPathParserContextPtr = *mut XmlXPathParserContext;
@@ -607,12 +607,6 @@ impl XmlXPathContext {
             .copied()
     }
 
-    /// Registers an external mechanism to do function lookup.
-    #[doc(alias = "xmlXPathRegisterFuncLookup")]
-    pub fn register_func_lookup(&mut self, f: impl XmlXPathFuncLookup + 'static) {
-        self.func_lookup = Some(Box::new(f));
-    }
-
     /// Search in the namespace declaration array of the context for the given
     /// namespace name associated to the given prefix
     ///
@@ -634,6 +628,86 @@ impl XmlXPathContext {
         self.ns_hash.get(prefix).cloned()
     }
 
+    /// Search in the Variable array of the context for the given variable value.
+    ///
+    /// Returns a copy of the value or NULL if not found
+    #[doc(alias = "xmlXPathVariableLookup")]
+    pub fn lookup_variable(&mut self, name: &str) -> Option<XmlXPathObject> {
+        if let Some(var_lookup_func) = self.var_lookup_func {
+            return var_lookup_func(self.var_lookup_data, name, None);
+        }
+        self.lookup_variable_ns(name, None)
+    }
+
+    /// Search in the Variable array of the context for the given variable value.
+    ///
+    /// Returns the a copy of the value or NULL if not found
+    #[doc(alias = "xmlXPathVariableLookupNS")]
+    pub fn lookup_variable_ns(
+        &mut self,
+        name: &str,
+        ns_uri: Option<&str>,
+    ) -> Option<XmlXPathObject> {
+        if let Some(var_lookup_func) = self.var_lookup_func {
+            if let Some(ret) = var_lookup_func(self.var_lookup_data, name, ns_uri) {
+                return Some(ret);
+            }
+        }
+
+        let obj = self
+            .var_hash
+            .get(&(name.into(), ns_uri.map(Cow::Borrowed)))?;
+        Some(xml_xpath_object_copy(obj))
+    }
+
+    /// Registers an external mechanism to do function lookup.
+    #[doc(alias = "xmlXPathRegisterFuncLookup")]
+    pub fn register_func_lookup(&mut self, f: impl XmlXPathFuncLookup + 'static) {
+        self.func_lookup = Some(Box::new(f));
+    }
+
+    /// Register a new variable value. If @value is NULL it unregisters the variable
+    ///
+    /// Returns 0 in case of success, -1 in case of error
+    #[doc(alias = "xmlXPathRegisterVariable")]
+    pub fn register_variable(&mut self, name: &str, value: Option<XmlXPathObject>) -> i32 {
+        self.register_variable_ns(name, None, value)
+    }
+
+    /// Register a new variable value. If @value is NULL it unregisters the variable
+    ///
+    /// Returns 0 in case of success, -1 in case of error
+    #[doc(alias = "xmlXPathRegisterVariableNS")]
+    pub fn register_variable_ns(
+        &mut self,
+        name: &str,
+        ns_uri: Option<&str>,
+        value: Option<XmlXPathObject>,
+    ) -> i32 {
+        let name = Cow::Owned(name.to_owned());
+        let ns_uri = ns_uri.map(|uri| Cow::Owned(uri.to_owned()));
+        let Some(value) = value else {
+            return if self.var_hash.remove(&(name, ns_uri)).is_some() {
+                0
+            } else {
+                -1
+            };
+        };
+
+        if self.var_hash.insert((name, ns_uri), value).is_none() {
+            0
+        } else {
+            -1
+        }
+    }
+
+    /// Register an external mechanism to do variable lookup
+    #[doc(alias = "xmlXPathRegisterVariableLookup")]
+    pub fn register_variable_lookup(&mut self, f: XmlXPathVariableLookupFunc, data: *mut c_void) {
+        self.var_lookup_func = Some(f);
+        self.var_lookup_data = data;
+    }
+
     /// Cleanup the XPath context data associated to registered functions
     #[doc(alias = "xmlXPathRegisteredFuncsCleanup")]
     pub fn cleanup_registered_func(&mut self) {
@@ -644,6 +718,12 @@ impl XmlXPathContext {
     #[doc(alias = "xmlXPathRegisteredNsCleanup")]
     pub fn cleanup_registered_ns(&mut self) {
         self.ns_hash.clear();
+    }
+
+    /// Cleanup the XPath context data associated to registered variables
+    #[doc(alias = "xmlXPathRegisteredVariablesCleanup")]
+    pub fn cleanup_registered_variables(&mut self) {
+        self.var_hash.clear();
     }
 }
 
@@ -722,7 +802,7 @@ pub unsafe fn xml_xpath_free_context(ctxt: XmlXPathContextPtr) {
 
         (*ctxt).cleanup_registered_ns();
         (*ctxt).cleanup_registered_func();
-        xml_xpath_registered_variables_cleanup(ctxt);
+        (*ctxt).cleanup_registered_variables();
         (*ctxt).last_error.reset();
         let _ = Box::from_raw(ctxt);
     }

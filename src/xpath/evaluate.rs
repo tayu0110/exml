@@ -32,8 +32,7 @@ use super::{
     xml_xpath_next_preceding_internal, xml_xpath_next_preceding_sibling, xml_xpath_next_self,
     xml_xpath_node_set_create, xml_xpath_node_set_merge, xml_xpath_node_set_merge_and_clear,
     xml_xpath_node_set_merge_and_clear_no_dupls, xml_xpath_not_equal_values, xml_xpath_object_copy,
-    xml_xpath_root, xml_xpath_sub_values, xml_xpath_value_flip_sign, xml_xpath_variable_lookup,
-    xml_xpath_variable_lookup_ns, xml_xpath_wrap_node_set,
+    xml_xpath_root, xml_xpath_sub_values, xml_xpath_value_flip_sign, xml_xpath_wrap_node_set,
 };
 
 type StepOpIndex = usize;
@@ -420,8 +419,7 @@ impl XmlXPathParserContext {
                             self.error = XmlXPathError::XPathUndefPrefixError as _;
                             break 'to_break;
                         };
-                        let Some(val) =
-                            xml_xpath_variable_lookup_ns(self.context, value4, Some(&uri))
+                        let Some(val) = (*self.context).lookup_variable_ns(value4, Some(&uri))
                         else {
                             xml_xpath_err(
                                 Some(self),
@@ -436,7 +434,7 @@ impl XmlXPathParserContext {
                             .as_ref()
                             .and_then(|val| val.as_str())
                             .unwrap();
-                        let Some(val) = xml_xpath_variable_lookup(self.context, value4) else {
+                        let Some(val) = (*self.context).lookup_variable(value4) else {
                             xml_xpath_err(
                                 Some(self),
                                 XmlXPathError::XPathUndefVariableError as i32,

@@ -87,31 +87,27 @@ impl Drop for XmlXPathObject {
     /// Free up an object: xmlXPathObjectPtr.
     #[doc(alias = "xmlXPathFreeObject")]
     fn drop(&mut self) {
-        unsafe {
-            if matches!(
-                self.typ,
-                XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
-            ) {
-                if self.boolval {
-                    self.typ = XmlXPathObjectType::XPathXSLTTree; // TODO: Just for debugging. 
-                    xml_xpath_free_value_tree(self.nodesetval.take());
-                } else if let Some(set) = self.nodesetval.take() {
-                    xml_xpath_free_node_set(Some(set));
-                }
-            } else if matches!(self.typ, XmlXPathObjectType::XPathString)
-                && self.stringval.is_some()
-            {
-                let _ = self.stringval.take();
-            } else {
-                #[cfg(feature = "libxml_xptr_locs")]
-                let _ = self.user.take();
-                // #[cfg(feature = "libxml_xptr_locs")]
-                // if let Some(loc) = self.user.take() {
-                //     if let Some(&loc) = loc.as_location_set() {
-                //         xml_xptr_free_location_set(loc);
-                //     }
-                // }
+        if matches!(
+            self.typ,
+            XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
+        ) {
+            if self.boolval {
+                self.typ = XmlXPathObjectType::XPathXSLTTree; // TODO: Just for debugging. 
+                xml_xpath_free_value_tree(self.nodesetval.take());
+            } else if let Some(set) = self.nodesetval.take() {
+                xml_xpath_free_node_set(Some(set));
             }
+        } else if matches!(self.typ, XmlXPathObjectType::XPathString) && self.stringval.is_some() {
+            let _ = self.stringval.take();
+        } else {
+            #[cfg(feature = "libxml_xptr_locs")]
+            let _ = self.user.take();
+            // #[cfg(feature = "libxml_xptr_locs")]
+            // if let Some(loc) = self.user.take() {
+            //     if let Some(&loc) = loc.as_location_set() {
+            //         xml_xptr_free_location_set(loc);
+            //     }
+            // }
         }
     }
 }
@@ -306,39 +302,37 @@ pub unsafe fn xml_xpath_wrap_external(val: *mut c_void) -> XmlXPathObjectPtr {
 ///
 /// Returns the newly created object.
 #[doc(alias = "xmlXPathObjectCopy", alias = "xmlXPathCacheObjectCopy")]
-pub unsafe fn xml_xpath_object_copy(val: &XmlXPathObject) -> XmlXPathObject {
-    unsafe {
-        let mut ret = val.clone();
-        match val.typ {
-            XmlXPathObjectType::XPathBoolean | XmlXPathObjectType::XPathNumber => {}
-            #[cfg(feature = "libxml_xptr_locs")]
-            XmlXPathObjectType::XPathPoint | XmlXPathObjectType::XPathRange => {}
-            XmlXPathObjectType::XPathString => {}
-            XmlXPathObjectType::XPathXSLTTree | XmlXPathObjectType::XPathNodeset => {
-                // TODO: Check memory error.
-                ret.nodesetval = xml_xpath_node_set_merge(None, val.nodesetval.as_deref());
-                // Do not deallocate the copied tree value
-                ret.boolval = false;
-            }
-            #[cfg(feature = "libxml_xptr_locs")]
-            XmlXPathObjectType::XPathLocationset => {
-                // What is this ????
-                // It seems that `xml_xptr_location_set_merge` always returns `null_mut()`...
-                // if let Some(loc) = (*val).user.as_ref().and_then(|user| user.as_location_set()) {
-                //     let loc = xml_xptr_location_set_merge(null_mut(), loc);
-                //     ret.user =
-                //         (!loc.is_null()).then_some(XmlXPathObjectUserData::LocationSet(loc));
-                // }
-            }
-            XmlXPathObjectType::XPathUsers => {
-                ret.user = val.user.clone();
-            }
-            XmlXPathObjectType::XPathUndefined => {
-                generic_error!("xmlXPathObjectCopy: unsupported type {}\n", val.typ as i32);
-            } // _ => {}
+pub fn xml_xpath_object_copy(val: &XmlXPathObject) -> XmlXPathObject {
+    let mut ret = val.clone();
+    match val.typ {
+        XmlXPathObjectType::XPathBoolean | XmlXPathObjectType::XPathNumber => {}
+        #[cfg(feature = "libxml_xptr_locs")]
+        XmlXPathObjectType::XPathPoint | XmlXPathObjectType::XPathRange => {}
+        XmlXPathObjectType::XPathString => {}
+        XmlXPathObjectType::XPathXSLTTree | XmlXPathObjectType::XPathNodeset => {
+            // TODO: Check memory error.
+            ret.nodesetval = xml_xpath_node_set_merge(None, val.nodesetval.as_deref());
+            // Do not deallocate the copied tree value
+            ret.boolval = false;
         }
-        ret
+        #[cfg(feature = "libxml_xptr_locs")]
+        XmlXPathObjectType::XPathLocationset => {
+            // What is this ????
+            // It seems that `xml_xptr_location_set_merge` always returns `null_mut()`...
+            // if let Some(loc) = (*val).user.as_ref().and_then(|user| user.as_location_set()) {
+            //     let loc = xml_xptr_location_set_merge(null_mut(), loc);
+            //     ret.user =
+            //         (!loc.is_null()).then_some(XmlXPathObjectUserData::LocationSet(loc));
+            // }
+        }
+        XmlXPathObjectType::XPathUsers => {
+            ret.user = val.user.clone();
+        }
+        XmlXPathObjectType::XPathUndefined => {
+            generic_error!("xmlXPathObjectCopy: unsupported type {}\n", val.typ as i32);
+        } // _ => {}
     }
+    ret
 }
 
 /// Free up an object: xmlXPathObjectPtr.

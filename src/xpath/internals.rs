@@ -26,7 +26,7 @@
 //
 // Author: daniel@veillard.com
 
-use std::{borrow::Cow, mem::size_of, os::raw::c_void, ptr::null_mut};
+use std::{mem::size_of, ptr::null_mut};
 
 #[cfg(feature = "libxml_xptr_locs")]
 use crate::libxml::xpointer::XmlLocationSet;
@@ -44,7 +44,7 @@ use crate::{
     },
     xpath::{
         XML_XPATH_NAN, XmlXPathContextPtr, XmlXPathError, XmlXPathObjectType,
-        XmlXPathParserContextPtr, XmlXPathVariableLookupFunc,
+        XmlXPathParserContextPtr,
         functions::{cast_to_number, xml_xpath_number_function},
         xml_xpath_cast_node_to_number, xml_xpath_cast_node_to_string,
         xml_xpath_cast_number_to_boolean, xml_xpath_cast_to_number, xml_xpath_is_inf,
@@ -56,22 +56,6 @@ use super::{
     XmlNodeSet, XmlXPathContext, XmlXPathObject, XmlXPathParserContext,
     functions::xml_xpath_boolean_function, xml_xpath_new_node_set, xml_xpath_new_string,
 };
-
-/// Register an external mechanism to do variable lookup
-#[doc(alias = "xmlXPathRegisterVariableLookup")]
-pub unsafe fn xml_xpath_register_variable_lookup(
-    ctxt: XmlXPathContextPtr,
-    f: XmlXPathVariableLookupFunc,
-    data: *mut c_void,
-) {
-    unsafe {
-        if ctxt.is_null() {
-            return;
-        }
-        (*ctxt).var_lookup_func = Some(f);
-        (*ctxt).var_lookup_data = data;
-    }
-}
 
 // The array xmlXPathErrorMessages corresponds to the enum XmlXPathError
 const XML_XPATH_ERROR_MESSAGES: &[&str] = &[
@@ -212,71 +196,6 @@ pub unsafe fn xml_xpath_err(ctxt: Option<&mut XmlXPathParserContext>, mut error:
     }
 }
 
-/// Register a new variable value. If @value is NULL it unregisters the variable
-///
-/// Returns 0 in case of success, -1 in case of error
-#[doc(alias = "xmlXPathRegisterVariable")]
-pub unsafe fn xml_xpath_register_variable(
-    ctxt: XmlXPathContextPtr,
-    name: &str,
-    value: Option<XmlXPathObject>,
-) -> i32 {
-    unsafe { xml_xpath_register_variable_ns(ctxt, name, None, value) }
-}
-
-/// Register a new variable value. If @value is NULL it unregisters the variable
-///
-/// Returns 0 in case of success, -1 in case of error
-#[doc(alias = "xmlXPathRegisterVariableNS")]
-pub unsafe fn xml_xpath_register_variable_ns(
-    ctxt: XmlXPathContextPtr,
-    name: &str,
-    ns_uri: Option<&str>,
-    value: Option<XmlXPathObject>,
-) -> i32 {
-    unsafe {
-        if ctxt.is_null() {
-            return -1;
-        }
-
-        let name = Cow::Owned(name.to_owned());
-        let ns_uri = ns_uri.map(|uri| Cow::Owned(uri.to_owned()));
-        let Some(value) = value else {
-            return if (*ctxt).var_hash.remove(&(name, ns_uri)).is_some() {
-                0
-            } else {
-                -1
-            };
-        };
-
-        if (*ctxt).var_hash.insert((name, ns_uri), value).is_none() {
-            0
-        } else {
-            -1
-        }
-    }
-}
-
-/// Search in the Variable array of the context for the given variable value.
-///
-/// Returns a copy of the value or NULL if not found
-#[doc(alias = "xmlXPathVariableLookup")]
-pub unsafe fn xml_xpath_variable_lookup(
-    ctxt: XmlXPathContextPtr,
-    name: &str,
-) -> Option<XmlXPathObject> {
-    unsafe {
-        if ctxt.is_null() {
-            return None;
-        }
-
-        if let Some(var_lookup_func) = (*ctxt).var_lookup_func {
-            return var_lookup_func((*ctxt).var_lookup_data, name, None);
-        }
-        xml_xpath_variable_lookup_ns(ctxt, name, None)
-    }
-}
-
 /// Handle a redefinition of attribute error
 #[doc(alias = "xmlXPathErrMemory")]
 pub fn xml_xpath_err_memory(ctxt: Option<&mut XmlXPathContext>, extra: Option<&str>) {
@@ -334,45 +253,6 @@ pub fn xml_xpath_err_memory(ctxt: Option<&mut XmlXPathContext>, extra: Option<&s
             0,
             "Memory allocation failed\n",
         );
-    }
-}
-
-/// Search in the Variable array of the context for the given variable value.
-///
-/// Returns the a copy of the value or NULL if not found
-#[doc(alias = "xmlXPathVariableLookupNS")]
-pub unsafe fn xml_xpath_variable_lookup_ns(
-    ctxt: XmlXPathContextPtr,
-    name: &str,
-    ns_uri: Option<&str>,
-) -> Option<XmlXPathObject> {
-    unsafe {
-        if ctxt.is_null() {
-            return None;
-        }
-
-        if let Some(var_lookup_func) = (*ctxt).var_lookup_func {
-            if let Some(ret) = var_lookup_func((*ctxt).var_lookup_data, name, ns_uri) {
-                return Some(ret);
-            }
-        }
-
-        let obj = (*ctxt)
-            .var_hash
-            .get(&(name.into(), ns_uri.map(Cow::Borrowed)))?;
-        Some(xml_xpath_object_copy(obj))
-    }
-}
-
-/// Cleanup the XPath context data associated to registered variables
-#[doc(alias = "xmlXPathRegisteredVariablesCleanup")]
-pub unsafe fn xml_xpath_registered_variables_cleanup(ctxt: XmlXPathContextPtr) {
-    unsafe {
-        if ctxt.is_null() {
-            return;
-        }
-
-        (*ctxt).var_hash.clear();
     }
 }
 
@@ -812,19 +692,17 @@ pub(super) unsafe fn xml_xpath_node_set_filter(
 /// Move the last node to the first position and clear temporary XPath objects
 /// (e.g. namespace nodes) from all other nodes. Sets the length of the list to 1.
 #[doc(alias = "xmlXPathNodeSetKeepLast")]
-pub(super) unsafe fn xml_xpath_node_set_keep_last(set: Option<&mut XmlNodeSet>) {
-    unsafe {
-        let Some(set) = set.filter(|s| s.len() > 1) else {
-            return;
-        };
-        if set.node_tab.len() <= 1 {
-            return;
-        }
-        let len = set.node_tab.len();
-        for node in set.node_tab.drain(..len - 1) {
-            if let Ok(ns) = XmlNsPtr::try_from(node) {
-                xml_xpath_node_set_free_ns(ns);
-            }
+pub(super) fn xml_xpath_node_set_keep_last(set: Option<&mut XmlNodeSet>) {
+    let Some(set) = set.filter(|s| s.len() > 1) else {
+        return;
+    };
+    if set.node_tab.len() <= 1 {
+        return;
+    }
+    let len = set.node_tab.len();
+    for node in set.node_tab.drain(..len - 1) {
+        if let Ok(ns) = XmlNsPtr::try_from(node) {
+            xml_xpath_node_set_free_ns(ns);
         }
     }
 }
@@ -2942,16 +2820,16 @@ pub(super) fn xml_xpath_get_elements_by_ids(
 /// parent node in the XPath semantic. Check if such a node needs to be freed
 #[doc(alias = "xmlXPathNodeSetFreeNs")]
 #[cfg(feature = "xpath")]
-pub(crate) unsafe fn xml_xpath_node_set_free_ns(ns: XmlNsPtr) {
-    unsafe {
-        if !matches!(ns.typ, XmlElementType::XmlNamespaceDecl) {
-            return;
-        }
+pub(crate) fn xml_xpath_node_set_free_ns(ns: XmlNsPtr) {
+    if !matches!(ns.typ, XmlElementType::XmlNamespaceDecl) {
+        return;
+    }
 
-        if ns
-            .node
-            .is_some_and(|node| !matches!(node.element_type(), XmlElementType::XmlNamespaceDecl))
-        {
+    if ns
+        .node
+        .is_some_and(|node| !matches!(node.element_type(), XmlElementType::XmlNamespaceDecl))
+    {
+        unsafe {
             ns.free();
         }
     }
