@@ -9,7 +9,7 @@ use crate::{
     libxml::xpointer::{
         xml_xptr_new_range, xml_xptr_new_range_node_object, xml_xptr_wrap_location_set,
     },
-    tree::XmlGenericNodePtr,
+    tree::{XmlAttrPtr, XmlElementType, XmlGenericNodePtr, XmlNodePtr, XmlNsPtr},
     xpath::{
         XmlXPathError, XmlXPathOp, xml_xpath_location_set_filter, xml_xpath_node_set_filter,
         xml_xpath_node_set_keep_last,
@@ -17,18 +17,29 @@ use crate::{
 };
 
 use super::{
-    XPATH_MAX_RECURSION_DEPTH, XmlXPathContext, XmlXPathContextPtr, XmlXPathFunction,
-    XmlXPathObject, XmlXPathObjectPtr, XmlXPathObjectType, XmlXPathParserContext,
+    XPATH_MAX_RECURSION_DEPTH, XmlXPathAxisVal, XmlXPathContext, XmlXPathContextPtr,
+    XmlXPathFunction, XmlXPathNodeSetMergeFunction, XmlXPathObject, XmlXPathObjectPtr,
+    XmlXPathObjectType, XmlXPathParserContext, XmlXPathParserContextPtr, XmlXPathTestVal,
+    XmlXPathTraversalFunction, XmlXPathTypeVal,
     compile::XmlXPathStepOpPtr,
     functions::{xml_xpath_boolean_function, xml_xpath_number_function},
     xml_xpath_add_values, xml_xpath_cache_new_boolean, xml_xpath_cache_new_node_set,
-    xml_xpath_cache_object_copy, xml_xpath_cast_to_boolean, xml_xpath_compare_values,
+    xml_xpath_cache_object_copy, xml_xpath_cache_wrap_node_set, xml_xpath_cast_to_boolean,
+    xml_xpath_cmp_nodes_ext, xml_xpath_comp_op_eval_predicate, xml_xpath_compare_values,
     xml_xpath_div_values, xml_xpath_equal_values, xml_xpath_err,
-    xml_xpath_evaluate_predicate_result, xml_xpath_free_object, xml_xpath_mod_values,
-    xml_xpath_mult_values, xml_xpath_node_collect_and_test, xml_xpath_node_set_merge,
+    xml_xpath_evaluate_predicate_result, xml_xpath_free_node_set, xml_xpath_free_object,
+    xml_xpath_mod_values, xml_xpath_mult_values, xml_xpath_next_ancestor,
+    xml_xpath_next_ancestor_or_self, xml_xpath_next_attribute, xml_xpath_next_child,
+    xml_xpath_next_child_element, xml_xpath_next_descendant, xml_xpath_next_descendant_or_self,
+    xml_xpath_next_following, xml_xpath_next_following_sibling, xml_xpath_next_namespace,
+    xml_xpath_next_parent, xml_xpath_next_preceding_internal, xml_xpath_next_preceding_sibling,
+    xml_xpath_next_self, xml_xpath_node_set_create, xml_xpath_node_set_merge,
+    xml_xpath_node_set_merge_and_clear, xml_xpath_node_set_merge_and_clear_no_dupls,
     xml_xpath_not_equal_values, xml_xpath_release_object, xml_xpath_root, xml_xpath_sub_values,
     xml_xpath_value_flip_sign, xml_xpath_variable_lookup, xml_xpath_variable_lookup_ns,
 };
+
+type StepOpIndex = usize;
 
 impl XmlXPathParserContext {
     /// Adds opCount to the running total of operations and returns -1 if the
@@ -143,13 +154,10 @@ impl XmlXPathParserContext {
             }
             let old_depth: i32 = (*self.context).depth;
             if to_bool {
-                let last = self.comp.last as usize;
-                let op = &raw mut self.comp.steps[last];
-                return self.evaluate_precompiled_operation_to_boolean(op, false);
+                return self
+                    .evaluate_precompiled_operation_to_boolean(self.comp.last as usize, false);
             } else {
-                let last = self.comp.last as usize;
-                let op = &raw mut self.comp.steps[last];
-                self.evaluate_precompiled_operation(op);
+                self.evaluate_precompiled_operation(self.comp.last as usize);
             }
             (*self.context).depth = old_depth;
 
@@ -160,7 +168,7 @@ impl XmlXPathParserContext {
     /// Evaluate the Precompiled XPath operation
     /// Returns the number of nodes traversed
     #[doc(alias = "xmlXPathCompOpEval")]
-    unsafe fn evaluate_precompiled_operation(&mut self, op: XmlXPathStepOpPtr) -> i32 {
+    unsafe fn evaluate_precompiled_operation(&mut self, op: StepOpIndex) -> i32 {
         unsafe {
             let mut total: i32 = 0;
             let equal: i32;
@@ -182,11 +190,10 @@ impl XmlXPathParserContext {
                 return 0;
             }
             (*self.context).depth += 1;
-            match (*op).op {
+            match self.comp.steps[op].op {
                 XmlXPathOp::XPathOpEnd => {}
                 XmlXPathOp::XPathOpAnd => 'to_break: {
-                    let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
-                    total += self.evaluate_precompiled_operation(op1);
+                    total += self.evaluate_precompiled_operation(self.comp.steps[op].ch1 as usize);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
@@ -195,8 +202,7 @@ impl XmlXPathParserContext {
                         break 'to_break;
                     }
                     arg2 = self.value_pop();
-                    let op2 = &raw mut self.comp.steps[(*op).ch2 as usize];
-                    total += self.evaluate_precompiled_operation(op2);
+                    total += self.evaluate_precompiled_operation(self.comp.steps[op].ch2 as usize);
                     if self.error != 0 {
                         xml_xpath_free_object(arg2);
                         break 'to_break;
@@ -208,8 +214,7 @@ impl XmlXPathParserContext {
                     xml_xpath_release_object(self.context, arg2);
                 }
                 XmlXPathOp::XPathOpOr => 'to_break: {
-                    let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
-                    total += self.evaluate_precompiled_operation(op1);
+                    total += self.evaluate_precompiled_operation(self.comp.steps[op].ch1 as usize);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
@@ -218,8 +223,7 @@ impl XmlXPathParserContext {
                         break 'to_break;
                     }
                     arg2 = self.value_pop();
-                    let op2 = &raw mut self.comp.steps[(*op).ch2 as usize];
-                    total += self.evaluate_precompiled_operation(op2);
+                    total += self.evaluate_precompiled_operation(self.comp.steps[op].ch2 as usize);
                     if self.error != 0 {
                         xml_xpath_free_object(arg2);
                         break 'to_break;
@@ -231,17 +235,15 @@ impl XmlXPathParserContext {
                     xml_xpath_release_object(self.context, arg2);
                 }
                 XmlXPathOp::XPathOpEqual => {
-                    let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
-                    total += self.evaluate_precompiled_operation(op1);
+                    total += self.evaluate_precompiled_operation(self.comp.steps[op].ch1 as usize);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
-                    let op2 = &raw mut self.comp.steps[(*op).ch2 as usize];
-                    total += self.evaluate_precompiled_operation(op2);
+                    total += self.evaluate_precompiled_operation(self.comp.steps[op].ch2 as usize);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
-                    if (*op).value != 0 {
+                    if self.comp.steps[op].value != 0 {
                         equal = xml_xpath_equal_values(self);
                     } else {
                         equal = xml_xpath_not_equal_values(self);
@@ -249,39 +251,40 @@ impl XmlXPathParserContext {
                     self.value_push(xml_xpath_cache_new_boolean(self.context, equal != 0));
                 }
                 XmlXPathOp::XPathOpCmp => {
-                    let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
-                    total += self.evaluate_precompiled_operation(op1);
+                    total += self.evaluate_precompiled_operation(self.comp.steps[op].ch1 as usize);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
-                    let op2 = &raw mut self.comp.steps[(*op).ch2 as usize];
-                    total += self.evaluate_precompiled_operation(op2);
+                    total += self.evaluate_precompiled_operation(self.comp.steps[op].ch2 as usize);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
-                    ret = xml_xpath_compare_values(self, (*op).value, (*op).value2);
+                    ret = xml_xpath_compare_values(
+                        self,
+                        self.comp.steps[op].value,
+                        self.comp.steps[op].value2,
+                    );
                     self.value_push(xml_xpath_cache_new_boolean(self.context, ret != 0));
                 }
                 XmlXPathOp::XPathOpPlus => {
-                    let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
-                    total += self.evaluate_precompiled_operation(op1);
+                    total += self.evaluate_precompiled_operation(self.comp.steps[op].ch1 as usize);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
-                    if (*op).ch2 != -1 {
-                        let op2 = &raw mut self.comp.steps[(*op).ch2 as usize];
-                        total += self.evaluate_precompiled_operation(op2);
+                    if self.comp.steps[op].ch2 != -1 {
+                        total +=
+                            self.evaluate_precompiled_operation(self.comp.steps[op].ch2 as usize);
                     }
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
-                    if (*op).value == 0 {
+                    if self.comp.steps[op].value == 0 {
                         xml_xpath_sub_values(self);
-                    } else if (*op).value == 1 {
+                    } else if self.comp.steps[op].value == 1 {
                         xml_xpath_add_values(self);
-                    } else if (*op).value == 2 {
+                    } else if self.comp.steps[op].value == 2 {
                         xml_xpath_value_flip_sign(self);
-                    } else if (*op).value == 3 {
+                    } else if self.comp.steps[op].value == 3 {
                         if self
                             .value()
                             .is_some_and(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
@@ -298,32 +301,28 @@ impl XmlXPathParserContext {
                     }
                 }
                 XmlXPathOp::XPathOpMult => {
-                    let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
-                    total += self.evaluate_precompiled_operation(op1);
+                    total += self.evaluate_precompiled_operation(self.comp.steps[op].ch1 as usize);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
-                    let op2 = &raw mut self.comp.steps[(*op).ch2 as usize];
-                    total += self.evaluate_precompiled_operation(op2);
+                    total += self.evaluate_precompiled_operation(self.comp.steps[op].ch2 as usize);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
-                    if (*op).value == 0 {
+                    if self.comp.steps[op].value == 0 {
                         xml_xpath_mult_values(self);
-                    } else if (*op).value == 1 {
+                    } else if self.comp.steps[op].value == 1 {
                         xml_xpath_div_values(self);
-                    } else if (*op).value == 2 {
+                    } else if self.comp.steps[op].value == 2 {
                         xml_xpath_mod_values(self);
                     }
                 }
                 XmlXPathOp::XPathOpUnion => 'to_break: {
-                    let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
-                    total += self.evaluate_precompiled_operation(op1);
+                    total += self.evaluate_precompiled_operation(self.comp.steps[op].ch1 as usize);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
-                    let op2 = &raw mut self.comp.steps[(*op).ch2 as usize];
-                    total += self.evaluate_precompiled_operation(op2);
+                    total += self.evaluate_precompiled_operation(self.comp.steps[op].ch2 as usize);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
@@ -374,16 +373,16 @@ impl XmlXPathParserContext {
                     xml_xpath_root(self);
                 }
                 XmlXPathOp::XPathOpNode => {
-                    if (*op).ch1 != -1 {
-                        let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
-                        total += self.evaluate_precompiled_operation(op1);
+                    if self.comp.steps[op].ch1 != -1 {
+                        total +=
+                            self.evaluate_precompiled_operation(self.comp.steps[op].ch1 as usize);
                     }
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
-                    if (*op).ch2 != -1 {
-                        let op2 = &raw mut self.comp.steps[(*op).ch2 as usize];
-                        total += self.evaluate_precompiled_operation(op2);
+                    if self.comp.steps[op].ch2 != -1 {
+                        total +=
+                            self.evaluate_precompiled_operation(self.comp.steps[op].ch2 as usize);
                     }
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
@@ -394,11 +393,10 @@ impl XmlXPathParserContext {
                     ));
                 }
                 XmlXPathOp::XPathOpCollect => 'to_break: {
-                    if (*op).ch1 == -1 {
+                    if self.comp.steps[op].ch1 == -1 {
                         break 'to_break;
                     }
-                    let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
-                    total += self.evaluate_precompiled_operation(op1);
+                    total += self.evaluate_precompiled_operation(self.comp.steps[op].ch1 as usize);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
@@ -408,18 +406,31 @@ impl XmlXPathParserContext {
                 XmlXPathOp::XPathOpValue => {
                     self.value_push(xml_xpath_cache_object_copy(
                         self.context,
-                        (*op).value4.as_ref().unwrap().as_object().unwrap(),
+                        self.comp.steps[op]
+                            .value4
+                            .as_ref()
+                            .unwrap()
+                            .as_object()
+                            .unwrap(),
                     ));
                 }
                 XmlXPathOp::XPathOpVariable => 'to_break: {
                     let val: XmlXPathObjectPtr;
-                    if (*op).ch1 != -1 {
-                        let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
-                        total += self.evaluate_precompiled_operation(op1);
+                    if self.comp.steps[op].ch1 != -1 {
+                        total +=
+                            self.evaluate_precompiled_operation(self.comp.steps[op].ch1 as usize);
                     }
-                    if let Some(value5) = (*op).value5.as_ref().and_then(|val| val.as_str()) {
+                    if let Some(value5) = self.comp.steps[op]
+                        .value5
+                        .as_ref()
+                        .and_then(|val| val.as_str())
+                    {
                         let uri = (*self.context).lookup_ns(value5);
-                        let value4 = (*op).value4.as_ref().and_then(|val| val.as_str()).unwrap();
+                        let value4 = self.comp.steps[op]
+                            .value4
+                            .as_ref()
+                            .and_then(|val| val.as_str())
+                            .unwrap();
                         let Some(uri) = uri else {
                             generic_error!(
                                 "xmlXPathCompOpEval: variable {} bound to undefined prefix {}\n",
@@ -439,7 +450,11 @@ impl XmlXPathParserContext {
                         }
                         self.value_push(val);
                     } else {
-                        let value4 = (*op).value4.as_ref().and_then(|val| val.as_str()).unwrap();
+                        let value4 = self.comp.steps[op]
+                            .value4
+                            .as_ref()
+                            .and_then(|val| val.as_str())
+                            .unwrap();
                         val = xml_xpath_variable_lookup(self.context, value4);
                         if val.is_null() {
                             xml_xpath_err(
@@ -454,33 +469,39 @@ impl XmlXPathParserContext {
                 XmlXPathOp::XPathOpFunction => 'to_break: {
                     let func: XmlXPathFunction;
                     let frame = self.value_tab.len();
-                    if (*op).ch1 != -1 {
-                        let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
-                        total += self.evaluate_precompiled_operation(op1);
+                    if self.comp.steps[op].ch1 != -1 {
+                        total +=
+                            self.evaluate_precompiled_operation(self.comp.steps[op].ch1 as usize);
                         if self.error != XmlXPathError::XPathExpressionOK as i32 {
                             break 'to_break;
                         }
                     }
-                    if self.value_tab.len() < frame + (*op).value as usize {
+                    if self.value_tab.len() < frame + self.comp.steps[op].value as usize {
                         generic_error!("xmlXPathCompOpEval: parameter error\n");
                         self.error = XmlXPathError::XPathInvalidOperand as i32;
                         break 'to_break;
                     }
-                    for i in 0..(*op).value {
+                    for i in 0..self.comp.steps[op].value {
                         if self.value_tab[(self.value_tab.len() - 1) - i as usize].is_null() {
                             generic_error!("xmlXPathCompOpEval: parameter error\n");
                             self.error = XmlXPathError::XPathInvalidOperand as i32;
                             break;
                         }
                     }
-                    if let Some(cache) = (*op).cache {
+                    if let Some(cache) = self.comp.steps[op].cache {
                         func = cache;
                     } else {
                         let mut uri = None;
 
-                        let value4 = (*op).value4.as_ref().and_then(|val| val.as_str()).unwrap();
-                        let f = if let Some(value5) =
-                            (*op).value5.as_ref().and_then(|val| val.as_str())
+                        let value4 = self.comp.steps[op]
+                            .value4
+                            .as_ref()
+                            .and_then(|val| val.as_str())
+                            .unwrap();
+                        let f = if let Some(value5) = self.comp.steps[op]
+                            .value5
+                            .as_ref()
+                            .and_then(|val| val.as_str())
                         {
                             uri = (*self.context).lookup_ns(value5);
                             let Some(uri) = uri.as_deref() else {
@@ -504,16 +525,25 @@ impl XmlXPathParserContext {
                             return 0;
                         }
 
-                        (*op).cache = Some(func);
-                        (*op).cache_uri = uri;
+                        self.comp.steps[op].cache = Some(func);
+                        self.comp.steps[op].cache_uri = uri;
                     }
 
                     let old_func = (*self.context).function.take();
-                    let old_func_uri =
-                        replace(&mut (*self.context).function_uri, (*op).cache_uri.clone());
-                    (*self.context).function =
-                        Some((*op).value4.as_ref().unwrap().as_str().unwrap().into());
-                    func(self, (*op).value as usize);
+                    let old_func_uri = replace(
+                        &mut (*self.context).function_uri,
+                        self.comp.steps[op].cache_uri.clone(),
+                    );
+                    (*self.context).function = Some(
+                        self.comp.steps[op]
+                            .value4
+                            .as_ref()
+                            .unwrap()
+                            .as_str()
+                            .unwrap()
+                            .into(),
+                    );
+                    func(self, self.comp.steps[op].value as usize);
                     (*self.context).function = old_func;
                     (*self.context).function_uri = old_func_uri;
                     if self.error == XmlXPathError::XPathExpressionOK as i32
@@ -524,16 +554,16 @@ impl XmlXPathParserContext {
                     }
                 }
                 XmlXPathOp::XPathOpArg => {
-                    if (*op).ch1 != -1 {
-                        let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
-                        total += self.evaluate_precompiled_operation(op1);
+                    if self.comp.steps[op].ch1 != -1 {
+                        total +=
+                            self.evaluate_precompiled_operation(self.comp.steps[op].ch1 as usize);
                         if self.error != XmlXPathError::XPathExpressionOK as i32 {
                             return 0;
                         };
                     }
-                    if (*op).ch2 != -1 {
-                        let op2 = &raw mut self.comp.steps[(*op).ch2 as usize];
-                        total += self.evaluate_precompiled_operation(op2);
+                    if self.comp.steps[op].ch2 != -1 {
+                        total +=
+                            self.evaluate_precompiled_operation(self.comp.steps[op].ch2 as usize);
                         if self.error != XmlXPathError::XPathExpressionOK as i32 {
                             return 0;
                         };
@@ -541,8 +571,8 @@ impl XmlXPathParserContext {
                 }
                 XmlXPathOp::XPathOpPredicate | XmlXPathOp::XPathOpFilter => 'to_break: {
                     // Optimization for ()[1] selection i.e. the first elem
-                    if (*op).ch1 != -1
-                        && (*op).ch2 != -1
+                    if self.comp.steps[op].ch1 != -1
+                        && self.comp.steps[op].ch2 != -1
                         // FILTER TODO: Can we assume that the inner processing
                         // will result in an ordered list if we have an
                         // XPATH_OP_FILTER?
@@ -551,15 +581,15 @@ impl XmlXPathParserContext {
                         // to assume anything, so it would be more robust and
                         // easier to optimize.
                         && (matches!(
-                            self.comp.steps[(*op).ch1 as usize].op,
+                            self.comp.steps[self.comp.steps[op].ch1 as usize].op,
                             XmlXPathOp::XPathOpSort // 18
                         ) || matches!(
-                            self.comp.steps[(*op).ch1 as usize].op,
+                            self.comp.steps[self.comp.steps[op].ch1 as usize].op,
                             XmlXPathOp::XPathOpFilter // 17
                         )) && matches!(
-                            self.comp.steps[(*op).ch2 as usize].op,
+                            self.comp.steps[self.comp.steps[op].ch2 as usize].op,
                             XmlXPathOp::XPathOpValue // 12
-                        ) && self.comp.steps[(*op).ch2 as usize]
+                        ) && self.comp.steps[self.comp.steps[op].ch2 as usize]
                             .value4
                             .as_ref()
                             .and_then(|val| val.as_object())
@@ -569,8 +599,10 @@ impl XmlXPathParserContext {
                     {
                         let mut first = None;
 
-                        let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
-                        total += self.evaluate_precompiled_operation_first(op1, &mut first);
+                        total += self.evaluate_precompiled_operation_first(
+                            self.comp.steps[op].ch1 as usize,
+                            &mut first,
+                        );
                         if self.error != XmlXPathError::XPathExpressionOK as i32 {
                             return 0;
                         };
@@ -590,18 +622,18 @@ impl XmlXPathParserContext {
                         break 'to_break;
                     }
                     // Optimization for ()[last()] selection i.e. the last elem
-                    if (*op).ch1 != -1
-                        && (*op).ch2 != -1
+                    if self.comp.steps[op].ch1 != -1
+                        && self.comp.steps[op].ch2 != -1
                         && matches!(
-                            self.comp.steps[(*op).ch1 as usize].op,
+                            self.comp.steps[self.comp.steps[op].ch1 as usize].op,
                             XmlXPathOp::XPathOpSort
                         )
                         && matches!(
-                            self.comp.steps[(*op).ch2 as usize].op,
+                            self.comp.steps[self.comp.steps[op].ch2 as usize].op,
                             XmlXPathOp::XPathOpSort
                         )
                     {
-                        let f: i32 = self.comp.steps[(*op).ch2 as usize].ch1;
+                        let f: i32 = self.comp.steps[self.comp.steps[op].ch2 as usize].ch1;
 
                         if f != -1
                             && matches!(self.comp.steps[f as usize].op, XmlXPathOp::XPathOpFunction)
@@ -615,8 +647,10 @@ impl XmlXPathParserContext {
                         {
                             let mut last = None;
 
-                            let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
-                            total += self.evaluate_precompiled_operation_last(op1, &mut last);
+                            total += self.evaluate_precompiled_operation_last(
+                                self.comp.steps[op].ch1 as usize,
+                                &mut last,
+                            );
                             if self.error != XmlXPathError::XPathExpressionOK as i32 {
                                 return 0;
                             };
@@ -644,14 +678,14 @@ impl XmlXPathParserContext {
                     //         COLLECT  'parent' 'name' 'node' book
                     //           NODE
                     //     ELEM Object is a number : 1
-                    if (*op).ch1 != -1 {
-                        let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
-                        total += self.evaluate_precompiled_operation(op1);
+                    if self.comp.steps[op].ch1 != -1 {
+                        total +=
+                            self.evaluate_precompiled_operation(self.comp.steps[op].ch1 as usize);
                     }
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
-                    if (*op).ch2 == -1 {
+                    if self.comp.steps[op].ch2 == -1 {
                         break 'to_break;
                     }
 
@@ -670,7 +704,7 @@ impl XmlXPathParserContext {
                             xml_xpath_location_set_filter(
                                 self,
                                 locset,
-                                (*op).ch2,
+                                self.comp.steps[op].ch2,
                                 1,
                                 locset.loc_tab.len() as i32,
                             );
@@ -694,14 +728,21 @@ impl XmlXPathParserContext {
                     let obj: XmlXPathObjectPtr = self.value_pop();
                     if let Some(set) = (*obj).nodesetval.as_deref_mut() {
                         let max_pos = set.len() as i32;
-                        xml_xpath_node_set_filter(self, Some(set), (*op).ch2, 1, max_pos, true);
+                        xml_xpath_node_set_filter(
+                            self,
+                            Some(set),
+                            self.comp.steps[op].ch2,
+                            1,
+                            max_pos,
+                            true,
+                        );
                     }
                     self.value_push(obj);
                 }
                 XmlXPathOp::XPathOpSort => {
-                    if (*op).ch1 != -1 {
-                        let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
-                        total += self.evaluate_precompiled_operation(op1);
+                    if self.comp.steps[op].ch1 != -1 {
+                        total +=
+                            self.evaluate_precompiled_operation(self.comp.steps[op].ch1 as usize);
                     }
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
@@ -729,9 +770,9 @@ impl XmlXPathParserContext {
                     let oldcs: i32 = (*self.context).context_size;
                     let oldpp: i32 = (*self.context).proximity_position;
 
-                    if (*op).ch1 != -1 {
-                        let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
-                        total += self.evaluate_precompiled_operation(op1);
+                    if self.comp.steps[op].ch1 != -1 {
+                        total +=
+                            self.evaluate_precompiled_operation(self.comp.steps[op].ch1 as usize);
                         if self.error != XmlXPathError::XPathExpressionOK as i32 {
                             return 0;
                         };
@@ -740,7 +781,7 @@ impl XmlXPathParserContext {
                         xml_xpath_err(Some(self), XmlXPathError::XPathInvalidOperand as i32);
                         return 0;
                     }
-                    if (*op).ch2 == -1 {
+                    if self.comp.steps[op].ch2 == -1 {
                         break 'to_break;
                     }
 
@@ -791,9 +832,10 @@ impl XmlXPathParserContext {
                                 );
                                 self.value_push(tmp);
 
-                                if (*op).ch2 != -1 {
-                                    let op2 = &raw mut self.comp.steps[(*op).ch2 as usize];
-                                    total += self.evaluate_precompiled_operation(op2);
+                                if self.comp.steps[op].ch2 != -1 {
+                                    total += self.evaluate_precompiled_operation(
+                                        self.comp.steps[op].ch2 as usize,
+                                    );
                                 }
                                 if self.error != XmlXPathError::XPathExpressionOK as i32 {
                                     break 'rangeto_error;
@@ -867,9 +909,10 @@ impl XmlXPathParserContext {
                                     );
                                     self.value_push(tmp);
 
-                                    if (*op).ch2 != -1 {
-                                        let op2 = &raw mut self.comp.steps[(*op).ch2 as usize];
-                                        total += self.evaluate_precompiled_operation(op2);
+                                    if self.comp.steps[op].ch2 != -1 {
+                                        total += self.evaluate_precompiled_operation(
+                                            self.comp.steps[op].ch2 as usize,
+                                        );
                                     }
                                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                                         break 'rangeto_error;
@@ -914,7 +957,7 @@ impl XmlXPathParserContext {
     #[doc(alias = "xmlXPathCompOpEvalFirst")]
     unsafe fn evaluate_precompiled_operation_first(
         &mut self,
-        op: XmlXPathStepOpPtr,
+        op: StepOpIndex,
         first: &mut Option<XmlGenericNodePtr>,
     ) -> i32 {
         unsafe {
@@ -938,11 +981,13 @@ impl XmlXPathParserContext {
                 return 0;
             }
             (*self.context).depth += 1;
-            match (*op).op {
+            match self.comp.steps[op].op {
                 XmlXPathOp::XPathOpEnd => {}
                 XmlXPathOp::XPathOpUnion => {
-                    let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
-                    total = self.evaluate_precompiled_operation_first(op1, first);
+                    total = self.evaluate_precompiled_operation_first(
+                        self.comp.steps[op].ch1 as usize,
+                        first,
+                    );
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
@@ -967,8 +1012,11 @@ impl XmlXPathParserContext {
                             *first = Some(nodeset.node_tab[0]);
                         }
                     }
-                    let op2 = &raw mut self.comp.steps[(*op).ch2 as usize];
-                    cur = self.evaluate_precompiled_operation_first(op2, first);
+
+                    cur = self.evaluate_precompiled_operation_first(
+                        self.comp.steps[op].ch2 as usize,
+                        first,
+                    );
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
@@ -1007,7 +1055,7 @@ impl XmlXPathParserContext {
                         xml_xpath_release_object(self.context, arg2);
                         // optimizer
                         if total > cur {
-                            (*op).swap_children();
+                            self.comp.steps[op].swap_children();
                         }
                         total += cur;
                     }
@@ -1016,16 +1064,16 @@ impl XmlXPathParserContext {
                     xml_xpath_root(self);
                 }
                 XmlXPathOp::XPathOpNode => {
-                    if (*op).ch1 != -1 {
-                        let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
-                        total += self.evaluate_precompiled_operation(op1);
+                    if self.comp.steps[op].ch1 != -1 {
+                        total +=
+                            self.evaluate_precompiled_operation(self.comp.steps[op].ch1 as usize);
                     }
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
-                    if (*op).ch2 != -1 {
-                        let op2 = &raw mut self.comp.steps[(*op).ch2 as usize];
-                        total += self.evaluate_precompiled_operation(op2);
+                    if self.comp.steps[op].ch2 != -1 {
+                        total +=
+                            self.evaluate_precompiled_operation(self.comp.steps[op].ch2 as usize);
                     }
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
@@ -1036,11 +1084,11 @@ impl XmlXPathParserContext {
                     ));
                 }
                 XmlXPathOp::XPathOpCollect => {
-                    if (*op).ch1 == -1 {
+                    if self.comp.steps[op].ch1 == -1 {
                         // break;
                     } else {
-                        let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
-                        total = self.evaluate_precompiled_operation(op1);
+                        total =
+                            self.evaluate_precompiled_operation(self.comp.steps[op].ch1 as usize);
                         if self.error != XmlXPathError::XPathExpressionOK as i32 {
                             return 0;
                         };
@@ -1050,7 +1098,7 @@ impl XmlXPathParserContext {
                 XmlXPathOp::XPathOpValue => {
                     self.value_push(xml_xpath_cache_object_copy(
                         self.context,
-                        (*op)
+                        self.comp.steps[op]
                             .value4
                             .as_ref()
                             .and_then(|val| val.as_object())
@@ -1058,9 +1106,11 @@ impl XmlXPathParserContext {
                     ));
                 }
                 XmlXPathOp::XPathOpSort => {
-                    if (*op).ch1 != -1 {
-                        let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
-                        total += self.evaluate_precompiled_operation_first(op1, first);
+                    if self.comp.steps[op].ch1 != -1 {
+                        total += self.evaluate_precompiled_operation_first(
+                            self.comp.steps[op].ch1 as usize,
+                            first,
+                        );
                     }
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
@@ -1098,7 +1148,7 @@ impl XmlXPathParserContext {
     #[doc(alias = "xmlXPathCompOpEvalLast")]
     unsafe fn evaluate_precompiled_operation_last(
         &mut self,
-        op: XmlXPathStepOpPtr,
+        op: StepOpIndex,
         last: &mut Option<XmlGenericNodePtr>,
     ) -> i32 {
         unsafe {
@@ -1121,11 +1171,13 @@ impl XmlXPathParserContext {
                 return 0;
             }
             (*self.context).depth += 1;
-            match (*op).op {
+            match self.comp.steps[op].op {
                 XmlXPathOp::XPathOpEnd => {}
                 XmlXPathOp::XPathOpUnion => {
-                    let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
-                    total = self.evaluate_precompiled_operation_last(op1, last);
+                    total = self.evaluate_precompiled_operation_last(
+                        self.comp.steps[op].ch1 as usize,
+                        last,
+                    );
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
@@ -1143,8 +1195,11 @@ impl XmlXPathParserContext {
                             }
                         }
                     }
-                    let op2 = &raw mut self.comp.steps[(*op).ch2 as usize];
-                    cur = self.evaluate_precompiled_operation_last(op2, last);
+
+                    cur = self.evaluate_precompiled_operation_last(
+                        self.comp.steps[op].ch2 as usize,
+                        last,
+                    );
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
@@ -1193,7 +1248,7 @@ impl XmlXPathParserContext {
                         xml_xpath_release_object(self.context, arg2);
                         // optimizer
                         if total > cur {
-                            (*op).swap_children();
+                            self.comp.steps[op].swap_children();
                         }
                         total += cur;
                     }
@@ -1202,16 +1257,16 @@ impl XmlXPathParserContext {
                     xml_xpath_root(self);
                 }
                 XmlXPathOp::XPathOpNode => {
-                    if (*op).ch1 != -1 {
-                        let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
-                        total += self.evaluate_precompiled_operation(op1);
+                    if self.comp.steps[op].ch1 != -1 {
+                        total +=
+                            self.evaluate_precompiled_operation(self.comp.steps[op].ch1 as usize);
                     }
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
-                    if (*op).ch2 != -1 {
-                        let op2 = &raw mut self.comp.steps[(*op).ch2 as usize];
-                        total += self.evaluate_precompiled_operation(op2);
+                    if self.comp.steps[op].ch2 != -1 {
+                        total +=
+                            self.evaluate_precompiled_operation(self.comp.steps[op].ch2 as usize);
                     }
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
@@ -1222,11 +1277,11 @@ impl XmlXPathParserContext {
                     ));
                 }
                 XmlXPathOp::XPathOpCollect => {
-                    if (*op).ch1 == -1 {
+                    if self.comp.steps[op].ch1 == -1 {
                         // break;
                     } else {
-                        let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
-                        total += self.evaluate_precompiled_operation(op1);
+                        total +=
+                            self.evaluate_precompiled_operation(self.comp.steps[op].ch1 as usize);
                         if self.error != XmlXPathError::XPathExpressionOK as i32 {
                             return 0;
                         };
@@ -1236,7 +1291,7 @@ impl XmlXPathParserContext {
                 XmlXPathOp::XPathOpValue => {
                     self.value_push(xml_xpath_cache_object_copy(
                         self.context,
-                        (*op)
+                        self.comp.steps[op]
                             .value4
                             .as_ref()
                             .and_then(|val| val.as_object())
@@ -1244,9 +1299,11 @@ impl XmlXPathParserContext {
                     ));
                 }
                 XmlXPathOp::XPathOpSort => {
-                    if (*op).ch1 != -1 {
-                        let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
-                        total += self.evaluate_precompiled_operation_last(op1, last);
+                    if self.comp.steps[op].ch1 != -1 {
+                        total += self.evaluate_precompiled_operation_last(
+                            self.comp.steps[op].ch1 as usize,
+                            last,
+                        );
                     }
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
@@ -1277,7 +1334,7 @@ impl XmlXPathParserContext {
     #[doc(alias = "xmlXPathCompOpEvalFilterFirst")]
     unsafe fn evaluate_precompiled_operation_filter_first(
         &mut self,
-        op: XmlXPathStepOpPtr,
+        op: StepOpIndex,
         first: &mut Option<XmlGenericNodePtr>,
     ) -> i32 {
         unsafe {
@@ -1287,18 +1344,18 @@ impl XmlXPathParserContext {
                 return 0;
             };
             // Optimization for ()[last()] selection i.e. the last elem
-            if (*op).ch1 != -1
-                && (*op).ch2 != -1
+            if self.comp.steps[op].ch1 != -1
+                && self.comp.steps[op].ch2 != -1
                 && matches!(
-                    self.comp.steps[(*op).ch1 as usize].op,
+                    self.comp.steps[self.comp.steps[op].ch1 as usize].op,
                     XmlXPathOp::XPathOpSort
                 )
                 && matches!(
-                    self.comp.steps[(*op).ch2 as usize].op,
+                    self.comp.steps[self.comp.steps[op].ch2 as usize].op,
                     XmlXPathOp::XPathOpSort
                 )
             {
-                let f: i32 = self.comp.steps[(*op).ch2 as usize].ch1;
+                let f: i32 = self.comp.steps[self.comp.steps[op].ch2 as usize].ch1;
 
                 if f != -1
                     && matches!(self.comp.steps[f as usize].op, XmlXPathOp::XPathOpFunction)
@@ -1312,8 +1369,10 @@ impl XmlXPathParserContext {
                 {
                     let mut last = None;
 
-                    let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
-                    total += self.evaluate_precompiled_operation_last(op1, &mut last);
+                    total += self.evaluate_precompiled_operation_last(
+                        self.comp.steps[op].ch1 as usize,
+                        &mut last,
+                    );
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
@@ -1336,14 +1395,13 @@ impl XmlXPathParserContext {
                 }
             }
 
-            if (*op).ch1 != -1 {
-                let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
-                total += self.evaluate_precompiled_operation(op1);
+            if self.comp.steps[op].ch1 != -1 {
+                total += self.evaluate_precompiled_operation(self.comp.steps[op].ch1 as usize);
             }
             if self.error != XmlXPathError::XPathExpressionOK as i32 {
                 return 0;
             };
-            if (*op).ch2 == -1 {
+            if self.comp.steps[op].ch2 == -1 {
                 return total;
             }
             if self.value().is_none() {
@@ -1362,7 +1420,7 @@ impl XmlXPathParserContext {
                         .as_mut()
                         .and_then(|user| user.as_location_set_mut())
                     {
-                        xml_xpath_location_set_filter(self, locset, (*op).ch2, 1, 1);
+                        xml_xpath_location_set_filter(self, locset, self.comp.steps[op].ch2, 1, 1);
                         if !locset.loc_tab.is_empty() {
                             *first = locset.loc_tab[0]
                                 .user
@@ -1388,7 +1446,7 @@ impl XmlXPathParserContext {
             };
             let obj: XmlXPathObjectPtr = self.value_pop();
             if let Some(set) = (*obj).nodesetval.as_deref_mut() {
-                xml_xpath_node_set_filter(self, Some(set), (*op).ch2, 1, 1, true);
+                xml_xpath_node_set_filter(self, Some(set), self.comp.steps[op].ch2, 1, 1, true);
                 if !set.node_tab.is_empty() {
                     *first = Some(set.node_tab[0]);
                 }
@@ -1405,7 +1463,7 @@ impl XmlXPathParserContext {
     #[doc(alias = "xmlXPathCompOpEvalToBoolean")]
     pub(super) unsafe fn evaluate_precompiled_operation_to_boolean(
         &mut self,
-        mut op: XmlXPathStepOpPtr,
+        mut op: StepOpIndex,
         is_predicate: bool,
     ) -> i32 {
         unsafe {
@@ -1417,12 +1475,12 @@ impl XmlXPathParserContext {
                     return 0;
                 }
                 // comp = self.comp;
-                match (*op).op {
+                match self.comp.steps[op].op {
                     XmlXPathOp::XPathOpEnd => {
                         return 0;
                     }
                     XmlXPathOp::XPathOpValue => {
-                        let res_obj = (*op)
+                        let res_obj = self.comp.steps[op]
                             .value4
                             .as_ref()
                             .and_then(|val| val.as_object())
@@ -1434,20 +1492,19 @@ impl XmlXPathParserContext {
                     }
                     XmlXPathOp::XPathOpSort => {
                         // We don't need sorting for boolean results. Skip this one.
-                        if (*op).ch1 != -1 {
-                            op = &raw mut self.comp.steps[(*op).ch1 as usize];
+                        if self.comp.steps[op].ch1 != -1 {
+                            op = self.comp.steps[op].ch1 as usize;
                             // goto start;
                             continue;
                         }
                         return 0;
                     }
                     XmlXPathOp::XPathOpCollect => {
-                        if (*op).ch1 == -1 {
+                        if self.comp.steps[op].ch1 == -1 {
                             return 0;
                         }
 
-                        let step = &raw mut self.comp.steps[(*op).ch1 as usize];
-                        self.evaluate_precompiled_operation(step);
+                        self.evaluate_precompiled_operation(self.comp.steps[op].ch1 as usize);
                         if self.error != XmlXPathError::XPathExpressionOK as i32 {
                             return -1;
                         }
@@ -1811,5 +1868,639 @@ impl XmlXPathContext {
             }
         }
         false
+    }
+}
+
+macro_rules! axis_range_end {
+    ($out_seq:expr, $seq:expr, $merge_and_clear:ident, $to_bool:expr, $label:tt) => {
+        // We have a "/foo[n]", and position() = n was reached.
+        // Note that we can have as well "/foo/::parent::foo[1]", so
+        // a duplicate-aware merge is still needed.
+        // Merge with the result.
+        if $out_seq.is_none() {
+            $out_seq = $seq;
+            $seq = None;
+        } else {
+            // TODO: Check memory error.
+            $out_seq = $merge_and_clear($out_seq, $seq.as_deref_mut());
+        }
+        // Break if only a true/false result was requested.
+        if $to_bool != 0 {
+            break $label;
+        }
+        continue $label;
+    }
+}
+
+macro_rules! first_hit {
+    ($out_seq:expr, $seq:expr, $merge_and_clear:expr, $label:tt) => {
+        // Break if only a true/false result was requested and
+        // no predicates existed and a node test succeeded.
+        if $out_seq.is_none() {
+            $out_seq = $seq;
+            $seq = None;
+        } else {
+            // TODO: Check memory error.
+            $out_seq = $merge_and_clear($out_seq, $seq.as_deref_mut());
+        }
+        break $label;
+    };
+}
+
+macro_rules! xp_test_hit {
+    (
+        $has_axis_range:expr,
+        $pos:expr,
+        $max_pos:expr,
+        $seq:expr,
+        $cur:expr,
+        $ctxt:expr,
+        $out_seq:expr,
+        $merge_and_clear:ident,
+        $to_bool:expr,
+        $break_on_first_hit:expr,
+        $label:tt
+    ) => {
+        if $has_axis_range != 0 {
+            $pos += 1;
+            if $pos == $max_pos {
+                if $seq.as_deref_mut().map_or(-1, |seq| seq.add_unique($cur)) < 0 {
+                    (*$ctxt).error = XmlXPathError::XPathMemoryError as i32;
+                }
+                axis_range_end!($out_seq, $seq, $merge_and_clear, $to_bool, $label);
+            }
+        } else {
+            if $seq.as_deref_mut().map_or(-1, |seq| seq.add_unique($cur)) < 0 {
+                (*$ctxt).error = XmlXPathError::XPathMemoryError as i32;
+            }
+            if $break_on_first_hit != 0 {
+                first_hit!($out_seq, $seq, $merge_and_clear, $label);
+            }
+        }
+    };
+}
+
+macro_rules! xp_test_hit_ns {
+    (
+        $has_axis_range:expr,
+        $pos:expr,
+        $max_pos:expr,
+        $has_ns_nodes:expr,
+        $seq:expr,
+        $xpctxt:expr,
+        $cur:expr,
+        $ctxt:expr,
+        $out_seq:expr,
+        $merge_and_clear:ident,
+        $to_bool:expr,
+        $break_on_first_hit:expr,
+        $label:tt
+    ) => {
+        #[allow(unused_assignments)]
+        if $has_axis_range != 0 {
+            $pos += 1;
+            if $pos == $max_pos {
+                $has_ns_nodes = true;
+                if $seq.as_deref_mut().map_or(-1, |seq| {
+                    seq.add_ns(
+                        XmlNodePtr::try_from((*$xpctxt).node.unwrap()).unwrap(),
+                        XmlNsPtr::try_from($cur).unwrap(),
+                    )
+                }) < 0
+                {
+                    (*$ctxt).error = XmlXPathError::XPathMemoryError as i32;
+                }
+                axis_range_end!($out_seq, $seq, $merge_and_clear, $to_bool, $label);
+            }
+        } else {
+            $has_ns_nodes = true;
+            if $seq.as_deref_mut().map_or(-1, |seq| {
+                seq.add_ns(
+                    XmlNodePtr::try_from((*$xpctxt).node.unwrap()).unwrap(),
+                    XmlNsPtr::try_from($cur).unwrap(),
+                )
+            }) < 0
+            {
+                (*$ctxt).error = XmlXPathError::XPathMemoryError as i32;
+            }
+            if $break_on_first_hit != 0 {
+                first_hit!($out_seq, $seq, $merge_and_clear, $label);
+            }
+        }
+    };
+}
+
+#[doc(alias = "xmlXPathNodeCollectAndTest")]
+pub(super) unsafe fn xml_xpath_node_collect_and_test(
+    ctxt: XmlXPathParserContextPtr,
+    op: StepOpIndex,
+    mut first: Option<&mut Option<XmlGenericNodePtr>>,
+    mut last: Option<&mut Option<XmlGenericNodePtr>>,
+    to_bool: i32,
+) -> i32 {
+    unsafe {
+        let axis: XmlXPathAxisVal = (*ctxt).comp.steps[op].value.try_into().unwrap();
+        let test: XmlXPathTestVal = (*ctxt).comp.steps[op].value2.try_into().unwrap();
+        let typ: XmlXPathTypeVal = (*ctxt).comp.steps[op].value3.try_into().unwrap();
+        let prefix = (*ctxt).comp.steps[op]
+            .value4
+            .as_ref()
+            .and_then(|val| val.as_str());
+        let name = (*ctxt).comp.steps[op]
+            .value5
+            .as_ref()
+            .and_then(|val| val.as_str());
+        let mut uri = None;
+        let mut total: i32 = 0;
+        let mut has_ns_nodes: bool;
+
+        // First predicate operator
+        let mut pred_op: XmlXPathStepOpPtr;
+        let mut max_pos: i32; /* The requested position() (when a "[n]" predicate) */
+        let mut has_predicate_range: i32;
+        let mut has_axis_range: i32;
+        let mut pos: i32;
+
+        let next: Option<XmlXPathTraversalFunction>;
+        let xpctxt: XmlXPathContextPtr = (*ctxt).context;
+
+        if (*ctxt)
+            .value()
+            .is_none_or(|value| (*value).typ != (XmlXPathObjectType::XPathNodeset))
+        {
+            xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathInvalidType as i32);
+            return 0;
+        };
+        // The popped object holding the context nodes
+        let obj: XmlXPathObjectPtr = (*ctxt).value_pop();
+        // Setup namespaces.
+        if let Some(prefix) = prefix {
+            uri = (*xpctxt).lookup_ns(prefix);
+            if uri.is_none() {
+                xml_xpath_release_object(xpctxt, obj);
+                xml_xpath_err(
+                    Some(&mut *ctxt),
+                    XmlXPathError::XPathUndefPrefixError as i32,
+                );
+                return 0;
+            }
+        }
+        // Setup axis.
+        //
+        // MAYBE FUTURE TODO: merging optimizations:
+        // - If the nodes to be traversed wrt to the initial nodes and
+        //   the current axis cannot overlap, then we could avoid searching
+        //   for duplicates during the merge.
+        //   But the question is how/when to evaluate if they cannot overlap.
+        //   Example: if we know that for two initial nodes, the one is
+        //   not in the ancestor-or-self axis of the other, then we could safely
+        //   avoid a duplicate-aware merge, if the axis to be traversed is e.g.
+        //   the descendant-or-self axis.
+        let mut merge_and_clear: XmlXPathNodeSetMergeFunction = xml_xpath_node_set_merge_and_clear;
+        match axis {
+            XmlXPathAxisVal::AxisAncestor => {
+                first = None;
+                next = Some(xml_xpath_next_ancestor);
+            }
+            XmlXPathAxisVal::AxisAncestorOrSelf => {
+                first = None;
+                next = Some(xml_xpath_next_ancestor_or_self);
+            }
+            XmlXPathAxisVal::AxisAttribute => {
+                first = None;
+                last = None;
+                next = Some(xml_xpath_next_attribute);
+                merge_and_clear = xml_xpath_node_set_merge_and_clear_no_dupls;
+            }
+            XmlXPathAxisVal::AxisChild => {
+                last = None;
+                if matches!(
+                    test,
+                    XmlXPathTestVal::NodeTestName | XmlXPathTestVal::NodeTestAll
+                ) && matches!(typ, XmlXPathTypeVal::NodeTypeNode)
+                {
+                    // Optimization if an element node type is 'element'.
+                    next = Some(xml_xpath_next_child_element);
+                } else {
+                    next = Some(xml_xpath_next_child);
+                }
+                merge_and_clear = xml_xpath_node_set_merge_and_clear_no_dupls;
+            }
+            XmlXPathAxisVal::AxisDescendant => {
+                last = None;
+                next = Some(xml_xpath_next_descendant);
+            }
+            XmlXPathAxisVal::AxisDescendantOrSelf => {
+                last = None;
+                next = Some(xml_xpath_next_descendant_or_self);
+            }
+            XmlXPathAxisVal::AxisFollowing => {
+                last = None;
+                next = Some(xml_xpath_next_following);
+            }
+            XmlXPathAxisVal::AxisFollowingSibling => {
+                last = None;
+                next = Some(xml_xpath_next_following_sibling);
+            }
+            XmlXPathAxisVal::AxisNamespace => {
+                first = None;
+                last = None;
+                next = Some(xml_xpath_next_namespace);
+                merge_and_clear = xml_xpath_node_set_merge_and_clear_no_dupls;
+            }
+            XmlXPathAxisVal::AxisParent => {
+                first = None;
+                next = Some(xml_xpath_next_parent);
+            }
+            XmlXPathAxisVal::AxisPreceding => {
+                first = None;
+                next = Some(xml_xpath_next_preceding_internal);
+            }
+            XmlXPathAxisVal::AxisPrecedingSibling => {
+                first = None;
+                next = Some(xml_xpath_next_preceding_sibling);
+            }
+            XmlXPathAxisVal::AxisSelf => {
+                first = None;
+                last = None;
+                next = Some(xml_xpath_next_self);
+                merge_and_clear = xml_xpath_node_set_merge_and_clear_no_dupls;
+            }
+        }
+
+        let Some(next) = next else {
+            xml_xpath_release_object(xpctxt, obj);
+            return 0;
+        };
+        // The set of context nodes for the node tests
+        let Some(context_seq) = (*obj).nodesetval.as_deref().filter(|n| !n.is_empty()) else {
+            xml_xpath_release_object(xpctxt, obj);
+            (*ctxt).value_push(xml_xpath_cache_wrap_node_set(xpctxt, None));
+            return 0;
+        };
+        // Predicate optimization ---------------------------------------------
+        // If this step has a last predicate, which contains a position(),
+        // then we'll optimize (although not exactly "position()", but only
+        // the  short-hand form, i.e., "[n]".
+        //
+        // Example - expression "/foo[parent::bar][1]":
+        //
+        // COLLECT 'child' 'name' 'node' foo    -- op (we are here)
+        //   ROOT                               -- (*ctxt).comp.steps[op].ch1
+        //   PREDICATE                          -- (*ctxt).comp.steps[op].ch2 (predOp)
+        //     PREDICATE                          -- (*predOp).ch1 = [parent::bar]
+        //       SORT
+        //         COLLECT  'parent' 'name' 'node' bar
+        //           NODE
+        //     ELEM Object is a number : 1        -- (*predOp).ch2 = [1]
+        //
+        max_pos = 0;
+        pred_op = null_mut();
+        has_predicate_range = 0;
+        has_axis_range = 0;
+        if (*ctxt).comp.steps[op].ch2 != -1 {
+            // There's at least one predicate. 16 == XPATH_OP_PREDICATE
+            pred_op = &raw mut (*ctxt).comp.steps[(*ctxt).comp.steps[op].ch2 as usize];
+            if (*ctxt).is_positional_predicate(&*pred_op, &mut max_pos) != 0 {
+                if (*pred_op).ch1 != -1 {
+                    // Use the next inner predicate operator.
+                    pred_op = &raw mut (*ctxt).comp.steps[(*pred_op).ch1 as usize];
+                    has_predicate_range = 1;
+                } else {
+                    // There's no other predicate than the [n] predicate.
+                    pred_op = null_mut();
+                    has_axis_range = 1;
+                }
+            }
+        }
+        let break_on_first_hit: i32 = (to_bool != 0 && pred_op.is_null()) as i32;
+        // Axis traversal -----------------------------------------------------
+        // 2.3 Node Tests
+        //  - For the attribute axis, the principal node type is attribute.
+        //  - For the namespace axis, the principal node type is namespace.
+        //  - For other axes, the principal node type is element.
+        //
+        // A node test * is true for any node of the
+        // principal node type. For example, child::* will
+        // select all element children of the context node
+        let old_context_node = (*xpctxt).node;
+        // The final resulting node set wrt to all context nodes
+        let mut out_seq = None;
+        // Used to feed predicate evaluation.
+        let mut seq = None;
+        let mut context_idx = 0;
+
+        'main: while context_idx < context_seq.node_tab.len()
+            && (*ctxt).error == XmlXPathError::XPathExpressionOK as i32
+        {
+            (*xpctxt).node = Some(context_seq.node_tab[context_idx]);
+            context_idx += 1;
+
+            if seq.is_none() {
+                seq = xml_xpath_node_set_create(None);
+                if seq.is_none() {
+                    // TODO: Propagate memory error.
+                    total = 0;
+                    // goto error;
+                    break 'main;
+                }
+            }
+            // Traverse the axis and test the nodes.
+            pos = 0;
+            let mut cur = None;
+            has_ns_nodes = false;
+            while let Some(cur) = {
+                if (*(*ctxt).context).op_limit != 0 && (*ctxt).check_operation_limit(1) < 0 {
+                    // goto error;
+                    break 'main;
+                }
+
+                cur = next(ctxt, cur);
+                cur
+            } {
+                // QUESTION TODO: What does the "first" and "last" stuff do?
+                if let Some(first) = first.as_mut().filter(|first| !first.is_none()) {
+                    if **first == Some(cur) {
+                        break;
+                    }
+                    if total % 256 == 0
+                        && xml_xpath_cmp_nodes_ext((**first).unwrap(), cur)
+                            .is_some_and(|f| f.is_le())
+                    {
+                        break;
+                    }
+                }
+                if let Some(last) = last.as_mut().filter(|last| !last.is_none()) {
+                    if **last == Some(cur) {
+                        break;
+                    }
+                    if total % 256 == 0
+                        && xml_xpath_cmp_nodes_ext(cur, (**last).unwrap())
+                            .is_some_and(|f| f.is_le())
+                    {
+                        break;
+                    }
+                }
+
+                total += 1;
+
+                match test {
+                    XmlXPathTestVal::NodeTestNone => {
+                        total = 0;
+                        generic_error!("Internal error at {}:{}\n", file!(), line!());
+                        // goto error;
+                        break 'main;
+                    }
+                    XmlXPathTestVal::NodeTestType => {
+                        if matches!(typ, XmlXPathTypeVal::NodeTypeNode) {
+                            match cur.element_type() {
+                                XmlElementType::XmlDocumentNode
+                                | XmlElementType::XmlHTMLDocumentNode
+                                | XmlElementType::XmlElementNode
+                                | XmlElementType::XmlAttributeNode
+                                | XmlElementType::XmlPINode
+                                | XmlElementType::XmlCommentNode
+                                | XmlElementType::XmlCDATASectionNode
+                                | XmlElementType::XmlTextNode => {
+                                    xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                                }
+                                XmlElementType::XmlNamespaceDecl => {
+                                    if matches!(axis, XmlXPathAxisVal::AxisNamespace) {
+                                        xp_test_hit_ns!(has_axis_range, pos, max_pos, has_ns_nodes, seq, xpctxt, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                                    } else {
+                                        has_ns_nodes = true;
+                                        xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                                    }
+                                }
+                                _ => {}
+                            }
+                        } else if cur.element_type() as isize == typ as isize {
+                            if matches!(cur.element_type(), XmlElementType::XmlNamespaceDecl) {
+                                xp_test_hit_ns!(has_axis_range, pos, max_pos, has_ns_nodes, seq, xpctxt, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                            } else {
+                                xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                            }
+                        } else if matches!(typ, XmlXPathTypeVal::NodeTypeText)
+                            && matches!(cur.element_type(), XmlElementType::XmlCDATASectionNode)
+                        {
+                            xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                        }
+                    }
+                    XmlXPathTestVal::NodeTestPI => {
+                        if matches!(cur.element_type(), XmlElementType::XmlPINode)
+                            && (name
+                                .is_none_or(|name| name == XmlNodePtr::try_from(cur).unwrap().name))
+                        {
+                            xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                        }
+                    }
+                    XmlXPathTestVal::NodeTestAll => {
+                        if matches!(axis, XmlXPathAxisVal::AxisAttribute) {
+                            if matches!(cur.element_type(), XmlElementType::XmlAttributeNode)
+                                && (prefix.is_none()
+                                    || XmlAttrPtr::try_from(cur)
+                                        .unwrap()
+                                        .ns
+                                        .as_deref()
+                                        .and_then(|ns| ns.href.as_deref())
+                                        .is_some_and(|href| uri.as_deref() == Some(href)))
+                            {
+                                xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                            }
+                        } else if matches!(axis, XmlXPathAxisVal::AxisNamespace) {
+                            if matches!(cur.element_type(), XmlElementType::XmlNamespaceDecl) {
+                                xp_test_hit_ns!(has_axis_range, pos, max_pos, has_ns_nodes, seq, xpctxt, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                            }
+                        } else if matches!(cur.element_type(), XmlElementType::XmlElementNode)
+                            && (prefix.is_none()
+                                || XmlNodePtr::try_from(cur)
+                                    .unwrap()
+                                    .ns
+                                    .as_deref()
+                                    .and_then(|ns| ns.href.as_deref())
+                                    .is_some_and(|href| uri.as_deref() == Some(href)))
+                        {
+                            xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                        }
+                    }
+                    XmlXPathTestVal::NodeTestNs => {
+                        // todo!();
+                    }
+                    XmlXPathTestVal::NodeTestName => 'to_break: {
+                        if matches!(axis, XmlXPathAxisVal::AxisAttribute) {
+                            if !matches!(cur.element_type(), XmlElementType::XmlAttributeNode) {
+                                break 'to_break;
+                            }
+                        } else if matches!(axis, XmlXPathAxisVal::AxisNamespace) {
+                            if !matches!(cur.element_type(), XmlElementType::XmlNamespaceDecl) {
+                                break 'to_break;
+                            }
+                        } else if !matches!(cur.element_type(), XmlElementType::XmlElementNode) {
+                            break 'to_break;
+                        }
+                        match cur.element_type() {
+                            XmlElementType::XmlElementNode => {
+                                let node = XmlNodePtr::try_from(cur).unwrap();
+                                if name == Some(&node.name) {
+                                    if prefix.is_none() {
+                                        if node.ns.is_none() {
+                                            xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                                        }
+                                    } else if node
+                                        .ns
+                                        .as_deref()
+                                        .and_then(|ns| ns.href.as_deref())
+                                        .is_some_and(|href| uri.as_deref() == Some(href))
+                                    {
+                                        xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                                    }
+                                }
+                            }
+                            XmlElementType::XmlAttributeNode => {
+                                let attr = XmlAttrPtr::try_from(cur).unwrap();
+
+                                if name == Some(attr.name.as_ref()) {
+                                    if prefix.is_none() {
+                                        if attr.ns.is_none_or(|ns| ns.prefix().is_none()) {
+                                            xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                                        }
+                                    } else if attr
+                                        .ns
+                                        .as_deref()
+                                        .and_then(|ns| ns.href.as_deref())
+                                        .is_some_and(|href| uri.as_deref() == Some(href))
+                                    {
+                                        xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                                    }
+                                }
+                            }
+                            XmlElementType::XmlNamespaceDecl => {
+                                let ns = XmlNsPtr::try_from(cur).unwrap();
+                                if ns
+                                    .prefix
+                                    .as_deref()
+                                    .is_some_and(|prefix| name.is_some_and(|name| prefix == name))
+                                {
+                                    xp_test_hit_ns!(has_axis_range, pos, max_pos, has_ns_nodes, seq, xpctxt, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+
+                if (*ctxt).error != XmlXPathError::XPathExpressionOK as i32 {
+                    break;
+                }
+            }
+
+            // goto apply_predicates;
+
+            // apply_predicates: /* --------------------------------------------------- */
+            if (*ctxt).error != XmlXPathError::XPathExpressionOK as i32 {
+                // goto error;
+                break 'main;
+            }
+
+            // Apply predicates.
+            if !pred_op.is_null() && !seq.as_deref().unwrap().node_tab.is_empty() {
+                // E.g. when we have a "/foo[some expression][n]".
+                // QUESTION TODO: The old predicate evaluation took into
+                // account location-sets.
+                // (E.g. (*(*ctxt).value).typ == XPATH_LOCATIONSET)
+                // Do we expect such a set here?
+                // All what I learned now from the evaluation semantics
+                // does not indicate that a location-set will be processed
+                // here, so this looks OK.
+                // Iterate over all predicates, starting with the outermost predicate.
+                // TODO: Problem: we cannot execute the inner predicates first
+                //  since we cannot go back *up* the operator tree!
+                //  Options we have:
+                //  1) Use of recursive functions (like is it currently done
+                //     via xmlXPathCompOpEval())
+                //  2) Add a predicate evaluation information stack to the
+                //     context struct
+                //  3) Change the way the operators are linked; we need a
+                //     "parent" field on xmlXPathStepOp
+                //
+                // For the moment, I'll try to solve this with a recursive
+                // function: xmlXPathCompOpEvalPredicate().
+                if has_predicate_range != 0 {
+                    xml_xpath_comp_op_eval_predicate(
+                        &mut *ctxt,
+                        pred_op,
+                        seq.as_deref_mut().unwrap(),
+                        max_pos,
+                        max_pos,
+                        has_ns_nodes,
+                    );
+                } else {
+                    let max_pos = seq.as_deref().unwrap().node_tab.len() as i32;
+                    xml_xpath_comp_op_eval_predicate(
+                        &mut *ctxt,
+                        pred_op,
+                        seq.as_deref_mut().unwrap(),
+                        1,
+                        max_pos,
+                        has_ns_nodes,
+                    );
+                }
+
+                if (*ctxt).error != XmlXPathError::XPathExpressionOK as i32 {
+                    total = 0;
+                    // goto error;
+                    break 'main;
+                }
+            }
+
+            if !seq.as_deref().unwrap().node_tab.is_empty() {
+                // Add to result set.
+                if out_seq.is_none() {
+                    out_seq = seq.take();
+                } else {
+                    // TODO: Check memory error.
+                    out_seq = merge_and_clear(out_seq, seq.as_deref_mut());
+                }
+
+                if to_bool != 0 {
+                    break 'main;
+                }
+            }
+            continue 'main;
+        }
+
+        // error:
+        if (*obj).boolval && (*obj).user.is_some() {
+            // QUESTION TODO: What does this do and why?
+            // TODO: Do we have to do this also for the "error"
+            // cleanup further down?
+            let value = (*ctxt).value_mut().unwrap();
+            (**value).boolval = true;
+            (**value).user = (*obj).user.take();
+            (*obj).boolval = false;
+        }
+        xml_xpath_release_object(xpctxt, obj);
+
+        // Ensure we return at least an empty set.
+        if out_seq.is_none() {
+            if seq.as_deref().is_some_and(|seq| seq.is_empty()) {
+                out_seq = seq.take();
+            } else {
+                // TODO: Check memory error.
+                out_seq = xml_xpath_node_set_create(None);
+            }
+        }
+        if seq.is_some() {
+            xml_xpath_free_node_set(seq);
+        }
+        // Hand over the result. Better to push the set also in case of errors.
+        (*ctxt).value_push(xml_xpath_cache_wrap_node_set(xpctxt, out_seq));
+        // Reset the context node.
+        (*xpctxt).node = old_context_node;
+        // When traversing the namespace axis in "toBool" mode, it's
+        // possible that tmpNsList wasn't freed.
+        (*xpctxt).tmp_ns_list = None;
+
+        total
     }
 }
