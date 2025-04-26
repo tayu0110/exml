@@ -64,87 +64,6 @@ use super::{
     xml_xpath_new_node_set, xml_xpath_new_string,
 };
 
-// Many of these macros may later turn into functions.
-// They shouldn't be used in #ifdef's preprocessor instructions.
-
-/// Macro to return from the function if an XPath error was detected.
-#[doc(hidden)]
-#[macro_export]
-macro_rules! CHECK_ERROR {
-    ($ctxt:expr) => {
-        if (*$ctxt).error != $crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
-            return;
-        }
-    };
-}
-
-/// Macro to return 0 from the function if an XPath error was detected.
-macro_rules! CHECK_ERROR0 {
-    ($ctxt:expr) => {
-        if (*$ctxt).error != XmlXPathError::XPathExpressionOK as i32 {
-            return 0;
-        }
-    };
-}
-
-/// Macro to raise an XPath error and return.
-#[doc(hidden)]
-#[macro_export]
-macro_rules! XP_ERROR {
-    ($ctxt:expr, $x:expr) => {{
-        $crate::xpath::internals::xml_xpath_err($ctxt, $x);
-        return;
-    }};
-}
-
-/// Macro to raise an XPath error and return 0.
-macro_rules! XP_ERROR0 {
-    ($ctxt:expr, $x:expr) => {{
-        xml_xpath_err($ctxt, $x);
-        return 0;
-    }};
-}
-
-/// Macro to check that the value on top of the XPath stack is of a given type.  
-/// Return(0) in case of failure
-macro_rules! CHECK_TYPE0 {
-    ($ctxt:expr, $typeval:expr) => {
-        if (*$ctxt).value.is_null() || (*(*$ctxt).value).typ != $typeval {
-            XP_ERROR0!($ctxt, XmlXPathError::XPathInvalidType as i32)
-        }
-    };
-}
-
-macro_rules! XP_CACHE_WANTS {
-    ($sl:expr, $n:expr) => {
-        $sl.is_null() || (*$sl).number < $n
-    };
-}
-
-macro_rules! XP_CACHE_ADD {
-    ($sl:expr, $obj:expr) => {
-        if $sl.is_null() {
-            $sl = xml_pointer_list_create(10);
-            if $sl.is_null() {
-                // Cache is full; free the object.
-                if let Some(nodeset) = (*$obj).nodesetval.take() {
-                    xml_xpath_free_node_set(Some(nodeset));
-                }
-                xml_free($obj as _);
-                return;
-            }
-        }
-        if xml_pointer_list_add_size($sl, $obj as _, 0) == -1 {
-            // Cache is full; free the object.
-            if let Some(nodeset) = (*$obj).nodesetval.take() {
-                xml_xpath_free_node_set(Some(nodeset));
-            }
-            xml_free($obj as _);
-            return;
-        }
-    };
-}
-
 /// Register an external mechanism to do variable lookup
 #[doc(alias = "xmlXPathRegisterVariableLookup")]
 pub unsafe fn xml_xpath_register_variable_lookup(
@@ -1434,7 +1353,9 @@ unsafe fn xml_xpath_equal_node_set_float(
                     Some(node),
                 ))));
                 xml_xpath_number_function(&mut *ctxt, 1);
-                CHECK_ERROR0!(ctxt);
+                if (*ctxt).error != XmlXPathError::XPathExpressionOK as i32 {
+                    return 0;
+                };
                 val = (*ctxt).value_pop();
                 v = (*val).floatval;
                 xml_xpath_free_object(val);
@@ -1722,7 +1643,8 @@ pub unsafe fn xml_xpath_equal_values(ctxt: XmlXPathParserContextPtr) -> i32 {
             } else {
                 xml_xpath_free_object(arg2);
             }
-            XP_ERROR0!(Some(&mut *ctxt), XmlXPathError::XPathInvalidOperand as i32);
+            xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathInvalidOperand as i32);
+            return 0;
         }
 
         if arg1 == arg2 {
@@ -1806,7 +1728,9 @@ pub unsafe fn xml_xpath_not_equal_values(ctxt: XmlXPathParserContextPtr) -> i32 
             } else {
                 xml_xpath_free_object(arg2);
             }
-            XP_ERROR0!(Some(&mut *ctxt), XmlXPathError::XPathInvalidOperand as i32);
+
+            xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathInvalidOperand as i32);
+            return 0;
         }
 
         if arg1 == arg2 {
@@ -2147,7 +2071,8 @@ unsafe fn xml_xpath_compare_node_set_value(
                 );
                 xml_xpath_free_object(arg);
                 xml_xpath_free_object(val);
-                XP_ERROR0!(Some(&mut *ctxt), XmlXPathError::XPathInvalidType as i32);
+                xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathInvalidType as i32);
+                0
             }
         }
     }
@@ -2194,7 +2119,8 @@ pub unsafe fn xml_xpath_compare_values(
             } else {
                 xml_xpath_free_object(arg2);
             }
-            XP_ERROR0!(Some(&mut *ctxt), XmlXPathError::XPathInvalidOperand as i32);
+            xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathInvalidOperand as i32);
+            return 0;
         }
 
         if matches!(
@@ -2305,10 +2231,11 @@ pub unsafe fn xml_xpath_value_flip_sign(ctxt: XmlXPathParserContextPtr) {
             .value()
             .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
         {
-            crate::XP_ERROR!(
+            xml_xpath_err(
                 Some(&mut *ctxt),
-                crate::xpath::XmlXPathError::XPathInvalidType as i32
-            )
+                crate::xpath::XmlXPathError::XPathInvalidType as i32,
+            );
+            return;
         };
         let val = &mut (**(*ctxt).value_mut().unwrap()).floatval;
         *val = -*val;
@@ -2323,7 +2250,8 @@ pub unsafe fn xml_xpath_add_values(ctxt: XmlXPathParserContextPtr) {
     unsafe {
         let arg: XmlXPathObjectPtr = (*ctxt).value_pop();
         if arg.is_null() {
-            XP_ERROR!(Some(&mut *ctxt), XmlXPathError::XPathInvalidOperand as i32);
+            xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathInvalidOperand as i32);
+            return;
         }
         let val: f64 = xml_xpath_cast_to_number(arg);
         xml_xpath_free_object(arg);
@@ -2332,10 +2260,11 @@ pub unsafe fn xml_xpath_add_values(ctxt: XmlXPathParserContextPtr) {
             .value()
             .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
         {
-            crate::XP_ERROR!(
+            xml_xpath_err(
                 Some(&mut *ctxt),
-                crate::xpath::XmlXPathError::XPathInvalidType as i32
-            )
+                crate::xpath::XmlXPathError::XPathInvalidType as i32,
+            );
+            return;
         };
         (**(*ctxt).value_mut().unwrap()).floatval += val;
     }
@@ -2349,7 +2278,8 @@ pub unsafe fn xml_xpath_sub_values(ctxt: XmlXPathParserContextPtr) {
     unsafe {
         let arg: XmlXPathObjectPtr = (*ctxt).value_pop();
         if arg.is_null() {
-            XP_ERROR!(Some(&mut *ctxt), XmlXPathError::XPathInvalidOperand as i32);
+            xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathInvalidOperand as i32);
+            return;
         }
         let val: f64 = xml_xpath_cast_to_number(arg);
         xml_xpath_free_object(arg);
@@ -2358,10 +2288,11 @@ pub unsafe fn xml_xpath_sub_values(ctxt: XmlXPathParserContextPtr) {
             .value()
             .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
         {
-            crate::XP_ERROR!(
+            xml_xpath_err(
                 Some(&mut *ctxt),
-                crate::xpath::XmlXPathError::XPathInvalidType as i32
-            )
+                crate::xpath::XmlXPathError::XPathInvalidType as i32,
+            );
+            return;
         };
         (**(*ctxt).value_mut().unwrap()).floatval -= val;
     }
@@ -2375,7 +2306,8 @@ pub unsafe fn xml_xpath_mult_values(ctxt: XmlXPathParserContextPtr) {
     unsafe {
         let arg: XmlXPathObjectPtr = (*ctxt).value_pop();
         if arg.is_null() {
-            XP_ERROR!(Some(&mut *ctxt), XmlXPathError::XPathInvalidOperand as i32);
+            xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathInvalidOperand as i32);
+            return;
         }
         let val: f64 = xml_xpath_cast_to_number(arg);
         xml_xpath_free_object(arg);
@@ -2384,10 +2316,11 @@ pub unsafe fn xml_xpath_mult_values(ctxt: XmlXPathParserContextPtr) {
             .value()
             .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
         {
-            crate::XP_ERROR!(
+            xml_xpath_err(
                 Some(&mut *ctxt),
-                crate::xpath::XmlXPathError::XPathInvalidType as i32
-            )
+                crate::xpath::XmlXPathError::XPathInvalidType as i32,
+            );
+            return;
         };
         (**(*ctxt).value_mut().unwrap()).floatval *= val;
     }
@@ -2401,7 +2334,8 @@ pub unsafe fn xml_xpath_div_values(ctxt: XmlXPathParserContextPtr) {
     unsafe {
         let arg: XmlXPathObjectPtr = (*ctxt).value_pop();
         if arg.is_null() {
-            XP_ERROR!(Some(&mut *ctxt), XmlXPathError::XPathInvalidOperand as i32);
+            xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathInvalidOperand as i32);
+            return;
         }
         let val: f64 = xml_xpath_cast_to_number(arg);
         xml_xpath_free_object(arg);
@@ -2410,10 +2344,11 @@ pub unsafe fn xml_xpath_div_values(ctxt: XmlXPathParserContextPtr) {
             .value()
             .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
         {
-            crate::XP_ERROR!(
+            xml_xpath_err(
                 Some(&mut *ctxt),
-                crate::xpath::XmlXPathError::XPathInvalidType as i32
-            )
+                crate::xpath::XmlXPathError::XPathInvalidType as i32,
+            );
+            return;
         };
         (**(*ctxt).value_mut().unwrap()).floatval /= val;
     }
@@ -2427,7 +2362,8 @@ pub unsafe fn xml_xpath_mod_values(ctxt: XmlXPathParserContextPtr) {
     unsafe {
         let arg: XmlXPathObjectPtr = (*ctxt).value_pop();
         if arg.is_null() {
-            XP_ERROR!(Some(&mut *ctxt), XmlXPathError::XPathInvalidOperand as i32);
+            xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathInvalidOperand as i32);
+            return;
         }
         let arg2: f64 = xml_xpath_cast_to_number(arg);
         xml_xpath_free_object(arg);
@@ -2436,10 +2372,11 @@ pub unsafe fn xml_xpath_mod_values(ctxt: XmlXPathParserContextPtr) {
             .value()
             .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
         {
-            crate::XP_ERROR!(
+            xml_xpath_err(
                 Some(&mut *ctxt),
-                crate::xpath::XmlXPathError::XPathInvalidType as i32
-            )
+                crate::xpath::XmlXPathError::XPathInvalidType as i32,
+            );
+            return;
         };
         let arg1 = &mut (**(*ctxt).value_mut().unwrap()).floatval;
         if arg2 == 0.0 {
