@@ -192,7 +192,12 @@ impl XmlXPathObjectUserData {
 /// Create a new xmlXPathObjectPtr of type string and of value @val
 ///
 /// Returns the newly created object.
-#[doc(alias = "xmlXPathNewCString", alias = "xmlXPathNewString")]
+#[doc(
+    alias = "xmlXPathNewCString",
+    alias = "xmlXPathNewString",
+    alias = "xmlXPathCacheNewString",
+    alias = "xmlXPathCacheNewCString"
+)]
 pub unsafe fn xml_xpath_new_string(val: Option<&str>) -> XmlXPathObjectPtr {
     unsafe {
         let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
@@ -210,7 +215,11 @@ pub unsafe fn xml_xpath_new_string(val: Option<&str>) -> XmlXPathObjectPtr {
 /// Returns the newly created object.
 ///
 /// Frees @val in case of error.
-#[doc(alias = "xmlXPathWrapString", alias = "xmlXPathWrapCString")]
+#[doc(
+    alias = "xmlXPathWrapString",
+    alias = "xmlXPathWrapCString",
+    alias = "xmlXPathCacheWrapString"
+)]
 pub unsafe fn xml_xpath_wrap_string(val: Option<&str>) -> XmlXPathObjectPtr {
     unsafe {
         let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
@@ -228,7 +237,7 @@ pub unsafe fn xml_xpath_wrap_string(val: Option<&str>) -> XmlXPathObjectPtr {
 /// Create a new xmlXPathObjectPtr of type f64 and of value @val
 ///
 /// Returns the newly created object.
-#[doc(alias = "xmlXPathNewFloat")]
+#[doc(alias = "xmlXPathNewFloat", alias = "xmlXPathCacheNewFloat")]
 pub unsafe fn xml_xpath_new_float(val: f64) -> XmlXPathObjectPtr {
     unsafe {
         let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
@@ -244,7 +253,7 @@ pub unsafe fn xml_xpath_new_float(val: f64) -> XmlXPathObjectPtr {
 /// Create a new xmlXPathObjectPtr of type boolean and of value @val
 ///
 /// Returns the newly created object.
-#[doc(alias = "xmlXPathNewBoolean")]
+#[doc(alias = "xmlXPathNewBoolean", alias = "xmlXPathCacheNewBoolean")]
 pub unsafe fn xml_xpath_new_boolean(val: bool) -> XmlXPathObjectPtr {
     unsafe {
         let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
@@ -261,7 +270,7 @@ pub unsafe fn xml_xpath_new_boolean(val: bool) -> XmlXPathObjectPtr {
 /// it with the single Node @val
 ///
 /// Returns the newly created object.
-#[doc(alias = "xmlXPathNewNodeSet")]
+#[doc(alias = "xmlXPathNewNodeSet", alias = "xmlXPathCacheNewNodeSet")]
 pub unsafe fn xml_xpath_new_node_set(val: Option<XmlGenericNodePtr>) -> XmlXPathObjectPtr {
     unsafe {
         let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
@@ -284,7 +293,7 @@ pub unsafe fn xml_xpath_new_node_set(val: Option<XmlGenericNodePtr>) -> XmlXPath
 /// Returns the newly created object.
 ///
 /// In case of error the node set is destroyed and NULL is returned.
-#[doc(alias = "xmlXPathWrapNodeSet")]
+#[doc(alias = "xmlXPathWrapNodeSet", alias = "xmlXPathCacheWrapNodeSet")]
 pub unsafe fn xml_xpath_wrap_node_set(val: Option<Box<XmlNodeSet>>) -> XmlXPathObjectPtr {
     unsafe {
         let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
@@ -342,7 +351,7 @@ pub unsafe fn xml_xpath_wrap_external(val: *mut c_void) -> XmlXPathObjectPtr {
 /// Allocate a new copy of a given object
 ///
 /// Returns the newly created object.
-#[doc(alias = "xmlXPathObjectCopy")]
+#[doc(alias = "xmlXPathObjectCopy", alias = "xmlXPathCacheObjectCopy")]
 pub unsafe fn xml_xpath_object_copy(val: &XmlXPathObject) -> XmlXPathObjectPtr {
     unsafe {
         let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;

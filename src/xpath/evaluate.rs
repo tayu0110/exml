@@ -22,20 +22,19 @@ use super::{
     XmlXPathObjectType, XmlXPathParserContext, XmlXPathTestVal, XmlXPathTraversalFunction,
     XmlXPathTypeVal,
     functions::{xml_xpath_boolean_function, xml_xpath_number_function},
-    xml_xpath_add_values, xml_xpath_cache_new_boolean, xml_xpath_cache_new_node_set,
-    xml_xpath_cache_object_copy, xml_xpath_cache_wrap_node_set, xml_xpath_cast_to_boolean,
-    xml_xpath_cmp_nodes_ext, xml_xpath_compare_values, xml_xpath_div_values,
-    xml_xpath_equal_values, xml_xpath_err, xml_xpath_evaluate_predicate_result,
-    xml_xpath_free_node_set, xml_xpath_free_object, xml_xpath_mod_values, xml_xpath_mult_values,
+    xml_xpath_add_values, xml_xpath_cast_to_boolean, xml_xpath_cmp_nodes_ext,
+    xml_xpath_compare_values, xml_xpath_div_values, xml_xpath_equal_values, xml_xpath_err,
+    xml_xpath_evaluate_predicate_result, xml_xpath_free_node_set, xml_xpath_free_object,
+    xml_xpath_mod_values, xml_xpath_mult_values, xml_xpath_new_boolean, xml_xpath_new_node_set,
     xml_xpath_next_ancestor, xml_xpath_next_ancestor_or_self, xml_xpath_next_attribute,
     xml_xpath_next_child, xml_xpath_next_child_element, xml_xpath_next_descendant,
     xml_xpath_next_descendant_or_self, xml_xpath_next_following, xml_xpath_next_following_sibling,
     xml_xpath_next_namespace, xml_xpath_next_parent, xml_xpath_next_preceding_internal,
     xml_xpath_next_preceding_sibling, xml_xpath_next_self, xml_xpath_node_set_create,
     xml_xpath_node_set_merge, xml_xpath_node_set_merge_and_clear,
-    xml_xpath_node_set_merge_and_clear_no_dupls, xml_xpath_not_equal_values,
+    xml_xpath_node_set_merge_and_clear_no_dupls, xml_xpath_not_equal_values, xml_xpath_object_copy,
     xml_xpath_release_object, xml_xpath_root, xml_xpath_sub_values, xml_xpath_value_flip_sign,
-    xml_xpath_variable_lookup, xml_xpath_variable_lookup_ns,
+    xml_xpath_variable_lookup, xml_xpath_variable_lookup_ns, xml_xpath_wrap_node_set,
 };
 
 type StepOpIndex = usize;
@@ -250,7 +249,7 @@ impl XmlXPathParserContext {
                     } else {
                         equal = xml_xpath_not_equal_values(self);
                     }
-                    self.value_push(xml_xpath_cache_new_boolean(self.context, equal != 0));
+                    self.value_push(xml_xpath_new_boolean(equal != 0));
                 }
                 XmlXPathOp::XPathOpCmp => {
                     total += self.evaluate_precompiled_operation(self.comp.steps[op].ch1 as usize);
@@ -266,7 +265,7 @@ impl XmlXPathParserContext {
                         self.comp.steps[op].value,
                         self.comp.steps[op].value2,
                     );
-                    self.value_push(xml_xpath_cache_new_boolean(self.context, ret != 0));
+                    self.value_push(xml_xpath_new_boolean(ret != 0));
                 }
                 XmlXPathOp::XPathOpPlus => {
                     total += self.evaluate_precompiled_operation(self.comp.steps[op].ch1 as usize);
@@ -389,10 +388,7 @@ impl XmlXPathParserContext {
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
-                    self.value_push(xml_xpath_cache_new_node_set(
-                        self.context,
-                        (*self.context).node,
-                    ));
+                    self.value_push(xml_xpath_new_node_set((*self.context).node));
                 }
                 XmlXPathOp::XPathOpCollect => 'to_break: {
                     if self.comp.steps[op].ch1 == -1 {
@@ -406,8 +402,7 @@ impl XmlXPathParserContext {
                     total += xml_xpath_node_collect_and_test(self, op, None, None, 0);
                 }
                 XmlXPathOp::XPathOpValue => {
-                    self.value_push(xml_xpath_cache_object_copy(
-                        self.context,
+                    self.value_push(xml_xpath_object_copy(
                         self.comp.steps[op]
                             .value4
                             .as_ref()
@@ -828,10 +823,7 @@ impl XmlXPathParserContext {
                                     iloc.user.as_ref().and_then(|user| user.as_node()).copied();
                                 (*self.context).context_size = oldlocset.loc_tab.len() as i32;
                                 (*self.context).proximity_position = i as i32 + 1;
-                                tmp = xml_xpath_cache_new_node_set(
-                                    self.context,
-                                    (*self.context).node,
-                                );
+                                tmp = xml_xpath_new_node_set((*self.context).node);
                                 self.value_push(tmp);
 
                                 if self.comp.steps[op].ch2 != -1 {
@@ -905,10 +897,7 @@ impl XmlXPathParserContext {
                                     // in the nodeset.
                                     (*self.context).node = Some(node);
                                     // OPTIMIZE TODO: Avoid recreation for every iteration.
-                                    tmp = xml_xpath_cache_new_node_set(
-                                        self.context,
-                                        (*self.context).node,
-                                    );
+                                    tmp = xml_xpath_new_node_set((*self.context).node);
                                     self.value_push(tmp);
 
                                     if self.comp.steps[op].ch2 != -1 {
@@ -1080,10 +1069,7 @@ impl XmlXPathParserContext {
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
-                    self.value_push(xml_xpath_cache_new_node_set(
-                        self.context,
-                        (*self.context).node,
-                    ));
+                    self.value_push(xml_xpath_new_node_set((*self.context).node));
                 }
                 XmlXPathOp::XPathOpCollect => {
                     if self.comp.steps[op].ch1 == -1 {
@@ -1098,8 +1084,7 @@ impl XmlXPathParserContext {
                     }
                 }
                 XmlXPathOp::XPathOpValue => {
-                    self.value_push(xml_xpath_cache_object_copy(
-                        self.context,
+                    self.value_push(xml_xpath_object_copy(
                         self.comp.steps[op]
                             .value4
                             .as_ref()
@@ -1273,10 +1258,7 @@ impl XmlXPathParserContext {
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
-                    self.value_push(xml_xpath_cache_new_node_set(
-                        self.context,
-                        (*self.context).node,
-                    ));
+                    self.value_push(xml_xpath_new_node_set((*self.context).node));
                 }
                 XmlXPathOp::XPathOpCollect => {
                     if self.comp.steps[op].ch1 == -1 {
@@ -1291,8 +1273,7 @@ impl XmlXPathParserContext {
                     }
                 }
                 XmlXPathOp::XPathOpValue => {
-                    self.value_push(xml_xpath_cache_object_copy(
-                        self.context,
+                    self.value_push(xml_xpath_object_copy(
                         self.comp.steps[op]
                             .value4
                             .as_ref()
@@ -1598,7 +1579,7 @@ impl XmlXPathContext {
                 if result_seq.is_null() {
                     return -1;
                 }
-                *result_seq = xml_xpath_cache_new_node_set(self, None);
+                *result_seq = xml_xpath_new_node_set(None);
                 if (*result_seq).is_null() {
                     return -1;
                 }
@@ -2134,7 +2115,7 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
         // The set of context nodes for the node tests
         let Some(context_seq) = (*obj).nodesetval.as_deref().filter(|n| !n.is_empty()) else {
             xml_xpath_release_object(xpctxt, obj);
-            ctxt.value_push(xml_xpath_cache_wrap_node_set(xpctxt, None));
+            ctxt.value_push(xml_xpath_wrap_node_set(None));
             return 0;
         };
         // Predicate optimization ---------------------------------------------
@@ -2493,7 +2474,7 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
             xml_xpath_free_node_set(seq);
         }
         // Hand over the result. Better to push the set also in case of errors.
-        ctxt.value_push(xml_xpath_cache_wrap_node_set(xpctxt, out_seq));
+        ctxt.value_push(xml_xpath_wrap_node_set(out_seq));
         // Reset the context node.
         (*xpctxt).node = old_context_node;
         // When traversing the namespace axis in "toBool" mode, it's

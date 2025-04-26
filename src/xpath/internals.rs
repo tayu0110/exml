@@ -64,7 +64,7 @@ use crate::{
 use super::{
     XmlNodeSet, XmlXPathContext, XmlXPathParserContext, functions::xml_xpath_boolean_function,
     xml_xpath_new_boolean, xml_xpath_new_float, xml_xpath_new_node_set, xml_xpath_new_string,
-    xml_xpath_wrap_node_set, xml_xpath_wrap_string,
+    xml_xpath_wrap_string,
 };
 
 // Many of these macros may later turn into functions.
@@ -393,20 +393,6 @@ pub unsafe fn xml_xpath_variable_lookup(ctxt: XmlXPathContextPtr, name: &str) ->
     }
 }
 
-/// This is the cached version of xmlXPathWrapNodeSet().
-/// Wrap the Nodeset @val in a new xmlXPathObjectPtr
-///
-/// Returns the created or reused object.
-///
-/// In case of error the node set is destroyed and NULL is returned.
-#[doc(alias = "xmlXPathCacheWrapNodeSet")]
-pub(super) unsafe fn xml_xpath_cache_wrap_node_set(
-    _ctxt: XmlXPathContextPtr,
-    val: Option<Box<XmlNodeSet>>,
-) -> XmlXPathObjectPtr {
-    unsafe { xml_xpath_wrap_node_set(val) }
-}
-
 /// Handle a redefinition of attribute error
 #[doc(alias = "xmlXPathErrMemory")]
 pub fn xml_xpath_err_memory(ctxt: Option<&mut XmlXPathContext>, extra: Option<&str>) {
@@ -467,54 +453,6 @@ pub fn xml_xpath_err_memory(ctxt: Option<&mut XmlXPathContext>, extra: Option<&s
     }
 }
 
-/// This is the cached version of xmlXPathNewString().
-/// Acquire an xmlXPathObjectPtr of type string and of value @val
-///
-/// Returns the created or reused object.
-#[doc(alias = "xmlXPathCacheNewString", alias = "xmlXPathCacheNewCString")]
-pub(super) unsafe fn xml_xpath_cache_new_string(
-    _ctxt: XmlXPathContextPtr,
-    val: Option<&str>,
-) -> XmlXPathObjectPtr {
-    unsafe { xml_xpath_new_string(val) }
-}
-
-/// This is the cached version of xmlXPathNewBoolean().
-/// Acquires an xmlXPathObjectPtr of type boolean and of value @val
-///
-/// Returns the created or reused object.
-#[doc(alias = "xmlXPathCacheNewBoolean")]
-pub(super) unsafe fn xml_xpath_cache_new_boolean(
-    _ctxt: XmlXPathContextPtr,
-    val: bool,
-) -> XmlXPathObjectPtr {
-    unsafe { xml_xpath_new_boolean(val) }
-}
-
-/// This is the cached version of xmlXPathNewFloat().
-/// Acquires an xmlXPathObjectPtr of type f64 and of value @val
-///
-/// Returns the created or reused object.
-#[doc(alias = "xmlXPathCacheNewFloat")]
-pub(super) unsafe fn xml_xpath_cache_new_float(
-    _ctxt: XmlXPathContextPtr,
-    val: f64,
-) -> XmlXPathObjectPtr {
-    unsafe { xml_xpath_new_float(val) }
-}
-
-/// This is the cached version of xmlXPathObjectCopy().
-/// Acquire a copy of a given object
-///
-/// Returns a created or reused created object.
-#[doc(alias = "xmlXPathCacheObjectCopy")]
-pub(super) unsafe fn xml_xpath_cache_object_copy(
-    _ctxt: XmlXPathContextPtr,
-    val: &XmlXPathObject,
-) -> XmlXPathObjectPtr {
-    unsafe { xml_xpath_object_copy(val) }
-}
-
 /// Search in the Variable array of the context for the given variable value.
 ///
 /// Returns the a copy of the value or NULL if not found
@@ -544,7 +482,7 @@ pub unsafe fn xml_xpath_variable_lookup_ns(
             .lookup2(name, ns_uri)
             .copied()
             .unwrap_or(null_mut());
-        xml_xpath_cache_object_copy(ctxt, &*obj)
+        xml_xpath_object_copy(&*obj)
     }
 }
 
@@ -614,19 +552,6 @@ pub fn xml_xpath_node_set_dup_ns(
     Some(cur.into())
 }
 
-/// This is the cached version of xmlXPathNewNodeSet().
-/// Acquire an xmlXPathObjectPtr of type NodeSet and initialize
-/// it with the single Node @val
-///
-/// Returns the created or reused object.
-#[doc(alias = "xmlXPathCacheNewNodeSet")]
-pub(super) unsafe fn xml_xpath_cache_new_node_set(
-    _ctxt: XmlXPathContextPtr,
-    val: Option<XmlGenericNodePtr>,
-) -> XmlXPathObjectPtr {
-    unsafe { xml_xpath_new_node_set(val) }
-}
-
 /// Initialize the context to the root of the document
 #[doc(alias = "xmlXPathRoot")]
 pub unsafe fn xml_xpath_root(ctxt: XmlXPathParserContextPtr) {
@@ -634,8 +559,7 @@ pub unsafe fn xml_xpath_root(ctxt: XmlXPathParserContextPtr) {
         if ctxt.is_null() || (*ctxt).context.is_null() {
             return;
         }
-        (*ctxt).value_push(xml_xpath_cache_new_node_set(
-            (*ctxt).context,
+        (*ctxt).value_push(xml_xpath_new_node_set(
             (*(*ctxt).context).doc.map(|doc| doc.into()),
         ));
     }
@@ -1270,18 +1194,6 @@ pub unsafe fn xml_xpath_evaluate_predicate_result(
     }
 }
 
-/// This is the cached version of xmlXPathWrapString().
-/// Wraps the @val string into an XPath object.
-///
-/// Returns the created or reused object.
-#[doc(alias = "xmlXPathCacheWrapString")]
-pub(super) unsafe fn xml_xpath_cache_wrap_string(
-    _ctxt: XmlXPathContextPtr,
-    val: Option<&str>,
-) -> XmlXPathObjectPtr {
-    unsafe { xml_xpath_wrap_string(val) }
-}
-
 /// Function computing the beginning of the string value of the node,
 /// used to speed up comparisons
 ///
@@ -1534,10 +1446,9 @@ unsafe fn xml_xpath_equal_node_set_float(
 
         if let Some(ns) = (*arg).nodesetval.as_deref() {
             for &node in &ns.node_tab {
-                (*ctxt).value_push(xml_xpath_cache_new_string(
-                    (*ctxt).context,
-                    Some(&xml_xpath_cast_node_to_string(Some(node))),
-                ));
+                (*ctxt).value_push(xml_xpath_new_string(Some(&xml_xpath_cast_node_to_string(
+                    Some(node),
+                ))));
                 xml_xpath_number_function(&mut *ctxt, 1);
                 CHECK_ERROR0!(ctxt);
                 val = (*ctxt).value_pop();
@@ -2129,12 +2040,11 @@ unsafe fn xml_xpath_compare_node_set_float(
         }
         if let Some(ns) = (*arg).nodesetval.as_deref() {
             for &node in &ns.node_tab {
-                (*ctxt).value_push(xml_xpath_cache_new_string(
-                    (*ctxt).context,
-                    Some(&xml_xpath_cast_node_to_string(Some(node))),
-                ));
+                (*ctxt).value_push(xml_xpath_new_string(Some(&xml_xpath_cast_node_to_string(
+                    Some(node),
+                ))));
                 xml_xpath_number_function(&mut *ctxt, 1);
-                (*ctxt).value_push(xml_xpath_cache_object_copy((*ctxt).context, &*f));
+                (*ctxt).value_push(xml_xpath_object_copy(&*f));
                 ret = xml_xpath_compare_values(ctxt, inf, strict);
                 if ret != 0 {
                     break;
@@ -2183,11 +2093,10 @@ unsafe fn xml_xpath_compare_node_set_string(
         }
         if let Some(ns) = (*arg).nodesetval.as_deref() {
             for &node in &ns.node_tab {
-                (*ctxt).value_push(xml_xpath_cache_new_string(
-                    (*ctxt).context,
-                    Some(&xml_xpath_cast_node_to_string(Some(node))),
-                ));
-                (*ctxt).value_push(xml_xpath_cache_object_copy((*ctxt).context, &*s));
+                (*ctxt).value_push(xml_xpath_new_string(Some(&xml_xpath_cast_node_to_string(
+                    Some(node),
+                ))));
+                (*ctxt).value_push(xml_xpath_object_copy(&*s));
                 ret = xml_xpath_compare_values(ctxt, inf, strict);
                 if ret != 0 {
                     break;
@@ -3340,7 +3249,7 @@ pub(super) unsafe fn xml_xpath_cache_convert_string(
 ) -> XmlXPathObjectPtr {
     unsafe {
         if val.is_null() {
-            return xml_xpath_cache_new_string(ctxt, Some(""));
+            return xml_xpath_new_string(Some(""));
         }
 
         let mut res = None;
@@ -3372,9 +3281,9 @@ pub(super) unsafe fn xml_xpath_cache_convert_string(
         }
         xml_xpath_release_object(ctxt, val);
         let Some(res) = res else {
-            return xml_xpath_cache_new_string(ctxt, Some(""));
+            return xml_xpath_new_string(Some(""));
         };
-        xml_xpath_cache_wrap_string(ctxt, Some(&res))
+        xml_xpath_wrap_string(Some(&res))
     }
 }
 
@@ -3390,12 +3299,12 @@ pub(super) unsafe fn xml_xpath_cache_convert_number(
 ) -> XmlXPathObjectPtr {
     unsafe {
         if val.is_null() {
-            return xml_xpath_cache_new_float(ctxt, 0.0);
+            return xml_xpath_new_float(0.0);
         }
         if matches!((*val).typ, XmlXPathObjectType::XPathNumber) {
             return val;
         }
-        let ret: XmlXPathObjectPtr = xml_xpath_cache_new_float(ctxt, xml_xpath_cast_to_number(val));
+        let ret: XmlXPathObjectPtr = xml_xpath_new_float(xml_xpath_cast_to_number(val));
         xml_xpath_release_object(ctxt, val);
         ret
     }
@@ -3413,13 +3322,12 @@ pub(super) unsafe fn xml_xpath_cache_convert_boolean(
 ) -> XmlXPathObjectPtr {
     unsafe {
         if val.is_null() {
-            return xml_xpath_cache_new_boolean(ctxt, false);
+            return xml_xpath_new_boolean(false);
         }
         if matches!((*val).typ, XmlXPathObjectType::XPathBoolean) {
             return val;
         }
-        let ret: XmlXPathObjectPtr =
-            xml_xpath_cache_new_boolean(ctxt, xml_xpath_cast_to_boolean(&*val));
+        let ret: XmlXPathObjectPtr = xml_xpath_new_boolean(xml_xpath_cast_to_boolean(&*val));
         xml_xpath_release_object(ctxt, val);
         ret
     }
