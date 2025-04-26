@@ -343,26 +343,22 @@ pub unsafe fn xml_xpath_wrap_external(val: *mut c_void) -> XmlXPathObjectPtr {
 ///
 /// Returns the newly created object.
 #[doc(alias = "xmlXPathObjectCopy")]
-pub unsafe fn xml_xpath_object_copy(val: XmlXPathObjectPtr) -> XmlXPathObjectPtr {
+pub unsafe fn xml_xpath_object_copy(val: &XmlXPathObject) -> XmlXPathObjectPtr {
     unsafe {
-        if val.is_null() {
-            return null_mut();
-        }
-
         let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
         if ret.is_null() {
             xml_xpath_err_memory(None, Some("copying object\n"));
             return null_mut();
         }
         std::ptr::write(&mut *ret, (*val).clone());
-        match (*val).typ {
+        match val.typ {
             XmlXPathObjectType::XPathBoolean | XmlXPathObjectType::XPathNumber => {}
             #[cfg(feature = "libxml_xptr_locs")]
             XmlXPathObjectType::XPathPoint | XmlXPathObjectType::XPathRange => {}
             XmlXPathObjectType::XPathString => {}
             XmlXPathObjectType::XPathXSLTTree | XmlXPathObjectType::XPathNodeset => {
                 // TODO: Check memory error.
-                (*ret).nodesetval = xml_xpath_node_set_merge(None, (*val).nodesetval.as_deref());
+                (*ret).nodesetval = xml_xpath_node_set_merge(None, val.nodesetval.as_deref());
                 // Do not deallocate the copied tree value
                 (*ret).boolval = false;
             }
@@ -377,13 +373,10 @@ pub unsafe fn xml_xpath_object_copy(val: XmlXPathObjectPtr) -> XmlXPathObjectPtr
                 // }
             }
             XmlXPathObjectType::XPathUsers => {
-                (*ret).user = (*val).user.clone();
+                (*ret).user = val.user.clone();
             }
             XmlXPathObjectType::XPathUndefined => {
-                generic_error!(
-                    "xmlXPathObjectCopy: unsupported type {}\n",
-                    (*val).typ as i32
-                );
+                generic_error!("xmlXPathObjectCopy: unsupported type {}\n", val.typ as i32);
             } // _ => {}
         }
         ret
@@ -441,32 +434,27 @@ pub unsafe fn xml_xpath_free_node_set_list(obj: XmlXPathObjectPtr) {
 ///
 /// Returns the boolean value
 #[doc(alias = "xmlXPathCastToBoolean")]
-pub unsafe fn xml_xpath_cast_to_boolean(val: XmlXPathObjectPtr) -> bool {
-    unsafe {
-        if val.is_null() {
-            return false;
+pub fn xml_xpath_cast_to_boolean(val: &XmlXPathObject) -> bool {
+    match val.typ {
+        XmlXPathObjectType::XPathUndefined => false,
+        XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
+            xml_xpath_cast_node_set_to_boolean(val.nodesetval.as_deref())
         }
-        match (*val).typ {
-            XmlXPathObjectType::XPathUndefined => false,
-            XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
-                xml_xpath_cast_node_set_to_boolean((*val).nodesetval.as_deref())
-            }
-            XmlXPathObjectType::XPathString => {
-                xml_xpath_cast_string_to_boolean((*val).stringval.as_deref())
-            }
-            XmlXPathObjectType::XPathNumber => xml_xpath_cast_number_to_boolean((*val).floatval),
-            XmlXPathObjectType::XPathBoolean => (*val).boolval,
-            XmlXPathObjectType::XPathUsers => {
-                // todo!();
-                false
-            }
-            #[cfg(feature = "libxml_xptr_locs")]
-            XmlXPathObjectType::XPathPoint
-            | XmlXPathObjectType::XPathRange
-            | XmlXPathObjectType::XPathLocationset => {
-                // todo!();
-                false
-            }
+        XmlXPathObjectType::XPathString => {
+            xml_xpath_cast_string_to_boolean(val.stringval.as_deref())
+        }
+        XmlXPathObjectType::XPathNumber => xml_xpath_cast_number_to_boolean(val.floatval),
+        XmlXPathObjectType::XPathBoolean => val.boolval,
+        XmlXPathObjectType::XPathUsers => {
+            // todo!();
+            false
+        }
+        #[cfg(feature = "libxml_xptr_locs")]
+        XmlXPathObjectType::XPathPoint
+        | XmlXPathObjectType::XPathRange
+        | XmlXPathObjectType::XPathLocationset => {
+            // todo!();
+            false
         }
     }
 }
@@ -552,7 +540,7 @@ pub unsafe fn xml_xpath_convert_boolean(val: XmlXPathObjectPtr) -> XmlXPathObjec
         if (*val).typ == XmlXPathObjectType::XPathBoolean {
             return val;
         }
-        let ret: XmlXPathObjectPtr = xml_xpath_new_boolean(xml_xpath_cast_to_boolean(val));
+        let ret: XmlXPathObjectPtr = xml_xpath_new_boolean(xml_xpath_cast_to_boolean(&*val));
         xml_xpath_free_object(val);
         ret
     }

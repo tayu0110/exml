@@ -1,4 +1,4 @@
-use std::{io::Write, ptr::null_mut};
+use std::io::Write;
 
 #[cfg(feature = "libxml_xptr_locs")]
 use crate::libxml::xpointer::XmlLocationSet;
@@ -408,14 +408,10 @@ unsafe fn xml_xpath_debug_dump_step_op<'a>(
                 }
             }
             XmlXPathOp::XPathOpValue => {
-                let object = (*op)
-                    .value4
-                    .as_ref()
-                    .and_then(|val| val.as_object())
-                    .map_or(null_mut(), |obj| *obj);
+                let object = (*op).value4.as_ref().and_then(|val| val.as_object());
 
                 write!(output, "ELEM ").ok();
-                xml_xpath_debug_dump_object(output, (!object.is_null()).then_some(&*object), 0);
+                xml_xpath_debug_dump_object(output, object, 0);
                 // goto finish;
                 if (*op).ch1 >= 0 {
                     xml_xpath_debug_dump_step_op(

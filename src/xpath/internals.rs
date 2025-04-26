@@ -807,29 +807,25 @@ pub(super) unsafe fn xml_xpath_cache_new_float(
 #[doc(alias = "xmlXPathCacheObjectCopy")]
 pub(super) unsafe fn xml_xpath_cache_object_copy(
     ctxt: XmlXPathContextPtr,
-    val: XmlXPathObjectPtr,
+    val: &XmlXPathObject,
 ) -> XmlXPathObjectPtr {
     unsafe {
-        if val.is_null() {
-            return null_mut();
-        }
-
         if XP_HAS_CACHE!(ctxt) {
-            match (*val).typ {
+            match val.typ {
                 XmlXPathObjectType::XPathNodeset => {
                     return xml_xpath_cache_wrap_node_set(
                         ctxt,
-                        xml_xpath_node_set_merge(None, (*val).nodesetval.as_deref()),
+                        xml_xpath_node_set_merge(None, val.nodesetval.as_deref()),
                     );
                 }
                 XmlXPathObjectType::XPathString => {
-                    return xml_xpath_cache_new_string(ctxt, (*val).stringval.as_deref());
+                    return xml_xpath_cache_new_string(ctxt, val.stringval.as_deref());
                 }
                 XmlXPathObjectType::XPathBoolean => {
-                    return xml_xpath_cache_new_boolean(ctxt, (*val).boolval);
+                    return xml_xpath_cache_new_boolean(ctxt, val.boolval);
                 }
                 XmlXPathObjectType::XPathNumber => {
-                    return xml_xpath_cache_new_float(ctxt, (*val).floatval);
+                    return xml_xpath_cache_new_float(ctxt, val.floatval);
                 }
                 _ => {}
             }
@@ -867,7 +863,7 @@ pub unsafe fn xml_xpath_variable_lookup_ns(
             .lookup2(name, ns_uri)
             .copied()
             .unwrap_or(null_mut());
-        xml_xpath_cache_object_copy(ctxt, obj)
+        xml_xpath_cache_object_copy(ctxt, &*obj)
     }
 }
 
@@ -2291,32 +2287,32 @@ pub fn xml_xpath_string_eval_number(s: Option<&str>) -> f64 {
 #[doc(alias = "xmlXPathEvaluatePredicateResult")]
 pub unsafe fn xml_xpath_evaluate_predicate_result(
     ctxt: XmlXPathParserContextPtr,
-    res: XmlXPathObjectPtr,
+    res: &XmlXPathObject,
 ) -> i32 {
     unsafe {
-        if ctxt.is_null() || res.is_null() {
+        if ctxt.is_null() {
             return 0;
         }
-        match (*res).typ {
+        match res.typ {
             XmlXPathObjectType::XPathBoolean => {
-                return (*res).boolval as i32;
+                return res.boolval as i32;
             }
             XmlXPathObjectType::XPathNumber => {
-                return ((*res).floatval == (*(*ctxt).context).proximity_position as f64) as i32;
+                return (res.floatval == (*(*ctxt).context).proximity_position as f64) as i32;
             }
             XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
-                if let Some(nodeset) = (*res).nodesetval.as_deref() {
+                if let Some(nodeset) = res.nodesetval.as_deref() {
                     return !nodeset.is_empty() as i32;
                 } else {
                     return 0;
                 }
             }
             XmlXPathObjectType::XPathString => {
-                return (*res).stringval.as_deref().is_some_and(|s| !s.is_empty()) as i32;
+                return res.stringval.as_deref().is_some_and(|s| !s.is_empty()) as i32;
             }
             #[cfg(feature = "libxml_xptr_locs")]
             XmlXPathObjectType::XPathLocationset => {
-                let Some(loc) = (*res).user.as_ref().and_then(|user| user.as_location_set()) else {
+                let Some(loc) = res.user.as_ref().and_then(|user| user.as_location_set()) else {
                     return 0;
                 };
 
@@ -3221,7 +3217,7 @@ unsafe fn xml_xpath_compare_node_set_float(
                     Some(&xml_xpath_cast_node_to_string(Some(node))),
                 ));
                 xml_xpath_number_function(&mut *ctxt, 1);
-                (*ctxt).value_push(xml_xpath_cache_object_copy((*ctxt).context, f));
+                (*ctxt).value_push(xml_xpath_cache_object_copy((*ctxt).context, &*f));
                 ret = xml_xpath_compare_values(ctxt, inf, strict);
                 if ret != 0 {
                     break;
@@ -3274,7 +3270,7 @@ unsafe fn xml_xpath_compare_node_set_string(
                     (*ctxt).context,
                     Some(&xml_xpath_cast_node_to_string(Some(node))),
                 ));
-                (*ctxt).value_push(xml_xpath_cache_object_copy((*ctxt).context, s));
+                (*ctxt).value_push(xml_xpath_cache_object_copy((*ctxt).context, &*s));
                 ret = xml_xpath_compare_values(ctxt, inf, strict);
                 if ret != 0 {
                     break;
@@ -4506,7 +4502,7 @@ pub(super) unsafe fn xml_xpath_cache_convert_boolean(
             return val;
         }
         let ret: XmlXPathObjectPtr =
-            xml_xpath_cache_new_boolean(ctxt, xml_xpath_cast_to_boolean(val));
+            xml_xpath_cache_new_boolean(ctxt, xml_xpath_cast_to_boolean(&*val));
         xml_xpath_release_object(ctxt, val);
         ret
     }

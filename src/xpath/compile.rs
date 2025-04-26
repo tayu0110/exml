@@ -11,17 +11,16 @@ use crate::{
     parser::{XML_MAX_NAME_LENGTH, xml_is_letter},
     xpath::{
         XML_XPATH_CHECKNS, XPATH_MAX_RECURSION_DEPTH, XmlXPathAxisVal, XmlXPathContextPtr,
-        XmlXPathError, XmlXPathObjectPtr, XmlXPathOp, xml_xpath_cache_new_float, xml_xpath_err,
-        xml_xpath_release_object,
+        XmlXPathError, XmlXPathOp, xml_xpath_err,
     },
 };
 
 #[cfg(feature = "libxml_pattern")]
 use super::XmlXPathCompExpr;
 use super::{
-    MAX_FRAC, XML_XPATH_NOVAR, XPATH_MAX_STEPS, XmlXPathContext, XmlXPathFunction,
+    MAX_FRAC, XML_XPATH_NOVAR, XPATH_MAX_STEPS, XmlXPathContext, XmlXPathFunction, XmlXPathObject,
     XmlXPathObjectType, XmlXPathParserContext, XmlXPathTestVal, XmlXPathTypeVal,
-    xml_xpath_cache_new_string, xml_xpath_perr_memory,
+    xml_xpath_perr_memory,
 };
 
 #[cfg(feature = "xpath")]
@@ -51,14 +50,14 @@ impl XmlXPathStepOp {
 
 #[derive(Clone)]
 pub(crate) enum XmlXPathStepOpValue {
-    Object(XmlXPathObjectPtr),
+    Object(Rc<XmlXPathObject>),
     String(Rc<str>),
 }
 
 impl XmlXPathStepOpValue {
-    pub(crate) fn as_object(&self) -> Option<&XmlXPathObjectPtr> {
+    pub(crate) fn as_object(&self) -> Option<&XmlXPathObject> {
         match self {
-            Self::Object(obj) => Some(obj),
+            Self::Object(obj) => Some(obj.as_ref()),
             _ => None,
         }
     }
@@ -1256,25 +1255,19 @@ impl XmlXPathParserContext {
                 }
                 ret *= 10.0f64.powi(exponent);
             }
-            let num: XmlXPathObjectPtr = xml_xpath_cache_new_float(self.context, ret);
-            if num.is_null() {
-                self.error = XmlXPathError::XPathMemoryError as i32;
-            } else {
-                let last = self.comp.borrow().last;
-                if self.add_compiled_expression(
-                    last,
-                    -1,
-                    XmlXPathOp::XPathOpValue,
-                    XmlXPathObjectType::XPathNumber as i32,
-                    0_i32,
-                    0_i32,
-                    Some(XmlXPathStepOpValue::Object(num)),
-                    None,
-                ) == -1
-                {
-                    xml_xpath_release_object(self.context, num);
-                }
-            }
+            let last = self.comp.borrow().last;
+            self.add_compiled_expression(
+                last,
+                -1,
+                XmlXPathOp::XPathOpValue,
+                XmlXPathObjectType::XPathNumber as i32,
+                0_i32,
+                0_i32,
+                Some(XmlXPathStepOpValue::Object(Rc::new(XmlXPathObject::from(
+                    ret,
+                )))),
+                None,
+            );
         }
     }
 
@@ -1334,28 +1327,19 @@ impl XmlXPathParserContext {
                 xml_xpath_perr_memory(Some(self), None);
                 return;
             }
-            let lit: XmlXPathObjectPtr = xml_xpath_cache_new_string(
-                self.context,
-                Some(CStr::from_ptr(ret as *const i8).to_string_lossy().as_ref()),
+            let last = self.comp.borrow().last;
+            self.add_compiled_expression(
+                last,
+                -1,
+                XmlXPathOp::XPathOpValue,
+                XmlXPathObjectType::XPathString as i32,
+                0_i32,
+                0_i32,
+                Some(XmlXPathStepOpValue::Object(Rc::new(XmlXPathObject::from(
+                    CStr::from_ptr(ret as *const i8).to_string_lossy().as_ref(),
+                )))),
+                None,
             );
-            if lit.is_null() {
-                self.error = XmlXPathError::XPathMemoryError as i32;
-            } else {
-                let last = self.comp.borrow().last;
-                if self.add_compiled_expression(
-                    last,
-                    -1,
-                    XmlXPathOp::XPathOpValue,
-                    XmlXPathObjectType::XPathString as i32,
-                    0_i32,
-                    0_i32,
-                    Some(XmlXPathStepOpValue::Object(lit)),
-                    None,
-                ) == -1
-                {
-                    xml_xpath_release_object(self.context, lit);
-                }
-            }
             xml_free(ret as _);
         }
     }
@@ -1886,9 +1870,10 @@ impl XmlXPathContext {
                 xml_pattern_compile(xpath, XmlPatternFlags::XmlPatternXPath as i32, namespaces)
             {
                 if stream.is_streamable() == 1 {
-                    let mut comp = XmlXPathCompExpr::default();
-                    comp.stream = Some(stream);
-                    return Some(comp);
+                    return Some(XmlXPathCompExpr {
+                        stream: Some(stream),
+                        ..Default::default()
+                    });
                 }
             }
         }

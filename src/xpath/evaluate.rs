@@ -448,7 +448,7 @@ impl XmlXPathParserContext {
                 XmlXPathOp::XPathOpValue => {
                     self.value_push(xml_xpath_cache_object_copy(
                         self.context,
-                        *(*op).value4.as_ref().unwrap().as_object().unwrap(),
+                        (*op).value4.as_ref().unwrap().as_object().unwrap(),
                     ));
                 }
                 XmlXPathOp::XPathOpVariable => 'to_break: {
@@ -604,44 +604,40 @@ impl XmlXPathParserContext {
                         ) || matches!(
                             self.comp.borrow().steps[(*op).ch1 as usize].op,
                             XmlXPathOp::XPathOpFilter // 17
-                        ))
-                        && matches!(
+                        )) && matches!(
                             self.comp.borrow().steps[(*op).ch2 as usize].op,
                             XmlXPathOp::XPathOpValue // 12
-                        )
-                    {
-                        let val: XmlXPathObjectPtr = self.comp.borrow().steps[(*op).ch2 as usize]
+                        ) && self.comp.borrow().steps[(*op).ch2 as usize]
                             .value4
                             .as_ref()
                             .and_then(|val| val.as_object())
-                            .map_or(null_mut(), |val| *val);
-                        if !val.is_null()
-                            && (*val).typ == XmlXPathObjectType::XPathNumber
-                            && (*val).floatval == 1.0
-                        {
-                            let mut first = None;
+                            .is_some_and(|obj| {
+                                obj.typ == XmlXPathObjectType::XPathNumber && obj.floatval == 1.0
+                            })
+                    {
+                        let mut first = None;
 
-                            let mut comp = self.comp.borrow_mut();
-                            let op1 = &raw mut comp.steps[(*op).ch1 as usize];
-                            drop(comp);
-                            total += self.evaluate_precompiled_operation_first(op1, &mut first);
-                            if self.error != XmlXPathError::XPathExpressionOK as i32 {
-                                return 0;
-                            };
-                            // The nodeset should be in document order, Keep only the first value
-                            if self.value().is_some_and(|value| {
-                                (*value).typ == XmlXPathObjectType::XPathNodeset
-                            }) {
-                                if let Some(nodeset) = (**self.value_mut().unwrap())
-                                    .nodesetval
-                                    .as_deref_mut()
-                                    .filter(|n| n.len() > 1)
-                                {
-                                    nodeset.truncate(1, true);
-                                }
+                        let mut comp = self.comp.borrow_mut();
+                        let op1 = &raw mut comp.steps[(*op).ch1 as usize];
+                        drop(comp);
+                        total += self.evaluate_precompiled_operation_first(op1, &mut first);
+                        if self.error != XmlXPathError::XPathExpressionOK as i32 {
+                            return 0;
+                        };
+                        // The nodeset should be in document order, Keep only the first value
+                        if self
+                            .value()
+                            .is_some_and(|value| (*value).typ == XmlXPathObjectType::XPathNodeset)
+                        {
+                            if let Some(nodeset) = (**self.value_mut().unwrap())
+                                .nodesetval
+                                .as_deref_mut()
+                                .filter(|n| n.len() > 1)
+                            {
+                                nodeset.truncate(1, true);
                             }
-                            break 'to_break;
                         }
+                        break 'to_break;
                     }
                     // Optimization for ()[last()] selection i.e. the last elem
                     if (*op).ch1 != -1
@@ -1133,7 +1129,7 @@ impl XmlXPathParserContext {
                             .value4
                             .as_ref()
                             .and_then(|val| val.as_object())
-                            .map_or(null_mut(), |obj| *obj),
+                            .unwrap(),
                     ));
                 }
                 XmlXPathOp::XPathOpSort => {
@@ -1331,7 +1327,7 @@ impl XmlXPathParserContext {
                             .value4
                             .as_ref()
                             .and_then(|val| val.as_object())
-                            .map_or(null_mut(), |obj| *obj),
+                            .unwrap(),
                     ));
                 }
                 XmlXPathOp::XPathOpSort => {
@@ -1526,7 +1522,7 @@ impl XmlXPathParserContext {
                             .value4
                             .as_ref()
                             .and_then(|val| val.as_object())
-                            .map_or(null_mut(), |obj| *obj);
+                            .unwrap();
                         if is_predicate {
                             return xml_xpath_evaluate_predicate_result(self, res_obj);
                         }
@@ -1590,9 +1586,9 @@ impl XmlXPathParserContext {
                     // "If the result is a number, the result will be converted
                     //  to true if the number is equal to the context position
                     //  and will be converted to false otherwise;"
-                    xml_xpath_evaluate_predicate_result(self, res_obj)
+                    xml_xpath_evaluate_predicate_result(self, &*res_obj)
                 } else {
-                    xml_xpath_cast_to_boolean(res_obj) as i32
+                    xml_xpath_cast_to_boolean(&*res_obj) as i32
                 };
                 xml_xpath_release_object(self.context, res_obj);
                 return res;

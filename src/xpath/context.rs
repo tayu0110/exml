@@ -158,62 +158,56 @@ impl XmlXPathParserContext {
     }
 
     #[doc(alias = "xmlXPathIsPositionalPredicate")]
-    pub(super) unsafe fn is_positional_predicate(
-        &self,
-        op: &XmlXPathStepOp,
-        max_pos: &mut i32,
-    ) -> i32 {
-        unsafe {
-            // BIG NOTE: This is not intended for XPATH_OP_FILTER yet!
+    pub(super) fn is_positional_predicate(&self, op: &XmlXPathStepOp, max_pos: &mut i32) -> i32 {
+        // BIG NOTE: This is not intended for XPATH_OP_FILTER yet!
 
-            // If not -1, then ch1 will point to:
-            // 1) For predicates (XPATH_OP_PREDICATE):
-            //    - an inner predicate operator
-            // 2) For filters (XPATH_OP_FILTER):
-            //    - an inner filter operator OR
-            //    - an expression selecting the node set.
-            //      E.g. "key('a', 'b')" or "(//foo | //bar)".
-            if !matches!(
-                op.op,
-                XmlXPathOp::XPathOpPredicate | XmlXPathOp::XPathOpFilter
-            ) {
-                return 0;
-            }
+        // If not -1, then ch1 will point to:
+        // 1) For predicates (XPATH_OP_PREDICATE):
+        //    - an inner predicate operator
+        // 2) For filters (XPATH_OP_FILTER):
+        //    - an inner filter operator OR
+        //    - an expression selecting the node set.
+        //      E.g. "key('a', 'b')" or "(//foo | //bar)".
+        if !matches!(
+            op.op,
+            XmlXPathOp::XPathOpPredicate | XmlXPathOp::XPathOpFilter
+        ) {
+            return 0;
+        }
 
-            if op.ch2 == -1 || op.ch2 >= self.comp.borrow().steps.len() as i32 {
-                return 0;
-            }
-            let expr_op = &self.comp.borrow().steps[op.ch2 as usize];
+        if op.ch2 == -1 || op.ch2 >= self.comp.borrow().steps.len() as i32 {
+            return 0;
+        }
+        let expr_op = &self.comp.borrow().steps[op.ch2 as usize];
 
-            if let Some(obj) = expr_op
-                .value4
-                .as_ref()
-                .and_then(|val| val.as_object())
-                .filter(|&obj| {
-                    matches!(expr_op.op, XmlXPathOp::XPathOpValue)
-                        && matches!((**obj).typ, XmlXPathObjectType::XPathNumber)
-                })
-            {
-                let floatval: f64 = (**obj).floatval;
+        if let Some(obj) = expr_op
+            .value4
+            .as_ref()
+            .and_then(|val| val.as_object())
+            .filter(|&obj| {
+                matches!(expr_op.op, XmlXPathOp::XPathOpValue)
+                    && matches!(obj.typ, XmlXPathObjectType::XPathNumber)
+            })
+        {
+            let floatval: f64 = obj.floatval;
 
-                // We have a "[n]" predicate here.
-                // TODO: Unfortunately this simplistic test here is not
-                // able to detect a position() predicate in compound
-                // expressions like "[@attr = 'a" and position() = 1],
-                // and even not the usage of position() in
-                // "[position() = 1]"; thus - obviously - a position-range,
-                // like it "[position() < 5]", is also not detected.
-                // Maybe we could rewrite the AST to ease the optimization.
+            // We have a "[n]" predicate here.
+            // TODO: Unfortunately this simplistic test here is not
+            // able to detect a position() predicate in compound
+            // expressions like "[@attr = 'a" and position() = 1],
+            // and even not the usage of position() in
+            // "[position() = 1]"; thus - obviously - a position-range,
+            // like it "[position() < 5]", is also not detected.
+            // Maybe we could rewrite the AST to ease the optimization.
 
-                if floatval > i32::MIN as f64 && floatval < i32::MAX as f64 {
-                    *max_pos = floatval as i32;
-                    if floatval == *max_pos as f64 {
-                        return 1;
-                    }
+            if floatval > i32::MIN as f64 && floatval < i32::MAX as f64 {
+                *max_pos = floatval as i32;
+                if floatval == *max_pos as f64 {
+                    return 1;
                 }
             }
-            0
         }
+        0
     }
 
     /// Pushes a new XPath object on top of the value stack. If value is NULL,
@@ -291,7 +285,7 @@ impl XmlXPathParserContext {
                 return false;
             }
             let ret = if (*obj).typ != XmlXPathObjectType::XPathBoolean {
-                xml_xpath_cast_to_boolean(obj)
+                xml_xpath_cast_to_boolean(&*obj)
             } else {
                 (*obj).boolval
             };
