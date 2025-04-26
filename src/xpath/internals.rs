@@ -26,14 +26,13 @@
 //
 // Author: daniel@veillard.com
 
-use std::{mem::size_of, os::raw::c_void, ptr::null_mut};
+use std::{borrow::Cow, mem::size_of, os::raw::c_void, ptr::null_mut};
 
 #[cfg(feature = "libxml_xptr_locs")]
 use crate::libxml::xpointer::XmlLocationSet;
 use crate::{
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     generic_error,
-    hash::XmlHashTableRef,
     libxml::{
         chvalid::xml_is_blank_char,
         globals::{xml_free, xml_malloc},
@@ -44,18 +43,18 @@ use crate::{
         XmlGenericNodePtr, XmlNodePtr, XmlNs, XmlNsPtr,
     },
     xpath::{
-        XML_XPATH_NAN, XmlXPathContextPtr, XmlXPathError, XmlXPathObjectPtr, XmlXPathObjectType,
+        XML_XPATH_NAN, XmlXPathContextPtr, XmlXPathError, XmlXPathObjectType,
         XmlXPathParserContextPtr, XmlXPathVariableLookupFunc,
         functions::{cast_to_number, xml_xpath_number_function},
         xml_xpath_cast_node_to_number, xml_xpath_cast_node_to_string,
-        xml_xpath_cast_number_to_boolean, xml_xpath_cast_to_number, xml_xpath_free_object,
-        xml_xpath_is_inf, xml_xpath_is_nan, xml_xpath_node_set_create, xml_xpath_object_copy,
+        xml_xpath_cast_number_to_boolean, xml_xpath_cast_to_number, xml_xpath_is_inf,
+        xml_xpath_is_nan, xml_xpath_node_set_create, xml_xpath_object_copy,
     },
 };
 
 use super::{
-    XmlNodeSet, XmlXPathContext, XmlXPathParserContext, functions::xml_xpath_boolean_function,
-    xml_xpath_new_node_set, xml_xpath_new_string,
+    XmlNodeSet, XmlXPathContext, XmlXPathObject, XmlXPathParserContext,
+    functions::xml_xpath_boolean_function, xml_xpath_new_node_set, xml_xpath_new_string,
 };
 
 /// Register an external mechanism to do variable lookup
@@ -220,15 +219,9 @@ pub unsafe fn xml_xpath_err(ctxt: Option<&mut XmlXPathParserContext>, mut error:
 pub unsafe fn xml_xpath_register_variable(
     ctxt: XmlXPathContextPtr,
     name: &str,
-    value: XmlXPathObjectPtr,
+    value: Option<XmlXPathObject>,
 ) -> i32 {
     unsafe { xml_xpath_register_variable_ns(ctxt, name, None, value) }
-}
-
-extern "C" fn xml_xpath_free_object_entry(obj: XmlXPathObjectPtr) {
-    unsafe {
-        xml_xpath_free_object(obj);
-    }
 }
 
 /// Register a new variable value. If @value is NULL it unregisters the variable
@@ -239,36 +232,27 @@ pub unsafe fn xml_xpath_register_variable_ns(
     ctxt: XmlXPathContextPtr,
     name: &str,
     ns_uri: Option<&str>,
-    value: XmlXPathObjectPtr,
+    value: Option<XmlXPathObject>,
 ) -> i32 {
     unsafe {
         if ctxt.is_null() {
             return -1;
         }
 
-        let mut var_hash = if let Some(var_hash) = (*ctxt).var_hash {
-            var_hash
-        } else {
-            let Some(table) = XmlHashTableRef::with_capacity(0) else {
-                return -1;
+        let name = Cow::Owned(name.to_owned());
+        let ns_uri = ns_uri.map(|uri| Cow::Owned(uri.to_owned()));
+        let Some(value) = value else {
+            return if (*ctxt).var_hash.remove(&(name, ns_uri)).is_some() {
+                0
+            } else {
+                -1
             };
-            (*ctxt).var_hash = Some(table);
-            table
         };
-        if value.is_null() {
-            return match var_hash.remove_entry2(name, ns_uri, |data, _| {
-                xml_xpath_free_object_entry(data);
-            }) {
-                Ok(_) => 0,
-                Err(_) => -1,
-            };
-        }
 
-        match var_hash.update_entry2(name, ns_uri, value, |data, _| {
-            xml_xpath_free_object_entry(data);
-        }) {
-            Ok(_) => 0,
-            Err(_) => -1,
+        if (*ctxt).var_hash.insert((name, ns_uri), value).is_none() {
+            0
+        } else {
+            -1
         }
     }
 }
@@ -277,10 +261,13 @@ pub unsafe fn xml_xpath_register_variable_ns(
 ///
 /// Returns a copy of the value or NULL if not found
 #[doc(alias = "xmlXPathVariableLookup")]
-pub unsafe fn xml_xpath_variable_lookup(ctxt: XmlXPathContextPtr, name: &str) -> XmlXPathObjectPtr {
+pub unsafe fn xml_xpath_variable_lookup(
+    ctxt: XmlXPathContextPtr,
+    name: &str,
+) -> Option<XmlXPathObject> {
     unsafe {
         if ctxt.is_null() {
-            return null_mut();
+            return None;
         }
 
         if let Some(var_lookup_func) = (*ctxt).var_lookup_func {
@@ -358,28 +345,22 @@ pub unsafe fn xml_xpath_variable_lookup_ns(
     ctxt: XmlXPathContextPtr,
     name: &str,
     ns_uri: Option<&str>,
-) -> XmlXPathObjectPtr {
+) -> Option<XmlXPathObject> {
     unsafe {
         if ctxt.is_null() {
-            return null_mut();
+            return None;
         }
 
         if let Some(var_lookup_func) = (*ctxt).var_lookup_func {
-            let ret: XmlXPathObjectPtr = var_lookup_func((*ctxt).var_lookup_data, name, ns_uri);
-            if !ret.is_null() {
-                return ret;
+            if let Some(ret) = var_lookup_func((*ctxt).var_lookup_data, name, ns_uri) {
+                return Some(ret);
             }
         }
 
-        let Some(var_hash) = (*ctxt).var_hash else {
-            return null_mut();
-        };
-
-        let obj = var_hash
-            .lookup2(name, ns_uri)
-            .copied()
-            .unwrap_or(null_mut());
-        xml_xpath_object_copy(&*obj)
+        let obj = (*ctxt)
+            .var_hash
+            .get(&(name.into(), ns_uri.map(Cow::Borrowed)))?;
+        Some(xml_xpath_object_copy(obj))
     }
 }
 
@@ -391,11 +372,7 @@ pub unsafe fn xml_xpath_registered_variables_cleanup(ctxt: XmlXPathContextPtr) {
             return;
         }
 
-        if let Some(mut var_hash) = (*ctxt).var_hash.take().map(|t| t.into_inner()) {
-            var_hash.clear_with(|data, _| {
-                xml_xpath_free_object_entry(data);
-            });
-        }
+        (*ctxt).var_hash.clear();
     }
 }
 
@@ -1169,32 +1146,24 @@ fn xml_xpath_node_val_hash(node: Option<XmlGenericNodePtr>) -> u32 {
 ///
 /// Returns 0 or 1 depending on the results of the test.
 #[doc(alias = "xmlXPathEqualNodeSets")]
-unsafe fn xml_xpath_equal_node_sets(
-    arg1: XmlXPathObjectPtr,
-    arg2: XmlXPathObjectPtr,
-    neq: i32,
-) -> i32 {
+unsafe fn xml_xpath_equal_node_sets(arg1: XmlXPathObject, arg2: XmlXPathObject, neq: i32) -> i32 {
     unsafe {
         let mut ret: i32 = 0;
 
-        if arg1.is_null()
-            || !matches!(
-                (*arg1).typ,
-                XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
-            )
-        {
+        if !matches!(
+            arg1.typ,
+            XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
+        ) {
             return 0;
         }
-        if arg2.is_null()
-            || !matches!(
-                (*arg2).typ,
-                XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
-            )
-        {
+        if !matches!(
+            arg2.typ,
+            XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
+        ) {
             return 0;
         }
 
-        let (Some(ns1), Some(ns2)) = ((*arg1).nodesetval.as_deref(), (*arg2).nodesetval.as_deref())
+        let (Some(ns1), Some(ns2)) = (arg1.nodesetval.as_deref(), arg2.nodesetval.as_deref())
         else {
             return 0;
         };
@@ -1273,26 +1242,21 @@ unsafe fn xml_xpath_equal_node_sets(
 #[doc(alias = "xmlXPathEqualNodeSetFloat")]
 unsafe fn xml_xpath_equal_node_set_float(
     ctxt: XmlXPathParserContextPtr,
-    arg: XmlXPathObjectPtr,
+    arg: XmlXPathObject,
     f: f64,
     neq: i32,
 ) -> i32 {
     unsafe {
         let mut ret: i32 = 0;
 
-        let mut val: XmlXPathObjectPtr;
-        let mut v: f64;
-
-        if arg.is_null()
-            || !matches!(
-                (*arg).typ,
-                XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
-            )
-        {
+        if !matches!(
+            arg.typ,
+            XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
+        ) {
             return 0;
         }
 
-        if let Some(ns) = (*arg).nodesetval.as_deref() {
+        if let Some(ns) = arg.nodesetval.as_deref() {
             for &node in &ns.node_tab {
                 (*ctxt).value_push(xml_xpath_new_string(Some(&xml_xpath_cast_node_to_string(
                     Some(node),
@@ -1301,9 +1265,8 @@ unsafe fn xml_xpath_equal_node_set_float(
                 if (*ctxt).error != XmlXPathError::XPathExpressionOK as i32 {
                     return 0;
                 };
-                val = (*ctxt).value_pop();
-                v = (*val).floatval;
-                xml_xpath_free_object(val);
+                let val = (*ctxt).value_pop().unwrap();
+                let v = val.floatval;
                 if !xml_xpath_is_nan(v) {
                     if (neq == 0 && v == f) || (neq != 0 && v != f) {
                         ret = 1;
@@ -1343,68 +1306,61 @@ fn xml_xpath_string_hash(string: &str) -> u32 {
 ///
 /// Returns 0 or 1 depending on the results of the test.
 #[doc(alias = "xmlXPathEqualNodeSetString")]
-unsafe fn xml_xpath_equal_node_set_string(arg: XmlXPathObjectPtr, s: &str, neq: i32) -> i32 {
-    unsafe {
-        if arg.is_null()
-            || !matches!(
-                (*arg).typ,
-                XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
-            )
-        {
-            return 0;
-        }
+unsafe fn xml_xpath_equal_node_set_string(arg: XmlXPathObject, s: &str, neq: i32) -> i32 {
+    if !matches!(
+        arg.typ,
+        XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
+    ) {
+        return 0;
+    }
 
-        // A NULL nodeset compared with a string is always false
-        // (since there is no node equal, and no node not equal)
-        let Some(ns) = (*arg).nodesetval.as_deref().filter(|n| !n.is_empty()) else {
-            return 0;
-        };
+    // A NULL nodeset compared with a string is always false
+    // (since there is no node equal, and no node not equal)
+    let Some(ns) = arg.nodesetval.as_deref().filter(|n| !n.is_empty()) else {
+        return 0;
+    };
 
-        let hash: u32 = xml_xpath_string_hash(s);
-        for &node in &ns.node_tab {
-            if xml_xpath_node_val_hash(Some(node)) == hash {
-                let str2 = node.get_content();
-                if (str2.is_some() && Some(s) == str2.as_deref())
-                    || (str2.is_none() && s.is_empty())
-                {
-                    if neq != 0 {
-                        continue;
-                    }
-                    return 1;
-                } else if neq != 0 {
-                    return 1;
+    let hash: u32 = xml_xpath_string_hash(s);
+    for &node in &ns.node_tab {
+        if xml_xpath_node_val_hash(Some(node)) == hash {
+            let str2 = node.get_content();
+            if (str2.is_some() && Some(s) == str2.as_deref()) || (str2.is_none() && s.is_empty()) {
+                if neq != 0 {
+                    continue;
                 }
+                return 1;
             } else if neq != 0 {
                 return 1;
             }
+        } else if neq != 0 {
+            return 1;
         }
-        0
     }
+    0
 }
 
 unsafe fn xml_xpath_equal_values_common(
     ctxt: XmlXPathParserContextPtr,
-    mut arg1: XmlXPathObjectPtr,
-    mut arg2: XmlXPathObjectPtr,
+    mut arg1: XmlXPathObject,
+    mut arg2: XmlXPathObject,
 ) -> i32 {
     unsafe {
         let mut ret: i32 = 0;
         // At this point we are assured neither arg1 nor arg2
         // is a nodeset, so we can just pick the appropriate routine.
-        match (*arg1).typ {
+        match arg1.typ {
             XmlXPathObjectType::XPathUndefined => {}
-            XmlXPathObjectType::XPathBoolean => match (*arg2).typ {
+            XmlXPathObjectType::XPathBoolean => match arg2.typ {
                 XmlXPathObjectType::XPathUndefined => {}
                 XmlXPathObjectType::XPathBoolean => {
-                    ret = ((*arg1).boolval == (*arg2).boolval) as i32;
+                    ret = (arg1.boolval == arg2.boolval) as i32;
                 }
                 XmlXPathObjectType::XPathNumber => {
-                    ret = ((*arg1).boolval == xml_xpath_cast_number_to_boolean((*arg2).floatval))
-                        as i32;
+                    ret = (arg1.boolval == xml_xpath_cast_number_to_boolean(arg2.floatval)) as i32;
                 }
                 XmlXPathObjectType::XPathString => {
-                    let f = (*arg2).stringval.as_deref().is_some_and(|s| !s.is_empty());
-                    ret = ((*arg1).boolval == f) as i32;
+                    let f = arg2.stringval.as_deref().is_some_and(|s| !s.is_empty());
+                    ret = (arg1.boolval == f) as i32;
                 }
                 XmlXPathObjectType::XPathUsers => {
                     todo!()
@@ -1418,11 +1374,10 @@ unsafe fn xml_xpath_equal_values_common(
                 XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {}
             },
             XmlXPathObjectType::XPathNumber => {
-                match (*arg2).typ {
+                match arg2.typ {
                     XmlXPathObjectType::XPathUndefined => {}
                     XmlXPathObjectType::XPathBoolean => {
-                        ret = ((*arg2).boolval
-                            == xml_xpath_cast_number_to_boolean((*arg1).floatval))
+                        ret = (arg2.boolval == xml_xpath_cast_number_to_boolean(arg1.floatval))
                             as i32;
                     }
 
@@ -1431,7 +1386,7 @@ unsafe fn xml_xpath_equal_values_common(
                         if matches!(ty, XmlXPathObjectType::XPathString) {
                             (*ctxt).value_push(arg2);
                             xml_xpath_number_function(&mut *ctxt, 1);
-                            arg2 = (*ctxt).value_pop();
+                            arg2 = (*ctxt).value_pop().unwrap();
                             if (*ctxt).error != 0 {
                                 break 'to_break;
                             }
@@ -1439,35 +1394,34 @@ unsafe fn xml_xpath_equal_values_common(
                         }
 
                         // Hand check NaN and Infinity equalities
-                        if xml_xpath_is_nan((*arg1).floatval) || xml_xpath_is_nan((*arg2).floatval)
-                        {
+                        if xml_xpath_is_nan(arg1.floatval) || xml_xpath_is_nan(arg2.floatval) {
                             ret = 0;
-                        } else if xml_xpath_is_inf((*arg1).floatval) == 1 {
-                            if xml_xpath_is_inf((*arg2).floatval) == 1 {
+                        } else if xml_xpath_is_inf(arg1.floatval) == 1 {
+                            if xml_xpath_is_inf(arg2.floatval) == 1 {
                                 ret = 1;
                             } else {
                                 ret = 0;
                             }
-                        } else if xml_xpath_is_inf((*arg1).floatval) == -1 {
-                            if xml_xpath_is_inf((*arg2).floatval) == -1 {
+                        } else if xml_xpath_is_inf(arg1.floatval) == -1 {
+                            if xml_xpath_is_inf(arg2.floatval) == -1 {
                                 ret = 1;
                             } else {
                                 ret = 0;
                             }
-                        } else if xml_xpath_is_inf((*arg2).floatval) == 1 {
-                            if xml_xpath_is_inf((*arg1).floatval) == 1 {
+                        } else if xml_xpath_is_inf(arg2.floatval) == 1 {
+                            if xml_xpath_is_inf(arg1.floatval) == 1 {
                                 ret = 1;
                             } else {
                                 ret = 0;
                             }
-                        } else if xml_xpath_is_inf((*arg2).floatval) == -1 {
-                            if xml_xpath_is_inf((*arg1).floatval) == -1 {
+                        } else if xml_xpath_is_inf(arg2.floatval) == -1 {
+                            if xml_xpath_is_inf(arg1.floatval) == -1 {
                                 ret = 1;
                             } else {
                                 ret = 0;
                             }
                         } else {
-                            ret = ((*arg1).floatval == (*arg2).floatval) as i32;
+                            ret = (arg1.floatval == arg2.floatval) as i32;
                         }
                     }
                     XmlXPathObjectType::XPathUsers => {
@@ -1483,53 +1437,51 @@ unsafe fn xml_xpath_equal_values_common(
                 }
             }
             XmlXPathObjectType::XPathString => {
-                match (*arg2).typ {
+                match arg2.typ {
                     XmlXPathObjectType::XPathUndefined => {}
                     XmlXPathObjectType::XPathBoolean => {
-                        let f = (*arg1).stringval.as_deref().is_some_and(|s| !s.is_empty());
-                        ret = ((*arg2).boolval == f) as i32;
+                        let f = arg1.stringval.as_deref().is_some_and(|s| !s.is_empty());
+                        ret = (arg2.boolval == f) as i32;
                     }
                     XmlXPathObjectType::XPathString => {
-                        ret = ((*arg1).stringval == (*arg2).stringval) as i32;
+                        ret = (arg1.stringval == arg2.stringval) as i32;
                     }
                     XmlXPathObjectType::XPathNumber => {
                         (*ctxt).value_push(arg1);
                         xml_xpath_number_function(&mut *ctxt, 1);
-                        arg1 = (*ctxt).value_pop();
+                        arg1 = (*ctxt).value_pop().unwrap();
                         if (*ctxt).error != 0 {
                             // break;
                         } else {
                             // Hand check NaN and Infinity equalities
-                            if xml_xpath_is_nan((*arg1).floatval)
-                                || xml_xpath_is_nan((*arg2).floatval)
-                            {
+                            if xml_xpath_is_nan(arg1.floatval) || xml_xpath_is_nan(arg2.floatval) {
                                 ret = 0;
-                            } else if xml_xpath_is_inf((*arg1).floatval) == 1 {
-                                if xml_xpath_is_inf((*arg2).floatval) == 1 {
+                            } else if xml_xpath_is_inf(arg1.floatval) == 1 {
+                                if xml_xpath_is_inf(arg2.floatval) == 1 {
                                     ret = 1;
                                 } else {
                                     ret = 0;
                                 }
-                            } else if xml_xpath_is_inf((*arg1).floatval) == -1 {
-                                if xml_xpath_is_inf((*arg2).floatval) == -1 {
+                            } else if xml_xpath_is_inf(arg1.floatval) == -1 {
+                                if xml_xpath_is_inf(arg2.floatval) == -1 {
                                     ret = 1;
                                 } else {
                                     ret = 0;
                                 }
-                            } else if xml_xpath_is_inf((*arg2).floatval) == 1 {
-                                if xml_xpath_is_inf((*arg1).floatval) == 1 {
+                            } else if xml_xpath_is_inf(arg2.floatval) == 1 {
+                                if xml_xpath_is_inf(arg1.floatval) == 1 {
                                     ret = 1;
                                 } else {
                                     ret = 0;
                                 }
-                            } else if xml_xpath_is_inf((*arg2).floatval) == -1 {
-                                if xml_xpath_is_inf((*arg1).floatval) == -1 {
+                            } else if xml_xpath_is_inf(arg2.floatval) == -1 {
+                                if xml_xpath_is_inf(arg1.floatval) == -1 {
                                     ret = 1;
                                 } else {
                                     ret = 0;
                                 }
                             } else {
-                                ret = ((*arg1).floatval == (*arg2).floatval) as i32;
+                                ret = (arg1.floatval == arg2.floatval) as i32;
                             }
                         }
                     }
@@ -1556,8 +1508,6 @@ unsafe fn xml_xpath_equal_values_common(
             }
             XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {}
         }
-        xml_xpath_free_object(arg1);
-        xml_xpath_free_object(arg2);
         ret
     }
 }
@@ -1568,64 +1518,51 @@ unsafe fn xml_xpath_equal_values_common(
 #[doc(alias = "xmlXPathEqualValues")]
 pub unsafe fn xml_xpath_equal_values(ctxt: XmlXPathParserContextPtr) -> i32 {
     unsafe {
-        let mut arg1: XmlXPathObjectPtr;
-        let mut arg2: XmlXPathObjectPtr;
-        let argtmp: XmlXPathObjectPtr;
         let mut ret: i32 = 0;
 
         if ctxt.is_null() || (*ctxt).context.is_null() {
             return 0;
         }
-        arg2 = (*ctxt).value_pop();
-        arg1 = (*ctxt).value_pop();
-        if arg1.is_null() || arg2.is_null() {
-            if !arg1.is_null() {
-                xml_xpath_free_object(arg1);
-            } else {
-                xml_xpath_free_object(arg2);
-            }
+        let Some((mut arg2, mut arg1)) = (*ctxt).value_pop().zip((*ctxt).value_pop()) else {
             xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathInvalidOperand as i32);
             return 0;
-        }
+        };
 
         if arg1 == arg2 {
-            xml_xpath_free_object(arg1);
             return 1;
         }
 
         // If either argument is a nodeset, it's a 'special case'
         if matches!(
-            (*arg2).typ,
+            arg2.typ,
             XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
         ) || matches!(
-            (*arg1).typ,
+            arg1.typ,
             XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
         ) {
             // Hack it to assure arg1 is the nodeset
             if !matches!(
-                (*arg1).typ,
+                arg1.typ,
                 XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
             ) {
-                argtmp = arg2;
-                arg2 = arg1;
-                arg1 = argtmp;
+                (arg1, arg2) = (arg2, arg1);
             }
-            match (*arg2).typ {
+            match arg2.typ {
                 XmlXPathObjectType::XPathUndefined => {}
                 XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
                     ret = xml_xpath_equal_node_sets(arg1, arg2, 0);
                 }
                 XmlXPathObjectType::XPathBoolean => {
-                    let f = (*arg1).nodesetval.as_deref().is_some_and(|n| !n.is_empty());
-                    ret = (f == (*arg2).boolval) as i32;
+                    let f = arg1.nodesetval.as_deref().is_some_and(|n| !n.is_empty());
+                    ret = (f == arg2.boolval) as i32;
                 }
                 XmlXPathObjectType::XPathNumber => {
-                    ret = xml_xpath_equal_node_set_float(ctxt, arg1, (*arg2).floatval, 0);
+                    ret = xml_xpath_equal_node_set_float(ctxt, arg1, arg2.floatval, 0);
                 }
                 XmlXPathObjectType::XPathString => {
                     ret = xml_xpath_equal_node_set_string(
                         arg1,
-                        (*arg2).stringval.as_deref().expect("Internal Error"),
+                        arg2.stringval.as_deref().expect("Internal Error"),
                         0,
                     );
                 }
@@ -1638,8 +1575,6 @@ pub unsafe fn xml_xpath_equal_values(ctxt: XmlXPathParserContextPtr) -> i32 {
                 | XmlXPathObjectType::XPathLocationset => todo!(),
                 // _ => {}
             }
-            xml_xpath_free_object(arg1);
-            xml_xpath_free_object(arg2);
             return ret;
         }
 
@@ -1653,65 +1588,51 @@ pub unsafe fn xml_xpath_equal_values(ctxt: XmlXPathParserContextPtr) -> i32 {
 #[doc(alias = "xmlXPathNotEqualValues")]
 pub unsafe fn xml_xpath_not_equal_values(ctxt: XmlXPathParserContextPtr) -> i32 {
     unsafe {
-        let mut arg1: XmlXPathObjectPtr;
-        let mut arg2: XmlXPathObjectPtr;
-        let argtmp: XmlXPathObjectPtr;
         let mut ret: i32 = 0;
 
         if ctxt.is_null() || (*ctxt).context.is_null() {
             return 0;
         }
-        arg2 = (*ctxt).value_pop();
-        arg1 = (*ctxt).value_pop();
-        if arg1.is_null() || arg2.is_null() {
-            if !arg1.is_null() {
-                xml_xpath_free_object(arg1);
-            } else {
-                xml_xpath_free_object(arg2);
-            }
-
+        let Some((mut arg2, mut arg1)) = (*ctxt).value_pop().zip((*ctxt).value_pop()) else {
             xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathInvalidOperand as i32);
             return 0;
-        }
+        };
 
         if arg1 == arg2 {
-            xml_xpath_free_object(arg1);
             return 0;
         }
 
         // If either argument is a nodeset, it's a 'special case'
         if matches!(
-            (*arg2).typ,
+            arg2.typ,
             XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
         ) || matches!(
-            (*arg1).typ,
+            arg1.typ,
             XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
         ) {
             // Hack it to assure arg1 is the nodeset
             if !matches!(
-                (*arg1).typ,
+                arg1.typ,
                 XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
             ) {
-                argtmp = arg2;
-                arg2 = arg1;
-                arg1 = argtmp;
+                (arg1, arg2) = (arg2, arg1);
             }
-            match (*arg2).typ {
+            match arg2.typ {
                 XmlXPathObjectType::XPathUndefined => {}
                 XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
                     ret = xml_xpath_equal_node_sets(arg1, arg2, 1);
                 }
                 XmlXPathObjectType::XPathBoolean => {
-                    let f = (*arg1).nodesetval.as_deref().is_some_and(|n| !n.is_empty());
-                    ret = (f != (*arg2).boolval) as i32;
+                    let f = arg1.nodesetval.as_deref().is_some_and(|n| !n.is_empty());
+                    ret = (f != arg2.boolval) as i32;
                 }
                 XmlXPathObjectType::XPathNumber => {
-                    ret = xml_xpath_equal_node_set_float(ctxt, arg1, (*arg2).floatval, 1);
+                    ret = xml_xpath_equal_node_set_float(ctxt, arg1, arg2.floatval, 1);
                 }
                 XmlXPathObjectType::XPathString => {
                     ret = xml_xpath_equal_node_set_string(
                         arg1,
-                        (*arg2).stringval.as_deref().expect("Internal Error"),
+                        arg2.stringval.as_deref().expect("Internal Error"),
                         1,
                     );
                 }
@@ -1725,8 +1646,6 @@ pub unsafe fn xml_xpath_not_equal_values(ctxt: XmlXPathParserContextPtr) -> i32 
                     todo!()
                 } // _ => {}
             }
-            xml_xpath_free_object(arg1);
-            xml_xpath_free_object(arg2);
             return ret;
         }
 
@@ -1758,52 +1677,41 @@ pub unsafe fn xml_xpath_not_equal_values(ctxt: XmlXPathParserContextPtr) -> i32 
 unsafe fn xml_xpath_compare_node_sets(
     inf: i32,
     strict: i32,
-    arg1: XmlXPathObjectPtr,
-    arg2: XmlXPathObjectPtr,
+    arg1: XmlXPathObject,
+    arg2: XmlXPathObject,
 ) -> i32 {
     unsafe {
         let mut init: i32 = 0;
         let mut val1: f64;
         let mut ret: i32 = 0;
 
-        if arg1.is_null()
-            || !matches!(
-                (*arg1).typ,
-                XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
-            )
-        {
-            xml_xpath_free_object(arg2);
+        if !matches!(
+            arg1.typ,
+            XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
+        ) {
             return 0;
         }
-        if arg2.is_null()
-            || !matches!(
-                (*arg2).typ,
-                XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
-            )
-        {
-            xml_xpath_free_object(arg1);
-            xml_xpath_free_object(arg2);
+        if !matches!(
+            arg2.typ,
+            XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
+        ) {
             return 0;
         }
 
-        let Some(ns1_table) = (*arg1)
+        let Some(ns1_table) = arg1
             .nodesetval
             .as_deref()
             .filter(|set| !set.node_tab.is_empty())
             .map(|n| n.node_tab.as_slice())
         else {
-            xml_xpath_free_object(arg1);
-            xml_xpath_free_object(arg2);
             return 0;
         };
-        let Some(ns2_table) = (*arg2)
+        let Some(ns2_table) = arg2
             .nodesetval
             .as_deref()
             .filter(|set| !set.node_tab.is_empty())
             .map(|n| n.node_tab.as_slice())
         else {
-            xml_xpath_free_object(arg1);
-            xml_xpath_free_object(arg2);
             return 0;
         };
 
@@ -1811,8 +1719,6 @@ unsafe fn xml_xpath_compare_node_sets(
         if values2.is_null() {
             // TODO: Propagate memory error.
             xml_xpath_err_memory(None, Some("comparing nodesets\n"));
-            xml_xpath_free_object(arg1);
-            xml_xpath_free_object(arg2);
             return 0;
         }
         for &node1 in ns1_table {
@@ -1846,8 +1752,6 @@ unsafe fn xml_xpath_compare_node_sets(
             init = 1;
         }
         xml_free(values2 as _);
-        xml_xpath_free_object(arg1);
-        xml_xpath_free_object(arg2);
         ret
     }
 }
@@ -1870,38 +1774,31 @@ unsafe fn xml_xpath_compare_node_set_float(
     ctxt: XmlXPathParserContextPtr,
     inf: i32,
     strict: i32,
-    arg: XmlXPathObjectPtr,
-    f: XmlXPathObjectPtr,
+    arg: XmlXPathObject,
+    f: XmlXPathObject,
 ) -> i32 {
     unsafe {
         let mut ret: i32 = 0;
 
-        if f.is_null()
-            || arg.is_null()
-            || !matches!(
-                (*arg).typ,
-                XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
-            )
-        {
-            xml_xpath_free_object(arg);
-            xml_xpath_free_object(f);
+        if !matches!(
+            arg.typ,
+            XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
+        ) {
             return 0;
         }
-        if let Some(ns) = (*arg).nodesetval.as_deref() {
+        if let Some(ns) = arg.nodesetval.as_deref() {
             for &node in &ns.node_tab {
                 (*ctxt).value_push(xml_xpath_new_string(Some(&xml_xpath_cast_node_to_string(
                     Some(node),
                 ))));
                 xml_xpath_number_function(&mut *ctxt, 1);
-                (*ctxt).value_push(xml_xpath_object_copy(&*f));
+                (*ctxt).value_push(xml_xpath_object_copy(&f));
                 ret = xml_xpath_compare_values(ctxt, inf, strict);
                 if ret != 0 {
                     break;
                 }
             }
         }
-        xml_xpath_free_object(arg);
-        xml_xpath_free_object(f);
         ret
     }
 }
@@ -1923,37 +1820,30 @@ unsafe fn xml_xpath_compare_node_set_string(
     ctxt: XmlXPathParserContextPtr,
     inf: i32,
     strict: i32,
-    arg: XmlXPathObjectPtr,
-    s: XmlXPathObjectPtr,
+    arg: XmlXPathObject,
+    s: XmlXPathObject,
 ) -> i32 {
     unsafe {
         let mut ret: i32 = 0;
 
-        if s.is_null()
-            || arg.is_null()
-            || !matches!(
-                (*arg).typ,
-                XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
-            )
-        {
-            xml_xpath_free_object(arg);
-            xml_xpath_free_object(s);
+        if !matches!(
+            arg.typ,
+            XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
+        ) {
             return 0;
         }
-        if let Some(ns) = (*arg).nodesetval.as_deref() {
+        if let Some(ns) = arg.nodesetval.as_deref() {
             for &node in &ns.node_tab {
                 (*ctxt).value_push(xml_xpath_new_string(Some(&xml_xpath_cast_node_to_string(
                     Some(node),
                 ))));
-                (*ctxt).value_push(xml_xpath_object_copy(&*s));
+                (*ctxt).value_push(xml_xpath_object_copy(&s));
                 ret = xml_xpath_compare_values(ctxt, inf, strict);
                 if ret != 0 {
                     break;
                 }
             }
         }
-        xml_xpath_free_object(arg);
-        xml_xpath_free_object(s);
         ret
     }
 }
@@ -1975,21 +1865,18 @@ unsafe fn xml_xpath_compare_node_set_value(
     ctxt: XmlXPathParserContextPtr,
     inf: i32,
     strict: i32,
-    arg: XmlXPathObjectPtr,
-    val: XmlXPathObjectPtr,
+    arg: XmlXPathObject,
+    val: XmlXPathObject,
 ) -> i32 {
     unsafe {
-        if val.is_null()
-            || arg.is_null()
-            || !matches!(
-                (*arg).typ,
-                XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
-            )
-        {
+        if !matches!(
+            arg.typ,
+            XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
+        ) {
             return 0;
         }
 
-        match (*val).typ {
+        match val.typ {
             XmlXPathObjectType::XPathNumber => {
                 xml_xpath_compare_node_set_float(ctxt, inf, strict, arg, val)
             }
@@ -2008,10 +1895,8 @@ unsafe fn xml_xpath_compare_node_set_value(
             _ => {
                 generic_error!(
                     "xmlXPathCompareNodeSetValue: Can't compare node set and object of type {:?}\n",
-                    (*val).typ
+                    val.typ
                 );
-                xml_xpath_free_object(arg);
-                xml_xpath_free_object(val);
                 xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathInvalidType as i32);
                 0
             }
@@ -2046,44 +1931,35 @@ pub unsafe fn xml_xpath_compare_values(
         let mut ret: i32 = 0;
         let arg1i: i32;
         let arg2i: i32;
-        let mut arg1: XmlXPathObjectPtr;
-        let mut arg2: XmlXPathObjectPtr;
 
         if ctxt.is_null() || (*ctxt).context.is_null() {
             return 0;
         }
-        arg2 = (*ctxt).value_pop();
-        arg1 = (*ctxt).value_pop();
-        if arg1.is_null() || arg2.is_null() {
-            if !arg1.is_null() {
-                xml_xpath_free_object(arg1);
-            } else {
-                xml_xpath_free_object(arg2);
-            }
+        let Some((mut arg2, mut arg1)) = (*ctxt).value_pop().zip((*ctxt).value_pop()) else {
             xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathInvalidOperand as i32);
             return 0;
-        }
+        };
 
         if matches!(
-            (*arg2).typ,
+            arg2.typ,
             XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
         ) || matches!(
-            (*arg1).typ,
+            arg1.typ,
             XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
         ) {
             // If either argument is a XpathNodeset or XpathXsltTree the two arguments
             // are not freed from within this routine; they will be freed from the
             // called routine, e.g. xmlXPathCompareNodeSets or xmlXPathCompareNodeSetValue
             if matches!(
-                (*arg2).typ,
+                arg2.typ,
                 XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
             ) && matches!(
-                (*arg1).typ,
+                arg1.typ,
                 XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
             ) {
                 ret = xml_xpath_compare_node_sets(inf, strict, arg1, arg2);
             } else if matches!(
-                (*arg1).typ,
+                arg1.typ,
                 XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
             ) {
                 ret = xml_xpath_compare_node_set_value(ctxt, inf, strict, arg1, arg2);
@@ -2093,35 +1969,33 @@ pub unsafe fn xml_xpath_compare_values(
             return ret;
         }
 
-        if !matches!((*arg1).typ, XmlXPathObjectType::XPathNumber) {
+        if !matches!(arg1.typ, XmlXPathObjectType::XPathNumber) {
             (*ctxt).value_push(arg1);
             xml_xpath_number_function(&mut *ctxt, 1);
-            arg1 = (*ctxt).value_pop();
+            arg1 = (*ctxt).value_pop().unwrap();
         }
-        if !matches!((*arg2).typ, XmlXPathObjectType::XPathNumber) {
+        if !matches!(arg2.typ, XmlXPathObjectType::XPathNumber) {
             (*ctxt).value_push(arg2);
             xml_xpath_number_function(&mut *ctxt, 1);
-            arg2 = (*ctxt).value_pop();
+            arg2 = (*ctxt).value_pop().unwrap();
         }
         if (*ctxt).error != 0 {
             // goto error;
-            xml_xpath_free_object(arg1);
-            xml_xpath_free_object(arg2);
             return ret;
         }
         // Add tests for infinity and nan
         // => feedback on 3.4 for Inf and NaN
         /* Hand check NaN and Infinity comparisons */
-        if xml_xpath_is_nan((*arg1).floatval) || xml_xpath_is_nan((*arg2).floatval) {
+        if xml_xpath_is_nan(arg1.floatval) || xml_xpath_is_nan(arg2.floatval) {
             ret = 0;
         } else {
-            arg1i = xml_xpath_is_inf((*arg1).floatval);
-            arg2i = xml_xpath_is_inf((*arg2).floatval);
+            arg1i = xml_xpath_is_inf(arg1.floatval);
+            arg2i = xml_xpath_is_inf(arg2.floatval);
             if inf != 0 && strict != 0 {
                 if (arg1i == -1 && arg2i != -1) || (arg2i == 1 && arg1i != 1) {
                     ret = 1;
                 } else if arg1i == 0 && arg2i == 0 {
-                    ret = ((*arg1).floatval < (*arg2).floatval) as i32;
+                    ret = (arg1.floatval < arg2.floatval) as i32;
                 } else {
                     ret = 0;
                 }
@@ -2129,7 +2003,7 @@ pub unsafe fn xml_xpath_compare_values(
                 if arg1i == -1 || arg2i == 1 {
                     ret = 1;
                 } else if arg1i == 0 && arg2i == 0 {
-                    ret = ((*arg1).floatval <= (*arg2).floatval) as i32;
+                    ret = (arg1.floatval <= arg2.floatval) as i32;
                 } else {
                     ret = 0;
                 }
@@ -2137,7 +2011,7 @@ pub unsafe fn xml_xpath_compare_values(
                 if (arg1i == 1 && arg2i != 1) || (arg2i == -1 && arg1i != -1) {
                     ret = 1;
                 } else if arg1i == 0 && arg2i == 0 {
-                    ret = ((*arg1).floatval > (*arg2).floatval) as i32;
+                    ret = (arg1.floatval > arg2.floatval) as i32;
                 } else {
                     ret = 0;
                 }
@@ -2145,15 +2019,13 @@ pub unsafe fn xml_xpath_compare_values(
                 if arg1i == 1 || arg2i == -1 {
                     ret = 1;
                 } else if arg1i == 0 && arg2i == 0 {
-                    ret = ((*arg1).floatval >= (*arg2).floatval) as i32;
+                    ret = (arg1.floatval >= arg2.floatval) as i32;
                 } else {
                     ret = 0;
                 }
             }
         }
         // error:
-        xml_xpath_free_object(arg1);
-        xml_xpath_free_object(arg2);
         ret
     }
 }
@@ -2170,7 +2042,7 @@ pub unsafe fn xml_xpath_value_flip_sign(ctxt: XmlXPathParserContextPtr) {
         cast_to_number(&mut *ctxt);
         if (*ctxt)
             .value()
-            .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
+            .is_none_or(|value| value.typ != XmlXPathObjectType::XPathNumber)
         {
             xml_xpath_err(
                 Some(&mut *ctxt),
@@ -2178,7 +2050,7 @@ pub unsafe fn xml_xpath_value_flip_sign(ctxt: XmlXPathParserContextPtr) {
             );
             return;
         };
-        let val = &mut (**(*ctxt).value_mut().unwrap()).floatval;
+        let val = &mut (*ctxt).value_mut().unwrap().floatval;
         *val = -*val;
     }
 }
@@ -2189,17 +2061,15 @@ pub unsafe fn xml_xpath_value_flip_sign(ctxt: XmlXPathParserContextPtr) {
 #[doc(alias = "xmlXPathAddValues")]
 pub unsafe fn xml_xpath_add_values(ctxt: XmlXPathParserContextPtr) {
     unsafe {
-        let arg: XmlXPathObjectPtr = (*ctxt).value_pop();
-        if arg.is_null() {
+        let Some(mut arg) = (*ctxt).value_pop() else {
             xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathInvalidOperand as i32);
             return;
-        }
-        let val: f64 = xml_xpath_cast_to_number(arg);
-        xml_xpath_free_object(arg);
+        };
+        let val: f64 = xml_xpath_cast_to_number(&mut arg);
         cast_to_number(&mut *ctxt);
         if (*ctxt)
             .value()
-            .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
+            .is_none_or(|value| value.typ != XmlXPathObjectType::XPathNumber)
         {
             xml_xpath_err(
                 Some(&mut *ctxt),
@@ -2207,7 +2077,7 @@ pub unsafe fn xml_xpath_add_values(ctxt: XmlXPathParserContextPtr) {
             );
             return;
         };
-        (**(*ctxt).value_mut().unwrap()).floatval += val;
+        (*ctxt).value_mut().unwrap().floatval += val;
     }
 }
 
@@ -2217,17 +2087,15 @@ pub unsafe fn xml_xpath_add_values(ctxt: XmlXPathParserContextPtr) {
 #[doc(alias = "xmlXPathSubValues")]
 pub unsafe fn xml_xpath_sub_values(ctxt: XmlXPathParserContextPtr) {
     unsafe {
-        let arg: XmlXPathObjectPtr = (*ctxt).value_pop();
-        if arg.is_null() {
+        let Some(mut arg) = (*ctxt).value_pop() else {
             xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathInvalidOperand as i32);
             return;
-        }
-        let val: f64 = xml_xpath_cast_to_number(arg);
-        xml_xpath_free_object(arg);
+        };
+        let val: f64 = xml_xpath_cast_to_number(&mut arg);
         cast_to_number(&mut *ctxt);
         if (*ctxt)
             .value()
-            .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
+            .is_none_or(|value| value.typ != XmlXPathObjectType::XPathNumber)
         {
             xml_xpath_err(
                 Some(&mut *ctxt),
@@ -2235,7 +2103,7 @@ pub unsafe fn xml_xpath_sub_values(ctxt: XmlXPathParserContextPtr) {
             );
             return;
         };
-        (**(*ctxt).value_mut().unwrap()).floatval -= val;
+        (*ctxt).value_mut().unwrap().floatval -= val;
     }
 }
 
@@ -2245,17 +2113,15 @@ pub unsafe fn xml_xpath_sub_values(ctxt: XmlXPathParserContextPtr) {
 #[doc(alias = "xmlXPathMultValues")]
 pub unsafe fn xml_xpath_mult_values(ctxt: XmlXPathParserContextPtr) {
     unsafe {
-        let arg: XmlXPathObjectPtr = (*ctxt).value_pop();
-        if arg.is_null() {
+        let Some(mut arg) = (*ctxt).value_pop() else {
             xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathInvalidOperand as i32);
             return;
-        }
-        let val: f64 = xml_xpath_cast_to_number(arg);
-        xml_xpath_free_object(arg);
+        };
+        let val: f64 = xml_xpath_cast_to_number(&mut arg);
         cast_to_number(&mut *ctxt);
         if (*ctxt)
             .value()
-            .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
+            .is_none_or(|value| value.typ != XmlXPathObjectType::XPathNumber)
         {
             xml_xpath_err(
                 Some(&mut *ctxt),
@@ -2263,7 +2129,7 @@ pub unsafe fn xml_xpath_mult_values(ctxt: XmlXPathParserContextPtr) {
             );
             return;
         };
-        (**(*ctxt).value_mut().unwrap()).floatval *= val;
+        (*ctxt).value_mut().unwrap().floatval *= val;
     }
 }
 
@@ -2273,17 +2139,15 @@ pub unsafe fn xml_xpath_mult_values(ctxt: XmlXPathParserContextPtr) {
 #[doc(alias = "xmlXPathDivValues")]
 pub unsafe fn xml_xpath_div_values(ctxt: XmlXPathParserContextPtr) {
     unsafe {
-        let arg: XmlXPathObjectPtr = (*ctxt).value_pop();
-        if arg.is_null() {
+        let Some(mut arg) = (*ctxt).value_pop() else {
             xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathInvalidOperand as i32);
             return;
-        }
-        let val: f64 = xml_xpath_cast_to_number(arg);
-        xml_xpath_free_object(arg);
+        };
+        let val: f64 = xml_xpath_cast_to_number(&mut arg);
         cast_to_number(&mut *ctxt);
         if (*ctxt)
             .value()
-            .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
+            .is_none_or(|value| value.typ != XmlXPathObjectType::XPathNumber)
         {
             xml_xpath_err(
                 Some(&mut *ctxt),
@@ -2291,7 +2155,7 @@ pub unsafe fn xml_xpath_div_values(ctxt: XmlXPathParserContextPtr) {
             );
             return;
         };
-        (**(*ctxt).value_mut().unwrap()).floatval /= val;
+        (*ctxt).value_mut().unwrap().floatval /= val;
     }
 }
 
@@ -2301,17 +2165,15 @@ pub unsafe fn xml_xpath_div_values(ctxt: XmlXPathParserContextPtr) {
 #[doc(alias = "xmlXPathModValues")]
 pub unsafe fn xml_xpath_mod_values(ctxt: XmlXPathParserContextPtr) {
     unsafe {
-        let arg: XmlXPathObjectPtr = (*ctxt).value_pop();
-        if arg.is_null() {
+        let Some(mut arg) = (*ctxt).value_pop() else {
             xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathInvalidOperand as i32);
             return;
-        }
-        let arg2: f64 = xml_xpath_cast_to_number(arg);
-        xml_xpath_free_object(arg);
+        };
+        let arg2: f64 = xml_xpath_cast_to_number(&mut arg);
         cast_to_number(&mut *ctxt);
         if (*ctxt)
             .value()
-            .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
+            .is_none_or(|value| value.typ != XmlXPathObjectType::XPathNumber)
         {
             xml_xpath_err(
                 Some(&mut *ctxt),
@@ -2319,7 +2181,7 @@ pub unsafe fn xml_xpath_mod_values(ctxt: XmlXPathParserContextPtr) {
             );
             return;
         };
-        let arg1 = &mut (**(*ctxt).value_mut().unwrap()).floatval;
+        let arg1 = &mut (*ctxt).value_mut().unwrap().floatval;
         if arg2 == 0.0 {
             *arg1 = XML_XPATH_NAN;
         } else {

@@ -49,10 +49,7 @@ use crate::{
         xml_new_doc_node, xml_new_doc_text, xml_static_copy_node, xml_static_copy_node_list,
     },
     uri::{XmlURI, build_relative_uri, build_uri, escape_url},
-    xpath::{
-        XmlXPathContextPtr, XmlXPathObject, XmlXPathObjectPtr, XmlXPathObjectType,
-        xml_xpath_free_context, xml_xpath_free_object,
-    },
+    xpath::{XmlXPathContextPtr, XmlXPathObject, XmlXPathObjectType, xml_xpath_free_context},
 };
 
 /// A constant defining the Xinclude namespace: `http://www.w3.org/2003/XInclude`
@@ -1286,8 +1283,7 @@ impl XmlXIncludeCtxt {
                         );
                         return ret;
                     }
-                    let xptr: XmlXPathObjectPtr = xml_xptr_eval(&fragment, xptrctxt);
-                    if xptr.is_null() {
+                    let Some(mut xptr) = xml_xptr_eval(&fragment, xptrctxt) else {
                         xml_xinclude_err!(
                             self,
                             self.inc_tab[ref_index].elem.map(|node| node.into()),
@@ -1297,8 +1293,8 @@ impl XmlXIncludeCtxt {
                         );
                         xml_xpath_free_context(xptrctxt);
                         return ret;
-                    }
-                    match (*xptr).typ {
+                    };
+                    match xptr.typ {
                         XmlXPathObjectType::XPathUndefined
                         | XmlXPathObjectType::XPathBoolean
                         | XmlXPathObjectType::XPathNumber
@@ -1312,7 +1308,6 @@ impl XmlXIncludeCtxt {
                                 "XPointer is not a range: #{}\n",
                                 fragment
                             );
-                            xml_xpath_free_object(xptr);
                             xml_xpath_free_context(xptrctxt);
                             return ret;
                         }
@@ -1325,13 +1320,11 @@ impl XmlXIncludeCtxt {
                                 "XPointer is not a range: #{}\n",
                                 fragment
                             );
-                            xml_xpath_free_object(xptr);
                             xml_xpath_free_context(xptrctxt);
                             return ret;
                         }
                         XmlXPathObjectType::XPathNodeset => {
-                            if (*xptr).nodesetval.as_deref().is_none_or(|n| n.is_empty()) {
-                                xml_xpath_free_object(xptr);
+                            if xptr.nodesetval.as_deref().is_none_or(|n| n.is_empty()) {
                                 xml_xpath_free_context(xptrctxt);
                                 return ret;
                             }
@@ -1339,7 +1332,7 @@ impl XmlXIncludeCtxt {
                         #[cfg(feature = "libxml_xptr_locs")]
                         XmlXPathObjectType::XPathRange | XmlXPathObjectType::XPathLocationset => {} // _ => {}
                     }
-                    if let Some(set) = (*xptr).nodesetval.as_deref_mut() {
+                    if let Some(set) = xptr.nodesetval.as_deref_mut() {
                         let mut i = 0;
                         while i < set.node_tab.len() {
                             let node = set.node_tab[i];
@@ -1402,8 +1395,7 @@ impl XmlXIncludeCtxt {
                             i += 1;
                         }
                     }
-                    self.inc_tab[ref_index].inc = self.copy_xpointer(&*xptr);
-                    xml_xpath_free_object(xptr);
+                    self.inc_tab[ref_index].inc = self.copy_xpointer(&xptr);
                     xml_xpath_free_context(xptrctxt);
                 }
             } else {

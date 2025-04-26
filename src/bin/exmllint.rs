@@ -102,7 +102,7 @@ use exml::{
         },
         schema::xml_schema_free,
     },
-    xpath::{XmlXPathObjectPtr, xml_xpath_order_doc_elems},
+    xpath::{XmlXPathObject, xml_xpath_order_doc_elems},
 };
 
 // Error codes.
@@ -2228,7 +2228,7 @@ unsafe fn walk_doc(doc: XmlDocPtr) {
 
 // XPath Query
 #[cfg(feature = "xpath")]
-unsafe fn do_xpath_dump(cur: XmlXPathObjectPtr) {
+unsafe fn do_xpath_dump(cur: &XmlXPathObject) {
     unsafe {
         use std::io::stdout;
 
@@ -2237,11 +2237,11 @@ unsafe fn do_xpath_dump(cur: XmlXPathObjectPtr) {
             xpath::{XmlXPathObjectType, xml_xpath_is_inf, xml_xpath_is_nan},
         };
 
-        match (*cur).typ {
+        match cur.typ {
             XmlXPathObjectType::XPathNodeset => {
                 #[cfg(feature = "libxml_output")]
                 {
-                    if let Some(nodeset) = (*cur).nodesetval.as_deref() {
+                    if let Some(nodeset) = cur.nodesetval.as_deref() {
                         if !nodeset.node_tab.is_empty() {
                             let Some(mut buf) = XmlOutputBuffer::from_writer(stdout(), None) else {
                                 eprintln!("Out of memory for XPath");
@@ -2262,17 +2262,17 @@ unsafe fn do_xpath_dump(cur: XmlXPathObjectPtr) {
                 }
                 #[cfg(not(feature = "libxml_output"))]
                 {
-                    println!("xpath returned {} nodes", (*(*cur).nodesetval).node_nr);
+                    println!("xpath returned {} nodes", cur.nodesetval.node_tab.len());
                 }
             }
             XmlXPathObjectType::XPathBoolean => {
-                if (*cur).boolval {
+                if cur.boolval {
                     println!("true");
                 } else {
                     println!("false");
                 }
             }
-            XmlXPathObjectType::XPathNumber => match xml_xpath_is_inf((*cur).floatval) {
+            XmlXPathObjectType::XPathNumber => match xml_xpath_is_inf(cur.floatval) {
                 1 => {
                     println!("Infinity");
                 }
@@ -2280,15 +2280,15 @@ unsafe fn do_xpath_dump(cur: XmlXPathObjectPtr) {
                     println!("-Infinity");
                 }
                 _ => {
-                    if xml_xpath_is_nan((*cur).floatval) {
+                    if xml_xpath_is_nan(cur.floatval) {
                         println!("NaN");
                     } else {
-                        println!("{}", (*cur).floatval);
+                        println!("{}", cur.floatval);
                     }
                 }
             },
             XmlXPathObjectType::XPathString => {
-                println!("{}", (*cur).stringval.as_deref().unwrap());
+                println!("{}", cur.stringval.as_deref().unwrap());
             }
             XmlXPathObjectType::XPathUndefined => {
                 eprintln!("XPath Object is uninitialized");
@@ -2306,8 +2306,7 @@ unsafe fn do_xpath_dump(cur: XmlXPathObjectPtr) {
 unsafe fn do_xpath_query(doc: XmlDocPtr, query: &str) {
     unsafe {
         use exml::xpath::{
-            XmlXPathContextPtr, xml_xpath_eval, xml_xpath_free_context, xml_xpath_free_object,
-            xml_xpath_new_context,
+            XmlXPathContextPtr, xml_xpath_eval, xml_xpath_free_context, xml_xpath_new_context,
         };
 
         let ctxt: XmlXPathContextPtr = xml_xpath_new_context(Some(doc));
@@ -2317,16 +2316,15 @@ unsafe fn do_xpath_query(doc: XmlDocPtr, query: &str) {
             return;
         }
         (*ctxt).node = Some(doc.into());
-        let res: XmlXPathObjectPtr = xml_xpath_eval(query, ctxt);
+        let res = xml_xpath_eval(query, ctxt);
         xml_xpath_free_context(ctxt);
 
-        if res.is_null() {
+        let Some(res) = res else {
             eprintln!("XPath evaluation failure");
             PROGRESULT.store(ERR_XPATH, Ordering::Relaxed);
             return;
-        }
-        do_xpath_dump(res);
-        xml_xpath_free_object(res);
+        };
+        do_xpath_dump(&res);
     }
 }
 

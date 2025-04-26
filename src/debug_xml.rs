@@ -2666,11 +2666,9 @@ pub unsafe fn xml_shell<'a>(
             tree::xml_free_doc,
             xpath::{
                 xml_xpath_debug_dump_object, xml_xpath_eval, xml_xpath_free_context,
-                xml_xpath_free_object, xml_xpath_new_context,
+                xml_xpath_new_context,
             },
         };
-
-        let mut list: XmlXPathObjectPtr;
 
         if input.is_none() {
             return;
@@ -2805,21 +2803,19 @@ pub unsafe fn xml_shell<'a>(
                     }
                     (*ctxt.pctxt).node = ctxt.node;
                     #[cfg(feature = "xpath")]
-                    {
+                    let list = {
                         (*ctxt.pctxt).node = ctxt.node;
-                        list = xml_xpath_eval(arg, ctxt.pctxt);
-                    }
+                        xml_xpath_eval(arg, ctxt.pctxt)
+                    };
                     #[cfg(not(feature = "xpath"))]
-                    {
-                        list = null_mut();
-                    }
-                    if !list.is_null() {
-                        match (*list).typ {
+                    let list = None;
+                    if let Some(list) = list {
+                        match list.typ {
                             XmlXPathObjectType::XPathUndefined => {
                                 generic_error!("{}: no such node\n", arg);
                             }
                             XmlXPathObjectType::XPathNodeset => {
-                                if let Some(nodeset) = (*list).nodesetval.as_deref() {
+                                if let Some(nodeset) = list.nodesetval.as_deref() {
                                     for &node in &nodeset.node_tab {
                                         ctxt.xml_shell_du(None, node, None);
                                     }
@@ -2853,10 +2849,6 @@ pub unsafe fn xml_shell<'a>(
                                 generic_error!("{} is an XSLT value tree\n", arg);
                             }
                         }
-                        #[cfg(feature = "xpath")]
-                        {
-                            xml_xpath_free_object(list);
-                        }
                     } else {
                         generic_error!("{}: no such node\n", arg);
                     }
@@ -2887,9 +2879,8 @@ pub unsafe fn xml_shell<'a>(
                         generic_error!("xpath: expression required\n");
                     } else {
                         (*ctxt.pctxt).node = ctxt.node;
-                        list = xml_xpath_eval(arg, ctxt.pctxt);
-                        xml_xpath_debug_dump_object(&mut ctxt.output, Some(&*list), 0);
-                        xml_xpath_free_object(list);
+                        let list = xml_xpath_eval(arg, ctxt.pctxt);
+                        xml_xpath_debug_dump_object(&mut ctxt.output, list.as_ref(), 0);
                     }
                 }
                 #[cfg(feature = "libxml_tree")]
@@ -2909,21 +2900,19 @@ pub unsafe fn xml_shell<'a>(
                     }
                     (*ctxt.pctxt).node = ctxt.node;
                     #[cfg(feature = "xpath")]
-                    {
+                    let list = {
                         (*ctxt.pctxt).node = ctxt.node;
-                        list = xml_xpath_eval(arg, ctxt.pctxt);
-                    }
+                        xml_xpath_eval(arg, ctxt.pctxt)
+                    };
                     #[cfg(not(feature = "xpath"))]
-                    {
-                        list = null_mut();
-                    }
-                    if !list.is_null() {
-                        match (*list).typ {
+                    let list = None;
+                    if let Some(list) = list {
+                        match list.typ {
                             XmlXPathObjectType::XPathUndefined => {
                                 generic_error!("{}: no such node\n", arg);
                             }
                             XmlXPathObjectType::XPathNodeset => {
-                                let Some(nodeset) = (*list).nodesetval.as_deref() else {
+                                let Some(nodeset) = list.nodesetval.as_deref() else {
                                     break;
                                 };
 
@@ -2963,10 +2952,6 @@ pub unsafe fn xml_shell<'a>(
                                 generic_error!("{} is an XSLT value tree\n", arg);
                             }
                         }
-                        #[cfg(feature = "xpath")]
-                        {
-                            xml_xpath_free_object(list);
-                        }
                     } else {
                         generic_error!("{}: no such node\n", arg);
                     }
@@ -2982,20 +2967,16 @@ pub unsafe fn xml_shell<'a>(
                     } else {
                         (*ctxt.pctxt).node = ctxt.node;
                         #[cfg(feature = "xpath")]
-                        {
-                            list = xml_xpath_eval(arg, ctxt.pctxt);
-                        }
+                        let list = xml_xpath_eval(arg, ctxt.pctxt);
                         #[cfg(not(feature = "xpath"))]
-                        {
-                            list = null_mut();
-                        }
-                        if !list.is_null() {
-                            match (*list).typ {
+                        let list = None;
+                        if let Some(list) = list {
+                            match list.typ {
                                 XmlXPathObjectType::XPathUndefined => {
                                     generic_error!("{}: no such node\n", arg);
                                 }
                                 XmlXPathObjectType::XPathNodeset => {
-                                    if let Some(nodeset) = (*list).nodesetval.as_deref() {
+                                    if let Some(nodeset) = list.nodesetval.as_deref() {
                                         for &node in &nodeset.node_tab {
                                             dir.clear();
                                             if ctxt.xml_shell_pwd(&mut dir, Some(node), None) == 0 {
@@ -3032,10 +3013,6 @@ pub unsafe fn xml_shell<'a>(
                                     generic_error!("{} is an XSLT value tree\n", arg);
                                 }
                             }
-                            #[cfg(feature = "xpath")]
-                            {
-                                xml_xpath_free_object(list);
-                            }
                         } else {
                             generic_error!("{}: no such node\n", arg);
                         }
@@ -3049,26 +3026,24 @@ pub unsafe fn xml_shell<'a>(
                     }
                     let mut arg = arg;
                     #[cfg(feature = "xpath")]
-                    {
+                    let list = {
                         (*ctxt.pctxt).node = ctxt.node;
                         if arg.len() >= 2 {
                             if let Some(new) = arg.strip_suffix('/') {
                                 arg = new;
                             }
                         }
-                        list = xml_xpath_eval(arg, ctxt.pctxt);
-                    }
+                        xml_xpath_eval(arg, ctxt.pctxt)
+                    };
                     #[cfg(not(feature = "xpath"))]
-                    {
-                        list = null_mut();
-                    }
-                    if !list.is_null() {
-                        match (*list).typ {
+                    let list = None;
+                    if let Some(list) = list {
+                        match list.typ {
                             XmlXPathObjectType::XPathUndefined => {
                                 generic_error!("{}: no such node\n", arg);
                             }
                             XmlXPathObjectType::XPathNodeset => {
-                                if let Some(nodeset) = (*list).nodesetval.as_deref() {
+                                if let Some(nodeset) = list.nodesetval.as_deref() {
                                     if nodeset.node_tab.len() == 1 {
                                         ctxt.node = Some(nodeset.node_tab[0]);
                                         if ctxt
@@ -3120,10 +3095,6 @@ pub unsafe fn xml_shell<'a>(
                                 generic_error!("{} is an XSLT value tree\n", arg);
                             }
                         }
-                        #[cfg(feature = "xpath")]
-                        {
-                            xml_xpath_free_object(list);
-                        }
                     } else {
                         generic_error!("{}: no such node\n", arg);
                     }
@@ -3137,21 +3108,19 @@ pub unsafe fn xml_shell<'a>(
                     }
                     (*ctxt.pctxt).node = ctxt.node;
                     #[cfg(feature = "xpath")]
-                    {
+                    let list = {
                         (*ctxt.pctxt).node = ctxt.node;
-                        list = xml_xpath_eval(arg, ctxt.pctxt);
-                    }
+                        xml_xpath_eval(arg, ctxt.pctxt)
+                    };
                     #[cfg(not(feature = "xpath"))]
-                    {
-                        list = null_mut();
-                    }
-                    if !list.is_null() {
-                        match (*list).typ {
+                    let list = None;
+                    if let Some(list) = list {
+                        match list.typ {
                             XmlXPathObjectType::XPathUndefined => {
                                 generic_error!("{}: no such node\n", arg);
                             }
                             XmlXPathObjectType::XPathNodeset => {
-                                if let Some(nodeset) = (*list).nodesetval.as_deref() {
+                                if let Some(nodeset) = list.nodesetval.as_deref() {
                                     for &node in &nodeset.node_tab {
                                         if !arg.is_empty() {
                                             writeln!(ctxt.output, " -------").ok();
@@ -3188,10 +3157,6 @@ pub unsafe fn xml_shell<'a>(
                                 generic_error!("{} is an XSLT value tree\n", arg);
                             }
                         }
-                        #[cfg(feature = "xpath")]
-                        {
-                            xml_xpath_free_object(list);
-                        }
                     } else {
                         generic_error!("{}: no such node\n", arg);
                     }
@@ -3208,42 +3173,6 @@ pub unsafe fn xml_shell<'a>(
         }
         if ctxt.loaded != 0 {
             xml_free_doc(doc);
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
-
-    use super::*;
-
-    #[test]
-    fn test_xml_shell_print_xpath_result() {
-        #[cfg(all(feature = "libxml_debug", feature = "xpath"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_list in 0..GEN_NB_XML_XPATH_OBJECT_PTR {
-                let mem_base = xml_mem_blocks();
-                let list = gen_xml_xpath_object_ptr(n_list, 0);
-
-                xml_shell_print_xpath_result(list);
-                des_xml_xpath_object_ptr(n_list, list, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlShellPrintXPathResult",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlShellPrintXPathResult()"
-                    );
-                    eprintln!(" {}", n_list);
-                }
-            }
         }
     }
 }

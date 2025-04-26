@@ -37,10 +37,9 @@ use crate::{
         xml_free_doc,
     },
     xpath::{
-        XML_XPATH_CHECKNS, XmlXPathCompExpr, XmlXPathContextPtr, XmlXPathObjectPtr,
-        XmlXPathObjectType, internals::xml_xpath_register_variable_ns, xml_xpath_compiled_eval,
-        xml_xpath_ctxt_compile, xml_xpath_eval, xml_xpath_free_context, xml_xpath_free_object,
-        xml_xpath_is_nan, xml_xpath_new_context,
+        XML_XPATH_CHECKNS, XmlXPathCompExpr, XmlXPathContextPtr, XmlXPathObjectType,
+        internals::xml_xpath_register_variable_ns, xml_xpath_compiled_eval, xml_xpath_ctxt_compile,
+        xml_xpath_eval, xml_xpath_free_context, xml_xpath_is_nan, xml_xpath_new_context,
     },
 };
 
@@ -167,17 +166,15 @@ unsafe fn xml_schematron_register_variables(
     cur: Option<XmlGenericNodePtr>,
 ) -> i32 {
     unsafe {
-        let mut let_eval: XmlXPathObjectPtr;
-
         (*ctxt).doc = Some(instance);
         (*ctxt).node = cur;
         while let Some(now) = letr {
-            let_eval = xml_xpath_compiled_eval(now.comp.clone(), ctxt);
-            if let_eval.is_null() {
+            let Some(let_eval) = xml_xpath_compiled_eval(now.comp.clone(), ctxt) else {
                 generic_error!("Evaluation of compiled expression failed\n");
                 return -1;
-            }
-            if xml_xpath_register_variable_ns(ctxt, &now.name, None, let_eval) != 0 {
+            };
+
+            if xml_xpath_register_variable_ns(ctxt, &now.name, None, Some(let_eval)) != 0 {
                 generic_error!("Registering a let variable failed\n");
                 return -1;
             }
@@ -197,7 +194,7 @@ unsafe fn xml_schematron_unregister_variables(
 ) -> i32 {
     unsafe {
         while let Some(now) = letr {
-            if xml_xpath_register_variable_ns(ctxt, &now.name, None, null_mut()) != 0 {
+            if xml_xpath_register_variable_ns(ctxt, &now.name, None, None) != 0 {
                 generic_error!("Unregistering a let variable failed\n");
                 return -1;
             }
@@ -446,22 +443,16 @@ impl<'a> XmlSchematronValidCtxt<'a> {
         unsafe {
             (*self.xctxt).doc = cur?.document();
             (*self.xctxt).node = cur;
-            let ret: XmlXPathObjectPtr = xml_xpath_eval(xpath, self.xctxt);
-            if ret.is_null() {
-                return None;
-            }
+            let ret = xml_xpath_eval(xpath, self.xctxt)?;
 
-            if (*ret).typ == XmlXPathObjectType::XPathNodeset {
-                if let Some(nodeset) = (*ret).nodesetval.as_deref() {
+            if ret.typ == XmlXPathObjectType::XPathNodeset {
+                if let Some(nodeset) = ret.nodesetval.as_deref() {
                     if !nodeset.node_tab.is_empty() {
-                        let node = Some(nodeset.node_tab[0]);
-                        xml_xpath_free_object(ret);
-                        return node;
+                        return Some(nodeset.node_tab[0]);
                     }
                 }
             }
 
-            xml_xpath_free_object(ret);
             None
         }
     }
@@ -524,14 +515,14 @@ impl<'a> XmlSchematronValidCtxt<'a> {
                         .get_no_ns_prop("select")
                         .and_then(|select| xml_xpath_ctxt_compile(self.xctxt, &select))
                         .unwrap();
-                    let eval: XmlXPathObjectPtr = xml_xpath_compiled_eval(comp, self.xctxt);
+                    let eval = xml_xpath_compiled_eval(comp, self.xctxt).unwrap();
 
-                    match (*eval).typ {
+                    match eval.typ {
                         XmlXPathObjectType::XPathNodeset => {
                             let spacer = " ";
                             let ret = ret.get_or_insert_default();
 
-                            if let Some(nodeset) = (*eval).nodesetval.as_deref() {
+                            if let Some(nodeset) = eval.nodesetval.as_deref() {
                                 for (indx, &node) in nodeset.node_tab.iter().enumerate() {
                                     if indx > 0 {
                                         ret.push_str(spacer);
@@ -543,7 +534,7 @@ impl<'a> XmlSchematronValidCtxt<'a> {
                             }
                         }
                         XmlXPathObjectType::XPathBoolean => {
-                            let s = if (*eval).boolval { "True" } else { "False" };
+                            let s = if eval.boolval { "True" } else { "False" };
                             if let Some(ret) = ret.as_mut() {
                                 ret.push_str(s);
                             } else {
@@ -552,22 +543,21 @@ impl<'a> XmlSchematronValidCtxt<'a> {
                         }
                         XmlXPathObjectType::XPathNumber => {
                             if let Some(ret) = ret.as_mut() {
-                                ret.push_str(format!("{}", (*eval).floatval).as_str());
+                                ret.push_str(format!("{}", eval.floatval).as_str());
                             } else {
-                                ret = Some(format!("{}", (*eval).floatval));
+                                ret = Some(format!("{}", eval.floatval));
                             }
                         }
                         XmlXPathObjectType::XPathString => {
-                            let strval = (*eval).stringval.as_deref().unwrap();
+                            let strval = eval.stringval.as_deref().unwrap();
                             let ret =
                                 ret.get_or_insert_with(|| String::with_capacity(strval.len()));
                             ret.push_str(strval);
                         }
                         _ => {
-                            generic_error!("Unsupported XPATH Type: {:?}\n", (*eval).typ);
+                            generic_error!("Unsupported XPATH Type: {:?}\n", eval.typ);
                         }
                     }
-                    xml_xpath_free_object(eval);
                 } else {
                     child = cur_node
                         .next
@@ -710,26 +700,23 @@ impl<'a> XmlSchematronValidCtxt<'a> {
             failed = 0;
             (*self.xctxt).doc = Some(instance);
             (*self.xctxt).node = Some(cur.into());
-            let ret: XmlXPathObjectPtr = xml_xpath_compiled_eval(test.comp.clone(), self.xctxt);
-            if ret.is_null() {
-                failed = 1;
-            } else {
-                match (*ret).typ {
+            if let Some(ret) = xml_xpath_compiled_eval(test.comp.clone(), self.xctxt) {
+                match ret.typ {
                     XmlXPathObjectType::XPathXSLTTree | XmlXPathObjectType::XPathNodeset => {
-                        if (*ret).nodesetval.as_deref().is_none_or(|n| n.is_empty()) {
+                        if ret.nodesetval.as_deref().is_none_or(|n| n.is_empty()) {
                             failed = 1;
                         }
                     }
                     XmlXPathObjectType::XPathBoolean => {
-                        failed = (!(*ret).boolval) as i32;
+                        failed = (!ret.boolval) as i32;
                     }
                     XmlXPathObjectType::XPathNumber => {
-                        if xml_xpath_is_nan((*ret).floatval) || (*ret).floatval == 0.0 {
+                        if xml_xpath_is_nan(ret.floatval) || ret.floatval == 0.0 {
                             failed = 1;
                         }
                     }
                     XmlXPathObjectType::XPathString => {
-                        if (*ret).stringval.as_deref().is_none_or(|s| s.is_empty()) {
+                        if ret.stringval.as_deref().is_none_or(|s| s.is_empty()) {
                             failed = 1;
                         }
                     }
@@ -743,7 +730,8 @@ impl<'a> XmlSchematronValidCtxt<'a> {
                         failed = 1;
                     }
                 }
-                xml_xpath_free_object(ret);
+            } else {
+                failed = 1;
             }
             if (failed != 0 && test.typ == XmlSchematronTestType::XmlSchematronAssert)
                 || (failed == 0 && test.typ == XmlSchematronTestType::XmlSchematronReport)

@@ -19,8 +19,6 @@ use std::{
 };
 
 use const_format::concatcp;
-#[cfg(feature = "c14n")]
-use exml::c14n::XmlC14NMode;
 #[cfg(feature = "html")]
 use exml::html::{
     parser::{html_ctxt_read_file, html_new_sax_parser_ctxt, html_read_file},
@@ -71,8 +69,9 @@ use exml::{
         XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNodePtr, xml_free_doc,
     },
     uri::{XmlURI, build_uri, normalize_uri_path},
-    xpath::XmlXPathObjectPtr,
 };
+#[cfg(feature = "c14n")]
+use exml::{c14n::XmlC14NMode, xpath::XmlXPathObject};
 use libc::memcpy;
 
 /// pseudo flag for the unification of HTML and XML tests
@@ -2430,13 +2429,13 @@ unsafe fn test_xpath(xpath: &str, xptr: i32, expr: i32) {
         use exml::{
             libxml::xpointer::{xml_xptr_eval, xml_xptr_new_context},
             xpath::{
-                XmlXPathContextPtr, XmlXPathObjectPtr, xml_xpath_compile, xml_xpath_compiled_eval,
+                XmlXPathContextPtr, xml_xpath_compile, xml_xpath_compiled_eval,
                 xml_xpath_debug_dump_object, xml_xpath_eval_expression, xml_xpath_free_context,
-                xml_xpath_free_object, xml_xpath_new_context,
+                xml_xpath_new_context,
             },
         };
 
-        let res: XmlXPathObjectPtr;
+        let res;
         let ctxt: XmlXPathContextPtr;
 
         // Don't print generic errors to stderr.
@@ -2463,16 +2462,15 @@ unsafe fn test_xpath(xpath: &str, xptr: i32, expr: i32) {
                 if let Some(comp) = xml_xpath_compile(xpath) {
                     res = xml_xpath_compiled_eval(comp, ctxt);
                 } else {
-                    res = null_mut();
+                    res = None;
                 }
             }
         }
         XPATH_OUTPUT.with_borrow_mut(|out| {
             let out = out.as_mut().unwrap();
-            xml_xpath_debug_dump_object(out, Some(&*res), 0);
+            xml_xpath_debug_dump_object(out, res.as_ref(), 0);
             out.flush().ok();
         });
-        xml_xpath_free_object(res);
         xml_xpath_free_context(ctxt);
 
         // Reset generic error handler.
@@ -3869,7 +3867,7 @@ unsafe fn pattern_test(
 }
 
 #[cfg(feature = "c14n")]
-unsafe fn load_xpath_expr(parent_doc: XmlDocPtr, filename: &str) -> XmlXPathObjectPtr {
+unsafe fn load_xpath_expr(parent_doc: XmlDocPtr, filename: &str) -> Option<XmlXPathObject> {
     unsafe {
         use exml::{
             globals::{set_load_ext_dtd_default_value, set_substitute_entities_default_value},
@@ -3891,14 +3889,14 @@ unsafe fn load_xpath_expr(parent_doc: XmlDocPtr, filename: &str) -> XmlXPathObje
             XmlParserOption::XmlParseDTDAttr as i32 | XmlParserOption::XmlParseNoEnt as i32,
         ) else {
             eprintln!("Error: unable to parse file \"{filename}\"");
-            return null_mut();
+            return None;
         };
 
         // Check the document is of the right kind
         if doc.get_root_element().is_none() {
             eprintln!("Error: empty document for file \"{filename}\"");
             xml_free_doc(doc);
-            return null_mut();
+            return None;
         }
 
         let mut node = doc.children();
@@ -3909,20 +3907,20 @@ unsafe fn load_xpath_expr(parent_doc: XmlDocPtr, filename: &str) -> XmlXPathObje
         let Some(node) = node else {
             eprintln!("Error: XPath element expected in the file  \"{filename}\"");
             xml_free_doc(doc);
-            return null_mut();
+            return None;
         };
 
         let Some(expr) = node.get_content() else {
             eprintln!("Error: XPath content element is NULL \"{filename}\"");
             xml_free_doc(doc);
-            return null_mut();
+            return None;
         };
 
         let ctx: XmlXPathContextPtr = xml_xpath_new_context(Some(parent_doc));
         if ctx.is_null() {
             eprintln!("Error: unable to create new context");
             xml_free_doc(doc);
-            return null_mut();
+            return None;
         }
 
         // Register namespaces
@@ -3937,25 +3935,24 @@ unsafe fn load_xpath_expr(parent_doc: XmlDocPtr, filename: &str) -> XmlXPathObje
                 );
                 xml_xpath_free_context(ctx);
                 xml_free_doc(doc);
-                return null_mut();
+                return None;
             }
             ns = now.next;
         }
 
         // Evaluate xpath
-        let xpath: XmlXPathObjectPtr = xml_xpath_eval_expression(&expr, ctx);
-        if xpath.is_null() {
+        let Some(xpath) = xml_xpath_eval_expression(&expr, ctx) else {
             eprintln!("Error: unable to evaluate xpath expression");
             xml_xpath_free_context(ctx);
             xml_free_doc(doc);
-            return null_mut();
-        }
+            return None;
+        };
 
         // print_xpath_nodes((*xpath).nodesetval);
 
         xml_xpath_free_context(ctx);
         xml_free_doc(doc);
-        xpath
+        Some(xpath)
     }
 }
 
@@ -3978,10 +3975,9 @@ unsafe fn c14n_run_test(
             c14n::xml_c14n_doc_dump_memory,
             globals::{set_load_ext_dtd_default_value, set_substitute_entities_default_value},
             parser::{XML_COMPLETE_ATTRS, XML_DETECT_IDS},
-            xpath::xml_xpath_free_object,
         };
 
-        let mut xpath: XmlXPathObjectPtr = null_mut();
+        let mut xpath = None;
         let mut ret: i32;
         let mut inclusive_namespaces = None;
 
@@ -4011,7 +4007,7 @@ unsafe fn c14n_run_test(
         // load xpath file if specified
         if let Some(xpath_filename) = xpath_filename {
             xpath = load_xpath_expr(doc, xpath_filename);
-            if xpath.is_null() {
+            if xpath.is_none() {
                 eprintln!("Error: unable to evaluate xpath expression");
                 xml_free_doc(doc);
                 return -1;
@@ -4021,9 +4017,6 @@ unsafe fn c14n_run_test(
         if let Some(ns_filename) = ns_filename {
             let Ok(nslist) = load_mem(ns_filename) else {
                 eprintln!("Error: unable to evaluate xpath expression");
-                if !xpath.is_null() {
-                    xml_xpath_free_object(xpath);
-                }
                 xml_free_doc(doc);
                 return -1;
             };
@@ -4035,11 +4028,9 @@ unsafe fn c14n_run_test(
         let mut result = String::new();
         ret = xml_c14n_doc_dump_memory(
             doc,
-            if !xpath.is_null() {
-                (*xpath).nodesetval.as_deref_mut()
-            } else {
-                None
-            },
+            xpath
+                .as_mut()
+                .and_then(|xpath| xpath.nodesetval.as_deref_mut()),
             mode,
             inclusive_namespaces,
             with_comments,
@@ -4060,9 +4051,6 @@ unsafe fn c14n_run_test(
         }
 
         // Cleanup
-        if !xpath.is_null() {
-            xml_xpath_free_object(xpath);
-        }
         xml_free_doc(doc);
 
         ret

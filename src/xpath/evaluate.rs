@@ -1,4 +1,4 @@
-use std::{mem::replace, ptr::null_mut, rc::Rc};
+use std::{mem::replace, rc::Rc};
 
 #[cfg(feature = "libxml_xptr_locs")]
 use crate::libxml::xpointer::XmlLocationSet;
@@ -18,23 +18,22 @@ use crate::{
 
 use super::{
     XPATH_MAX_RECURSION_DEPTH, XmlNodeSet, XmlXPathAxisVal, XmlXPathContext, XmlXPathContextPtr,
-    XmlXPathFunction, XmlXPathNodeSetMergeFunction, XmlXPathObject, XmlXPathObjectPtr,
-    XmlXPathObjectType, XmlXPathParserContext, XmlXPathTestVal, XmlXPathTraversalFunction,
+    XmlXPathFunction, XmlXPathNodeSetMergeFunction, XmlXPathObject, XmlXPathObjectType,
+    XmlXPathObjectUserData, XmlXPathParserContext, XmlXPathTestVal, XmlXPathTraversalFunction,
     XmlXPathTypeVal,
     functions::{xml_xpath_boolean_function, xml_xpath_number_function},
     xml_xpath_add_values, xml_xpath_cast_to_boolean, xml_xpath_cmp_nodes_ext,
     xml_xpath_compare_values, xml_xpath_div_values, xml_xpath_equal_values, xml_xpath_err,
-    xml_xpath_free_node_set, xml_xpath_free_object, xml_xpath_mod_values, xml_xpath_mult_values,
-    xml_xpath_new_boolean, xml_xpath_new_node_set, xml_xpath_next_ancestor,
-    xml_xpath_next_ancestor_or_self, xml_xpath_next_attribute, xml_xpath_next_child,
-    xml_xpath_next_child_element, xml_xpath_next_descendant, xml_xpath_next_descendant_or_self,
-    xml_xpath_next_following, xml_xpath_next_following_sibling, xml_xpath_next_namespace,
-    xml_xpath_next_parent, xml_xpath_next_preceding_internal, xml_xpath_next_preceding_sibling,
-    xml_xpath_next_self, xml_xpath_node_set_create, xml_xpath_node_set_merge,
-    xml_xpath_node_set_merge_and_clear, xml_xpath_node_set_merge_and_clear_no_dupls,
-    xml_xpath_not_equal_values, xml_xpath_object_copy, xml_xpath_root, xml_xpath_sub_values,
-    xml_xpath_value_flip_sign, xml_xpath_variable_lookup, xml_xpath_variable_lookup_ns,
-    xml_xpath_wrap_node_set,
+    xml_xpath_free_node_set, xml_xpath_mod_values, xml_xpath_mult_values, xml_xpath_new_boolean,
+    xml_xpath_new_node_set, xml_xpath_next_ancestor, xml_xpath_next_ancestor_or_self,
+    xml_xpath_next_attribute, xml_xpath_next_child, xml_xpath_next_child_element,
+    xml_xpath_next_descendant, xml_xpath_next_descendant_or_self, xml_xpath_next_following,
+    xml_xpath_next_following_sibling, xml_xpath_next_namespace, xml_xpath_next_parent,
+    xml_xpath_next_preceding_internal, xml_xpath_next_preceding_sibling, xml_xpath_next_self,
+    xml_xpath_node_set_create, xml_xpath_node_set_merge, xml_xpath_node_set_merge_and_clear,
+    xml_xpath_node_set_merge_and_clear_no_dupls, xml_xpath_not_equal_values, xml_xpath_object_copy,
+    xml_xpath_root, xml_xpath_sub_values, xml_xpath_value_flip_sign, xml_xpath_variable_lookup,
+    xml_xpath_variable_lookup_ns, xml_xpath_wrap_node_set,
 };
 
 type StepOpIndex = usize;
@@ -115,34 +114,29 @@ impl XmlXPathParserContext {
         unsafe {
             #[cfg(feature = "libxml_pattern")]
             if self.comp.stream.is_some() {
-                let res: i32;
-
                 if to_bool {
                     // Evaluation to boolean result.
-                    res = (*self.context).run_stream_eval(
+                    let res = (*self.context).run_stream_eval(
                         self.comp.stream.as_deref().unwrap(),
-                        null_mut(),
+                        &mut None,
                         1,
                     );
                     if res != -1 {
                         return res;
                     }
                 } else {
-                    let mut res_obj: XmlXPathObjectPtr = null_mut();
+                    let mut res_obj = None;
 
                     // Evaluation to a sequence.
-                    res = (*self.context).run_stream_eval(
+                    let res = (*self.context).run_stream_eval(
                         self.comp.stream.as_deref().unwrap(),
-                        &raw mut res_obj,
+                        &mut res_obj,
                         0,
                     );
 
-                    if res != -1 && !res_obj.is_null() {
+                    if let Some(res_obj) = res_obj.filter(|_| res != -1) {
                         self.value_push(res_obj);
                         return 0;
-                    }
-                    if !res_obj.is_null() {
-                        xml_xpath_free_object(res_obj);
                     }
                 }
                 // QUESTION TODO: This falls back to normal XPath evaluation
@@ -174,8 +168,6 @@ impl XmlXPathParserContext {
             let mut total: i32 = 0;
             let equal: i32;
             let ret: i32;
-            let arg1: XmlXPathObjectPtr;
-            let arg2: XmlXPathObjectPtr;
 
             if self.error != XmlXPathError::XPathExpressionOK as i32 {
                 return 0;
@@ -199,20 +191,18 @@ impl XmlXPathParserContext {
                         return 0;
                     };
                     xml_xpath_boolean_function(self, 1);
-                    if self.value().is_none_or(|value| !(*value).boolval) {
+                    if self.value().is_none_or(|value| !value.boolval) {
                         break 'to_break;
                     }
-                    arg2 = self.value_pop();
+                    let arg2 = self.value_pop();
                     total += self.evaluate_precompiled_operation(self.comp.steps[op].ch2 as usize);
                     if self.error != 0 {
-                        xml_xpath_free_object(arg2);
                         break 'to_break;
                     }
                     xml_xpath_boolean_function(self, 1);
                     if let Some(value) = self.value_mut() {
-                        (**value).boolval &= (*arg2).boolval;
+                        value.boolval &= arg2.unwrap().boolval;
                     }
-                    xml_xpath_free_object(arg2);
                 }
                 XmlXPathOp::XPathOpOr => 'to_break: {
                     total += self.evaluate_precompiled_operation(self.comp.steps[op].ch1 as usize);
@@ -220,20 +210,18 @@ impl XmlXPathParserContext {
                         return 0;
                     };
                     xml_xpath_boolean_function(self, 1);
-                    if self.value().is_none_or(|value| (*value).boolval) {
+                    if self.value().is_none_or(|value| value.boolval) {
                         break 'to_break;
                     }
-                    arg2 = self.value_pop();
+                    let arg2 = self.value_pop();
                     total += self.evaluate_precompiled_operation(self.comp.steps[op].ch2 as usize);
                     if self.error != 0 {
-                        xml_xpath_free_object(arg2);
                         break 'to_break;
                     }
                     xml_xpath_boolean_function(self, 1);
                     if let Some(value) = self.value_mut() {
-                        (**value).boolval |= (*arg2).boolval;
+                        value.boolval |= arg2.unwrap().boolval;
                     }
-                    xml_xpath_free_object(arg2);
                 }
                 XmlXPathOp::XPathOpEqual => {
                     total += self.evaluate_precompiled_operation(self.comp.steps[op].ch1 as usize);
@@ -288,13 +276,13 @@ impl XmlXPathParserContext {
                     } else if self.comp.steps[op].value == 3 {
                         if self
                             .value()
-                            .is_some_and(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
+                            .is_some_and(|value| value.typ != XmlXPathObjectType::XPathNumber)
                         {
                             xml_xpath_number_function(self, 1);
                         }
                         if self
                             .value()
-                            .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
+                            .is_none_or(|value| value.typ != XmlXPathObjectType::XPathNumber)
                         {
                             xml_xpath_err(Some(self), XmlXPathError::XPathInvalidType as i32);
                             return 0;
@@ -328,47 +316,43 @@ impl XmlXPathParserContext {
                         return 0;
                     };
 
-                    arg2 = self.value_pop();
-                    arg1 = self.value_pop();
-                    if arg1.is_null()
-                        || (*arg1).typ != XmlXPathObjectType::XPathNodeset
-                        || arg2.is_null()
-                        || (*arg2).typ != XmlXPathObjectType::XPathNodeset
-                    {
-                        xml_xpath_free_object(arg1);
-                        xml_xpath_free_object(arg2);
+                    let Some((arg2, mut arg1)) =
+                        self.value_pop()
+                            .zip(self.value_pop())
+                            .filter(|(arg2, arg1)| {
+                                arg1.typ == XmlXPathObjectType::XPathNodeset
+                                    && arg2.typ == XmlXPathObjectType::XPathNodeset
+                            })
+                    else {
                         xml_xpath_err(Some(self), XmlXPathError::XPathInvalidType as i32);
                         return 0;
-                    }
+                    };
                     if (*self.context).op_limit != 0
-                        && ((*arg1)
+                        && (arg1
                             .nodesetval
                             .as_deref()
                             .is_some_and(|n| self.check_operation_limit(n.len() as _) < 0)
-                            || (*arg2)
+                            || arg2
                                 .nodesetval
                                 .as_deref()
                                 .is_some_and(|n| self.check_operation_limit(n.len() as _) < 0))
                     {
-                        xml_xpath_free_object(arg1);
-                        xml_xpath_free_object(arg2);
                         break 'to_break;
                     }
-                    if (*arg1).nodesetval.is_none()
-                        || (*arg2)
+                    if arg1.nodesetval.is_none()
+                        || arg2
                             .nodesetval
                             .as_deref()
                             .is_some_and(|n| !n.node_tab.is_empty())
                     {
                         // TODO: Check memory error.
-                        (*arg1).nodesetval = xml_xpath_node_set_merge(
-                            (*arg1).nodesetval.take(),
-                            (*arg2).nodesetval.as_deref(),
+                        arg1.nodesetval = xml_xpath_node_set_merge(
+                            arg1.nodesetval.take(),
+                            arg2.nodesetval.as_deref(),
                         );
                     }
 
                     self.value_push(arg1);
-                    xml_xpath_free_object(arg2);
                 }
                 XmlXPathOp::XPathOpRoot => {
                     xml_xpath_root(self);
@@ -412,7 +396,6 @@ impl XmlXPathParserContext {
                     ));
                 }
                 XmlXPathOp::XPathOpVariable => 'to_break: {
-                    let val: XmlXPathObjectPtr;
                     if self.comp.steps[op].ch1 != -1 {
                         total +=
                             self.evaluate_precompiled_operation(self.comp.steps[op].ch1 as usize);
@@ -437,14 +420,15 @@ impl XmlXPathParserContext {
                             self.error = XmlXPathError::XPathUndefPrefixError as _;
                             break 'to_break;
                         };
-                        val = xml_xpath_variable_lookup_ns(self.context, value4, Some(&uri));
-                        if val.is_null() {
+                        let Some(val) =
+                            xml_xpath_variable_lookup_ns(self.context, value4, Some(&uri))
+                        else {
                             xml_xpath_err(
                                 Some(self),
                                 XmlXPathError::XPathUndefVariableError as i32,
                             );
                             return 0;
-                        }
+                        };
                         self.value_push(val);
                     } else {
                         let value4 = self.comp.steps[op]
@@ -452,14 +436,13 @@ impl XmlXPathParserContext {
                             .as_ref()
                             .and_then(|val| val.as_str())
                             .unwrap();
-                        val = xml_xpath_variable_lookup(self.context, value4);
-                        if val.is_null() {
+                        let Some(val) = xml_xpath_variable_lookup(self.context, value4) else {
                             xml_xpath_err(
                                 Some(self),
                                 XmlXPathError::XPathUndefVariableError as i32,
                             );
                             return 0;
-                        }
+                        };
                         self.value_push(val);
                     }
                 }
@@ -477,13 +460,6 @@ impl XmlXPathParserContext {
                         generic_error!("xmlXPathCompOpEval: parameter error\n");
                         self.error = XmlXPathError::XPathInvalidOperand as i32;
                         break 'to_break;
-                    }
-                    for i in 0..self.comp.steps[op].value {
-                        if self.value_tab[(self.value_tab.len() - 1) - i as usize].is_null() {
-                            generic_error!("xmlXPathCompOpEval: parameter error\n");
-                            self.error = XmlXPathError::XPathInvalidOperand as i32;
-                            break;
-                        }
                     }
                     if let Some(cache) = self.comp.steps[op].cache {
                         func = cache;
@@ -606,9 +582,11 @@ impl XmlXPathParserContext {
                         // The nodeset should be in document order, Keep only the first value
                         if self
                             .value()
-                            .is_some_and(|value| (*value).typ == XmlXPathObjectType::XPathNodeset)
+                            .is_some_and(|value| value.typ == XmlXPathObjectType::XPathNodeset)
                         {
-                            if let Some(nodeset) = (**self.value_mut().unwrap())
+                            if let Some(nodeset) = self
+                                .value_mut()
+                                .unwrap()
                                 .nodesetval
                                 .as_deref_mut()
                                 .filter(|n| n.len() > 1)
@@ -652,10 +630,13 @@ impl XmlXPathParserContext {
                                 return 0;
                             };
                             // The nodeset should be in document order, Keep only the last value
-                            if self.value().is_some_and(|value| {
-                                (*value).typ == XmlXPathObjectType::XPathNodeset
-                            }) {
-                                if let Some(nodeset) = (**self.value_mut().unwrap())
+                            if self
+                                .value()
+                                .is_some_and(|value| value.typ == XmlXPathObjectType::XPathNodeset)
+                            {
+                                if let Some(nodeset) = self
+                                    .value_mut()
+                                    .unwrap()
                                     .nodesetval
                                     .as_deref_mut()
                                     .filter(|n| n.len() > 1)
@@ -692,19 +673,27 @@ impl XmlXPathParserContext {
 
                     // Hum are we filtering the result of an XPointer expression
                     #[cfg(feature = "libxml_xptr_locs")]
-                    if (*self.value().unwrap()).typ == XmlXPathObjectType::XPathLocationset {
-                        if let Some(locset) = (**self.value_mut().unwrap())
+                    if self.value().unwrap().typ == XmlXPathObjectType::XPathLocationset {
+                        if let Some(locset) = self
+                            .value()
+                            .unwrap()
                             .user
-                            .as_mut()
-                            .and_then(|user| user.as_location_set_mut())
+                            .as_ref()
+                            .and_then(|user| user.as_location_set())
                         {
+                            let keep = self.value_tab.len() - 1;
+                            let mut copied = locset.clone();
+                            let max_pos = copied.loc_tab.len() as i32;
+                            let filter_op_index = self.comp.steps[op].ch2;
                             xml_xpath_location_set_filter(
                                 self,
-                                locset,
-                                self.comp.steps[op].ch2,
+                                &mut copied,
+                                filter_op_index,
                                 1,
-                                locset.loc_tab.len() as i32,
+                                max_pos,
                             );
+                            self.value_tab[keep].user =
+                                Some(XmlXPathObjectUserData::LocationSet(copied));
                         }
 
                         break 'to_break;
@@ -715,15 +704,15 @@ impl XmlXPathParserContext {
                     // nodeset object from the stack to avoid freeing it prematurely.
                     if self
                         .value()
-                        .is_none_or(|value| (*value).typ != (XmlXPathObjectType::XPathNodeset))
+                        .is_none_or(|value| value.typ != (XmlXPathObjectType::XPathNodeset))
                     {
                         {
                             xml_xpath_err(Some(self), XmlXPathError::XPathInvalidType as i32);
                             return 0;
                         }
                     };
-                    let obj: XmlXPathObjectPtr = self.value_pop();
-                    if let Some(set) = (*obj).nodesetval.as_deref_mut() {
+                    let mut obj = self.value_pop().unwrap();
+                    if let Some(set) = obj.nodesetval.as_deref_mut() {
                         let max_pos = set.len() as i32;
                         xml_xpath_node_set_filter(
                             self,
@@ -746,9 +735,11 @@ impl XmlXPathParserContext {
                     };
                     if self
                         .value()
-                        .is_some_and(|value| (*value).typ == XmlXPathObjectType::XPathNodeset)
+                        .is_some_and(|value| value.typ == XmlXPathObjectType::XPathNodeset)
                     {
-                        if let Some(nodeset) = (*self.value().unwrap())
+                        if let Some(nodeset) = self
+                            .value_mut()
+                            .unwrap()
                             .nodesetval
                             .as_deref_mut()
                             .filter(|n| n.len() > 1)
@@ -759,9 +750,6 @@ impl XmlXPathParserContext {
                 }
                 #[cfg(feature = "libxml_xptr_locs")]
                 XmlXPathOp::XPathOpRangeto => 'to_break: {
-                    let mut res: XmlXPathObjectPtr;
-                    let obj: XmlXPathObjectPtr;
-                    let mut tmp: XmlXPathObjectPtr;
                     let mut newlocset;
                     let oldnode = (*self.context).node;
                     let oldcs: i32 = (*self.context).context_size;
@@ -783,12 +771,12 @@ impl XmlXPathParserContext {
                     }
 
                     'rangeto_error: {
-                        if (*self.value().unwrap()).typ == XmlXPathObjectType::XPathLocationset {
+                        if self.value().unwrap().typ == XmlXPathObjectType::XPathLocationset {
                             // Extract the old locset, and then evaluate the result of the
                             // expression for all the element in the locset. use it to grow
                             // up a new locset.
                             if self.value().is_none_or(|value| {
-                                (*value).typ != XmlXPathObjectType::XPathLocationset
+                                value.typ != XmlXPathObjectType::XPathLocationset
                             }) {
                                 {
                                     xml_xpath_err(
@@ -799,7 +787,9 @@ impl XmlXPathParserContext {
                                 }
                             };
 
-                            if (*self.value().unwrap())
+                            if self
+                                .value()
+                                .unwrap()
                                 .user
                                 .as_ref()
                                 .and_then(|user| user.as_location_set())
@@ -807,8 +797,8 @@ impl XmlXPathParserContext {
                             {
                                 break 'to_break;
                             }
-                            obj = self.value_pop();
-                            let oldlocset = (*obj)
+                            let obj = self.value_pop().unwrap();
+                            let oldlocset = obj
                                 .user
                                 .as_ref()
                                 .and_then(|user| user.as_location_set())
@@ -823,8 +813,9 @@ impl XmlXPathParserContext {
                                     iloc.user.as_ref().and_then(|user| user.as_node()).copied();
                                 (*self.context).context_size = oldlocset.loc_tab.len() as i32;
                                 (*self.context).proximity_position = i as i32 + 1;
-                                tmp = xml_xpath_new_node_set((*self.context).node);
+                                let tmp = xml_xpath_new_node_set((*self.context).node);
                                 self.value_push(tmp);
+                                let keep_stack_len = self.value_tab.len();
 
                                 if self.comp.steps[op].ch2 != -1 {
                                     total += self.evaluate_precompiled_operation(
@@ -835,9 +826,9 @@ impl XmlXPathParserContext {
                                     break 'rangeto_error;
                                 }
 
-                                res = self.value_pop();
-                                if (*res).typ == XmlXPathObjectType::XPathLocationset {
-                                    let rloc = (*res)
+                                let res = self.value_pop().unwrap();
+                                if res.typ == XmlXPathObjectType::XPathLocationset {
+                                    let rloc = res
                                         .user
                                         .as_ref()
                                         .and_then(|user| user.as_location_set())
@@ -866,39 +857,37 @@ impl XmlXPathParserContext {
                                         .and_then(|user| user.as_node())
                                         .copied()
                                         .unwrap(),
-                                    res,
+                                    &res,
                                 ) {
                                     newlocset.push(Rc::new(range));
                                 }
 
                                 // Cleanup
-                                if !res.is_null() {
-                                    xml_xpath_free_object(res);
-                                }
-                                if self.value().unwrap() == tmp {
-                                    res = self.value_pop();
-                                    xml_xpath_free_object(res);
+                                if keep_stack_len == self.value_tab.len() {
+                                    self.value_pop();
                                 }
                             }
                         } else {
                             // Not a location set
-                            if self.value().is_none_or(|value| {
-                                (*value).typ != XmlXPathObjectType::XPathNodeset
-                            }) {
+                            if self
+                                .value()
+                                .is_none_or(|value| value.typ != XmlXPathObjectType::XPathNodeset)
+                            {
                                 xml_xpath_err(Some(self), XmlXPathError::XPathInvalidType as i32);
                                 return 0;
                             };
-                            obj = self.value_pop();
+                            let obj = self.value_pop().unwrap();
                             newlocset = XmlLocationSet::new(None);
 
-                            if let Some(oldset) = (*obj).nodesetval.as_deref() {
+                            if let Some(oldset) = obj.nodesetval.as_deref() {
                                 for &node in &oldset.node_tab {
                                     // Run the evaluation with a node list made of a single item
                                     // in the nodeset.
                                     (*self.context).node = Some(node);
                                     // OPTIMIZE TODO: Avoid recreation for every iteration.
-                                    tmp = xml_xpath_new_node_set((*self.context).node);
+                                    let tmp = xml_xpath_new_node_set((*self.context).node);
                                     self.value_push(tmp);
+                                    let keep_stack_len = self.value_tab.len();
 
                                     if self.comp.steps[op].ch2 != -1 {
                                         total += self.evaluate_precompiled_operation(
@@ -909,18 +898,15 @@ impl XmlXPathParserContext {
                                         break 'rangeto_error;
                                     }
 
-                                    res = self.value_pop();
-                                    if let Some(range) = xml_xptr_new_range_node_object(node, res) {
+                                    let res = self.value_pop().unwrap();
+                                    if let Some(range) = xml_xptr_new_range_node_object(node, &res)
+                                    {
                                         newlocset.push(Rc::new(range));
                                     }
 
                                     // Cleanup
-                                    if !res.is_null() {
-                                        xml_xpath_free_object(res);
-                                    }
-                                    if self.value().unwrap() == tmp {
-                                        res = self.value_pop();
-                                        xml_xpath_free_object(res);
+                                    if keep_stack_len == self.value_tab.len() {
+                                        self.value_pop();
                                     }
                                 }
                             }
@@ -930,7 +916,6 @@ impl XmlXPathParserContext {
                         self.value_push(xml_xptr_wrap_location_set(newlocset));
                     }
                     // rangeto_error:
-                    xml_xpath_free_object(obj);
                     (*self.context).node = oldnode;
                     (*self.context).context_size = oldcs;
                     (*self.context).proximity_position = oldpp;
@@ -954,9 +939,6 @@ impl XmlXPathParserContext {
         unsafe {
             let mut total: i32 = 0;
             let cur: i32;
-
-            let arg1: XmlXPathObjectPtr;
-            let arg2: XmlXPathObjectPtr;
 
             if self.error != XmlXPathError::XPathExpressionOK as i32 {
                 return 0;
@@ -984,9 +966,11 @@ impl XmlXPathParserContext {
                     };
                     if self
                         .value()
-                        .is_some_and(|value| (*value).typ == XmlXPathObjectType::XPathNodeset)
+                        .is_some_and(|value| value.typ == XmlXPathObjectType::XPathNodeset)
                     {
-                        if let Some(nodeset) = (*self.value().unwrap())
+                        if let Some(nodeset) = self
+                            .value_mut()
+                            .unwrap()
                             .nodesetval
                             .as_deref_mut()
                             .filter(|n| !n.is_empty())
@@ -1012,38 +996,35 @@ impl XmlXPathParserContext {
                         return 0;
                     };
 
-                    arg2 = self.value_pop();
-                    arg1 = self.value_pop();
-                    if arg1.is_null()
-                        || (*arg1).typ != XmlXPathObjectType::XPathNodeset
-                        || arg2.is_null()
-                        || (*arg2).typ != XmlXPathObjectType::XPathNodeset
-                    {
-                        xml_xpath_free_object(arg1);
-                        xml_xpath_free_object(arg2);
+                    let Some((arg2, mut arg1)) =
+                        self.value_pop()
+                            .zip(self.value_pop())
+                            .filter(|(arg2, arg1)| {
+                                arg1.typ == XmlXPathObjectType::XPathNodeset
+                                    && arg2.typ == XmlXPathObjectType::XPathNodeset
+                            })
+                    else {
                         xml_xpath_err(Some(self), XmlXPathError::XPathInvalidType as i32);
                         return 0;
-                    }
+                    };
                     if (*self.context).op_limit != 0
-                        && ((*arg1)
+                        && (arg1
                             .nodesetval
                             .as_deref()
                             .is_some_and(|n| self.check_operation_limit(n.len() as _) < 0)
-                            || (*arg2)
+                            || arg2
                                 .nodesetval
                                 .as_deref()
                                 .is_some_and(|n| self.check_operation_limit(n.len() as _) < 0))
                     {
-                        xml_xpath_free_object(arg1);
-                        xml_xpath_free_object(arg2);
+                        // no op
                     } else {
                         // TODO: Check memory error.
-                        (*arg1).nodesetval = xml_xpath_node_set_merge(
-                            (*arg1).nodesetval.take(),
-                            (*arg2).nodesetval.as_deref(),
+                        arg1.nodesetval = xml_xpath_node_set_merge(
+                            arg1.nodesetval.take(),
+                            arg2.nodesetval.as_deref(),
                         );
                         self.value_push(arg1);
-                        xml_xpath_free_object(arg2);
                         // optimizer
                         if total > cur {
                             self.comp.steps[op].swap_children();
@@ -1104,9 +1085,11 @@ impl XmlXPathParserContext {
                     };
                     if self
                         .value()
-                        .is_some_and(|value| (*value).typ == XmlXPathObjectType::XPathNodeset)
+                        .is_some_and(|value| value.typ == XmlXPathObjectType::XPathNodeset)
                     {
-                        if let Some(nodeset) = (*self.value().unwrap())
+                        if let Some(nodeset) = self
+                            .value_mut()
+                            .unwrap()
                             .nodesetval
                             .as_deref_mut()
                             .filter(|n| n.len() > 1)
@@ -1141,8 +1124,6 @@ impl XmlXPathParserContext {
         unsafe {
             let mut total: i32 = 0;
             let cur: i32;
-            let arg1: XmlXPathObjectPtr;
-            let arg2: XmlXPathObjectPtr;
 
             if self.error != XmlXPathError::XPathExpressionOK as i32 {
                 return 0;
@@ -1170,9 +1151,9 @@ impl XmlXPathParserContext {
                     };
                     if self
                         .value()
-                        .is_some_and(|value| (*value).typ == XmlXPathObjectType::XPathNodeset)
+                        .is_some_and(|value| value.typ == XmlXPathObjectType::XPathNodeset)
                     {
-                        if let Some(nodeset) = (*self.value().unwrap()).nodesetval.as_deref_mut() {
+                        if let Some(nodeset) = self.value_mut().unwrap().nodesetval.as_deref_mut() {
                             if !nodeset.is_empty() {
                                 // limit tree traversing to first node in the result
                                 if nodeset.node_tab.len() > 1 {
@@ -1190,49 +1171,48 @@ impl XmlXPathParserContext {
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
-                    if self.value().is_some_and(|value| {
-                        matches!((*value).typ, XmlXPathObjectType::XPathNodeset)
-                    }) {
-                        if let Some(_nodeset) = (*self.value().unwrap())
+                    if self
+                        .value()
+                        .is_some_and(|value| matches!(value.typ, XmlXPathObjectType::XPathNodeset))
+                    {
+                        if let Some(_nodeset) = self
+                            .value()
+                            .unwrap()
                             .nodesetval
                             .as_deref()
                             .filter(|n| !n.is_empty())
                         { /* TODO: NOP ? */ }
                     }
 
-                    arg2 = self.value_pop();
-                    arg1 = self.value_pop();
-                    if arg1.is_null()
-                        || (*arg1).typ != XmlXPathObjectType::XPathNodeset
-                        || arg2.is_null()
-                        || (*arg2).typ != XmlXPathObjectType::XPathNodeset
-                    {
-                        xml_xpath_free_object(arg1);
-                        xml_xpath_free_object(arg2);
+                    let Some((arg2, mut arg1)) =
+                        self.value_pop()
+                            .zip(self.value_pop())
+                            .filter(|(arg2, arg1)| {
+                                arg1.typ == XmlXPathObjectType::XPathNodeset
+                                    && arg2.typ == XmlXPathObjectType::XPathNodeset
+                            })
+                    else {
                         xml_xpath_err(Some(self), XmlXPathError::XPathInvalidType as i32);
                         return 0;
-                    }
+                    };
                     if (*self.context).op_limit != 0
-                        && ((*arg1)
+                        && (arg1
                             .nodesetval
                             .as_deref()
                             .is_some_and(|n| self.check_operation_limit(n.len() as _) < 0)
-                            || (*arg2)
+                            || arg2
                                 .nodesetval
                                 .as_deref()
                                 .is_some_and(|n| self.check_operation_limit(n.len() as _) < 0))
                     {
-                        xml_xpath_free_object(arg1);
-                        xml_xpath_free_object(arg2);
                         // break;
                     } else {
                         // TODO: Check memory error.
-                        (*arg1).nodesetval = xml_xpath_node_set_merge(
-                            (*arg1).nodesetval.take(),
-                            (*arg2).nodesetval.as_deref(),
+                        arg1.nodesetval = xml_xpath_node_set_merge(
+                            arg1.nodesetval.take(),
+                            arg2.nodesetval.as_deref(),
                         );
                         self.value_push(arg1);
-                        xml_xpath_free_object(arg2);
                         // optimizer
                         if total > cur {
                             self.comp.steps[op].swap_children();
@@ -1293,9 +1273,11 @@ impl XmlXPathParserContext {
                     };
                     if self
                         .value()
-                        .is_some_and(|value| (*value).typ == XmlXPathObjectType::XPathNodeset)
+                        .is_some_and(|value| value.typ == XmlXPathObjectType::XPathNodeset)
                     {
-                        if let Some(nodeset) = (*self.value().unwrap())
+                        if let Some(nodeset) = self
+                            .value_mut()
+                            .unwrap()
                             .nodesetval
                             .as_deref_mut()
                             .filter(|n| n.len() > 1)
@@ -1363,9 +1345,11 @@ impl XmlXPathParserContext {
                     // Keep only the last value
                     if self
                         .value()
-                        .is_some_and(|value| (*value).typ == XmlXPathObjectType::XPathNodeset)
+                        .is_some_and(|value| value.typ == XmlXPathObjectType::XPathNodeset)
                     {
-                        if let Some(nodeset) = (*self.value().unwrap())
+                        if let Some(nodeset) = self
+                            .value_mut()
+                            .unwrap()
                             .nodesetval
                             .as_deref_mut()
                             .filter(|n| n.len() > 1)
@@ -1395,22 +1379,30 @@ impl XmlXPathParserContext {
             {
                 // Hum are we filtering the result of an XPointer expression
                 if matches!(
-                    (*self.value().unwrap()).typ,
+                    self.value().unwrap().typ,
                     XmlXPathObjectType::XPathLocationset
                 ) {
-                    if let Some(locset) = (**self.value_mut().unwrap())
+                    if let Some(locset) = self
+                        .value()
+                        .unwrap()
                         .user
-                        .as_mut()
-                        .and_then(|user| user.as_location_set_mut())
+                        .as_ref()
+                        .and_then(|user| user.as_location_set())
                     {
-                        xml_xpath_location_set_filter(self, locset, self.comp.steps[op].ch2, 1, 1);
-                        if !locset.loc_tab.is_empty() {
-                            *first = locset.loc_tab[0]
+                        let keep = self.value_tab.len() - 1;
+                        let mut copied = locset.clone();
+                        let filter_op_index = self.comp.steps[op].ch2;
+                        xml_xpath_location_set_filter(self, &mut copied, filter_op_index, 1, 1);
+
+                        if !copied.loc_tab.is_empty() {
+                            *first = copied.loc_tab[0]
                                 .user
                                 .as_ref()
                                 .and_then(|user| user.as_node())
                                 .copied();
                         }
+                        self.value_tab[keep].user =
+                            Some(XmlXPathObjectUserData::LocationSet(copied));
                     }
 
                     return total;
@@ -1422,13 +1414,13 @@ impl XmlXPathParserContext {
             // stack to avoid freeing it prematurely.
             if self
                 .value()
-                .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNodeset)
+                .is_none_or(|value| value.typ != XmlXPathObjectType::XPathNodeset)
             {
                 xml_xpath_err(Some(self), XmlXPathError::XPathInvalidType as i32);
                 return 0;
             };
-            let obj: XmlXPathObjectPtr = self.value_pop();
-            if let Some(set) = (*obj).nodesetval.as_deref_mut() {
+            let mut obj = self.value_pop().unwrap();
+            if let Some(set) = obj.nodesetval.as_deref_mut() {
                 xml_xpath_node_set_filter(self, Some(set), self.comp.steps[op].ch2, 1, 1, true);
                 if !set.node_tab.is_empty() {
                     *first = Some(set.node_tab[0]);
@@ -1450,7 +1442,7 @@ impl XmlXPathParserContext {
         is_predicate: bool,
     ) -> i32 {
         unsafe {
-            let res_obj: XmlXPathObjectPtr;
+            let res_obj;
 
             // start:
             loop {
@@ -1497,10 +1489,10 @@ impl XmlXPathParserContext {
                             return -1;
                         }
 
-                        res_obj = self.value_pop();
-                        if res_obj.is_null() {
+                        let Some(res) = self.value_pop() else {
                             return -1;
-                        }
+                        };
+                        res_obj = res;
                     }
                     _ => {
                         // Fallback to call xmlXPathCompOpEval().
@@ -1509,34 +1501,28 @@ impl XmlXPathParserContext {
                             return -1;
                         }
 
-                        res_obj = self.value_pop();
-                        if res_obj.is_null() {
+                        let Some(res) = self.value_pop() else {
                             return -1;
-                        }
+                        };
+                        res_obj = res;
                     }
                 }
                 break;
             }
 
-            if !res_obj.is_null() {
-                let res = if (*res_obj).typ == XmlXPathObjectType::XPathBoolean {
-                    (*res_obj).boolval as i32
-                } else if is_predicate {
-                    // For predicates a result of type "number" is handled
-                    // differently:
-                    // SPEC XPath 1.0:
-                    // "If the result is a number, the result will be converted
-                    //  to true if the number is equal to the context position
-                    //  and will be converted to false otherwise;"
-                    self.evaluate_predicate_result(&*res_obj)
-                } else {
-                    xml_xpath_cast_to_boolean(&*res_obj) as i32
-                };
-                xml_xpath_free_object(res_obj);
-                return res;
+            if res_obj.typ == XmlXPathObjectType::XPathBoolean {
+                res_obj.boolval as i32
+            } else if is_predicate {
+                // For predicates a result of type "number" is handled
+                // differently:
+                // SPEC XPath 1.0:
+                // "If the result is a number, the result will be converted
+                //  to true if the number is equal to the context position
+                //  and will be converted to false otherwise;"
+                self.evaluate_predicate_result(&res_obj)
+            } else {
+                xml_xpath_cast_to_boolean(&res_obj) as i32
             }
-
-            0
         }
     }
 
@@ -1592,10 +1578,10 @@ impl XmlXPathContext {
     /// Evaluate the Precompiled Streamable XPath expression in the given context.
     #[doc(alias = "xmlXPathRunStreamEval")]
     #[cfg(feature = "libxml_pattern")]
-    unsafe fn run_stream_eval(
+    fn run_stream_eval(
         &mut self,
         comp: &XmlPattern,
-        result_seq: *mut XmlXPathObjectPtr,
+        result_seq: &mut Option<XmlXPathObject>,
         to_bool: i32,
     ) -> i32 {
         use crate::{
@@ -1603,145 +1589,137 @@ impl XmlXPathContext {
             tree::{XmlElementType, XmlNodePtr},
         };
 
-        unsafe {
-            let mut ret: i32;
+        let mut ret: i32;
 
-            let mut max_depth = comp.max_depth();
-            if max_depth == -1 {
-                return -1;
-            }
-            if max_depth == -2 {
-                max_depth = 10000;
-            }
-            let min_depth: i32 = comp.min_depth();
-            if min_depth == -1 {
-                return -1;
-            }
-            let from_root: i32 = comp.is_from_root();
-            if from_root < 0 {
-                return -1;
-            }
+        let mut max_depth = comp.max_depth();
+        if max_depth == -1 {
+            return -1;
+        }
+        if max_depth == -2 {
+            max_depth = 10000;
+        }
+        let min_depth: i32 = comp.min_depth();
+        if min_depth == -1 {
+            return -1;
+        }
+        let from_root: i32 = comp.is_from_root();
+        if from_root < 0 {
+            return -1;
+        }
 
-            if to_bool == 0 {
-                if result_seq.is_null() {
-                    return -1;
-                }
-                *result_seq = xml_xpath_new_node_set(None);
-                if (*result_seq).is_null() {
-                    return -1;
-                }
-            }
+        if to_bool == 0 {
+            *result_seq = Some(xml_xpath_new_node_set(None));
+        }
 
-            // handle the special cases of "/" amd "." being matched
-            if min_depth == 0 {
-                if from_root != 0 {
-                    // Select "/"
-                    if to_bool != 0 {
-                        return 1;
-                    }
-                    // TODO: Check memory error.
-                    if let Some(nodeset) = (*(*result_seq)).nodesetval.as_deref_mut() {
-                        nodeset.add_unique(self.doc.unwrap().into());
-                    }
-                } else {
-                    // Select "self::node()"
-                    if to_bool != 0 {
-                        return 1;
-                    }
-                    // TODO: Check memory error.
-                    if let Some(nodeset) = (*(*result_seq)).nodesetval.as_deref_mut() {
-                        nodeset.add_unique(self.node.unwrap());
-                    }
-                }
-            }
-            if max_depth == 0 {
-                return 0;
-            }
-
-            let mut limit = None;
-            let cur = if from_root != 0 {
-                self.doc.map(|doc| doc.into())
-            } else if let Some(node) = self.node {
-                match node.element_type() {
-                    XmlElementType::XmlElementNode
-                    | XmlElementType::XmlDocumentNode
-                    | XmlElementType::XmlDocumentFragNode
-                    | XmlElementType::XmlHTMLDocumentNode => {
-                        limit = Some(node);
-                    }
-                    XmlElementType::XmlAttributeNode
-                    | XmlElementType::XmlTextNode
-                    | XmlElementType::XmlCDATASectionNode
-                    | XmlElementType::XmlEntityRefNode
-                    | XmlElementType::XmlEntityNode
-                    | XmlElementType::XmlPINode
-                    | XmlElementType::XmlCommentNode
-                    | XmlElementType::XmlNotationNode
-                    | XmlElementType::XmlDTDNode
-                    | XmlElementType::XmlDocumentTypeNode
-                    | XmlElementType::XmlElementDecl
-                    | XmlElementType::XmlAttributeDecl
-                    | XmlElementType::XmlEntityDecl
-                    | XmlElementType::XmlNamespaceDecl
-                    | XmlElementType::XmlXIncludeStart
-                    | XmlElementType::XmlXIncludeEnd => {}
-                    _ => unreachable!(),
-                }
-                limit
-            } else {
-                None
-            };
-            let Some(mut cur) = cur else {
-                return 0;
-            };
-
-            let Some(mut patstream) = comp.get_stream_context() else {
-                // QUESTION TODO: Is this an error?
-                return 0;
-            };
-
-            let eval_all_nodes: i32 = patstream.wants_any_node();
-
+        // handle the special cases of "/" amd "." being matched
+        if min_depth == 0 {
             if from_root != 0 {
-                ret = patstream.push(None, None);
-                if ret < 0 {
-                    // no op
-                } else if ret == 1 {
-                    if to_bool != 0 {
-                        return 1;
-                    }
-                    // TODO: Check memory error.
-                    if let Some(nodeset) = (*(*result_seq)).nodesetval.as_deref_mut() {
-                        nodeset.add_unique(cur);
-                    }
+                // Select "/"
+                if to_bool != 0 {
+                    return 1;
+                }
+                // TODO: Check memory error.
+                if let Some(nodeset) = result_seq.as_mut().unwrap().nodesetval.as_deref_mut() {
+                    nodeset.add_unique(self.doc.unwrap().into());
+                }
+            } else {
+                // Select "self::node()"
+                if to_bool != 0 {
+                    return 1;
+                }
+                // TODO: Check memory error.
+                if let Some(nodeset) = result_seq.as_mut().unwrap().nodesetval.as_deref_mut() {
+                    nodeset.add_unique(self.node.unwrap());
                 }
             }
-            let mut depth = 0;
-            let mut goto_scan_children = true;
-            // goto scan_children;
-            // next_node:
-            'main: while {
-                'to_continue_main: {
-                    'next_node: loop {
-                        if !goto_scan_children {
-                            if self.op_limit != 0 {
-                                if self.op_count >= self.op_limit {
-                                    generic_error!("XPath operation limit exceeded\n");
-                                    return -1;
-                                }
-                                self.op_count += 1;
-                            }
+        }
+        if max_depth == 0 {
+            return 0;
+        }
 
-                            match cur.element_type() {
-                                XmlElementType::XmlElementNode
-                                | XmlElementType::XmlTextNode
-                                | XmlElementType::XmlCDATASectionNode
-                                | XmlElementType::XmlCommentNode
-                                | XmlElementType::XmlPINode => 'to_break: {
-                                    ret = if matches!(
-                                        cur.element_type(),
-                                        XmlElementType::XmlElementNode
-                                    ) {
+        let mut limit = None;
+        let cur = if from_root != 0 {
+            self.doc.map(|doc| doc.into())
+        } else if let Some(node) = self.node {
+            match node.element_type() {
+                XmlElementType::XmlElementNode
+                | XmlElementType::XmlDocumentNode
+                | XmlElementType::XmlDocumentFragNode
+                | XmlElementType::XmlHTMLDocumentNode => {
+                    limit = Some(node);
+                }
+                XmlElementType::XmlAttributeNode
+                | XmlElementType::XmlTextNode
+                | XmlElementType::XmlCDATASectionNode
+                | XmlElementType::XmlEntityRefNode
+                | XmlElementType::XmlEntityNode
+                | XmlElementType::XmlPINode
+                | XmlElementType::XmlCommentNode
+                | XmlElementType::XmlNotationNode
+                | XmlElementType::XmlDTDNode
+                | XmlElementType::XmlDocumentTypeNode
+                | XmlElementType::XmlElementDecl
+                | XmlElementType::XmlAttributeDecl
+                | XmlElementType::XmlEntityDecl
+                | XmlElementType::XmlNamespaceDecl
+                | XmlElementType::XmlXIncludeStart
+                | XmlElementType::XmlXIncludeEnd => {}
+                _ => unreachable!(),
+            }
+            limit
+        } else {
+            None
+        };
+        let Some(mut cur) = cur else {
+            return 0;
+        };
+
+        let Some(mut patstream) = comp.get_stream_context() else {
+            // QUESTION TODO: Is this an error?
+            return 0;
+        };
+
+        let eval_all_nodes: i32 = patstream.wants_any_node();
+
+        if from_root != 0 {
+            ret = patstream.push(None, None);
+            if ret < 0 {
+                // no op
+            } else if ret == 1 {
+                if to_bool != 0 {
+                    return 1;
+                }
+                // TODO: Check memory error.
+                if let Some(nodeset) = result_seq.as_mut().unwrap().nodesetval.as_deref_mut() {
+                    nodeset.add_unique(cur);
+                }
+            }
+        }
+        let mut depth = 0;
+        let mut goto_scan_children = true;
+        // goto scan_children;
+        // next_node:
+        'main: while {
+            'to_continue_main: {
+                'next_node: loop {
+                    if !goto_scan_children {
+                        if self.op_limit != 0 {
+                            if self.op_count >= self.op_limit {
+                                generic_error!("XPath operation limit exceeded\n");
+                                return -1;
+                            }
+                            self.op_count += 1;
+                        }
+
+                        match cur.element_type() {
+                            XmlElementType::XmlElementNode
+                            | XmlElementType::XmlTextNode
+                            | XmlElementType::XmlCDATASectionNode
+                            | XmlElementType::XmlCommentNode
+                            | XmlElementType::XmlPINode => 'to_break: {
+                                ret =
+                                    if matches!(cur.element_type(), XmlElementType::XmlElementNode)
+                                    {
                                         let node = XmlNodePtr::try_from(cur).unwrap();
                                         patstream.push(
                                             Some(&node.name),
@@ -1752,117 +1730,114 @@ impl XmlXPathContext {
                                     } else {
                                         break 'to_break;
                                     };
-                                    if ret < 0 {
-                                        // NOP.
-                                    } else if ret == 1 {
-                                        if to_bool != 0 {
-                                            return 1;
-                                        }
-                                        if let Some(nodeset) =
-                                            (*(*result_seq)).nodesetval.as_deref_mut()
-                                        {
-                                            if nodeset.add_unique(cur) < 0 {
-                                                self.last_error.domain =
-                                                    XmlErrorDomain::XmlFromXPath;
-                                                self.last_error.code =
-                                                    XmlParserErrors::XmlErrNoMemory;
-                                            }
-                                        }
+                                if ret < 0 {
+                                    // NOP.
+                                } else if ret == 1 {
+                                    if to_bool != 0 {
+                                        return 1;
                                     }
-                                    if cur.children().is_none() || depth >= max_depth {
-                                        // ret =
-                                        patstream.pop();
-                                        while let Some(next) = cur.next() {
-                                            cur = next;
-                                            if !matches!(
-                                                cur.element_type(),
-                                                XmlElementType::XmlEntityDecl
-                                                    | XmlElementType::XmlDTDNode
-                                            ) {
-                                                // goto next_node;
-                                                continue 'next_node;
-                                            }
+                                    if let Some(nodeset) =
+                                        result_seq.as_mut().unwrap().nodesetval.as_deref_mut()
+                                    {
+                                        if nodeset.add_unique(cur) < 0 {
+                                            self.last_error.domain = XmlErrorDomain::XmlFromXPath;
+                                            self.last_error.code = XmlParserErrors::XmlErrNoMemory;
                                         }
                                     }
                                 }
-                                _ => {}
-                            }
-                        }
-                        goto_scan_children = false;
-
-                        // scan_children:
-                        if matches!((*cur).element_type(), XmlElementType::XmlNamespaceDecl) {
-                            break 'main;
-                        }
-                        if let Some(children) = cur.children().filter(|_| depth < max_depth) {
-                            // Do not descend on entities declarations
-                            if !matches!(children.element_type(), XmlElementType::XmlEntityDecl) {
-                                cur = children;
-                                depth += 1;
-                                // Skip DTDs
-                                if !matches!(cur.element_type(), XmlElementType::XmlDTDNode) {
-                                    break 'to_continue_main;
+                                if cur.children().is_none() || depth >= max_depth {
+                                    // ret =
+                                    patstream.pop();
+                                    while let Some(next) = cur.next() {
+                                        cur = next;
+                                        if !matches!(
+                                            cur.element_type(),
+                                            XmlElementType::XmlEntityDecl
+                                                | XmlElementType::XmlDTDNode
+                                        ) {
+                                            // goto next_node;
+                                            continue 'next_node;
+                                        }
+                                    }
                                 }
                             }
+                            _ => {}
                         }
+                    }
+                    goto_scan_children = false;
 
-                        if Some(cur) == limit {
-                            break 'main;
-                        }
-
-                        while let Some(next) = cur.next() {
-                            cur = next;
-                            if !matches!(
-                                cur.element_type(),
-                                XmlElementType::XmlEntityDecl | XmlElementType::XmlDTDNode
-                            ) {
-                                // goto next_node;
-                                continue 'next_node;
+                    // scan_children:
+                    if matches!((*cur).element_type(), XmlElementType::XmlNamespaceDecl) {
+                        break 'main;
+                    }
+                    if let Some(children) = cur.children().filter(|_| depth < max_depth) {
+                        // Do not descend on entities declarations
+                        if !matches!(children.element_type(), XmlElementType::XmlEntityDecl) {
+                            cur = children;
+                            depth += 1;
+                            // Skip DTDs
+                            if !matches!(cur.element_type(), XmlElementType::XmlDTDNode) {
+                                break 'to_continue_main;
                             }
                         }
-
-                        break 'next_node;
                     }
 
-                    'inner: loop {
-                        let Some(parent) = cur.parent() else {
-                            break 'main;
-                        };
-                        depth -= 1;
-                        cur = parent;
-                        if Some(cur) == limit
-                            || matches!(cur.element_type(), XmlElementType::XmlDocumentNode)
-                        {
-                            // goto done;
-                            break 'main;
-                        }
-                        if matches!(cur.element_type(), XmlElementType::XmlElementNode)
-                            || (eval_all_nodes != 0
-                                && matches!(
-                                    cur.element_type(),
-                                    XmlElementType::XmlTextNode
-                                        | XmlElementType::XmlCDATASectionNode
-                                        | XmlElementType::XmlCommentNode
-                                        | XmlElementType::XmlPINode
-                                ))
-                        {
-                            // ret =
-                            patstream.pop();
-                        };
-                        if let Some(next) = cur.next() {
-                            cur = next;
-                            break 'inner;
+                    if Some(cur) == limit {
+                        break 'main;
+                    }
+
+                    while let Some(next) = cur.next() {
+                        cur = next;
+                        if !matches!(
+                            cur.element_type(),
+                            XmlElementType::XmlEntityDecl | XmlElementType::XmlDTDNode
+                        ) {
+                            // goto next_node;
+                            continue 'next_node;
                         }
                     }
+
+                    break 'next_node;
                 }
 
-                depth >= 0
-            } {}
+                'inner: loop {
+                    let Some(parent) = cur.parent() else {
+                        break 'main;
+                    };
+                    depth -= 1;
+                    cur = parent;
+                    if Some(cur) == limit
+                        || matches!(cur.element_type(), XmlElementType::XmlDocumentNode)
+                    {
+                        // goto done;
+                        break 'main;
+                    }
+                    if matches!(cur.element_type(), XmlElementType::XmlElementNode)
+                        || (eval_all_nodes != 0
+                            && matches!(
+                                cur.element_type(),
+                                XmlElementType::XmlTextNode
+                                    | XmlElementType::XmlCDATASectionNode
+                                    | XmlElementType::XmlCommentNode
+                                    | XmlElementType::XmlPINode
+                            ))
+                    {
+                        // ret =
+                        patstream.pop();
+                    };
+                    if let Some(next) = cur.next() {
+                        cur = next;
+                        break 'inner;
+                    }
+                }
+            }
 
-            // done:
+            depth >= 0
+        } {}
 
-            0
-        }
+        // done:
+
+        0
     }
 
     /// Evaluate a predicate result for the current node.
@@ -2056,18 +2031,17 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
 
         if ctxt
             .value()
-            .is_none_or(|value| (*value).typ != (XmlXPathObjectType::XPathNodeset))
+            .is_none_or(|value| value.typ != XmlXPathObjectType::XPathNodeset)
         {
             xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return 0;
         };
         // The popped object holding the context nodes
-        let obj: XmlXPathObjectPtr = ctxt.value_pop();
+        let mut obj = ctxt.value_pop().unwrap();
         // Setup namespaces.
         if let Some(prefix) = prefix.as_deref() {
             uri = (*xpctxt).lookup_ns(prefix);
             if uri.is_none() {
-                xml_xpath_free_object(obj);
                 xml_xpath_err(Some(ctxt), XmlXPathError::XPathUndefPrefixError as i32);
                 return 0;
             }
@@ -2156,12 +2130,10 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
         }
 
         let Some(next) = next else {
-            xml_xpath_free_object(obj);
             return 0;
         };
         // The set of context nodes for the node tests
-        let Some(context_seq) = (*obj).nodesetval.as_deref().filter(|n| !n.is_empty()) else {
-            xml_xpath_free_object(obj);
+        let Some(context_seq) = obj.nodesetval.as_deref().filter(|n| !n.is_empty()) else {
             ctxt.value_push(xml_xpath_wrap_node_set(None));
             return 0;
         };
@@ -2497,16 +2469,15 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
         }
 
         // error:
-        if (*obj).boolval && (*obj).user.is_some() {
+        if obj.boolval && obj.user.is_some() {
             // QUESTION TODO: What does this do and why?
             // TODO: Do we have to do this also for the "error"
             // cleanup further down?
             let value = ctxt.value_mut().unwrap();
-            (**value).boolval = true;
-            (**value).user = (*obj).user.take();
-            (*obj).boolval = false;
+            value.boolval = true;
+            value.user = obj.user.take();
+            obj.boolval = false;
         }
-        xml_xpath_free_object(obj);
 
         // Ensure we return at least an empty set.
         if out_seq.is_none() {

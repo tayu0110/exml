@@ -51,9 +51,8 @@ use exml::{
         schema::{XmlSchemaPtr, xml_schema_free},
     },
     xpath::{
-        XmlXPathContext, XmlXPathObjectPtr, XmlXPathObjectType, xml_xpath_compile,
-        xml_xpath_compiled_eval, xml_xpath_free_context, xml_xpath_free_object,
-        xml_xpath_new_context,
+        XmlXPathContext, XmlXPathObjectType, xml_xpath_compile, xml_xpath_compiled_eval,
+        xml_xpath_free_context, xml_xpath_new_context,
     },
 };
 use libc::strstr;
@@ -228,20 +227,15 @@ unsafe fn get_next(cur: Option<XmlNodePtr>, xpath: &str) -> Option<XmlNodePtr> {
             eprintln!("Failed to compile {}", xpath);
             return None;
         };
-        let res: XmlXPathObjectPtr =
-            xml_xpath_compiled_eval(comp, CTXT_XPATH.load(Ordering::Relaxed));
-        if res.is_null() {
-            return None;
-        }
+        let res = xml_xpath_compiled_eval(comp, CTXT_XPATH.load(Ordering::Relaxed))?;
         let mut ret = None;
-        if (*res).typ == XmlXPathObjectType::XPathNodeset {
-            if let Some(nodeset) = (*res).nodesetval.as_deref() {
+        if res.typ == XmlXPathObjectType::XPathNodeset {
+            if let Some(nodeset) = res.nodesetval.as_deref() {
                 if !nodeset.node_tab.is_empty() {
                     ret = Some(nodeset.node_tab[0]);
                 }
             }
         }
-        xml_xpath_free_object(res);
         ret.and_then(|ret| XmlNodePtr::try_from(ret).ok())
     }
 }
@@ -255,16 +249,11 @@ unsafe fn get_string(cur: XmlNodePtr, xpath: &str) -> Option<String> {
             eprintln!("Failed to compile {}", xpath);
             return None;
         };
-        let res: XmlXPathObjectPtr =
-            xml_xpath_compiled_eval(comp, CTXT_XPATH.load(Ordering::Relaxed));
-        if res.is_null() {
-            return None;
-        }
+        let mut res = xml_xpath_compiled_eval(comp, CTXT_XPATH.load(Ordering::Relaxed))?;
         let mut ret = None;
-        if (*res).typ == XmlXPathObjectType::XPathString {
-            ret = (*res).stringval.take();
+        if res.typ == XmlXPathObjectType::XPathString {
+            ret = res.stringval.take();
         }
-        xml_xpath_free_object(res);
         ret
     }
 }

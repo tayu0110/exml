@@ -4,13 +4,13 @@ use crate::{
     libxml::chvalid::xml_is_blank_char,
     parser::build_qname,
     tree::{NodeCommon, XmlAttrPtr, XmlElementType, XmlNodePtr, XmlNsPtr},
-    xpath::{XmlXPathObjectPtr, XmlXPathObjectType},
+    xpath::XmlXPathObjectType,
 };
 
 use super::{
     XmlXPathError, XmlXPathParserContext, xml_xpath_cast_node_to_number,
     xml_xpath_cast_node_to_string, xml_xpath_convert_boolean, xml_xpath_convert_number,
-    xml_xpath_convert_string, xml_xpath_err, xml_xpath_free_node_set, xml_xpath_free_object,
+    xml_xpath_convert_string, xml_xpath_err, xml_xpath_free_node_set,
     xml_xpath_get_elements_by_ids, xml_xpath_new_boolean, xml_xpath_new_float,
     xml_xpath_new_node_set, xml_xpath_new_string, xml_xpath_node_set_create,
     xml_xpath_node_set_merge, xml_xpath_string_eval_number, xml_xpath_wrap_node_set,
@@ -45,7 +45,7 @@ pub(super) unsafe fn cast_to_number(ctxt: &mut XmlXPathParserContext) {
     unsafe {
         if ctxt
             .value()
-            .is_some_and(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
+            .is_some_and(|value| value.typ != XmlXPathObjectType::XPathNumber)
         {
             xml_xpath_number_function(ctxt, 1);
         }
@@ -58,7 +58,7 @@ pub(super) unsafe fn cast_to_string(ctxt: &mut XmlXPathParserContext) {
     unsafe {
         if ctxt
             .value()
-            .is_some_and(|value| (*value).typ != XmlXPathObjectType::XPathString)
+            .is_some_and(|value| value.typ != XmlXPathObjectType::XPathString)
         {
             xml_xpath_string_function(ctxt, 1);
         }
@@ -71,7 +71,7 @@ pub(super) unsafe fn cast_to_boolean(ctxt: &mut XmlXPathParserContext) {
     unsafe {
         if ctxt
             .value()
-            .is_some_and(|value| (*value).typ != XmlXPathObjectType::XPathBoolean)
+            .is_some_and(|value| value.typ != XmlXPathObjectType::XPathBoolean)
         {
             xml_xpath_boolean_function(ctxt, 1);
         }
@@ -91,12 +91,11 @@ pub unsafe fn xml_xpath_boolean_function(ctxt: &mut XmlXPathParserContext, nargs
         if check_arity(ctxt, nargs, 1).is_err() {
             return;
         }
-        let cur = ctxt.value_pop();
-        if cur.is_null() {
+        let Some(cur) = ctxt.value_pop() else {
             xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidOperand as i32);
             return;
-        }
-        let cur = xml_xpath_convert_boolean(cur);
+        };
+        let cur = xml_xpath_convert_boolean(Some(cur));
         ctxt.value_push(cur);
     }
 }
@@ -114,13 +113,13 @@ pub unsafe fn xml_xpath_ceiling_function(ctxt: &mut XmlXPathParserContext, nargs
         cast_to_number(ctxt);
         if ctxt
             .value()
-            .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
+            .is_none_or(|value| value.typ != XmlXPathObjectType::XPathNumber)
         {
             xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
         };
 
-        let val = &mut (**ctxt.value_mut().unwrap()).floatval;
+        let val = &mut ctxt.value_mut().unwrap().floatval;
         *val = val.ceil();
     }
 }
@@ -135,23 +134,22 @@ pub unsafe fn xml_xpath_count_function(ctxt: &mut XmlXPathParserContext, nargs: 
         }
         if ctxt.value().is_none_or(|value| {
             !matches!(
-                (*value).typ,
+                value.typ,
                 XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
             )
         }) {
             xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
         }
-        let cur: XmlXPathObjectPtr = ctxt.value_pop();
-
-        if cur.is_null() {
-            ctxt.value_push(xml_xpath_new_float(0.0));
-        } else if let Some(nodeset) = (*cur).nodesetval.as_deref() {
-            ctxt.value_push(xml_xpath_new_float(nodeset.len() as f64));
+        if let Some(cur) = ctxt.value_pop() {
+            if let Some(nodeset) = cur.nodesetval.as_deref() {
+                ctxt.value_push(xml_xpath_new_float(nodeset.len() as f64));
+            } else {
+                ctxt.value_push(xml_xpath_new_float(0.0));
+            }
         } else {
             ctxt.value_push(xml_xpath_new_float(0.0));
         }
-        xml_xpath_free_object(cur);
     }
 }
 
@@ -161,36 +159,34 @@ pub unsafe fn xml_xpath_count_function(ctxt: &mut XmlXPathParserContext, nargs: 
 #[doc(alias = "xmlXPathConcatFunction")]
 pub unsafe fn xml_xpath_concat_function(ctxt: &mut XmlXPathParserContext, mut nargs: usize) {
     unsafe {
-        let mut newobj: XmlXPathObjectPtr;
-
         if nargs < 2 && check_arity(ctxt, nargs, 2).is_err() {
             return;
         }
 
         cast_to_string(ctxt);
-        let cur: XmlXPathObjectPtr = ctxt.value_pop();
-        if cur.is_null() || !matches!((*cur).typ, XmlXPathObjectType::XPathString) {
-            xml_xpath_free_object(cur);
+        let Some(mut cur) = ctxt
+            .value_pop()
+            .filter(|cur| cur.typ == XmlXPathObjectType::XPathString)
+        else {
             return;
-        }
+        };
         nargs -= 1;
 
         while nargs > 0 {
             cast_to_string(ctxt);
-            newobj = ctxt.value_pop();
-            if newobj.is_null() || (*newobj).typ != XmlXPathObjectType::XPathString {
-                xml_xpath_free_object(newobj);
-                xml_xpath_free_object(cur);
+            let Some(mut newobj) = ctxt
+                .value_pop()
+                .filter(|cur| cur.typ == XmlXPathObjectType::XPathString)
+            else {
                 xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
                 return;
-            }
-            let mut tmp = (*newobj).stringval.take();
-            if let Some(curstr) = (*cur).stringval.take() {
+            };
+            let mut tmp = newobj.stringval.take();
+            if let Some(curstr) = cur.stringval.take() {
                 tmp.get_or_insert_with(String::new).push_str(&curstr);
-                (*newobj).stringval = Some(curstr);
+                newobj.stringval = Some(curstr);
             }
-            (*cur).stringval = tmp;
-            xml_xpath_free_object(newobj);
+            cur.stringval = tmp;
             nargs -= 1;
         }
         ctxt.value_push(cur);
@@ -210,27 +206,24 @@ pub unsafe fn xml_xpath_contains_function(ctxt: &mut XmlXPathParserContext, narg
         cast_to_string(ctxt);
         if ctxt
             .value()
-            .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathString)
+            .is_none_or(|value| value.typ != XmlXPathObjectType::XPathString)
         {
             xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
         };
-        let needle: XmlXPathObjectPtr = ctxt.value_pop();
+        let needle = ctxt.value_pop().unwrap();
         cast_to_string(ctxt);
-        let hay: XmlXPathObjectPtr = ctxt.value_pop();
+        let hay = ctxt.value_pop();
 
-        if hay.is_null() || (*hay).typ != XmlXPathObjectType::XPathString {
-            xml_xpath_free_object(hay);
-            xml_xpath_free_object(needle);
+        let Some(hay) = hay.filter(|hay| hay.typ == XmlXPathObjectType::XPathString) else {
             xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
-        }
-        if (*needle)
+        };
+        if needle
             .stringval
             .as_deref()
             .filter(|&s| {
-                (*hay)
-                    .stringval
+                hay.stringval
                     .as_deref()
                     .expect("Internal Error")
                     .contains(s)
@@ -241,8 +234,6 @@ pub unsafe fn xml_xpath_contains_function(ctxt: &mut XmlXPathParserContext, narg
         } else {
             ctxt.value_push(xml_xpath_new_boolean(false));
         }
-        xml_xpath_free_object(hay);
-        xml_xpath_free_object(needle);
     }
 }
 
@@ -264,19 +255,18 @@ pub unsafe fn xml_xpath_id_function(ctxt: &mut XmlXPathParserContext, nargs: usi
         if check_arity(ctxt, nargs, 1).is_err() {
             return;
         }
-        let mut obj = ctxt.value_pop();
-        if obj.is_null() {
+        let Some(obj) = ctxt.value_pop() else {
             xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidOperand as i32);
             return;
-        }
+        };
         if matches!(
-            (*obj).typ,
+            obj.typ,
             XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
         ) {
             // TODO: Check memory error.
             let mut ret = xml_xpath_node_set_create(None);
 
-            if let Some(nodeset) = (*obj).nodesetval.as_deref() {
+            if let Some(nodeset) = obj.nodesetval.as_deref() {
                 for &node in &nodeset.node_tab {
                     let tokens = xml_xpath_cast_node_to_string(Some(node));
                     let ns =
@@ -286,18 +276,13 @@ pub unsafe fn xml_xpath_id_function(ctxt: &mut XmlXPathParserContext, nargs: usi
                     xml_xpath_free_node_set(ns);
                 }
             }
-            xml_xpath_free_object(obj);
             ctxt.value_push(xml_xpath_wrap_node_set(ret));
             return;
         }
-        obj = xml_xpath_convert_string(obj);
-        if obj.is_null() {
-            return;
-        }
-        let strval = (*obj).stringval.as_deref();
+        let obj = xml_xpath_convert_string(Some(obj));
+        let strval = obj.stringval.as_deref();
         let ret = xml_xpath_get_elements_by_ids((*ctxt.context).doc.unwrap(), strval);
         ctxt.value_push(xml_xpath_wrap_node_set(ret));
-        xml_xpath_free_object(obj);
     }
 }
 
@@ -326,13 +311,13 @@ pub unsafe fn xml_xpath_floor_function(ctxt: &mut XmlXPathParserContext, nargs: 
         cast_to_number(ctxt);
         if ctxt
             .value()
-            .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
+            .is_none_or(|value| value.typ != XmlXPathObjectType::XPathNumber)
         {
             xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
         };
 
-        let val = &mut (**ctxt.value_mut().unwrap()).floatval;
+        let val = &mut ctxt.value_mut().unwrap().floatval;
         *val = val.floor();
     }
 }
@@ -380,13 +365,13 @@ pub unsafe fn xml_xpath_lang_function(ctxt: &mut XmlXPathParserContext, nargs: u
         cast_to_string(ctxt);
         if ctxt
             .value()
-            .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathString)
+            .is_none_or(|value| value.typ != XmlXPathObjectType::XPathString)
         {
             xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
         };
-        let val = ctxt.value_pop();
-        let lang = (*val).stringval.as_deref();
+        let val = ctxt.value_pop().unwrap();
+        let lang = val.stringval.as_deref();
         let the_lang = (*ctxt.context).node.unwrap().get_lang();
         'not_equal: {
             if let (Some(the_lang), Some(lang)) = (the_lang, lang) {
@@ -406,7 +391,6 @@ pub unsafe fn xml_xpath_lang_function(ctxt: &mut XmlXPathParserContext, nargs: u
         }
         // not_equal:
 
-        xml_xpath_free_object(val);
         ctxt.value_push(xml_xpath_new_boolean(ret != 0));
     }
 }
@@ -431,16 +415,16 @@ pub unsafe fn xml_xpath_local_name_function(ctxt: &mut XmlXPathParserContext, mu
         }
         if ctxt.value().is_none_or(|value| {
             !matches!(
-                (*value).typ,
+                value.typ,
                 XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
             )
         }) {
             xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
         }
-        let cur: XmlXPathObjectPtr = ctxt.value_pop();
+        let cur = ctxt.value_pop().unwrap();
 
-        if let Some(nodeset) = (*cur).nodesetval.as_deref() {
+        if let Some(nodeset) = cur.nodesetval.as_deref() {
             if !nodeset.node_tab.is_empty() {
                 let table = &nodeset.node_tab;
                 let i = 0; /* Should be first in document order !!!!! */
@@ -470,7 +454,6 @@ pub unsafe fn xml_xpath_local_name_function(ctxt: &mut XmlXPathParserContext, mu
         } else {
             ctxt.value_push(xml_xpath_new_string(Some("")));
         }
-        xml_xpath_free_object(cur);
     }
 }
 
@@ -487,12 +470,12 @@ pub unsafe fn xml_xpath_not_function(ctxt: &mut XmlXPathParserContext, nargs: us
         cast_to_boolean(ctxt);
         if ctxt
             .value()
-            .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathBoolean)
+            .is_none_or(|value| value.typ != XmlXPathObjectType::XPathBoolean)
         {
             xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
         };
-        let val = &mut (**ctxt.value_mut().unwrap()).boolval;
+        let val = &mut ctxt.value_mut().unwrap().boolval;
         *val = !*val;
     }
 }
@@ -525,16 +508,16 @@ pub(super) unsafe fn xml_xpath_name_function(ctxt: &mut XmlXPathParserContext, m
         }
         if ctxt.value().is_none_or(|value| {
             !matches!(
-                (*value).typ,
+                value.typ,
                 XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
             )
         }) {
             xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
         }
-        let cur: XmlXPathObjectPtr = ctxt.value_pop();
+        let cur = ctxt.value_pop().unwrap();
 
-        if let Some(nodeset) = (*cur).nodesetval.as_deref() {
+        if let Some(nodeset) = cur.nodesetval.as_deref() {
             if !nodeset.node_tab.is_empty() {
                 let table = &nodeset.node_tab;
                 let i = 0; /* Should be first in document order !!!!! */
@@ -579,7 +562,6 @@ pub(super) unsafe fn xml_xpath_name_function(ctxt: &mut XmlXPathParserContext, m
         } else {
             ctxt.value_push(xml_xpath_new_string(Some("")));
         }
-        xml_xpath_free_object(cur);
     }
 }
 
@@ -603,16 +585,16 @@ pub unsafe fn xml_xpath_namespace_uri_function(ctxt: &mut XmlXPathParserContext,
         }
         if ctxt.value().is_none_or(|value| {
             !matches!(
-                (*value).typ,
+                value.typ,
                 XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
             )
         }) {
             xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
         }
-        let cur: XmlXPathObjectPtr = ctxt.value_pop();
+        let cur = ctxt.value_pop().unwrap();
 
-        if let Some(nodeset) = (*cur).nodesetval.as_deref() {
+        if let Some(nodeset) = cur.nodesetval.as_deref() {
             if !nodeset.node_tab.is_empty() {
                 let table = &nodeset.node_tab;
                 let i = 0; /* Should be first in document order !!!!! */
@@ -637,7 +619,6 @@ pub unsafe fn xml_xpath_namespace_uri_function(ctxt: &mut XmlXPathParserContext,
         } else {
             ctxt.value_push(xml_xpath_new_string(Some("")));
         }
-        xml_xpath_free_object(cur);
     }
 }
 
@@ -665,18 +646,19 @@ pub unsafe fn xml_xpath_normalize_function(ctxt: &mut XmlXPathParserContext, mut
         cast_to_string(ctxt);
         if ctxt
             .value()
-            .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathString)
+            .is_none_or(|value| value.typ != XmlXPathObjectType::XPathString)
         {
             xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
         };
-        let Some(source) = (*ctxt.value().unwrap()).stringval.as_deref_mut() else {
+        let Some(source) = ctxt.value_mut().unwrap().stringval.as_deref_mut() else {
             return;
         };
         let oldlen = source.len();
         // Skip leading whitespaces
         let Some(start) = source.find(|c| !xml_is_blank_char(c as u32)) else {
-            (**ctxt.value_mut().unwrap())
+            ctxt.value_mut()
+                .unwrap()
                 .stringval
                 .as_mut()
                 .unwrap()
@@ -702,7 +684,8 @@ pub unsafe fn xml_xpath_normalize_function(ctxt: &mut XmlXPathParserContext, mut
                 written += 1;
             }
         }
-        (**ctxt.value_mut().unwrap())
+        ctxt.value_mut()
+            .unwrap()
             .stringval
             .as_mut()
             .unwrap()
@@ -731,7 +714,7 @@ pub unsafe fn xml_xpath_number_function(ctxt: &mut XmlXPathParserContext, nargs:
         if check_arity(ctxt, nargs, 1).is_err() {
             return;
         }
-        let cur: XmlXPathObjectPtr = ctxt.value_pop();
+        let cur = ctxt.value_pop();
         ctxt.value_push(xml_xpath_convert_number(cur));
     }
 }
@@ -771,23 +754,23 @@ pub unsafe fn xml_xpath_round_function(ctxt: &mut XmlXPathParserContext, nargs: 
         cast_to_number(ctxt);
         if ctxt
             .value()
-            .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
+            .is_none_or(|value| value.typ != XmlXPathObjectType::XPathNumber)
         {
             xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
         };
 
-        let f: f64 = (*ctxt.value().unwrap()).floatval;
+        let f: f64 = ctxt.value().unwrap().floatval;
 
         if (-0.5..0.5).contains(&f) {
             /* Handles negative zero. */
-            (**ctxt.value_mut().unwrap()).floatval *= 0.0;
+            ctxt.value_mut().unwrap().floatval *= 0.0;
         } else {
             let mut rounded: f64 = f.floor();
             if f - rounded >= 0.5 {
                 rounded += 1.0;
             }
-            (**ctxt.value_mut().unwrap()).floatval = rounded;
+            ctxt.value_mut().unwrap().floatval = rounded;
         }
     }
 }
@@ -834,12 +817,11 @@ pub unsafe fn xml_xpath_string_function(ctxt: &mut XmlXPathParserContext, nargs:
         if check_arity(ctxt, nargs, 1).is_err() {
             return;
         }
-        let cur: XmlXPathObjectPtr = ctxt.value_pop();
-        if cur.is_null() {
+        let Some(cur) = ctxt.value_pop() else {
             xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidOperand as i32);
             return;
-        }
-        ctxt.value_push(xml_xpath_convert_string(cur));
+        };
+        ctxt.value_push(xml_xpath_convert_string(Some(cur)));
     }
 }
 
@@ -870,16 +852,15 @@ pub unsafe fn xml_xpath_string_length_function(ctxt: &mut XmlXPathParserContext,
         cast_to_string(ctxt);
         if ctxt
             .value()
-            .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathString)
+            .is_none_or(|value| value.typ != XmlXPathObjectType::XPathString)
         {
             xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
         };
-        let cur: XmlXPathObjectPtr = ctxt.value_pop();
+        let cur = ctxt.value_pop().unwrap();
         ctxt.value_push(xml_xpath_new_float(
-            (*cur).stringval.as_deref().map_or(0, |s| s.chars().count()) as _,
+            cur.stringval.as_deref().map_or(0, |s| s.chars().count()) as _,
         ));
-        xml_xpath_free_object(cur);
     }
 }
 
@@ -896,32 +877,28 @@ pub unsafe fn xml_xpath_starts_with_function(ctxt: &mut XmlXPathParserContext, n
         cast_to_string(ctxt);
         if ctxt
             .value()
-            .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathString)
+            .is_none_or(|value| value.typ != XmlXPathObjectType::XPathString)
         {
             xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
         };
-        let needle: XmlXPathObjectPtr = ctxt.value_pop();
+        let needle = ctxt.value_pop().unwrap();
         cast_to_string(ctxt);
-        let hay: XmlXPathObjectPtr = ctxt.value_pop();
+        let hay = ctxt.value_pop();
 
-        if hay.is_null() || (*hay).typ != XmlXPathObjectType::XPathString {
-            xml_xpath_free_object(hay);
-            xml_xpath_free_object(needle);
+        let Some(hay) = hay.filter(|hay| hay.typ == XmlXPathObjectType::XPathString) else {
             xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
-        }
-        let m = (*hay).stringval.as_deref().map_or(0, |s| s.len());
-        let n = (*needle).stringval.as_deref().map_or(0, |s| s.len());
-        if &(*hay).stringval.as_deref().unwrap()[..n.min(m)]
-            != (*needle).stringval.as_deref().expect("Internal Error")
+        };
+        let m = hay.stringval.as_deref().map_or(0, |s| s.len());
+        let n = needle.stringval.as_deref().map_or(0, |s| s.len());
+        if &hay.stringval.as_deref().unwrap()[..n.min(m)]
+            != needle.stringval.as_deref().expect("Internal Error")
         {
             ctxt.value_push(xml_xpath_new_boolean(false));
         } else {
             ctxt.value_push(xml_xpath_new_boolean(true));
         }
-        xml_xpath_free_object(hay);
-        xml_xpath_free_object(needle);
     }
 }
 
@@ -950,7 +927,6 @@ pub unsafe fn xml_xpath_starts_with_function(ctxt: &mut XmlXPathParserContext, n
 #[doc(alias = "xmlXPathSubstringFunction")]
 pub unsafe fn xml_xpath_substring_function(ctxt: &mut XmlXPathParserContext, nargs: usize) {
     unsafe {
-        let len: XmlXPathObjectPtr;
         let mut le: f64 = 0.0;
         let mut i: i32 = 1;
         let mut j: i32 = i32::MAX;
@@ -966,36 +942,34 @@ pub unsafe fn xml_xpath_substring_function(ctxt: &mut XmlXPathParserContext, nar
             cast_to_number(ctxt);
             if ctxt
                 .value()
-                .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
+                .is_none_or(|value| value.typ != XmlXPathObjectType::XPathNumber)
             {
                 xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
                 return;
             };
-            len = ctxt.value_pop();
-            le = (*len).floatval;
-            xml_xpath_free_object(len);
+            let len = ctxt.value_pop().unwrap();
+            le = len.floatval;
         }
 
         cast_to_number(ctxt);
         if ctxt
             .value()
-            .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathNumber)
+            .is_none_or(|value| value.typ != XmlXPathObjectType::XPathNumber)
         {
             xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
         };
-        let start: XmlXPathObjectPtr = ctxt.value_pop();
-        let input: f64 = (*start).floatval;
-        xml_xpath_free_object(start);
+        let start = ctxt.value_pop().unwrap();
+        let input: f64 = start.floatval;
         cast_to_string(ctxt);
         if ctxt
             .value()
-            .is_none_or(|value| (*value).typ != XmlXPathObjectType::XPathString)
+            .is_none_or(|value| value.typ != XmlXPathObjectType::XPathString)
         {
             xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
         };
-        let str: XmlXPathObjectPtr = ctxt.value_pop();
+        let str = ctxt.value_pop().unwrap();
 
         if !matches!(
             input.partial_cmp(&(i32::MAX as f64)),
@@ -1037,7 +1011,7 @@ pub unsafe fn xml_xpath_substring_function(ctxt: &mut XmlXPathParserContext, nar
         }
 
         if i < j {
-            let ret = (*str)
+            let ret = str
                 .stringval
                 .as_deref()
                 .expect("Internal Error")
@@ -1049,8 +1023,6 @@ pub unsafe fn xml_xpath_substring_function(ctxt: &mut XmlXPathParserContext, nar
         } else {
             ctxt.value_push(xml_xpath_new_string(Some("")));
         }
-
-        xml_xpath_free_object(str);
     }
 }
 
@@ -1068,16 +1040,14 @@ pub unsafe fn xml_xpath_substring_before_function(ctxt: &mut XmlXPathParserConte
             return;
         }
         cast_to_string(ctxt);
-        let find: XmlXPathObjectPtr = ctxt.value_pop();
+        let find = ctxt.value_pop().unwrap();
         cast_to_string(ctxt);
-        let str: XmlXPathObjectPtr = ctxt.value_pop();
+        let str = ctxt.value_pop().unwrap();
 
-        let ss = (*str).stringval.as_deref().unwrap();
-        let fs = (*find).stringval.as_deref().unwrap();
+        let ss = str.stringval.as_deref().unwrap();
+        let fs = find.stringval.as_deref().unwrap();
         let target = ss.find(fs).map(|pos| ss[..pos].to_owned());
         ctxt.value_push(xml_xpath_new_string(target.as_deref()));
-        xml_xpath_free_object(str);
-        xml_xpath_free_object(find);
     }
 }
 
@@ -1096,16 +1066,14 @@ pub unsafe fn xml_xpath_substring_after_function(ctxt: &mut XmlXPathParserContex
             return;
         }
         cast_to_string(ctxt);
-        let find: XmlXPathObjectPtr = ctxt.value_pop();
+        let find = ctxt.value_pop().unwrap();
         cast_to_string(ctxt);
-        let str: XmlXPathObjectPtr = ctxt.value_pop();
+        let str = ctxt.value_pop().unwrap();
 
-        let ss = (*str).stringval.as_deref().unwrap();
-        let fs = (*find).stringval.as_deref().unwrap();
+        let ss = str.stringval.as_deref().unwrap();
+        let fs = find.stringval.as_deref().unwrap();
         let target = ss.find(fs).map(|pos| ss[pos..].to_owned());
         ctxt.value_push(xml_xpath_new_string(target.as_deref()));
-        xml_xpath_free_object(str);
-        xml_xpath_free_object(find);
     }
 }
 
@@ -1123,16 +1091,16 @@ pub unsafe fn xml_xpath_sum_function(ctxt: &mut XmlXPathParserContext, nargs: us
         }
         if ctxt.value().is_none_or(|value| {
             !matches!(
-                (*value).typ,
+                value.typ,
                 XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
             )
         }) {
             xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
             return;
         }
-        let cur: XmlXPathObjectPtr = ctxt.value_pop();
+        let cur = ctxt.value_pop().unwrap();
 
-        if let Some(nodeset) = (*cur).nodesetval.as_deref().filter(|n| !n.is_empty()) {
+        if let Some(nodeset) = cur.nodesetval.as_deref().filter(|n| !n.is_empty()) {
             if !nodeset.node_tab.is_empty() {
                 for &node in &nodeset.node_tab {
                     res += xml_xpath_cast_node_to_number(Some(node));
@@ -1140,7 +1108,6 @@ pub unsafe fn xml_xpath_sum_function(ctxt: &mut XmlXPathParserContext, nargs: us
             }
         }
         ctxt.value_push(xml_xpath_new_float(res));
-        xml_xpath_free_object(cur);
     }
 }
 
@@ -1179,15 +1146,15 @@ pub unsafe fn xml_xpath_translate_function(ctxt: &mut XmlXPathParserContext, nar
         }
 
         cast_to_string(ctxt);
-        let to: XmlXPathObjectPtr = ctxt.value_pop();
+        let to = ctxt.value_pop().unwrap();
         cast_to_string(ctxt);
-        let from: XmlXPathObjectPtr = ctxt.value_pop();
+        let from = ctxt.value_pop().unwrap();
         cast_to_string(ctxt);
-        let str: XmlXPathObjectPtr = ctxt.value_pop();
+        let str = ctxt.value_pop().unwrap();
 
-        let to_str = (*to).stringval.as_deref().unwrap();
-        let from_str = (*from).stringval.as_deref().unwrap();
-        let arg = (*str).stringval.as_deref().unwrap();
+        let to_str = to.stringval.as_deref().unwrap();
+        let from_str = from.stringval.as_deref().unwrap();
+        let arg = str.stringval.as_deref().unwrap();
         let mut target = String::with_capacity(arg.len());
         for c in arg.chars() {
             if let Some((_, replace)) = from_str
@@ -1203,9 +1170,6 @@ pub unsafe fn xml_xpath_translate_function(ctxt: &mut XmlXPathParserContext, nar
             }
         }
         ctxt.value_push(xml_xpath_new_string(Some(&target)));
-        xml_xpath_free_object(str);
-        xml_xpath_free_object(from);
-        xml_xpath_free_object(to);
     }
 }
 
@@ -1261,17 +1225,13 @@ pub(super) unsafe fn xml_xpath_escape_uri_function(ctxt: &mut XmlXPathParserCont
         let escape_reserved = ctxt.pop_boolean();
 
         cast_to_string(ctxt);
-        let str: XmlXPathObjectPtr = ctxt.value_pop();
+        let str = ctxt.value_pop().unwrap();
 
         escape[0] = b'%';
         escape[3] = 0;
 
         let mut target = String::new();
-        let cptr = (*str)
-            .stringval
-            .as_deref()
-            .expect("Internal Error")
-            .as_bytes();
+        let cptr = str.stringval.as_deref().expect("Internal Error").as_bytes();
         for (i, &c) in cptr.iter().enumerate() {
             if c.is_ascii_alphanumeric()
                 || c == b'-'
@@ -1316,6 +1276,5 @@ pub(super) unsafe fn xml_xpath_escape_uri_function(ctxt: &mut XmlXPathParserCont
             }
         }
         ctxt.value_push(xml_xpath_new_string(Some(&target)));
-        xml_xpath_free_object(str);
     }
 }

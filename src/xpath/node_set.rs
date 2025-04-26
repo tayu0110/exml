@@ -1,5 +1,3 @@
-use std::ptr::null_mut;
-
 use crate::{
     hash::XmlHashTable,
     tree::{
@@ -9,8 +7,8 @@ use crate::{
 };
 
 use super::{
-    XmlXPathObjectPtr, xml_xpath_cast_node_to_string, xml_xpath_cmp_nodes_ext,
-    xml_xpath_err_memory, xml_xpath_new_node_set, xml_xpath_node_set_dup_ns,
+    XmlXPathObject, xml_xpath_cast_node_to_string, xml_xpath_cmp_nodes_ext, xml_xpath_err_memory,
+    xml_xpath_new_node_set, xml_xpath_node_set_dup_ns,
 };
 
 // when evaluating an XPath expression nodesets are created and we
@@ -851,23 +849,19 @@ pub unsafe fn xml_xpath_node_set_merge(
 ///
 /// Returns the newly created object.
 #[doc(alias = "xmlXPathNewNodeSetList")]
-pub unsafe fn xml_xpath_new_node_set_list(val: Option<&mut XmlNodeSet>) -> XmlXPathObjectPtr {
-    unsafe {
-        if let Some(val) = val {
-            let ret = xml_xpath_new_node_set(Some(val.node_tab[0]));
-            if !ret.is_null() {
-                if let Some(nodeset) = (*ret).nodesetval.as_deref_mut() {
-                    for &node in &val.node_tab[1..] {
-                        // TODO: Propagate memory error.
-                        if nodeset.add_unique(node) < 0 {
-                            break;
-                        }
-                    }
+pub fn xml_xpath_new_node_set_list(val: Option<&mut XmlNodeSet>) -> Option<XmlXPathObject> {
+    if let Some(val) = val {
+        let mut ret = xml_xpath_new_node_set(Some(val.node_tab[0]));
+        if let Some(nodeset) = ret.nodesetval.as_deref_mut() {
+            for &node in &val.node_tab[1..] {
+                // TODO: Propagate memory error.
+                if nodeset.add_unique(node) < 0 {
+                    break;
                 }
             }
-            ret
-        } else {
-            null_mut()
         }
+        Some(ret)
+    } else {
+        None
     }
 }

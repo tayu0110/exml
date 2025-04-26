@@ -51,12 +51,7 @@ pub mod node_set;
 #[cfg(feature = "xpath")]
 pub mod object;
 
-use std::{
-    borrow::Cow,
-    os::raw::c_void,
-    ptr::{addr_of_mut, null_mut},
-    rc::Rc,
-};
+use std::{borrow::Cow, os::raw::c_void, ptr::null_mut, rc::Rc};
 
 use compile::XmlXPathStepOp;
 
@@ -203,7 +198,7 @@ pub type XmlXPathFunction = unsafe fn(ctxt: &mut XmlXPathParserContext, nargs: u
 #[doc(alias = "xmlXPathVariableLookupFunc")]
 #[cfg(feature = "xpath")]
 pub type XmlXPathVariableLookupFunc =
-    unsafe fn(ctxt: *mut c_void, name: &str, ns_uri: Option<&str>) -> XmlXPathObjectPtr;
+    unsafe fn(ctxt: *mut c_void, name: &str, ns_uri: Option<&str>) -> Option<XmlXPathObject>;
 
 /// Prototype for callbacks used to plug function lookup in the XPath engine.
 ///
@@ -475,8 +470,7 @@ pub fn xml_xpath_cast_node_set_to_number(ns: Option<&mut XmlNodeSet>) -> f64 {
         return XML_XPATH_NAN;
     };
     let s = xml_xpath_cast_node_set_to_string(Some(ns));
-    let ret: f64 = xml_xpath_cast_string_to_number(Some(&s));
-    ret
+    xml_xpath_cast_string_to_number(Some(&s))
 }
 
 /// Converts a boolean to its string value.
@@ -710,10 +704,10 @@ pub unsafe fn xml_xpath_node_eval(
     node: XmlGenericNodePtr,
     xpath: &str,
     ctx: XmlXPathContextPtr,
-) -> XmlXPathObjectPtr {
+) -> Option<XmlXPathObject> {
     unsafe {
         if xml_xpath_set_context_node(node, ctx) < 0 {
-            return null_mut();
+            return None;
         }
         xml_xpath_eval(xpath, ctx)
     }
@@ -725,11 +719,9 @@ pub unsafe fn xml_xpath_node_eval(
 /// The caller has to free the object.
 #[doc(alias = "xmlXPathEval")]
 #[cfg(feature = "xpath")]
-pub unsafe fn xml_xpath_eval(xpath: &str, ctx: XmlXPathContextPtr) -> XmlXPathObjectPtr {
+pub unsafe fn xml_xpath_eval(xpath: &str, ctx: XmlXPathContextPtr) -> Option<XmlXPathObject> {
     unsafe {
         use crate::generic_error;
-
-        let res: XmlXPathObjectPtr;
 
         if ctx.is_null() {
             crate::error::__xml_raise_error!(
@@ -750,7 +742,7 @@ pub unsafe fn xml_xpath_eval(xpath: &str, ctx: XmlXPathContextPtr) -> XmlXPathOb
                 0,
                 "NULL context pointer\n",
             );
-            return null_mut();
+            return None;
         };
 
         xml_init_parser();
@@ -759,10 +751,10 @@ pub unsafe fn xml_xpath_eval(xpath: &str, ctx: XmlXPathContextPtr) -> XmlXPathOb
         ctxt.evaluate_expression();
 
         if ctxt.error != XmlXPathError::XPathExpressionOK as i32 {
-            res = null_mut();
+            None
         } else {
-            res = ctxt.value_pop();
-            if res.is_null() {
+            let res = ctxt.value_pop();
+            if res.is_none() {
                 generic_error!("xmlXPathCompiledEval: No result on the stack.\n");
             } else if !ctxt.value_tab.is_empty() {
                 generic_error!(
@@ -770,9 +762,8 @@ pub unsafe fn xml_xpath_eval(xpath: &str, ctx: XmlXPathContextPtr) -> XmlXPathOb
                     ctxt.value_tab.len() as i32
                 );
             }
+            res
         }
-
-        res
     }
 }
 
@@ -785,7 +776,7 @@ pub unsafe fn xml_xpath_eval(xpath: &str, ctx: XmlXPathContextPtr) -> XmlXPathOb
 pub unsafe fn xml_xpath_eval_expression(
     xpath: &str,
     ctxt: XmlXPathContextPtr,
-) -> XmlXPathObjectPtr {
+) -> Option<XmlXPathObject> {
     unsafe { xml_xpath_eval(xpath, ctxt) }
 }
 
@@ -876,12 +867,10 @@ pub unsafe fn xml_xpath_ctxt_compile(
 unsafe fn xml_xpath_compiled_eval_internal(
     comp: XmlXPathCompExpr,
     ctxt: XmlXPathContextPtr,
-    res_obj_ptr: *mut XmlXPathObjectPtr,
+    res_obj_ptr: &mut Option<XmlXPathObject>,
     to_bool: bool,
 ) -> i32 {
     unsafe {
-        let res_obj: XmlXPathObjectPtr;
-
         if ctxt.is_null() {
             crate::error::__xml_raise_error!(
                 None,
@@ -911,11 +900,11 @@ unsafe fn xml_xpath_compiled_eval_internal(
         };
         let res: i32 = pctxt.run_evaluate(to_bool);
 
-        if pctxt.error != XmlXPathError::XPathExpressionOK as i32 {
-            res_obj = null_mut();
+        let res_obj = if pctxt.error != XmlXPathError::XPathExpressionOK as i32 {
+            None
         } else {
-            res_obj = pctxt.value_pop();
-            if res_obj.is_null() {
+            let res_obj = pctxt.value_pop();
+            if res_obj.is_none() {
                 if !to_bool {
                     generic_error!("xmlXPathCompiledEval: No result on the stack.\n");
                 }
@@ -925,15 +914,10 @@ unsafe fn xml_xpath_compiled_eval_internal(
                     pctxt.value_tab.len() as i32
                 );
             }
-        }
+            res_obj
+        };
 
-        if !res_obj_ptr.is_null() {
-            *res_obj_ptr = res_obj;
-        } else {
-            xml_xpath_free_object(res_obj);
-        }
-
-        // pctxt.comp = null_mut();
+        *res_obj_ptr = res_obj;
 
         res
     }
@@ -948,12 +932,11 @@ unsafe fn xml_xpath_compiled_eval_internal(
 pub unsafe fn xml_xpath_compiled_eval(
     comp: XmlXPathCompExpr,
     ctx: XmlXPathContextPtr,
-) -> XmlXPathObjectPtr {
+) -> Option<XmlXPathObject> {
     unsafe {
-        let mut res: XmlXPathObjectPtr = null_mut();
-
-        xml_xpath_compiled_eval_internal(comp, ctx, addr_of_mut!(res), false);
-        res
+        let mut ret = None;
+        xml_xpath_compiled_eval_internal(comp, ctx, &mut ret, false);
+        ret
     }
 }
 
@@ -968,7 +951,7 @@ pub unsafe fn xml_xpath_compiled_eval_to_boolean(
     comp: XmlXPathCompExpr,
     ctxt: XmlXPathContextPtr,
 ) -> i32 {
-    unsafe { xml_xpath_compiled_eval_internal(comp, ctxt, null_mut(), true) }
+    unsafe { xml_xpath_compiled_eval_internal(comp, ctxt, &mut None, true) }
 }
 
 /// Compare two nodes w.r.t document order.
@@ -1391,159 +1374,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_xpath_cast_to_number() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_val in 0..GEN_NB_XML_XPATH_OBJECT_PTR {
-                let mem_base = xml_mem_blocks();
-                let val = gen_xml_xpath_object_ptr(n_val, 0);
-
-                let ret_val = xml_xpath_cast_to_number(val);
-                desret_double(ret_val);
-                des_xml_xpath_object_ptr(n_val, val, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathCastToNumber",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlXPathCastToNumber()"
-                    );
-                    eprintln!(" {}", n_val);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_cast_to_string() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_val in 0..GEN_NB_XML_XPATH_OBJECT_PTR {
-                let mem_base = xml_mem_blocks();
-                let val = gen_xml_xpath_object_ptr(n_val, 0);
-
-                let _ = xml_xpath_cast_to_string(val);
-                // desret_xml_char_ptr(ret_val);
-                des_xml_xpath_object_ptr(n_val, val, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathCastToString",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlXPathCastToString()"
-                    );
-                    eprintln!(" {}", n_val);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_convert_boolean() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_val in 0..GEN_NB_XML_XPATH_OBJECT_PTR {
-                let mem_base = xml_mem_blocks();
-                let mut val = gen_xml_xpath_object_ptr(n_val, 0);
-
-                let ret_val = xml_xpath_convert_boolean(val);
-                val = null_mut();
-                desret_xml_xpath_object_ptr(ret_val);
-                des_xml_xpath_object_ptr(n_val, val, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathConvertBoolean",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlXPathConvertBoolean()"
-                    );
-                    eprintln!(" {}", n_val);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_convert_number() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_val in 0..GEN_NB_XML_XPATH_OBJECT_PTR {
-                let mem_base = xml_mem_blocks();
-                let mut val = gen_xml_xpath_object_ptr(n_val, 0);
-
-                let ret_val = xml_xpath_convert_number(val);
-                val = null_mut();
-                desret_xml_xpath_object_ptr(ret_val);
-                des_xml_xpath_object_ptr(n_val, val, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathConvertNumber",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlXPathConvertNumber()"
-                    );
-                    eprintln!(" {}", n_val);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_convert_string() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_val in 0..GEN_NB_XML_XPATH_OBJECT_PTR {
-                let mem_base = xml_mem_blocks();
-                let mut val = gen_xml_xpath_object_ptr(n_val, 0);
-
-                let ret_val = xml_xpath_convert_string(val);
-                val = null_mut();
-                desret_xml_xpath_object_ptr(ret_val);
-                des_xml_xpath_object_ptr(n_val, val, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathConvertString",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlXPathConvertString()"
-                    );
-                    eprintln!(" {}", n_val);
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_xpath_is_inf() {
         #[cfg(any(feature = "xpath", feature = "schema"))]
         unsafe {
@@ -1827,93 +1657,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_xpath_new_boolean() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_val in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let val = gen_int(n_val, 0);
-
-                let ret_val = xml_xpath_new_boolean(val != 0);
-                desret_xml_xpath_object_ptr(ret_val);
-                des_int(n_val, val, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathNewBoolean",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlXPathNewBoolean()"
-                    );
-                    eprintln!(" {}", n_val);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_new_float() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_val in 0..GEN_NB_DOUBLE {
-                let mem_base = xml_mem_blocks();
-                let val = gen_double(n_val, 0);
-
-                let ret_val = xml_xpath_new_float(val);
-                desret_xml_xpath_object_ptr(ret_val);
-                des_double(n_val, val, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathNewFloat",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlXPathNewFloat()");
-                    eprintln!(" {}", n_val);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_new_node_set_list() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_val in 0..GEN_NB_XML_NODE_SET_PTR {
-                let mem_base = xml_mem_blocks();
-                let mut val = gen_xml_node_set_ptr(n_val, 0);
-
-                let ret_val = xml_xpath_new_node_set_list(val.as_deref_mut());
-                desret_xml_xpath_object_ptr(ret_val);
-                des_xml_node_set_ptr(n_val, val, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathNewNodeSetList",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlXPathNewNodeSetList()"
-                    );
-                    eprintln!(" {}", n_val);
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_xpath_node_set_merge() {
         #[cfg(feature = "xpath")]
         unsafe {
@@ -2117,36 +1860,6 @@ mod tests {
                     assert!(
                         leaks == 0,
                         "{leaks} Leaks are found in xmlXPathWrapExternal()"
-                    );
-                    eprintln!(" {}", n_val);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_wrap_node_set() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_val in 0..GEN_NB_XML_NODE_SET_PTR {
-                let mem_base = xml_mem_blocks();
-                let val = gen_xml_node_set_ptr(n_val, 0);
-
-                let ret_val = xml_xpath_wrap_node_set(val);
-                desret_xml_xpath_object_ptr(ret_val);
-                // des_xml_node_set_ptr(n_val, val, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathWrapNodeSet",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlXPathWrapNodeSet()"
                     );
                     eprintln!(" {}", n_val);
                 }

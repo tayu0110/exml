@@ -198,16 +198,8 @@ impl XmlXPathObjectUserData {
     alias = "xmlXPathCacheNewString",
     alias = "xmlXPathCacheNewCString"
 )]
-pub unsafe fn xml_xpath_new_string(val: Option<&str>) -> XmlXPathObjectPtr {
-    unsafe {
-        let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
-        if ret.is_null() {
-            xml_xpath_err_memory(None, Some("creating string object\n"));
-            return null_mut();
-        }
-        std::ptr::write(&mut *ret, XmlXPathObject::from(val.unwrap_or("")));
-        ret
-    }
+pub fn xml_xpath_new_string(val: Option<&str>) -> XmlXPathObject {
+    XmlXPathObject::from(val.unwrap_or(""))
 }
 
 /// Wraps the @val string into an XPath object.
@@ -220,50 +212,27 @@ pub unsafe fn xml_xpath_new_string(val: Option<&str>) -> XmlXPathObjectPtr {
     alias = "xmlXPathWrapCString",
     alias = "xmlXPathCacheWrapString"
 )]
-pub unsafe fn xml_xpath_wrap_string(val: Option<&str>) -> XmlXPathObjectPtr {
-    unsafe {
-        let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
-        if ret.is_null() {
-            xml_xpath_err_memory(None, Some("creating string object\n"));
-            return null_mut();
-        }
-        std::ptr::write(&mut *ret, XmlXPathObject::default());
-        (*ret).typ = XmlXPathObjectType::XPathString;
-        (*ret).stringval = val.map(|s| s.to_owned());
-        ret
-    }
+pub fn xml_xpath_wrap_string(val: Option<&str>) -> XmlXPathObject {
+    let mut ret = XmlXPathObject::default();
+    ret.typ = XmlXPathObjectType::XPathString;
+    ret.stringval = val.map(|s| s.to_owned());
+    ret
 }
 
 /// Create a new xmlXPathObjectPtr of type f64 and of value @val
 ///
 /// Returns the newly created object.
 #[doc(alias = "xmlXPathNewFloat", alias = "xmlXPathCacheNewFloat")]
-pub unsafe fn xml_xpath_new_float(val: f64) -> XmlXPathObjectPtr {
-    unsafe {
-        let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
-        if ret.is_null() {
-            xml_xpath_err_memory(None, Some("creating float object\n"));
-            return null_mut();
-        }
-        std::ptr::write(&mut *ret, XmlXPathObject::from(val));
-        ret
-    }
+pub fn xml_xpath_new_float(val: f64) -> XmlXPathObject {
+    XmlXPathObject::from(val)
 }
 
 /// Create a new xmlXPathObjectPtr of type boolean and of value @val
 ///
 /// Returns the newly created object.
 #[doc(alias = "xmlXPathNewBoolean", alias = "xmlXPathCacheNewBoolean")]
-pub unsafe fn xml_xpath_new_boolean(val: bool) -> XmlXPathObjectPtr {
-    unsafe {
-        let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
-        if ret.is_null() {
-            xml_xpath_err_memory(None, Some("creating boolean object\n"));
-            return null_mut();
-        }
-        std::ptr::write(&mut *ret, XmlXPathObject::from(val));
-        ret
-    }
+pub fn xml_xpath_new_boolean(val: bool) -> XmlXPathObject {
+    XmlXPathObject::from(val)
 }
 
 /// Create a new xmlXPathObjectPtr of type NodeSet and initialize
@@ -271,21 +240,14 @@ pub unsafe fn xml_xpath_new_boolean(val: bool) -> XmlXPathObjectPtr {
 ///
 /// Returns the newly created object.
 #[doc(alias = "xmlXPathNewNodeSet", alias = "xmlXPathCacheNewNodeSet")]
-pub unsafe fn xml_xpath_new_node_set(val: Option<XmlGenericNodePtr>) -> XmlXPathObjectPtr {
-    unsafe {
-        let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
-        if ret.is_null() {
-            xml_xpath_err_memory(None, Some("creating nodeset\n"));
-            return null_mut();
-        }
-        std::ptr::write(&mut *ret, XmlXPathObject::default());
-        (*ret).typ = XmlXPathObjectType::XPathNodeset;
-        (*ret).boolval = false;
-        // TODO: Check memory error.
-        (*ret).nodesetval = xml_xpath_node_set_create(val);
-        /* @@ with_ns to check whether namespace nodes should be looked at @@ */
-        ret
-    }
+pub fn xml_xpath_new_node_set(val: Option<XmlGenericNodePtr>) -> XmlXPathObject {
+    let mut ret = XmlXPathObject::default();
+    ret.typ = XmlXPathObjectType::XPathNodeset;
+    ret.boolval = false;
+    // TODO: Check memory error.
+    ret.nodesetval = xml_xpath_node_set_create(val);
+    /* @@ with_ns to check whether namespace nodes should be looked at @@ */
+    ret
 }
 
 /// Wrap the Nodeset @val in a new xmlXPathObjectPtr
@@ -294,19 +256,11 @@ pub unsafe fn xml_xpath_new_node_set(val: Option<XmlGenericNodePtr>) -> XmlXPath
 ///
 /// In case of error the node set is destroyed and NULL is returned.
 #[doc(alias = "xmlXPathWrapNodeSet", alias = "xmlXPathCacheWrapNodeSet")]
-pub unsafe fn xml_xpath_wrap_node_set(val: Option<Box<XmlNodeSet>>) -> XmlXPathObjectPtr {
-    unsafe {
-        let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
-        if ret.is_null() {
-            xml_xpath_err_memory(None, Some("creating node set object\n"));
-            xml_xpath_free_node_set(val);
-            return null_mut();
-        }
-        std::ptr::write(&mut *ret, XmlXPathObject::default());
-        (*ret).typ = XmlXPathObjectType::XPathNodeset;
-        (*ret).nodesetval = val;
-        ret
-    }
+pub fn xml_xpath_wrap_node_set(val: Option<Box<XmlNodeSet>>) -> XmlXPathObject {
+    let mut ret = XmlXPathObject::default();
+    ret.typ = XmlXPathObjectType::XPathNodeset;
+    ret.nodesetval = val;
+    ret
 }
 
 /// Create a new xmlXPathObjectPtr of type Value Tree (XSLT) and initialize
@@ -352,14 +306,9 @@ pub unsafe fn xml_xpath_wrap_external(val: *mut c_void) -> XmlXPathObjectPtr {
 ///
 /// Returns the newly created object.
 #[doc(alias = "xmlXPathObjectCopy", alias = "xmlXPathCacheObjectCopy")]
-pub unsafe fn xml_xpath_object_copy(val: &XmlXPathObject) -> XmlXPathObjectPtr {
+pub unsafe fn xml_xpath_object_copy(val: &XmlXPathObject) -> XmlXPathObject {
     unsafe {
-        let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
-        if ret.is_null() {
-            xml_xpath_err_memory(None, Some("copying object\n"));
-            return null_mut();
-        }
-        std::ptr::write(&mut *ret, (*val).clone());
+        let mut ret = val.clone();
         match val.typ {
             XmlXPathObjectType::XPathBoolean | XmlXPathObjectType::XPathNumber => {}
             #[cfg(feature = "libxml_xptr_locs")]
@@ -367,9 +316,9 @@ pub unsafe fn xml_xpath_object_copy(val: &XmlXPathObject) -> XmlXPathObjectPtr {
             XmlXPathObjectType::XPathString => {}
             XmlXPathObjectType::XPathXSLTTree | XmlXPathObjectType::XPathNodeset => {
                 // TODO: Check memory error.
-                (*ret).nodesetval = xml_xpath_node_set_merge(None, val.nodesetval.as_deref());
+                ret.nodesetval = xml_xpath_node_set_merge(None, val.nodesetval.as_deref());
                 // Do not deallocate the copied tree value
-                (*ret).boolval = false;
+                ret.boolval = false;
             }
             #[cfg(feature = "libxml_xptr_locs")]
             XmlXPathObjectType::XPathLocationset => {
@@ -377,12 +326,12 @@ pub unsafe fn xml_xpath_object_copy(val: &XmlXPathObject) -> XmlXPathObjectPtr {
                 // It seems that `xml_xptr_location_set_merge` always returns `null_mut()`...
                 // if let Some(loc) = (*val).user.as_ref().and_then(|user| user.as_location_set()) {
                 //     let loc = xml_xptr_location_set_merge(null_mut(), loc);
-                //     (*ret).user =
+                //     ret.user =
                 //         (!loc.is_null()).then_some(XmlXPathObjectUserData::LocationSet(loc));
                 // }
             }
             XmlXPathObjectType::XPathUsers => {
-                (*ret).user = val.user.clone();
+                ret.user = val.user.clone();
             }
             XmlXPathObjectType::XPathUndefined => {
                 generic_error!("xmlXPathObjectCopy: unsupported type {}\n", val.typ as i32);
@@ -472,33 +421,28 @@ pub fn xml_xpath_cast_to_boolean(val: &XmlXPathObject) -> bool {
 ///
 /// Returns the number value
 #[doc(alias = "xmlXPathCastToNumber")]
-pub unsafe fn xml_xpath_cast_to_number(val: XmlXPathObjectPtr) -> f64 {
-    unsafe {
-        if val.is_null() {
-            return XML_XPATH_NAN;
+pub fn xml_xpath_cast_to_number(val: &mut XmlXPathObject) -> f64 {
+    match val.typ {
+        XmlXPathObjectType::XPathUndefined => XML_XPATH_NAN,
+        XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
+            xml_xpath_cast_node_set_to_number(val.nodesetval.as_deref_mut())
         }
-        match (*val).typ {
-            XmlXPathObjectType::XPathUndefined => XML_XPATH_NAN,
-            XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
-                xml_xpath_cast_node_set_to_number((*val).nodesetval.as_deref_mut())
-            }
-            XmlXPathObjectType::XPathString => {
-                let strval = (*val).stringval.as_deref();
-                xml_xpath_cast_string_to_number(strval)
-            }
-            XmlXPathObjectType::XPathNumber => (*val).floatval,
-            XmlXPathObjectType::XPathBoolean => xml_xpath_cast_boolean_to_number((*val).boolval),
-            XmlXPathObjectType::XPathUsers => {
-                // todo!();
-                XML_XPATH_NAN
-            }
-            #[cfg(feature = "libxml_xptr_locs")]
-            XmlXPathObjectType::XPathPoint
-            | XmlXPathObjectType::XPathRange
-            | XmlXPathObjectType::XPathLocationset => {
-                // todo!();
-                XML_XPATH_NAN
-            }
+        XmlXPathObjectType::XPathString => {
+            let strval = val.stringval.as_deref();
+            xml_xpath_cast_string_to_number(strval)
+        }
+        XmlXPathObjectType::XPathNumber => val.floatval,
+        XmlXPathObjectType::XPathBoolean => xml_xpath_cast_boolean_to_number(val.boolval),
+        XmlXPathObjectType::XPathUsers => {
+            // todo!();
+            XML_XPATH_NAN
+        }
+        #[cfg(feature = "libxml_xptr_locs")]
+        XmlXPathObjectType::XPathPoint
+        | XmlXPathObjectType::XPathRange
+        | XmlXPathObjectType::XPathLocationset => {
+            // todo!();
+            XML_XPATH_NAN
         }
     }
 }
@@ -507,32 +451,25 @@ pub unsafe fn xml_xpath_cast_to_number(val: XmlXPathObjectPtr) -> f64 {
 ///
 /// Returns the allocated string value of the object, `None` in case of error.
 #[doc(alias = "xmlXPathCastToString")]
-pub unsafe fn xml_xpath_cast_to_string(val: XmlXPathObjectPtr) -> Cow<'static, str> {
-    unsafe {
-        if val.is_null() {
-            return "".into();
+pub fn xml_xpath_cast_to_string(val: &mut XmlXPathObject) -> Cow<'static, str> {
+    match val.typ {
+        XmlXPathObjectType::XPathUndefined => "".into(),
+        XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
+            xml_xpath_cast_node_set_to_string(val.nodesetval.as_deref_mut())
         }
-        match (*val).typ {
-            XmlXPathObjectType::XPathUndefined => "".into(),
-            XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
-                xml_xpath_cast_node_set_to_string((*val).nodesetval.as_deref_mut())
-            }
-            XmlXPathObjectType::XPathString => (*val).stringval.clone().unwrap().into(),
-            XmlXPathObjectType::XPathBoolean => {
-                xml_xpath_cast_boolean_to_string((*val).boolval).into()
-            }
-            XmlXPathObjectType::XPathNumber => xml_xpath_cast_number_to_string((*val).floatval),
-            XmlXPathObjectType::XPathUsers => {
-                // todo!();
-                "".into()
-            }
-            #[cfg(feature = "libxml_xptr_locs")]
-            XmlXPathObjectType::XPathPoint
-            | XmlXPathObjectType::XPathRange
-            | XmlXPathObjectType::XPathLocationset => {
-                // todo!();
-                "".into()
-            }
+        XmlXPathObjectType::XPathString => val.stringval.clone().unwrap().into(),
+        XmlXPathObjectType::XPathBoolean => xml_xpath_cast_boolean_to_string(val.boolval).into(),
+        XmlXPathObjectType::XPathNumber => xml_xpath_cast_number_to_string(val.floatval),
+        XmlXPathObjectType::XPathUsers => {
+            // todo!();
+            "".into()
+        }
+        #[cfg(feature = "libxml_xptr_locs")]
+        XmlXPathObjectType::XPathPoint
+        | XmlXPathObjectType::XPathRange
+        | XmlXPathObjectType::XPathLocationset => {
+            // todo!();
+            "".into()
         }
     }
 }
@@ -544,79 +481,68 @@ pub unsafe fn xml_xpath_cast_to_string(val: XmlXPathObjectPtr) -> Cow<'static, s
     alias = "xmlXPathConvertBoolean",
     alias = "xmlXPathCacheConvertBoolean"
 )]
-pub unsafe fn xml_xpath_convert_boolean(val: XmlXPathObjectPtr) -> XmlXPathObjectPtr {
-    unsafe {
-        if val.is_null() {
-            return xml_xpath_new_boolean(false);
-        }
-        if (*val).typ == XmlXPathObjectType::XPathBoolean {
-            return val;
-        }
-        let ret: XmlXPathObjectPtr = xml_xpath_new_boolean(xml_xpath_cast_to_boolean(&*val));
-        xml_xpath_free_object(val);
-        ret
+pub fn xml_xpath_convert_boolean(val: Option<XmlXPathObject>) -> XmlXPathObject {
+    let Some(val) = val else {
+        return xml_xpath_new_boolean(false);
+    };
+    if val.typ == XmlXPathObjectType::XPathBoolean {
+        return val;
     }
+    xml_xpath_new_boolean(xml_xpath_cast_to_boolean(&val))
 }
 
 /// Converts an existing object to its number() equivalent
 ///
 /// Returns the new object, the old one is freed (or the operation is done directly on @val)
 #[doc(alias = "xmlXPathConvertNumber", alias = "xmlXPathCacheConvertNumber")]
-pub unsafe fn xml_xpath_convert_number(val: XmlXPathObjectPtr) -> XmlXPathObjectPtr {
-    unsafe {
-        if val.is_null() {
-            return xml_xpath_new_float(0.0);
-        }
-        if (*val).typ == XmlXPathObjectType::XPathNumber {
-            return val;
-        }
-        let ret: XmlXPathObjectPtr = xml_xpath_new_float(xml_xpath_cast_to_number(val));
-        xml_xpath_free_object(val);
-        ret
+pub fn xml_xpath_convert_number(val: Option<XmlXPathObject>) -> XmlXPathObject {
+    let Some(mut val) = val else {
+        return xml_xpath_new_float(0.0);
+    };
+    if val.typ == XmlXPathObjectType::XPathNumber {
+        return val;
     }
+    xml_xpath_new_float(xml_xpath_cast_to_number(&mut val))
 }
 
 /// Converts an existing object to its string() equivalent
 ///
 /// Returns the new object, the old one is freed (or the operation is done directly on @val)
 #[doc(alias = "xmlXPathConvertString", alias = "xmlXPathCacheConvertString")]
-pub unsafe fn xml_xpath_convert_string(val: XmlXPathObjectPtr) -> XmlXPathObjectPtr {
-    unsafe {
-        if val.is_null() {
-            return xml_xpath_new_string(Some(""));
-        }
+pub fn xml_xpath_convert_string(val: Option<XmlXPathObject>) -> XmlXPathObject {
+    let Some(mut val) = val else {
+        return xml_xpath_new_string(Some(""));
+    };
 
-        let mut res = None::<Cow<'_, str>>;
-        match (*val).typ {
-            XmlXPathObjectType::XPathUndefined => {}
-            XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
-                res = Some(xml_xpath_cast_node_set_to_string(
-                    (*val).nodesetval.as_deref_mut(),
-                ));
-            }
-            XmlXPathObjectType::XPathString => {
-                return val;
-            }
-            XmlXPathObjectType::XPathBoolean => {
-                res = Some(xml_xpath_cast_boolean_to_string((*val).boolval).into());
-            }
-            XmlXPathObjectType::XPathNumber => {
-                res = Some(xml_xpath_cast_number_to_string((*val).floatval));
-            }
-            XmlXPathObjectType::XPathUsers => {
-                // todo!()
-            }
-            #[cfg(feature = "libxml_xptr_locs")]
-            XmlXPathObjectType::XPathPoint
-            | XmlXPathObjectType::XPathRange
-            | XmlXPathObjectType::XPathLocationset => {
-                // todo!()
-            }
+    let mut res = None::<Cow<'_, str>>;
+    match val.typ {
+        XmlXPathObjectType::XPathUndefined => {}
+        XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
+            res = Some(xml_xpath_cast_node_set_to_string(
+                val.nodesetval.as_deref_mut(),
+            ));
         }
-        xml_xpath_free_object(val);
-        let Some(res) = res else {
-            return xml_xpath_new_string(Some(""));
-        };
-        xml_xpath_wrap_string(Some(&res))
+        XmlXPathObjectType::XPathString => {
+            return val;
+        }
+        XmlXPathObjectType::XPathBoolean => {
+            res = Some(xml_xpath_cast_boolean_to_string(val.boolval).into());
+        }
+        XmlXPathObjectType::XPathNumber => {
+            res = Some(xml_xpath_cast_number_to_string(val.floatval));
+        }
+        XmlXPathObjectType::XPathUsers => {
+            // todo!()
+        }
+        #[cfg(feature = "libxml_xptr_locs")]
+        XmlXPathObjectType::XPathPoint
+        | XmlXPathObjectType::XPathRange
+        | XmlXPathObjectType::XPathLocationset => {
+            // todo!()
+        }
     }
+    let Some(res) = res else {
+        return xml_xpath_new_string(Some(""));
+    };
+    xml_xpath_wrap_string(Some(&res))
 }
