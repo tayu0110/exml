@@ -27,6 +27,7 @@ use super::{
 pub type XmlXPathStepOpPtr = *mut XmlXPathStepOp;
 #[cfg(feature = "xpath")]
 #[repr(C)]
+#[derive(Clone)]
 pub struct XmlXPathStepOp {
     pub(crate) op: XmlXPathOp, /* The identifier of the operation */
     pub(crate) ch1: i32,       /* First child */
@@ -1871,7 +1872,7 @@ impl XmlXPathContext {
             {
                 if stream.is_streamable() == 1 {
                     return Some(XmlXPathCompExpr {
-                        stream: Some(stream),
+                        stream: Some(Rc::new(*stream)),
                         ..Default::default()
                     });
                 }

@@ -256,12 +256,13 @@ pub enum XmlXPathOp {
 /// The structure of a compiled expression form is not public.
 #[cfg(feature = "xpath")]
 #[repr(C)]
+#[derive(Clone)]
 pub struct XmlXPathCompExpr {
     pub(crate) steps: Vec<XmlXPathStepOp>, /* ops for computation of this expression */
     pub(crate) last: i32,                  /* index of last step in expression */
-    pub(crate) expr: Box<str>,             /* the expression being computed */
+    pub(crate) expr: Rc<str>,              /* the expression being computed */
     #[cfg(feature = "libxml_pattern")]
-    pub(crate) stream: Option<Box<XmlPattern>>,
+    pub(crate) stream: Option<Rc<XmlPattern>>,
 }
 
 impl Default for XmlXPathCompExpr {
