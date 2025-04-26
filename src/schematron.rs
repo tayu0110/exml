@@ -956,34 +956,32 @@ impl<'a> XmlSchematronParserCtxt<'a> {
     ///
     /// Returns the parser context or NULL in case of error
     #[doc(alias = "xmlSchematronNewMemParserCtxt")]
-    pub unsafe fn from_memory(buffer: &'a [u8]) -> Option<Self> {
-        unsafe {
-            if buffer.is_empty() {
-                return None;
-            }
-
-            let ret = Self {
-                typ: XML_STRON_CTXT_PARSER,
-                url: None,
-                doc: None,
-                preserve: 0,
-                buffer,
-                nberrors: 0,
-                err: 0,
-                xctxt: xml_xpath_new_context(None),
-                namespaces: vec![],
-                includes: vec![],
-                user_data: None,
-                error: None,
-                warning: None,
-                serror: None,
-            };
-            if ret.xctxt.is_null() {
-                xml_schematron_perr_memory("allocating schema parser XPath context", None);
-                return None;
-            }
-            Some(ret)
+    pub fn from_memory(buffer: &'a [u8]) -> Option<Self> {
+        if buffer.is_empty() {
+            return None;
         }
+
+        let ret = Self {
+            typ: XML_STRON_CTXT_PARSER,
+            url: None,
+            doc: None,
+            preserve: 0,
+            buffer,
+            nberrors: 0,
+            err: 0,
+            xctxt: xml_xpath_new_context(None),
+            namespaces: vec![],
+            includes: vec![],
+            user_data: None,
+            error: None,
+            warning: None,
+            serror: None,
+        };
+        if ret.xctxt.is_null() {
+            xml_schematron_perr_memory("allocating schema parser XPath context", None);
+            return None;
+        }
+        Some(ret)
     }
 
     /// Create an XML Schematrons parse context for that document.
@@ -991,32 +989,30 @@ impl<'a> XmlSchematronParserCtxt<'a> {
     ///
     /// Returns the parser context or NULL in case of error
     #[doc(alias = "xmlSchematronNewDocParserCtxt")]
-    pub unsafe fn from_doc(doc: XmlDocPtr) -> Option<Self> {
-        unsafe {
-            let ret = Self {
-                typ: XML_STRON_CTXT_PARSER,
-                url: None,
-                doc: Some(doc),
-                // The application has responsibility for the document
-                preserve: 1,
-                buffer: &[],
-                nberrors: 0,
-                err: 0,
-                xctxt: xml_xpath_new_context(Some(doc)),
-                namespaces: vec![],
-                includes: vec![],
-                user_data: None,
-                error: None,
-                warning: None,
-                serror: None,
-            };
-            if ret.xctxt.is_null() {
-                xml_schematron_perr_memory("allocating schema parser XPath context", None);
-                return None;
-            }
-
-            Some(ret)
+    pub fn from_doc(doc: XmlDocPtr) -> Option<Self> {
+        let ret = Self {
+            typ: XML_STRON_CTXT_PARSER,
+            url: None,
+            doc: Some(doc),
+            // The application has responsibility for the document
+            preserve: 1,
+            buffer: &[],
+            nberrors: 0,
+            err: 0,
+            xctxt: xml_xpath_new_context(Some(doc)),
+            namespaces: vec![],
+            includes: vec![],
+            user_data: None,
+            error: None,
+            warning: None,
+            serror: None,
+        };
+        if ret.xctxt.is_null() {
+            xml_schematron_perr_memory("allocating schema parser XPath context", None);
+            return None;
         }
+
+        Some(ret)
     }
 
     /// Add a namespace definition in the context

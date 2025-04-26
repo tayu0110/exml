@@ -40,9 +40,9 @@ use crate::{
 };
 
 use super::{
-    XPATH_MAX_STACK_DEPTH, XmlNodeSet, XmlXPathAxisPtr, XmlXPathCompExpr, XmlXPathContextCachePtr,
-    XmlXPathError, XmlXPathFuncLookup, XmlXPathFunction, XmlXPathObjectPtr, XmlXPathObjectType,
-    XmlXPathOp, XmlXPathTypePtr, XmlXPathVariableLookupFunc,
+    XPATH_MAX_STACK_DEPTH, XmlNodeSet, XmlXPathAxisPtr, XmlXPathCompExpr, XmlXPathError,
+    XmlXPathFuncLookup, XmlXPathFunction, XmlXPathObjectPtr, XmlXPathObjectType, XmlXPathOp,
+    XmlXPathTypePtr, XmlXPathVariableLookupFunc,
     compile::XmlXPathStepOp,
     functions::{
         xml_xpath_boolean_function, xml_xpath_ceiling_function, xml_xpath_concat_function,
@@ -56,9 +56,9 @@ use super::{
         xml_xpath_substring_before_function, xml_xpath_substring_function, xml_xpath_sum_function,
         xml_xpath_translate_function, xml_xpath_true_function,
     },
-    xml_xpath_cast_to_boolean, xml_xpath_cast_to_number, xml_xpath_cast_to_string,
-    xml_xpath_context_set_cache, xml_xpath_err, xml_xpath_free_cache, xml_xpath_free_object,
-    xml_xpath_perr_memory, xml_xpath_registered_variables_cleanup, xml_xpath_release_object,
+    xml_xpath_cast_to_boolean, xml_xpath_cast_to_number, xml_xpath_cast_to_string, xml_xpath_err,
+    xml_xpath_free_object, xml_xpath_perr_memory, xml_xpath_registered_variables_cleanup,
+    xml_xpath_release_object,
 };
 
 pub type XmlXPathParserContextPtr = *mut XmlXPathParserContext;
@@ -504,9 +504,6 @@ pub struct XmlXPathContext {
     // flags to control compilation
     pub(crate) flags: i32,
 
-    // Cache for reusal of XPath objects
-    pub cache: *mut c_void,
-
     // Resource limits
     pub(crate) op_limit: u64,
     pub(crate) op_count: u64,
@@ -723,7 +720,6 @@ impl Default for XmlXPathContext {
             last_error: XmlError::default(),
             debug_node: None,
             flags: 0,
-            cache: null_mut(),
             op_limit: 0,
             op_count: 0,
             depth: 0,
@@ -735,7 +731,7 @@ impl Default for XmlXPathContext {
 ///
 /// Returns the xmlXPathContext just allocated. The caller will need to free it.
 #[doc(alias = "xmlXPathNewContext")]
-pub unsafe fn xml_xpath_new_context(doc: Option<XmlDocPtr>) -> XmlXPathContextPtr {
+pub fn xml_xpath_new_context(doc: Option<XmlDocPtr>) -> XmlXPathContextPtr {
     let mut ret = Box::new(XmlXPathContext {
         doc,
         node: None,
@@ -752,11 +748,6 @@ pub unsafe fn xml_xpath_new_context(doc: Option<XmlDocPtr>) -> XmlXPathContextPt
         proximity_position: -1,
         ..Default::default()
     });
-    unsafe {
-        if xml_xpath_context_set_cache(&mut *ret, 1, -1, 0) == -1 {
-            return null_mut();
-        }
-    }
     ret.register_all_functions();
     Box::leak(ret)
 }
@@ -769,9 +760,6 @@ pub unsafe fn xml_xpath_free_context(ctxt: XmlXPathContextPtr) {
             return;
         }
 
-        if !(*ctxt).cache.is_null() {
-            xml_xpath_free_cache((*ctxt).cache as XmlXPathContextCachePtr);
-        }
         (*ctxt).cleanup_registered_ns();
         (*ctxt).cleanup_registered_func();
         xml_xpath_registered_variables_cleanup(ctxt);

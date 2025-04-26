@@ -52,8 +52,8 @@ use exml::{
     },
     xpath::{
         XmlXPathContext, XmlXPathObjectPtr, XmlXPathObjectType, xml_xpath_compile,
-        xml_xpath_compiled_eval, xml_xpath_context_set_cache, xml_xpath_free_context,
-        xml_xpath_free_object, xml_xpath_new_context,
+        xml_xpath_compiled_eval, xml_xpath_free_context, xml_xpath_free_object,
+        xml_xpath_new_context,
     },
 };
 use libc::strstr;
@@ -205,15 +205,7 @@ unsafe fn initialize_libxml2() {
         xml_init_parser();
         xml_set_external_entity_loader(test_external_entity_loader);
         CTXT_XPATH.store(xml_xpath_new_context(None), Ordering::Relaxed);
-        // Deactivate the cache if created; otherwise we have to create/free it
-        // for every test, since it will confuse the memory leak detection.
-        // Note that normally this need not be done, since the cache is not
-        // created until set explicitly with xmlXPathContextSetCache();
-        // but for test purposes it is sometimes useful to activate the
-        // cache by default for the whole library.
-        if !(*CTXT_XPATH.load(Ordering::Relaxed)).cache.is_null() {
-            xml_xpath_context_set_cache(CTXT_XPATH.load(Ordering::Relaxed), 0, -1, 0);
-        }
+
         // used as default namespace in xstc tests
         (*CTXT_XPATH.load(Ordering::Relaxed)).register_ns("ts", Some("TestSuite"));
         (*CTXT_XPATH.load(Ordering::Relaxed))

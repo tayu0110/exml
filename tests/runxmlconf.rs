@@ -27,9 +27,7 @@ use exml::{
         xml_init_parser, xml_read_file, xml_set_external_entity_loader,
     },
     tree::{NodeCommon, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr, xml_free_doc},
-    xpath::{
-        XmlXPathContext, xml_xpath_context_set_cache, xml_xpath_free_context, xml_xpath_new_context,
-    },
+    xpath::{XmlXPathContext, xml_xpath_free_context, xml_xpath_new_context},
 };
 
 static mut VERBOSE: c_int = 0;
@@ -147,15 +145,7 @@ unsafe fn initialize_libxml2() {
         xml_init_parser();
         xml_set_external_entity_loader(test_external_entity_loader);
         CTXT_XPATH.store(xml_xpath_new_context(None), Ordering::Relaxed);
-        // Deactivate the cache if created; otherwise we have to create/free it
-        // for every test, since it will confuse the memory leak detection.
-        // Note that normally this need not be done, since the cache is not
-        // created until set explicitly with xmlXPathContextSetCache();
-        // but for test purposes it is sometimes useful to activate the
-        // cache by default for the whole library.
-        if !(*CTXT_XPATH.load(Ordering::Relaxed)).cache.is_null() {
-            xml_xpath_context_set_cache(CTXT_XPATH.load(Ordering::Relaxed), 0, -1, 0);
-        }
+
         set_structured_error(Some(test_error_handler), None);
     }
 }

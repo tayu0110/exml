@@ -33,8 +33,6 @@ use std::{
     ptr::null_mut,
 };
 
-use libc::memset;
-
 #[cfg(feature = "libxml_xptr_locs")]
 use crate::libxml::xpointer::XmlLocationSet;
 use crate::{
@@ -43,7 +41,7 @@ use crate::{
     hash::XmlHashTableRef,
     libxml::{
         chvalid::xml_is_blank_char,
-        globals::{xml_free, xml_malloc, xml_realloc},
+        globals::{xml_free, xml_malloc},
         valid::xml_get_id,
         xmlstring::{XmlChar, xml_strndup},
     },
@@ -58,16 +56,15 @@ use crate::{
         xml_xpath_cast_boolean_to_string, xml_xpath_cast_node_set_to_string,
         xml_xpath_cast_node_to_number, xml_xpath_cast_node_to_string,
         xml_xpath_cast_number_to_boolean, xml_xpath_cast_number_to_string,
-        xml_xpath_cast_to_boolean, xml_xpath_cast_to_number, xml_xpath_free_node_set,
-        xml_xpath_free_object, xml_xpath_free_value_tree, xml_xpath_is_inf, xml_xpath_is_nan,
-        xml_xpath_node_set_create, xml_xpath_object_copy,
+        xml_xpath_cast_to_boolean, xml_xpath_cast_to_number, xml_xpath_free_object,
+        xml_xpath_is_inf, xml_xpath_is_nan, xml_xpath_node_set_create, xml_xpath_object_copy,
     },
 };
 
 use super::{
     XmlNodeSet, XmlXPathContext, XmlXPathParserContext, functions::xml_xpath_boolean_function,
     xml_xpath_new_boolean, xml_xpath_new_float, xml_xpath_new_node_set, xml_xpath_new_string,
-    xml_xpath_node_set_merge, xml_xpath_wrap_node_set, xml_xpath_wrap_string,
+    xml_xpath_wrap_node_set, xml_xpath_wrap_string,
 };
 
 // Many of these macros may later turn into functions.
@@ -121,90 +118,6 @@ macro_rules! CHECK_TYPE0 {
     };
 }
 
-pub type XmlPointerListPtr = *mut XmlPointerList;
-/// Pointer-list for various purposes.
-#[doc(alias = "xsltPointerList")]
-#[repr(C)]
-pub struct XmlPointerList {
-    pub(crate) items: *mut *mut c_void,
-    pub(crate) number: i32,
-    pub(crate) size: i32,
-}
-
-pub type XmlXPathContextCachePtr = *mut XmlXPathContextCache;
-#[repr(C)]
-pub struct XmlXPathContextCache {
-    pub(crate) nodeset_objs: XmlPointerListPtr, /* contains xmlXPathObjectPtr */
-    pub(crate) string_objs: XmlPointerListPtr,  /* contains xmlXPathObjectPtr */
-    pub(crate) boolean_objs: XmlPointerListPtr, /* contains xmlXPathObjectPtr */
-    pub(crate) number_objs: XmlPointerListPtr,  /* contains xmlXPathObjectPtr */
-    pub(crate) misc_objs: XmlPointerListPtr,    /* contains xmlXPathObjectPtr */
-    pub(crate) max_nodeset: i32,
-    pub(crate) max_string: i32,
-    pub(crate) max_boolean: i32,
-    pub(crate) max_number: i32,
-    pub(crate) max_misc: i32,
-}
-
-// TODO: Since such a list-handling is used in xmlschemas.c and libxslt
-// and here, we should make the functions public.
-unsafe fn xml_pointer_list_add_size(
-    list: XmlPointerListPtr,
-    item: *mut c_void,
-    mut initial_size: i32,
-) -> i32 {
-    unsafe {
-        if (*list).size <= (*list).number {
-            let new_size: usize;
-
-            if (*list).size == 0 {
-                if initial_size <= 0 {
-                    initial_size = 1;
-                }
-                new_size = initial_size as _;
-            } else {
-                if (*list).size > 50000000 {
-                    xml_xpath_err_memory(None, Some("xmlPointerListAddSize: re-allocating item\n"));
-                    return -1;
-                }
-                new_size = (*list).size as usize * 2;
-            }
-            let tmp: *mut *mut c_void =
-                xml_realloc((*list).items as _, new_size * size_of::<*mut c_void>())
-                    as *mut *mut c_void;
-            if tmp.is_null() {
-                xml_xpath_err_memory(None, Some("xmlPointerListAddSize: re-allocating item\n"));
-                return -1;
-            }
-            (*list).items = tmp;
-            (*list).size = new_size as _;
-        }
-        *(*list).items.add((*list).number as usize) = item;
-        (*list).number += 1;
-        0
-    }
-}
-
-/// Creates an xsltPointerList structure.
-///
-/// Returns a xsltPointerList structure or NULL in case of an error.
-#[doc(alias = "xsltPointerListCreate")]
-unsafe fn xml_pointer_list_create(initial_size: i32) -> XmlPointerListPtr {
-    unsafe {
-        let ret: XmlPointerListPtr = xml_malloc(size_of::<XmlPointerList>()) as _;
-        if ret.is_null() {
-            xml_xpath_err_memory(None, Some("xmlPointerListCreate: allocating item\n"));
-            return null_mut();
-        }
-        memset(ret as _, 0, size_of::<XmlPointerList>());
-        if initial_size > 0 {
-            xml_pointer_list_add_size(ret, null_mut(), initial_size);
-            (*ret).number = 0;
-        }
-        ret
-    }
-}
-
 macro_rules! XP_CACHE_WANTS {
     ($sl:expr, $n:expr) => {
         $sl.is_null() || (*$sl).number < $n
@@ -238,119 +151,13 @@ macro_rules! XP_CACHE_ADD {
 /// Depending on the state of the cache this frees the given
 /// XPath object or stores it in the cache.
 #[doc(alias = "xmlXPathReleaseObject")]
-pub(crate) unsafe fn xml_xpath_release_object(ctxt: XmlXPathContextPtr, obj: XmlXPathObjectPtr) {
+pub(crate) unsafe fn xml_xpath_release_object(_ctxt: XmlXPathContextPtr, obj: XmlXPathObjectPtr) {
     unsafe {
         if obj.is_null() {
             return;
         }
-        if ctxt.is_null() || (*ctxt).cache.is_null() {
-            xml_xpath_free_object(obj);
-        } else {
-            let cache: XmlXPathContextCachePtr = (*ctxt).cache as XmlXPathContextCachePtr;
 
-            'free_obj: {
-                'obj_cached: {
-                    match (*obj).typ {
-                        XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
-                            if let Some(nodeset) = (*obj).nodesetval.take() {
-                                if (*obj).boolval {
-                                    // It looks like the @boolval is used for
-                                    // evaluation if this an XSLT Result Tree Fragment.
-                                    // TODO: Check if this assumption is correct.
-                                    (*obj).typ = XmlXPathObjectType::XPathXSLTTree; /* just for debugging */
-                                    xml_xpath_free_value_tree(Some(nodeset));
-                                } else if nodeset.node_tab.len() <= 40
-                                    && XP_CACHE_WANTS!((*cache).nodeset_objs, (*cache).max_nodeset)
-                                {
-                                    XP_CACHE_ADD!((*cache).nodeset_objs, obj);
-                                    (*obj).nodesetval = Some(nodeset);
-                                    break 'obj_cached;
-                                } else {
-                                    xml_xpath_free_node_set(Some(nodeset));
-                                }
-                            }
-                        }
-                        XmlXPathObjectType::XPathString => {
-                            let _ = (*obj).stringval.take();
-
-                            if XP_CACHE_WANTS!((*cache).string_objs, (*cache).max_string) {
-                                XP_CACHE_ADD!((*cache).string_objs, obj);
-                                break 'obj_cached;
-                            }
-                        }
-                        XmlXPathObjectType::XPathBoolean => {
-                            if XP_CACHE_WANTS!((*cache).boolean_objs, (*cache).max_boolean) {
-                                XP_CACHE_ADD!((*cache).boolean_objs, obj);
-                                break 'obj_cached;
-                            }
-                        }
-                        XmlXPathObjectType::XPathNumber => {
-                            if XP_CACHE_WANTS!((*cache).number_objs, (*cache).max_number) {
-                                XP_CACHE_ADD!((*cache).number_objs, obj);
-                                break 'obj_cached;
-                            }
-                        }
-                        #[cfg(feature = "libxml_xptr_locs")]
-                        XmlXPathObjectType::XPathLocationset => {
-                            let _ = (*obj).user.take();
-                            // if let Some(loc) = (*obj).user.take() {
-                            //     if let Some(&loc) = loc.as_location_set() {
-                            //         xml_xptr_free_location_set(loc);
-                            //     }
-                            // }
-                            break 'free_obj;
-                        }
-                        _ => {
-                            break 'free_obj;
-                        }
-                    }
-
-                    // Fallback to adding to the misc-objects slot.
-                    if XP_CACHE_WANTS!((*cache).misc_objs, (*cache).max_misc) {
-                        XP_CACHE_ADD!((*cache).misc_objs, obj);
-                    } else {
-                        break 'free_obj;
-                    }
-                }
-
-                // obj_cached:
-
-                if let Some(mut nodeset) = (*obj).nodesetval.take() {
-                    // TODO: Due to those nasty ns-nodes, we need to traverse
-                    //  the list and free the ns-nodes.
-                    // URGENT TODO: Check if it's actually slowing things down.
-                    //  Maybe we shouldn't try to preserve the list.
-                    if nodeset.node_tab.len() > 1 {
-                        for &node in &nodeset.node_tab {
-                            if let Ok(ns) = XmlNsPtr::try_from(node) {
-                                xml_xpath_node_set_free_ns(ns);
-                            }
-                        }
-                    } else if let Some(ns) = nodeset
-                        .node_tab
-                        .first()
-                        .and_then(|&node| XmlNsPtr::try_from(node).ok())
-                        .filter(|_| nodeset.node_tab.len() == 1)
-                    {
-                        xml_xpath_node_set_free_ns(ns);
-                    }
-                    nodeset.node_tab.clear();
-                    *obj = XmlXPathObject::default();
-                    (*obj).nodesetval = Some(nodeset);
-                } else {
-                    std::ptr::write(&mut *obj, XmlXPathObject::default());
-                }
-
-                return;
-            }
-
-            // free_obj:
-            // Cache is full; free the object.
-            if let Some(nodeset) = (*obj).nodesetval.take() {
-                xml_xpath_free_node_set(Some(nodeset));
-            }
-            xml_free(obj as _);
-        }
+        xml_xpath_free_object(obj);
     }
 }
 
@@ -586,12 +393,6 @@ pub unsafe fn xml_xpath_variable_lookup(ctxt: XmlXPathContextPtr, name: &str) ->
     }
 }
 
-macro_rules! XP_HAS_CACHE {
-    ($c:expr) => {
-        !$c.is_null() && !(*$c).cache.is_null()
-    };
-}
-
 /// This is the cached version of xmlXPathWrapNodeSet().
 /// Wrap the Nodeset @val in a new xmlXPathObjectPtr
 ///
@@ -600,27 +401,10 @@ macro_rules! XP_HAS_CACHE {
 /// In case of error the node set is destroyed and NULL is returned.
 #[doc(alias = "xmlXPathCacheWrapNodeSet")]
 pub(super) unsafe fn xml_xpath_cache_wrap_node_set(
-    ctxt: XmlXPathContextPtr,
+    _ctxt: XmlXPathContextPtr,
     val: Option<Box<XmlNodeSet>>,
 ) -> XmlXPathObjectPtr {
-    unsafe {
-        if !ctxt.is_null() && !(*ctxt).cache.is_null() {
-            let cache: XmlXPathContextCachePtr = (*ctxt).cache as XmlXPathContextCachePtr;
-
-            if !(*cache).misc_objs.is_null() && (*(*cache).misc_objs).number != 0 {
-                (*(*cache).misc_objs).number -= 1;
-                let ret: XmlXPathObjectPtr = *(*(*cache).misc_objs)
-                    .items
-                    .add((*(*cache).misc_objs).number as usize)
-                    as XmlXPathObjectPtr;
-                (*ret).typ = XmlXPathObjectType::XPathNodeset;
-                (*ret).nodesetval = val;
-                return ret;
-            }
-        }
-
-        xml_xpath_wrap_node_set(val)
-    }
+    unsafe { xml_xpath_wrap_node_set(val) }
 }
 
 /// Handle a redefinition of attribute error
@@ -689,36 +473,10 @@ pub fn xml_xpath_err_memory(ctxt: Option<&mut XmlXPathContext>, extra: Option<&s
 /// Returns the created or reused object.
 #[doc(alias = "xmlXPathCacheNewString", alias = "xmlXPathCacheNewCString")]
 pub(super) unsafe fn xml_xpath_cache_new_string(
-    ctxt: XmlXPathContextPtr,
+    _ctxt: XmlXPathContextPtr,
     val: Option<&str>,
 ) -> XmlXPathObjectPtr {
-    unsafe {
-        if !ctxt.is_null() && !(*ctxt).cache.is_null() {
-            let cache: XmlXPathContextCachePtr = (*ctxt).cache as XmlXPathContextCachePtr;
-
-            if !(*cache).string_objs.is_null() && (*(*cache).string_objs).number != 0 {
-                (*(*cache).string_objs).number -= 1;
-                let ret: XmlXPathObjectPtr = *(*(*cache).string_objs)
-                    .items
-                    .add((*(*cache).string_objs).number as usize)
-                    as XmlXPathObjectPtr;
-                (*ret).typ = XmlXPathObjectType::XPathString;
-                (*ret).stringval = Some(val.unwrap_or("").to_owned());
-                return ret;
-            } else if !(*cache).misc_objs.is_null() && (*(*cache).misc_objs).number != 0 {
-                (*(*cache).misc_objs).number -= 1;
-                let ret: XmlXPathObjectPtr = *(*(*cache).misc_objs)
-                    .items
-                    .add((*(*cache).misc_objs).number as usize)
-                    as XmlXPathObjectPtr;
-
-                (*ret).typ = XmlXPathObjectType::XPathString;
-                (*ret).stringval = Some(val.unwrap_or("").to_owned());
-                return ret;
-            }
-        }
-        xml_xpath_new_string(val)
-    }
+    unsafe { xml_xpath_new_string(val) }
 }
 
 /// This is the cached version of xmlXPathNewBoolean().
@@ -727,36 +485,10 @@ pub(super) unsafe fn xml_xpath_cache_new_string(
 /// Returns the created or reused object.
 #[doc(alias = "xmlXPathCacheNewBoolean")]
 pub(super) unsafe fn xml_xpath_cache_new_boolean(
-    ctxt: XmlXPathContextPtr,
+    _ctxt: XmlXPathContextPtr,
     val: bool,
 ) -> XmlXPathObjectPtr {
-    unsafe {
-        if !ctxt.is_null() && !(*ctxt).cache.is_null() {
-            let cache: XmlXPathContextCachePtr = (*ctxt).cache as XmlXPathContextCachePtr;
-
-            if !(*cache).boolean_objs.is_null() && (*(*cache).boolean_objs).number != 0 {
-                (*(*cache).boolean_objs).number -= 1;
-                let ret: XmlXPathObjectPtr = *(*(*cache).boolean_objs)
-                    .items
-                    .add((*(*cache).boolean_objs).number as usize)
-                    as XmlXPathObjectPtr;
-                (*ret).typ = XmlXPathObjectType::XPathBoolean;
-                (*ret).boolval = val;
-                return ret;
-            } else if !(*cache).misc_objs.is_null() && (*(*cache).misc_objs).number != 0 {
-                (*(*cache).misc_objs).number -= 1;
-                let ret: XmlXPathObjectPtr = *(*(*cache).misc_objs)
-                    .items
-                    .add((*(*cache).misc_objs).number as usize)
-                    as XmlXPathObjectPtr;
-
-                (*ret).typ = XmlXPathObjectType::XPathBoolean;
-                (*ret).boolval = val;
-                return ret;
-            }
-        }
-        xml_xpath_new_boolean(val)
-    }
+    unsafe { xml_xpath_new_boolean(val) }
 }
 
 /// This is the cached version of xmlXPathNewFloat().
@@ -765,36 +497,10 @@ pub(super) unsafe fn xml_xpath_cache_new_boolean(
 /// Returns the created or reused object.
 #[doc(alias = "xmlXPathCacheNewFloat")]
 pub(super) unsafe fn xml_xpath_cache_new_float(
-    ctxt: XmlXPathContextPtr,
+    _ctxt: XmlXPathContextPtr,
     val: f64,
 ) -> XmlXPathObjectPtr {
-    unsafe {
-        if !ctxt.is_null() && !(*ctxt).cache.is_null() {
-            let cache: XmlXPathContextCachePtr = (*ctxt).cache as XmlXPathContextCachePtr;
-
-            if !(*cache).number_objs.is_null() && (*(*cache).number_objs).number != 0 {
-                (*(*cache).number_objs).number -= 1;
-                let ret: XmlXPathObjectPtr = *(*(*cache).number_objs)
-                    .items
-                    .add((*(*cache).number_objs).number as usize)
-                    as XmlXPathObjectPtr;
-                (*ret).typ = XmlXPathObjectType::XPathNumber;
-                (*ret).floatval = val;
-                return ret;
-            } else if !(*cache).misc_objs.is_null() && (*(*cache).misc_objs).number != 0 {
-                (*(*cache).misc_objs).number -= 1;
-                let ret: XmlXPathObjectPtr = *(*(*cache).misc_objs)
-                    .items
-                    .add((*(*cache).misc_objs).number as usize)
-                    as XmlXPathObjectPtr;
-
-                (*ret).typ = XmlXPathObjectType::XPathNumber;
-                (*ret).floatval = val;
-                return ret;
-            }
-        }
-        xml_xpath_new_float(val)
-    }
+    unsafe { xml_xpath_new_float(val) }
 }
 
 /// This is the cached version of xmlXPathObjectCopy().
@@ -803,32 +509,10 @@ pub(super) unsafe fn xml_xpath_cache_new_float(
 /// Returns a created or reused created object.
 #[doc(alias = "xmlXPathCacheObjectCopy")]
 pub(super) unsafe fn xml_xpath_cache_object_copy(
-    ctxt: XmlXPathContextPtr,
+    _ctxt: XmlXPathContextPtr,
     val: &XmlXPathObject,
 ) -> XmlXPathObjectPtr {
-    unsafe {
-        if XP_HAS_CACHE!(ctxt) {
-            match val.typ {
-                XmlXPathObjectType::XPathNodeset => {
-                    return xml_xpath_cache_wrap_node_set(
-                        ctxt,
-                        xml_xpath_node_set_merge(None, val.nodesetval.as_deref()),
-                    );
-                }
-                XmlXPathObjectType::XPathString => {
-                    return xml_xpath_cache_new_string(ctxt, val.stringval.as_deref());
-                }
-                XmlXPathObjectType::XPathBoolean => {
-                    return xml_xpath_cache_new_boolean(ctxt, val.boolval);
-                }
-                XmlXPathObjectType::XPathNumber => {
-                    return xml_xpath_cache_new_float(ctxt, val.floatval);
-                }
-                _ => {}
-            }
-        }
-        xml_xpath_object_copy(val)
-    }
+    unsafe { xml_xpath_object_copy(val) }
 }
 
 /// Search in the Variable array of the context for the given variable value.
@@ -937,61 +621,10 @@ pub fn xml_xpath_node_set_dup_ns(
 /// Returns the created or reused object.
 #[doc(alias = "xmlXPathCacheNewNodeSet")]
 pub(super) unsafe fn xml_xpath_cache_new_node_set(
-    ctxt: XmlXPathContextPtr,
+    _ctxt: XmlXPathContextPtr,
     val: Option<XmlGenericNodePtr>,
 ) -> XmlXPathObjectPtr {
-    unsafe {
-        if !ctxt.is_null() && !(*ctxt).cache.is_null() {
-            let cache: XmlXPathContextCachePtr = (*ctxt).cache as XmlXPathContextCachePtr;
-
-            if !(*cache).nodeset_objs.is_null() && (*(*cache).nodeset_objs).number != 0 {
-                // Use the nodeset-cache.
-                (*(*cache).nodeset_objs).number -= 1;
-                let ret: XmlXPathObjectPtr = *(*(*cache).nodeset_objs)
-                    .items
-                    .add((*(*cache).nodeset_objs).number as usize)
-                    as XmlXPathObjectPtr;
-                (*ret).typ = XmlXPathObjectType::XPathNodeset;
-                (*ret).boolval = false;
-                if let Some(val) = val {
-                    if let Some(table) = (*ret)
-                        .nodesetval
-                        .as_mut()
-                        .filter(|_| !matches!(val.element_type(), XmlElementType::XmlNamespaceDecl))
-                        .map(|set| &mut set.node_tab)
-                    {
-                        table.clear();
-                        table.push(val);
-                    } else if let Some(nodeset) = (*ret).nodesetval.as_deref_mut() {
-                        // TODO: Check memory error.
-                        nodeset.add_unique(val);
-                    }
-                }
-                return ret;
-            } else if !(*cache).misc_objs.is_null() && (*(*cache).misc_objs).number != 0 {
-                // Fallback to misc-cache.
-
-                let set = xml_xpath_node_set_create(val);
-                if set.is_none() {
-                    (*ctxt).last_error.domain = XmlErrorDomain::XmlFromXPath;
-                    (*ctxt).last_error.code = XmlParserErrors::XmlErrNoMemory;
-                    return null_mut();
-                }
-
-                (*(*cache).misc_objs).number -= 1;
-                let ret: XmlXPathObjectPtr = *(*(*cache).misc_objs)
-                    .items
-                    .add((*(*cache).misc_objs).number as usize)
-                    as XmlXPathObjectPtr;
-
-                (*ret).typ = XmlXPathObjectType::XPathNodeset;
-                (*ret).boolval = false;
-                (*ret).nodesetval = set;
-                return ret;
-            }
-        }
-        xml_xpath_new_node_set(val)
-    }
+    unsafe { xml_xpath_new_node_set(val) }
 }
 
 /// Initialize the context to the root of the document
@@ -1643,37 +1276,10 @@ pub unsafe fn xml_xpath_evaluate_predicate_result(
 /// Returns the created or reused object.
 #[doc(alias = "xmlXPathCacheWrapString")]
 pub(super) unsafe fn xml_xpath_cache_wrap_string(
-    ctxt: XmlXPathContextPtr,
+    _ctxt: XmlXPathContextPtr,
     val: Option<&str>,
 ) -> XmlXPathObjectPtr {
-    unsafe {
-        if !ctxt.is_null() && !(*ctxt).cache.is_null() {
-            let cache: XmlXPathContextCachePtr = (*ctxt).cache as XmlXPathContextCachePtr;
-
-            if !(*cache).string_objs.is_null() && (*(*cache).string_objs).number != 0 {
-                (*(*cache).string_objs).number -= 1;
-                let ret: XmlXPathObjectPtr = *(*(*cache).string_objs)
-                    .items
-                    .add((*(*cache).string_objs).number as usize)
-                    as XmlXPathObjectPtr;
-                (*ret).typ = XmlXPathObjectType::XPathString;
-                (*ret).stringval = val.map(|s| s.to_owned());
-                return ret;
-            } else if !(*cache).misc_objs.is_null() && (*(*cache).misc_objs).number != 0 {
-                // Fallback to misc-cache.
-                (*(*cache).misc_objs).number -= 1;
-                let ret: XmlXPathObjectPtr = *(*(*cache).misc_objs)
-                    .items
-                    .add((*(*cache).misc_objs).number as usize)
-                    as XmlXPathObjectPtr;
-
-                (*ret).typ = XmlXPathObjectType::XPathString;
-                (*ret).stringval = val.map(|s| s.to_owned());
-                return ret;
-            }
-        }
-        xml_xpath_wrap_string(val)
-    }
+    unsafe { xml_xpath_wrap_string(val) }
 }
 
 /// Function computing the beginning of the string value of the node,

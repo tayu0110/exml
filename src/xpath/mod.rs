@@ -53,23 +53,18 @@ pub mod object;
 
 use std::{
     borrow::Cow,
-    mem::size_of,
     os::raw::c_void,
     ptr::{addr_of_mut, null_mut},
     rc::Rc,
 };
 
 use compile::XmlXPathStepOp;
-use libc::memset;
 
 #[cfg(feature = "libxml_pattern")]
 use crate::pattern::XmlPattern;
 use crate::{
     generic_error,
-    libxml::{
-        globals::{xml_free, xml_malloc},
-        xmlstring::XmlChar,
-    },
+    libxml::xmlstring::XmlChar,
     parser::xml_init_parser,
     tree::{XmlDocPtr, XmlElementType, XmlGenericNodePtr},
 };
@@ -633,135 +628,6 @@ pub fn xml_xpath_cast_node_set_to_string(ns: Option<&mut XmlNodeSet>) -> Cow<'st
     }
 
     xml_xpath_cast_node_to_string(Some(ns.node_tab[0])).into()
-}
-
-/// Frees the xsltPointerList structure. This does not free the content of the list.
-#[doc(alias = "xsltPointerListFree")]
-unsafe fn xml_pointer_list_free(list: XmlPointerListPtr) {
-    unsafe {
-        if list.is_null() {
-            return;
-        }
-        if !(*list).items.is_null() {
-            xml_free((*list).items as _);
-        }
-        xml_free(list as _);
-    }
-}
-
-unsafe fn xml_xpath_cache_free_object_list(list: XmlPointerListPtr) {
-    unsafe {
-        let mut obj: XmlXPathObjectPtr;
-
-        if list.is_null() {
-            return;
-        }
-
-        for i in 0..(*list).number {
-            obj = *(*list).items.add(i as usize) as _;
-            // Note that it is already assured that we don't need to
-            // look out for namespace nodes in the node-set.
-            let _ = (*obj).nodesetval.take();
-            xml_free(obj as _);
-        }
-        xml_pointer_list_free(list);
-    }
-}
-
-unsafe fn xml_xpath_free_cache(cache: XmlXPathContextCachePtr) {
-    unsafe {
-        if cache.is_null() {
-            return;
-        }
-        if !(*cache).nodeset_objs.is_null() {
-            xml_xpath_cache_free_object_list((*cache).nodeset_objs);
-        }
-        if !(*cache).string_objs.is_null() {
-            xml_xpath_cache_free_object_list((*cache).string_objs);
-        }
-        if !(*cache).boolean_objs.is_null() {
-            xml_xpath_cache_free_object_list((*cache).boolean_objs);
-        }
-        if !(*cache).number_objs.is_null() {
-            xml_xpath_cache_free_object_list((*cache).number_objs);
-        }
-        if !(*cache).misc_objs.is_null() {
-            xml_xpath_cache_free_object_list((*cache).misc_objs);
-        }
-        xml_free(cache as _);
-    }
-}
-
-/// Create a new object cache
-///
-/// Returns the xmlXPathCache just allocated.
-#[doc(alias = "xmlXPathNewCache")]
-unsafe fn xml_xpath_new_cache() -> XmlXPathContextCachePtr {
-    unsafe {
-        let ret: XmlXPathContextCachePtr =
-            xml_malloc(size_of::<XmlXPathContextCache>()) as XmlXPathContextCachePtr;
-        if ret.is_null() {
-            xml_xpath_err_memory(None, Some("creating object cache\n"));
-            return null_mut();
-        }
-        memset(ret as _, 0, size_of::<XmlXPathContextCache>());
-        (*ret).max_nodeset = 100;
-        (*ret).max_string = 100;
-        (*ret).max_boolean = 100;
-        (*ret).max_number = 100;
-        (*ret).max_misc = 100;
-        ret
-    }
-}
-
-/// Creates/frees an object cache on the XPath context.
-/// If activates XPath objects (xmlXPathObject) will be cached internally to be reused.
-/// @options:
-///   0: This will set the XPath object caching:
-///      @value:
-///        This will set the maximum number of XPath objects
-///        to be cached per slot
-///        There are 5 slots for: node-set, string, number, boolean, and
-///        misc objects. Use <0 for the default number (100).
-///   Other values for @options have currently no effect.
-///
-/// Returns 0 if the setting succeeded, and -1 on API or internal errors.
-#[doc(alias = "xmlXPathContextSetCache")]
-#[cfg(feature = "xpath")]
-pub unsafe fn xml_xpath_context_set_cache(
-    ctxt: XmlXPathContextPtr,
-    active: i32,
-    mut value: i32,
-    options: i32,
-) -> i32 {
-    unsafe {
-        if ctxt.is_null() {
-            return -1;
-        }
-        if active != 0 {
-            if (*ctxt).cache.is_null() {
-                (*ctxt).cache = xml_xpath_new_cache() as _;
-                if (*ctxt).cache.is_null() {
-                    return -1;
-                }
-            }
-            let cache: XmlXPathContextCachePtr = (*ctxt).cache as XmlXPathContextCachePtr;
-            if options == 0 {
-                if value < 0 {
-                    value = 100;
-                }
-                (*cache).max_nodeset = value;
-                (*cache).max_string = value;
-                (*cache).max_number = value;
-                (*cache).max_boolean = value;
-                (*cache).max_misc = value;
-            }
-        } else if !(*ctxt).cache.is_null() {
-            xml_xpath_free_cache((*ctxt).cache as XmlXPathContextCachePtr);
-            (*ctxt).cache = null_mut();
-        }
-        0
-    }
 }
 
 /// Call this routine to speed up XPath computation on static documents.
@@ -1579,51 +1445,6 @@ mod tests {
                         "{leaks} Leaks are found in xmlXPathCastToString()"
                     );
                     eprintln!(" {}", n_val);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_context_set_cache() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_XPATH_CONTEXT_PTR {
-                for n_active in 0..GEN_NB_INT {
-                    for n_value in 0..GEN_NB_INT {
-                        for n_options in 0..GEN_NB_INT {
-                            let mem_base = xml_mem_blocks();
-                            let ctxt = gen_xml_xpath_context_ptr(n_ctxt, 0);
-                            let active = gen_int(n_active, 1);
-                            let value = gen_int(n_value, 2);
-                            let options = gen_int(n_options, 3);
-
-                            let ret_val = xml_xpath_context_set_cache(ctxt, active, value, options);
-                            desret_int(ret_val);
-                            des_xml_xpath_context_ptr(n_ctxt, ctxt, 0);
-                            des_int(n_active, active, 1);
-                            des_int(n_value, value, 2);
-                            des_int(n_options, options, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlXPathContextSetCache",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                assert!(
-                                    leaks == 0,
-                                    "{leaks} Leaks are found in xmlXPathContextSetCache()"
-                                );
-                                eprint!(" {}", n_ctxt);
-                                eprint!(" {}", n_active);
-                                eprint!(" {}", n_value);
-                                eprintln!(" {}", n_options);
-                            }
-                        }
-                    }
                 }
             }
         }
