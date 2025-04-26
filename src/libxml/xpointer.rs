@@ -44,11 +44,7 @@ use crate::xpath::functions::xml_xpath_id_function;
 #[cfg(feature = "libxml_xptr_locs")]
 use crate::xpath::{XmlNodeSet, XmlXPathParserContext, functions::check_arity};
 #[cfg(feature = "libxml_xptr_locs")]
-use crate::xpath::{
-    XmlXPathObject,
-    internals::{xml_xpath_err, xml_xpath_evaluate_predicate_result},
-    xml_xpath_cmp_nodes,
-};
+use crate::xpath::{XmlXPathObject, internals::xml_xpath_err, xml_xpath_cmp_nodes};
 use crate::{
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     libxml::{
@@ -2865,7 +2861,7 @@ pub unsafe fn xml_xptr_eval_range_predicate(ctxt: XmlXPathParserContextPtr) {
                 // The result of the evaluation need to be tested to
                 // decided whether the filter succeeded or not
                 res = (*ctxt).value_pop();
-                if xml_xpath_evaluate_predicate_result(&*ctxt, &*res) != 0 {
+                if (*ctxt).evaluate_predicate_result(&*res) != 0 {
                     newset.push(loc.clone());
                 }
 

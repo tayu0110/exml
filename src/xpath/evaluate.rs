@@ -24,17 +24,17 @@ use super::{
     functions::{xml_xpath_boolean_function, xml_xpath_number_function},
     xml_xpath_add_values, xml_xpath_cast_to_boolean, xml_xpath_cmp_nodes_ext,
     xml_xpath_compare_values, xml_xpath_div_values, xml_xpath_equal_values, xml_xpath_err,
-    xml_xpath_evaluate_predicate_result, xml_xpath_free_node_set, xml_xpath_free_object,
-    xml_xpath_mod_values, xml_xpath_mult_values, xml_xpath_new_boolean, xml_xpath_new_node_set,
-    xml_xpath_next_ancestor, xml_xpath_next_ancestor_or_self, xml_xpath_next_attribute,
-    xml_xpath_next_child, xml_xpath_next_child_element, xml_xpath_next_descendant,
-    xml_xpath_next_descendant_or_self, xml_xpath_next_following, xml_xpath_next_following_sibling,
-    xml_xpath_next_namespace, xml_xpath_next_parent, xml_xpath_next_preceding_internal,
-    xml_xpath_next_preceding_sibling, xml_xpath_next_self, xml_xpath_node_set_create,
-    xml_xpath_node_set_merge, xml_xpath_node_set_merge_and_clear,
-    xml_xpath_node_set_merge_and_clear_no_dupls, xml_xpath_not_equal_values, xml_xpath_object_copy,
-    xml_xpath_root, xml_xpath_sub_values, xml_xpath_value_flip_sign, xml_xpath_variable_lookup,
-    xml_xpath_variable_lookup_ns, xml_xpath_wrap_node_set,
+    xml_xpath_free_node_set, xml_xpath_free_object, xml_xpath_mod_values, xml_xpath_mult_values,
+    xml_xpath_new_boolean, xml_xpath_new_node_set, xml_xpath_next_ancestor,
+    xml_xpath_next_ancestor_or_self, xml_xpath_next_attribute, xml_xpath_next_child,
+    xml_xpath_next_child_element, xml_xpath_next_descendant, xml_xpath_next_descendant_or_self,
+    xml_xpath_next_following, xml_xpath_next_following_sibling, xml_xpath_next_namespace,
+    xml_xpath_next_parent, xml_xpath_next_preceding_internal, xml_xpath_next_preceding_sibling,
+    xml_xpath_next_self, xml_xpath_node_set_create, xml_xpath_node_set_merge,
+    xml_xpath_node_set_merge_and_clear, xml_xpath_node_set_merge_and_clear_no_dupls,
+    xml_xpath_not_equal_values, xml_xpath_object_copy, xml_xpath_root, xml_xpath_sub_values,
+    xml_xpath_value_flip_sign, xml_xpath_variable_lookup, xml_xpath_variable_lookup_ns,
+    xml_xpath_wrap_node_set,
 };
 
 type StepOpIndex = usize;
@@ -1469,7 +1469,7 @@ impl XmlXPathParserContext {
                             .and_then(|val| val.as_object())
                             .unwrap();
                         if is_predicate {
-                            return xml_xpath_evaluate_predicate_result(self, res_obj);
+                            return self.evaluate_predicate_result(res_obj);
                         }
                         return xml_xpath_cast_to_boolean(res_obj) as i32;
                     }
@@ -1528,7 +1528,7 @@ impl XmlXPathParserContext {
                     // "If the result is a number, the result will be converted
                     //  to true if the number is equal to the context position
                     //  and will be converted to false otherwise;"
-                    xml_xpath_evaluate_predicate_result(self, &*res_obj)
+                    self.evaluate_predicate_result(&*res_obj)
                 } else {
                     xml_xpath_cast_to_boolean(&*res_obj) as i32
                 };
@@ -1536,6 +1536,53 @@ impl XmlXPathParserContext {
                 return res;
             }
 
+            0
+        }
+    }
+
+    /// Evaluate a predicate result for the current node.
+    /// A PredicateExpr is evaluated by evaluating the Expr and converting
+    /// the result to a boolean. If the result is a number, the result will
+    /// be converted to true if the number is equal to the position of the
+    /// context node in the context node list (as returned by the position
+    /// function) and will be converted to false otherwise; if the result
+    /// is not a number, then the result will be converted as if by a call
+    /// to the boolean function.
+    ///
+    /// Returns 1 if predicate is true, 0 otherwise
+    #[doc(alias = "xmlXPathEvaluatePredicateResult")]
+    pub unsafe fn evaluate_predicate_result(&self, res: &XmlXPathObject) -> i32 {
+        unsafe {
+            match res.typ {
+                XmlXPathObjectType::XPathBoolean => {
+                    return res.boolval as i32;
+                }
+                XmlXPathObjectType::XPathNumber => {
+                    return (res.floatval == (*self.context).proximity_position as f64) as i32;
+                }
+                XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
+                    if let Some(nodeset) = res.nodesetval.as_deref() {
+                        return !nodeset.is_empty() as i32;
+                    } else {
+                        return 0;
+                    }
+                }
+                XmlXPathObjectType::XPathString => {
+                    return res.stringval.as_deref().is_some_and(|s| !s.is_empty()) as i32;
+                }
+                #[cfg(feature = "libxml_xptr_locs")]
+                XmlXPathObjectType::XPathLocationset => {
+                    let Some(loc) = res.user.as_ref().and_then(|user| user.as_location_set())
+                    else {
+                        return 0;
+                    };
+
+                    return (!loc.loc_tab.is_empty()) as i32;
+                }
+                _ => {
+                    generic_error!("Internal error at {}:{}\n", file!(), line!());
+                }
+            }
             0
         }
     }

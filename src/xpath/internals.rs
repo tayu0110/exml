@@ -26,12 +26,7 @@
 //
 // Author: daniel@veillard.com
 
-use std::{
-    ffi::{CStr, CString},
-    mem::size_of,
-    os::raw::c_void,
-    ptr::null_mut,
-};
+use std::{mem::size_of, os::raw::c_void, ptr::null_mut};
 
 #[cfg(feature = "libxml_xptr_locs")]
 use crate::libxml::xpointer::XmlLocationSet;
@@ -43,15 +38,14 @@ use crate::{
         chvalid::xml_is_blank_char,
         globals::{xml_free, xml_malloc},
         valid::xml_get_id,
-        xmlstring::{XmlChar, xml_strndup},
     },
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlAttrPtr, XmlDocPtr, XmlDtdPtr, XmlElementType,
         XmlGenericNodePtr, XmlNodePtr, XmlNs, XmlNsPtr,
     },
     xpath::{
-        XML_XPATH_NAN, XmlXPathContextPtr, XmlXPathError, XmlXPathObject, XmlXPathObjectPtr,
-        XmlXPathObjectType, XmlXPathParserContextPtr, XmlXPathVariableLookupFunc,
+        XML_XPATH_NAN, XmlXPathContextPtr, XmlXPathError, XmlXPathObjectPtr, XmlXPathObjectType,
+        XmlXPathParserContextPtr, XmlXPathVariableLookupFunc,
         functions::{cast_to_number, xml_xpath_number_function},
         xml_xpath_cast_node_to_number, xml_xpath_cast_node_to_string,
         xml_xpath_cast_number_to_boolean, xml_xpath_cast_to_number, xml_xpath_free_object,
@@ -1048,55 +1042,6 @@ pub fn xml_xpath_string_eval_number(s: Option<&str>) -> f64 {
     ret * 10.0f64.powi(exponent)
 }
 
-/// Evaluate a predicate result for the current node.
-/// A PredicateExpr is evaluated by evaluating the Expr and converting
-/// the result to a boolean. If the result is a number, the result will
-/// be converted to true if the number is equal to the position of the
-/// context node in the context node list (as returned by the position
-/// function) and will be converted to false otherwise; if the result
-/// is not a number, then the result will be converted as if by a call
-/// to the boolean function.
-///
-/// Returns 1 if predicate is true, 0 otherwise
-#[doc(alias = "xmlXPathEvaluatePredicateResult")]
-pub unsafe fn xml_xpath_evaluate_predicate_result(
-    ctxt: &XmlXPathParserContext,
-    res: &XmlXPathObject,
-) -> i32 {
-    unsafe {
-        match res.typ {
-            XmlXPathObjectType::XPathBoolean => {
-                return res.boolval as i32;
-            }
-            XmlXPathObjectType::XPathNumber => {
-                return (res.floatval == (*ctxt.context).proximity_position as f64) as i32;
-            }
-            XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
-                if let Some(nodeset) = res.nodesetval.as_deref() {
-                    return !nodeset.is_empty() as i32;
-                } else {
-                    return 0;
-                }
-            }
-            XmlXPathObjectType::XPathString => {
-                return res.stringval.as_deref().is_some_and(|s| !s.is_empty()) as i32;
-            }
-            #[cfg(feature = "libxml_xptr_locs")]
-            XmlXPathObjectType::XPathLocationset => {
-                let Some(loc) = res.user.as_ref().and_then(|user| user.as_location_set()) else {
-                    return 0;
-                };
-
-                return (!loc.loc_tab.is_empty()) as i32;
-            }
-            _ => {
-                generic_error!("Internal error at {}:{}\n", file!(), line!());
-            }
-        }
-        0
-    }
-}
-
 /// Function computing the beginning of the string value of the node,
 /// used to speed up comparisons
 ///
@@ -1382,16 +1327,12 @@ unsafe fn xml_xpath_equal_node_set_float(
 ///
 /// Returns an int usable as a hash
 #[doc(alias = "xmlXPathStringHash")]
-unsafe fn xml_xpath_string_hash(string: *const XmlChar) -> u32 {
-    unsafe {
-        if string.is_null() {
-            return 0;
-        }
-        if *string.add(0) == 0 {
-            return 0;
-        }
-        *string.add(0) as u32 + ((*string.add(1) as u32) << 8)
+fn xml_xpath_string_hash(string: &str) -> u32 {
+    if string.is_empty() {
+        return 0;
     }
+    let string = string.as_bytes();
+    string[0] as u32 + ((*string.get(1).unwrap_or(&0) as u32) << 8)
 }
 
 /// Implement the equal operation on XPath objects content: @arg1 == @arg2
@@ -1402,7 +1343,7 @@ unsafe fn xml_xpath_string_hash(string: *const XmlChar) -> u32 {
 ///
 /// Returns 0 or 1 depending on the results of the test.
 #[doc(alias = "xmlXPathEqualNodeSetString")]
-unsafe fn xml_xpath_equal_node_set_string(arg: XmlXPathObjectPtr, str: &str, neq: i32) -> i32 {
+unsafe fn xml_xpath_equal_node_set_string(arg: XmlXPathObjectPtr, s: &str, neq: i32) -> i32 {
     unsafe {
         if arg.is_null()
             || !matches!(
@@ -1418,13 +1359,13 @@ unsafe fn xml_xpath_equal_node_set_string(arg: XmlXPathObjectPtr, str: &str, neq
         let Some(ns) = (*arg).nodesetval.as_deref().filter(|n| !n.is_empty()) else {
             return 0;
         };
-        let cstr = CString::new(str).unwrap();
-        let hash: u32 = xml_xpath_string_hash(cstr.as_ptr() as *const u8);
+
+        let hash: u32 = xml_xpath_string_hash(s);
         for &node in &ns.node_tab {
             if xml_xpath_node_val_hash(Some(node)) == hash {
                 let str2 = node.get_content();
-                if (str2.is_some() && Some(str) == str2.as_deref())
-                    || (str2.is_none() && str.is_empty())
+                if (str2.is_some() && Some(s) == str2.as_deref())
+                    || (str2.is_none() && s.is_empty())
                 {
                     if neq != 0 {
                         continue;
@@ -3098,64 +3039,40 @@ pub unsafe fn xml_xpath_next_preceding_sibling(
 ///
 /// Returns a node-set of selected elements.
 #[doc(alias = "xmlXPathGetElementsByIds")]
-pub(super) unsafe fn xml_xpath_get_elements_by_ids(
+pub(super) fn xml_xpath_get_elements_by_ids(
     doc: XmlDocPtr,
-    mut ids: *const XmlChar,
+    ids: Option<&str>,
 ) -> Option<Box<XmlNodeSet>> {
-    unsafe {
-        let mut cur: *const XmlChar = ids;
-        let mut id: *mut XmlChar;
+    let ids = ids?;
+    let mut ret = xml_xpath_node_set_create(None)?;
 
-        if ids.is_null() {
-            return None;
-        }
-
-        let mut ret = xml_xpath_node_set_create(None)?;
-
-        while xml_is_blank_char(*cur as u32) {
-            cur = cur.add(1);
-        }
-        while *cur != 0 {
-            while !xml_is_blank_char(*cur as u32) && *cur != 0 {
-                cur = cur.add(1);
+    for id in ids
+        .split(|c: char| xml_is_blank_char(c as u32))
+        .filter(|s| !s.is_empty())
+    {
+        // We used to check the fact that the value passed
+        // was an NCName, but this generated much troubles for
+        // me and Aleksey Sanin, people blatantly violated that
+        // constraint, like Visa3D spec.
+        // if (xmlValidateNCName(ID, 1) == 0)
+        if let Some(attr) = xml_get_id(doc, id) {
+            let elem = if let Ok(attr) = attr {
+                attr.parent.map(XmlGenericNodePtr::from)
+            // The following branch can not be reachable
+            // because `xml_get_id` can only return `XmlAttrPtr` or `XmlDocPtr`...
+            // What is the purpose of this branch ???
+            // } else if matches!(attr.element_type(), XmlElementType::XmlElementNode) {
+            //     Some(XmlGenericNodePtr::from(attr))
+            } else {
+                None
+            };
+            // TODO: Check memory error.
+            if let Some(elem) = elem {
+                ret.as_mut().add(elem);
             }
-
-            id = xml_strndup(ids, cur.offset_from(ids) as _);
-            if !id.is_null() {
-                // We used to check the fact that the value passed
-                // was an NCName, but this generated much troubles for
-                // me and Aleksey Sanin, people blatantly violated that
-                // constraint, like Visa3D spec.
-                // if (xmlValidateNCName(ID, 1) == 0)
-                if let Some(attr) = xml_get_id(
-                    doc,
-                    CStr::from_ptr(id as *const i8).to_string_lossy().as_ref(),
-                ) {
-                    let elem = if let Ok(attr) = attr {
-                        attr.parent.map(XmlGenericNodePtr::from)
-                    // The following branch can not be reachable
-                    // because `xml_get_id` can only return `XmlAttrPtr` or `XmlDocPtr`...
-                    // What is the purpose of this branch ???
-                    // } else if matches!(attr.element_type(), XmlElementType::XmlElementNode) {
-                    //     Some(XmlGenericNodePtr::from(attr))
-                    } else {
-                        None
-                    };
-                    // TODO: Check memory error.
-                    if let Some(elem) = elem {
-                        ret.as_mut().add(elem);
-                    }
-                }
-                xml_free(id as _);
-            }
-
-            while xml_is_blank_char(*cur as u32) {
-                cur = cur.add(1);
-            }
-            ids = cur;
         }
-        Some(ret)
     }
+    Some(ret)
 }
 
 /// Namespace nodes in libxml don't match the XPath semantic. In a node set

@@ -1,4 +1,4 @@
-use std::{ffi::CString, iter::repeat, ptr::null_mut};
+use std::iter::repeat;
 
 use crate::{
     libxml::chvalid::xml_is_blank_char,
@@ -279,11 +279,8 @@ pub unsafe fn xml_xpath_id_function(ctxt: &mut XmlXPathParserContext, nargs: usi
             if let Some(nodeset) = (*obj).nodesetval.as_deref() {
                 for &node in &nodeset.node_tab {
                     let tokens = xml_xpath_cast_node_to_string(Some(node));
-                    let tokens = CString::new(tokens).unwrap();
-                    let ns = xml_xpath_get_elements_by_ids(
-                        (*ctxt.context).doc.unwrap(),
-                        tokens.as_ptr() as *const u8,
-                    );
+                    let ns =
+                        xml_xpath_get_elements_by_ids((*ctxt.context).doc.unwrap(), Some(&tokens));
                     // TODO: Check memory error.
                     ret = xml_xpath_node_set_merge(ret, ns.as_deref());
                     xml_xpath_free_node_set(ns);
@@ -297,16 +294,8 @@ pub unsafe fn xml_xpath_id_function(ctxt: &mut XmlXPathParserContext, nargs: usi
         if obj.is_null() {
             return;
         }
-        let strval = (*obj)
-            .stringval
-            .as_deref()
-            .map(|s| CString::new(s).unwrap());
-        let ret = xml_xpath_get_elements_by_ids(
-            (*ctxt.context).doc.unwrap(),
-            strval
-                .as_deref()
-                .map_or(null_mut(), |s| s.as_ptr() as *const u8),
-        );
+        let strval = (*obj).stringval.as_deref();
+        let ret = xml_xpath_get_elements_by_ids((*ctxt.context).doc.unwrap(), strval);
         ctxt.value_push(xml_xpath_wrap_node_set(ret));
         xml_xpath_free_object(obj);
     }
