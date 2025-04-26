@@ -1,4 +1,4 @@
-use std::{cell::RefCell, mem::replace, ptr::null_mut, rc::Rc};
+use std::{mem::replace, ptr::null_mut, rc::Rc};
 
 #[cfg(feature = "libxml_xptr_locs")]
 use crate::libxml::xpointer::XmlLocationSet;
@@ -62,7 +62,7 @@ impl XmlXPathParserContext {
             match () {
                 #[cfg(feature = "libxml_pattern")]
                 _ if comp.is_some() => {
-                    self.comp = Rc::new(RefCell::new(comp.unwrap()));
+                    self.comp = comp.unwrap();
                 }
                 _ => {
                     if !self.context.is_null() {
@@ -79,14 +79,12 @@ impl XmlXPathParserContext {
                         XP_ERROR!(Some(self), XmlXPathError::XPathExprError as i32);
                     }
 
-                    if self.comp.borrow().steps.len() > 1 && self.comp.borrow().last >= 0 {
+                    if self.comp.steps.len() > 1 && self.comp.last >= 0 {
                         if !self.context.is_null() {
                             old_depth = (*self.context).depth;
                         }
-                        let last = self.comp.borrow().last as usize;
-                        let mut comp = self.comp.borrow_mut();
-                        let op = &raw mut comp.steps[last];
-                        drop(comp);
+                        let last = self.comp.last as usize;
+                        let op = &raw mut self.comp.steps[last];
                         self.optimize_expression(op);
                         if !self.context.is_null() {
                             (*self.context).depth = old_depth;
@@ -104,13 +102,13 @@ impl XmlXPathParserContext {
     pub(crate) unsafe fn run_evaluate(&mut self, to_bool: bool) -> i32 {
         unsafe {
             #[cfg(feature = "libxml_pattern")]
-            if self.comp.borrow().stream.is_some() {
+            if self.comp.stream.is_some() {
                 let res: i32;
 
                 if to_bool {
                     // Evaluation to boolean result.
                     res = (*self.context).run_stream_eval(
-                        self.comp.borrow().stream.as_deref().unwrap(),
+                        self.comp.stream.as_deref().unwrap(),
                         null_mut(),
                         1,
                     );
@@ -122,7 +120,7 @@ impl XmlXPathParserContext {
 
                     // Evaluation to a sequence.
                     res = (*self.context).run_stream_eval(
-                        self.comp.borrow().stream.as_deref().unwrap(),
+                        self.comp.stream.as_deref().unwrap(),
                         &raw mut res_obj,
                         0,
                     );
@@ -139,22 +137,18 @@ impl XmlXPathParserContext {
                 // if res == -1. Is this intended?
             }
 
-            if self.comp.borrow().last < 0 {
+            if self.comp.last < 0 {
                 generic_error!("xmlXPathRunEval: last is less than zero\n");
                 return -1;
             }
             let old_depth: i32 = (*self.context).depth;
             if to_bool {
-                let last = self.comp.borrow().last as usize;
-                let mut comp = self.comp.borrow_mut();
-                let op = &raw mut comp.steps[last];
-                drop(comp);
+                let last = self.comp.last as usize;
+                let op = &raw mut self.comp.steps[last];
                 return self.evaluate_precompiled_operation_to_boolean(op, false);
             } else {
-                let last = self.comp.borrow().last as usize;
-                let mut comp = self.comp.borrow_mut();
-                let op = &raw mut comp.steps[last];
-                drop(comp);
+                let last = self.comp.last as usize;
+                let op = &raw mut self.comp.steps[last];
                 self.evaluate_precompiled_operation(op);
             }
             (*self.context).depth = old_depth;
@@ -191,9 +185,7 @@ impl XmlXPathParserContext {
             match (*op).op {
                 XmlXPathOp::XPathOpEnd => {}
                 XmlXPathOp::XPathOpAnd => 'to_break: {
-                    let mut comp = self.comp.borrow_mut();
-                    let op1 = &raw mut comp.steps[(*op).ch1 as usize];
-                    drop(comp);
+                    let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
                     total += self.evaluate_precompiled_operation(op1);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
@@ -203,9 +195,7 @@ impl XmlXPathParserContext {
                         break 'to_break;
                     }
                     arg2 = self.value_pop();
-                    let mut comp = self.comp.borrow_mut();
-                    let op2 = &raw mut comp.steps[(*op).ch2 as usize];
-                    drop(comp);
+                    let op2 = &raw mut self.comp.steps[(*op).ch2 as usize];
                     total += self.evaluate_precompiled_operation(op2);
                     if self.error != 0 {
                         xml_xpath_free_object(arg2);
@@ -218,9 +208,7 @@ impl XmlXPathParserContext {
                     xml_xpath_release_object(self.context, arg2);
                 }
                 XmlXPathOp::XPathOpOr => 'to_break: {
-                    let mut comp = self.comp.borrow_mut();
-                    let op1 = &raw mut comp.steps[(*op).ch1 as usize];
-                    drop(comp);
+                    let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
                     total += self.evaluate_precompiled_operation(op1);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
@@ -230,9 +218,7 @@ impl XmlXPathParserContext {
                         break 'to_break;
                     }
                     arg2 = self.value_pop();
-                    let mut comp = self.comp.borrow_mut();
-                    let op2 = &raw mut comp.steps[(*op).ch2 as usize];
-                    drop(comp);
+                    let op2 = &raw mut self.comp.steps[(*op).ch2 as usize];
                     total += self.evaluate_precompiled_operation(op2);
                     if self.error != 0 {
                         xml_xpath_free_object(arg2);
@@ -245,16 +231,12 @@ impl XmlXPathParserContext {
                     xml_xpath_release_object(self.context, arg2);
                 }
                 XmlXPathOp::XPathOpEqual => {
-                    let mut comp = self.comp.borrow_mut();
-                    let op1 = &raw mut comp.steps[(*op).ch1 as usize];
-                    drop(comp);
+                    let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
                     total += self.evaluate_precompiled_operation(op1);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
-                    let mut comp = self.comp.borrow_mut();
-                    let op2 = &raw mut comp.steps[(*op).ch2 as usize];
-                    drop(comp);
+                    let op2 = &raw mut self.comp.steps[(*op).ch2 as usize];
                     total += self.evaluate_precompiled_operation(op2);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
@@ -267,16 +249,12 @@ impl XmlXPathParserContext {
                     self.value_push(xml_xpath_cache_new_boolean(self.context, equal != 0));
                 }
                 XmlXPathOp::XPathOpCmp => {
-                    let mut comp = self.comp.borrow_mut();
-                    let op1 = &raw mut comp.steps[(*op).ch1 as usize];
-                    drop(comp);
+                    let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
                     total += self.evaluate_precompiled_operation(op1);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
-                    let mut comp = self.comp.borrow_mut();
-                    let op2 = &raw mut comp.steps[(*op).ch2 as usize];
-                    drop(comp);
+                    let op2 = &raw mut self.comp.steps[(*op).ch2 as usize];
                     total += self.evaluate_precompiled_operation(op2);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
@@ -285,17 +263,13 @@ impl XmlXPathParserContext {
                     self.value_push(xml_xpath_cache_new_boolean(self.context, ret != 0));
                 }
                 XmlXPathOp::XPathOpPlus => {
-                    let mut comp = self.comp.borrow_mut();
-                    let op1 = &raw mut comp.steps[(*op).ch1 as usize];
-                    drop(comp);
+                    let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
                     total += self.evaluate_precompiled_operation(op1);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
                     if (*op).ch2 != -1 {
-                        let mut comp = self.comp.borrow_mut();
-                        let op2 = &raw mut comp.steps[(*op).ch2 as usize];
-                        drop(comp);
+                        let op2 = &raw mut self.comp.steps[(*op).ch2 as usize];
                         total += self.evaluate_precompiled_operation(op2);
                     }
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
@@ -324,16 +298,12 @@ impl XmlXPathParserContext {
                     }
                 }
                 XmlXPathOp::XPathOpMult => {
-                    let mut comp = self.comp.borrow_mut();
-                    let op1 = &raw mut comp.steps[(*op).ch1 as usize];
-                    drop(comp);
+                    let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
                     total += self.evaluate_precompiled_operation(op1);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
-                    let mut comp = self.comp.borrow_mut();
-                    let op2 = &raw mut comp.steps[(*op).ch2 as usize];
-                    drop(comp);
+                    let op2 = &raw mut self.comp.steps[(*op).ch2 as usize];
                     total += self.evaluate_precompiled_operation(op2);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
@@ -347,16 +317,12 @@ impl XmlXPathParserContext {
                     }
                 }
                 XmlXPathOp::XPathOpUnion => 'to_break: {
-                    let mut comp = self.comp.borrow_mut();
-                    let op1 = &raw mut comp.steps[(*op).ch1 as usize];
-                    drop(comp);
+                    let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
                     total += self.evaluate_precompiled_operation(op1);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
-                    let mut comp = self.comp.borrow_mut();
-                    let op2 = &raw mut comp.steps[(*op).ch2 as usize];
-                    drop(comp);
+                    let op2 = &raw mut self.comp.steps[(*op).ch2 as usize];
                     total += self.evaluate_precompiled_operation(op2);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
@@ -409,18 +375,14 @@ impl XmlXPathParserContext {
                 }
                 XmlXPathOp::XPathOpNode => {
                     if (*op).ch1 != -1 {
-                        let mut comp = self.comp.borrow_mut();
-                        let op1 = &raw mut comp.steps[(*op).ch1 as usize];
-                        drop(comp);
+                        let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
                         total += self.evaluate_precompiled_operation(op1);
                     }
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
                     if (*op).ch2 != -1 {
-                        let mut comp = self.comp.borrow_mut();
-                        let op2 = &raw mut comp.steps[(*op).ch2 as usize];
-                        drop(comp);
+                        let op2 = &raw mut self.comp.steps[(*op).ch2 as usize];
                         total += self.evaluate_precompiled_operation(op2);
                     }
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
@@ -435,9 +397,7 @@ impl XmlXPathParserContext {
                     if (*op).ch1 == -1 {
                         break 'to_break;
                     }
-                    let mut comp = self.comp.borrow_mut();
-                    let op1 = &raw mut comp.steps[(*op).ch1 as usize];
-                    drop(comp);
+                    let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
                     total += self.evaluate_precompiled_operation(op1);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
@@ -454,9 +414,7 @@ impl XmlXPathParserContext {
                 XmlXPathOp::XPathOpVariable => 'to_break: {
                     let val: XmlXPathObjectPtr;
                     if (*op).ch1 != -1 {
-                        let mut comp = self.comp.borrow_mut();
-                        let op1 = &raw mut comp.steps[(*op).ch1 as usize];
-                        drop(comp);
+                        let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
                         total += self.evaluate_precompiled_operation(op1);
                     }
                     if let Some(value5) = (*op).value5.as_ref().and_then(|val| val.as_str()) {
@@ -497,9 +455,7 @@ impl XmlXPathParserContext {
                     let func: XmlXPathFunction;
                     let frame = self.value_tab.len();
                     if (*op).ch1 != -1 {
-                        let mut comp = self.comp.borrow_mut();
-                        let op1 = &raw mut comp.steps[(*op).ch1 as usize];
-                        drop(comp);
+                        let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
                         total += self.evaluate_precompiled_operation(op1);
                         if self.error != XmlXPathError::XPathExpressionOK as i32 {
                             break 'to_break;
@@ -569,18 +525,14 @@ impl XmlXPathParserContext {
                 }
                 XmlXPathOp::XPathOpArg => {
                     if (*op).ch1 != -1 {
-                        let mut comp = self.comp.borrow_mut();
-                        let op1 = &raw mut comp.steps[(*op).ch1 as usize];
-                        drop(comp);
+                        let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
                         total += self.evaluate_precompiled_operation(op1);
                         if self.error != XmlXPathError::XPathExpressionOK as i32 {
                             return 0;
                         };
                     }
                     if (*op).ch2 != -1 {
-                        let mut comp = self.comp.borrow_mut();
-                        let op2 = &raw mut comp.steps[(*op).ch2 as usize];
-                        drop(comp);
+                        let op2 = &raw mut self.comp.steps[(*op).ch2 as usize];
                         total += self.evaluate_precompiled_operation(op2);
                         if self.error != XmlXPathError::XPathExpressionOK as i32 {
                             return 0;
@@ -599,15 +551,15 @@ impl XmlXPathParserContext {
                         // to assume anything, so it would be more robust and
                         // easier to optimize.
                         && (matches!(
-                            self.comp.borrow().steps[(*op).ch1 as usize].op,
+                            self.comp.steps[(*op).ch1 as usize].op,
                             XmlXPathOp::XPathOpSort // 18
                         ) || matches!(
-                            self.comp.borrow().steps[(*op).ch1 as usize].op,
+                            self.comp.steps[(*op).ch1 as usize].op,
                             XmlXPathOp::XPathOpFilter // 17
                         )) && matches!(
-                            self.comp.borrow().steps[(*op).ch2 as usize].op,
+                            self.comp.steps[(*op).ch2 as usize].op,
                             XmlXPathOp::XPathOpValue // 12
-                        ) && self.comp.borrow().steps[(*op).ch2 as usize]
+                        ) && self.comp.steps[(*op).ch2 as usize]
                             .value4
                             .as_ref()
                             .and_then(|val| val.as_object())
@@ -617,9 +569,7 @@ impl XmlXPathParserContext {
                     {
                         let mut first = None;
 
-                        let mut comp = self.comp.borrow_mut();
-                        let op1 = &raw mut comp.steps[(*op).ch1 as usize];
-                        drop(comp);
+                        let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
                         total += self.evaluate_precompiled_operation_first(op1, &mut first);
                         if self.error != XmlXPathError::XPathExpressionOK as i32 {
                             return 0;
@@ -643,24 +593,21 @@ impl XmlXPathParserContext {
                     if (*op).ch1 != -1
                         && (*op).ch2 != -1
                         && matches!(
-                            self.comp.borrow().steps[(*op).ch1 as usize].op,
+                            self.comp.steps[(*op).ch1 as usize].op,
                             XmlXPathOp::XPathOpSort
                         )
                         && matches!(
-                            self.comp.borrow().steps[(*op).ch2 as usize].op,
+                            self.comp.steps[(*op).ch2 as usize].op,
                             XmlXPathOp::XPathOpSort
                         )
                     {
-                        let f: i32 = self.comp.borrow().steps[(*op).ch2 as usize].ch1;
+                        let f: i32 = self.comp.steps[(*op).ch2 as usize].ch1;
 
                         if f != -1
-                            && matches!(
-                                self.comp.borrow().steps[f as usize].op,
-                                XmlXPathOp::XPathOpFunction
-                            )
-                            && self.comp.borrow().steps[f as usize].value5.is_none()
-                            && self.comp.borrow().steps[f as usize].value == 0
-                            && self.comp.borrow().steps[f as usize]
+                            && matches!(self.comp.steps[f as usize].op, XmlXPathOp::XPathOpFunction)
+                            && self.comp.steps[f as usize].value5.is_none()
+                            && self.comp.steps[f as usize].value == 0
+                            && self.comp.steps[f as usize]
                                 .value4
                                 .as_ref()
                                 .and_then(|val| val.as_str())
@@ -668,9 +615,7 @@ impl XmlXPathParserContext {
                         {
                             let mut last = None;
 
-                            let mut comp = self.comp.borrow_mut();
-                            let op1 = &raw mut comp.steps[(*op).ch1 as usize];
-                            drop(comp);
+                            let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
                             total += self.evaluate_precompiled_operation_last(op1, &mut last);
                             if self.error != XmlXPathError::XPathExpressionOK as i32 {
                                 return 0;
@@ -700,9 +645,7 @@ impl XmlXPathParserContext {
                     //           NODE
                     //     ELEM Object is a number : 1
                     if (*op).ch1 != -1 {
-                        let mut comp = self.comp.borrow_mut();
-                        let op1 = &raw mut comp.steps[(*op).ch1 as usize];
-                        drop(comp);
+                        let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
                         total += self.evaluate_precompiled_operation(op1);
                     }
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
@@ -757,9 +700,7 @@ impl XmlXPathParserContext {
                 }
                 XmlXPathOp::XPathOpSort => {
                     if (*op).ch1 != -1 {
-                        let mut comp = self.comp.borrow_mut();
-                        let op1 = &raw mut comp.steps[(*op).ch1 as usize];
-                        drop(comp);
+                        let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
                         total += self.evaluate_precompiled_operation(op1);
                     }
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
@@ -789,9 +730,7 @@ impl XmlXPathParserContext {
                     let oldpp: i32 = (*self.context).proximity_position;
 
                     if (*op).ch1 != -1 {
-                        let mut comp = self.comp.borrow_mut();
-                        let op1 = &raw mut comp.steps[(*op).ch1 as usize];
-                        drop(comp);
+                        let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
                         total += self.evaluate_precompiled_operation(op1);
                         if self.error != XmlXPathError::XPathExpressionOK as i32 {
                             return 0;
@@ -853,9 +792,7 @@ impl XmlXPathParserContext {
                                 self.value_push(tmp);
 
                                 if (*op).ch2 != -1 {
-                                    let mut comp = self.comp.borrow_mut();
-                                    let op2 = &raw mut comp.steps[(*op).ch2 as usize];
-                                    drop(comp);
+                                    let op2 = &raw mut self.comp.steps[(*op).ch2 as usize];
                                     total += self.evaluate_precompiled_operation(op2);
                                 }
                                 if self.error != XmlXPathError::XPathExpressionOK as i32 {
@@ -931,9 +868,7 @@ impl XmlXPathParserContext {
                                     self.value_push(tmp);
 
                                     if (*op).ch2 != -1 {
-                                        let mut comp = self.comp.borrow_mut();
-                                        let op2 = &raw mut comp.steps[(*op).ch2 as usize];
-                                        drop(comp);
+                                        let op2 = &raw mut self.comp.steps[(*op).ch2 as usize];
                                         total += self.evaluate_precompiled_operation(op2);
                                     }
                                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
@@ -1006,9 +941,7 @@ impl XmlXPathParserContext {
             match (*op).op {
                 XmlXPathOp::XPathOpEnd => {}
                 XmlXPathOp::XPathOpUnion => {
-                    let mut comp = self.comp.borrow_mut();
-                    let op1 = &raw mut comp.steps[(*op).ch1 as usize];
-                    drop(comp);
+                    let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
                     total = self.evaluate_precompiled_operation_first(op1, first);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
@@ -1034,9 +967,7 @@ impl XmlXPathParserContext {
                             *first = Some(nodeset.node_tab[0]);
                         }
                     }
-                    let mut comp = self.comp.borrow_mut();
-                    let op2 = &raw mut comp.steps[(*op).ch2 as usize];
-                    drop(comp);
+                    let op2 = &raw mut self.comp.steps[(*op).ch2 as usize];
                     cur = self.evaluate_precompiled_operation_first(op2, first);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
@@ -1086,18 +1017,14 @@ impl XmlXPathParserContext {
                 }
                 XmlXPathOp::XPathOpNode => {
                     if (*op).ch1 != -1 {
-                        let mut comp = self.comp.borrow_mut();
-                        let op1 = &raw mut comp.steps[(*op).ch1 as usize];
-                        drop(comp);
+                        let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
                         total += self.evaluate_precompiled_operation(op1);
                     }
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
                     if (*op).ch2 != -1 {
-                        let mut comp = self.comp.borrow_mut();
-                        let op2 = &raw mut comp.steps[(*op).ch2 as usize];
-                        drop(comp);
+                        let op2 = &raw mut self.comp.steps[(*op).ch2 as usize];
                         total += self.evaluate_precompiled_operation(op2);
                     }
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
@@ -1112,9 +1039,7 @@ impl XmlXPathParserContext {
                     if (*op).ch1 == -1 {
                         // break;
                     } else {
-                        let mut comp = self.comp.borrow_mut();
-                        let op1 = &raw mut comp.steps[(*op).ch1 as usize];
-                        drop(comp);
+                        let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
                         total = self.evaluate_precompiled_operation(op1);
                         if self.error != XmlXPathError::XPathExpressionOK as i32 {
                             return 0;
@@ -1134,9 +1059,7 @@ impl XmlXPathParserContext {
                 }
                 XmlXPathOp::XPathOpSort => {
                     if (*op).ch1 != -1 {
-                        let mut comp = self.comp.borrow_mut();
-                        let op1 = &raw mut comp.steps[(*op).ch1 as usize];
-                        drop(comp);
+                        let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
                         total += self.evaluate_precompiled_operation_first(op1, first);
                     }
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
@@ -1201,9 +1124,7 @@ impl XmlXPathParserContext {
             match (*op).op {
                 XmlXPathOp::XPathOpEnd => {}
                 XmlXPathOp::XPathOpUnion => {
-                    let mut comp = self.comp.borrow_mut();
-                    let op1 = &raw mut comp.steps[(*op).ch1 as usize];
-                    drop(comp);
+                    let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
                     total = self.evaluate_precompiled_operation_last(op1, last);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
@@ -1222,9 +1143,7 @@ impl XmlXPathParserContext {
                             }
                         }
                     }
-                    let mut comp = self.comp.borrow_mut();
-                    let op2 = &raw mut comp.steps[(*op).ch2 as usize];
-                    drop(comp);
+                    let op2 = &raw mut self.comp.steps[(*op).ch2 as usize];
                     cur = self.evaluate_precompiled_operation_last(op2, last);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
@@ -1284,18 +1203,14 @@ impl XmlXPathParserContext {
                 }
                 XmlXPathOp::XPathOpNode => {
                     if (*op).ch1 != -1 {
-                        let mut comp = self.comp.borrow_mut();
-                        let op1 = &raw mut comp.steps[(*op).ch1 as usize];
-                        drop(comp);
+                        let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
                         total += self.evaluate_precompiled_operation(op1);
                     }
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
                     if (*op).ch2 != -1 {
-                        let mut comp = self.comp.borrow_mut();
-                        let op2 = &raw mut comp.steps[(*op).ch2 as usize];
-                        drop(comp);
+                        let op2 = &raw mut self.comp.steps[(*op).ch2 as usize];
                         total += self.evaluate_precompiled_operation(op2);
                     }
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
@@ -1310,9 +1225,7 @@ impl XmlXPathParserContext {
                     if (*op).ch1 == -1 {
                         // break;
                     } else {
-                        let mut comp = self.comp.borrow_mut();
-                        let op1 = &raw mut comp.steps[(*op).ch1 as usize];
-                        drop(comp);
+                        let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
                         total += self.evaluate_precompiled_operation(op1);
                         if self.error != XmlXPathError::XPathExpressionOK as i32 {
                             return 0;
@@ -1332,9 +1245,7 @@ impl XmlXPathParserContext {
                 }
                 XmlXPathOp::XPathOpSort => {
                     if (*op).ch1 != -1 {
-                        let mut comp = self.comp.borrow_mut();
-                        let op1 = &raw mut comp.steps[(*op).ch1 as usize];
-                        drop(comp);
+                        let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
                         total += self.evaluate_precompiled_operation_last(op1, last);
                     }
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
@@ -1379,24 +1290,21 @@ impl XmlXPathParserContext {
             if (*op).ch1 != -1
                 && (*op).ch2 != -1
                 && matches!(
-                    self.comp.borrow().steps[(*op).ch1 as usize].op,
+                    self.comp.steps[(*op).ch1 as usize].op,
                     XmlXPathOp::XPathOpSort
                 )
                 && matches!(
-                    self.comp.borrow().steps[(*op).ch2 as usize].op,
+                    self.comp.steps[(*op).ch2 as usize].op,
                     XmlXPathOp::XPathOpSort
                 )
             {
-                let f: i32 = self.comp.borrow().steps[(*op).ch2 as usize].ch1;
+                let f: i32 = self.comp.steps[(*op).ch2 as usize].ch1;
 
                 if f != -1
-                    && matches!(
-                        self.comp.borrow().steps[f as usize].op,
-                        XmlXPathOp::XPathOpFunction
-                    )
-                    && self.comp.borrow().steps[f as usize].value5.is_none()
-                    && self.comp.borrow().steps[f as usize].value == 0
-                    && self.comp.borrow().steps[f as usize]
+                    && matches!(self.comp.steps[f as usize].op, XmlXPathOp::XPathOpFunction)
+                    && self.comp.steps[f as usize].value5.is_none()
+                    && self.comp.steps[f as usize].value == 0
+                    && self.comp.steps[f as usize]
                         .value4
                         .as_ref()
                         .and_then(|val| val.as_str())
@@ -1404,9 +1312,7 @@ impl XmlXPathParserContext {
                 {
                     let mut last = None;
 
-                    let mut comp = self.comp.borrow_mut();
-                    let op1 = &raw mut comp.steps[(*op).ch1 as usize];
-                    drop(comp);
+                    let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
                     total += self.evaluate_precompiled_operation_last(op1, &mut last);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
@@ -1431,9 +1337,7 @@ impl XmlXPathParserContext {
             }
 
             if (*op).ch1 != -1 {
-                let mut comp = self.comp.borrow_mut();
-                let op1 = &raw mut comp.steps[(*op).ch1 as usize];
-                drop(comp);
+                let op1 = &raw mut self.comp.steps[(*op).ch1 as usize];
                 total += self.evaluate_precompiled_operation(op1);
             }
             if self.error != XmlXPathError::XPathExpressionOK as i32 {
@@ -1531,7 +1435,7 @@ impl XmlXPathParserContext {
                     XmlXPathOp::XPathOpSort => {
                         // We don't need sorting for boolean results. Skip this one.
                         if (*op).ch1 != -1 {
-                            op = &raw mut self.comp.borrow_mut().steps[(*op).ch1 as usize];
+                            op = &raw mut self.comp.steps[(*op).ch1 as usize];
                             // goto start;
                             continue;
                         }
@@ -1542,9 +1446,7 @@ impl XmlXPathParserContext {
                             return 0;
                         }
 
-                        let mut comp = self.comp.borrow_mut();
-                        let step = &raw mut comp.steps[(*op).ch1 as usize];
-                        drop(comp);
+                        let step = &raw mut self.comp.steps[(*op).ch1 as usize];
                         self.evaluate_precompiled_operation(step);
                         if self.error != XmlXPathError::XPathExpressionOK as i32 {
                             return -1;

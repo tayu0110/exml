@@ -2461,7 +2461,7 @@ unsafe fn test_xpath(xpath: &str, xptr: i32, expr: i32) {
                 /* res = xmlXPathEval(str, ctxt); */
 
                 if let Some(comp) = xml_xpath_compile(xpath) {
-                    res = xml_xpath_compiled_eval(Rc::new(RefCell::new(comp)), ctxt);
+                    res = xml_xpath_compiled_eval(comp, ctxt);
                 } else {
                     res = null_mut();
                 }

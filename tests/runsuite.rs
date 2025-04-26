@@ -3,12 +3,10 @@
 
 use std::{
     borrow::Cow,
-    cell::RefCell,
     env::args,
     ffi::{CStr, CString, c_char, c_int},
     fs::{File, metadata},
     ptr::null_mut,
-    rc::Rc,
     sync::{
         Mutex,
         atomic::{AtomicI32, AtomicPtr, AtomicUsize, Ordering},
@@ -238,10 +236,8 @@ unsafe fn get_next(cur: Option<XmlNodePtr>, xpath: &str) -> Option<XmlNodePtr> {
             eprintln!("Failed to compile {}", xpath);
             return None;
         };
-        let res: XmlXPathObjectPtr = xml_xpath_compiled_eval(
-            Rc::new(RefCell::new(comp)),
-            CTXT_XPATH.load(Ordering::Relaxed),
-        );
+        let res: XmlXPathObjectPtr =
+            xml_xpath_compiled_eval(comp, CTXT_XPATH.load(Ordering::Relaxed));
         if res.is_null() {
             return None;
         }
@@ -267,10 +263,8 @@ unsafe fn get_string(cur: XmlNodePtr, xpath: &str) -> Option<String> {
             eprintln!("Failed to compile {}", xpath);
             return None;
         };
-        let res: XmlXPathObjectPtr = xml_xpath_compiled_eval(
-            Rc::new(RefCell::new(comp)),
-            CTXT_XPATH.load(Ordering::Relaxed),
-        );
+        let res: XmlXPathObjectPtr =
+            xml_xpath_compiled_eval(comp, CTXT_XPATH.load(Ordering::Relaxed));
         if res.is_null() {
             return None;
         }

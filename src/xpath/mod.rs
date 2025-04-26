@@ -53,7 +53,6 @@ pub mod object;
 
 use std::{
     borrow::Cow,
-    cell::RefCell,
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of_mut, null_mut},
@@ -944,7 +943,7 @@ pub unsafe fn xml_xpath_ctxt_compile(
     ctxt: XmlXPathContextPtr,
     xpath: &str,
 ) -> Option<XmlXPathCompExpr> {
-    use std::{mem::take, rc::Rc};
+    use std::mem::take;
 
     unsafe {
         let mut old_depth: i32 = 0;
@@ -981,14 +980,11 @@ pub unsafe fn xml_xpath_ctxt_compile(
             None
         } else {
             // comp = pctxt.comp;
-            if pctxt.comp.borrow().steps.len() > 1 && pctxt.comp.borrow().last >= 0 {
+            if pctxt.comp.steps.len() > 1 && pctxt.comp.last >= 0 {
                 if !ctxt.is_null() {
                     old_depth = (*ctxt).depth;
                 }
-                let last = pctxt.comp.borrow().last as usize;
-                let mut comp = pctxt.comp.borrow_mut();
-                let op = &raw mut comp.steps[last];
-                drop(comp);
+                let op = &raw mut pctxt.comp.steps[pctxt.comp.last as usize];
                 pctxt.optimize_expression(op);
                 if !ctxt.is_null() {
                     (*ctxt).depth = old_depth;
@@ -999,9 +995,9 @@ pub unsafe fn xml_xpath_ctxt_compile(
         };
 
         if let Some(comp) = comp.as_mut() {
-            comp.borrow_mut().expr = xpath.into();
+            comp.expr = xpath.into();
         }
-        comp.map(|comp| Rc::into_inner(comp).unwrap().into_inner())
+        comp
     }
 }
 
@@ -1012,7 +1008,7 @@ pub unsafe fn xml_xpath_ctxt_compile(
 /// The caller has to free the object.
 #[doc(alias = "xmlXPathCompiledEvalInternal")]
 unsafe fn xml_xpath_compiled_eval_internal(
-    comp: Rc<RefCell<XmlXPathCompExpr>>,
+    comp: XmlXPathCompExpr,
     ctxt: XmlXPathContextPtr,
     res_obj_ptr: *mut XmlXPathObjectPtr,
     to_bool: bool,
@@ -1084,7 +1080,7 @@ unsafe fn xml_xpath_compiled_eval_internal(
 #[doc(alias = "xmlXPathCompiledEval")]
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_xpath_compiled_eval(
-    comp: Rc<RefCell<XmlXPathCompExpr>>,
+    comp: XmlXPathCompExpr,
     ctx: XmlXPathContextPtr,
 ) -> XmlXPathObjectPtr {
     unsafe {
@@ -1103,7 +1099,7 @@ pub unsafe fn xml_xpath_compiled_eval(
 #[doc(alias = "xmlXPathCompiledEvalToBoolean")]
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_xpath_compiled_eval_to_boolean(
-    comp: Rc<RefCell<XmlXPathCompExpr>>,
+    comp: XmlXPathCompExpr,
     ctxt: XmlXPathContextPtr,
 ) -> i32 {
     unsafe { xml_xpath_compiled_eval_internal(comp, ctxt, null_mut(), true) }

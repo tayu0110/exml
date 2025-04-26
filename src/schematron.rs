@@ -276,21 +276,8 @@ enum XmlSchematronTestType {
 pub struct XmlSchematronLet {
     next: Option<Box<XmlSchematronLet>>, /* the next let variable in the list */
     name: String,                        /* the name of the variable */
-    comp: Rc<RefCell<XmlXPathCompExpr>>, /* the compiled expression */
+    comp: XmlXPathCompExpr,              /* the compiled expression */
 }
-
-// impl Drop for XmlSchematronLet {
-//     /// Free a list of let variables.
-//     #[doc(alias = "xmlSchematronFreeLets")]
-//     fn drop(&mut self) {
-//         self.next.take();
-//         unsafe {
-//             if !self.comp.is_null() {
-//                 xml_xpath_free_comp_expr(self.comp);
-//             }
-//         }
-//     }
-// }
 
 /// A Schematrons test, either an assert or a report
 #[doc(alias = "xmlSchematronTest")]
@@ -300,22 +287,9 @@ pub struct XmlSchematronTest {
     typ: XmlSchematronTestType,           /* the test type */
     node: XmlNodePtr,                     /* the node in the tree */
     test: String,                         /* the expression to test */
-    comp: Rc<RefCell<XmlXPathCompExpr>>,  /* the compiled expression */
+    comp: XmlXPathCompExpr,               /* the compiled expression */
     report: Option<String>,               /* the message to report */
 }
-
-// impl Drop for XmlSchematronTest {
-//     /// Free a list of tests.
-//     #[doc(alias = "xmlSchematronFreeTests")]
-//     fn drop(&mut self) {
-//         self.next.take();
-//         unsafe {
-//             if !self.comp.is_null() {
-//                 xml_xpath_free_comp_expr(self.comp);
-//             }
-//         }
-//     }
-// }
 
 /// A Schematrons rule
 #[doc(alias = "xmlSchematronRule")]
@@ -550,8 +524,7 @@ impl<'a> XmlSchematronValidCtxt<'a> {
                         .get_no_ns_prop("select")
                         .and_then(|select| xml_xpath_ctxt_compile(self.xctxt, &select))
                         .unwrap();
-                    let eval: XmlXPathObjectPtr =
-                        xml_xpath_compiled_eval(Rc::new(RefCell::new(comp)), self.xctxt);
+                    let eval: XmlXPathObjectPtr = xml_xpath_compiled_eval(comp, self.xctxt);
 
                     match (*eval).typ {
                         XmlXPathObjectType::XPathNodeset => {
@@ -1175,7 +1148,7 @@ impl<'a> XmlSchematronParserCtxt<'a> {
                 next: None,
                 node,
                 test: test.to_owned(),
-                comp: Rc::new(RefCell::new(comp)),
+                comp,
                 report: report.map(|report| report.to_owned()),
             });
             if let Some(mut prev) = rule.tests.as_deref_mut() {
@@ -1289,7 +1262,7 @@ impl<'a> XmlSchematronParserCtxt<'a> {
                     let letr = Box::new(XmlSchematronLet {
                         name,
                         next: ruleptr.borrow_mut().lets.take(),
-                        comp: Rc::new(RefCell::new(var_comp)),
+                        comp: var_comp,
                     });
                     ruleptr.borrow_mut().lets = Some(letr);
                 } else if is_schematron(cur_node, "assert") {

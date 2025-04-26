@@ -29,7 +29,7 @@
 //
 // Author: daniel@veillard.com
 
-use std::{borrow::Cow, cell::RefCell, collections::HashMap, ffi::c_void, ptr::null_mut, rc::Rc};
+use std::{borrow::Cow, collections::HashMap, ffi::c_void, ptr::null_mut, rc::Rc};
 
 use crate::{
     error::XmlError,
@@ -75,8 +75,8 @@ pub struct XmlXPathParserContext {
     pub(crate) context: XmlXPathContextPtr, /* the evaluation context */
     pub(crate) value_tab: Vec<XmlXPathObjectPtr>, /* stack of values */
 
-    pub(crate) comp: Rc<RefCell<XmlXPathCompExpr>>, /* the precompiled expression */
-    pub(crate) xptr: i32,                           /* it this an XPointer expression */
+    pub(crate) comp: XmlXPathCompExpr, /* the precompiled expression */
+    pub(crate) xptr: i32,              /* it this an XPointer expression */
     pub(crate) ancestor: Option<XmlGenericNodePtr>, /* used for walking preceding axis */
 
     pub(crate) value_frame: i32, /* unused */
@@ -100,7 +100,7 @@ impl XmlXPathParserContext {
     /// Returns the xmlXPathParserContext just allocated.
     #[doc(alias = "xmlXPathCompParserContext")]
     pub(super) fn from_compiled_expression(
-        comp: Rc<RefCell<XmlXPathCompExpr>>,
+        comp: XmlXPathCompExpr,
         ctxt: XmlXPathContextPtr,
     ) -> Option<Self> {
         let mut ret = XmlXPathParserContext::default();
@@ -175,10 +175,10 @@ impl XmlXPathParserContext {
             return 0;
         }
 
-        if op.ch2 == -1 || op.ch2 >= self.comp.borrow().steps.len() as i32 {
+        if op.ch2 == -1 || op.ch2 >= self.comp.steps.len() as i32 {
             return 0;
         }
-        let expr_op = &self.comp.borrow().steps[op.ch2 as usize];
+        let expr_op = &self.comp.steps[op.ch2 as usize];
 
         if let Some(obj) = expr_op
             .value4
@@ -380,7 +380,7 @@ impl Default for XmlXPathParserContext {
             error: 0,
             context: null_mut(),
             value_tab: vec![],
-            comp: Rc::new(RefCell::new(Default::default())),
+            comp: Default::default(),
             xptr: 0,
             ancestor: None,
             value_frame: 0,

@@ -1321,9 +1321,7 @@ pub(super) unsafe fn xml_xpath_node_set_filter(
                 (*xpctxt).doc = node.document();
             }
 
-            let mut comp = ctxt.comp.borrow_mut();
-            let op = &raw mut comp.steps[filter_op_index as usize];
-            drop(comp);
+            let op = &raw mut ctxt.comp.steps[filter_op_index as usize];
             let res = ctxt.evaluate_precompiled_operation_to_boolean(op, true);
 
             if ctxt.error != XmlXPathError::XPathExpressionOK as i32 {
@@ -1399,7 +1397,7 @@ unsafe fn xml_xpath_comp_op_eval_predicate(
         if (*op).ch1 != -1 {
             // Process inner predicates first.
             if !matches!(
-                ctxt.comp.borrow().steps[(*op).ch1 as usize].op,
+                ctxt.comp.steps[(*op).ch1 as usize].op,
                 XmlXPathOp::XPathOpPredicate
             ) {
                 generic_error!("xmlXPathCompOpEvalPredicate: Expected a predicate\n");
@@ -1412,9 +1410,7 @@ unsafe fn xml_xpath_comp_op_eval_predicate(
                 );
             }
             (*ctxt.context).depth += 1;
-            let mut comp = ctxt.comp.borrow_mut();
-            let op = &raw mut comp.steps[(*op).ch1 as usize];
-            drop(comp);
+            let op = &raw mut ctxt.comp.steps[(*op).ch1 as usize];
             xml_xpath_comp_op_eval_predicate(
                 ctxt,
                 op,
@@ -1714,15 +1710,11 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
         has_axis_range = 0;
         if (*op).ch2 != -1 {
             // There's at least one predicate. 16 == XPATH_OP_PREDICATE
-            let mut comp = (*ctxt).comp.borrow_mut();
-            pred_op = &raw mut comp.steps[(*op).ch2 as usize];
-            drop(comp);
+            pred_op = &raw mut (*ctxt).comp.steps[(*op).ch2 as usize];
             if (*ctxt).is_positional_predicate(&*pred_op, &mut max_pos) != 0 {
                 if (*pred_op).ch1 != -1 {
                     // Use the next inner predicate operator.
-                    let mut comp = (*ctxt).comp.borrow_mut();
-                    pred_op = &raw mut comp.steps[(*pred_op).ch1 as usize];
-                    drop(comp);
+                    pred_op = &raw mut (*ctxt).comp.steps[(*pred_op).ch1 as usize];
                     has_predicate_range = 1;
                 } else {
                     // There's no other predicate than the [n] predicate.
@@ -2133,8 +2125,7 @@ pub(super) unsafe fn xml_xpath_location_set_filter(
                 (*xpctxt).doc = context_node.document();
             }
 
-            let mut comp = (*ctxt).comp.borrow_mut();
-            let op = &raw mut comp.steps[filter_op_index as usize];
+            let op = &raw mut (*ctxt).comp.steps[filter_op_index as usize];
             let res: i32 = (*ctxt).evaluate_precompiled_operation_to_boolean(op, true);
 
             if (*ctxt).error != XmlXPathError::XPathExpressionOK as i32 {

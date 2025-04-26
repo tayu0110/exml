@@ -89,13 +89,13 @@ impl XmlXPathParserContext {
         value5: Option<XmlXPathStepOpValue>,
     ) -> i32 {
         unsafe {
-            if self.comp.borrow().steps.len() == XPATH_MAX_STEPS {
+            if self.comp.steps.len() == XPATH_MAX_STEPS {
                 xml_xpath_perr_memory(Some(self), Some("adding step\n"));
                 return -1;
             }
-            let last = self.comp.borrow().steps.len() as i32;
-            self.comp.borrow_mut().last = last;
-            self.comp.borrow_mut().steps.push(XmlXPathStepOp {
+            let last = self.comp.steps.len() as i32;
+            self.comp.last = last;
+            self.comp.steps.push(XmlXPathStepOp {
                 ch1,
                 ch2,
                 op,
@@ -107,7 +107,7 @@ impl XmlXPathParserContext {
                 cache: None,
                 cache_uri: None,
             });
-            self.comp.borrow().steps.len() as i32 - 1
+            self.comp.steps.len() as i32 - 1
         }
     }
 
@@ -140,20 +140,20 @@ impl XmlXPathParserContext {
             };
             self.skip_blanks();
             while self.current_str().starts_with("or") {
-                let op1: i32 = self.comp.borrow().last;
+                let op1: i32 = self.comp.last;
                 self.cur += 2;
                 self.skip_blanks();
                 self.compile_and_expr();
                 if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
                     return;
                 };
-                let last = self.comp.borrow().last;
+                let last = self.comp.last;
                 self.add_compiled_expression(op1, last, XmlXPathOp::XPathOpOr, 0, 0, 0, None, None);
                 self.skip_blanks();
             }
             if sort
                 && !matches!(
-                    self.comp.borrow().steps[self.comp.borrow().last as usize].op,
+                    self.comp.steps[self.comp.last as usize].op,
                     XmlXPathOp::XPathOpValue
                 )
             {
@@ -161,7 +161,7 @@ impl XmlXPathParserContext {
                 // This is the main place to eliminate sorting for
                 // operations which don't require a sorted node-set.
                 // E.g. count().
-                let last = self.comp.borrow().last;
+                let last = self.comp.last;
                 self.add_compiled_expression(
                     last,
                     -1,
@@ -194,14 +194,14 @@ impl XmlXPathParserContext {
             };
             self.skip_blanks();
             while self.current_str().starts_with("and") {
-                let op1: i32 = self.comp.borrow().last;
+                let op1: i32 = self.comp.last;
                 self.cur += 3;
                 self.skip_blanks();
                 self.compile_equality_expr();
                 if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
                     return;
                 };
-                let last = self.comp.borrow().last;
+                let last = self.comp.last;
                 self.add_compiled_expression(
                     op1,
                     last,
@@ -241,7 +241,7 @@ impl XmlXPathParserContext {
             while self.current_char() == Some('=')
                 || (self.current_char() == Some('!') && self.nth_byte(1) == Some(b'='))
             {
-                let op1: i32 = self.comp.borrow().last;
+                let op1: i32 = self.comp.last;
                 let eq = (self.current_char() == Some('=')) as i32;
 
                 self.next_char();
@@ -253,7 +253,7 @@ impl XmlXPathParserContext {
                 if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
                     return;
                 };
-                let last = self.comp.borrow().last;
+                let last = self.comp.last;
                 self.add_compiled_expression(
                     op1,
                     last,
@@ -291,7 +291,7 @@ impl XmlXPathParserContext {
             };
             self.skip_blanks();
             while self.current_char() == Some('<') || self.current_char() == Some('>') {
-                let op1: i32 = self.comp.borrow().last;
+                let op1: i32 = self.comp.last;
                 let inf = (self.current_char() == Some('<')) as i32;
                 let strict = (self.nth_byte(1) != Some(b'=')) as i32;
 
@@ -304,7 +304,7 @@ impl XmlXPathParserContext {
                 if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
                     return;
                 };
-                let last = self.comp.borrow().last;
+                let last = self.comp.last;
                 self.add_compiled_expression(
                     op1,
                     last,
@@ -336,7 +336,7 @@ impl XmlXPathParserContext {
             };
             self.skip_blanks();
             while self.current_char() == Some('+') || self.current_char() == Some('-') {
-                let op1: i32 = self.comp.borrow().last;
+                let op1: i32 = self.comp.last;
                 let plus = (self.current_char() == Some('+')) as i32;
 
                 self.next_char();
@@ -345,7 +345,7 @@ impl XmlXPathParserContext {
                 if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
                     return;
                 };
-                let last = self.comp.borrow().last;
+                let last = self.comp.last;
                 self.add_compiled_expression(
                     op1,
                     last,
@@ -383,7 +383,7 @@ impl XmlXPathParserContext {
                 || self.current_str().starts_with("mod")
             {
                 let mut op: i32 = -1;
-                let op1: i32 = self.comp.borrow().last;
+                let op1: i32 = self.comp.last;
 
                 if self.current_char() == Some('*') {
                     op = 0;
@@ -400,7 +400,7 @@ impl XmlXPathParserContext {
                 if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
                     return;
                 };
-                let last = self.comp.borrow().last;
+                let last = self.comp.last;
                 self.add_compiled_expression(
                     op1,
                     last,
@@ -441,7 +441,7 @@ impl XmlXPathParserContext {
             };
             if found != 0 {
                 if minus != 0 {
-                    let last = self.comp.borrow().last;
+                    let last = self.comp.last;
                     self.add_compiled_expression(
                         last,
                         -1,
@@ -453,7 +453,7 @@ impl XmlXPathParserContext {
                         None,
                     );
                 } else {
-                    let last = self.comp.borrow().last;
+                    let last = self.comp.last;
                     self.add_compiled_expression(
                         last,
                         -1,
@@ -483,14 +483,14 @@ impl XmlXPathParserContext {
             };
             self.skip_blanks();
             while self.current_char() == Some('|') {
-                let op1: i32 = self.comp.borrow().last;
+                let op1: i32 = self.comp.last;
                 self.add_compiled_expression(-1, -1, XmlXPathOp::XPathOpNode, 0, 0, 0, None, None);
 
                 self.next_char();
                 self.skip_blanks();
                 self.compile_path_expr();
 
-                let last = self.comp.borrow().last;
+                let last = self.comp.last;
                 self.add_compiled_expression(
                     op1,
                     last,
@@ -651,7 +651,7 @@ impl XmlXPathParserContext {
                     self.cur += 2;
                     self.skip_blanks();
 
-                    let last = self.comp.borrow().last;
+                    let last = self.comp.last;
                     self.add_compiled_expression(
                         last,
                         -1,
@@ -701,7 +701,7 @@ impl XmlXPathParserContext {
                     if self.current_str().starts_with("//") {
                         self.cur += 2;
                         self.skip_blanks();
-                        let last = self.comp.borrow().last;
+                        let last = self.comp.last;
                         self.add_compiled_expression(
                             last,
                             -1,
@@ -745,7 +745,7 @@ impl XmlXPathParserContext {
             if self.current_str().starts_with("//") {
                 self.cur += 2;
                 self.skip_blanks();
-                let last = self.comp.borrow().last;
+                let last = self.comp.last;
                 self.add_compiled_expression(
                     last,
                     -1,
@@ -769,7 +769,7 @@ impl XmlXPathParserContext {
                 if self.current_str().starts_with("//") {
                     self.cur += 2;
                     self.skip_blanks();
-                    let last = self.comp.borrow().last;
+                    let last = self.comp.last;
                     self.add_compiled_expression(
                         last,
                         -1,
@@ -827,7 +827,7 @@ impl XmlXPathParserContext {
             if self.current_str().starts_with("..") {
                 self.cur += 2;
                 self.skip_blanks();
-                let last = self.comp.borrow().last;
+                let last = self.comp.last;
                 self.add_compiled_expression(
                     last,
                     -1,
@@ -858,7 +858,7 @@ impl XmlXPathParserContext {
                     if self.xptr != 0 {
                         name = self.parse_ncname();
                         if name.as_deref() == Some("range-to") {
-                            op2 = self.comp.borrow().last;
+                            op2 = self.comp.last;
                             self.skip_blanks();
                             if self.current_char() != Some('(') {
                                 xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
@@ -942,8 +942,8 @@ impl XmlXPathParserContext {
                     }
                 }
 
-                let op1: i32 = self.comp.borrow().last;
-                self.comp.borrow_mut().last = -1;
+                let op1: i32 = self.comp.last;
+                self.comp.last = -1;
 
                 self.skip_blanks();
                 while self.current_char() == Some('[') {
@@ -965,7 +965,7 @@ impl XmlXPathParserContext {
                     return;
                 }
 
-                let last = self.comp.borrow().last;
+                let last = self.comp.last;
                 self.add_compiled_expression(
                     op1,
                     last,
@@ -1256,7 +1256,7 @@ impl XmlXPathParserContext {
                 }
                 ret *= 10.0f64.powi(exponent);
             }
-            let last = self.comp.borrow().last;
+            let last = self.comp.last;
             self.add_compiled_expression(
                 last,
                 -1,
@@ -1328,7 +1328,7 @@ impl XmlXPathParserContext {
                 xml_xpath_perr_memory(Some(self), None);
                 return;
             }
-            let last = self.comp.borrow().last;
+            let last = self.comp.last;
             self.add_compiled_expression(
                 last,
                 -1,
@@ -1375,16 +1375,16 @@ impl XmlXPathParserContext {
             if prefix.is_none() && name.starts_with('c') && name == "count" {
                 sort = false;
             }
-            self.comp.borrow_mut().last = -1;
+            self.comp.last = -1;
             if self.current_char() != Some(')') {
                 while self.current_char().is_some() {
-                    let op1: i32 = self.comp.borrow().last;
-                    self.comp.borrow_mut().last = -1;
+                    let op1: i32 = self.comp.last;
+                    self.comp.last = -1;
                     self.compile_expr(sort);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return;
                     }
-                    let last = self.comp.borrow().last;
+                    let last = self.comp.last;
                     self.add_compiled_expression(
                         op1,
                         last,
@@ -1407,7 +1407,7 @@ impl XmlXPathParserContext {
                     self.skip_blanks();
                 }
             }
-            let last = self.comp.borrow().last;
+            let last = self.comp.last;
             self.add_compiled_expression(
                 last,
                 -1,
@@ -1432,7 +1432,7 @@ impl XmlXPathParserContext {
     #[doc(alias = "xmlXPathCompPredicate")]
     unsafe fn compile_predicate(&mut self, filter: bool) {
         unsafe {
-            let op1: i32 = self.comp.borrow().last;
+            let op1: i32 = self.comp.last;
 
             self.skip_blanks();
             if self.current_char() != Some('[') {
@@ -1442,7 +1442,7 @@ impl XmlXPathParserContext {
             self.next_char();
             self.skip_blanks();
 
-            self.comp.borrow_mut().last = -1;
+            self.comp.last = -1;
             // This call to xmlXPathCompileExpr() will deactivate sorting
             // of the predicate result.
             // TODO: Sorting is still activated for filters, since I'm not
@@ -1465,7 +1465,7 @@ impl XmlXPathParserContext {
             }
 
             if filter {
-                let last = self.comp.borrow().last;
+                let last = self.comp.last;
                 self.add_compiled_expression(
                     op1,
                     last,
@@ -1477,7 +1477,7 @@ impl XmlXPathParserContext {
                     None,
                 );
             } else {
-                let last = self.comp.borrow().last;
+                let last = self.comp.last;
                 self.add_compiled_expression(
                     op1,
                     last,
@@ -1522,8 +1522,8 @@ impl XmlXPathParserContext {
                 xml_xpath_err(Some(self), XmlXPathError::XPathVariableRefError as i32);
                 return;
             };
-            self.comp.borrow_mut().last = -1;
-            let last = self.comp.borrow().last;
+            self.comp.last = -1;
+            let last = self.comp.last;
             self.add_compiled_expression(
                 last,
                 -1,
@@ -1551,7 +1551,7 @@ impl XmlXPathParserContext {
                 && (*op).ch1 != -1
                 && (*op).ch2 == -1
             {
-                let prevop = &self.comp.borrow().steps[(*op).ch1 as usize];
+                let prevop = &self.comp.steps[(*op).ch1 as usize];
 
                 if matches!(prevop.op, XmlXPathOp::XPathOpCollect /* 11 */)
                     && prevop.value == XmlXPathAxisVal::AxisDescendantOrSelf as i32
@@ -1596,15 +1596,11 @@ impl XmlXPathParserContext {
                 (*ctxt).depth += 1;
             }
             if (*op).ch1 != -1 {
-                let mut comp = self.comp.borrow_mut();
-                let ptr = &raw mut comp.steps[(*op).ch1 as usize];
-                drop(comp);
+                let ptr = &raw mut self.comp.steps[(*op).ch1 as usize];
                 self.optimize_expression(ptr);
             }
             if (*op).ch2 != -1 {
-                let mut comp = self.comp.borrow_mut();
-                let ptr = &raw mut comp.steps[(*op).ch2 as usize];
-                drop(comp);
+                let ptr = &raw mut self.comp.steps[(*op).ch2 as usize];
                 self.optimize_expression(ptr);
             }
             if !ctxt.is_null() {
