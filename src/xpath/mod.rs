@@ -1900,44 +1900,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_xpath_debug_dump_object() {
-        #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_output in 0..GEN_NB_FILE_PTR {
-                for n_cur in 0..GEN_NB_XML_XPATH_OBJECT_PTR {
-                    for n_depth in 0..GEN_NB_INT {
-                        let mem_base = xml_mem_blocks();
-                        let mut output = gen_file_ptr(n_output, 0).unwrap();
-                        let cur = gen_xml_xpath_object_ptr(n_cur, 1);
-                        let depth = gen_int(n_depth, 2);
-
-                        xml_xpath_debug_dump_object(&mut output, cur, depth);
-                        des_xml_xpath_object_ptr(n_cur, cur, 1);
-                        des_int(n_depth, depth, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlXPathDebugDumpObject",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlXPathDebugDumpObject()"
-                            );
-                            eprint!(" {}", n_output);
-                            eprint!(" {}", n_cur);
-                            eprintln!(" {}", n_depth);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_xpath_difference() {
         #[cfg(feature = "xpath")]
         unsafe {

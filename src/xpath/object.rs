@@ -54,7 +54,7 @@ pub enum XmlXPathObjectType {
 
 pub type XmlXPathObjectPtr = *mut XmlXPathObject;
 #[repr(C)]
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct XmlXPathObject {
     pub typ: XmlXPathObjectType,
     pub nodesetval: Option<Box<XmlNodeSet>>,

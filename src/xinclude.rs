@@ -50,8 +50,8 @@ use crate::{
     },
     uri::{XmlURI, build_relative_uri, build_uri, escape_url},
     xpath::{
-        XmlXPathContextPtr, XmlXPathObjectPtr, XmlXPathObjectType, xml_xpath_free_context,
-        xml_xpath_free_object,
+        XmlXPathContextPtr, XmlXPathObject, XmlXPathObjectPtr, XmlXPathObjectType,
+        xml_xpath_free_context, xml_xpath_free_object,
     },
 };
 
@@ -828,16 +828,13 @@ impl XmlXIncludeCtxt {
     /// Returns an xmlNodePtr list or NULL.
     /// The caller has to free the node tree.
     #[doc(alias = "xmlXIncludeCopyXPointer")]
-    unsafe fn copy_xpointer(&mut self, obj: XmlXPathObjectPtr) -> Option<XmlNodePtr> {
+    unsafe fn copy_xpointer(&mut self, obj: &XmlXPathObject) -> Option<XmlNodePtr> {
         unsafe {
             let mut list: Option<XmlNodePtr> = None;
 
-            if obj.is_null() {
-                return None;
-            }
-            match (*obj).typ {
+            match obj.typ {
                 XmlXPathObjectType::XPathNodeset => {
-                    let set = (*obj).nodesetval.as_deref()?;
+                    let set = obj.nodesetval.as_deref()?;
                     let mut last: Option<XmlNodePtr> = None;
                     for &now in &set.node_tab {
                         let node = match now.element_type() {
@@ -894,13 +891,10 @@ impl XmlXIncludeCtxt {
                 }
                 #[cfg(feature = "libxml_xptr_locs")]
                 XmlXPathObjectType::XPathLocationset => {
-                    let set = (*obj)
-                        .user
-                        .as_ref()
-                        .and_then(|user| user.as_location_set())?;
+                    let set = obj.user.as_ref().and_then(|user| user.as_location_set())?;
 
                     let mut last: Option<XmlNodePtr> = None;
-                    for &loc in &set.loc_tab {
+                    for loc in &set.loc_tab {
                         if let Some(mut last) = last {
                             last.add_next_sibling(self.copy_xpointer(loc).unwrap().into());
                         } else {
@@ -937,7 +931,7 @@ impl XmlXIncludeCtxt {
     /// The caller has to free the node tree.
     #[doc(alias = "xmlXIncludeCopyRange")]
     #[cfg(feature = "libxml_xptr_locs")]
-    unsafe fn copy_range(&self, range: XmlXPathObjectPtr) -> Option<XmlGenericNodePtr> {
+    unsafe fn copy_range(&self, range: &XmlXPathObject) -> Option<XmlGenericNodePtr> {
         unsafe {
             use crate::{libxml::xpointer::xml_xptr_advance_node, tree::xml_new_doc_text};
 
@@ -950,20 +944,17 @@ impl XmlXIncludeCtxt {
             let mut end_level: i32 = 0;
             let mut end_flag: i32 = 0;
 
-            if range.is_null() {
+            if range.typ != XmlXPathObjectType::XPathRange {
                 return None;
             }
-            if (*range).typ != XmlXPathObjectType::XPathRange {
-                return None;
-            }
-            let start = (*range)
+            let start = range
                 .user
                 .as_ref()
                 .and_then(|user| user.as_node())
                 .copied()
                 .filter(|node| node.element_type() != XmlElementType::XmlNamespaceDecl)?;
 
-            let Some(mut end) = (*range)
+            let Some(mut end) = range
                 .user2
                 .as_ref()
                 .and_then(|user| user.as_node())
@@ -976,8 +967,8 @@ impl XmlXIncludeCtxt {
             }
 
             let mut cur = Some(start);
-            let mut index1 = (*range).index;
-            let mut index2 = (*range).index2;
+            let mut index1 = range.index;
+            let mut index2 = range.index2;
             // level is depth of the current node under consideration
             // list is the pointer to the root of the output tree
             // listParent is a pointer to the parent of output tree (within
@@ -1411,7 +1402,7 @@ impl XmlXIncludeCtxt {
                             i += 1;
                         }
                     }
-                    self.inc_tab[ref_index].inc = self.copy_xpointer(xptr);
+                    self.inc_tab[ref_index].inc = self.copy_xpointer(&*xptr);
                     xml_xpath_free_object(xptr);
                     xml_xpath_free_context(xptrctxt);
                 }

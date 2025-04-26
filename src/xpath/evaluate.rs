@@ -784,7 +784,6 @@ impl XmlXPathParserContext {
                 }
                 #[cfg(feature = "libxml_xptr_locs")]
                 XmlXPathOp::XPathOpRangeto => 'to_break: {
-                    let mut range: XmlXPathObjectPtr;
                     let mut res: XmlXPathObjectPtr;
                     let obj: XmlXPathObjectPtr;
                     let mut tmp: XmlXPathObjectPtr;
@@ -842,16 +841,13 @@ impl XmlXPathParserContext {
                                 .and_then(|user| user.as_location_set())
                                 .unwrap();
 
-                            newlocset = XmlLocationSet::new(null_mut());
+                            newlocset = XmlLocationSet::new(None);
 
-                            for (i, &iloc) in oldlocset.loc_tab.iter().enumerate() {
+                            for (i, iloc) in oldlocset.loc_tab.iter().enumerate() {
                                 // Run the evaluation with a node list made of a
                                 // single item in the nodelocset.
-                                (*self.context).node = (*iloc)
-                                    .user
-                                    .as_ref()
-                                    .and_then(|user| user.as_node())
-                                    .copied();
+                                (*self.context).node =
+                                    iloc.user.as_ref().and_then(|user| user.as_node()).copied();
                                 (*self.context).context_size = oldlocset.loc_tab.len() as i32;
                                 (*self.context).proximity_position = i as i32 + 1;
                                 tmp = xml_xpath_cache_new_node_set(
@@ -877,40 +873,33 @@ impl XmlXPathParserContext {
                                         .as_ref()
                                         .and_then(|user| user.as_location_set())
                                         .unwrap();
-                                    for &jloc in &rloc.loc_tab {
-                                        range = xml_xptr_new_range(
-                                            (*iloc)
-                                                .user
+                                    for jloc in &rloc.loc_tab {
+                                        if let Some(range) = xml_xptr_new_range(
+                                            iloc.user
                                                 .as_ref()
                                                 .and_then(|user| user.as_node())
                                                 .copied()
                                                 .unwrap(),
-                                            (*iloc).index,
-                                            (*jloc)
-                                                .user2
+                                            iloc.index,
+                                            jloc.user2
                                                 .as_ref()
                                                 .and_then(|user| user.as_node())
                                                 .copied()
                                                 .unwrap(),
-                                            (*jloc).index2,
-                                        );
-                                        if !range.is_null() {
-                                            newlocset.push(range);
+                                            jloc.index2,
+                                        ) {
+                                            newlocset.push(Rc::new(range));
                                         }
                                     }
-                                } else {
-                                    range = xml_xptr_new_range_node_object(
-                                        (*iloc)
-                                            .user
-                                            .as_ref()
-                                            .and_then(|user| user.as_node())
-                                            .copied()
-                                            .unwrap(),
-                                        res,
-                                    );
-                                    if !range.is_null() {
-                                        newlocset.push(range);
-                                    }
+                                } else if let Some(range) = xml_xptr_new_range_node_object(
+                                    iloc.user
+                                        .as_ref()
+                                        .and_then(|user| user.as_node())
+                                        .copied()
+                                        .unwrap(),
+                                    res,
+                                ) {
+                                    newlocset.push(Rc::new(range));
                                 }
 
                                 // Cleanup
@@ -931,7 +920,7 @@ impl XmlXPathParserContext {
                                 return 0;
                             };
                             obj = self.value_pop();
-                            newlocset = XmlLocationSet::new(null_mut());
+                            newlocset = XmlLocationSet::new(None);
 
                             if let Some(oldset) = (*obj).nodesetval.as_deref() {
                                 for &node in &oldset.node_tab {
@@ -956,9 +945,8 @@ impl XmlXPathParserContext {
                                     }
 
                                     res = self.value_pop();
-                                    range = xml_xptr_new_range_node_object(node, res);
-                                    if !range.is_null() {
-                                        newlocset.push(range);
+                                    if let Some(range) = xml_xptr_new_range_node_object(node, res) {
+                                        newlocset.push(Rc::new(range));
                                     }
 
                                     // Cleanup
@@ -1476,7 +1464,7 @@ impl XmlXPathParserContext {
                     {
                         xml_xpath_location_set_filter(self, locset, (*op).ch2, 1, 1);
                         if !locset.loc_tab.is_empty() {
-                            *first = (*locset.loc_tab[0])
+                            *first = locset.loc_tab[0]
                                 .user
                                 .as_ref()
                                 .and_then(|user| user.as_node())

@@ -2888,7 +2888,7 @@ pub unsafe fn xml_shell<'a>(
                     } else {
                         (*ctxt.pctxt).node = ctxt.node;
                         list = xml_xpath_eval(arg, ctxt.pctxt);
-                        xml_xpath_debug_dump_object(&mut ctxt.output, list, 0);
+                        xml_xpath_debug_dump_object(&mut ctxt.output, Some(&*list), 0);
                         xml_xpath_free_object(list);
                     }
                 }

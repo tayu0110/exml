@@ -2469,7 +2469,7 @@ unsafe fn test_xpath(xpath: &str, xptr: i32, expr: i32) {
         }
         XPATH_OUTPUT.with_borrow_mut(|out| {
             let out = out.as_mut().unwrap();
-            xml_xpath_debug_dump_object(out, res, 0);
+            xml_xpath_debug_dump_object(out, Some(&*res), 0);
             out.flush().ok();
         });
         xml_xpath_free_object(res);

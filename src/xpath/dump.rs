@@ -11,7 +11,7 @@ use crate::{
     },
 };
 
-use super::{XmlNodeSet, XmlXPathCompExpr, XmlXPathObjectPtr, compile::XmlXPathStepOpPtr};
+use super::{XmlNodeSet, XmlXPathCompExpr, XmlXPathObject, compile::XmlXPathStepOpPtr};
 
 unsafe fn xml_xpath_debug_dump_node<'a>(
     output: &mut (impl Write + 'a),
@@ -118,10 +118,10 @@ unsafe fn xml_xpath_debug_dump_location_set<'a>(
             return;
         };
 
-        for (i, &loc) in cur.loc_tab.iter().enumerate() {
+        for (i, loc) in cur.loc_tab.iter().enumerate() {
             write!(output, "{}", shift).ok();
             write!(output, "{} : ", i + 1).ok();
-            xml_xpath_debug_dump_object(output, loc, depth + 1);
+            xml_xpath_debug_dump_object(output, Some(loc), depth + 1);
         }
     }
 }
@@ -130,7 +130,7 @@ unsafe fn xml_xpath_debug_dump_location_set<'a>(
 #[doc(alias = "xmlXPathDebugDumpObject")]
 pub unsafe fn xml_xpath_debug_dump_object<'a>(
     output: &mut (impl Write + 'a),
-    cur: XmlXPathObjectPtr,
+    cur: Option<&XmlXPathObject>,
     depth: i32,
 ) {
     unsafe {
@@ -138,32 +138,32 @@ pub unsafe fn xml_xpath_debug_dump_object<'a>(
 
         write!(output, "{}", shift).ok();
 
-        if cur.is_null() {
+        let Some(cur) = cur else {
             writeln!(output, "Object is empty (NULL)").ok();
             return;
-        }
-        match (*cur).typ {
+        };
+        match cur.typ {
             XmlXPathObjectType::XPathUndefined => {
                 writeln!(output, "Object is uninitialized").ok();
             }
             XmlXPathObjectType::XPathNodeset => {
                 writeln!(output, "Object is a Node Set :").ok();
-                xml_xpath_debug_dump_node_set(output, (*cur).nodesetval.as_deref(), depth);
+                xml_xpath_debug_dump_node_set(output, cur.nodesetval.as_deref(), depth);
             }
             XmlXPathObjectType::XPathXSLTTree => {
                 writeln!(output, "Object is an XSLT value tree :").ok();
-                xml_xpath_debug_dump_value_tree(output, (*cur).nodesetval.as_deref(), depth);
+                xml_xpath_debug_dump_value_tree(output, cur.nodesetval.as_deref(), depth);
             }
             XmlXPathObjectType::XPathBoolean => {
                 write!(output, "Object is a Boolean : ").ok();
-                if (*cur).boolval {
+                if cur.boolval {
                     writeln!(output, "true").ok();
                 } else {
                     writeln!(output, "false").ok();
                 }
             }
             XmlXPathObjectType::XPathNumber => {
-                match xml_xpath_is_inf((*cur).floatval) {
+                match xml_xpath_is_inf(cur.floatval) {
                     1 => {
                         writeln!(output, "Object is a number : Infinity").ok();
                     }
@@ -171,76 +171,62 @@ pub unsafe fn xml_xpath_debug_dump_object<'a>(
                         writeln!(output, "Object is a number : -Infinity").ok();
                     }
                     _ => {
-                        if xml_xpath_is_nan((*cur).floatval) {
+                        if xml_xpath_is_nan(cur.floatval) {
                             writeln!(output, "Object is a number : NaN").ok();
-                        } else if (*cur).floatval == 0.0 {
+                        } else if cur.floatval == 0.0 {
                             /* Omit sign for negative zero. */
                             writeln!(output, "Object is a number : 0").ok();
                         } else {
-                            writeln!(output, "Object is a number : {}", (*cur).floatval).ok();
+                            writeln!(output, "Object is a number : {}", cur.floatval).ok();
                         }
                     }
                 }
             }
             XmlXPathObjectType::XPathString => {
                 write!(output, "Object is a string : ").ok();
-                let strval = (*cur).stringval.as_deref();
+                let strval = cur.stringval.as_deref();
                 xml_debug_dump_string(Some(output), strval);
                 writeln!(output).ok();
             }
             #[cfg(feature = "libxml_xptr_locs")]
             XmlXPathObjectType::XPathPoint => {
-                write!(output, "Object is a point : index {} in node", (*cur).index,).ok();
-                let node = (*cur)
-                    .user
-                    .as_ref()
-                    .and_then(|user| user.as_node())
-                    .copied();
+                write!(output, "Object is a point : index {} in node", cur.index,).ok();
+                let node = cur.user.as_ref().and_then(|user| user.as_node()).copied();
                 xml_xpath_debug_dump_node(output, node, depth + 1);
                 writeln!(output).ok();
             }
             #[cfg(feature = "libxml_xptr_locs")]
             XmlXPathObjectType::XPathRange => {
-                if (*cur).user2.as_ref().is_none_or(|user| {
-                    Some(user) == (*cur).user.as_ref() && (*cur).index == (*cur).index2
-                }) {
+                if cur
+                    .user2
+                    .as_ref()
+                    .is_none_or(|user| Some(user) == cur.user.as_ref() && cur.index == cur.index2)
+                {
                     writeln!(output, "Object is a collapsed range :").ok();
                     write!(output, "{}", shift).ok();
-                    if (*cur).index >= 0 {
-                        write!(output, "index {} in ", (*cur).index).ok();
+                    if cur.index >= 0 {
+                        write!(output, "index {} in ", cur.index).ok();
                     }
                     writeln!(output, "node").ok();
-                    let node = (*cur)
-                        .user
-                        .as_ref()
-                        .and_then(|user| user.as_node())
-                        .copied();
+                    let node = cur.user.as_ref().and_then(|user| user.as_node()).copied();
                     xml_xpath_debug_dump_node(output, node, depth + 1);
                 } else {
                     writeln!(output, "Object is a range :").ok();
                     write!(output, "{}", shift).ok();
                     write!(output, "From ").ok();
-                    if (*cur).index >= 0 {
-                        write!(output, "index {} in ", (*cur).index).ok();
+                    if cur.index >= 0 {
+                        write!(output, "index {} in ", cur.index).ok();
                     }
                     writeln!(output, "node").ok();
-                    let node = (*cur)
-                        .user
-                        .as_ref()
-                        .and_then(|user| user.as_node())
-                        .copied();
+                    let node = cur.user.as_ref().and_then(|user| user.as_node()).copied();
                     xml_xpath_debug_dump_node(output, node, depth + 1);
                     write!(output, "{}", shift).ok();
                     write!(output, "To ").ok();
-                    if (*cur).index2 >= 0 {
-                        write!(output, "index {} in ", (*cur).index2).ok();
+                    if cur.index2 >= 0 {
+                        write!(output, "index {} in ", cur.index2).ok();
                     }
                     writeln!(output, "node").ok();
-                    let node = (*cur)
-                        .user2
-                        .as_ref()
-                        .and_then(|user| user.as_node())
-                        .copied();
+                    let node = cur.user2.as_ref().and_then(|user| user.as_node()).copied();
                     xml_xpath_debug_dump_node(output, node, depth + 1);
                     writeln!(output).ok();
                 }
@@ -248,7 +234,7 @@ pub unsafe fn xml_xpath_debug_dump_object<'a>(
             #[cfg(feature = "libxml_xptr_locs")]
             XmlXPathObjectType::XPathLocationset => {
                 writeln!(output, "Object is a Location Set:").ok();
-                let loc = (*cur).user.as_ref().and_then(|user| user.as_location_set());
+                let loc = cur.user.as_ref().and_then(|user| user.as_location_set());
                 xml_xpath_debug_dump_location_set(output, loc, depth);
             }
             XmlXPathObjectType::XPathUsers => {
@@ -429,7 +415,7 @@ unsafe fn xml_xpath_debug_dump_step_op<'a>(
                     .map_or(null_mut(), |obj| *obj);
 
                 write!(output, "ELEM ").ok();
-                xml_xpath_debug_dump_object(output, object, 0);
+                xml_xpath_debug_dump_object(output, (!object.is_null()).then_some(&*object), 0);
                 // goto finish;
                 if (*op).ch1 >= 0 {
                     xml_xpath_debug_dump_step_op(

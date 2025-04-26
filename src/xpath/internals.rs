@@ -2115,7 +2115,7 @@ pub(super) unsafe fn xml_xpath_location_set_filter(
         let mut j = 0;
         let mut pos = 1;
         while i < locset.loc_tab.len() {
-            let context_node = (*locset.loc_tab[i])
+            let context_node = locset.loc_tab[i]
                 .user
                 .as_ref()
                 .and_then(|user| user.as_node())
@@ -2152,20 +2152,20 @@ pub(super) unsafe fn xml_xpath_location_set_filter(
 
             if res != 0 && (pos >= min_pos && pos <= max_pos) {
                 if i != j {
-                    locset.loc_tab[j] = locset.loc_tab[i];
-                    locset.loc_tab[i] = null_mut();
+                    locset.loc_tab[j] = locset.loc_tab[i].clone();
+                    // locset.loc_tab[i] = null_mut();
                 }
 
                 j += 1;
             } else {
                 /* Remove the entry from the initial location set. */
-                xml_xpath_free_object(locset.loc_tab[i]);
-                locset.loc_tab[i] = null_mut();
+                // xml_xpath_free_object(locset.loc_tab[i]);
+                // locset.loc_tab[i] = null_mut();
             }
 
             if res != 0 {
                 if pos == max_pos {
-                    i += 1;
+                    // i += 1;
                     break;
                 }
 
@@ -2176,11 +2176,6 @@ pub(super) unsafe fn xml_xpath_location_set_filter(
         }
 
         // Free remaining nodes.
-        while i < locset.loc_tab.len() {
-            xml_xpath_free_object(locset.loc_tab[i]);
-            i += 1;
-        }
-
         locset.loc_tab.truncate(j);
         // If too many elements were removed, shrink table to preserve memory.
         locset.loc_tab.shrink_to(XML_NODESET_DEFAULT);

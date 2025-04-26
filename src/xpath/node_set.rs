@@ -23,7 +23,7 @@ const XPATH_MAX_NODESET_LENGTH: usize = 10000000;
 // A node-set (an unordered collection of nodes without duplicates).
 pub type XmlNodeSetPtr = *mut XmlNodeSet;
 #[repr(C)]
-#[derive(Clone, Default)]
+#[derive(Clone, PartialEq, Default)]
 pub struct XmlNodeSet {
     // array of nodes in no particular order
     pub node_tab: Vec<XmlGenericNodePtr>,
