@@ -59,7 +59,6 @@ use super::{
     xml_xpath_object_copy, xml_xpath_perr_memory,
 };
 
-pub type XmlXPathParserContextPtr = *mut XmlXPathParserContext;
 /// An XPath parser context. It contains pure parsing information,
 /// an xmlXPathContext, and the stack of objects.
 #[doc(alias = "xmlXPathParserContext")]

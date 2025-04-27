@@ -27,7 +27,7 @@ use crate::{
         xmlstring::XmlChar,
     },
     tree::{XmlAttr, XmlDoc, XmlDtd, XmlNode, XmlNs},
-    xpath::{XmlNodeSet, XmlXPathContextPtr, XmlXPathObjectPtr, XmlXPathParserContextPtr},
+    xpath::{XmlNodeSet, XmlXPathContextPtr},
 };
 
 pub(crate) static TEST_CATALOG_LOCK: Mutex<()> = Mutex::new(());
@@ -101,24 +101,6 @@ pub(crate) const GEN_NB_XML_XPATH_OBJECT_PTR: i32 = 5;
 pub(crate) const GEN_NB_DOUBLE: i32 = 4;
 #[cfg(feature = "xpath")]
 pub(crate) const GEN_NB_XML_XPATH_PARSER_CONTEXT_PTR: i32 = 1;
-
-#[cfg(feature = "xpath")]
-pub(crate) fn gen_xml_xpath_parser_context_ptr(_no: i32, _nr: i32) -> XmlXPathParserContextPtr {
-    null_mut()
-}
-
-#[cfg(feature = "xpath")]
-pub(crate) fn des_xml_xpath_parser_context_ptr(_no: i32, _val: XmlXPathParserContextPtr, _nr: i32) {
-}
-
-#[cfg(feature = "xpath")]
-pub(crate) unsafe fn desret_xml_xpath_object_ptr(val: XmlXPathObjectPtr) {
-    unsafe {
-        use crate::xpath::xml_xpath_free_object;
-
-        xml_xpath_free_object(val);
-    }
-}
 
 #[cfg(feature = "xpath")]
 pub(crate) fn desret_xml_node_set_ptr(val: Option<Box<crate::xpath::XmlNodeSet>>) {
