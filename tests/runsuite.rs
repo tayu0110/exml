@@ -3,13 +3,14 @@
 
 use std::{
     borrow::Cow,
+    cell::RefCell,
     env::args,
     ffi::{CStr, CString, c_char, c_int},
     fs::{File, metadata},
     ptr::null_mut,
     sync::{
         Mutex,
-        atomic::{AtomicI32, AtomicPtr, AtomicUsize, Ordering},
+        atomic::{AtomicI32, AtomicUsize, Ordering},
     },
 };
 
@@ -50,10 +51,7 @@ use exml::{
         },
         schema::{XmlSchemaPtr, xml_schema_free},
     },
-    xpath::{
-        XmlXPathContext, XmlXPathObjectType, xml_xpath_compile, xml_xpath_compiled_eval,
-        xml_xpath_free_context, xml_xpath_new_context,
-    },
+    xpath::{XmlXPathContext, XmlXPathObjectType, xml_xpath_compile, xml_xpath_compiled_eval},
 };
 use libc::strstr;
 
@@ -188,7 +186,9 @@ fn test_error_handler(_ctx: Option<GenericErrorContext>, msg: &str) {
     errors[TEST_ERRORS_SIZE.load(Ordering::Relaxed)] = 0;
 }
 
-static CTXT_XPATH: AtomicPtr<XmlXPathContext> = AtomicPtr::new(null_mut());
+thread_local! {
+    static CTXT_XPATH: RefCell<XmlXPathContext> = RefCell::new(XmlXPathContext::new(None));
+}
 
 unsafe fn initialize_libxml2() {
     unsafe {
@@ -203,12 +203,11 @@ unsafe fn initialize_libxml2() {
         );
         xml_init_parser();
         xml_set_external_entity_loader(test_external_entity_loader);
-        CTXT_XPATH.store(xml_xpath_new_context(None), Ordering::Relaxed);
-
-        // used as default namespace in xstc tests
-        (*CTXT_XPATH.load(Ordering::Relaxed)).register_ns("ts", Some("TestSuite"));
-        (*CTXT_XPATH.load(Ordering::Relaxed))
-            .register_ns("xlink", Some("http://www.w3.org/1999/xlink"));
+        CTXT_XPATH.with_borrow_mut(|ctxt| {
+            // used as default namespace in xstc tests
+            ctxt.register_ns("ts", Some("TestSuite"));
+            ctxt.register_ns("xlink", Some("http://www.w3.org/1999/xlink"));
+        });
         set_generic_error(Some(test_error_handler), None);
         #[cfg(feature = "schema")]
         {
@@ -221,13 +220,15 @@ unsafe fn initialize_libxml2() {
 unsafe fn get_next(cur: Option<XmlNodePtr>, xpath: &str) -> Option<XmlNodePtr> {
     unsafe {
         let cur_doc = cur?.doc?;
-        (*CTXT_XPATH.load(Ordering::Relaxed)).doc = Some(cur_doc);
-        (*CTXT_XPATH.load(Ordering::Relaxed)).node = Some(XmlGenericNodePtr::from(cur?));
-        let Some(comp) = xml_xpath_compile(xpath) else {
-            eprintln!("Failed to compile {}", xpath);
-            return None;
-        };
-        let res = xml_xpath_compiled_eval(comp, &mut *CTXT_XPATH.load(Ordering::Relaxed))?;
+        let res = CTXT_XPATH.with_borrow_mut(|ctxt| {
+            ctxt.doc = Some(cur_doc);
+            ctxt.node = Some(XmlGenericNodePtr::from(cur?));
+            let Some(comp) = xml_xpath_compile(xpath) else {
+                eprintln!("Failed to compile {}", xpath);
+                return None;
+            };
+            xml_xpath_compiled_eval(comp, ctxt)
+        })?;
         let mut ret = None;
         if res.typ == XmlXPathObjectType::XPathNodeset {
             if let Some(nodeset) = res.nodesetval.as_deref() {
@@ -243,13 +244,15 @@ unsafe fn get_next(cur: Option<XmlNodePtr>, xpath: &str) -> Option<XmlNodePtr> {
 unsafe fn get_string(cur: XmlNodePtr, xpath: &str) -> Option<String> {
     unsafe {
         let cur_doc = cur.doc?;
-        (*CTXT_XPATH.load(Ordering::Relaxed)).doc = Some(cur_doc);
-        (*CTXT_XPATH.load(Ordering::Relaxed)).node = Some(XmlGenericNodePtr::from(cur));
-        let Some(comp) = xml_xpath_compile(xpath) else {
-            eprintln!("Failed to compile {}", xpath);
-            return None;
-        };
-        let mut res = xml_xpath_compiled_eval(comp, &mut *CTXT_XPATH.load(Ordering::Relaxed))?;
+        let mut res = CTXT_XPATH.with_borrow_mut(|ctxt| {
+            ctxt.doc = Some(cur_doc);
+            ctxt.node = Some(XmlGenericNodePtr::from(cur));
+            let Some(comp) = xml_xpath_compile(xpath) else {
+                eprintln!("Failed to compile {}", xpath);
+                return None;
+            };
+            xml_xpath_compiled_eval(comp, ctxt)
+        })?;
         let mut ret = None;
         if res.typ == XmlXPathObjectType::XPathString {
             ret = res.stringval.take();
@@ -1267,7 +1270,6 @@ fn main() {
                 NB_LEAKS.load(Ordering::Relaxed),
             );
         }
-        xml_xpath_free_context(CTXT_XPATH.load(Ordering::Relaxed));
         xml_cleanup_parser();
     }
 

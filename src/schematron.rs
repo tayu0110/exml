@@ -37,9 +37,8 @@ use crate::{
         xml_free_doc,
     },
     xpath::{
-        XML_XPATH_CHECKNS, XmlXPathCompExpr, XmlXPathContext, XmlXPathContextPtr,
-        XmlXPathObjectType, xml_xpath_compiled_eval, xml_xpath_ctxt_compile, xml_xpath_eval,
-        xml_xpath_free_context, xml_xpath_is_nan, xml_xpath_new_context,
+        XML_XPATH_CHECKNS, XmlXPathCompExpr, XmlXPathContext, XmlXPathObjectType,
+        xml_xpath_compiled_eval, xml_xpath_ctxt_compile, xml_xpath_eval, xml_xpath_is_nan,
     },
 };
 
@@ -174,7 +173,7 @@ unsafe fn xml_schematron_register_variables(
                 return -1;
             };
 
-            if (*ctxt).register_variable_ns(&now.name, None, Some(let_eval)) != 0 {
+            if ctxt.register_variable_ns(&now.name, None, Some(let_eval)) != 0 {
                 generic_error!("Registering a let variable failed\n");
                 return -1;
             }
@@ -188,20 +187,18 @@ unsafe fn xml_schematron_register_variables(
 ///
 /// Returns -1 in case of errors, otherwise 0
 #[doc(alias = "xmlSchematronUnregisterVariables")]
-unsafe fn xml_schematron_unregister_variables(
-    ctxt: XmlXPathContextPtr,
+fn xml_schematron_unregister_variables(
+    ctxt: &mut XmlXPathContext,
     mut letr: Option<&XmlSchematronLet>,
 ) -> i32 {
-    unsafe {
-        while let Some(now) = letr {
-            if (*ctxt).register_variable_ns(&now.name, None, None) != 0 {
-                generic_error!("Unregistering a let variable failed\n");
-                return -1;
-            }
-            letr = now.next.as_deref();
+    while let Some(now) = letr {
+        if ctxt.register_variable_ns(&now.name, None, None) != 0 {
+            generic_error!("Unregistering a let variable failed\n");
+            return -1;
         }
-        0
+        letr = now.next.as_deref();
     }
+    0
 }
 
 fn xml_schematron_next_node(cur: XmlNodePtr) -> Option<XmlNodePtr> {
@@ -379,7 +376,7 @@ pub struct XmlSchematronValidCtxt<'a> {
     err: i32,
 
     schema: &'a XmlSchematron,
-    xctxt: XmlXPathContextPtr,
+    xctxt: Box<XmlXPathContext>,
 
     output_file: *mut FILE, /* if using XML_SCHEMATRON_OUT_FILE */
     output_buffer: Vec<u8>, /* if using XML_SCHEMATRON_OUT_BUFFER */
@@ -401,49 +398,43 @@ impl<'a> XmlSchematronValidCtxt<'a> {
     ///
     /// Returns the validation context or NULL in case of error
     #[doc(alias = "xmlSchematronNewValidCtxt")]
-    pub unsafe fn new(schema: &'a XmlSchematron, options: i32) -> Option<Self> {
-        unsafe {
-            let ret = Self {
-                typ: XML_STRON_CTXT_VALIDATOR,
-                flags: options,
-                nberrors: 0,
-                err: 0,
-                schema,
-                xctxt: xml_xpath_new_context(None),
-                output_file: null_mut(),
-                output_buffer: vec![],
-                iowrite: None,
-                ioclose: None,
-                ioctx: null_mut(),
-                user_data: None,
-                error: None,
-                warning: None,
-                serror: None,
+    pub fn new(schema: &'a XmlSchematron, options: i32) -> Option<Self> {
+        let mut ret = Self {
+            typ: XML_STRON_CTXT_VALIDATOR,
+            flags: options,
+            nberrors: 0,
+            err: 0,
+            schema,
+            xctxt: Box::new(XmlXPathContext::new(None)),
+            output_file: null_mut(),
+            output_buffer: vec![],
+            iowrite: None,
+            ioclose: None,
+            ioctx: null_mut(),
+            user_data: None,
+            error: None,
+            warning: None,
+            serror: None,
+        };
+        for (href, pref) in &schema.namespaces {
+            let Some(pref) = pref.as_deref() else {
+                break;
             };
-            if ret.xctxt.is_null() {
-                xml_schematron_perr_memory("allocating schema parser XPath context", None);
-                return None;
-            }
-            for (href, pref) in &schema.namespaces {
-                let Some(pref) = pref.as_deref() else {
-                    break;
-                };
-                (*ret.xctxt).register_ns(pref, Some(href.as_str()));
-            }
-            Some(ret)
+            ret.xctxt.register_ns(pref, Some(href.as_str()));
         }
+        Some(ret)
     }
 
     #[doc(alias = "xmlSchematronGetNode")]
     unsafe fn get_node(
-        &self,
+        &mut self,
         cur: Option<XmlGenericNodePtr>,
         xpath: &str,
     ) -> Option<XmlGenericNodePtr> {
         unsafe {
-            (*self.xctxt).doc = cur?.document();
-            (*self.xctxt).node = cur;
-            let ret = xml_xpath_eval(xpath, &mut *self.xctxt)?;
+            self.xctxt.doc = cur?.document();
+            self.xctxt.node = cur;
+            let ret = xml_xpath_eval(xpath, &mut self.xctxt)?;
 
             if ret.typ == XmlXPathObjectType::XPathNodeset {
                 if let Some(nodeset) = ret.nodesetval.as_deref() {
@@ -474,7 +465,7 @@ impl<'a> XmlSchematronValidCtxt<'a> {
     ///
     /// Returns a report string or NULL in case of error. The string needs to be deallocated by the caller
     #[doc(alias = "xmlSchematronFormatReport")]
-    unsafe fn format_report(&self, test: XmlNodePtr, cur: XmlNodePtr) -> Option<String> {
+    unsafe fn format_report(&mut self, test: XmlNodePtr, cur: XmlNodePtr) -> Option<String> {
         unsafe {
             let mut ret: Option<String> = None;
 
@@ -515,7 +506,7 @@ impl<'a> XmlSchematronValidCtxt<'a> {
                         .get_no_ns_prop("select")
                         .and_then(|select| xml_xpath_ctxt_compile(Some(&mut *self.xctxt), &select))
                         .unwrap();
-                    let eval = xml_xpath_compiled_eval(comp, &mut *self.xctxt).unwrap();
+                    let eval = xml_xpath_compiled_eval(comp, &mut self.xctxt).unwrap();
 
                     match eval.typ {
                         XmlXPathObjectType::XPathNodeset => {
@@ -593,7 +584,7 @@ impl<'a> XmlSchematronValidCtxt<'a> {
     /// Called from the validation engine when an assert or report test have been done.
     #[doc(alias = "xmlSchematronReportSuccess")]
     unsafe fn report_success(
-        &self,
+        &mut self,
         test: &XmlSchematronTest,
         cur: XmlNodePtr,
         pattern: Option<&XmlSchematronPattern>,
@@ -698,9 +689,9 @@ impl<'a> XmlSchematronValidCtxt<'a> {
             let mut failed: i32;
 
             failed = 0;
-            (*self.xctxt).doc = Some(instance);
-            (*self.xctxt).node = Some(cur.into());
-            if let Some(ret) = xml_xpath_compiled_eval(test.comp.clone(), &mut *self.xctxt) {
+            self.xctxt.doc = Some(instance);
+            self.xctxt.node = Some(cur.into());
+            if let Some(ret) = xml_xpath_compiled_eval(test.comp.clone(), &mut self.xctxt) {
                 match ret.typ {
                     XmlXPathObjectType::XPathXSLTTree | XmlXPathObjectType::XPathNodeset => {
                         if ret.nodesetval.as_deref().is_none_or(|n| n.is_empty()) {
@@ -781,7 +772,7 @@ impl<'a> XmlSchematronValidCtxt<'a> {
                             let mut test = rule.tests.as_deref();
 
                             if xml_schematron_register_variables(
-                                &mut *self.xctxt,
+                                &mut self.xctxt,
                                 rule.lets.as_deref(),
                                 instance,
                                 Some(cur_node.into()),
@@ -801,8 +792,10 @@ impl<'a> XmlSchematronValidCtxt<'a> {
                                 test = tst.next.as_deref();
                             }
 
-                            if xml_schematron_unregister_variables(self.xctxt, rule.lets.as_deref())
-                                != 0
+                            if xml_schematron_unregister_variables(
+                                &mut self.xctxt,
+                                rule.lets.as_deref(),
+                            ) != 0
                             {
                                 return -1;
                             }
@@ -838,7 +831,7 @@ impl<'a> XmlSchematronValidCtxt<'a> {
                                 let rule = rule.borrow();
                                 let mut test = rule.tests.as_deref();
                                 xml_schematron_register_variables(
-                                    &mut *self.xctxt,
+                                    &mut self.xctxt,
                                     rule.lets.as_deref(),
                                     instance,
                                     Some(cur_node.into()),
@@ -850,7 +843,7 @@ impl<'a> XmlSchematronValidCtxt<'a> {
                                 }
 
                                 xml_schematron_unregister_variables(
-                                    self.xctxt,
+                                    &mut self.xctxt,
                                     rule.lets.as_deref(),
                                 );
                             }
@@ -867,18 +860,6 @@ impl<'a> XmlSchematronValidCtxt<'a> {
     }
 }
 
-impl Drop for XmlSchematronValidCtxt<'_> {
-    /// Free the resources associated to the schema validation context
-    #[doc(alias = "xmlSchematronFreeValidCtxt")]
-    fn drop(&mut self) {
-        unsafe {
-            if !self.xctxt.is_null() {
-                xml_xpath_free_context(self.xctxt);
-            }
-        }
-    }
-}
-
 /// A schemas validation context
 #[doc(alias = "xmlSchematronParserCtxt")]
 #[repr(C)]
@@ -891,7 +872,7 @@ pub struct XmlSchematronParserCtxt<'a> {
 
     nberrors: i32,
     err: i32,
-    xctxt: XmlXPathContextPtr, /* the XPath context used for compilation */
+    xctxt: Box<XmlXPathContext>, /* the XPath context used for compilation */
 
     // the array of namespaces
     // (href, prefix)
@@ -912,31 +893,25 @@ impl<'a> XmlSchematronParserCtxt<'a> {
     ///
     /// Returns the parser context or NULL in case of error
     #[doc(alias = "xmlSchematronNewParserCtxt")]
-    pub unsafe fn new(url: &str) -> Option<Self> {
-        unsafe {
-            let ret = Self {
-                typ: XML_STRON_CTXT_PARSER,
-                url: Some(url.to_owned()),
-                doc: None,
-                preserve: 0,
-                buffer: &[],
-                nberrors: 0,
-                err: 0,
-                xctxt: xml_xpath_new_context(None),
-                namespaces: vec![],
-                includes: vec![],
-                user_data: None,
-                error: None,
-                warning: None,
-                serror: None,
-            };
-            if ret.xctxt.is_null() {
-                xml_schematron_perr_memory("allocating schema parser XPath context", None);
-                return None;
-            }
-            (*ret.xctxt).flags = XML_XPATH_CHECKNS as i32;
-            Some(ret)
-        }
+    pub fn new(url: &str) -> Option<Self> {
+        let mut ret = Self {
+            typ: XML_STRON_CTXT_PARSER,
+            url: Some(url.to_owned()),
+            doc: None,
+            preserve: 0,
+            buffer: &[],
+            nberrors: 0,
+            err: 0,
+            xctxt: Box::new(XmlXPathContext::new(None)),
+            namespaces: vec![],
+            includes: vec![],
+            user_data: None,
+            error: None,
+            warning: None,
+            serror: None,
+        };
+        ret.xctxt.flags = XML_XPATH_CHECKNS as i32;
+        Some(ret)
     }
 
     /// Create an XML Schematrons parse context for that memory buffer expected
@@ -957,7 +932,7 @@ impl<'a> XmlSchematronParserCtxt<'a> {
             buffer,
             nberrors: 0,
             err: 0,
-            xctxt: xml_xpath_new_context(None),
+            xctxt: Box::new(XmlXPathContext::new(None)),
             namespaces: vec![],
             includes: vec![],
             user_data: None,
@@ -965,10 +940,6 @@ impl<'a> XmlSchematronParserCtxt<'a> {
             warning: None,
             serror: None,
         };
-        if ret.xctxt.is_null() {
-            xml_schematron_perr_memory("allocating schema parser XPath context", None);
-            return None;
-        }
         Some(ret)
     }
 
@@ -987,7 +958,7 @@ impl<'a> XmlSchematronParserCtxt<'a> {
             buffer: &[],
             nberrors: 0,
             err: 0,
-            xctxt: xml_xpath_new_context(Some(doc)),
+            xctxt: Box::new(XmlXPathContext::new(Some(doc))),
             namespaces: vec![],
             includes: vec![],
             user_data: None,
@@ -995,11 +966,6 @@ impl<'a> XmlSchematronParserCtxt<'a> {
             warning: None,
             serror: None,
         };
-        if ret.xctxt.is_null() {
-            xml_schematron_perr_memory("allocating schema parser XPath context", None);
-            return None;
-        }
-
         Some(ret)
     }
 
@@ -1616,7 +1582,7 @@ impl Default for XmlSchematronParserCtxt<'_> {
             buffer: &[],
             nberrors: 0,
             err: 0,
-            xctxt: null_mut(),
+            xctxt: Box::new(XmlXPathContext::new(None)),
             namespaces: vec![],
             includes: vec![],
             user_data: None,
@@ -1634,9 +1600,6 @@ impl Drop for XmlSchematronParserCtxt<'_> {
         unsafe {
             if let Some(doc) = self.doc.filter(|_| self.preserve == 0) {
                 xml_free_doc(doc);
-            }
-            if !self.xctxt.is_null() {
-                xml_xpath_free_context(self.xctxt);
             }
         }
     }

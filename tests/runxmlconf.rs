@@ -2,13 +2,13 @@
 //! If you want this to work, please download https://www.w3.org/XML/Test/xmlts20130923.tar.gz from [W3C](http://www.w3.org/XML/Test/).
 
 use std::{
+    cell::RefCell,
     env::args,
-    ffi::{CStr, c_int},
+    ffi::CStr,
     fs::{File, metadata},
-    ptr::null_mut,
     sync::{
         Mutex,
-        atomic::{AtomicI32, AtomicPtr, AtomicUsize, Ordering},
+        atomic::{AtomicI32, AtomicUsize, Ordering},
     },
 };
 
@@ -27,10 +27,10 @@ use exml::{
         xml_init_parser, xml_read_file, xml_set_external_entity_loader,
     },
     tree::{NodeCommon, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr, xml_free_doc},
-    xpath::{XmlXPathContext, xml_xpath_free_context, xml_xpath_new_context},
+    xpath::XmlXPathContext,
 };
 
-static mut VERBOSE: c_int = 0;
+static mut VERBOSE: i32 = 0;
 
 const NB_EXPECTED_ERRORS: usize = 15;
 
@@ -129,7 +129,9 @@ fn test_error_handler(_user_data: Option<GenericErrorContext>, error: &XmlError)
     errors[TEST_ERRORS_SIZE.load(Ordering::Relaxed)] = 0;
 }
 
-static CTXT_XPATH: AtomicPtr<XmlXPathContext> = AtomicPtr::new(null_mut());
+thread_local! {
+    static CTXT_XPATH: RefCell<XmlXPathContext> = RefCell::new(XmlXPathContext::new(None));
+}
 
 unsafe fn initialize_libxml2() {
     unsafe {
@@ -144,8 +146,6 @@ unsafe fn initialize_libxml2() {
         );
         xml_init_parser();
         xml_set_external_entity_loader(test_external_entity_loader);
-        CTXT_XPATH.store(xml_xpath_new_context(None), Ordering::Relaxed);
-
         set_structured_error(Some(test_error_handler), None);
     }
 }
@@ -191,10 +191,10 @@ unsafe fn xmlconf_test_valid(
     logfile: &mut Option<File>,
     id: &str,
     filename: &str,
-    options: c_int,
-) -> c_int {
+    options: i32,
+) -> i32 {
     unsafe {
-        let mut ret: c_int = 1;
+        let mut ret: i32 = 1;
 
         let Some(mut ctxt) = XmlParserCtxt::new() else {
             test_log!(logfile, "test {id} : {filename} out of memory\n",);
@@ -279,11 +279,11 @@ unsafe fn xmlconf_test_not_wf(
     }
 }
 
-unsafe fn xmlconf_test_item(logfile: &mut Option<File>, doc: XmlDocPtr, cur: XmlNodePtr) -> c_int {
+unsafe fn xmlconf_test_item(logfile: &mut Option<File>, doc: XmlDocPtr, cur: XmlNodePtr) -> i32 {
     unsafe {
-        let mut ret: c_int = -1;
-        let mut options: c_int = 0;
-        let mut nstest: c_int = 0;
+        let mut ret: i32 = -1;
+        let mut options: i32 = 0;
+        let mut nstest: i32 = 0;
 
         TEST_ERRORS_SIZE.store(0, Ordering::Relaxed);
         TEST_ERRORS.lock().unwrap()[0] = 0;
@@ -359,7 +359,7 @@ unsafe fn xmlconf_test_item(logfile: &mut Option<File>, doc: XmlDocPtr, cur: Xml
         reset_last_error();
         TEST_ERRORS_SIZE.store(0, Ordering::Relaxed);
         TEST_ERRORS.lock().unwrap()[0] = 0;
-        let mem: c_int = xml_mem_used();
+        let mem: i32 = xml_mem_used();
 
         if typ == "not-wf" {
             if nstest == 0 {
@@ -388,7 +388,7 @@ unsafe fn xmlconf_test_item(logfile: &mut Option<File>, doc: XmlDocPtr, cur: Xml
 
         // Reset errors and check memory usage after the test
         reset_last_error();
-        let is_final: c_int = xml_mem_used();
+        let is_final: i32 = xml_mem_used();
         if is_final > mem {
             test_log!(
                 logfile,
@@ -408,12 +408,12 @@ unsafe fn xmlconf_test_cases(
     logfile: &mut Option<File>,
     doc: XmlDocPtr,
     cur: XmlNodePtr,
-    mut level: c_int,
-) -> c_int {
+    mut level: i32,
+) -> i32 {
     unsafe {
-        let mut ret: c_int = 0;
-        let mut tests: c_int = 0;
-        let mut output: c_int = 0;
+        let mut ret: i32 = 0;
+        let mut tests: i32 = 0;
+        let mut output: i32 = 0;
 
         if level == 1 {
             if let Some(profile) = cur.get_prop("PROFILE") {
@@ -447,9 +447,9 @@ unsafe fn xmlconf_test_cases(
     }
 }
 
-unsafe fn xmlconf_test_suite(logfile: &mut Option<File>, doc: XmlDocPtr, cur: XmlNodePtr) -> c_int {
+unsafe fn xmlconf_test_suite(logfile: &mut Option<File>, doc: XmlDocPtr, cur: XmlNodePtr) -> i32 {
     unsafe {
-        let mut ret: c_int = 0;
+        let mut ret: i32 = 0;
 
         if let Some(profile) = cur.get_prop("PROFILE") {
             println!("Test suite: {profile}",);
@@ -480,7 +480,7 @@ fn xmlconf_info() {
     eprintln!("  see http://www.w3.org/XML/Test/ for information");
 }
 
-unsafe fn xmlconf_test(logfile: &mut Option<File>) -> c_int {
+unsafe fn xmlconf_test(logfile: &mut Option<File>) -> i32 {
     unsafe {
         let confxml: &str = "xmlconf/xmlconf.xml";
 
@@ -509,10 +509,10 @@ unsafe fn xmlconf_test(logfile: &mut Option<File>) -> c_int {
 
 #[test]
 fn main() {
-    let mut ret: c_int;
-    let old_errors: c_int;
-    let old_tests: c_int;
-    let old_leaks: c_int;
+    let mut ret: i32;
+    let old_errors: i32;
+    let old_tests: i32;
+    let old_leaks: i32;
 
     const LOGFILE: &str = "runxmlconf.log";
 
@@ -577,7 +577,6 @@ fn main() {
                 ret = 0;
             }
         }
-        xml_xpath_free_context(CTXT_XPATH.load(Ordering::Relaxed));
         xml_cleanup_parser();
     }
 

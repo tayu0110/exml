@@ -49,7 +49,7 @@ use crate::{
         xml_new_doc_node, xml_new_doc_text, xml_static_copy_node, xml_static_copy_node_list,
     },
     uri::{XmlURI, build_relative_uri, build_uri, escape_url},
-    xpath::{XmlXPathContextPtr, XmlXPathObject, XmlXPathObjectType, xml_xpath_free_context},
+    xpath::{XmlXPathObject, XmlXPathObjectType},
 };
 
 /// A constant defining the Xinclude namespace: `http://www.w3.org/2003/XInclude`
@@ -1273,17 +1273,8 @@ impl XmlXIncludeCtxt {
                         return ret;
                     }
 
-                    let xptrctxt: XmlXPathContextPtr = xml_xptr_new_context(Some(doc), None, None);
-                    if xptrctxt.is_null() {
-                        xml_xinclude_err!(
-                            self,
-                            self.inc_tab[ref_index].elem.map(|node| node.into()),
-                            XmlParserErrors::XmlXIncludeXPtrFailed,
-                            "could not create XPointer context\n"
-                        );
-                        return ret;
-                    }
-                    let Some(mut xptr) = xml_xptr_eval(&fragment, &mut *xptrctxt) else {
+                    let mut xptrctxt = xml_xptr_new_context(Some(doc), None, None);
+                    let Some(mut xptr) = xml_xptr_eval(&fragment, &mut xptrctxt) else {
                         xml_xinclude_err!(
                             self,
                             self.inc_tab[ref_index].elem.map(|node| node.into()),
@@ -1291,7 +1282,6 @@ impl XmlXIncludeCtxt {
                             "XPointer evaluation failed: #{}\n",
                             fragment
                         );
-                        xml_xpath_free_context(xptrctxt);
                         return ret;
                     };
                     match xptr.typ {
@@ -1308,7 +1298,6 @@ impl XmlXIncludeCtxt {
                                 "XPointer is not a range: #{}\n",
                                 fragment
                             );
-                            xml_xpath_free_context(xptrctxt);
                             return ret;
                         }
                         #[cfg(feature = "libxml_xptr_locs")]
@@ -1320,12 +1309,10 @@ impl XmlXIncludeCtxt {
                                 "XPointer is not a range: #{}\n",
                                 fragment
                             );
-                            xml_xpath_free_context(xptrctxt);
                             return ret;
                         }
                         XmlXPathObjectType::XPathNodeset => {
                             if xptr.nodesetval.as_deref().is_none_or(|n| n.is_empty()) {
-                                xml_xpath_free_context(xptrctxt);
                                 return ret;
                             }
                         }
@@ -1396,7 +1383,6 @@ impl XmlXIncludeCtxt {
                         }
                     }
                     self.inc_tab[ref_index].inc = self.copy_xpointer(&xptr);
-                    xml_xpath_free_context(xptrctxt);
                 }
             } else {
                 // Add the top children list as the replacement copy.

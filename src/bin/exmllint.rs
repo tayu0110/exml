@@ -2304,20 +2304,14 @@ unsafe fn do_xpath_dump(cur: &XmlXPathObject) {
 
 #[cfg(feature = "xpath")]
 unsafe fn do_xpath_query(doc: XmlDocPtr, query: &str) {
-    unsafe {
-        use exml::xpath::{
-            XmlXPathContextPtr, xml_xpath_eval, xml_xpath_free_context, xml_xpath_new_context,
-        };
+    use exml::xpath::XmlXPathContext;
 
-        let ctxt: XmlXPathContextPtr = xml_xpath_new_context(Some(doc));
-        if ctxt.is_null() {
-            eprintln!("Out of memory for XPath");
-            PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
-            return;
-        }
-        (*ctxt).node = Some(doc.into());
-        let res = xml_xpath_eval(query, &mut *ctxt);
-        xml_xpath_free_context(ctxt);
+    unsafe {
+        use exml::xpath::xml_xpath_eval;
+
+        let mut ctxt = XmlXPathContext::new(Some(doc));
+        ctxt.node = Some(doc.into());
+        let res = xml_xpath_eval(query, &mut ctxt);
 
         let Some(res) = res else {
             eprintln!("XPath evaluation failure");

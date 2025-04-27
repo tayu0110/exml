@@ -2425,18 +2425,19 @@ fn ignore_generic_error(_ctx: Option<GenericErrorContext>, _msg: &str) {}
 
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
 unsafe fn test_xpath(xpath: &str, xptr: i32, expr: i32) {
+    use exml::xpath::XmlXPathContext;
+
     unsafe {
         use exml::{
             libxml::xpointer::{xml_xptr_eval, xml_xptr_new_context},
             xpath::{
-                XmlXPathContextPtr, xml_xpath_compile, xml_xpath_compiled_eval,
-                xml_xpath_debug_dump_object, xml_xpath_eval_expression, xml_xpath_free_context,
-                xml_xpath_new_context,
+                xml_xpath_compile, xml_xpath_compiled_eval, xml_xpath_debug_dump_object,
+                xml_xpath_eval_expression,
             },
         };
 
         let res;
-        let ctxt: XmlXPathContextPtr;
+        let mut ctxt;
 
         // Don't print generic errors to stderr.
         set_generic_error(Some(ignore_generic_error), None);
@@ -2446,21 +2447,21 @@ unsafe fn test_xpath(xpath: &str, xptr: i32, expr: i32) {
             #[cfg(feature = "xpointer")]
             {
                 ctxt = xml_xptr_new_context(XPATH_DOCUMENT.get(), None, None);
-                res = xml_xptr_eval(xpath, &mut *ctxt);
+                res = xml_xptr_eval(xpath, &mut ctxt);
             }
         } else {
             let xpath_document = XPATH_DOCUMENT.get();
-            ctxt = xml_xpath_new_context(xpath_document);
-            (*ctxt).node = xpath_document
+            ctxt = XmlXPathContext::new(xpath_document);
+            ctxt.node = xpath_document
                 .and_then(|doc| doc.get_root_element())
                 .map(|root| root.into());
             if expr != 0 {
-                res = xml_xpath_eval_expression(xpath, &mut *ctxt);
+                res = xml_xpath_eval_expression(xpath, &mut ctxt);
             } else {
                 /* res = xmlXPathEval(str, ctxt); */
 
                 if let Some(comp) = xml_xpath_compile(xpath) {
-                    res = xml_xpath_compiled_eval(comp, &mut *ctxt);
+                    res = xml_xpath_compiled_eval(comp, &mut ctxt);
                 } else {
                     res = None;
                 }
@@ -2471,7 +2472,6 @@ unsafe fn test_xpath(xpath: &str, xptr: i32, expr: i32) {
             xml_xpath_debug_dump_object(out, res.as_ref(), 0);
             out.flush().ok();
         });
-        xml_xpath_free_context(ctxt);
 
         // Reset generic error handler.
         set_generic_error(None, None);
@@ -3868,15 +3868,14 @@ unsafe fn pattern_test(
 
 #[cfg(feature = "c14n")]
 unsafe fn load_xpath_expr(parent_doc: XmlDocPtr, filename: &str) -> Option<XmlXPathObject> {
+    use exml::xpath::XmlXPathContext;
+
     unsafe {
         use exml::{
             globals::{set_load_ext_dtd_default_value, set_substitute_entities_default_value},
             parser::{XML_COMPLETE_ATTRS, XML_DETECT_IDS},
             tree::NodeCommon,
-            xpath::{
-                XmlXPathContextPtr, xml_xpath_eval_expression, xml_xpath_free_context,
-                xml_xpath_new_context,
-            },
+            xpath::xml_xpath_eval_expression,
         };
 
         // load XPath expr as a file
@@ -3916,24 +3915,18 @@ unsafe fn load_xpath_expr(parent_doc: XmlDocPtr, filename: &str) -> Option<XmlXP
             return None;
         };
 
-        let ctx: XmlXPathContextPtr = xml_xpath_new_context(Some(parent_doc));
-        if ctx.is_null() {
-            eprintln!("Error: unable to create new context");
-            xml_free_doc(doc);
-            return None;
-        }
+        let mut ctx = XmlXPathContext::new(Some(parent_doc));
 
         // Register namespaces
         let node = XmlNodePtr::try_from(node).unwrap();
         let mut ns = node.ns_def;
         while let Some(now) = ns {
-            if (*ctx).register_ns(now.prefix().as_deref().unwrap(), now.href().as_deref()) != 0 {
+            if ctx.register_ns(now.prefix().as_deref().unwrap(), now.href().as_deref()) != 0 {
                 eprintln!(
                     "Error: unable to register NS with prefix=\"{}\" and href=\"{}\"",
                     now.prefix.as_deref().unwrap(),
                     now.href.as_deref().unwrap()
                 );
-                xml_xpath_free_context(ctx);
                 xml_free_doc(doc);
                 return None;
             }
@@ -3941,16 +3934,14 @@ unsafe fn load_xpath_expr(parent_doc: XmlDocPtr, filename: &str) -> Option<XmlXP
         }
 
         // Evaluate xpath
-        let Some(xpath) = xml_xpath_eval_expression(&expr, &mut *ctx) else {
+        let Some(xpath) = xml_xpath_eval_expression(&expr, &mut ctx) else {
             eprintln!("Error: unable to evaluate xpath expression");
-            xml_xpath_free_context(ctx);
             xml_free_doc(doc);
             return None;
         };
 
         // print_xpath_nodes((*xpath).nodesetval);
 
-        xml_xpath_free_context(ctx);
         xml_free_doc(doc);
         Some(xpath)
     }

@@ -25,7 +25,7 @@ use std::{
 };
 
 #[cfg(feature = "xpath")]
-use crate::xpath::{XmlXPathContextPtr, XmlXPathObjectPtr, XmlXPathObjectType};
+use crate::xpath::{XmlXPathObjectPtr, XmlXPathObjectType};
 use crate::{
     error::{__xml_raise_error, XmlParserErrors},
     generic_error,
@@ -39,6 +39,7 @@ use crate::{
         XmlEntityType, XmlGenericNodePtr, XmlNodePtr, XmlNs, XmlNsPtr, validate_name,
         xml_free_node_list, xml_get_doc_entity,
     },
+    xpath::XmlXPathContext,
 };
 
 /// Handle a debug error.
@@ -1750,7 +1751,7 @@ pub struct XmlShellCtxt<'a> {
     filename: String,
     doc: Option<XmlDocPtr>,
     node: Option<XmlGenericNodePtr>,
-    pctxt: XmlXPathContextPtr,
+    pctxt: Option<Box<XmlXPathContext>>,
     loaded: i32,
     output: Box<dyn Write + 'a>,
     input: XmlShellReadlineFunc,
@@ -1857,14 +1858,12 @@ impl XmlShellCtxt<'_> {
         _node: Option<XmlGenericNodePtr>,
         _node2: Option<XmlGenericNodePtr>,
     ) -> i32 {
+        use crate::xpath::XmlXPathContext;
+
         unsafe {
             #[cfg(feature = "html")]
             use crate::html::parser::html_parse_file;
-            use crate::{
-                parser::xml_read_file,
-                uri::canonic_path,
-                xpath::{xml_xpath_free_context, xml_xpath_new_context},
-            };
+            use crate::{parser::xml_read_file, uri::canonic_path};
 
             use crate::tree::xml_free_doc;
 
@@ -1895,15 +1894,11 @@ impl XmlShellCtxt<'_> {
                 }
             }
             self.loaded = 1;
-            #[cfg(feature = "xpath")]
-            {
-                xml_xpath_free_context(self.pctxt);
-            }
             self.doc = Some(doc);
             self.node = Some(doc.into());
             #[cfg(feature = "xpath")]
             {
-                self.pctxt = xml_xpath_new_context(Some(doc));
+                self.pctxt = Some(Box::new(XmlXPathContext::new(Some(doc))));
             }
             let canonic = canonic_path(filename);
             self.filename = canonic.into_owned();
@@ -2409,38 +2404,36 @@ impl XmlShellCtxt<'_> {
     /// Returns 0 on success and a negative value otherwise.
     #[doc(alias = "xmlShellRegisterNamespace")]
     #[cfg(feature = "xpath")]
-    unsafe fn xml_shell_register_namespace(
+    fn xml_shell_register_namespace(
         &mut self,
         arg: Option<&str>,
         _node: Option<XmlGenericNodePtr>,
         _node2: Option<XmlGenericNodePtr>,
     ) -> i32 {
-        unsafe {
-            let Some(mut arg) = arg else {
-                return 0;
+        let Some(mut arg) = arg else {
+            return 0;
+        };
+
+        arg = arg.trim_start();
+        while !arg.is_empty() {
+            let Some((prefix, rem)) = arg.split_once('=') else {
+                writeln!(self.output, "setns: prefix=[nsuri] required").ok();
+                return -1;
             };
+            let (href, rem) = rem.split_once(' ').unwrap_or((rem, ""));
+            arg = rem.trim_start();
 
-            arg = arg.trim_start();
-            while !arg.is_empty() {
-                let Some((prefix, rem)) = arg.split_once('=') else {
-                    writeln!(self.output, "setns: prefix=[nsuri] required").ok();
-                    return -1;
-                };
-                let (href, rem) = rem.split_once(' ').unwrap_or((rem, ""));
-                arg = rem.trim_start();
-
-                // do register namespace
-                if (*self.pctxt).register_ns(prefix, Some(href)) != 0 {
-                    writeln!(
-                        self.output,
-                        "Error: unable to register NS with prefix=\"{prefix}\" and href=\"{href}\""
-                    )
-                    .ok();
-                    return -1;
-                }
+            // do register namespace
+            if self.pctxt.as_mut().unwrap().register_ns(prefix, Some(href)) != 0 {
+                writeln!(
+                    self.output,
+                    "Error: unable to register NS with prefix=\"{prefix}\" and href=\"{href}\""
+                )
+                .ok();
+                return -1;
             }
-            0
         }
+        0
     }
 
     /// Implements the XML shell function "setrootns"
@@ -2449,30 +2442,34 @@ impl XmlShellCtxt<'_> {
     /// Returns 0 on success and a negative value otherwise.
     #[doc(alias = "xmlShellRegisterRootNamespaces")]
     #[cfg(feature = "xpath")]
-    unsafe fn xml_shell_register_root_namespaces(
+    fn xml_shell_register_root_namespaces(
         &mut self,
         _arg: Option<&str>,
         root: XmlNodePtr,
         _node2: Option<XmlGenericNodePtr>,
     ) -> i32 {
-        unsafe {
-            if root.element_type() != XmlElementType::XmlElementNode
-                || root.ns_def.is_none()
-                || self.pctxt.is_null()
-            {
-                return -1;
-            }
-            let mut ns = root.ns_def;
-            while let Some(now) = ns {
-                if let Some(prefix) = now.prefix() {
-                    (*self.pctxt).register_ns(&prefix, now.href().as_deref());
-                } else {
-                    (*self.pctxt).register_ns("defaultns", now.href().as_deref());
-                }
-                ns = now.next;
-            }
-            0
+        if root.element_type() != XmlElementType::XmlElementNode
+            || root.ns_def.is_none()
+            || self.pctxt.is_none()
+        {
+            return -1;
         }
+        let mut ns = root.ns_def;
+        while let Some(now) = ns {
+            if let Some(prefix) = now.prefix() {
+                self.pctxt
+                    .as_mut()
+                    .unwrap()
+                    .register_ns(&prefix, now.href().as_deref());
+            } else {
+                self.pctxt
+                    .as_mut()
+                    .unwrap()
+                    .register_ns("defaultns", now.href().as_deref());
+            }
+            ns = now.next;
+        }
+        0
     }
 
     /// Implements the XML shell function "setbase"
@@ -2660,14 +2657,13 @@ pub unsafe fn xml_shell<'a>(
     input: Option<XmlShellReadlineFunc>,
     output: Option<impl Write + 'a>,
 ) {
+    use crate::xpath::XmlXPathContext;
+
     unsafe {
         use crate::{
             libxml::xmlmemory::xml_mem_show,
             tree::xml_free_doc,
-            xpath::{
-                xml_xpath_debug_dump_object, xml_xpath_eval, xml_xpath_free_context,
-                xml_xpath_new_context,
-            },
+            xpath::{xml_xpath_debug_dump_object, xml_xpath_eval},
         };
 
         if input.is_none() {
@@ -2681,15 +2677,12 @@ pub unsafe fn xml_shell<'a>(
             output: output.map_or(Box::new(stdout()) as Box<dyn Write + 'a>, |o| Box::new(o)),
             filename: filename.into(),
             node: Some(doc.into()),
-            pctxt: null_mut(),
+            pctxt: None,
         };
 
         #[cfg(feature = "xpath")]
         {
-            ctxt.pctxt = xml_xpath_new_context(Some(doc));
-            if ctxt.pctxt.is_null() {
-                return;
-            }
+            ctxt.pctxt = Some(Box::new(XmlXPathContext::new(Some(doc))));
         }
         let mut prompt = String::with_capacity(500);
         loop {
@@ -2801,11 +2794,11 @@ pub unsafe fn xml_shell<'a>(
                         ctxt.xml_shell_du(None, ctxt.node.unwrap(), None);
                         continue;
                     }
-                    (*ctxt.pctxt).node = ctxt.node;
+                    ctxt.pctxt.as_mut().unwrap().node = ctxt.node;
                     #[cfg(feature = "xpath")]
                     let list = {
-                        (*ctxt.pctxt).node = ctxt.node;
-                        xml_xpath_eval(arg, &mut *ctxt.pctxt)
+                        ctxt.pctxt.as_mut().unwrap().node = ctxt.node;
+                        xml_xpath_eval(arg, ctxt.pctxt.as_mut().unwrap())
                     };
                     #[cfg(not(feature = "xpath"))]
                     let list = None;
@@ -2852,7 +2845,7 @@ pub unsafe fn xml_shell<'a>(
                     } else {
                         generic_error!("{}: no such node\n", arg);
                     }
-                    (*ctxt.pctxt).node = None;
+                    ctxt.pctxt.as_mut().unwrap().node = None;
                 }
                 "base" => {
                     ctxt.xml_shell_base(None, ctxt.node, None);
@@ -2878,8 +2871,8 @@ pub unsafe fn xml_shell<'a>(
                     if arg.is_empty() {
                         generic_error!("xpath: expression required\n");
                     } else {
-                        (*ctxt.pctxt).node = ctxt.node;
-                        let list = xml_xpath_eval(arg, &mut *ctxt.pctxt);
+                        ctxt.pctxt.as_mut().unwrap().node = ctxt.node;
+                        let list = xml_xpath_eval(arg, ctxt.pctxt.as_mut().unwrap());
                         xml_xpath_debug_dump_object(&mut ctxt.output, list.as_ref(), 0);
                     }
                 }
@@ -2898,11 +2891,11 @@ pub unsafe fn xml_shell<'a>(
                         }
                         continue;
                     }
-                    (*ctxt.pctxt).node = ctxt.node;
+                    ctxt.pctxt.as_mut().unwrap().node = ctxt.node;
                     #[cfg(feature = "xpath")]
                     let list = {
-                        (*ctxt.pctxt).node = ctxt.node;
-                        xml_xpath_eval(arg, &mut *ctxt.pctxt)
+                        ctxt.pctxt.as_mut().unwrap().node = ctxt.node;
+                        xml_xpath_eval(arg, ctxt.pctxt.as_mut().unwrap())
                     };
                     #[cfg(not(feature = "xpath"))]
                     let list = None;
@@ -2955,7 +2948,7 @@ pub unsafe fn xml_shell<'a>(
                     } else {
                         generic_error!("{}: no such node\n", arg);
                     }
-                    (*ctxt.pctxt).node = None;
+                    ctxt.pctxt.as_mut().unwrap().node = None;
                 }
                 "whereis" => {
                     let mut dir = String::with_capacity(500);
@@ -2965,9 +2958,9 @@ pub unsafe fn xml_shell<'a>(
                             writeln!(ctxt.output, "{dir}").ok();
                         }
                     } else {
-                        (*ctxt.pctxt).node = ctxt.node;
+                        ctxt.pctxt.as_mut().unwrap().node = ctxt.node;
                         #[cfg(feature = "xpath")]
-                        let list = xml_xpath_eval(arg, &mut *ctxt.pctxt);
+                        let list = xml_xpath_eval(arg, ctxt.pctxt.as_mut().unwrap());
                         #[cfg(not(feature = "xpath"))]
                         let list = None;
                         if let Some(list) = list {
@@ -3016,7 +3009,7 @@ pub unsafe fn xml_shell<'a>(
                         } else {
                             generic_error!("{}: no such node\n", arg);
                         }
-                        (*ctxt.pctxt).node = None;
+                        ctxt.pctxt.as_mut().unwrap().node = None;
                     }
                 }
                 "cd" => {
@@ -3027,13 +3020,13 @@ pub unsafe fn xml_shell<'a>(
                     let mut arg = arg;
                     #[cfg(feature = "xpath")]
                     let list = {
-                        (*ctxt.pctxt).node = ctxt.node;
+                        ctxt.pctxt.as_mut().unwrap().node = ctxt.node;
                         if arg.len() >= 2 {
                             if let Some(new) = arg.strip_suffix('/') {
                                 arg = new;
                             }
                         }
-                        xml_xpath_eval(arg, &mut *ctxt.pctxt)
+                        xml_xpath_eval(arg, ctxt.pctxt.as_mut().unwrap())
                     };
                     #[cfg(not(feature = "xpath"))]
                     let list = None;
@@ -3099,18 +3092,18 @@ pub unsafe fn xml_shell<'a>(
                         generic_error!("{}: no such node\n", arg);
                     }
 
-                    (*ctxt.pctxt).node = None;
+                    ctxt.pctxt.as_mut().unwrap().node = None;
                 }
                 "cat" => {
                     if arg.is_empty() {
                         ctxt.xml_shell_cat(None, ctxt.node, None);
                         continue;
                     }
-                    (*ctxt.pctxt).node = ctxt.node;
+                    ctxt.pctxt.as_mut().unwrap().node = ctxt.node;
                     #[cfg(feature = "xpath")]
                     let list = {
-                        (*ctxt.pctxt).node = ctxt.node;
-                        xml_xpath_eval(arg, &mut *ctxt.pctxt)
+                        ctxt.pctxt.as_mut().unwrap().node = ctxt.node;
+                        xml_xpath_eval(arg, ctxt.pctxt.as_mut().unwrap())
                     };
                     #[cfg(not(feature = "xpath"))]
                     let list = None;
@@ -3160,16 +3153,12 @@ pub unsafe fn xml_shell<'a>(
                     } else {
                         generic_error!("{}: no such node\n", arg);
                     }
-                    (*ctxt.pctxt).node = None;
+                    ctxt.pctxt.as_mut().unwrap().node = None;
                 }
                 _ => {
                     generic_error!("Unknown command {command}\n");
                 }
             }
-        }
-        #[cfg(feature = "xpath")]
-        {
-            xml_xpath_free_context(ctxt.pctxt);
         }
         if ctxt.loaded != 0 {
             xml_free_doc(doc);

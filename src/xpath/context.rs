@@ -454,6 +454,28 @@ pub struct XmlXPathContext {
 }
 
 impl XmlXPathContext {
+    /// Create a new xmlXPathContext
+    ///
+    /// Returns the xmlXPathContext just allocated. The caller will need to free it.
+    #[doc(alias = "xmlXPathNewContext")]
+    pub fn new(doc: Option<XmlDocPtr>) -> Self {
+        let mut ret = XmlXPathContext::default();
+        ret.doc = doc;
+        ret.node = None;
+        ret.nb_types = 0;
+        ret.max_types = 0;
+        ret.types = null_mut();
+        ret.func_hash = HashMap::new();
+        ret.nb_axis = 0;
+        ret.max_axis = 0;
+        ret.axis = null_mut();
+        ret.user = null_mut();
+        ret.context_size = -1;
+        ret.proximity_position = -1;
+        ret.register_all_functions();
+        ret
+    }
+
     /// Register a new function. If @f is NULL it unregisters the function
     ///
     /// Returns 0 in case of success, -1 in case of error
@@ -750,28 +772,15 @@ impl Default for XmlXPathContext {
     }
 }
 
-/// Create a new xmlXPathContext
-///
-/// Returns the xmlXPathContext just allocated. The caller will need to free it.
-#[doc(alias = "xmlXPathNewContext")]
-pub fn xml_xpath_new_context(doc: Option<XmlDocPtr>) -> XmlXPathContextPtr {
-    let mut ret = Box::new(XmlXPathContext {
-        doc,
-        node: None,
-        nb_types: 0,
-        max_types: 0,
-        types: null_mut(),
-        func_hash: HashMap::new(),
-        nb_axis: 0,
-        max_axis: 0,
-        axis: null_mut(),
-        user: null_mut(),
-        context_size: -1,
-        proximity_position: -1,
-        ..Default::default()
-    });
-    ret.register_all_functions();
-    Box::leak(ret)
+impl Drop for XmlXPathContext {
+    /// Free up an xmlXPathContext
+    #[doc(alias = "xmlXPathFreeContext")]
+    fn drop(&mut self) {
+        self.cleanup_registered_ns();
+        self.cleanup_registered_func();
+        self.cleanup_registered_variables();
+        self.last_error.reset();
+    }
 }
 
 /// Free up an xmlXPathContext
