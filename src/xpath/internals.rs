@@ -526,7 +526,7 @@ pub(super) fn xml_xpath_next_preceding_internal(
 /// matches. Afterwards, keep only nodes between minPos and maxPos in the
 /// filtered result.
 #[doc(alias = "xmlXPathNodeSetFilter")]
-pub(super) unsafe fn xml_xpath_node_set_filter(
+pub(super) fn xml_xpath_node_set_filter(
     ctxt: &mut XmlXPathParserContext,
     set: Option<&mut XmlNodeSet>,
     filter_op_index: i32,
@@ -534,100 +534,97 @@ pub(super) unsafe fn xml_xpath_node_set_filter(
     max_pos: i32,
     has_ns_nodes: bool,
 ) {
-    unsafe {
-        let Some(set) = set.filter(|s| !s.is_empty()) else {
-            return;
-        };
+    let Some(set) = set.filter(|s| !s.is_empty()) else {
+        return;
+    };
 
-        // Check if the node set contains a sufficient number of nodes for
-        // the requested range.
-        if (set.node_tab.len() as i32) < min_pos {
-            set.clear(has_ns_nodes);
-            return;
+    // Check if the node set contains a sufficient number of nodes for
+    // the requested range.
+    if (set.node_tab.len() as i32) < min_pos {
+        set.clear(has_ns_nodes);
+        return;
+    }
+
+    let oldnode = ctxt.context.node;
+    let olddoc = ctxt.context.doc;
+    let oldcs: i32 = ctxt.context.context_size;
+    let oldpp: i32 = ctxt.context.proximity_position;
+
+    ctxt.context.context_size = set.node_tab.len() as i32;
+
+    let mut i = 0;
+    let mut j = 0;
+    let mut pos = 1;
+    while i < set.node_tab.len() {
+        let node = set.node_tab[i];
+
+        ctxt.context.node = Some(node);
+        ctxt.context.proximity_position = i as i32 + 1;
+
+        // Also set the xpath document in case things like
+        // key() are evaluated in the predicate.
+        //
+        // TODO: Get real doc for namespace nodes.
+        if !matches!(node.element_type(), XmlElementType::XmlNamespaceDecl)
+            && node.document().is_some()
+        {
+            ctxt.context.doc = node.document();
         }
 
-        let oldnode = ctxt.context.node;
-        let olddoc = ctxt.context.doc;
-        let oldcs: i32 = ctxt.context.context_size;
-        let oldpp: i32 = ctxt.context.proximity_position;
+        let res = ctxt.evaluate_precompiled_operation_to_boolean(filter_op_index as usize, true);
 
-        ctxt.context.context_size = set.node_tab.len() as i32;
+        if ctxt.error != XmlXPathError::XPathExpressionOK as i32 {
+            break;
+        }
+        if res < 0 {
+            // Shouldn't happen
+            xml_xpath_err(Some(ctxt), XmlXPathError::XPathExprError as i32);
+            break;
+        }
 
-        let mut i = 0;
-        let mut j = 0;
-        let mut pos = 1;
+        if res != 0 && (pos >= min_pos && pos <= max_pos) {
+            if i != j {
+                set.node_tab[j] = node;
+            }
+
+            j += 1;
+        } else {
+            // Remove the entry from the initial node set.
+            if let Ok(ns) = XmlNsPtr::try_from(node) {
+                xml_xpath_node_set_free_ns(ns);
+            }
+        }
+
+        if res != 0 {
+            if pos == max_pos {
+                i += 1;
+                break;
+            }
+
+            pos += 1;
+        }
+
+        i += 1;
+    }
+
+    // Free remaining nodes.
+    if has_ns_nodes {
         while i < set.node_tab.len() {
             let node = set.node_tab[i];
-
-            ctxt.context.node = Some(node);
-            ctxt.context.proximity_position = i as i32 + 1;
-
-            // Also set the xpath document in case things like
-            // key() are evaluated in the predicate.
-            //
-            // TODO: Get real doc for namespace nodes.
-            if !matches!(node.element_type(), XmlElementType::XmlNamespaceDecl)
-                && node.document().is_some()
-            {
-                ctxt.context.doc = node.document();
+            if let Ok(ns) = XmlNsPtr::try_from(node) {
+                xml_xpath_node_set_free_ns(ns);
             }
-
-            let res =
-                ctxt.evaluate_precompiled_operation_to_boolean(filter_op_index as usize, true);
-
-            if ctxt.error != XmlXPathError::XPathExpressionOK as i32 {
-                break;
-            }
-            if res < 0 {
-                // Shouldn't happen
-                xml_xpath_err(Some(ctxt), XmlXPathError::XPathExprError as i32);
-                break;
-            }
-
-            if res != 0 && (pos >= min_pos && pos <= max_pos) {
-                if i != j {
-                    set.node_tab[j] = node;
-                }
-
-                j += 1;
-            } else {
-                // Remove the entry from the initial node set.
-                if let Ok(ns) = XmlNsPtr::try_from(node) {
-                    xml_xpath_node_set_free_ns(ns);
-                }
-            }
-
-            if res != 0 {
-                if pos == max_pos {
-                    i += 1;
-                    break;
-                }
-
-                pos += 1;
-            }
-
             i += 1;
         }
-
-        // Free remaining nodes.
-        if has_ns_nodes {
-            while i < set.node_tab.len() {
-                let node = set.node_tab[i];
-                if let Ok(ns) = XmlNsPtr::try_from(node) {
-                    xml_xpath_node_set_free_ns(ns);
-                }
-                i += 1;
-            }
-        }
-
-        set.node_tab.truncate(j);
-        set.node_tab.shrink_to_fit();
-
-        ctxt.context.node = oldnode;
-        ctxt.context.doc = olddoc;
-        ctxt.context.context_size = oldcs;
-        ctxt.context.proximity_position = oldpp;
     }
+
+    set.node_tab.truncate(j);
+    set.node_tab.shrink_to_fit();
+
+    ctxt.context.node = oldnode;
+    ctxt.context.doc = olddoc;
+    ctxt.context.context_size = oldcs;
+    ctxt.context.proximity_position = oldpp;
 }
 
 /// Move the last node to the first position and clear temporary XPath objects
@@ -652,93 +649,91 @@ pub(super) fn xml_xpath_node_set_keep_last(set: Option<&mut XmlNodeSet>) {
 /// Afterwards, keep only nodes between minPos and maxPos in the filtered result.
 #[doc(alias = "xmlXPathLocationSetFilter")]
 #[cfg(feature = "libxml_xptr_locs")]
-pub(super) unsafe fn xml_xpath_location_set_filter(
+pub(super) fn xml_xpath_location_set_filter(
     ctxt: &mut XmlXPathParserContext,
     locset: &mut XmlLocationSet,
     filter_op_index: i32,
     min_pos: i32,
     max_pos: i32,
 ) {
-    unsafe {
-        if locset.loc_tab.is_empty() || filter_op_index == -1 {
-            return;
-        }
-
-        let oldnode = ctxt.context.node;
-        let olddoc = ctxt.context.doc;
-        let oldcs: i32 = ctxt.context.context_size;
-        let oldpp: i32 = ctxt.context.proximity_position;
-
-        ctxt.context.context_size = locset.loc_tab.len() as i32;
-
-        let mut i = 0;
-        let mut j = 0;
-        let mut pos = 1;
-        while i < locset.loc_tab.len() {
-            let context_node = locset.loc_tab[i]
-                .user
-                .as_ref()
-                .and_then(|user| user.as_node())
-                .copied()
-                .unwrap();
-
-            ctxt.context.node = Some(context_node);
-            ctxt.context.proximity_position = i as i32 + 1;
-
-            // Also set the xpath document in case things like
-            // key() are evaluated in the predicate.
-            //
-            // TODO: Get real doc for namespace nodes.
-            if !matches!(
-                context_node.element_type(),
-                XmlElementType::XmlNamespaceDecl
-            ) && context_node.document().is_some()
-            {
-                ctxt.context.doc = context_node.document();
-            }
-
-            let res: i32 =
-                ctxt.evaluate_precompiled_operation_to_boolean(filter_op_index as usize, true);
-
-            if ctxt.error != XmlXPathError::XPathExpressionOK as i32 {
-                break;
-            }
-            if res < 0 {
-                // Shouldn't happen
-                xml_xpath_err(Some(ctxt), XmlXPathError::XPathExprError as i32);
-                break;
-            }
-
-            if res != 0 && (pos >= min_pos && pos <= max_pos) {
-                if i != j {
-                    locset.loc_tab[j] = locset.loc_tab[i].clone();
-                }
-
-                j += 1;
-            }
-
-            if res != 0 {
-                if pos == max_pos {
-                    // i += 1;
-                    break;
-                }
-
-                pos += 1;
-            }
-
-            i += 1;
-        }
-
-        // Free remaining nodes.
-        locset.loc_tab.truncate(j);
-        // If too many elements were removed, shrink table to preserve memory.
-        locset.loc_tab.shrink_to(XML_NODESET_DEFAULT);
-
-        ctxt.context.node = oldnode;
-        ctxt.context.doc = olddoc;
-        ctxt.context.context_size = oldcs;
-        ctxt.context.proximity_position = oldpp;
+    if locset.loc_tab.is_empty() || filter_op_index == -1 {
+        return;
     }
+
+    let oldnode = ctxt.context.node;
+    let olddoc = ctxt.context.doc;
+    let oldcs: i32 = ctxt.context.context_size;
+    let oldpp: i32 = ctxt.context.proximity_position;
+
+    ctxt.context.context_size = locset.loc_tab.len() as i32;
+
+    let mut i = 0;
+    let mut j = 0;
+    let mut pos = 1;
+    while i < locset.loc_tab.len() {
+        let context_node = locset.loc_tab[i]
+            .user
+            .as_ref()
+            .and_then(|user| user.as_node())
+            .copied()
+            .unwrap();
+
+        ctxt.context.node = Some(context_node);
+        ctxt.context.proximity_position = i as i32 + 1;
+
+        // Also set the xpath document in case things like
+        // key() are evaluated in the predicate.
+        //
+        // TODO: Get real doc for namespace nodes.
+        if !matches!(
+            context_node.element_type(),
+            XmlElementType::XmlNamespaceDecl
+        ) && context_node.document().is_some()
+        {
+            ctxt.context.doc = context_node.document();
+        }
+
+        let res: i32 =
+            ctxt.evaluate_precompiled_operation_to_boolean(filter_op_index as usize, true);
+
+        if ctxt.error != XmlXPathError::XPathExpressionOK as i32 {
+            break;
+        }
+        if res < 0 {
+            // Shouldn't happen
+            xml_xpath_err(Some(ctxt), XmlXPathError::XPathExprError as i32);
+            break;
+        }
+
+        if res != 0 && (pos >= min_pos && pos <= max_pos) {
+            if i != j {
+                locset.loc_tab[j] = locset.loc_tab[i].clone();
+            }
+
+            j += 1;
+        }
+
+        if res != 0 {
+            if pos == max_pos {
+                // i += 1;
+                break;
+            }
+
+            pos += 1;
+        }
+
+        i += 1;
+    }
+
+    // Free remaining nodes.
+    locset.loc_tab.truncate(j);
+    // If too many elements were removed, shrink table to preserve memory.
+    locset.loc_tab.shrink_to(XML_NODESET_DEFAULT);
+
+    ctxt.context.node = oldnode;
+    ctxt.context.doc = olddoc;
+    ctxt.context.context_size = oldcs;
+    ctxt.context.proximity_position = oldpp;
 }
 
 pub(super) const MAX_FRAC: usize = 20;
@@ -1101,7 +1096,7 @@ fn xml_xpath_string_hash(string: &str) -> u32 {
 ///
 /// Returns 0 or 1 depending on the results of the test.
 #[doc(alias = "xmlXPathEqualNodeSetString")]
-unsafe fn xml_xpath_equal_node_set_string(arg: XmlXPathObject, s: &str, neq: i32) -> i32 {
+fn xml_xpath_equal_node_set_string(arg: XmlXPathObject, s: &str, neq: i32) -> i32 {
     if !matches!(
         arg.typ,
         XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
@@ -1308,135 +1303,131 @@ fn xml_xpath_equal_values_common(
 ///
 /// Returns 0 or 1 depending on the results of the test.
 #[doc(alias = "xmlXPathEqualValues")]
-pub unsafe fn xml_xpath_equal_values(ctxt: &mut XmlXPathParserContext) -> i32 {
-    unsafe {
-        let mut ret: i32 = 0;
+pub fn xml_xpath_equal_values(ctxt: &mut XmlXPathParserContext) -> i32 {
+    let mut ret: i32 = 0;
 
-        let Some((mut arg2, mut arg1)) = ctxt.value_pop().zip(ctxt.value_pop()) else {
-            xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathInvalidOperand as i32);
-            return 0;
-        };
+    let Some((mut arg2, mut arg1)) = ctxt.value_pop().zip(ctxt.value_pop()) else {
+        xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathInvalidOperand as i32);
+        return 0;
+    };
 
-        if arg1 == arg2 {
-            return 1;
-        }
+    if arg1 == arg2 {
+        return 1;
+    }
 
-        // If either argument is a nodeset, it's a 'special case'
-        if matches!(
-            arg2.typ,
-            XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
-        ) || matches!(
+    // If either argument is a nodeset, it's a 'special case'
+    if matches!(
+        arg2.typ,
+        XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
+    ) || matches!(
+        arg1.typ,
+        XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
+    ) {
+        // Hack it to assure arg1 is the nodeset
+        if !matches!(
             arg1.typ,
             XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
         ) {
-            // Hack it to assure arg1 is the nodeset
-            if !matches!(
-                arg1.typ,
-                XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
-            ) {
-                (arg1, arg2) = (arg2, arg1);
-            }
-            match arg2.typ {
-                XmlXPathObjectType::XPathUndefined => {}
-                XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
-                    ret = xml_xpath_equal_node_sets(arg1, arg2, 0);
-                }
-                XmlXPathObjectType::XPathBoolean => {
-                    let f = arg1.nodesetval.as_deref().is_some_and(|n| !n.is_empty());
-                    ret = (f == arg2.boolval) as i32;
-                }
-                XmlXPathObjectType::XPathNumber => {
-                    ret = xml_xpath_equal_node_set_float(ctxt, arg1, arg2.floatval, 0);
-                }
-                XmlXPathObjectType::XPathString => {
-                    ret = xml_xpath_equal_node_set_string(
-                        arg1,
-                        arg2.stringval.as_deref().expect("Internal Error"),
-                        0,
-                    );
-                }
-                XmlXPathObjectType::XPathUsers => {
-                    todo!()
-                }
-                #[cfg(feature = "libxml_xptr_locs")]
-                XmlXPathObjectType::XPathPoint
-                | XmlXPathObjectType::XPathRange
-                | XmlXPathObjectType::XPathLocationset => todo!(),
-                // _ => {}
-            }
-            return ret;
+            (arg1, arg2) = (arg2, arg1);
         }
-
-        xml_xpath_equal_values_common(ctxt, arg1, arg2)
+        match arg2.typ {
+            XmlXPathObjectType::XPathUndefined => {}
+            XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
+                ret = xml_xpath_equal_node_sets(arg1, arg2, 0);
+            }
+            XmlXPathObjectType::XPathBoolean => {
+                let f = arg1.nodesetval.as_deref().is_some_and(|n| !n.is_empty());
+                ret = (f == arg2.boolval) as i32;
+            }
+            XmlXPathObjectType::XPathNumber => {
+                ret = xml_xpath_equal_node_set_float(ctxt, arg1, arg2.floatval, 0);
+            }
+            XmlXPathObjectType::XPathString => {
+                ret = xml_xpath_equal_node_set_string(
+                    arg1,
+                    arg2.stringval.as_deref().expect("Internal Error"),
+                    0,
+                );
+            }
+            XmlXPathObjectType::XPathUsers => {
+                todo!()
+            }
+            #[cfg(feature = "libxml_xptr_locs")]
+            XmlXPathObjectType::XPathPoint
+            | XmlXPathObjectType::XPathRange
+            | XmlXPathObjectType::XPathLocationset => todo!(),
+            // _ => {}
+        }
+        return ret;
     }
+
+    xml_xpath_equal_values_common(ctxt, arg1, arg2)
 }
 
 /// Implement the equal operation on XPath objects content: @arg1 == @arg2
 ///
 /// Returns 0 or 1 depending on the results of the test.
 #[doc(alias = "xmlXPathNotEqualValues")]
-pub unsafe fn xml_xpath_not_equal_values(ctxt: &mut XmlXPathParserContext) -> i32 {
-    unsafe {
-        let mut ret: i32 = 0;
+pub fn xml_xpath_not_equal_values(ctxt: &mut XmlXPathParserContext) -> i32 {
+    let mut ret: i32 = 0;
 
-        let Some((mut arg2, mut arg1)) = ctxt.value_pop().zip(ctxt.value_pop()) else {
-            xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathInvalidOperand as i32);
-            return 0;
-        };
+    let Some((mut arg2, mut arg1)) = ctxt.value_pop().zip(ctxt.value_pop()) else {
+        xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathInvalidOperand as i32);
+        return 0;
+    };
 
-        if arg1 == arg2 {
-            return 0;
-        }
+    if arg1 == arg2 {
+        return 0;
+    }
 
-        // If either argument is a nodeset, it's a 'special case'
-        if matches!(
-            arg2.typ,
-            XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
-        ) || matches!(
+    // If either argument is a nodeset, it's a 'special case'
+    if matches!(
+        arg2.typ,
+        XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
+    ) || matches!(
+        arg1.typ,
+        XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
+    ) {
+        // Hack it to assure arg1 is the nodeset
+        if !matches!(
             arg1.typ,
             XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
         ) {
-            // Hack it to assure arg1 is the nodeset
-            if !matches!(
-                arg1.typ,
-                XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
-            ) {
-                (arg1, arg2) = (arg2, arg1);
-            }
-            match arg2.typ {
-                XmlXPathObjectType::XPathUndefined => {}
-                XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
-                    ret = xml_xpath_equal_node_sets(arg1, arg2, 1);
-                }
-                XmlXPathObjectType::XPathBoolean => {
-                    let f = arg1.nodesetval.as_deref().is_some_and(|n| !n.is_empty());
-                    ret = (f != arg2.boolval) as i32;
-                }
-                XmlXPathObjectType::XPathNumber => {
-                    ret = xml_xpath_equal_node_set_float(ctxt, arg1, arg2.floatval, 1);
-                }
-                XmlXPathObjectType::XPathString => {
-                    ret = xml_xpath_equal_node_set_string(
-                        arg1,
-                        arg2.stringval.as_deref().expect("Internal Error"),
-                        1,
-                    );
-                }
-                XmlXPathObjectType::XPathUsers => {
-                    todo!()
-                }
-                #[cfg(feature = "libxml_xptr_locs")]
-                XmlXPathObjectType::XPathPoint
-                | XmlXPathObjectType::XPathRange
-                | XmlXPathObjectType::XPathLocationset => {
-                    todo!()
-                } // _ => {}
-            }
-            return ret;
+            (arg1, arg2) = (arg2, arg1);
         }
-
-        (xml_xpath_equal_values_common(ctxt, arg1, arg2) == 0) as i32
+        match arg2.typ {
+            XmlXPathObjectType::XPathUndefined => {}
+            XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
+                ret = xml_xpath_equal_node_sets(arg1, arg2, 1);
+            }
+            XmlXPathObjectType::XPathBoolean => {
+                let f = arg1.nodesetval.as_deref().is_some_and(|n| !n.is_empty());
+                ret = (f != arg2.boolval) as i32;
+            }
+            XmlXPathObjectType::XPathNumber => {
+                ret = xml_xpath_equal_node_set_float(ctxt, arg1, arg2.floatval, 1);
+            }
+            XmlXPathObjectType::XPathString => {
+                ret = xml_xpath_equal_node_set_string(
+                    arg1,
+                    arg2.stringval.as_deref().expect("Internal Error"),
+                    1,
+                );
+            }
+            XmlXPathObjectType::XPathUsers => {
+                todo!()
+            }
+            #[cfg(feature = "libxml_xptr_locs")]
+            XmlXPathObjectType::XPathPoint
+            | XmlXPathObjectType::XPathRange
+            | XmlXPathObjectType::XPathLocationset => {
+                todo!()
+            } // _ => {}
+        }
+        return ret;
     }
+
+    (xml_xpath_equal_values_common(ctxt, arg1, arg2) == 0) as i32
 }
 
 /// Implement the compare operation on nodesets:
@@ -1548,37 +1539,35 @@ fn xml_xpath_compare_node_sets(
 ///
 /// Returns 0 or 1 depending on the results of the test.
 #[doc(alias = "xmlXPathCompareNodeSetFloat")]
-unsafe fn xml_xpath_compare_node_set_float(
+fn xml_xpath_compare_node_set_float(
     ctxt: &mut XmlXPathParserContext,
     inf: i32,
     strict: i32,
     arg: XmlXPathObject,
     f: XmlXPathObject,
 ) -> i32 {
-    unsafe {
-        let mut ret: i32 = 0;
+    let mut ret: i32 = 0;
 
-        if !matches!(
-            arg.typ,
-            XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
-        ) {
-            return 0;
-        }
-        if let Some(ns) = arg.nodesetval.as_deref() {
-            for &node in &ns.node_tab {
-                ctxt.value_push(xml_xpath_new_string(Some(&xml_xpath_cast_node_to_string(
-                    Some(node),
-                ))));
-                xml_xpath_number_function(ctxt, 1);
-                ctxt.value_push(xml_xpath_object_copy(&f));
-                ret = xml_xpath_compare_values(ctxt, inf, strict);
-                if ret != 0 {
-                    break;
-                }
+    if !matches!(
+        arg.typ,
+        XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
+    ) {
+        return 0;
+    }
+    if let Some(ns) = arg.nodesetval.as_deref() {
+        for &node in &ns.node_tab {
+            ctxt.value_push(xml_xpath_new_string(Some(&xml_xpath_cast_node_to_string(
+                Some(node),
+            ))));
+            xml_xpath_number_function(ctxt, 1);
+            ctxt.value_push(xml_xpath_object_copy(&f));
+            ret = xml_xpath_compare_values(ctxt, inf, strict);
+            if ret != 0 {
+                break;
             }
         }
-        ret
     }
+    ret
 }
 
 /// Implement the compare operation between a nodeset and a string
@@ -1594,36 +1583,34 @@ unsafe fn xml_xpath_compare_node_set_float(
 ///
 /// Returns 0 or 1 depending on the results of the test.
 #[doc(alias = "xmlXPathCompareNodeSetString")]
-unsafe fn xml_xpath_compare_node_set_string(
+fn xml_xpath_compare_node_set_string(
     ctxt: &mut XmlXPathParserContext,
     inf: i32,
     strict: i32,
     arg: XmlXPathObject,
     s: XmlXPathObject,
 ) -> i32 {
-    unsafe {
-        let mut ret: i32 = 0;
+    let mut ret: i32 = 0;
 
-        if !matches!(
-            arg.typ,
-            XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
-        ) {
-            return 0;
-        }
-        if let Some(ns) = arg.nodesetval.as_deref() {
-            for &node in &ns.node_tab {
-                ctxt.value_push(xml_xpath_new_string(Some(&xml_xpath_cast_node_to_string(
-                    Some(node),
-                ))));
-                ctxt.value_push(xml_xpath_object_copy(&s));
-                ret = xml_xpath_compare_values(ctxt, inf, strict);
-                if ret != 0 {
-                    break;
-                }
+    if !matches!(
+        arg.typ,
+        XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
+    ) {
+        return 0;
+    }
+    if let Some(ns) = arg.nodesetval.as_deref() {
+        for &node in &ns.node_tab {
+            ctxt.value_push(xml_xpath_new_string(Some(&xml_xpath_cast_node_to_string(
+                Some(node),
+            ))));
+            ctxt.value_push(xml_xpath_object_copy(&s));
+            ret = xml_xpath_compare_values(ctxt, inf, strict);
+            if ret != 0 {
+                break;
             }
         }
-        ret
     }
+    ret
 }
 
 /// Implement the compare operation between a nodeset and a value
@@ -1639,45 +1626,43 @@ unsafe fn xml_xpath_compare_node_set_string(
 ///
 /// Returns 0 or 1 depending on the results of the test.
 #[doc(alias = "xmlXPathCompareNodeSetValue")]
-unsafe fn xml_xpath_compare_node_set_value(
+fn xml_xpath_compare_node_set_value(
     ctxt: &mut XmlXPathParserContext,
     inf: i32,
     strict: i32,
     arg: XmlXPathObject,
     val: XmlXPathObject,
 ) -> i32 {
-    unsafe {
-        if !matches!(
-            arg.typ,
-            XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
-        ) {
-            return 0;
-        }
+    if !matches!(
+        arg.typ,
+        XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
+    ) {
+        return 0;
+    }
 
-        match val.typ {
-            XmlXPathObjectType::XPathNumber => {
-                xml_xpath_compare_node_set_float(ctxt, inf, strict, arg, val)
-            }
-            XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
-                xml_xpath_compare_node_sets(inf, strict, arg, val)
-            }
-            XmlXPathObjectType::XPathString => {
-                xml_xpath_compare_node_set_string(ctxt, inf, strict, arg, val)
-            }
-            XmlXPathObjectType::XPathBoolean => {
-                ctxt.value_push(arg);
-                xml_xpath_boolean_function(ctxt, 1);
-                ctxt.value_push(val);
-                xml_xpath_compare_values(ctxt, inf, strict)
-            }
-            _ => {
-                generic_error!(
-                    "xmlXPathCompareNodeSetValue: Can't compare node set and object of type {:?}\n",
-                    val.typ
-                );
-                xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
-                0
-            }
+    match val.typ {
+        XmlXPathObjectType::XPathNumber => {
+            xml_xpath_compare_node_set_float(ctxt, inf, strict, arg, val)
+        }
+        XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
+            xml_xpath_compare_node_sets(inf, strict, arg, val)
+        }
+        XmlXPathObjectType::XPathString => {
+            xml_xpath_compare_node_set_string(ctxt, inf, strict, arg, val)
+        }
+        XmlXPathObjectType::XPathBoolean => {
+            ctxt.value_push(arg);
+            xml_xpath_boolean_function(ctxt, 1);
+            ctxt.value_push(val);
+            xml_xpath_compare_values(ctxt, inf, strict)
+        }
+        _ => {
+            generic_error!(
+                "xmlXPathCompareNodeSetValue: Can't compare node set and object of type {:?}\n",
+                val.typ
+            );
+            xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
+            0
         }
     }
 }
@@ -1700,109 +1685,103 @@ unsafe fn xml_xpath_compare_node_set_value(
 ///
 /// Returns 1 if the comparison succeeded, 0 if it failed
 #[doc(alias = "xmlXPathCompareValues")]
-pub unsafe fn xml_xpath_compare_values(
-    ctxt: &mut XmlXPathParserContext,
-    inf: i32,
-    strict: i32,
-) -> i32 {
-    unsafe {
-        let mut ret: i32 = 0;
-        let arg1i: i32;
-        let arg2i: i32;
+pub fn xml_xpath_compare_values(ctxt: &mut XmlXPathParserContext, inf: i32, strict: i32) -> i32 {
+    let mut ret: i32 = 0;
+    let arg1i: i32;
+    let arg2i: i32;
 
-        let Some((mut arg2, mut arg1)) = ctxt.value_pop().zip(ctxt.value_pop()) else {
-            xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathInvalidOperand as i32);
-            return 0;
-        };
+    let Some((mut arg2, mut arg1)) = ctxt.value_pop().zip(ctxt.value_pop()) else {
+        xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathInvalidOperand as i32);
+        return 0;
+    };
 
+    if matches!(
+        arg2.typ,
+        XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
+    ) || matches!(
+        arg1.typ,
+        XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
+    ) {
+        // If either argument is a XpathNodeset or XpathXsltTree the two arguments
+        // are not freed from within this routine; they will be freed from the
+        // called routine, e.g. xmlXPathCompareNodeSets or xmlXPathCompareNodeSetValue
         if matches!(
             arg2.typ,
             XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
-        ) || matches!(
+        ) && matches!(
             arg1.typ,
             XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
         ) {
-            // If either argument is a XpathNodeset or XpathXsltTree the two arguments
-            // are not freed from within this routine; they will be freed from the
-            // called routine, e.g. xmlXPathCompareNodeSets or xmlXPathCompareNodeSetValue
-            if matches!(
-                arg2.typ,
-                XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
-            ) && matches!(
-                arg1.typ,
-                XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
-            ) {
-                ret = xml_xpath_compare_node_sets(inf, strict, arg1, arg2);
-            } else if matches!(
-                arg1.typ,
-                XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
-            ) {
-                ret = xml_xpath_compare_node_set_value(ctxt, inf, strict, arg1, arg2);
-            } else {
-                ret = xml_xpath_compare_node_set_value(ctxt, !inf, strict, arg2, arg1);
-            }
-            return ret;
-        }
-
-        if !matches!(arg1.typ, XmlXPathObjectType::XPathNumber) {
-            ctxt.value_push(arg1);
-            xml_xpath_number_function(&mut *ctxt, 1);
-            arg1 = ctxt.value_pop().unwrap();
-        }
-        if !matches!(arg2.typ, XmlXPathObjectType::XPathNumber) {
-            ctxt.value_push(arg2);
-            xml_xpath_number_function(&mut *ctxt, 1);
-            arg2 = ctxt.value_pop().unwrap();
-        }
-        if ctxt.error != 0 {
-            // goto error;
-            return ret;
-        }
-        // Add tests for infinity and nan
-        // => feedback on 3.4 for Inf and NaN
-        /* Hand check NaN and Infinity comparisons */
-        if xml_xpath_is_nan(arg1.floatval) || xml_xpath_is_nan(arg2.floatval) {
-            ret = 0;
+            ret = xml_xpath_compare_node_sets(inf, strict, arg1, arg2);
+        } else if matches!(
+            arg1.typ,
+            XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
+        ) {
+            ret = xml_xpath_compare_node_set_value(ctxt, inf, strict, arg1, arg2);
         } else {
-            arg1i = xml_xpath_is_inf(arg1.floatval);
-            arg2i = xml_xpath_is_inf(arg2.floatval);
-            if inf != 0 && strict != 0 {
-                if (arg1i == -1 && arg2i != -1) || (arg2i == 1 && arg1i != 1) {
-                    ret = 1;
-                } else if arg1i == 0 && arg2i == 0 {
-                    ret = (arg1.floatval < arg2.floatval) as i32;
-                } else {
-                    ret = 0;
-                }
-            } else if inf != 0 && strict == 0 {
-                if arg1i == -1 || arg2i == 1 {
-                    ret = 1;
-                } else if arg1i == 0 && arg2i == 0 {
-                    ret = (arg1.floatval <= arg2.floatval) as i32;
-                } else {
-                    ret = 0;
-                }
-            } else if inf == 0 && strict != 0 {
-                if (arg1i == 1 && arg2i != 1) || (arg2i == -1 && arg1i != -1) {
-                    ret = 1;
-                } else if arg1i == 0 && arg2i == 0 {
-                    ret = (arg1.floatval > arg2.floatval) as i32;
-                } else {
-                    ret = 0;
-                }
-            } else if inf == 0 && strict == 0 {
-                if arg1i == 1 || arg2i == -1 {
-                    ret = 1;
-                } else if arg1i == 0 && arg2i == 0 {
-                    ret = (arg1.floatval >= arg2.floatval) as i32;
-                } else {
-                    ret = 0;
-                }
+            ret = xml_xpath_compare_node_set_value(ctxt, !inf, strict, arg2, arg1);
+        }
+        return ret;
+    }
+
+    if !matches!(arg1.typ, XmlXPathObjectType::XPathNumber) {
+        ctxt.value_push(arg1);
+        xml_xpath_number_function(&mut *ctxt, 1);
+        arg1 = ctxt.value_pop().unwrap();
+    }
+    if !matches!(arg2.typ, XmlXPathObjectType::XPathNumber) {
+        ctxt.value_push(arg2);
+        xml_xpath_number_function(&mut *ctxt, 1);
+        arg2 = ctxt.value_pop().unwrap();
+    }
+    if ctxt.error != 0 {
+        // goto error;
+        return ret;
+    }
+    // Add tests for infinity and nan
+    // => feedback on 3.4 for Inf and NaN
+    /* Hand check NaN and Infinity comparisons */
+    if xml_xpath_is_nan(arg1.floatval) || xml_xpath_is_nan(arg2.floatval) {
+        ret = 0;
+    } else {
+        arg1i = xml_xpath_is_inf(arg1.floatval);
+        arg2i = xml_xpath_is_inf(arg2.floatval);
+        if inf != 0 && strict != 0 {
+            if (arg1i == -1 && arg2i != -1) || (arg2i == 1 && arg1i != 1) {
+                ret = 1;
+            } else if arg1i == 0 && arg2i == 0 {
+                ret = (arg1.floatval < arg2.floatval) as i32;
+            } else {
+                ret = 0;
+            }
+        } else if inf != 0 && strict == 0 {
+            if arg1i == -1 || arg2i == 1 {
+                ret = 1;
+            } else if arg1i == 0 && arg2i == 0 {
+                ret = (arg1.floatval <= arg2.floatval) as i32;
+            } else {
+                ret = 0;
+            }
+        } else if inf == 0 && strict != 0 {
+            if (arg1i == 1 && arg2i != 1) || (arg2i == -1 && arg1i != -1) {
+                ret = 1;
+            } else if arg1i == 0 && arg2i == 0 {
+                ret = (arg1.floatval > arg2.floatval) as i32;
+            } else {
+                ret = 0;
+            }
+        } else if inf == 0 && strict == 0 {
+            if arg1i == 1 || arg2i == -1 {
+                ret = 1;
+            } else if arg1i == 0 && arg2i == 0 {
+                ret = (arg1.floatval >= arg2.floatval) as i32;
+            } else {
+                ret = 0;
             }
         }
-        // error:
-        ret
     }
+    // error:
+    ret
 }
 
 /// Implement the unary - operation on an XPath object

@@ -24,12 +24,7 @@
 //
 // daniel@veillard.com
 
-use std::{
-    borrow::Cow,
-    mem::take,
-    os::raw::c_void,
-    ptr::{addr_of_mut, null_mut},
-};
+use std::{borrow::Cow, mem::take, os::raw::c_void, ptr::null_mut};
 
 use crate::{
     encoding::{XmlCharEncoding, get_encoding_handler},
@@ -1118,7 +1113,7 @@ impl XmlXIncludeCtxt {
                     }
                 }
                 // Skip to next node in document order
-                cur = xml_xptr_advance_node(cur_node, addr_of_mut!(level));
+                cur = xml_xptr_advance_node(cur_node, &mut level);
                 if end_flag != 0 && level >= end_level {
                     break;
                 }

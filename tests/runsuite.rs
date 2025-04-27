@@ -217,48 +217,44 @@ unsafe fn initialize_libxml2() {
     }
 }
 
-unsafe fn get_next(cur: Option<XmlNodePtr>, xpath: &str) -> Option<XmlNodePtr> {
-    unsafe {
-        let cur_doc = cur?.doc?;
-        let res = CTXT_XPATH.with_borrow_mut(|ctxt| {
-            ctxt.doc = Some(cur_doc);
-            ctxt.node = Some(XmlGenericNodePtr::from(cur?));
-            let Some(comp) = xml_xpath_compile(xpath) else {
-                eprintln!("Failed to compile {}", xpath);
-                return None;
-            };
-            xml_xpath_compiled_eval(comp, ctxt)
-        })?;
-        let mut ret = None;
-        if res.typ == XmlXPathObjectType::XPathNodeset {
-            if let Some(nodeset) = res.nodesetval.as_deref() {
-                if !nodeset.node_tab.is_empty() {
-                    ret = Some(nodeset.node_tab[0]);
-                }
+fn get_next(cur: Option<XmlNodePtr>, xpath: &str) -> Option<XmlNodePtr> {
+    let cur_doc = cur?.doc?;
+    let res = CTXT_XPATH.with_borrow_mut(|ctxt| {
+        ctxt.doc = Some(cur_doc);
+        ctxt.node = Some(XmlGenericNodePtr::from(cur?));
+        let Some(comp) = xml_xpath_compile(xpath) else {
+            eprintln!("Failed to compile {}", xpath);
+            return None;
+        };
+        xml_xpath_compiled_eval(comp, ctxt)
+    })?;
+    let mut ret = None;
+    if res.typ == XmlXPathObjectType::XPathNodeset {
+        if let Some(nodeset) = res.nodesetval.as_deref() {
+            if !nodeset.node_tab.is_empty() {
+                ret = Some(nodeset.node_tab[0]);
             }
         }
-        ret.and_then(|ret| XmlNodePtr::try_from(ret).ok())
     }
+    ret.and_then(|ret| XmlNodePtr::try_from(ret).ok())
 }
 
-unsafe fn get_string(cur: XmlNodePtr, xpath: &str) -> Option<String> {
-    unsafe {
-        let cur_doc = cur.doc?;
-        let mut res = CTXT_XPATH.with_borrow_mut(|ctxt| {
-            ctxt.doc = Some(cur_doc);
-            ctxt.node = Some(XmlGenericNodePtr::from(cur));
-            let Some(comp) = xml_xpath_compile(xpath) else {
-                eprintln!("Failed to compile {}", xpath);
-                return None;
-            };
-            xml_xpath_compiled_eval(comp, ctxt)
-        })?;
-        let mut ret = None;
-        if res.typ == XmlXPathObjectType::XPathString {
-            ret = res.stringval.take();
-        }
-        ret
+fn get_string(cur: XmlNodePtr, xpath: &str) -> Option<String> {
+    let cur_doc = cur.doc?;
+    let mut res = CTXT_XPATH.with_borrow_mut(|ctxt| {
+        ctxt.doc = Some(cur_doc);
+        ctxt.node = Some(XmlGenericNodePtr::from(cur));
+        let Some(comp) = xml_xpath_compile(xpath) else {
+            eprintln!("Failed to compile {}", xpath);
+            return None;
+        };
+        xml_xpath_compiled_eval(comp, ctxt)
+    })?;
+    let mut ret = None;
+    if res.typ == XmlXPathObjectType::XPathString {
+        ret = res.stringval.take();
     }
+    ret
 }
 
 unsafe fn xsd_incorrect_test_case(logfile: &mut Option<File>, cur: Option<XmlNodePtr>) -> c_int {

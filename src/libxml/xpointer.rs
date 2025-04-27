@@ -50,8 +50,8 @@ use crate::{
     parser::xml_init_parser,
     tree::{NodeCommon, XmlDocPtr, XmlElementType, XmlGenericNodePtr},
     xpath::{
-        XmlXPathError, XmlXPathObjectPtr, XmlXPathObjectType, internals::xml_xpath_root,
-        xml_xpath_new_node_set, xml_xpath_new_string,
+        XmlXPathError, XmlXPathObjectType, internals::xml_xpath_root, xml_xpath_new_node_set,
+        xml_xpath_new_string,
     },
 };
 
@@ -284,41 +284,25 @@ pub(crate) fn xml_xptr_new_range(
 /// Returns the newly created object.
 #[doc(alias = "xmlXPtrNewRangePoints")]
 #[cfg(feature = "libxml_xptr_locs")]
-pub unsafe fn xml_xptr_new_range_points(
-    start: XmlXPathObjectPtr,
-    end: XmlXPathObjectPtr,
+pub fn xml_xptr_new_range_points(
+    start: &XmlXPathObject,
+    end: &XmlXPathObject,
 ) -> Option<XmlXPathObject> {
-    unsafe {
-        if start.is_null() {
-            return None;
-        }
-        if end.is_null() {
-            return None;
-        }
-        if !matches!((*start).typ, XmlXPathObjectType::XPathPoint) {
-            return None;
-        }
-        if !matches!((*end).typ, XmlXPathObjectType::XPathPoint) {
-            return None;
-        }
-
-        let mut ret = xml_xptr_new_range_internal(
-            (*start)
-                .user
-                .as_ref()
-                .and_then(|user| user.as_node())
-                .copied(),
-            (*start).index,
-            (*end)
-                .user
-                .as_ref()
-                .and_then(|user| user.as_node())
-                .copied(),
-            (*end).index,
-        );
-        xml_xptr_range_check_order(ret.as_mut());
-        ret
+    if !matches!(start.typ, XmlXPathObjectType::XPathPoint) {
+        return None;
     }
+    if !matches!(end.typ, XmlXPathObjectType::XPathPoint) {
+        return None;
+    }
+
+    let mut ret = xml_xptr_new_range_internal(
+        start.user.as_ref().and_then(|user| user.as_node()).copied(),
+        start.index,
+        end.user.as_ref().and_then(|user| user.as_node()).copied(),
+        end.index,
+    );
+    xml_xptr_range_check_order(ret.as_mut());
+    ret
 }
 
 // /// Create a new xmlXPathObjectPtr of type range from a node to a point
@@ -548,7 +532,7 @@ pub(crate) fn xml_xptr_wrap_location_set(val: XmlLocationSet) -> XmlXPathObject 
 /// Returns the number of child for an element, -1 in case of error
 #[doc(alias = "xmlXPtrGetArity")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe fn xml_xptr_get_arity(cur: XmlGenericNodePtr) -> i32 {
+fn xml_xptr_get_arity(cur: XmlGenericNodePtr) -> i32 {
     let mut i: i32;
     if cur.element_type() == XmlElementType::XmlNamespaceDecl {
         return -1;
@@ -572,7 +556,7 @@ unsafe fn xml_xptr_get_arity(cur: XmlGenericNodePtr) -> i32 {
 /// Returns the index of the node in its parent children list, -1 in case of error
 #[doc(alias = "xmlXPtrGetIndex")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe fn xml_xptr_get_index(cur: XmlGenericNodePtr) -> i32 {
+fn xml_xptr_get_index(cur: XmlGenericNodePtr) -> i32 {
     let mut i: i32;
     if cur.element_type() == XmlElementType::XmlNamespaceDecl {
         return -1;
@@ -600,14 +584,30 @@ unsafe fn xml_xptr_get_index(cur: XmlGenericNodePtr) -> i32 {
 /// Returns a new location or NULL in case of error
 #[doc(alias = "xmlXPtrCoveringRange")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe fn xml_xptr_covering_range(
+fn xml_xptr_covering_range(
     ctxt: &mut XmlXPathParserContext,
     loc: Rc<XmlXPathObject>,
 ) -> Option<XmlXPathObject> {
-    unsafe {
-        let doc = ctxt.context.doc?;
-        match loc.typ {
-            XmlXPathObjectType::XPathPoint => {
+    let doc = ctxt.context.doc?;
+    match loc.typ {
+        XmlXPathObjectType::XPathPoint => {
+            return xml_xptr_new_range(
+                loc.user
+                    .as_ref()
+                    .and_then(|user| user.as_node())
+                    .copied()
+                    .unwrap(),
+                loc.index,
+                loc.user
+                    .as_ref()
+                    .and_then(|user| user.as_node())
+                    .copied()
+                    .unwrap(),
+                loc.index,
+            );
+        }
+        XmlXPathObjectType::XPathRange => {
+            if loc.user2.is_some() {
                 return xml_xptr_new_range(
                     loc.user
                         .as_ref()
@@ -615,71 +615,53 @@ unsafe fn xml_xptr_covering_range(
                         .copied()
                         .unwrap(),
                     loc.index,
-                    loc.user
+                    loc.user2
                         .as_ref()
                         .and_then(|user| user.as_node())
                         .copied()
                         .unwrap(),
-                    loc.index,
+                    loc.index2,
                 );
-            }
-            XmlXPathObjectType::XPathRange => {
-                if loc.user2.is_some() {
-                    return xml_xptr_new_range(
-                        loc.user
-                            .as_ref()
-                            .and_then(|user| user.as_node())
-                            .copied()
-                            .unwrap(),
-                        loc.index,
-                        loc.user2
-                            .as_ref()
-                            .and_then(|user| user.as_node())
-                            .copied()
-                            .unwrap(),
-                        loc.index2,
-                    );
+            } else {
+                let mut node = loc
+                    .user
+                    .as_ref()
+                    .and_then(|user| user.as_node())
+                    .copied()
+                    .unwrap();
+
+                if node == XmlGenericNodePtr::from(doc) {
+                    return xml_xptr_new_range(node, 0, node, xml_xptr_get_arity(node));
                 } else {
-                    let mut node = loc
-                        .user
-                        .as_ref()
-                        .and_then(|user| user.as_node())
-                        .copied()
-                        .unwrap();
-
-                    if node == XmlGenericNodePtr::from(doc) {
-                        return xml_xptr_new_range(node, 0, node, xml_xptr_get_arity(node));
-                    } else {
-                        match node.element_type() {
-                            XmlElementType::XmlAttributeNode => {
-                                /* !!! our model is slightly different than XPath */
-                                return xml_xptr_new_range(node, 0, node, xml_xptr_get_arity(node));
-                            }
-                            XmlElementType::XmlElementNode
-                            | XmlElementType::XmlTextNode
-                            | XmlElementType::XmlCDATASectionNode
-                            | XmlElementType::XmlEntityRefNode
-                            | XmlElementType::XmlPINode
-                            | XmlElementType::XmlCommentNode
-                            | XmlElementType::XmlDocumentNode
-                            | XmlElementType::XmlNotationNode
-                            | XmlElementType::XmlHTMLDocumentNode => {
-                                let indx: i32 = xml_xptr_get_index(node);
-
-                                node = node.parent().unwrap();
-                                return xml_xptr_new_range(node, indx - 1, node, indx + 1);
-                            }
-                            _ => return None,
+                    match node.element_type() {
+                        XmlElementType::XmlAttributeNode => {
+                            /* !!! our model is slightly different than XPath */
+                            return xml_xptr_new_range(node, 0, node, xml_xptr_get_arity(node));
                         }
+                        XmlElementType::XmlElementNode
+                        | XmlElementType::XmlTextNode
+                        | XmlElementType::XmlCDATASectionNode
+                        | XmlElementType::XmlEntityRefNode
+                        | XmlElementType::XmlPINode
+                        | XmlElementType::XmlCommentNode
+                        | XmlElementType::XmlDocumentNode
+                        | XmlElementType::XmlNotationNode
+                        | XmlElementType::XmlHTMLDocumentNode => {
+                            let indx: i32 = xml_xptr_get_index(node);
+
+                            node = node.parent().unwrap();
+                            return xml_xptr_new_range(node, indx - 1, node, indx + 1);
+                        }
+                        _ => return None,
                     }
                 }
             }
-            _ => {
-                // TODO /* missed one case ??? */
-            }
         }
-        None
+        _ => {
+            // TODO /* missed one case ??? */
+        }
     }
+    None
 }
 
 /// Function implementing the range() function 5.4.3
@@ -691,43 +673,41 @@ unsafe fn xml_xptr_covering_range(
 ///  x is added to the result location-set.
 #[doc(alias = "xmlXPtrRangeFunction")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe fn xml_xptr_range_function(ctxt: &mut XmlXPathParserContext, nargs: usize) {
-    unsafe {
-        if check_arity(ctxt, nargs, 1).is_err() {
-            return;
-        }
-        if ctxt.value().is_none_or(|value| {
-            !matches!(
-                value.typ,
-                XmlXPathObjectType::XPathLocationset | XmlXPathObjectType::XPathNodeset
-            )
-        }) {
-            xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathInvalidType as i32);
-            return;
-        }
-
-        let mut set = ctxt.value_pop().unwrap();
-        if set.typ == XmlXPathObjectType::XPathNodeset {
-            // First convert to a location set
-            set = xml_xptr_new_location_set_node_set(set.nodesetval.as_deref());
-        }
-        let oldset = set.user.as_ref().and_then(|user| user.as_location_set());
-
-        // The loop is to compute the covering range for each item and add it
-        let mut newset = XmlLocationSet::new(None);
-        if let Some(oldset) = oldset {
-            for loc in &oldset.loc_tab {
-                newset.push(
-                    xml_xptr_covering_range(ctxt, loc.clone())
-                        .map(Rc::new)
-                        .unwrap(),
-                );
-            }
-        }
-
-        // Save the new value and cleanup
-        ctxt.value_push(xml_xptr_wrap_location_set(newset));
+fn xml_xptr_range_function(ctxt: &mut XmlXPathParserContext, nargs: usize) {
+    if check_arity(ctxt, nargs, 1).is_err() {
+        return;
     }
+    if ctxt.value().is_none_or(|value| {
+        !matches!(
+            value.typ,
+            XmlXPathObjectType::XPathLocationset | XmlXPathObjectType::XPathNodeset
+        )
+    }) {
+        xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathInvalidType as i32);
+        return;
+    }
+
+    let mut set = ctxt.value_pop().unwrap();
+    if set.typ == XmlXPathObjectType::XPathNodeset {
+        // First convert to a location set
+        set = xml_xptr_new_location_set_node_set(set.nodesetval.as_deref());
+    }
+    let oldset = set.user.as_ref().and_then(|user| user.as_location_set());
+
+    // The loop is to compute the covering range for each item and add it
+    let mut newset = XmlLocationSet::new(None);
+    if let Some(oldset) = oldset {
+        for loc in &oldset.loc_tab {
+            newset.push(
+                xml_xptr_covering_range(ctxt, loc.clone())
+                    .map(Rc::new)
+                    .unwrap(),
+            );
+        }
+    }
+
+    // Save the new value and cleanup
+    ctxt.value_push(xml_xptr_wrap_location_set(newset));
 }
 
 /// A inside range is a range described in the range-inside() description
@@ -735,23 +715,71 @@ unsafe fn xml_xptr_range_function(ctxt: &mut XmlXPathParserContext, nargs: usize
 /// Returns a new location or NULL in case of error
 #[doc(alias = "xmlXPtrInsideRange")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe fn xml_xptr_inside_range(
+fn xml_xptr_inside_range(
     ctxt: &mut XmlXPathParserContext,
     loc: Rc<XmlXPathObject>,
 ) -> Option<XmlXPathObject> {
-    unsafe {
-        use crate::tree::XmlNodePtr;
+    use crate::tree::XmlNodePtr;
 
-        ctxt.context.doc?;
-        match loc.typ {
-            XmlXPathObjectType::XPathPoint => {
-                let node = loc
-                    .user
-                    .as_ref()
-                    .and_then(|user| user.as_node())
-                    .copied()
-                    .unwrap();
+    ctxt.context.doc?;
+    match loc.typ {
+        XmlXPathObjectType::XPathPoint => {
+            let node = loc
+                .user
+                .as_ref()
+                .and_then(|user| user.as_node())
+                .copied()
+                .unwrap();
 
+            match node.element_type() {
+                XmlElementType::XmlPINode
+                | XmlElementType::XmlCommentNode
+                | XmlElementType::XmlTextNode
+                | XmlElementType::XmlCDATASectionNode => {
+                    let node = XmlNodePtr::try_from(node).unwrap();
+                    if let Some(content) = node.content.as_deref() {
+                        return xml_xptr_new_range(
+                            node.into(),
+                            0,
+                            node.into(),
+                            content.len() as i32,
+                        );
+                    } else {
+                        return xml_xptr_new_range(node.into(), 0, node.into(), 0);
+                    }
+                }
+                XmlElementType::XmlAttributeNode
+                | XmlElementType::XmlElementNode
+                | XmlElementType::XmlEntityRefNode
+                | XmlElementType::XmlDocumentNode
+                | XmlElementType::XmlNotationNode
+                | XmlElementType::XmlHTMLDocumentNode => {
+                    return xml_xptr_new_range(node, 0, node, xml_xptr_get_arity(node));
+                }
+                _ => {}
+            }
+            return None;
+        }
+        XmlXPathObjectType::XPathRange => {
+            let node = loc
+                .user
+                .as_ref()
+                .and_then(|user| user.as_node())
+                .copied()
+                .unwrap();
+
+            if loc.user2.is_some() {
+                return xml_xptr_new_range(
+                    node,
+                    loc.index,
+                    loc.user2
+                        .as_ref()
+                        .and_then(|user| user.as_node())
+                        .copied()
+                        .unwrap(),
+                    loc.index2,
+                );
+            } else {
                 match node.element_type() {
                     XmlElementType::XmlPINode
                     | XmlElementType::XmlCommentNode
@@ -781,62 +809,12 @@ unsafe fn xml_xptr_inside_range(
                 }
                 return None;
             }
-            XmlXPathObjectType::XPathRange => {
-                let node = loc
-                    .user
-                    .as_ref()
-                    .and_then(|user| user.as_node())
-                    .copied()
-                    .unwrap();
-
-                if loc.user2.is_some() {
-                    return xml_xptr_new_range(
-                        node,
-                        loc.index,
-                        loc.user2
-                            .as_ref()
-                            .and_then(|user| user.as_node())
-                            .copied()
-                            .unwrap(),
-                        loc.index2,
-                    );
-                } else {
-                    match node.element_type() {
-                        XmlElementType::XmlPINode
-                        | XmlElementType::XmlCommentNode
-                        | XmlElementType::XmlTextNode
-                        | XmlElementType::XmlCDATASectionNode => {
-                            let node = XmlNodePtr::try_from(node).unwrap();
-                            if let Some(content) = node.content.as_deref() {
-                                return xml_xptr_new_range(
-                                    node.into(),
-                                    0,
-                                    node.into(),
-                                    content.len() as i32,
-                                );
-                            } else {
-                                return xml_xptr_new_range(node.into(), 0, node.into(), 0);
-                            }
-                        }
-                        XmlElementType::XmlAttributeNode
-                        | XmlElementType::XmlElementNode
-                        | XmlElementType::XmlEntityRefNode
-                        | XmlElementType::XmlDocumentNode
-                        | XmlElementType::XmlNotationNode
-                        | XmlElementType::XmlHTMLDocumentNode => {
-                            return xml_xptr_new_range(node, 0, node, xml_xptr_get_arity(node));
-                        }
-                        _ => {}
-                    }
-                    return None;
-                }
-            }
-            _ => {
-                // TODO /* missed one case ??? */
-            }
         }
-        None
+        _ => {
+            // TODO /* missed one case ??? */
+        }
     }
+    None
 }
 
 /// Function implementing the range-inside() function 5.4.3
@@ -854,44 +832,42 @@ unsafe fn xml_xptr_inside_range(
 ///  location children of x.
 #[doc(alias = "xmlXPtrRangeInsideFunction")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe fn xml_xptr_range_inside_function(ctxt: &mut XmlXPathParserContext, nargs: usize) {
-    unsafe {
-        if check_arity(ctxt, nargs, 1).is_err() {
-            return;
-        }
-        if ctxt.value().is_none_or(|value| {
-            !matches!(
-                value.typ,
-                XmlXPathObjectType::XPathLocationset | XmlXPathObjectType::XPathNodeset
-            )
-        }) {
-            xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathInvalidType as i32);
-            return;
-        }
-
-        let mut set = ctxt.value_pop().unwrap();
-        if set.typ == XmlXPathObjectType::XPathNodeset {
-            // First convert to a location set
-            set = xml_xptr_new_location_set_node_set(set.nodesetval.as_deref());
-        }
-
-        // The loop is to compute the covering range for each item and add it
-        let mut newset = XmlLocationSet::new(None);
-        let oldset = set.user.as_ref().and_then(|user| user.as_location_set());
-
-        if let Some(oldset) = oldset {
-            for loc in &oldset.loc_tab {
-                newset.push(
-                    xml_xptr_inside_range(ctxt, loc.clone())
-                        .map(Rc::new)
-                        .unwrap(),
-                );
-            }
-        }
-
-        // Save the new value and cleanup
-        ctxt.value_push(xml_xptr_wrap_location_set(newset));
+fn xml_xptr_range_inside_function(ctxt: &mut XmlXPathParserContext, nargs: usize) {
+    if check_arity(ctxt, nargs, 1).is_err() {
+        return;
     }
+    if ctxt.value().is_none_or(|value| {
+        !matches!(
+            value.typ,
+            XmlXPathObjectType::XPathLocationset | XmlXPathObjectType::XPathNodeset
+        )
+    }) {
+        xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathInvalidType as i32);
+        return;
+    }
+
+    let mut set = ctxt.value_pop().unwrap();
+    if set.typ == XmlXPathObjectType::XPathNodeset {
+        // First convert to a location set
+        set = xml_xptr_new_location_set_node_set(set.nodesetval.as_deref());
+    }
+
+    // The loop is to compute the covering range for each item and add it
+    let mut newset = XmlLocationSet::new(None);
+    let oldset = set.user.as_ref().and_then(|user| user.as_location_set());
+
+    if let Some(oldset) = oldset {
+        for loc in &oldset.loc_tab {
+            newset.push(
+                xml_xptr_inside_range(ctxt, loc.clone())
+                    .map(Rc::new)
+                    .unwrap(),
+            );
+        }
+    }
+
+    // Save the new value and cleanup
+    ctxt.value_push(xml_xptr_wrap_location_set(newset));
 }
 
 /// Read the object and return the start point coordinates.
@@ -968,7 +944,7 @@ fn xml_xptr_get_end_point(
 
 /// Returns the @no'th element child of @cur or NULL
 #[doc(alias = "xmlXPtrGetNthChild")]
-unsafe fn xml_xptr_get_nth_child(cur: XmlGenericNodePtr, no: usize) -> Option<XmlGenericNodePtr> {
+fn xml_xptr_get_nth_child(cur: XmlGenericNodePtr, no: usize) -> Option<XmlGenericNodePtr> {
     if cur.element_type() == XmlElementType::XmlNamespaceDecl {
         return Some(cur);
     }
@@ -999,83 +975,77 @@ unsafe fn xml_xptr_get_nth_child(cur: XmlGenericNodePtr, no: usize) -> Option<Xm
 /// Returns -1 in case of failure, 0 otherwise
 #[doc(alias = "xmlXPtrAdvanceNode")]
 #[cfg(feature = "libxml_xptr_locs")]
-pub(crate) unsafe fn xml_xptr_advance_node(
+pub(crate) fn xml_xptr_advance_node(
     mut cur: XmlGenericNodePtr,
-    level: *mut i32,
+    level: &mut i32,
 ) -> Option<XmlGenericNodePtr> {
-    unsafe {
-        // next:
-        'next: loop {
-            if cur.element_type() == XmlElementType::XmlNamespaceDecl {
-                return None;
-            }
-            if let Some(children) = cur.children() {
-                cur = children;
-                if !level.is_null() {
-                    *level += 1;
-                }
-                // goto found;
-                // found:
-                if !matches!(
-                    cur.element_type(),
-                    XmlElementType::XmlElementNode
-                        | XmlElementType::XmlTextNode
-                        | XmlElementType::XmlDocumentNode
-                        | XmlElementType::XmlHTMLDocumentNode
-                        | XmlElementType::XmlCDATASectionNode
-                ) {
-                    if cur.element_type() == XmlElementType::XmlEntityRefNode {
-                        // Shouldn't happen
-                        // TODO
-                        // goto skip;
-                    } else {
-                        // goto next;
-                        continue 'next;
-                    }
+    // next:
+    'next: loop {
+        if cur.element_type() == XmlElementType::XmlNamespaceDecl {
+            return None;
+        }
+        if let Some(children) = cur.children() {
+            cur = children;
+            *level += 1;
+            // goto found;
+            // found:
+            if !matches!(
+                cur.element_type(),
+                XmlElementType::XmlElementNode
+                    | XmlElementType::XmlTextNode
+                    | XmlElementType::XmlDocumentNode
+                    | XmlElementType::XmlHTMLDocumentNode
+                    | XmlElementType::XmlCDATASectionNode
+            ) {
+                if cur.element_type() == XmlElementType::XmlEntityRefNode {
+                    // Shouldn't happen
+                    // TODO
+                    // goto skip;
                 } else {
-                    return Some(cur);
-                }
-            }
-            // skip:		/* This label should only be needed if something is wrong! */
-            'skip: loop {
-                if let Some(next) = cur.next() {
-                    cur = next;
-                    // goto found;
-                } else {
-                    loop {
-                        if !level.is_null() {
-                            *level -= 1;
-                        }
-                        cur = cur.parent()?;
-                        if let Some(next) = cur.next() {
-                            cur = next;
-                            // goto found;
-                            break;
-                        }
-                    }
-                }
-
-                // found:
-                if !matches!(
-                    cur.element_type(),
-                    XmlElementType::XmlElementNode
-                        | XmlElementType::XmlTextNode
-                        | XmlElementType::XmlDocumentNode
-                        | XmlElementType::XmlHTMLDocumentNode
-                        | XmlElementType::XmlCDATASectionNode
-                ) {
-                    if cur.element_type() == XmlElementType::XmlEntityRefNode {
-                        /* Shouldn't happen */
-                        // TODO
-                        // goto skip;
-                        continue 'skip;
-                    }
                     // goto next;
                     continue 'next;
                 }
-
-                break 'next Some(cur);
+            } else {
+                return Some(cur);
             }
+        }
+        // skip:		/* This label should only be needed if something is wrong! */
+        'skip: loop {
+            if let Some(next) = cur.next() {
+                cur = next;
+                // goto found;
+            } else {
+                loop {
+                    *level -= 1;
+                    cur = cur.parent()?;
+                    if let Some(next) = cur.next() {
+                        cur = next;
+                        // goto found;
+                        break;
+                    }
+                }
+            }
+
+            // found:
+            if !matches!(
+                cur.element_type(),
+                XmlElementType::XmlElementNode
+                    | XmlElementType::XmlTextNode
+                    | XmlElementType::XmlDocumentNode
+                    | XmlElementType::XmlHTMLDocumentNode
+                    | XmlElementType::XmlCDATASectionNode
+            ) {
+                if cur.element_type() == XmlElementType::XmlEntityRefNode {
+                    /* Shouldn't happen */
+                    // TODO
+                    // goto skip;
+                    continue 'skip;
+                }
+                // goto next;
+                continue 'next;
+            }
+
+            break 'next Some(cur);
         }
     }
 }
@@ -1085,81 +1055,79 @@ pub(crate) unsafe fn xml_xptr_advance_node(
 /// Returns -1 in case of failure, 0 otherwise
 #[doc(alias = "xmlXPtrAdvanceChar")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe fn xml_xptr_advance_char(
+fn xml_xptr_advance_char(
     node: &mut Option<XmlGenericNodePtr>,
     indx: &mut usize,
     mut bytes: i32,
 ) -> i32 {
-    unsafe {
-        use crate::tree::XmlNodePtr;
+    use crate::tree::XmlNodePtr;
 
-        let mut cur = *node;
-        if cur.is_none_or(|cur| cur.element_type() == XmlElementType::XmlNamespaceDecl) {
-            return -1;
-        }
-        let mut pos = *indx as i32;
-
-        while bytes >= 0 {
-            // First position to the beginning of the first text node
-            // corresponding to this point
-            while let Some(now) = cur.filter(|cur| {
-                matches!(
-                    cur.element_type(),
-                    XmlElementType::XmlElementNode
-                        | XmlElementType::XmlDocumentNode
-                        | XmlElementType::XmlHTMLDocumentNode
-                )
-            }) {
-                if pos > 0 {
-                    cur = xml_xptr_get_nth_child(now, pos as usize);
-                    pos = 0;
-                } else {
-                    cur = xml_xptr_advance_node(now, null_mut());
-                    pos = 0;
-                }
-            }
-
-            let Some(now) = cur else {
-                *node = None;
-                *indx = 0;
-                return -1;
-            };
-
-            // if there is no move needed return the current value.
-            if pos == 0 {
-                pos = 1;
-            }
-            if bytes == 0 {
-                *node = cur;
-                *indx = pos as usize;
-                return 0;
-            }
-            // We should have a text (or cdata) node ...
-            let mut len = 0;
-            if now.element_type() != XmlElementType::XmlElementNode {
-                let cur = XmlNodePtr::try_from(now).unwrap();
-                if let Some(content) = cur.content.as_deref() {
-                    len = content.len() as i32;
-                }
-            }
-            if pos > len {
-                // Strange, the indx in the text node is greater than it's len
-                STRANGE!();
-                pos = len;
-            }
-            if pos + bytes >= len {
-                bytes -= len - pos;
-                cur = xml_xptr_advance_node(now, null_mut());
-                pos = 0;
-            } else if pos + bytes < len {
-                pos += bytes;
-                *node = cur;
-                *indx = pos as usize;
-                return 0;
-            }
-        }
-        -1
+    let mut cur = *node;
+    if cur.is_none_or(|cur| cur.element_type() == XmlElementType::XmlNamespaceDecl) {
+        return -1;
     }
+    let mut pos = *indx as i32;
+
+    while bytes >= 0 {
+        // First position to the beginning of the first text node
+        // corresponding to this point
+        while let Some(now) = cur.filter(|cur| {
+            matches!(
+                cur.element_type(),
+                XmlElementType::XmlElementNode
+                    | XmlElementType::XmlDocumentNode
+                    | XmlElementType::XmlHTMLDocumentNode
+            )
+        }) {
+            if pos > 0 {
+                cur = xml_xptr_get_nth_child(now, pos as usize);
+                pos = 0;
+            } else {
+                cur = xml_xptr_advance_node(now, &mut 0);
+                pos = 0;
+            }
+        }
+
+        let Some(now) = cur else {
+            *node = None;
+            *indx = 0;
+            return -1;
+        };
+
+        // if there is no move needed return the current value.
+        if pos == 0 {
+            pos = 1;
+        }
+        if bytes == 0 {
+            *node = cur;
+            *indx = pos as usize;
+            return 0;
+        }
+        // We should have a text (or cdata) node ...
+        let mut len = 0;
+        if now.element_type() != XmlElementType::XmlElementNode {
+            let cur = XmlNodePtr::try_from(now).unwrap();
+            if let Some(content) = cur.content.as_deref() {
+                len = content.len() as i32;
+            }
+        }
+        if pos > len {
+            // Strange, the indx in the text node is greater than it's len
+            STRANGE!();
+            pos = len;
+        }
+        if pos + bytes >= len {
+            bytes -= len - pos;
+            cur = xml_xptr_advance_node(now, &mut 0);
+            pos = 0;
+        } else if pos + bytes < len {
+            pos += bytes;
+            *node = cur;
+            *indx = pos as usize;
+            return 0;
+        }
+    }
+    -1
 }
 
 /// Computes the point coordinates of the last c_char of this point
@@ -1167,51 +1135,49 @@ unsafe fn xml_xptr_advance_char(
 /// Returns -1 in case of failure, 0 otherwise
 #[doc(alias = "xmlXPtrGetLastChar")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe fn xml_xptr_get_last_char(node: &mut Option<XmlGenericNodePtr>, indx: &mut usize) -> i32 {
-    unsafe {
-        use crate::tree::XmlNodePtr;
+fn xml_xptr_get_last_char(node: &mut Option<XmlGenericNodePtr>, indx: &mut usize) -> i32 {
+    use crate::tree::XmlNodePtr;
 
-        let mut len = 0;
+    let mut len = 0;
 
-        if node.map_or(true, |node| {
-            node.element_type() == XmlElementType::XmlNamespaceDecl
-        }) {
-            return -1;
-        }
-        let mut cur = *node;
-        let pos = *indx;
-
-        if matches!(
-            cur.unwrap().element_type(),
-            XmlElementType::XmlElementNode
-                | XmlElementType::XmlDocumentNode
-                | XmlElementType::XmlHTMLDocumentNode
-        ) && pos > 0
-        {
-            cur = xml_xptr_get_nth_child(cur.unwrap(), pos);
-        }
-        while let Some(now) = cur {
-            if let Some(last) = now.last() {
-                cur = Some(last);
-            } else if let Some(content) = XmlNodePtr::try_from(now)
-                .ok()
-                .as_deref()
-                .filter(|now| now.element_type() != XmlElementType::XmlElementNode)
-                .and_then(|now| now.content.as_deref())
-            {
-                len = content.len();
-                break;
-            } else {
-                return -1;
-            }
-        }
-        if cur.is_none() {
-            return -1;
-        }
-        *node = cur;
-        *indx = len;
-        0
+    if node.map_or(true, |node| {
+        node.element_type() == XmlElementType::XmlNamespaceDecl
+    }) {
+        return -1;
     }
+    let mut cur = *node;
+    let pos = *indx;
+
+    if matches!(
+        cur.unwrap().element_type(),
+        XmlElementType::XmlElementNode
+            | XmlElementType::XmlDocumentNode
+            | XmlElementType::XmlHTMLDocumentNode
+    ) && pos > 0
+    {
+        cur = xml_xptr_get_nth_child(cur.unwrap(), pos);
+    }
+    while let Some(now) = cur {
+        if let Some(last) = now.last() {
+            cur = Some(last);
+        } else if let Some(content) = XmlNodePtr::try_from(now)
+            .ok()
+            .as_deref()
+            .filter(|now| now.element_type() != XmlElementType::XmlElementNode)
+            .and_then(|now| now.content.as_deref())
+        {
+            len = content.len();
+            break;
+        } else {
+            return -1;
+        }
+    }
+    if cur.is_none() {
+        return -1;
+    }
+    *node = cur;
+    *indx = len;
+    0
 }
 
 /// Check whether the document contains @string at the position
@@ -1223,68 +1189,64 @@ unsafe fn xml_xptr_get_last_char(node: &mut Option<XmlGenericNodePtr>, indx: &mu
 ///            of the range
 #[doc(alias = "xmlXPtrMatchString")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe fn xml_xptr_match_string(
+fn xml_xptr_match_string(
     mut string: &str,
     start: XmlGenericNodePtr,
     startindex: usize,
     end: &mut Option<XmlGenericNodePtr>,
     endindex: &mut usize,
 ) -> i32 {
-    unsafe {
-        use crate::tree::XmlNodePtr;
+    use crate::tree::XmlNodePtr;
 
-        if start.element_type() == XmlElementType::XmlNamespaceDecl {
-            return -1;
+    if start.element_type() == XmlElementType::XmlNamespaceDecl {
+        return -1;
+    }
+    if end.map_or(true, |end| {
+        end.element_type() == XmlElementType::XmlNamespaceDecl
+    }) {
+        return -1;
+    }
+    let mut cur = start;
+    let mut pos = startindex - 1;
+    let mut stringlen = string.len();
+
+    while stringlen > 0 {
+        if Some(cur) == *end && pos + stringlen > *endindex {
+            return 0;
         }
-        if end.map_or(true, |end| {
-            end.element_type() == XmlElementType::XmlNamespaceDecl
-        }) {
-            return -1;
-        }
-        let mut cur = start;
-        let mut pos = startindex - 1;
-        let mut stringlen = string.len();
 
-        while stringlen > 0 {
-            if Some(cur) == *end && pos + stringlen > *endindex {
-                return 0;
-            }
-
-            if cur.element_type() != XmlElementType::XmlElementNode {
-                let cur = XmlNodePtr::try_from(cur).unwrap();
-                if let Some(content) = cur.content.as_deref() {
-                    let len = content.len();
-                    if len >= pos + stringlen {
-                        let is_match =
-                            &content.as_bytes()[pos..pos + stringlen] == string.as_bytes();
-                        if is_match {
-                            *end = Some(cur.into());
-                            *endindex = pos + stringlen;
-                            return 1;
-                        } else {
-                            return 0;
-                        }
+        if cur.element_type() != XmlElementType::XmlElementNode {
+            let cur = XmlNodePtr::try_from(cur).unwrap();
+            if let Some(content) = cur.content.as_deref() {
+                let len = content.len();
+                if len >= pos + stringlen {
+                    let is_match = &content.as_bytes()[pos..pos + stringlen] == string.as_bytes();
+                    if is_match {
+                        *end = Some(cur.into());
+                        *endindex = pos + stringlen;
+                        return 1;
                     } else {
-                        let sub = len - pos;
-                        let is_match =
-                            content.as_bytes()[pos..pos + sub] == string.as_bytes()[..sub];
-                        if is_match {
-                            string = &string[sub..];
-                            stringlen -= sub;
-                        } else {
-                            return 0;
-                        }
+                        return 0;
+                    }
+                } else {
+                    let sub = len - pos;
+                    let is_match = content.as_bytes()[pos..pos + sub] == string.as_bytes()[..sub];
+                    if is_match {
+                        string = &string[sub..];
+                        stringlen -= sub;
+                    } else {
+                        return 0;
                     }
                 }
             }
-            let Some(next) = xml_xptr_advance_node(cur, null_mut()) else {
-                return 0;
-            };
-            cur = next;
-            pos = 0;
         }
-        1
+        let Some(next) = xml_xptr_advance_node(cur, &mut 0) else {
+            return 0;
+        };
+        cur = next;
+        pos = 0;
     }
+    1
 }
 
 /// Search the next occurrence of @string within the document content
@@ -1296,70 +1258,68 @@ unsafe fn xml_xptr_match_string(
 ///            of the range
 #[doc(alias = "xmlXPtrSearchString")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe fn xml_xptr_search_string(
+fn xml_xptr_search_string(
     string: &str,
     start: &mut Option<XmlGenericNodePtr>,
     startindex: &mut usize,
     end: &mut Option<XmlGenericNodePtr>,
     endindex: &mut usize,
 ) -> i32 {
-    unsafe {
-        use crate::tree::XmlNodePtr;
+    use crate::tree::XmlNodePtr;
 
-        if start.map_or(true, |start| {
-            start.element_type() == XmlElementType::XmlNamespaceDecl
-        }) {
-            return -1;
-        }
-        let mut cur = *start;
-        let mut pos = *startindex - 1;
-        let first = *string.as_bytes().first().unwrap_or(&0);
+    if start.map_or(true, |start| {
+        start.element_type() == XmlElementType::XmlNamespaceDecl
+    }) {
+        return -1;
+    }
+    let mut cur = *start;
+    let mut pos = *startindex - 1;
+    let first = *string.as_bytes().first().unwrap_or(&0);
 
-        while let Some(cur_node) = cur {
-            if cur_node.element_type() != XmlElementType::XmlElementNode {
-                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                if let Some(content) = cur_node.content.as_deref() {
-                    let len = content.len();
-                    while pos <= len {
-                        if first != 0 {
-                            if let Some(p) = content[pos..].find(first as char) {
-                                pos += p;
-                                if xml_xptr_match_string(
-                                    string,
-                                    cur_node.into(),
-                                    pos + 1,
-                                    end,
-                                    endindex,
-                                ) != 0
-                                {
-                                    *start = cur;
-                                    *startindex = pos + 1;
-                                    return 1;
-                                }
-                                pos += 1;
-                            } else {
-                                pos = len + 1;
+    while let Some(cur_node) = cur {
+        if cur_node.element_type() != XmlElementType::XmlElementNode {
+            let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+            if let Some(content) = cur_node.content.as_deref() {
+                let len = content.len();
+                while pos <= len {
+                    if first != 0 {
+                        if let Some(p) = content[pos..].find(first as char) {
+                            pos += p;
+                            if xml_xptr_match_string(
+                                string,
+                                cur_node.into(),
+                                pos + 1,
+                                end,
+                                endindex,
+                            ) != 0
+                            {
+                                *start = cur;
+                                *startindex = pos + 1;
+                                return 1;
                             }
+                            pos += 1;
                         } else {
-                            // An empty string is considered to match before each
-                            // character of the string-value and after the final character.
-                            *start = cur;
-                            *startindex = pos + 1;
-                            *end = cur;
-                            *endindex = pos + 1;
-                            return 1;
+                            pos = len + 1;
                         }
+                    } else {
+                        // An empty string is considered to match before each
+                        // character of the string-value and after the final character.
+                        *start = cur;
+                        *startindex = pos + 1;
+                        *end = cur;
+                        *endindex = pos + 1;
+                        return 1;
                     }
                 }
             }
-            if cur == *end && pos >= *endindex {
-                return 0;
-            }
-            cur = xml_xptr_advance_node(cur_node, null_mut());
-            pos = 1;
         }
-        0
+        if cur == *end && pos >= *endindex {
+            return 0;
+        }
+        cur = xml_xptr_advance_node(cur_node, &mut 0);
+        pos = 1;
     }
+    0
 }
 
 /// Function implementing the string-range() function
@@ -1394,112 +1354,149 @@ unsafe fn xml_xptr_search_string(
 /// ------------------------------
 #[doc(alias = "xmlXPtrStringRangeFunction")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe fn xml_xptr_string_range_function(ctxt: &mut XmlXPathParserContext, nargs: usize) {
-    unsafe {
-        let mut startindex = 0usize;
-        let mut endindex = 0usize;
-        let mut fendindex: usize;
-        let mut start = None;
-        let mut end = None;
-        let mut fend;
-        let mut newset = None;
-        let mut position = None;
-        let mut number = None;
-        let mut found: i32;
-        let mut pos = 0;
-        let mut num: i32 = 0;
+fn xml_xptr_string_range_function(ctxt: &mut XmlXPathParserContext, nargs: usize) {
+    let mut startindex = 0usize;
+    let mut endindex = 0usize;
+    let mut fendindex: usize;
+    let mut start = None;
+    let mut end = None;
+    let mut fend;
+    let mut newset = None;
+    let mut position = None;
+    let mut number = None;
+    let mut found: i32;
+    let mut pos = 0;
+    let mut num: i32 = 0;
 
-        // Grab the arguments
-        if !(2..=4).contains(&nargs) {
-            xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathInvalidArity as i32);
-            return;
-        }
+    // Grab the arguments
+    if !(2..=4).contains(&nargs) {
+        xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathInvalidArity as i32);
+        return;
+    }
 
-        'goto_error: {
-            if nargs >= 4 {
-                if ctxt
-                    .value()
-                    .is_none_or(|value| value.typ != XmlXPathObjectType::XPathNumber)
-                {
-                    xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
-                    // goto error;
-                    break 'goto_error;
-                }
-                number = ctxt.value_pop();
-                if let Some(number) = number.as_ref() {
-                    num = number.floatval as i32;
-                }
-            }
-            if nargs >= 3 {
-                if ctxt
-                    .value()
-                    .is_none_or(|value| value.typ != XmlXPathObjectType::XPathNumber)
-                {
-                    xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
-                    // goto error;
-                    break 'goto_error;
-                }
-                position = ctxt.value_pop();
-                if let Some(position) = position.as_ref() {
-                    pos = position.floatval as i32;
-                }
-            }
+    'goto_error: {
+        if nargs >= 4 {
             if ctxt
                 .value()
-                .is_none_or(|value| value.typ != XmlXPathObjectType::XPathString)
+                .is_none_or(|value| value.typ != XmlXPathObjectType::XPathNumber)
             {
                 xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
                 // goto error;
                 break 'goto_error;
             }
-            let string = ctxt.value_pop().unwrap();
-            if ctxt.value().is_none_or(|value| {
-                !matches!(
-                    value.typ,
-                    XmlXPathObjectType::XPathLocationset | XmlXPathObjectType::XPathNodeset
-                )
-            }) {
+            number = ctxt.value_pop();
+            if let Some(number) = number.as_ref() {
+                num = number.floatval as i32;
+            }
+        }
+        if nargs >= 3 {
+            if ctxt
+                .value()
+                .is_none_or(|value| value.typ != XmlXPathObjectType::XPathNumber)
+            {
                 xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
                 // goto error;
                 break 'goto_error;
             }
-            let mut set = ctxt.value_pop().unwrap();
-            newset = Some(XmlLocationSet::new(None));
-
-            if set.nodesetval.is_none() {
-                // goto error;
-                break 'goto_error;
+            position = ctxt.value_pop();
+            if let Some(position) = position.as_ref() {
+                pos = position.floatval as i32;
             }
-            if set.typ == XmlXPathObjectType::XPathNodeset {
-                // First convert to a location set
-                set = xml_xptr_new_location_set_node_set(set.nodesetval.as_deref());
-            }
-            let oldset = set
-                .user
-                .as_ref()
-                .and_then(|user| user.as_location_set())
-                .unwrap();
+        }
+        if ctxt
+            .value()
+            .is_none_or(|value| value.typ != XmlXPathObjectType::XPathString)
+        {
+            xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
+            // goto error;
+            break 'goto_error;
+        }
+        let string = ctxt.value_pop().unwrap();
+        if ctxt.value().is_none_or(|value| {
+            !matches!(
+                value.typ,
+                XmlXPathObjectType::XPathLocationset | XmlXPathObjectType::XPathNodeset
+            )
+        }) {
+            xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
+            // goto error;
+            break 'goto_error;
+        }
+        let mut set = ctxt.value_pop().unwrap();
+        newset = Some(XmlLocationSet::new(None));
 
-            // The loop is to search for each element in the location set
-            // the list of location set corresponding to that search
-            for loc in &oldset.loc_tab {
-                xml_xptr_get_start_point(loc, &mut start, &mut startindex);
-                xml_xptr_get_end_point(loc, &mut end, &mut endindex);
-                xml_xptr_advance_char(&mut start, &mut startindex, 0);
-                xml_xptr_get_last_char(&mut end, &mut endindex);
+        if set.nodesetval.is_none() {
+            // goto error;
+            break 'goto_error;
+        }
+        if set.typ == XmlXPathObjectType::XPathNodeset {
+            // First convert to a location set
+            set = xml_xptr_new_location_set_node_set(set.nodesetval.as_deref());
+        }
+        let oldset = set
+            .user
+            .as_ref()
+            .and_then(|user| user.as_location_set())
+            .unwrap();
 
-                while {
-                    fend = end;
-                    fendindex = endindex;
-                    found = xml_xptr_search_string(
-                        string.stringval.as_deref().unwrap(),
-                        &mut start,
-                        &mut startindex,
-                        &mut fend,
-                        &mut fendindex,
-                    );
-                    if found == 1 {
-                        if position.is_none() {
+        // The loop is to search for each element in the location set
+        // the list of location set corresponding to that search
+        for loc in &oldset.loc_tab {
+            xml_xptr_get_start_point(loc, &mut start, &mut startindex);
+            xml_xptr_get_end_point(loc, &mut end, &mut endindex);
+            xml_xptr_advance_char(&mut start, &mut startindex, 0);
+            xml_xptr_get_last_char(&mut end, &mut endindex);
+
+            while {
+                fend = end;
+                fendindex = endindex;
+                found = xml_xptr_search_string(
+                    string.stringval.as_deref().unwrap(),
+                    &mut start,
+                    &mut startindex,
+                    &mut fend,
+                    &mut fendindex,
+                );
+                if found == 1 {
+                    if position.is_none() {
+                        newset.as_mut().unwrap().push(
+                            xml_xptr_new_range(
+                                start.unwrap(),
+                                startindex as i32,
+                                fend.unwrap(),
+                                fendindex as i32,
+                            )
+                            .map(Rc::new)
+                            .unwrap(),
+                        );
+                    } else if xml_xptr_advance_char(&mut start, &mut startindex, pos - 1) == 0 {
+                        if number.is_some() && num > 0 {
+                            let mut rend = start;
+                            let mut rindx = startindex - 1;
+                            if xml_xptr_advance_char(&mut rend, &mut rindx, num) == 0 {
+                                newset.as_mut().unwrap().push(
+                                    xml_xptr_new_range(
+                                        start.unwrap(),
+                                        startindex as i32,
+                                        rend.unwrap(),
+                                        rindx as i32,
+                                    )
+                                    .map(Rc::new)
+                                    .unwrap(),
+                                );
+                            }
+                        } else if number.is_some() && num <= 0 {
+                            newset.as_mut().unwrap().push(
+                                xml_xptr_new_range(
+                                    start.unwrap(),
+                                    startindex as i32,
+                                    start.unwrap(),
+                                    startindex as i32,
+                                )
+                                .map(Rc::new)
+                                .unwrap(),
+                            );
+                        } else {
                             newset.as_mut().unwrap().push(
                                 xml_xptr_new_range(
                                     start.unwrap(),
@@ -1510,63 +1507,24 @@ unsafe fn xml_xptr_string_range_function(ctxt: &mut XmlXPathParserContext, nargs
                                 .map(Rc::new)
                                 .unwrap(),
                             );
-                        } else if xml_xptr_advance_char(&mut start, &mut startindex, pos - 1) == 0 {
-                            if number.is_some() && num > 0 {
-                                let mut rend = start;
-                                let mut rindx = startindex - 1;
-                                if xml_xptr_advance_char(&mut rend, &mut rindx, num) == 0 {
-                                    newset.as_mut().unwrap().push(
-                                        xml_xptr_new_range(
-                                            start.unwrap(),
-                                            startindex as i32,
-                                            rend.unwrap(),
-                                            rindx as i32,
-                                        )
-                                        .map(Rc::new)
-                                        .unwrap(),
-                                    );
-                                }
-                            } else if number.is_some() && num <= 0 {
-                                newset.as_mut().unwrap().push(
-                                    xml_xptr_new_range(
-                                        start.unwrap(),
-                                        startindex as i32,
-                                        start.unwrap(),
-                                        startindex as i32,
-                                    )
-                                    .map(Rc::new)
-                                    .unwrap(),
-                                );
-                            } else {
-                                newset.as_mut().unwrap().push(
-                                    xml_xptr_new_range(
-                                        start.unwrap(),
-                                        startindex as i32,
-                                        fend.unwrap(),
-                                        fendindex as i32,
-                                    )
-                                    .map(Rc::new)
-                                    .unwrap(),
-                                );
-                            }
-                        }
-                        start = fend;
-                        startindex = fendindex;
-                        if string.stringval.as_deref().unwrap().is_empty() {
-                            startindex += 1;
                         }
                     }
+                    start = fend;
+                    startindex = fendindex;
+                    if string.stringval.as_deref().unwrap().is_empty() {
+                        startindex += 1;
+                    }
+                }
 
-                    found == 1
-                } {}
-            }
+                found == 1
+            } {}
         }
+    }
 
-        // Save the new value and cleanup
-        // error:
-        if let Some(newset) = newset {
-            (*ctxt).value_push(xml_xptr_wrap_location_set(newset));
-        }
+    // Save the new value and cleanup
+    // error:
+    if let Some(newset) = newset {
+        (*ctxt).value_push(xml_xptr_wrap_location_set(newset));
     }
 }
 
@@ -1918,34 +1876,32 @@ macro_rules! xml_xptr_err {
 
 /// Move the current node of the nodeset on the stack to the given child if found
 #[doc(alias = "xmlXPtrGetChildNo")]
-unsafe fn xml_xptr_get_child_no(ctxt: &mut XmlXPathParserContext, indx: i32) {
-    unsafe {
-        if ctxt
-            .value()
-            .is_none_or(|value| value.typ != XmlXPathObjectType::XPathNodeset)
-        {
-            xml_xpath_err(
-                Some(&mut *ctxt),
-                crate::xpath::XmlXPathError::XPathInvalidType as i32,
-            );
-            return;
-        };
-        let mut obj = ctxt.value_pop().unwrap();
-        let Some(oldset) = obj.nodesetval.as_deref_mut().filter(|_| indx > 0) else {
-            ctxt.value_push(xml_xpath_new_node_set(None));
-            return;
-        };
-        if oldset.node_tab.len() != 1 {
-            ctxt.value_push(xml_xpath_new_node_set(None));
-            return;
-        }
-        let Some(cur) = xml_xptr_get_nth_child(oldset.node_tab[0], indx as usize) else {
-            ctxt.value_push(xml_xpath_new_node_set(None));
-            return;
-        };
-        oldset.node_tab[0] = cur;
-        ctxt.value_push(obj);
+fn xml_xptr_get_child_no(ctxt: &mut XmlXPathParserContext, indx: i32) {
+    if ctxt
+        .value()
+        .is_none_or(|value| value.typ != XmlXPathObjectType::XPathNodeset)
+    {
+        xml_xpath_err(
+            Some(&mut *ctxt),
+            crate::xpath::XmlXPathError::XPathInvalidType as i32,
+        );
+        return;
+    };
+    let mut obj = ctxt.value_pop().unwrap();
+    let Some(oldset) = obj.nodesetval.as_deref_mut().filter(|_| indx > 0) else {
+        ctxt.value_push(xml_xpath_new_node_set(None));
+        return;
+    };
+    if oldset.node_tab.len() != 1 {
+        ctxt.value_push(xml_xpath_new_node_set(None));
+        return;
     }
+    let Some(cur) = xml_xptr_get_nth_child(oldset.node_tab[0], indx as usize) else {
+        ctxt.value_push(xml_xpath_new_node_set(None));
+        return;
+    };
+    oldset.node_tab[0] = cur;
+    ctxt.value_push(obj);
 }
 
 /// `ChildSeq ::= '/1' ('/' [0-9]*)* | Name ('/' [0-9]*)+`
@@ -1953,44 +1909,42 @@ unsafe fn xml_xptr_get_child_no(ctxt: &mut XmlXPathParserContext, indx: i32) {
 /// Parse and evaluate a Child Sequence. This routine also handle the
 /// case of a Bare Name used to get a document ID.
 #[doc(alias = "xmlXPtrEvalChildSeq")]
-unsafe fn xml_xptr_eval_child_seq(ctxt: &mut XmlXPathParserContext, name: Option<&str>) {
-    unsafe {
-        // XPointer don't allow by syntax to address in multirooted trees
-        // this might prove useful in some cases, warn about it.
-        if name.is_none() && ctxt.current_char() == Some('/') && ctxt.nth_byte(1) != Some(b'1') {
-            xml_xptr_err!(
-                ctxt,
-                XmlParserErrors::XmlXPtrChildseqStart,
-                "warning: ChildSeq not starting by /1\n"
-            );
-        }
+fn xml_xptr_eval_child_seq(ctxt: &mut XmlXPathParserContext, name: Option<&str>) {
+    // XPointer don't allow by syntax to address in multirooted trees
+    // this might prove useful in some cases, warn about it.
+    if name.is_none() && ctxt.current_char() == Some('/') && ctxt.nth_byte(1) != Some(b'1') {
+        xml_xptr_err!(
+            ctxt,
+            XmlParserErrors::XmlXPtrChildseqStart,
+            "warning: ChildSeq not starting by /1\n"
+        );
+    }
 
-        if let Some(name) = name {
-            ctxt.value_push(xml_xpath_new_string(Some(name)));
-            xml_xpath_id_function(&mut *ctxt, 1);
-            if ctxt.error != XmlXPathError::XPathExpressionOK as i32 {
-                return;
-            };
-        }
+    if let Some(name) = name {
+        ctxt.value_push(xml_xpath_new_string(Some(name)));
+        xml_xpath_id_function(&mut *ctxt, 1);
+        if ctxt.error != XmlXPathError::XPathExpressionOK as i32 {
+            return;
+        };
+    }
 
-        while ctxt.current_char() == Some('/') {
-            let mut child: i32 = 0;
-            let mut overflow = false;
+    while ctxt.current_char() == Some('/') {
+        let mut child: i32 = 0;
+        let mut overflow = false;
+        ctxt.next_char();
+
+        while let Some(cur) = ctxt.current_char().filter(|c| c.is_ascii_digit()) {
+            let (c, f) = child.overflowing_mul(10);
+            overflow |= f;
+            let (c, f) = c.overflowing_add(cur as i32 - b'0' as i32);
+            overflow |= f;
+            child = c;
             ctxt.next_char();
-
-            while let Some(cur) = ctxt.current_char().filter(|c| c.is_ascii_digit()) {
-                let (c, f) = child.overflowing_mul(10);
-                overflow |= f;
-                let (c, f) = c.overflowing_add(cur as i32 - b'0' as i32);
-                overflow |= f;
-                child = c;
-                ctxt.next_char();
-            }
-            if overflow {
-                child = 0;
-            }
-            xml_xptr_get_child_no(ctxt, child);
         }
+        if overflow {
+            child = 0;
+        }
+        xml_xptr_get_child_no(ctxt, child);
     }
 }
 
@@ -2619,93 +2573,91 @@ pub fn xml_xptr_range_to_function(ctxt: &mut XmlXPathParserContext, _nargs: i32)
 /// a Location Set instead of a node set
 #[doc(alias = "xmlXPtrEvalRangePredicate")]
 #[cfg(feature = "libxml_xptr_locs")]
-pub unsafe fn xml_xptr_eval_range_predicate(ctxt: &mut XmlXPathParserContext) {
-    unsafe {
-        ctxt.skip_blanks();
-        if ctxt.current_char() != Some('[') {
-            xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidPredicateError as i32);
-            return;
-        }
-        ctxt.next_char();
-        ctxt.skip_blanks();
+pub fn xml_xptr_eval_range_predicate(ctxt: &mut XmlXPathParserContext) {
+    ctxt.skip_blanks();
+    if ctxt.current_char() != Some('[') {
+        xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidPredicateError as i32);
+        return;
+    }
+    ctxt.next_char();
+    ctxt.skip_blanks();
 
-        // Extract the old set, and then evaluate the result of the
-        // expression for all the element in the set. use it to grow
-        // up a new set.
-        if ctxt
-            .value()
-            .is_none_or(|value| value.typ != XmlXPathObjectType::XPathLocationset)
-        {
-            xml_xpath_err(
-                Some(ctxt),
-                crate::xpath::XmlXPathError::XPathInvalidType as i32,
-            );
-            return;
-        };
-        let obj = ctxt.value_pop().unwrap();
-        let oldset = obj.user.as_ref().and_then(|user| user.as_location_set());
+    // Extract the old set, and then evaluate the result of the
+    // expression for all the element in the set. use it to grow
+    // up a new set.
+    if ctxt
+        .value()
+        .is_none_or(|value| value.typ != XmlXPathObjectType::XPathLocationset)
+    {
+        xml_xpath_err(
+            Some(ctxt),
+            crate::xpath::XmlXPathError::XPathInvalidType as i32,
+        );
+        return;
+    };
+    let obj = ctxt.value_pop().unwrap();
+    let oldset = obj.user.as_ref().and_then(|user| user.as_location_set());
 
-        ctxt.context.node = None;
+    ctxt.context.node = None;
 
-        if let Some(oldset) = oldset.filter(|oldset| !oldset.loc_tab.is_empty()) {
-            // Save the expression pointer since we will have to evaluate
-            // it multiple times. Initialize the new set.
-            let cur = ctxt.cur;
-            let mut newset = XmlLocationSet::new(None);
+    if let Some(oldset) = oldset.filter(|oldset| !oldset.loc_tab.is_empty()) {
+        // Save the expression pointer since we will have to evaluate
+        // it multiple times. Initialize the new set.
+        let cur = ctxt.cur;
+        let mut newset = XmlLocationSet::new(None);
 
-            for (i, loc) in oldset.loc_tab.iter().enumerate() {
-                ctxt.cur = cur;
+        for (i, loc) in oldset.loc_tab.iter().enumerate() {
+            ctxt.cur = cur;
 
-                // Run the evaluation with a node list made of a single item in the nodeset.
-                ctxt.context.node = loc.user.as_ref().and_then(|user| user.as_node()).copied();
+            // Run the evaluation with a node list made of a single item in the nodeset.
+            ctxt.context.node = loc.user.as_ref().and_then(|user| user.as_node()).copied();
 
-                let tmp = xml_xpath_new_node_set(ctxt.context.node);
-                ctxt.value_push(tmp);
-                let keep_stack_len = ctxt.value_tab.len();
-                ctxt.context.context_size = oldset.loc_tab.len() as i32;
-                ctxt.context.proximity_position = i as i32 + 1;
+            let tmp = xml_xpath_new_node_set(ctxt.context.node);
+            ctxt.value_push(tmp);
+            let keep_stack_len = ctxt.value_tab.len();
+            ctxt.context.context_size = oldset.loc_tab.len() as i32;
+            ctxt.context.proximity_position = i as i32 + 1;
 
-                ctxt.evaluate_expression();
-                if ctxt.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
-                    return;
-                };
-
-                // The result of the evaluation need to be tested to
-                // decided whether the filter succeeded or not
-                let res = ctxt.value_pop().unwrap();
-                if ctxt.evaluate_predicate_result(&res) != 0 {
-                    newset.push(loc.clone());
-                }
-
-                // Cleanup
-                if keep_stack_len == ctxt.value_tab.len() {
-                    ctxt.value_pop();
-                }
-
-                ctxt.context.node = None;
-            }
-
-            // The result is used as the new evaluation set.
-            ctxt.context.node = None;
-            ctxt.context.context_size = -1;
-            ctxt.context.proximity_position = -1;
-            ctxt.value_push(xml_xptr_wrap_location_set(newset));
-        } else {
-            ctxt.context.context_size = 0;
-            ctxt.context.proximity_position = 0;
             ctxt.evaluate_expression();
-            ctxt.value_pop();
-            ctxt.value_push(obj);
             if ctxt.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
                 return;
             };
-        }
-        if ctxt.current_char() != Some(']') {
-            xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidPredicateError as i32);
-            return;
+
+            // The result of the evaluation need to be tested to
+            // decided whether the filter succeeded or not
+            let res = ctxt.value_pop().unwrap();
+            if ctxt.evaluate_predicate_result(&res) != 0 {
+                newset.push(loc.clone());
+            }
+
+            // Cleanup
+            if keep_stack_len == ctxt.value_tab.len() {
+                ctxt.value_pop();
+            }
+
+            ctxt.context.node = None;
         }
 
-        ctxt.next_char();
-        ctxt.skip_blanks();
+        // The result is used as the new evaluation set.
+        ctxt.context.node = None;
+        ctxt.context.context_size = -1;
+        ctxt.context.proximity_position = -1;
+        ctxt.value_push(xml_xptr_wrap_location_set(newset));
+    } else {
+        ctxt.context.context_size = 0;
+        ctxt.context.proximity_position = 0;
+        ctxt.evaluate_expression();
+        ctxt.value_pop();
+        ctxt.value_push(obj);
+        if ctxt.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
+            return;
+        };
     }
+    if ctxt.current_char() != Some(']') {
+        xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidPredicateError as i32);
+        return;
+    }
+
+    ctxt.next_char();
+    ctxt.skip_blanks();
 }

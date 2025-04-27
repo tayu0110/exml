@@ -1,12 +1,8 @@
-use std::{ffi::CStr, rc::Rc};
+use std::rc::Rc;
 
 use crate::{
-    libxml::{
-        chvalid::{
-            xml_is_blank_char, xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender,
-        },
-        globals::xml_free,
-        xmlstring::xml_strndup,
+    libxml::chvalid::{
+        xml_is_blank_char, xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender,
     },
     parser::{XML_MAX_NAME_LENGTH, xml_is_letter},
     xpath::{
@@ -23,8 +19,6 @@ use super::{
     xml_xpath_perr_memory,
 };
 
-#[cfg(feature = "xpath")]
-pub type XmlXPathStepOpPtr = *mut XmlXPathStepOp;
 #[cfg(feature = "xpath")]
 #[repr(C)]
 #[derive(Clone)]
@@ -116,60 +110,49 @@ impl XmlXPathParserContext<'_> {
     ///
     /// Parse and compile an expression
     #[doc(alias = "xmlXPathCompileExpr")]
-    pub unsafe fn compile_expr(&mut self, sort: bool) {
-        unsafe {
-            if self.context.depth >= XPATH_MAX_RECURSION_DEPTH as i32 {
-                xml_xpath_err(
-                    Some(self),
-                    XmlXPathError::XPathRecursionLimitExceeded as i32,
-                );
-                return;
-            }
-            // Parsing a single '(' pushes about 10 functions on the call stack before recursing!
-            self.context.depth += 10;
+    pub fn compile_expr(&mut self, sort: bool) {
+        if self.context.depth >= XPATH_MAX_RECURSION_DEPTH as i32 {
+            xml_xpath_err(
+                Some(self),
+                XmlXPathError::XPathRecursionLimitExceeded as i32,
+            );
+            return;
+        }
+        // Parsing a single '(' pushes about 10 functions on the call stack before recursing!
+        self.context.depth += 10;
 
+        self.compile_and_expr();
+        if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
+            return;
+        };
+        self.skip_blanks();
+        while self.current_str().starts_with("or") {
+            let op1: i32 = self.comp.last;
+            self.cur += 2;
+            self.skip_blanks();
             self.compile_and_expr();
             if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
                 return;
             };
+            let last = self.comp.last;
+            self.add_compiled_expression(op1, last, XmlXPathOp::XPathOpOr, 0, 0, 0, None, None);
             self.skip_blanks();
-            while self.current_str().starts_with("or") {
-                let op1: i32 = self.comp.last;
-                self.cur += 2;
-                self.skip_blanks();
-                self.compile_and_expr();
-                if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
-                    return;
-                };
-                let last = self.comp.last;
-                self.add_compiled_expression(op1, last, XmlXPathOp::XPathOpOr, 0, 0, 0, None, None);
-                self.skip_blanks();
-            }
-            if sort
-                && !matches!(
-                    self.comp.steps[self.comp.last as usize].op,
-                    XmlXPathOp::XPathOpValue
-                )
-            {
-                // more ops could be optimized too
-                // This is the main place to eliminate sorting for
-                // operations which don't require a sorted node-set.
-                // E.g. count().
-                let last = self.comp.last;
-                self.add_compiled_expression(
-                    last,
-                    -1,
-                    XmlXPathOp::XPathOpSort,
-                    0,
-                    0,
-                    0,
-                    None,
-                    None,
-                );
-            }
-
-            self.context.depth -= 10;
         }
+        if sort
+            && !matches!(
+                self.comp.steps[self.comp.last as usize].op,
+                XmlXPathOp::XPathOpValue
+            )
+        {
+            // more ops could be optimized too
+            // This is the main place to eliminate sorting for
+            // operations which don't require a sorted node-set.
+            // E.g. count().
+            let last = self.comp.last;
+            self.add_compiled_expression(last, -1, XmlXPathOp::XPathOpSort, 0, 0, 0, None, None);
+        }
+
+        self.context.depth -= 10;
     }
 
     /// ```text
@@ -178,34 +161,23 @@ impl XmlXPathParserContext<'_> {
     ///
     /// Compile an AND expression.
     #[doc(alias = "xmlXPathCompAndExpr")]
-    unsafe fn compile_and_expr(&mut self) {
-        unsafe {
+    fn compile_and_expr(&mut self) {
+        self.compile_equality_expr();
+        if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
+            return;
+        };
+        self.skip_blanks();
+        while self.current_str().starts_with("and") {
+            let op1: i32 = self.comp.last;
+            self.cur += 3;
+            self.skip_blanks();
             self.compile_equality_expr();
             if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
                 return;
             };
+            let last = self.comp.last;
+            self.add_compiled_expression(op1, last, XmlXPathOp::XPathOpAnd, 0, 0, 0, None, None);
             self.skip_blanks();
-            while self.current_str().starts_with("and") {
-                let op1: i32 = self.comp.last;
-                self.cur += 3;
-                self.skip_blanks();
-                self.compile_equality_expr();
-                if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
-                    return;
-                };
-                let last = self.comp.last;
-                self.add_compiled_expression(
-                    op1,
-                    last,
-                    XmlXPathOp::XPathOpAnd,
-                    0,
-                    0,
-                    0,
-                    None,
-                    None,
-                );
-                self.skip_blanks();
-            }
         }
     }
 
@@ -223,41 +195,30 @@ impl XmlXPathParserContext<'_> {
     /// Compile an Equality expression.
     ///
     #[doc(alias = "xmlXPathCompEqualityExpr")]
-    unsafe fn compile_equality_expr(&mut self) {
-        unsafe {
+    fn compile_equality_expr(&mut self) {
+        self.compile_relational_expr();
+        if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
+            return;
+        };
+        self.skip_blanks();
+        while self.current_char() == Some('=')
+            || (self.current_char() == Some('!') && self.nth_byte(1) == Some(b'='))
+        {
+            let op1: i32 = self.comp.last;
+            let eq = (self.current_char() == Some('=')) as i32;
+
+            self.next_char();
+            if eq == 0 {
+                self.next_char();
+            }
+            self.skip_blanks();
             self.compile_relational_expr();
             if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
                 return;
             };
+            let last = self.comp.last;
+            self.add_compiled_expression(op1, last, XmlXPathOp::XPathOpEqual, eq, 0, 0, None, None);
             self.skip_blanks();
-            while self.current_char() == Some('=')
-                || (self.current_char() == Some('!') && self.nth_byte(1) == Some(b'='))
-            {
-                let op1: i32 = self.comp.last;
-                let eq = (self.current_char() == Some('=')) as i32;
-
-                self.next_char();
-                if eq == 0 {
-                    self.next_char();
-                }
-                self.skip_blanks();
-                self.compile_relational_expr();
-                if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
-                    return;
-                };
-                let last = self.comp.last;
-                self.add_compiled_expression(
-                    op1,
-                    last,
-                    XmlXPathOp::XPathOpEqual,
-                    eq,
-                    0,
-                    0,
-                    None,
-                    None,
-                );
-                self.skip_blanks();
-            }
         }
     }
 
@@ -275,40 +236,38 @@ impl XmlXPathParserContext<'_> {
     ///
     /// Compile a Relational expression, then push the result on the stack
     #[doc(alias = "xmlXPathCompRelationalExpr")]
-    unsafe fn compile_relational_expr(&mut self) {
-        unsafe {
+    fn compile_relational_expr(&mut self) {
+        self.compile_additive_expr();
+        if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
+            return;
+        };
+        self.skip_blanks();
+        while self.current_char() == Some('<') || self.current_char() == Some('>') {
+            let op1: i32 = self.comp.last;
+            let inf = (self.current_char() == Some('<')) as i32;
+            let strict = (self.nth_byte(1) != Some(b'=')) as i32;
+
+            self.next_char();
+            if strict == 0 {
+                self.next_char();
+            }
+            self.skip_blanks();
             self.compile_additive_expr();
             if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
                 return;
             };
+            let last = self.comp.last;
+            self.add_compiled_expression(
+                op1,
+                last,
+                XmlXPathOp::XPathOpCmp,
+                inf,
+                strict,
+                0,
+                None,
+                None,
+            );
             self.skip_blanks();
-            while self.current_char() == Some('<') || self.current_char() == Some('>') {
-                let op1: i32 = self.comp.last;
-                let inf = (self.current_char() == Some('<')) as i32;
-                let strict = (self.nth_byte(1) != Some(b'=')) as i32;
-
-                self.next_char();
-                if strict == 0 {
-                    self.next_char();
-                }
-                self.skip_blanks();
-                self.compile_additive_expr();
-                if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
-                    return;
-                };
-                let last = self.comp.last;
-                self.add_compiled_expression(
-                    op1,
-                    last,
-                    XmlXPathOp::XPathOpCmp,
-                    inf,
-                    strict,
-                    0,
-                    None,
-                    None,
-                );
-                self.skip_blanks();
-            }
         }
     }
 
@@ -320,36 +279,34 @@ impl XmlXPathParserContext<'_> {
     ///
     /// Compile an Additive expression.
     #[doc(alias = "xmlXPathCompAdditiveExpr")]
-    unsafe fn compile_additive_expr(&mut self) {
-        unsafe {
+    fn compile_additive_expr(&mut self) {
+        self.compile_multiplicative_expr();
+        if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
+            return;
+        };
+        self.skip_blanks();
+        while self.current_char() == Some('+') || self.current_char() == Some('-') {
+            let op1: i32 = self.comp.last;
+            let plus = (self.current_char() == Some('+')) as i32;
+
+            self.next_char();
+            self.skip_blanks();
             self.compile_multiplicative_expr();
             if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
                 return;
             };
+            let last = self.comp.last;
+            self.add_compiled_expression(
+                op1,
+                last,
+                XmlXPathOp::XPathOpPlus,
+                plus,
+                0,
+                0,
+                None,
+                None,
+            );
             self.skip_blanks();
-            while self.current_char() == Some('+') || self.current_char() == Some('-') {
-                let op1: i32 = self.comp.last;
-                let plus = (self.current_char() == Some('+')) as i32;
-
-                self.next_char();
-                self.skip_blanks();
-                self.compile_multiplicative_expr();
-                if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
-                    return;
-                };
-                let last = self.comp.last;
-                self.add_compiled_expression(
-                    op1,
-                    last,
-                    XmlXPathOp::XPathOpPlus,
-                    plus,
-                    0,
-                    0,
-                    None,
-                    None,
-                );
-                self.skip_blanks();
-            }
         }
     }
 
@@ -363,48 +320,37 @@ impl XmlXPathParserContext<'_> {
     ///
     /// Compile an Additive expression.
     #[doc(alias = "xmlXPathCompMultiplicativeExpr")]
-    unsafe fn compile_multiplicative_expr(&mut self) {
-        unsafe {
+    fn compile_multiplicative_expr(&mut self) {
+        self.compile_unary_expr();
+        if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
+            return;
+        };
+        self.skip_blanks();
+        while self.current_char() == Some('*')
+            || self.current_str().starts_with("div")
+            || self.current_str().starts_with("mod")
+        {
+            let mut op: i32 = -1;
+            let op1: i32 = self.comp.last;
+
+            if self.current_char() == Some('*') {
+                op = 0;
+                self.next_char();
+            } else if self.current_char() == Some('d') {
+                op = 1;
+                self.cur += 3;
+            } else if self.current_char() == Some('m') {
+                op = 2;
+                self.cur += 3;
+            }
+            self.skip_blanks();
             self.compile_unary_expr();
             if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
                 return;
             };
+            let last = self.comp.last;
+            self.add_compiled_expression(op1, last, XmlXPathOp::XPathOpMult, op, 0, 0, None, None);
             self.skip_blanks();
-            while self.current_char() == Some('*')
-                || self.current_str().starts_with("div")
-                || self.current_str().starts_with("mod")
-            {
-                let mut op: i32 = -1;
-                let op1: i32 = self.comp.last;
-
-                if self.current_char() == Some('*') {
-                    op = 0;
-                    self.next_char();
-                } else if self.current_char() == Some('d') {
-                    op = 1;
-                    self.cur += 3;
-                } else if self.current_char() == Some('m') {
-                    op = 2;
-                    self.cur += 3;
-                }
-                self.skip_blanks();
-                self.compile_unary_expr();
-                if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
-                    return;
-                };
-                let last = self.comp.last;
-                self.add_compiled_expression(
-                    op1,
-                    last,
-                    XmlXPathOp::XPathOpMult,
-                    op,
-                    0,
-                    0,
-                    None,
-                    None,
-                );
-                self.skip_blanks();
-            }
         }
     }
 
@@ -414,49 +360,47 @@ impl XmlXPathParserContext<'_> {
     ///
     /// Compile an unary expression.
     #[doc(alias = "xmlXPathCompUnaryExpr")]
-    unsafe fn compile_unary_expr(&mut self) {
-        unsafe {
-            let mut minus: i32 = 0;
-            let mut found: i32 = 0;
+    fn compile_unary_expr(&mut self) {
+        let mut minus: i32 = 0;
+        let mut found: i32 = 0;
 
+        self.skip_blanks();
+        while self.current_char() == Some('-') {
+            minus = 1 - minus;
+            found = 1;
+            self.next_char();
             self.skip_blanks();
-            while self.current_char() == Some('-') {
-                minus = 1 - minus;
-                found = 1;
-                self.next_char();
-                self.skip_blanks();
-            }
+        }
 
-            self.compile_union_expr();
-            if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
-                return;
-            };
-            if found != 0 {
-                if minus != 0 {
-                    let last = self.comp.last;
-                    self.add_compiled_expression(
-                        last,
-                        -1,
-                        XmlXPathOp::XPathOpPlus,
-                        2,
-                        0,
-                        0,
-                        None,
-                        None,
-                    );
-                } else {
-                    let last = self.comp.last;
-                    self.add_compiled_expression(
-                        last,
-                        -1,
-                        XmlXPathOp::XPathOpPlus,
-                        3,
-                        0,
-                        0,
-                        None,
-                        None,
-                    );
-                }
+        self.compile_union_expr();
+        if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
+            return;
+        };
+        if found != 0 {
+            if minus != 0 {
+                let last = self.comp.last;
+                self.add_compiled_expression(
+                    last,
+                    -1,
+                    XmlXPathOp::XPathOpPlus,
+                    2,
+                    0,
+                    0,
+                    None,
+                    None,
+                );
+            } else {
+                let last = self.comp.last;
+                self.add_compiled_expression(
+                    last,
+                    -1,
+                    XmlXPathOp::XPathOpPlus,
+                    3,
+                    0,
+                    0,
+                    None,
+                    None,
+                );
             }
         }
     }
@@ -467,35 +411,24 @@ impl XmlXPathParserContext<'_> {
     ///
     /// Compile an union expression.
     #[doc(alias = "xmlXPathCompUnionExpr")]
-    unsafe fn compile_union_expr(&mut self) {
-        unsafe {
-            self.compile_path_expr();
-            if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
-                return;
-            };
+    fn compile_union_expr(&mut self) {
+        self.compile_path_expr();
+        if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
+            return;
+        };
+        self.skip_blanks();
+        while self.current_char() == Some('|') {
+            let op1: i32 = self.comp.last;
+            self.add_compiled_expression(-1, -1, XmlXPathOp::XPathOpNode, 0, 0, 0, None, None);
+
+            self.next_char();
             self.skip_blanks();
-            while self.current_char() == Some('|') {
-                let op1: i32 = self.comp.last;
-                self.add_compiled_expression(-1, -1, XmlXPathOp::XPathOpNode, 0, 0, 0, None, None);
+            self.compile_path_expr();
 
-                self.next_char();
-                self.skip_blanks();
-                self.compile_path_expr();
+            let last = self.comp.last;
+            self.add_compiled_expression(op1, last, XmlXPathOp::XPathOpUnion, 0, 0, 0, None, None);
 
-                let last = self.comp.last;
-                self.add_compiled_expression(
-                    op1,
-                    last,
-                    XmlXPathOp::XPathOpUnion,
-                    0,
-                    0,
-                    0,
-                    None,
-                    None,
-                );
-
-                self.skip_blanks();
-            }
+            self.skip_blanks();
         }
     }
 
@@ -514,154 +447,134 @@ impl XmlXPathParserContext<'_> {
     /// used in a location path. As in location paths, // is short for
     /// /descendant-or-self::node()/.
     #[doc(alias = "xmlXPathCompPathExpr")]
-    unsafe fn compile_path_expr(&mut self) {
-        unsafe {
-            let mut lc: i32 = 1; /* Should we branch to LocationPath ? */
+    fn compile_path_expr(&mut self) {
+        let mut lc: i32 = 1; /* Should we branch to LocationPath ? */
 
+        self.skip_blanks();
+        if self.current_char() == Some('$')
+            || self.current_char() == Some('(')
+            || self.current_char().is_some_and(|c| c.is_ascii_digit())
+            || self.current_char() == Some('\'')
+            || self.current_char() == Some('"')
+            || (self.current_char() == Some('.')
+                && self.nth_byte(1).is_some_and(|c| c.is_ascii_digit()))
+        {
+            lc = 0;
+        } else if self.current_char() == Some('*') || self.current_char() == Some('/') {
+            // relative or absolute location path
+            lc = 1;
+        } else if self.current_char() == Some('@') || self.current_char() == Some('.') {
+            // relative abbreviated attribute location path
+            lc = 1;
+        } else {
+            // Problem is finding if we have a name here whether it's:
+            //   - a nodetype
+            //   - a function call in which case it's followed by '('
+            //   - an axis in which case it's followed by ':'
+            //   - a element name
+            // We do an a priori analysis here rather than having to
+            // maintain parsed token content through the recursive function
+            // calls. This looks uglier but makes the code easier to
+            // read/write/debug.
             self.skip_blanks();
-            if self.current_char() == Some('$')
-                || self.current_char() == Some('(')
-                || self.current_char().is_some_and(|c| c.is_ascii_digit())
-                || self.current_char() == Some('\'')
-                || self.current_char() == Some('"')
-                || (self.current_char() == Some('.')
-                    && self.nth_byte(1).is_some_and(|c| c.is_ascii_digit()))
-            {
-                lc = 0;
-            } else if self.current_char() == Some('*') || self.current_char() == Some('/') {
-                // relative or absolute location path
-                lc = 1;
-            } else if self.current_char() == Some('@') || self.current_char() == Some('.') {
-                // relative abbreviated attribute location path
-                lc = 1;
-            } else {
-                // Problem is finding if we have a name here whether it's:
-                //   - a nodetype
-                //   - a function call in which case it's followed by '('
-                //   - an axis in which case it's followed by ':'
-                //   - a element name
-                // We do an a priori analysis here rather than having to
-                // maintain parsed token content through the recursive function
-                // calls. This looks uglier but makes the code easier to
-                // read/write/debug.
-                self.skip_blanks();
-                if let Some(name) = self.scan_name() {
-                    if name.contains("::") {
-                        lc = 1;
-                    } else {
-                        let mut len = name.len();
+            if let Some(name) = self.scan_name() {
+                if name.contains("::") {
+                    lc = 1;
+                } else {
+                    let mut len = name.len();
 
-                        while self.nth_byte(len).is_some() {
-                            if self.nth_byte(len) == Some(b'/') {
-                                // element name
-                                lc = 1;
-                                break;
-                            } else if self
-                                .nth_byte(len)
-                                .is_some_and(|c| xml_is_blank_char(c as u32))
-                            {
-                                // ignore blanks
-                            } else if self.nth_byte(len) == Some(b':') {
-                                lc = 1;
-                                break;
-                            } else if self.nth_byte(len) == Some(b'(') {
-                                // Node Type or Function
-                                if is_node_type(name) {
-                                    lc = 1;
-                                } else {
-                                    #[cfg(feature = "libxml_xptr_locs")]
-                                    if self.xptr != 0 && name == "range-to" {
-                                        lc = 1;
-                                    } else {
-                                        lc = 0;
-                                    }
-                                    #[cfg(not(feature = "libxml_xptr_locs"))]
-                                    {
-                                        lc = 0;
-                                    }
-                                }
-                                break;
-                            // } else if self.nth_byte(len) == Some(b'[') {
-                            //     // element name
-                            //     lc = 1;
-                            //     break;
-                            // } else if self.nth_byte(len as usize) == Some(b'<')
-                            //     || self.nth_byte(len as usize) == Some(b'>')
-                            //     || self.nth_byte(len as usize) == Some(b'=')
-                            // {
-                            //     lc = 1;
-                            //     break;
-                            } else {
-                                lc = 1;
-                                break;
-                            }
-                            len += 1;
-                        }
-                        if self.nth_byte(len).is_none() {
+                    while self.nth_byte(len).is_some() {
+                        if self.nth_byte(len) == Some(b'/') {
                             // element name
                             lc = 1;
+                            break;
+                        } else if self
+                            .nth_byte(len)
+                            .is_some_and(|c| xml_is_blank_char(c as u32))
+                        {
+                            // ignore blanks
+                        } else if self.nth_byte(len) == Some(b':') {
+                            lc = 1;
+                            break;
+                        } else if self.nth_byte(len) == Some(b'(') {
+                            // Node Type or Function
+                            if is_node_type(name) {
+                                lc = 1;
+                            } else {
+                                #[cfg(feature = "libxml_xptr_locs")]
+                                if self.xptr != 0 && name == "range-to" {
+                                    lc = 1;
+                                } else {
+                                    lc = 0;
+                                }
+                                #[cfg(not(feature = "libxml_xptr_locs"))]
+                                {
+                                    lc = 0;
+                                }
+                            }
+                            break;
+                        // } else if self.nth_byte(len) == Some(b'[') {
+                        //     // element name
+                        //     lc = 1;
+                        //     break;
+                        // } else if self.nth_byte(len as usize) == Some(b'<')
+                        //     || self.nth_byte(len as usize) == Some(b'>')
+                        //     || self.nth_byte(len as usize) == Some(b'=')
+                        // {
+                        //     lc = 1;
+                        //     break;
+                        } else {
+                            lc = 1;
+                            break;
                         }
+                        len += 1;
                     }
-                } else {
-                    // make sure all cases are covered explicitly
-                    xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
-                    return;
+                    if self.nth_byte(len).is_none() {
+                        // element name
+                        lc = 1;
+                    }
                 }
-            }
-
-            if lc != 0 {
-                if self.current_char() == Some('/') {
-                    self.add_compiled_expression(
-                        -1,
-                        -1,
-                        XmlXPathOp::XPathOpRoot,
-                        0,
-                        0,
-                        0,
-                        None,
-                        None,
-                    );
-                } else {
-                    self.add_compiled_expression(
-                        -1,
-                        -1,
-                        XmlXPathOp::XPathOpNode,
-                        0,
-                        0,
-                        0,
-                        None,
-                        None,
-                    );
-                }
-                self.compile_location_path();
             } else {
-                self.compile_filter_expr();
-                if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
-                    return;
-                };
-                if self.current_char() == Some('/') && self.nth_byte(1) == Some(b'/') {
-                    self.cur += 2;
-                    self.skip_blanks();
-
-                    let last = self.comp.last;
-                    self.add_compiled_expression(
-                        last,
-                        -1,
-                        XmlXPathOp::XPathOpCollect,
-                        XmlXPathAxisVal::AxisDescendantOrSelf as i32,
-                        XmlXPathTestVal::NodeTestType as i32,
-                        XmlXPathTypeVal::NodeTypeNode as i32,
-                        None,
-                        None,
-                    );
-
-                    self.compile_relative_location_path();
-                } else if self.current_char() == Some('/') {
-                    self.compile_relative_location_path();
-                }
+                // make sure all cases are covered explicitly
+                xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
+                return;
             }
-            self.skip_blanks();
         }
+
+        if lc != 0 {
+            if self.current_char() == Some('/') {
+                self.add_compiled_expression(-1, -1, XmlXPathOp::XPathOpRoot, 0, 0, 0, None, None);
+            } else {
+                self.add_compiled_expression(-1, -1, XmlXPathOp::XPathOpNode, 0, 0, 0, None, None);
+            }
+            self.compile_location_path();
+        } else {
+            self.compile_filter_expr();
+            if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
+                return;
+            };
+            if self.current_char() == Some('/') && self.nth_byte(1) == Some(b'/') {
+                self.cur += 2;
+                self.skip_blanks();
+
+                let last = self.comp.last;
+                self.add_compiled_expression(
+                    last,
+                    -1,
+                    XmlXPathOp::XPathOpCollect,
+                    XmlXPathAxisVal::AxisDescendantOrSelf as i32,
+                    XmlXPathTestVal::NodeTestType as i32,
+                    XmlXPathTypeVal::NodeTypeNode as i32,
+                    None,
+                    None,
+                );
+
+                self.compile_relative_location_path();
+            } else if self.current_char() == Some('/') {
+                self.compile_relative_location_path();
+            }
+        }
+        self.skip_blanks();
     }
 
     /// ```text
@@ -683,80 +596,11 @@ impl XmlXPathParserContext<'_> {
     /// short for div/descendant-or-self::node()/child::para and so will
     /// select all para descendants of div children.
     #[doc(alias = "xmlXPathCompLocationPath")]
-    unsafe fn compile_location_path(&mut self) {
-        unsafe {
-            self.skip_blanks();
-            if self.current_char() != Some('/') {
-                self.compile_relative_location_path();
-            } else {
-                while self.current_char() == Some('/') {
-                    if self.current_str().starts_with("//") {
-                        self.cur += 2;
-                        self.skip_blanks();
-                        let last = self.comp.last;
-                        self.add_compiled_expression(
-                            last,
-                            -1,
-                            XmlXPathOp::XPathOpCollect,
-                            XmlXPathAxisVal::AxisDescendantOrSelf as i32,
-                            XmlXPathTestVal::NodeTestType as i32,
-                            XmlXPathTypeVal::NodeTypeNode as i32,
-                            None,
-                            None,
-                        );
-                        self.compile_relative_location_path();
-                    } else if self.current_char() == Some('/') {
-                        self.next_char();
-                        self.skip_blanks();
-                        if self.current_char().is_some_and(|c| {
-                            c.is_ascii_alphabetic() || c == '_' || c == '.' || c == '@' || c == '*'
-                        }) {
-                            self.compile_relative_location_path();
-                        }
-                    }
-                    if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
-                        return;
-                    };
-                }
-            }
-        }
-    }
-
-    /// ```text
-    /// [3]   RelativeLocationPath ::=   Step
-    ///                     | RelativeLocationPath '/' Step
-    ///                     | AbbreviatedRelativeLocationPath
-    /// [11]  AbbreviatedRelativeLocationPath ::=   RelativeLocationPath '//' Step
-    /// ```
-    ///
-    /// Compile a relative location path.
-    #[doc(alias = "xmlXPathCompRelativeLocationPath")]
-    unsafe fn compile_relative_location_path(&mut self) {
-        unsafe {
-            self.skip_blanks();
-            if self.current_str().starts_with("//") {
-                self.cur += 2;
-                self.skip_blanks();
-                let last = self.comp.last;
-                self.add_compiled_expression(
-                    last,
-                    -1,
-                    XmlXPathOp::XPathOpCollect,
-                    XmlXPathAxisVal::AxisDescendantOrSelf as i32,
-                    XmlXPathTestVal::NodeTestType as i32,
-                    XmlXPathTypeVal::NodeTypeNode as i32,
-                    None,
-                    None,
-                );
-            } else if self.current_char() == Some('/') {
-                self.next_char();
-                self.skip_blanks();
-            }
-            self.compile_step();
-            if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
-                return;
-            };
-            self.skip_blanks();
+    fn compile_location_path(&mut self) {
+        self.skip_blanks();
+        if self.current_char() != Some('/') {
+            self.compile_relative_location_path();
+        } else {
             while self.current_char() == Some('/') {
                 if self.current_str().starts_with("//") {
                     self.cur += 2;
@@ -772,14 +616,79 @@ impl XmlXPathParserContext<'_> {
                         None,
                         None,
                     );
-                    self.compile_step();
+                    self.compile_relative_location_path();
                 } else if self.current_char() == Some('/') {
                     self.next_char();
                     self.skip_blanks();
-                    self.compile_step();
+                    if self.current_char().is_some_and(|c| {
+                        c.is_ascii_alphabetic() || c == '_' || c == '.' || c == '@' || c == '*'
+                    }) {
+                        self.compile_relative_location_path();
+                    }
                 }
-                self.skip_blanks();
+                if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
+                    return;
+                };
             }
+        }
+    }
+
+    /// ```text
+    /// [3]   RelativeLocationPath ::=   Step
+    ///                     | RelativeLocationPath '/' Step
+    ///                     | AbbreviatedRelativeLocationPath
+    /// [11]  AbbreviatedRelativeLocationPath ::=   RelativeLocationPath '//' Step
+    /// ```
+    ///
+    /// Compile a relative location path.
+    #[doc(alias = "xmlXPathCompRelativeLocationPath")]
+    fn compile_relative_location_path(&mut self) {
+        self.skip_blanks();
+        if self.current_str().starts_with("//") {
+            self.cur += 2;
+            self.skip_blanks();
+            let last = self.comp.last;
+            self.add_compiled_expression(
+                last,
+                -1,
+                XmlXPathOp::XPathOpCollect,
+                XmlXPathAxisVal::AxisDescendantOrSelf as i32,
+                XmlXPathTestVal::NodeTestType as i32,
+                XmlXPathTypeVal::NodeTypeNode as i32,
+                None,
+                None,
+            );
+        } else if self.current_char() == Some('/') {
+            self.next_char();
+            self.skip_blanks();
+        }
+        self.compile_step();
+        if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
+            return;
+        };
+        self.skip_blanks();
+        while self.current_char() == Some('/') {
+            if self.current_str().starts_with("//") {
+                self.cur += 2;
+                self.skip_blanks();
+                let last = self.comp.last;
+                self.add_compiled_expression(
+                    last,
+                    -1,
+                    XmlXPathOp::XPathOpCollect,
+                    XmlXPathAxisVal::AxisDescendantOrSelf as i32,
+                    XmlXPathTestVal::NodeTestType as i32,
+                    XmlXPathTypeVal::NodeTypeNode as i32,
+                    None,
+                    None,
+                );
+                self.compile_step();
+            } else if self.current_char() == Some('/') {
+                self.next_char();
+                self.skip_blanks();
+                self.compile_step();
+            }
+            self.skip_blanks();
         }
     }
 
@@ -808,172 +717,168 @@ impl XmlXPathParserContext<'_> {
     /// For example, ../title is short for parent::node()/child::title
     /// and so will select the title children of the parent of the context node.
     #[doc(alias = "xmlXPathCompStep")]
-    unsafe fn compile_step(&mut self) {
-        unsafe {
-            #[cfg(feature = "libxml_xptr_locs")]
-            let mut rangeto: i32 = 0;
-            #[cfg(feature = "libxml_xptr_locs")]
-            let mut op2: i32 = -1;
+    fn compile_step(&mut self) {
+        #[cfg(feature = "libxml_xptr_locs")]
+        let mut rangeto: i32 = 0;
+        #[cfg(feature = "libxml_xptr_locs")]
+        let mut op2: i32 = -1;
 
+        self.skip_blanks();
+        if self.current_str().starts_with("..") {
+            self.cur += 2;
             self.skip_blanks();
-            if self.current_str().starts_with("..") {
-                self.cur += 2;
-                self.skip_blanks();
-                let last = self.comp.last;
-                self.add_compiled_expression(
-                    last,
-                    -1,
-                    XmlXPathOp::XPathOpCollect,
-                    XmlXPathAxisVal::AxisParent as i32,
-                    XmlXPathTestVal::NodeTestType as i32,
-                    XmlXPathTypeVal::NodeTypeNode as i32,
-                    None,
-                    None,
-                );
-            } else if self.current_char() == Some('.') {
-                self.next_char();
-                self.skip_blanks();
-            } else {
-                let mut name = None;
-                let mut prefix = None;
-                let mut test: XmlXPathTestVal = XmlXPathTestVal::NodeTestNone;
-                #[cfg(not(feature = "libxml_xptr_locs"))]
-                let mut axis: Option<XmlXPathAxisVal>;
+            let last = self.comp.last;
+            self.add_compiled_expression(
+                last,
+                -1,
+                XmlXPathOp::XPathOpCollect,
+                XmlXPathAxisVal::AxisParent as i32,
+                XmlXPathTestVal::NodeTestType as i32,
+                XmlXPathTypeVal::NodeTypeNode as i32,
+                None,
+                None,
+            );
+        } else if self.current_char() == Some('.') {
+            self.next_char();
+            self.skip_blanks();
+        } else {
+            let mut name = None;
+            let mut prefix = None;
+            let mut test: XmlXPathTestVal = XmlXPathTestVal::NodeTestNone;
+            #[cfg(not(feature = "libxml_xptr_locs"))]
+            let mut axis: Option<XmlXPathAxisVal>;
+            #[cfg(feature = "libxml_xptr_locs")]
+            let mut axis = None;
+            let mut typ: XmlXPathTypeVal = XmlXPathTypeVal::NodeTypeNode;
+
+            // The modification needed for XPointer change to the production
+            #[cfg_attr(not(feature = "libxml_xptr_locs"), allow(unused_labels))]
+            'eval_predicates: {
                 #[cfg(feature = "libxml_xptr_locs")]
-                let mut axis = None;
-                let mut typ: XmlXPathTypeVal = XmlXPathTypeVal::NodeTypeNode;
-
-                // The modification needed for XPointer change to the production
-                #[cfg_attr(not(feature = "libxml_xptr_locs"), allow(unused_labels))]
-                'eval_predicates: {
-                    #[cfg(feature = "libxml_xptr_locs")]
-                    if self.xptr != 0 {
-                        name = self.parse_ncname();
-                        if name.as_deref() == Some("range-to") {
-                            op2 = self.comp.last;
-                            self.skip_blanks();
-                            if self.current_char() != Some('(') {
-                                xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
-                                return;
-                            }
-                            self.next_char();
-                            self.skip_blanks();
-
-                            self.compile_expr(true);
-                            /* PUSH_BINARY_EXPR(XPATH_OP_RANGETO, op2, self.comp.borrow().last, 0, 0); */
-                            if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
-                                return;
-                            };
-
-                            self.skip_blanks();
-                            if self.current_char() != Some(')') {
-                                xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
-                                return;
-                            }
-                            self.next_char();
-                            rangeto = 1;
-                            break 'eval_predicates;
+                if self.xptr != 0 {
+                    name = self.parse_ncname();
+                    if name.as_deref() == Some("range-to") {
+                        op2 = self.comp.last;
+                        self.skip_blanks();
+                        if self.current_char() != Some('(') {
+                            xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
+                            return;
                         }
+                        self.next_char();
+                        self.skip_blanks();
+
+                        self.compile_expr(true);
+                        /* PUSH_BINARY_EXPR(XPATH_OP_RANGETO, op2, self.comp.borrow().last, 0, 0); */
+                        if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
+                            return;
+                        };
+
+                        self.skip_blanks();
+                        if self.current_char() != Some(')') {
+                            xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
+                            return;
+                        }
+                        self.next_char();
+                        rangeto = 1;
+                        break 'eval_predicates;
                     }
+                }
 
-                    if self.current_char() == Some('*') {
-                        axis = Some(XmlXPathAxisVal::AxisChild);
-                    } else {
-                        if name.is_none() {
-                            name = self.parse_ncname();
-                        }
-                        if name.is_some() {
-                            axis = is_axis_name(name.as_deref().unwrap());
-                            if axis.is_some() {
-                                self.skip_blanks();
-                                if self.current_char() == Some(':')
-                                    && self.nth_byte(1) == Some(b':')
-                                {
-                                    self.cur += 2;
-                                    name = None;
-                                } else {
-                                    // an element name can conflict with an axis one :-\
-                                    axis = Some(XmlXPathAxisVal::AxisChild);
-                                }
+                if self.current_char() == Some('*') {
+                    axis = Some(XmlXPathAxisVal::AxisChild);
+                } else {
+                    if name.is_none() {
+                        name = self.parse_ncname();
+                    }
+                    if name.is_some() {
+                        axis = is_axis_name(name.as_deref().unwrap());
+                        if axis.is_some() {
+                            self.skip_blanks();
+                            if self.current_char() == Some(':') && self.nth_byte(1) == Some(b':') {
+                                self.cur += 2;
+                                name = None;
                             } else {
+                                // an element name can conflict with an axis one :-\
                                 axis = Some(XmlXPathAxisVal::AxisChild);
                             }
-                        } else if self.current_char() == Some('@') {
-                            self.next_char();
-                            axis = Some(XmlXPathAxisVal::AxisAttribute);
                         } else {
                             axis = Some(XmlXPathAxisVal::AxisChild);
                         }
-                    }
-
-                    if self.error != XmlXPathError::XPathExpressionOK as i32 {
-                        return;
-                    }
-
-                    match self.compile_node_test(&mut test, &mut typ, name.as_deref()) {
-                        Some((pref, local)) => {
-                            prefix = pref;
-                            name = Some(local);
-                        }
-                        None => {
-                            prefix = None;
-                            name = None;
-                        }
-                    }
-                    if matches!(test, XmlXPathTestVal::NodeTestNone) {
-                        return;
-                    }
-
-                    if let Some(prefix) = prefix.as_deref() {
-                        if self.context.flags & XML_XPATH_CHECKNS as i32 != 0
-                            && self.context.lookup_ns(prefix).is_none()
-                        {
-                            xml_xpath_err(Some(self), XmlXPathError::XPathUndefPrefixError as i32);
-                        }
+                    } else if self.current_char() == Some('@') {
+                        self.next_char();
+                        axis = Some(XmlXPathAxisVal::AxisAttribute);
+                    } else {
+                        axis = Some(XmlXPathAxisVal::AxisChild);
                     }
                 }
 
-                let op1: i32 = self.comp.last;
-                self.comp.last = -1;
-
-                self.skip_blanks();
-                while self.current_char() == Some('[') {
-                    self.compile_predicate(false);
-                }
-
-                #[cfg(feature = "libxml_xptr_locs")]
-                if rangeto != 0 {
-                    self.add_compiled_expression(
-                        op2,
-                        op1,
-                        XmlXPathOp::XPathOpRangeto,
-                        0,
-                        0,
-                        0,
-                        None,
-                        None,
-                    );
+                if self.error != XmlXPathError::XPathExpressionOK as i32 {
                     return;
                 }
 
-                let last = self.comp.last;
-                self.add_compiled_expression(
-                    op1,
-                    last,
-                    XmlXPathOp::XPathOpCollect,
-                    (axis.unwrap_or_else(|| {
-                        panic!(
-                            "Invalid xmlXPathAxisVal: file: {}, line: {}",
-                            file!(),
-                            line!()
-                        )
-                    })) as i32,
-                    test as i32,
-                    typ as i32,
-                    prefix.map(Rc::from).map(XmlXPathStepOpValue::String),
-                    name.map(Rc::from).map(XmlXPathStepOpValue::String),
-                );
+                match self.compile_node_test(&mut test, &mut typ, name.as_deref()) {
+                    Some((pref, local)) => {
+                        prefix = pref;
+                        name = Some(local);
+                    }
+                    None => {
+                        prefix = None;
+                        name = None;
+                    }
+                }
+                if matches!(test, XmlXPathTestVal::NodeTestNone) {
+                    return;
+                }
+
+                if let Some(prefix) = prefix.as_deref() {
+                    if self.context.flags & XML_XPATH_CHECKNS as i32 != 0
+                        && self.context.lookup_ns(prefix).is_none()
+                    {
+                        xml_xpath_err(Some(self), XmlXPathError::XPathUndefPrefixError as i32);
+                    }
+                }
             }
+
+            let op1: i32 = self.comp.last;
+            self.comp.last = -1;
+
+            self.skip_blanks();
+            while self.current_char() == Some('[') {
+                self.compile_predicate(false);
+            }
+
+            #[cfg(feature = "libxml_xptr_locs")]
+            if rangeto != 0 {
+                self.add_compiled_expression(
+                    op2,
+                    op1,
+                    XmlXPathOp::XPathOpRangeto,
+                    0,
+                    0,
+                    0,
+                    None,
+                    None,
+                );
+                return;
+            }
+
+            let last = self.comp.last;
+            self.add_compiled_expression(
+                op1,
+                last,
+                XmlXPathOp::XPathOpCollect,
+                (axis.unwrap_or_else(|| {
+                    panic!(
+                        "Invalid xmlXPathAxisVal: file: {}, line: {}",
+                        file!(),
+                        line!()
+                    )
+                })) as i32,
+                test as i32,
+                typ as i32,
+                prefix.map(Rc::from).map(XmlXPathStepOpValue::String),
+                name.map(Rc::from).map(XmlXPathStepOpValue::String),
+            );
         }
     }
 
@@ -1109,18 +1014,16 @@ impl XmlXPathParserContext<'_> {
     /// used for evaluating the expression in square brackets is the node-set
     /// to be filtered listed in document order.
     #[doc(alias = "xmlXPathCompFilterExpr")]
-    unsafe fn compile_filter_expr(&mut self) {
-        unsafe {
-            self.compile_primary_expr();
-            if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
-                return;
-            };
-            self.skip_blanks();
+    fn compile_filter_expr(&mut self) {
+        self.compile_primary_expr();
+        if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
+            return;
+        };
+        self.skip_blanks();
 
-            while self.current_char() == Some('[') {
-                self.compile_predicate(true);
-                self.skip_blanks();
-            }
+        while self.current_char() == Some('[') {
+            self.compile_predicate(true);
+            self.skip_blanks();
         }
     }
 
@@ -1134,36 +1037,34 @@ impl XmlXPathParserContext<'_> {
     ///
     /// Compile a primary expression.
     #[doc(alias = "xmlXPathCompPrimaryExpr")]
-    unsafe fn compile_primary_expr(&mut self) {
-        unsafe {
+    fn compile_primary_expr(&mut self) {
+        self.skip_blanks();
+        if self.current_char() == Some('$') {
+            self.compile_variable_reference();
+        } else if self.current_char() == Some('(') {
+            self.next_char();
             self.skip_blanks();
-            if self.current_char() == Some('$') {
-                self.compile_variable_reference();
-            } else if self.current_char() == Some('(') {
-                self.next_char();
-                self.skip_blanks();
-                self.compile_expr(true);
-                if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
-                    return;
-                };
-                if self.current_char() != Some(')') {
-                    xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
-                    return;
-                }
-                self.next_char();
-                self.skip_blanks();
-            } else if self.current_char().is_some_and(|c| c.is_ascii_digit())
-                || (self.current_char() == Some('.')
-                    && self.nth_byte(1).is_some_and(|c| c.is_ascii_digit()))
-            {
-                self.compile_number();
-            } else if self.current_char() == Some('\'') || self.current_char() == Some('"') {
-                self.compile_literal();
-            } else {
-                self.compile_function_call();
+            self.compile_expr(true);
+            if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
+                return;
+            };
+            if self.current_char() != Some(')') {
+                xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
+                return;
             }
+            self.next_char();
             self.skip_blanks();
+        } else if self.current_char().is_some_and(|c| c.is_ascii_digit())
+            || (self.current_char() == Some('.')
+                && self.nth_byte(1).is_some_and(|c| c.is_ascii_digit()))
+        {
+            self.compile_number();
+        } else if self.current_char() == Some('\'') || self.current_char() == Some('"') {
+            self.compile_literal();
+        } else {
+            self.compile_function_call();
         }
+        self.skip_blanks();
     }
 
     /// ```text
@@ -1265,71 +1166,64 @@ impl XmlXPathParserContext<'_> {
     ///
     /// TODO: xmlXPathCompLiteral memory allocation could be improved.
     #[doc(alias = "xmlXPathCompLiteral")]
-    unsafe fn compile_literal(&mut self) {
-        unsafe {
-            let ret: *mut u8;
+    fn compile_literal(&mut self) {
+        let ret;
 
-            if self.current_char() == Some('"') {
+        if self.current_char() == Some('"') {
+            self.next_char();
+            let q = self.cur;
+            while self
+                .current_char()
+                .is_some_and(|c| xml_is_char(c as u32) && c != '"')
+            {
                 self.next_char();
-                let q = self.cur;
-                while self
-                    .current_char()
-                    .is_some_and(|c| xml_is_char(c as u32) && c != '"')
-                {
-                    self.next_char();
-                }
-                if self.current_char().is_none_or(|c| !xml_is_char(c as u32)) {
-                    xml_xpath_err(
-                        Some(self),
-                        XmlXPathError::XPathUnfinishedLiteralError as i32,
-                    );
-                    return;
-                } else {
-                    ret = xml_strndup(self.base[q..].as_ptr(), self.cur as i32 - q as i32);
-                    self.next_char();
-                }
-            } else if self.current_char() == Some('\'') {
-                self.next_char();
-                let q = self.cur;
-                while self
-                    .current_char()
-                    .is_some_and(|c| xml_is_char(c as u32) && c != '\'')
-                {
-                    self.next_char();
-                }
-                if self.current_char().is_none_or(|c| !xml_is_char(c as u32)) {
-                    xml_xpath_err(
-                        Some(self),
-                        XmlXPathError::XPathUnfinishedLiteralError as i32,
-                    );
-                    return;
-                } else {
-                    ret = xml_strndup(self.base[q..].as_ptr(), self.cur as i32 - q as i32);
-                    self.next_char();
-                }
+            }
+            if self.current_char().is_none_or(|c| !xml_is_char(c as u32)) {
+                xml_xpath_err(
+                    Some(self),
+                    XmlXPathError::XPathUnfinishedLiteralError as i32,
+                );
+                return;
             } else {
-                xml_xpath_err(Some(self), XmlXPathError::XPathStartLiteralError as i32);
-                return;
+                ret = self.base[q..self.cur].to_owned();
+                self.next_char();
             }
-            if ret.is_null() {
-                xml_xpath_perr_memory(Some(self), None);
-                return;
+        } else if self.current_char() == Some('\'') {
+            self.next_char();
+            let q = self.cur;
+            while self
+                .current_char()
+                .is_some_and(|c| xml_is_char(c as u32) && c != '\'')
+            {
+                self.next_char();
             }
-            let last = self.comp.last;
-            self.add_compiled_expression(
-                last,
-                -1,
-                XmlXPathOp::XPathOpValue,
-                XmlXPathObjectType::XPathString as i32,
-                0_i32,
-                0_i32,
-                Some(XmlXPathStepOpValue::Object(Rc::new(XmlXPathObject::from(
-                    CStr::from_ptr(ret as *const i8).to_string_lossy().as_ref(),
-                )))),
-                None,
-            );
-            xml_free(ret as _);
+            if self.current_char().is_none_or(|c| !xml_is_char(c as u32)) {
+                xml_xpath_err(
+                    Some(self),
+                    XmlXPathError::XPathUnfinishedLiteralError as i32,
+                );
+                return;
+            } else {
+                ret = self.base[q..self.cur].to_owned();
+                self.next_char();
+            }
+        } else {
+            xml_xpath_err(Some(self), XmlXPathError::XPathStartLiteralError as i32);
+            return;
         }
+        let last = self.comp.last;
+        self.add_compiled_expression(
+            last,
+            -1,
+            XmlXPathOp::XPathOpValue,
+            XmlXPathObjectType::XPathString as i32,
+            0_i32,
+            0_i32,
+            Some(XmlXPathStepOpValue::Object(Rc::new(XmlXPathObject::from(
+                ret,
+            )))),
+            None,
+        );
     }
 
     /// ```text
@@ -1340,74 +1234,72 @@ impl XmlXPathParserContext<'_> {
     /// Compile a function call, the evaluation of all arguments are
     /// pushed on the stack
     #[doc(alias = "xmlXPathCompFunctionCall")]
-    unsafe fn compile_function_call(&mut self) {
-        unsafe {
-            let mut nbargs: i32 = 0;
-            let mut sort = true;
+    fn compile_function_call(&mut self) {
+        let mut nbargs: i32 = 0;
+        let mut sort = true;
 
-            let Some((prefix, name)) = self.parse_qname() else {
-                xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
-                return;
-            };
-            self.skip_blanks();
+        let Some((prefix, name)) = self.parse_qname() else {
+            xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
+            return;
+        };
+        self.skip_blanks();
 
-            if self.current_char() != Some('(') {
-                xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
-                return;
-            }
-            self.next_char();
-            self.skip_blanks();
-
-            // Optimization for count(): we don't need the node-set to be sorted.
-            if prefix.is_none() && name.starts_with('c') && name == "count" {
-                sort = false;
-            }
-            self.comp.last = -1;
-            if self.current_char() != Some(')') {
-                while self.current_char().is_some() {
-                    let op1: i32 = self.comp.last;
-                    self.comp.last = -1;
-                    self.compile_expr(sort);
-                    if self.error != XmlXPathError::XPathExpressionOK as i32 {
-                        return;
-                    }
-                    let last = self.comp.last;
-                    self.add_compiled_expression(
-                        op1,
-                        last,
-                        XmlXPathOp::XPathOpArg,
-                        0,
-                        0,
-                        0,
-                        None,
-                        None,
-                    );
-                    nbargs += 1;
-                    if self.current_char() == Some(')') {
-                        break;
-                    }
-                    if self.current_char() != Some(',') {
-                        xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
-                        return;
-                    }
-                    self.next_char();
-                    self.skip_blanks();
-                }
-            }
-            let last = self.comp.last;
-            self.add_compiled_expression(
-                last,
-                -1,
-                XmlXPathOp::XPathOpFunction,
-                nbargs,
-                0_i32,
-                0_i32,
-                Some(XmlXPathStepOpValue::String(name.into())),
-                prefix.map(Rc::from).map(XmlXPathStepOpValue::String),
-            );
-            self.next_char();
-            self.skip_blanks();
+        if self.current_char() != Some('(') {
+            xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
+            return;
         }
+        self.next_char();
+        self.skip_blanks();
+
+        // Optimization for count(): we don't need the node-set to be sorted.
+        if prefix.is_none() && name.starts_with('c') && name == "count" {
+            sort = false;
+        }
+        self.comp.last = -1;
+        if self.current_char() != Some(')') {
+            while self.current_char().is_some() {
+                let op1: i32 = self.comp.last;
+                self.comp.last = -1;
+                self.compile_expr(sort);
+                if self.error != XmlXPathError::XPathExpressionOK as i32 {
+                    return;
+                }
+                let last = self.comp.last;
+                self.add_compiled_expression(
+                    op1,
+                    last,
+                    XmlXPathOp::XPathOpArg,
+                    0,
+                    0,
+                    0,
+                    None,
+                    None,
+                );
+                nbargs += 1;
+                if self.current_char() == Some(')') {
+                    break;
+                }
+                if self.current_char() != Some(',') {
+                    xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
+                    return;
+                }
+                self.next_char();
+                self.skip_blanks();
+            }
+        }
+        let last = self.comp.last;
+        self.add_compiled_expression(
+            last,
+            -1,
+            XmlXPathOp::XPathOpFunction,
+            nbargs,
+            0_i32,
+            0_i32,
+            Some(XmlXPathStepOpValue::String(name.into())),
+            prefix.map(Rc::from).map(XmlXPathStepOpValue::String),
+        );
+        self.next_char();
+        self.skip_blanks();
     }
 
     /// ```text
@@ -1417,69 +1309,58 @@ impl XmlXPathParserContext<'_> {
     ///
     /// Compile a predicate expression
     #[doc(alias = "xmlXPathCompPredicate")]
-    unsafe fn compile_predicate(&mut self, filter: bool) {
-        unsafe {
-            let op1: i32 = self.comp.last;
+    fn compile_predicate(&mut self, filter: bool) {
+        let op1: i32 = self.comp.last;
 
-            self.skip_blanks();
-            if self.current_char() != Some('[') {
-                xml_xpath_err(Some(self), XmlXPathError::XPathInvalidPredicateError as i32);
-                return;
-            }
-            self.next_char();
-            self.skip_blanks();
-
-            self.comp.last = -1;
-            // This call to xmlXPathCompileExpr() will deactivate sorting
-            // of the predicate result.
-            // TODO: Sorting is still activated for filters, since I'm not
-            //  sure if needed. Normally sorting should not be needed, since
-            //  a filter can only diminish the number of items in a sequence,
-            //  but won't change its order; so if the initial sequence is sorted,
-            //  subsequent sorting is not needed.
-            if !filter {
-                self.compile_expr(false);
-            } else {
-                self.compile_expr(true);
-            }
-            if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
-                return;
-            };
-
-            if self.current_char() != Some(']') {
-                xml_xpath_err(Some(self), XmlXPathError::XPathInvalidPredicateError as i32);
-                return;
-            }
-
-            if filter {
-                let last = self.comp.last;
-                self.add_compiled_expression(
-                    op1,
-                    last,
-                    XmlXPathOp::XPathOpFilter,
-                    0,
-                    0,
-                    0,
-                    None,
-                    None,
-                );
-            } else {
-                let last = self.comp.last;
-                self.add_compiled_expression(
-                    op1,
-                    last,
-                    XmlXPathOp::XPathOpPredicate,
-                    0,
-                    0,
-                    0,
-                    None,
-                    None,
-                );
-            }
-
-            self.next_char();
-            self.skip_blanks();
+        self.skip_blanks();
+        if self.current_char() != Some('[') {
+            xml_xpath_err(Some(self), XmlXPathError::XPathInvalidPredicateError as i32);
+            return;
         }
+        self.next_char();
+        self.skip_blanks();
+
+        self.comp.last = -1;
+        // This call to xmlXPathCompileExpr() will deactivate sorting
+        // of the predicate result.
+        // TODO: Sorting is still activated for filters, since I'm not
+        //  sure if needed. Normally sorting should not be needed, since
+        //  a filter can only diminish the number of items in a sequence,
+        //  but won't change its order; so if the initial sequence is sorted,
+        //  subsequent sorting is not needed.
+        if !filter {
+            self.compile_expr(false);
+        } else {
+            self.compile_expr(true);
+        }
+        if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
+            return;
+        };
+
+        if self.current_char() != Some(']') {
+            xml_xpath_err(Some(self), XmlXPathError::XPathInvalidPredicateError as i32);
+            return;
+        }
+
+        if filter {
+            let last = self.comp.last;
+            self.add_compiled_expression(op1, last, XmlXPathOp::XPathOpFilter, 0, 0, 0, None, None);
+        } else {
+            let last = self.comp.last;
+            self.add_compiled_expression(
+                op1,
+                last,
+                XmlXPathOp::XPathOpPredicate,
+                0,
+                0,
+                0,
+                None,
+                None,
+            );
+        }
+
+        self.next_char();
+        self.skip_blanks();
     }
 
     /// Parse a VariableReference, evaluate it and push it on the stack.

@@ -592,66 +592,64 @@ pub fn xml_xpath_namespace_uri_function(ctxt: &mut XmlXPathParserContext, mut na
 /// in XML. If the argument is omitted, it defaults to the context
 /// node converted to a string, in other words the value of the context node.
 #[doc(alias = "xmlXPathNormalizeFunction")]
-pub unsafe fn xml_xpath_normalize_function(ctxt: &mut XmlXPathParserContext, mut nargs: usize) {
-    unsafe {
-        if nargs == 0 {
-            // Use current context node
-            let val = xml_xpath_cast_node_to_string(ctxt.context.node);
-            ctxt.value_push(xml_xpath_wrap_string(Some(&val)));
-            nargs = 1;
-        }
+pub fn xml_xpath_normalize_function(ctxt: &mut XmlXPathParserContext, mut nargs: usize) {
+    if nargs == 0 {
+        // Use current context node
+        let val = xml_xpath_cast_node_to_string(ctxt.context.node);
+        ctxt.value_push(xml_xpath_wrap_string(Some(&val)));
+        nargs = 1;
+    }
 
-        if check_arity(ctxt, nargs, 1).is_err() {
-            return;
-        }
-        cast_to_string(ctxt);
-        if ctxt
-            .value()
-            .is_none_or(|value| value.typ != XmlXPathObjectType::XPathString)
-        {
-            xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
-            return;
-        };
-        let Some(source) = ctxt.value_mut().unwrap().stringval.as_deref_mut() else {
-            return;
-        };
-        let oldlen = source.len();
-        // Skip leading whitespaces
-        let Some(start) = source.find(|c| !xml_is_blank_char(c as u32)) else {
-            ctxt.value_mut()
-                .unwrap()
-                .stringval
-                .as_mut()
-                .unwrap()
-                .clear();
-            return;
-        };
-        let target = source.as_bytes_mut();
-
-        // Collapse intermediate whitespaces, and skip trailing whitespaces
-        let mut written = 0;
-        let mut blank = false;
-        for i in start..oldlen {
-            let c = target[i];
-            if xml_is_blank_char(c as u32) {
-                blank = true;
-            } else {
-                if blank {
-                    target[written] = 0x20;
-                    written += 1;
-                    blank = false;
-                }
-                target[written] = c;
-                written += 1;
-            }
-        }
+    if check_arity(ctxt, nargs, 1).is_err() {
+        return;
+    }
+    cast_to_string(ctxt);
+    if ctxt
+        .value()
+        .is_none_or(|value| value.typ != XmlXPathObjectType::XPathString)
+    {
+        xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidType as i32);
+        return;
+    };
+    let Some(source) = ctxt.value_mut().unwrap().stringval.as_deref_mut() else {
+        return;
+    };
+    let oldlen = source.len();
+    // Skip leading whitespaces
+    let Some(start) = source.find(|c| !xml_is_blank_char(c as u32)) else {
         ctxt.value_mut()
             .unwrap()
             .stringval
             .as_mut()
             .unwrap()
-            .truncate(written);
+            .clear();
+        return;
+    };
+    let target = unsafe { source.as_bytes_mut() };
+
+    // Collapse intermediate whitespaces, and skip trailing whitespaces
+    let mut written = 0;
+    let mut blank = false;
+    for i in start..oldlen {
+        let c = target[i];
+        if xml_is_blank_char(c as u32) {
+            blank = true;
+        } else {
+            if blank {
+                target[written] = 0x20;
+                written += 1;
+                blank = false;
+            }
+            target[written] = c;
+            written += 1;
+        }
     }
+    ctxt.value_mut()
+        .unwrap()
+        .stringval
+        .as_mut()
+        .unwrap()
+        .truncate(written);
 }
 
 /// Implement the number() XPath function

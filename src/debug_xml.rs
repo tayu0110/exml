@@ -25,7 +25,7 @@ use std::{
 };
 
 #[cfg(feature = "xpath")]
-use crate::xpath::{XmlXPathObjectPtr, XmlXPathObjectType};
+use crate::xpath::XmlXPathObjectType;
 use crate::{
     error::{__xml_raise_error, XmlParserErrors},
     generic_error,
@@ -39,7 +39,7 @@ use crate::{
         XmlEntityType, XmlGenericNodePtr, XmlNodePtr, XmlNs, XmlNsPtr, validate_name,
         xml_free_node_list, xml_get_doc_entity,
     },
-    xpath::XmlXPathContext,
+    xpath::{XmlXPathContext, XmlXPathObject},
 };
 
 /// Handle a debug error.
@@ -416,22 +416,20 @@ impl XmlDebugCtxt<'_> {
 
     /// Dumps debug information for the DTD
     #[doc(alias = "xmlCtxtDumpDTD")]
-    unsafe fn dump_dtd(&mut self, dtd: Option<XmlDtdPtr>) {
-        unsafe {
-            let Some(dtd) = dtd else {
-                if self.check == 0 {
-                    writeln!(self.output, "DTD is NULL").ok();
-                }
-                return;
-            };
-            self.dump_dtd_node(Some(dtd));
-            if let Some(children) = dtd.children() {
-                self.depth += 1;
-                self.dump_node_list(Some(children));
-                self.depth -= 1;
-            } else {
-                writeln!(self.output, "    DTD is empty").ok();
+    fn dump_dtd(&mut self, dtd: Option<XmlDtdPtr>) {
+        let Some(dtd) = dtd else {
+            if self.check == 0 {
+                writeln!(self.output, "DTD is NULL").ok();
             }
+            return;
+        };
+        self.dump_dtd_node(Some(dtd));
+        if let Some(children) = dtd.children() {
+            self.depth += 1;
+            self.dump_node_list(Some(children));
+            self.depth -= 1;
+        } else {
+            writeln!(self.output, "    DTD is empty").ok();
         }
     }
 
@@ -801,283 +799,273 @@ impl XmlDebugCtxt<'_> {
 
     /// Dumps debug information for the attribute
     #[doc(alias = "xmlCtxtDumpAttr")]
-    unsafe fn dump_attr(&mut self, attr: Option<XmlAttrPtr>) {
-        unsafe {
-            self.dump_spaces();
+    fn dump_attr(&mut self, attr: Option<XmlAttrPtr>) {
+        self.dump_spaces();
 
-            let Some(attr) = attr else {
-                if self.check == 0 {
-                    write!(self.output, "Attr is NULL").ok();
-                }
-                return;
-            };
+        let Some(attr) = attr else {
             if self.check == 0 {
-                write!(self.output, "ATTRIBUTE ").ok();
-                self.dump_string(attr.name().as_deref());
-                writeln!(self.output).ok();
-                if let Some(children) = attr.children() {
-                    self.depth += 1;
-                    self.dump_node_list(Some(children));
-                    self.depth -= 1;
-                }
+                write!(self.output, "Attr is NULL").ok();
             }
-            if attr.name().is_none() {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckNoName,
-                    "Attribute has no name",
-                );
-            }
-
-            // Do a bit of checking
-            self.generic_node_check(attr.into());
-        }
-    }
-
-    /// Dumps debug information for the attribute list
-    #[doc(alias = "xmlCtxtDumpAttrList")]
-    unsafe fn dump_attr_list(&mut self, mut attr: Option<XmlAttrPtr>) {
-        unsafe {
-            while let Some(now) = attr {
-                self.dump_attr(Some(now));
-                attr = now.next;
-            }
-        }
-    }
-
-    /// Dumps debug information for the element node, it is not recursive
-    #[doc(alias = "xmlCtxtDumpOneNode")]
-    unsafe fn dump_one_node(&mut self, node: Option<XmlGenericNodePtr>) {
-        unsafe {
-            let Some(node) = node else {
-                if self.check == 0 {
-                    self.dump_spaces();
-                    writeln!(self.output, "node is NULL").ok();
-                }
-                return;
-            };
-            self.node = Some(node);
-
-            match node.element_type() {
-                XmlElementType::XmlElementNode => {
-                    if self.check == 0 {
-                        self.dump_spaces();
-                        write!(self.output, "ELEMENT ").ok();
-                        let node = XmlNodePtr::try_from(node).unwrap();
-                        if let Some(ns) = node.ns {
-                            if let Some(prefix) = ns.prefix() {
-                                self.dump_string(Some(&prefix));
-                            }
-                            write!(self.output, ":").ok();
-                        }
-                        self.dump_string(node.name().as_deref());
-                        writeln!(self.output).ok();
-                    }
-                }
-                XmlElementType::XmlAttributeNode => {
-                    if self.check == 0 {
-                        self.dump_spaces();
-                    }
-                    writeln!(self.output, "Error, ATTRIBUTE found here").ok();
-                    self.generic_node_check(node);
-                    return;
-                }
-                XmlElementType::XmlTextNode => {
-                    if self.check == 0 {
-                        self.dump_spaces();
-                        let node = XmlNodePtr::try_from(node).unwrap();
-                        if node.name == XML_STRING_TEXT_NOENC {
-                            write!(self.output, "TEXT no enc").ok();
-                        } else {
-                            write!(self.output, "TEXT").ok();
-                        }
-                        writeln!(self.output).ok();
-                    }
-                }
-                XmlElementType::XmlCDATASectionNode => {
-                    if self.check == 0 {
-                        self.dump_spaces();
-                        writeln!(self.output, "CDATA_SECTION").ok();
-                    }
-                }
-                XmlElementType::XmlEntityRefNode => {
-                    if self.check == 0 {
-                        self.dump_spaces();
-                        writeln!(self.output, "ENTITY_REF({})", node.name().unwrap()).ok();
-                    }
-                }
-                XmlElementType::XmlEntityNode => {
-                    if self.check == 0 {
-                        self.dump_spaces();
-                        writeln!(self.output, "ENTITY").ok();
-                    }
-                }
-                XmlElementType::XmlPINode => {
-                    if self.check == 0 {
-                        self.dump_spaces();
-                        writeln!(self.output, "PI {}", node.name().unwrap()).ok();
-                    }
-                }
-                XmlElementType::XmlCommentNode => {
-                    if self.check == 0 {
-                        self.dump_spaces();
-                        writeln!(self.output, "COMMENT").ok();
-                    }
-                }
-                XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
-                    if self.check == 0 {
-                        self.dump_spaces();
-                    }
-                    writeln!(self.output, "Error, DOCUMENT found here").ok();
-                    self.generic_node_check(node);
-                    return;
-                }
-                XmlElementType::XmlDocumentTypeNode => {
-                    if self.check == 0 {
-                        self.dump_spaces();
-                        writeln!(self.output, "DOCUMENT_TYPE").ok();
-                    }
-                }
-                XmlElementType::XmlDocumentFragNode => {
-                    if self.check == 0 {
-                        self.dump_spaces();
-                        writeln!(self.output, "DOCUMENT_FRAG").ok();
-                    }
-                }
-                XmlElementType::XmlNotationNode => {
-                    if self.check == 0 {
-                        self.dump_spaces();
-                        writeln!(self.output, "NOTATION").ok();
-                    }
-                }
-                XmlElementType::XmlDTDNode => {
-                    self.dump_dtd_node(XmlDtdPtr::try_from(node).ok());
-                    return;
-                }
-                XmlElementType::XmlElementDecl => {
-                    self.dump_elem_decl(XmlElementPtr::try_from(node).ok());
-                    return;
-                }
-                XmlElementType::XmlAttributeDecl => {
-                    self.dump_attr_decl(XmlAttributePtr::try_from(node).ok());
-                    return;
-                }
-                XmlElementType::XmlEntityDecl => {
-                    self.dump_entity_decl(XmlEntityPtr::try_from(node).ok());
-                    return;
-                }
-                XmlElementType::XmlNamespaceDecl => {
-                    self.dump_namespace(XmlNsPtr::try_from(node).ok().as_deref());
-                    return;
-                }
-                XmlElementType::XmlXIncludeStart => {
-                    if self.check == 0 {
-                        self.dump_spaces();
-                        writeln!(self.output, "INCLUDE START").ok();
-                    }
-                    return;
-                }
-                XmlElementType::XmlXIncludeEnd => {
-                    if self.check == 0 {
-                        self.dump_spaces();
-                        writeln!(self.output, "INCLUDE END").ok();
-                    }
-                    return;
-                }
-                _ => {
-                    if self.check == 0 {
-                        self.dump_spaces();
-                    }
-                    xml_debug_err!(
-                        self,
-                        XmlParserErrors::XmlCheckUnknownNode,
-                        "Unknown node type {}\n",
-                        node.element_type() as i32
-                    );
-                    return;
-                }
-            }
-            if node.document().is_none() {
-                if self.check == 0 {
-                    self.dump_spaces();
-                }
-                writeln!(self.output, "PBM: doc.is_null() !!!").ok();
-            }
-            self.depth += 1;
-            if let Some(ns_def) = XmlNodePtr::try_from(node)
-                .ok()
-                .filter(|n| n.element_type() == XmlElementType::XmlElementNode)
-                .and_then(|node| node.ns_def)
-            {
-                self.dump_namespace_list(Some(ns_def));
-            }
-            if let Some(prop) = XmlNodePtr::try_from(node)
-                .ok()
-                .filter(|n| n.element_type() == XmlElementType::XmlElementNode)
-                .and_then(|n| n.properties)
-            {
-                self.dump_attr_list(Some(prop));
-            }
-            if node.element_type() != XmlElementType::XmlEntityRefNode {
-                if node.element_type() != XmlElementType::XmlElementNode && self.check == 0 {
-                    let content = if let Ok(node) = XmlNodePtr::try_from(node) {
-                        node.content.clone()
-                    } else {
-                        None
-                    };
-                    if let Some(content) = content {
-                        self.dump_spaces();
-                        write!(self.output, "content=").ok();
-                        self.dump_string(Some(&content));
-                        writeln!(self.output).ok();
-                    }
-                }
-            } else {
-                let name = node.name().unwrap();
-                if let Some(ent) = xml_get_doc_entity(node.document(), &name) {
-                    self.dump_entity(Some(&*ent));
-                }
-            }
-            self.depth -= 1;
-
-            // Do a bit of checking
-            self.generic_node_check(node);
-        }
-    }
-
-    /// Dumps debug information for the element node, it is recursive
-    #[doc(alias = "xmlCtxtDumpNode")]
-    unsafe fn dump_node(&mut self, node: Option<XmlGenericNodePtr>) {
-        unsafe {
-            let Some(node) = node else {
-                if self.check == 0 {
-                    self.dump_spaces();
-                    writeln!(self.output, "node is NULL").ok();
-                }
-                return;
-            };
-            self.dump_one_node(Some(node));
-            if let Some(children) = node.children().filter(|_| {
-                node.element_type() != XmlElementType::XmlNamespaceDecl
-                    && node.element_type() != XmlElementType::XmlEntityRefNode
-            }) {
+            return;
+        };
+        if self.check == 0 {
+            write!(self.output, "ATTRIBUTE ").ok();
+            self.dump_string(attr.name().as_deref());
+            writeln!(self.output).ok();
+            if let Some(children) = attr.children() {
                 self.depth += 1;
                 self.dump_node_list(Some(children));
                 self.depth -= 1;
             }
         }
+        if attr.name().is_none() {
+            xml_debug_err!(
+                self,
+                XmlParserErrors::XmlCheckNoName,
+                "Attribute has no name",
+            );
+        }
+
+        // Do a bit of checking
+        self.generic_node_check(attr.into());
+    }
+
+    /// Dumps debug information for the attribute list
+    #[doc(alias = "xmlCtxtDumpAttrList")]
+    fn dump_attr_list(&mut self, mut attr: Option<XmlAttrPtr>) {
+        while let Some(now) = attr {
+            self.dump_attr(Some(now));
+            attr = now.next;
+        }
+    }
+
+    /// Dumps debug information for the element node, it is not recursive
+    #[doc(alias = "xmlCtxtDumpOneNode")]
+    fn dump_one_node(&mut self, node: Option<XmlGenericNodePtr>) {
+        let Some(node) = node else {
+            if self.check == 0 {
+                self.dump_spaces();
+                writeln!(self.output, "node is NULL").ok();
+            }
+            return;
+        };
+        self.node = Some(node);
+
+        match node.element_type() {
+            XmlElementType::XmlElementNode => {
+                if self.check == 0 {
+                    self.dump_spaces();
+                    write!(self.output, "ELEMENT ").ok();
+                    let node = XmlNodePtr::try_from(node).unwrap();
+                    if let Some(ns) = node.ns {
+                        if let Some(prefix) = ns.prefix() {
+                            self.dump_string(Some(&prefix));
+                        }
+                        write!(self.output, ":").ok();
+                    }
+                    self.dump_string(node.name().as_deref());
+                    writeln!(self.output).ok();
+                }
+            }
+            XmlElementType::XmlAttributeNode => {
+                if self.check == 0 {
+                    self.dump_spaces();
+                }
+                writeln!(self.output, "Error, ATTRIBUTE found here").ok();
+                self.generic_node_check(node);
+                return;
+            }
+            XmlElementType::XmlTextNode => {
+                if self.check == 0 {
+                    self.dump_spaces();
+                    let node = XmlNodePtr::try_from(node).unwrap();
+                    if node.name == XML_STRING_TEXT_NOENC {
+                        write!(self.output, "TEXT no enc").ok();
+                    } else {
+                        write!(self.output, "TEXT").ok();
+                    }
+                    writeln!(self.output).ok();
+                }
+            }
+            XmlElementType::XmlCDATASectionNode => {
+                if self.check == 0 {
+                    self.dump_spaces();
+                    writeln!(self.output, "CDATA_SECTION").ok();
+                }
+            }
+            XmlElementType::XmlEntityRefNode => {
+                if self.check == 0 {
+                    self.dump_spaces();
+                    writeln!(self.output, "ENTITY_REF({})", node.name().unwrap()).ok();
+                }
+            }
+            XmlElementType::XmlEntityNode => {
+                if self.check == 0 {
+                    self.dump_spaces();
+                    writeln!(self.output, "ENTITY").ok();
+                }
+            }
+            XmlElementType::XmlPINode => {
+                if self.check == 0 {
+                    self.dump_spaces();
+                    writeln!(self.output, "PI {}", node.name().unwrap()).ok();
+                }
+            }
+            XmlElementType::XmlCommentNode => {
+                if self.check == 0 {
+                    self.dump_spaces();
+                    writeln!(self.output, "COMMENT").ok();
+                }
+            }
+            XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
+                if self.check == 0 {
+                    self.dump_spaces();
+                }
+                writeln!(self.output, "Error, DOCUMENT found here").ok();
+                self.generic_node_check(node);
+                return;
+            }
+            XmlElementType::XmlDocumentTypeNode => {
+                if self.check == 0 {
+                    self.dump_spaces();
+                    writeln!(self.output, "DOCUMENT_TYPE").ok();
+                }
+            }
+            XmlElementType::XmlDocumentFragNode => {
+                if self.check == 0 {
+                    self.dump_spaces();
+                    writeln!(self.output, "DOCUMENT_FRAG").ok();
+                }
+            }
+            XmlElementType::XmlNotationNode => {
+                if self.check == 0 {
+                    self.dump_spaces();
+                    writeln!(self.output, "NOTATION").ok();
+                }
+            }
+            XmlElementType::XmlDTDNode => {
+                self.dump_dtd_node(XmlDtdPtr::try_from(node).ok());
+                return;
+            }
+            XmlElementType::XmlElementDecl => {
+                self.dump_elem_decl(XmlElementPtr::try_from(node).ok());
+                return;
+            }
+            XmlElementType::XmlAttributeDecl => {
+                self.dump_attr_decl(XmlAttributePtr::try_from(node).ok());
+                return;
+            }
+            XmlElementType::XmlEntityDecl => {
+                self.dump_entity_decl(XmlEntityPtr::try_from(node).ok());
+                return;
+            }
+            XmlElementType::XmlNamespaceDecl => {
+                self.dump_namespace(XmlNsPtr::try_from(node).ok().as_deref());
+                return;
+            }
+            XmlElementType::XmlXIncludeStart => {
+                if self.check == 0 {
+                    self.dump_spaces();
+                    writeln!(self.output, "INCLUDE START").ok();
+                }
+                return;
+            }
+            XmlElementType::XmlXIncludeEnd => {
+                if self.check == 0 {
+                    self.dump_spaces();
+                    writeln!(self.output, "INCLUDE END").ok();
+                }
+                return;
+            }
+            _ => {
+                if self.check == 0 {
+                    self.dump_spaces();
+                }
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckUnknownNode,
+                    "Unknown node type {}\n",
+                    node.element_type() as i32
+                );
+                return;
+            }
+        }
+        if node.document().is_none() {
+            if self.check == 0 {
+                self.dump_spaces();
+            }
+            writeln!(self.output, "PBM: doc.is_null() !!!").ok();
+        }
+        self.depth += 1;
+        if let Some(ns_def) = XmlNodePtr::try_from(node)
+            .ok()
+            .filter(|n| n.element_type() == XmlElementType::XmlElementNode)
+            .and_then(|node| node.ns_def)
+        {
+            self.dump_namespace_list(Some(ns_def));
+        }
+        if let Some(prop) = XmlNodePtr::try_from(node)
+            .ok()
+            .filter(|n| n.element_type() == XmlElementType::XmlElementNode)
+            .and_then(|n| n.properties)
+        {
+            self.dump_attr_list(Some(prop));
+        }
+        if node.element_type() != XmlElementType::XmlEntityRefNode {
+            if node.element_type() != XmlElementType::XmlElementNode && self.check == 0 {
+                let content = if let Ok(node) = XmlNodePtr::try_from(node) {
+                    node.content.clone()
+                } else {
+                    None
+                };
+                if let Some(content) = content {
+                    self.dump_spaces();
+                    write!(self.output, "content=").ok();
+                    self.dump_string(Some(&content));
+                    writeln!(self.output).ok();
+                }
+            }
+        } else {
+            let name = node.name().unwrap();
+            if let Some(ent) = xml_get_doc_entity(node.document(), &name) {
+                self.dump_entity(Some(&*ent));
+            }
+        }
+        self.depth -= 1;
+
+        // Do a bit of checking
+        self.generic_node_check(node);
+    }
+
+    /// Dumps debug information for the element node, it is recursive
+    #[doc(alias = "xmlCtxtDumpNode")]
+    fn dump_node(&mut self, node: Option<XmlGenericNodePtr>) {
+        let Some(node) = node else {
+            if self.check == 0 {
+                self.dump_spaces();
+                writeln!(self.output, "node is NULL").ok();
+            }
+            return;
+        };
+        self.dump_one_node(Some(node));
+        if let Some(children) = node.children().filter(|_| {
+            node.element_type() != XmlElementType::XmlNamespaceDecl
+                && node.element_type() != XmlElementType::XmlEntityRefNode
+        }) {
+            self.depth += 1;
+            self.dump_node_list(Some(children));
+            self.depth -= 1;
+        }
     }
 
     /// Dumps debug information for the list of element node, it is recursive
     #[doc(alias = "xmlCtxtDumpNodeList")]
-    unsafe fn dump_node_list(&mut self, node: Option<XmlGenericNodePtr>) {
-        unsafe {
-            if let Some(mut node) = node {
-                self.dump_node(Some(node));
-                while let Some(next) = node.next() {
-                    self.dump_node(Some(next));
-                    node = next;
-                }
+    fn dump_node_list(&mut self, node: Option<XmlGenericNodePtr>) {
+        if let Some(mut node) = node {
+            self.dump_node(Some(node));
+            while let Some(next) = node.next() {
+                self.dump_node(Some(next));
+                node = next;
             }
         }
     }
@@ -1223,25 +1211,23 @@ impl XmlDebugCtxt<'_> {
 
     /// Dumps debug information for the document, it's recursive
     #[doc(alias = "xmlCtxtDumpDocument")]
-    unsafe fn dump_document(&mut self, doc: Option<XmlDocPtr>) {
-        unsafe {
-            let Some(doc) = doc else {
-                if self.check == 0 {
-                    writeln!(self.output, "DOCUMENT.is_null() !").ok();
-                }
-                return;
-            };
-            self.dump_document_head(Some(doc));
-            if let Some(children) = (*doc).children().filter(|_| {
-                matches!(
-                    doc.element_type(),
-                    XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
-                )
-            }) {
-                self.depth += 1;
-                self.dump_node_list(Some(children));
-                self.depth -= 1;
+    fn dump_document(&mut self, doc: Option<XmlDocPtr>) {
+        let Some(doc) = doc else {
+            if self.check == 0 {
+                writeln!(self.output, "DOCUMENT.is_null() !").ok();
             }
+            return;
+        };
+        self.dump_document_head(Some(doc));
+        if let Some(children) = (*doc).children().filter(|_| {
+            matches!(
+                doc.element_type(),
+                XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
+            )
+        }) {
+            self.depth += 1;
+            self.dump_node_list(Some(children));
+            self.depth -= 1;
         }
     }
 
@@ -1435,87 +1421,77 @@ fn xml_ns_check_scope(node: XmlGenericNodePtr, ns: XmlNsPtr) -> i32 {
 
 /// Dumps debug information for the attribute
 #[doc(alias = "xmlDebugDumpAttr")]
-pub unsafe fn xml_debug_dump_attr<'a>(
+pub fn xml_debug_dump_attr<'a>(
     output: &mut (impl Write + 'a),
     attr: Option<XmlAttrPtr>,
     depth: i32,
 ) {
-    unsafe {
-        let mut ctxt = XmlDebugCtxt {
-            output: Box::new(output),
-            depth,
-            ..Default::default()
-        };
-        ctxt.dump_attr(attr);
-    }
+    let mut ctxt = XmlDebugCtxt {
+        output: Box::new(output),
+        depth,
+        ..Default::default()
+    };
+    ctxt.dump_attr(attr);
 }
 
 /// Dumps debug information for the attribute list
 #[doc(alias = "xmlDebugDumpAttrList")]
-pub unsafe fn xml_debug_dump_attr_list<'a>(
+pub fn xml_debug_dump_attr_list<'a>(
     output: &mut (impl Write + 'a),
     attr: Option<XmlAttrPtr>,
     depth: i32,
 ) {
-    unsafe {
-        let mut ctxt = XmlDebugCtxt {
-            output: Box::new(output),
-            depth,
-            ..Default::default()
-        };
-        ctxt.dump_attr_list(attr);
-    }
+    let mut ctxt = XmlDebugCtxt {
+        output: Box::new(output),
+        depth,
+        ..Default::default()
+    };
+    ctxt.dump_attr_list(attr);
 }
 
 /// Dumps debug information for the element node, it is not recursive
 #[doc(alias = "xmlDebugDumpOneNode")]
-pub unsafe fn xml_debug_dump_one_node<'a>(
+pub fn xml_debug_dump_one_node<'a>(
     output: &mut (impl Write + 'a),
     node: Option<XmlGenericNodePtr>,
     depth: i32,
 ) {
-    unsafe {
-        let mut ctxt = XmlDebugCtxt {
-            output: Box::new(output),
-            depth,
-            ..Default::default()
-        };
-        ctxt.dump_one_node(node);
-    }
+    let mut ctxt = XmlDebugCtxt {
+        output: Box::new(output),
+        depth,
+        ..Default::default()
+    };
+    ctxt.dump_one_node(node);
 }
 
 /// Dumps debug information for the element node, it is recursive
 #[doc(alias = "xmlDebugDumpNode")]
-pub unsafe fn xml_debug_dump_node<'a>(
+pub fn xml_debug_dump_node<'a>(
     output: Option<impl Write + 'a>,
     node: Option<XmlGenericNodePtr>,
     depth: i32,
 ) {
-    unsafe {
-        let mut ctxt = XmlDebugCtxt {
-            output: output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o)),
-            depth,
-            ..Default::default()
-        };
-        ctxt.dump_node(node);
-    }
+    let mut ctxt = XmlDebugCtxt {
+        output: output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o)),
+        depth,
+        ..Default::default()
+    };
+    ctxt.dump_node(node);
 }
 
 /// Dumps debug information for the list of element node, it is recursive
 #[doc(alias = "xmlDebugDumpNodeList")]
-pub unsafe fn xml_debug_dump_node_list<'a>(
+pub fn xml_debug_dump_node_list<'a>(
     output: Option<impl Write + 'a>,
     node: Option<XmlGenericNodePtr>,
     depth: i32,
 ) {
-    unsafe {
-        let mut ctxt = XmlDebugCtxt {
-            output: output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o)),
-            depth,
-            ..Default::default()
-        };
-        ctxt.dump_node_list(node);
-    }
+    let mut ctxt = XmlDebugCtxt {
+        output: output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o)),
+        depth,
+        ..Default::default()
+    };
+    ctxt.dump_node_list(node);
 }
 
 /// Dumps debug information concerning the document, not recursive
@@ -1530,26 +1506,22 @@ pub fn xml_debug_dump_document_head<'a>(output: Option<impl Write + 'a>, doc: Op
 
 /// Dumps debug information for the document, it's recursive
 #[doc(alias = "xmlDebugDumpDocument")]
-pub unsafe fn xml_debug_dump_document<'a>(output: Option<impl Write + 'a>, doc: Option<XmlDocPtr>) {
-    unsafe {
-        let mut ctxt = XmlDebugCtxt::default();
+pub fn xml_debug_dump_document<'a>(output: Option<impl Write + 'a>, doc: Option<XmlDocPtr>) {
+    let mut ctxt = XmlDebugCtxt::default();
 
-        ctxt.options |= DUMP_TEXT_TYPE;
-        ctxt.output = output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o));
-        ctxt.dump_document(doc);
-    }
+    ctxt.options |= DUMP_TEXT_TYPE;
+    ctxt.output = output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o));
+    ctxt.dump_document(doc);
 }
 
 /// Dumps debug information for the DTD
 #[doc(alias = "xmlDebugDumpDTD")]
-pub unsafe fn xml_debug_dump_dtd<'a>(output: Option<impl Write + 'a>, dtd: Option<XmlDtdPtr>) {
-    unsafe {
-        let mut ctxt = XmlDebugCtxt::default();
+pub fn xml_debug_dump_dtd<'a>(output: Option<impl Write + 'a>, dtd: Option<XmlDtdPtr>) {
+    let mut ctxt = XmlDebugCtxt::default();
 
-        ctxt.options |= DUMP_TEXT_TYPE;
-        ctxt.output = output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o));
-        ctxt.dump_dtd(dtd);
-    }
+    ctxt.options |= DUMP_TEXT_TYPE;
+    ctxt.output = output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o));
+    ctxt.dump_dtd(dtd);
 }
 
 /// Dumps debug information for all the entities in use by the document
@@ -1567,19 +1539,17 @@ pub fn xml_debug_dump_entities<'a>(output: impl Write + 'a, doc: Option<XmlDocPt
 ///
 /// Returns the number of errors found
 #[doc(alias = "xmlDebugCheckDocument")]
-pub unsafe fn xml_debug_check_document<'a>(
+pub fn xml_debug_check_document<'a>(
     output: Option<impl Write + 'a>,
     doc: Option<XmlDocPtr>,
 ) -> i32 {
-    unsafe {
-        let mut ctxt = XmlDebugCtxt {
-            output: output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o)),
-            check: 1,
-            ..Default::default()
-        };
-        ctxt.dump_document(doc);
-        ctxt.errors
-    }
+    let mut ctxt = XmlDebugCtxt {
+        output: output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o)),
+        check: 1,
+        ..Default::default()
+    };
+    ctxt.dump_document(doc);
+    ctxt.errors
 }
 
 /// Dump to `output` the type and name of @node.
@@ -1824,26 +1794,24 @@ impl XmlShellCtxt<'_> {
     /// Returns 0
     #[doc(alias = "xmlShellDir")]
     #[cfg(feature = "xpath")]
-    pub unsafe fn xml_shell_dir(
+    pub fn xml_shell_dir(
         &mut self,
         _arg: Option<&str>,
         node: Option<XmlGenericNodePtr>,
         _node2: Option<XmlGenericNodePtr>,
     ) -> i32 {
-        unsafe {
-            let Some(node) = node else {
-                writeln!(self.output, "NULL").ok();
-                return 0;
-            };
-            if let Ok(doc) = XmlDocPtr::try_from(node) {
-                xml_debug_dump_document_head(Some(&mut self.output), Some(doc));
-            } else if node.element_type() == XmlElementType::XmlAttributeNode {
-                xml_debug_dump_attr(&mut self.output, XmlAttrPtr::try_from(node).ok(), 0);
-            } else {
-                xml_debug_dump_one_node(&mut self.output, Some(node), 0);
-            }
-            0
+        let Some(node) = node else {
+            writeln!(self.output, "NULL").ok();
+            return 0;
+        };
+        if let Ok(doc) = XmlDocPtr::try_from(node) {
+            xml_debug_dump_document_head(Some(&mut self.output), Some(doc));
+        } else if node.element_type() == XmlElementType::XmlAttributeNode {
+            xml_debug_dump_attr(&mut self.output, XmlAttrPtr::try_from(node).ok(), 0);
+        } else {
+            xml_debug_dump_one_node(&mut self.output, Some(node), 0);
         }
+        0
     }
 
     /// Implements the XML shell function "load"
@@ -2560,14 +2528,14 @@ unsafe fn xml_shell_print_node_ctxt(ctxt: Option<&mut XmlShellCtxt<'_>>, node: X
 #[doc(alias = "xmlShellPrintXPathResultCtxt")]
 unsafe fn xml_shell_print_xpath_result_ctxt(
     mut ctxt: Option<&mut XmlShellCtxt<'_>>,
-    list: XmlXPathObjectPtr,
+    list: Option<&XmlXPathObject>,
 ) {
     unsafe {
-        if !list.is_null() {
-            match (*list).typ {
+        if let Some(list) = list {
+            match list.typ {
                 XmlXPathObjectType::XPathNodeset => {
                     #[cfg(feature = "libxml_output")]
-                    if let Some(nodeset) = (*list).nodesetval.as_deref() {
+                    if let Some(nodeset) = list.nodesetval.as_deref() {
                         for &node in &nodeset.node_tab {
                             xml_shell_print_node_ctxt(ctxt.as_deref_mut(), node);
                         }
@@ -2580,16 +2548,16 @@ unsafe fn xml_shell_print_xpath_result_ctxt(
                     }
                 }
                 XmlXPathObjectType::XPathBoolean => {
-                    generic_error!("Is a Boolean:{}\n", xml_bool_to_text((*list).boolval));
+                    generic_error!("Is a Boolean:{}\n", xml_bool_to_text(list.boolval));
                 }
                 XmlXPathObjectType::XPathNumber => {
-                    generic_error!("Is a number:{}\n", (*list).floatval);
+                    generic_error!("Is a number:{}\n", list.floatval);
                 }
                 XmlXPathObjectType::XPathString => {
-                    generic_error!("Is a string:{}\n", (*list).stringval.as_deref().unwrap());
+                    generic_error!("Is a string:{}\n", list.stringval.as_deref().unwrap());
                 }
                 _ => {
-                    xml_shell_print_xpath_error((*list).typ, None);
+                    xml_shell_print_xpath_error(list.typ, None);
                 }
             }
         }
@@ -2599,7 +2567,7 @@ unsafe fn xml_shell_print_xpath_result_ctxt(
 /// Prints result to the output FILE
 #[doc(alias = "xmlShellPrintXPathResult")]
 #[cfg(feature = "xpath")]
-pub unsafe fn xml_shell_print_xpath_result(list: XmlXPathObjectPtr) {
+pub unsafe fn xml_shell_print_xpath_result(list: Option<&XmlXPathObject>) {
     unsafe {
         xml_shell_print_xpath_result_ctxt(None, list);
     }

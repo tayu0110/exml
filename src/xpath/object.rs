@@ -1,21 +1,14 @@
-use std::{borrow::Cow, ffi::c_void, ptr::null_mut};
+use std::{borrow::Cow, ffi::c_void};
 
-use crate::{
-    generic_error,
-    libxml::{
-        globals::{xml_free, xml_malloc},
-        xpointer::XmlLocationSet,
-    },
-    tree::XmlGenericNodePtr,
-};
+use crate::{generic_error, libxml::xpointer::XmlLocationSet, tree::XmlGenericNodePtr};
 
 use super::{
     XML_XPATH_NAN, XmlNodeSet, xml_xpath_cast_boolean_to_number, xml_xpath_cast_boolean_to_string,
     xml_xpath_cast_node_set_to_boolean, xml_xpath_cast_node_set_to_number,
     xml_xpath_cast_node_set_to_string, xml_xpath_cast_number_to_boolean,
     xml_xpath_cast_number_to_string, xml_xpath_cast_string_to_boolean,
-    xml_xpath_cast_string_to_number, xml_xpath_err_memory, xml_xpath_free_node_set,
-    xml_xpath_free_value_tree, xml_xpath_node_set_create, xml_xpath_node_set_merge,
+    xml_xpath_cast_string_to_number, xml_xpath_free_node_set, xml_xpath_free_value_tree,
+    xml_xpath_node_set_create, xml_xpath_node_set_merge,
 };
 
 // An expression is evaluated to yield an object, which
@@ -52,7 +45,6 @@ pub enum XmlXPathObjectType {
 // #[cfg(all(feature = "libxml_xptr_locs", feature = "xpath"))]
 // const XPATH_LOCATIONSET: usize = 7;
 
-pub type XmlXPathObjectPtr = *mut XmlXPathObject;
 #[repr(C)]
 #[derive(Clone, PartialEq)]
 pub struct XmlXPathObject {
@@ -264,38 +256,24 @@ pub fn xml_xpath_wrap_node_set(val: Option<Box<XmlNodeSet>>) -> XmlXPathObject {
 ///
 /// Returns the newly created object.
 #[doc(alias = "xmlXPathNewValueTree")]
-pub unsafe fn xml_xpath_new_value_tree(val: Option<XmlGenericNodePtr>) -> XmlXPathObjectPtr {
-    unsafe {
-        let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
-        if ret.is_null() {
-            xml_xpath_err_memory(None, Some("creating result value tree\n"));
-            return null_mut();
-        }
-        std::ptr::write(&mut *ret, XmlXPathObject::default());
-        (*ret).typ = XmlXPathObjectType::XPathXSLTTree;
-        (*ret).boolval = true;
-        (*ret).user = val.map(XmlXPathObjectUserData::Node);
-        (*ret).nodesetval = xml_xpath_node_set_create(val);
-        ret
-    }
+pub fn xml_xpath_new_value_tree(val: Option<XmlGenericNodePtr>) -> XmlXPathObject {
+    let mut ret = XmlXPathObject::default();
+    ret.typ = XmlXPathObjectType::XPathXSLTTree;
+    ret.boolval = true;
+    ret.user = val.map(XmlXPathObjectUserData::Node);
+    ret.nodesetval = xml_xpath_node_set_create(val);
+    ret
 }
 
 /// Wraps the @val data into an XPath object.
 ///
 /// Returns the newly created object.
 #[doc(alias = "xmlXPathWrapExternal")]
-pub unsafe fn xml_xpath_wrap_external(val: *mut c_void) -> XmlXPathObjectPtr {
-    unsafe {
-        let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
-        if ret.is_null() {
-            xml_xpath_err_memory(None, Some("creating user object\n"));
-            return null_mut();
-        }
-        std::ptr::write(&mut *ret, XmlXPathObject::default());
-        (*ret).typ = XmlXPathObjectType::XPathUsers;
-        (*ret).user = (!val.is_null()).then_some(XmlXPathObjectUserData::External(val));
-        ret
-    }
+pub fn xml_xpath_wrap_external(val: *mut c_void) -> XmlXPathObject {
+    let mut ret = XmlXPathObject::default();
+    ret.typ = XmlXPathObjectType::XPathUsers;
+    ret.user = (!val.is_null()).then_some(XmlXPathObjectUserData::External(val));
+    ret
 }
 
 /// Allocate a new copy of a given object
@@ -333,53 +311,6 @@ pub fn xml_xpath_object_copy(val: &XmlXPathObject) -> XmlXPathObject {
         } // _ => {}
     }
     ret
-}
-
-/// Free up an object: xmlXPathObjectPtr.
-#[doc(alias = "xmlXPathFreeObject", alias = "xmlXPathReleaseObject")]
-pub unsafe fn xml_xpath_free_object(obj: XmlXPathObjectPtr) {
-    unsafe {
-        if obj.is_null() {
-            return;
-        }
-        if matches!(
-            (*obj).typ,
-            XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
-        ) {
-            if (*obj).boolval {
-                (*obj).typ = XmlXPathObjectType::XPathXSLTTree; /* TODO: Just for debugging. */
-                xml_xpath_free_value_tree((*obj).nodesetval.take());
-            } else if let Some(set) = (*obj).nodesetval.take() {
-                xml_xpath_free_node_set(Some(set));
-            }
-        } else if matches!((*obj).typ, XmlXPathObjectType::XPathString)
-            && (*obj).stringval.is_some()
-        {
-            let _ = (*obj).stringval.take();
-        } else {
-            #[cfg(feature = "libxml_xptr_locs")]
-            let _ = (*obj).user.take();
-            // #[cfg(feature = "libxml_xptr_locs")]
-            // if let Some(loc) = (*obj).user.take() {
-            //     if let Some(&loc) = loc.as_location_set() {
-            //         xml_xptr_free_location_set(loc);
-            //     }
-            // }
-        }
-        xml_free(obj as _);
-    }
-}
-
-/// Free up the xmlXPathObjectPtr @obj but don't deallocate the objects in
-/// the list contrary to xmlXPathFreeObject().
-#[doc(alias = "xmlXPathFreeNodeSetList")]
-pub unsafe fn xml_xpath_free_node_set_list(obj: XmlXPathObjectPtr) {
-    unsafe {
-        if obj.is_null() {
-            return;
-        }
-        xml_free(obj as _);
-    }
 }
 
 /// Converts an XPath object to its boolean value
