@@ -71,13 +71,13 @@ impl XmlXPathStepOpValue {
     }
 }
 
-impl XmlXPathParserContext {
+impl XmlXPathParserContext<'_> {
     /// Add a step to an XPath Compiled Expression
     ///
     /// Returns -1 in case of failure, the index otherwise
     #[allow(clippy::too_many_arguments)]
     #[doc(alias = "xmlXPathCompExprAdd")]
-    unsafe fn add_compiled_expression(
+    fn add_compiled_expression(
         &mut self,
         ch1: i32,
         ch2: i32,
@@ -88,27 +88,25 @@ impl XmlXPathParserContext {
         value4: Option<XmlXPathStepOpValue>,
         value5: Option<XmlXPathStepOpValue>,
     ) -> i32 {
-        unsafe {
-            if self.comp.steps.len() == XPATH_MAX_STEPS {
-                xml_xpath_perr_memory(Some(self), Some("adding step\n"));
-                return -1;
-            }
-            let last = self.comp.steps.len() as i32;
-            self.comp.last = last;
-            self.comp.steps.push(XmlXPathStepOp {
-                ch1,
-                ch2,
-                op,
-                value,
-                value2,
-                value3,
-                value4,
-                value5,
-                cache: None,
-                cache_uri: None,
-            });
-            self.comp.steps.len() as i32 - 1
+        if self.comp.steps.len() == XPATH_MAX_STEPS {
+            xml_xpath_perr_memory(Some(self), Some("adding step\n"));
+            return -1;
         }
+        let last = self.comp.steps.len() as i32;
+        self.comp.last = last;
+        self.comp.steps.push(XmlXPathStepOp {
+            ch1,
+            ch2,
+            op,
+            value,
+            value2,
+            value3,
+            value4,
+            value5,
+            cache: None,
+            cache_uri: None,
+        });
+        self.comp.steps.len() as i32 - 1
     }
 
     /// ```text
@@ -933,9 +931,8 @@ impl XmlXPathParserContext {
                     }
 
                     if let Some(prefix) = prefix.as_deref() {
-                        if !self.context.is_null()
-                            && (*self.context).flags & XML_XPATH_CHECKNS as i32 != 0
-                            && (*self.context).lookup_ns(prefix).is_none()
+                        if self.context.flags & XML_XPATH_CHECKNS as i32 != 0
+                            && self.context.lookup_ns(prefix).is_none()
                         {
                             xml_xpath_err(Some(self), XmlXPathError::XPathUndefPrefixError as i32);
                         }
@@ -1002,113 +999,111 @@ impl XmlXPathParserContext {
     ///
     /// Returns the name found and updates @test, @type and @prefix appropriately
     #[doc(alias = "xmlXPathCompNodeTest")]
-    unsafe fn compile_node_test(
+    fn compile_node_test(
         &mut self,
         test: &mut XmlXPathTestVal,
         typ: &mut XmlXPathTypeVal,
         name: Option<&str>,
     ) -> Option<(Option<String>, String)> {
-        unsafe {
-            *typ = XmlXPathTypeVal::NodeTypeNode;
-            *test = XmlXPathTestVal::NodeTestNone;
-            self.skip_blanks();
+        *typ = XmlXPathTypeVal::NodeTypeNode;
+        *test = XmlXPathTestVal::NodeTestNone;
+        self.skip_blanks();
 
-            if name.is_none() && self.current_char() == Some('*') {
+        if name.is_none() && self.current_char() == Some('*') {
+            // All elements
+            self.next_char();
+            *test = XmlXPathTestVal::NodeTestAll;
+            return None;
+        }
+
+        let Some(mut name) = name
+            .map(|name| name.to_owned())
+            .or_else(|| self.parse_ncname())
+        else {
+            xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
+            return None;
+        };
+
+        let blanks: i32 = self
+            .current_char()
+            .is_some_and(|c| xml_is_blank_char(c as u32)) as i32;
+        self.skip_blanks();
+        if self.current_char() == Some('(') {
+            self.next_char();
+            // NodeType or PI search
+            if name == "comment" {
+                *typ = XmlXPathTypeVal::NodeTypeComment;
+            } else if name == "node" {
+                *typ = XmlXPathTypeVal::NodeTypeNode;
+            } else if name == "processing-instruction" {
+                *typ = XmlXPathTypeVal::NodeTypePI;
+            } else if name == "text" {
+                *typ = XmlXPathTypeVal::NodeTypeText;
+            } else {
+                xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
+                return None;
+            }
+
+            *test = XmlXPathTestVal::NodeTestType;
+
+            self.skip_blanks();
+            let mut name = Some(name);
+            if matches!(*typ, XmlXPathTypeVal::NodeTypePI) {
+                // Specific case: search a PI by name.
+                name = None;
+                if self.current_char() != Some(')') {
+                    let Some(lit) = self.parse_literal() else {
+                        xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
+                        return None;
+                    };
+                    name = Some(lit);
+                    *test = XmlXPathTestVal::NodeTestPI;
+                    self.skip_blanks();
+                }
+            }
+            if self.current_char() != Some(')') {
+                xml_xpath_err(Some(self), XmlXPathError::XPathUnclosedError as i32);
+                return None;
+            }
+            self.next_char();
+            return name.map(|name| (None, name));
+        }
+        *test = XmlXPathTestVal::NodeTestName;
+        let mut prefix = None;
+        if blanks == 0 && self.current_char() == Some(':') {
+            self.next_char();
+
+            // Since currently the parser context don't have a
+            // namespace list associated:
+            // The namespace name for this prefix can be computed
+            // only at evaluation time. The compilation is done
+            // outside of any context.
+            // #if 0
+            // 	*prefix = xmlXPathNsLookup(self.context, name);
+            // 	if (name != NULL) {
+            // 	    xmlFree(name as _);
+            // 	}
+            // 	if (*prefix.is_null()) {
+            // 	    XP_ERROR0!(ctxt, XmlXPathError::XPATH_UNDEF_PREFIX_ERROR as i32);
+            // 	}
+            // #else
+            prefix = Some(name);
+            // #endif
+
+            if self.current_char() == Some('*') {
                 // All elements
                 self.next_char();
                 *test = XmlXPathTestVal::NodeTestAll;
                 return None;
             }
 
-            let Some(mut name) = name
-                .map(|name| name.to_owned())
-                .or_else(|| self.parse_ncname())
-            else {
+            let Some(ncname) = self.parse_ncname() else {
                 xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
                 return None;
             };
-
-            let blanks: i32 = self
-                .current_char()
-                .is_some_and(|c| xml_is_blank_char(c as u32)) as i32;
-            self.skip_blanks();
-            if self.current_char() == Some('(') {
-                self.next_char();
-                // NodeType or PI search
-                if name == "comment" {
-                    *typ = XmlXPathTypeVal::NodeTypeComment;
-                } else if name == "node" {
-                    *typ = XmlXPathTypeVal::NodeTypeNode;
-                } else if name == "processing-instruction" {
-                    *typ = XmlXPathTypeVal::NodeTypePI;
-                } else if name == "text" {
-                    *typ = XmlXPathTypeVal::NodeTypeText;
-                } else {
-                    xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
-                    return None;
-                }
-
-                *test = XmlXPathTestVal::NodeTestType;
-
-                self.skip_blanks();
-                let mut name = Some(name);
-                if matches!(*typ, XmlXPathTypeVal::NodeTypePI) {
-                    // Specific case: search a PI by name.
-                    name = None;
-                    if self.current_char() != Some(')') {
-                        let Some(lit) = self.parse_literal() else {
-                            xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
-                            return None;
-                        };
-                        name = Some(lit);
-                        *test = XmlXPathTestVal::NodeTestPI;
-                        self.skip_blanks();
-                    }
-                }
-                if self.current_char() != Some(')') {
-                    xml_xpath_err(Some(self), XmlXPathError::XPathUnclosedError as i32);
-                    return None;
-                }
-                self.next_char();
-                return name.map(|name| (None, name));
-            }
-            *test = XmlXPathTestVal::NodeTestName;
-            let mut prefix = None;
-            if blanks == 0 && self.current_char() == Some(':') {
-                self.next_char();
-
-                // Since currently the parser context don't have a
-                // namespace list associated:
-                // The namespace name for this prefix can be computed
-                // only at evaluation time. The compilation is done
-                // outside of any context.
-                // #if 0
-                // 	*prefix = xmlXPathNsLookup(self.context, name);
-                // 	if (name != NULL) {
-                // 	    xmlFree(name as _);
-                // 	}
-                // 	if (*prefix.is_null()) {
-                // 	    XP_ERROR0!(ctxt, XmlXPathError::XPATH_UNDEF_PREFIX_ERROR as i32);
-                // 	}
-                // #else
-                prefix = Some(name);
-                // #endif
-
-                if self.current_char() == Some('*') {
-                    // All elements
-                    self.next_char();
-                    *test = XmlXPathTestVal::NodeTestAll;
-                    return None;
-                }
-
-                let Some(ncname) = self.parse_ncname() else {
-                    xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
-                    return None;
-                };
-                name = ncname;
-            }
-            Some((prefix, name))
+            name = ncname;
         }
+        Some((prefix, name))
     }
 
     /// `[20]   FilterExpr ::=   PrimaryExpr | FilterExpr Predicate`
@@ -1185,91 +1180,89 @@ impl XmlXPathParserContext {
     ///
     /// Compile a Number, then push it on the stack
     #[doc(alias = "xmlXPathCompNumber")]
-    unsafe fn compile_number(&mut self) {
-        unsafe {
-            let mut ret: f64;
-            let mut ok: i32 = 0;
-            let mut exponent: i32 = 0;
-            let mut is_exponent_negative: i32 = 0;
+    fn compile_number(&mut self) {
+        let mut ret: f64;
+        let mut ok: i32 = 0;
+        let mut exponent: i32 = 0;
+        let mut is_exponent_negative: i32 = 0;
 
-            if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
-                return;
-            };
-            if self.current_char() != Some('.')
-                && self.current_char().is_none_or(|c| !c.is_ascii_digit())
-            {
+        if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
+            return;
+        };
+        if self.current_char() != Some('.')
+            && self.current_char().is_none_or(|c| !c.is_ascii_digit())
+        {
+            xml_xpath_err(Some(self), XmlXPathError::XPathNumberError as i32);
+            return;
+        }
+        ret = 0.0;
+        while let Some(c) = self.current_char().filter(|c| c.is_ascii_digit()) {
+            ret = ret * 10.0 + (c as u8 - b'0') as f64;
+            ok = 1;
+            self.next_char();
+        }
+        if self.current_char() == Some('.') {
+            let mut v: i32;
+            let mut frac: i32 = 0;
+            let mut fraction: f64 = 0.0;
+
+            self.next_char();
+            if self.current_char().is_none_or(|c| !c.is_ascii_digit()) && ok == 0 {
                 xml_xpath_err(Some(self), XmlXPathError::XPathNumberError as i32);
                 return;
             }
-            ret = 0.0;
-            while let Some(c) = self.current_char().filter(|c| c.is_ascii_digit()) {
-                ret = ret * 10.0 + (c as u8 - b'0') as f64;
-                ok = 1;
+            while self.current_char() == Some('0') {
+                frac += 1;
                 self.next_char();
             }
-            if self.current_char() == Some('.') {
-                let mut v: i32;
-                let mut frac: i32 = 0;
-                let mut fraction: f64 = 0.0;
-
+            let max: i32 = frac + MAX_FRAC as i32;
+            while let Some(c) = self
+                .current_char()
+                .filter(|c| c.is_ascii_digit() && frac < max)
+            {
+                v = (c as u8 - b'0') as i32;
+                fraction = fraction * 10.0 + v as f64;
+                frac += 1;
                 self.next_char();
-                if self.current_char().is_none_or(|c| !c.is_ascii_digit()) && ok == 0 {
-                    xml_xpath_err(Some(self), XmlXPathError::XPathNumberError as i32);
-                    return;
-                }
-                while self.current_char() == Some('0') {
-                    frac += 1;
-                    self.next_char();
-                }
-                let max: i32 = frac + MAX_FRAC as i32;
-                while let Some(c) = self
-                    .current_char()
-                    .filter(|c| c.is_ascii_digit() && frac < max)
-                {
-                    v = (c as u8 - b'0') as i32;
-                    fraction = fraction * 10.0 + v as f64;
-                    frac += 1;
-                    self.next_char();
-                }
-                fraction /= 10.0f64.powi(frac);
-                ret += fraction;
-                while self.current_char().is_some_and(|c| c.is_ascii_digit()) {
-                    self.next_char();
-                }
             }
-            if self.current_char() == Some('e') || self.current_char() == Some('E') {
+            fraction /= 10.0f64.powi(frac);
+            ret += fraction;
+            while self.current_char().is_some_and(|c| c.is_ascii_digit()) {
                 self.next_char();
-                if self.current_char() == Some('-') {
-                    is_exponent_negative = 1;
-                    self.next_char();
-                } else if self.current_char() == Some('+') {
-                    self.next_char();
-                }
-                while let Some(c) = self.current_char().filter(|c| c.is_ascii_digit()) {
-                    if exponent < 1000000 {
-                        exponent = exponent * 10 + (c as u8 - b'0') as i32;
-                    }
-                    self.next_char();
-                }
-                if is_exponent_negative != 0 {
-                    exponent = -exponent;
-                }
-                ret *= 10.0f64.powi(exponent);
             }
-            let last = self.comp.last;
-            self.add_compiled_expression(
-                last,
-                -1,
-                XmlXPathOp::XPathOpValue,
-                XmlXPathObjectType::XPathNumber as i32,
-                0_i32,
-                0_i32,
-                Some(XmlXPathStepOpValue::Object(Rc::new(XmlXPathObject::from(
-                    ret,
-                )))),
-                None,
-            );
         }
+        if self.current_char() == Some('e') || self.current_char() == Some('E') {
+            self.next_char();
+            if self.current_char() == Some('-') {
+                is_exponent_negative = 1;
+                self.next_char();
+            } else if self.current_char() == Some('+') {
+                self.next_char();
+            }
+            while let Some(c) = self.current_char().filter(|c| c.is_ascii_digit()) {
+                if exponent < 1000000 {
+                    exponent = exponent * 10 + (c as u8 - b'0') as i32;
+                }
+                self.next_char();
+            }
+            if is_exponent_negative != 0 {
+                exponent = -exponent;
+            }
+            ret *= 10.0f64.powi(exponent);
+        }
+        let last = self.comp.last;
+        self.add_compiled_expression(
+            last,
+            -1,
+            XmlXPathOp::XPathOpValue,
+            XmlXPathObjectType::XPathNumber as i32,
+            0_i32,
+            0_i32,
+            Some(XmlXPathStepOpValue::Object(Rc::new(XmlXPathObject::from(
+                ret,
+            )))),
+            None,
+        );
     }
 
     /// Parse a Literal and push it on the stack.
@@ -1510,34 +1503,32 @@ impl XmlXPathParserContext {
     /// [36]   VariableReference ::=   '$' QName
     /// ```
     #[doc(alias = "xmlXPathCompVariableReference")]
-    unsafe fn compile_variable_reference(&mut self) {
-        unsafe {
-            self.skip_blanks();
-            if self.current_char() != Some('$') {
-                xml_xpath_err(Some(self), XmlXPathError::XPathVariableRefError as i32);
-                return;
-            }
-            self.next_char();
-            let Some((prefix, name)) = self.parse_qname() else {
-                xml_xpath_err(Some(self), XmlXPathError::XPathVariableRefError as i32);
-                return;
-            };
-            self.comp.last = -1;
-            let last = self.comp.last;
-            self.add_compiled_expression(
-                last,
-                -1,
-                XmlXPathOp::XPathOpVariable,
-                0_i32,
-                0_i32,
-                0_i32,
-                Some(XmlXPathStepOpValue::String(name.into())),
-                prefix.map(Rc::from).map(XmlXPathStepOpValue::String),
-            );
-            self.skip_blanks();
-            if !self.context.is_null() && (*self.context).flags & XML_XPATH_NOVAR as i32 != 0 {
-                xml_xpath_err(Some(self), XmlXPathError::XPathForbidVariableError as i32);
-            }
+    fn compile_variable_reference(&mut self) {
+        self.skip_blanks();
+        if self.current_char() != Some('$') {
+            xml_xpath_err(Some(self), XmlXPathError::XPathVariableRefError as i32);
+            return;
+        }
+        self.next_char();
+        let Some((prefix, name)) = self.parse_qname() else {
+            xml_xpath_err(Some(self), XmlXPathError::XPathVariableRefError as i32);
+            return;
+        };
+        self.comp.last = -1;
+        let last = self.comp.last;
+        self.add_compiled_expression(
+            last,
+            -1,
+            XmlXPathOp::XPathOpVariable,
+            0_i32,
+            0_i32,
+            0_i32,
+            Some(XmlXPathStepOpValue::String(name.into())),
+            prefix.map(Rc::from).map(XmlXPathStepOpValue::String),
+        );
+        self.skip_blanks();
+        if self.context.flags & XML_XPATH_NOVAR as i32 != 0 {
+            xml_xpath_err(Some(self), XmlXPathError::XPathForbidVariableError as i32);
         }
     }
 
@@ -1669,9 +1660,7 @@ impl XmlXPathParserContext {
                 let count = self.current_str().len() - input.len();
                 if count > XML_MAX_NAME_LENGTH {
                     self.cur += count;
-                    unsafe {
-                        xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
-                    }
+                    xml_xpath_err(Some(self), XmlXPathError::XPathExprError as i32);
                     return None;
                 }
                 let ret = self.current_str()[..count].to_owned();
@@ -1791,28 +1780,22 @@ impl XmlXPathParserContext {
     fn parse_literal(&mut self) -> Option<String> {
         let expr = self.current_str();
         let Some(sep) = expr.chars().next().filter(|&sep| sep == '"' || sep == '\'') else {
-            unsafe {
-                xml_xpath_err(Some(self), XmlXPathError::XPathStartLiteralError as i32);
-            }
+            xml_xpath_err(Some(self), XmlXPathError::XPathStartLiteralError as i32);
             return None;
         };
         let Some((lit, _)) = expr.split_once(|c: char| !xml_is_char(c as u32) || c == sep) else {
-            unsafe {
-                xml_xpath_err(
-                    Some(self),
-                    XmlXPathError::XPathUnfinishedLiteralError as i32,
-                );
-            }
+            xml_xpath_err(
+                Some(self),
+                XmlXPathError::XPathUnfinishedLiteralError as i32,
+            );
             return None;
         };
         let expr = &expr[1 + lit.len()..];
         if !expr.starts_with(sep) {
-            unsafe {
-                xml_xpath_err(
-                    Some(self),
-                    XmlXPathError::XPathUnfinishedLiteralError as i32,
-                );
-            }
+            xml_xpath_err(
+                Some(self),
+                XmlXPathError::XPathUnfinishedLiteralError as i32,
+            );
             None
         } else {
             let lit = lit.to_owned();

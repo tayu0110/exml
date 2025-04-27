@@ -51,7 +51,7 @@ pub mod node_set;
 #[cfg(feature = "xpath")]
 pub mod object;
 
-use std::{borrow::Cow, os::raw::c_void, ptr::null_mut, rc::Rc};
+use std::{borrow::Cow, os::raw::c_void, rc::Rc};
 
 use compile::XmlXPathStepOp;
 
@@ -678,9 +678,6 @@ pub fn xml_xpath_order_doc_elems(doc: XmlDocPtr) -> i64 {
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_xpath_set_context_node(node: XmlGenericNodePtr, ctx: XmlXPathContextPtr) -> i32 {
     unsafe {
-        // if node.is_null() {
-        //     return -1;
-        // }
         if ctx.is_null() {
             return -1;
         }
@@ -703,7 +700,7 @@ pub unsafe fn xml_xpath_set_context_node(node: XmlGenericNodePtr, ctx: XmlXPathC
 pub unsafe fn xml_xpath_node_eval(
     node: XmlGenericNodePtr,
     xpath: &str,
-    ctx: XmlXPathContextPtr,
+    ctx: &mut XmlXPathContext,
 ) -> Option<XmlXPathObject> {
     unsafe {
         if xml_xpath_set_context_node(node, ctx) < 0 {
@@ -719,31 +716,9 @@ pub unsafe fn xml_xpath_node_eval(
 /// The caller has to free the object.
 #[doc(alias = "xmlXPathEval")]
 #[cfg(feature = "xpath")]
-pub unsafe fn xml_xpath_eval(xpath: &str, ctx: XmlXPathContextPtr) -> Option<XmlXPathObject> {
+pub unsafe fn xml_xpath_eval(xpath: &str, ctx: &mut XmlXPathContext) -> Option<XmlXPathObject> {
     unsafe {
         use crate::generic_error;
-
-        if ctx.is_null() {
-            crate::error::__xml_raise_error!(
-                None,
-                None,
-                None,
-                std::ptr::null_mut(),
-                None,
-                crate::error::XmlErrorDomain::XmlFromXPath,
-                crate::error::XmlParserErrors::XmlErrInternalError,
-                crate::error::XmlErrorLevel::XmlErrFatal,
-                Some(file!().into()),
-                line!() as i32,
-                None,
-                None,
-                None,
-                0,
-                0,
-                "NULL context pointer\n",
-            );
-            return None;
-        };
 
         xml_init_parser();
 
@@ -775,7 +750,7 @@ pub unsafe fn xml_xpath_eval(xpath: &str, ctx: XmlXPathContextPtr) -> Option<Xml
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_xpath_eval_expression(
     xpath: &str,
-    ctxt: XmlXPathContextPtr,
+    ctxt: &mut XmlXPathContext,
 ) -> Option<XmlXPathObject> {
     unsafe { xml_xpath_eval(xpath, ctxt) }
 }
@@ -787,7 +762,7 @@ pub unsafe fn xml_xpath_eval_expression(
 #[doc(alias = "xmlXPathCompile")]
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_xpath_compile(xpath: &str) -> Option<XmlXPathCompExpr> {
-    unsafe { xml_xpath_ctxt_compile(null_mut(), xpath) }
+    unsafe { xml_xpath_ctxt_compile(None, xpath) }
 }
 
 /// Compile an XPath expression
@@ -797,60 +772,77 @@ pub unsafe fn xml_xpath_compile(xpath: &str) -> Option<XmlXPathCompExpr> {
 #[doc(alias = "xmlXPathCtxtCompile")]
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_xpath_ctxt_compile(
-    ctxt: XmlXPathContextPtr,
+    mut ctxt: Option<&mut XmlXPathContext>,
     xpath: &str,
 ) -> Option<XmlXPathCompExpr> {
     use std::mem::take;
 
     unsafe {
-        let mut old_depth: i32 = 0;
-
         #[cfg(feature = "libxml_pattern")]
-        if !ctxt.is_null() {
-            if let Some(comp) = (*ctxt).try_stream_compile(xpath) {
+        if let Some(ctxt) = ctxt.as_mut() {
+            if let Some(comp) = ctxt.try_stream_compile(xpath) {
                 return Some(comp);
             }
         }
 
         xml_init_parser();
 
-        let mut pctxt = XmlXPathParserContext::new(xpath, ctxt);
+        let mut comp = if let Some(ctxt) = ctxt {
+            let mut pctxt = XmlXPathParserContext::new(xpath, ctxt);
 
-        if !ctxt.is_null() {
-            old_depth = (*ctxt).depth;
-        }
-        pctxt.compile_expr(true);
-        if !ctxt.is_null() {
-            (*ctxt).depth = old_depth;
-        }
+            let old_depth = pctxt.context.depth;
+            pctxt.compile_expr(true);
+            pctxt.context.depth = old_depth;
 
-        if pctxt.error != XmlXPathError::XPathExpressionOK as i32 {
-            return None;
-        }
-
-        let mut comp = if pctxt.cur < pctxt.base.len() {
-            // aleksey: in some cases this line prints *second* error message
-            // (see bug #78858) and probably this should be fixed.
-            // However, we are not sure that all error messages are printed
-            // out in other places. It's not critical so we leave it as-is for now
-            xml_xpath_err(Some(&mut pctxt), XmlXPathError::XPathExprError as i32);
-            None
-        } else {
-            // comp = pctxt.comp;
-            if pctxt.comp.steps.len() > 1 && pctxt.comp.last >= 0 {
-                if !ctxt.is_null() {
-                    old_depth = (*ctxt).depth;
-                }
-                let op = &raw mut pctxt.comp.steps[pctxt.comp.last as usize];
-                pctxt.optimize_expression(op);
-                if !ctxt.is_null() {
-                    (*ctxt).depth = old_depth;
-                }
+            if pctxt.error != XmlXPathError::XPathExpressionOK as i32 {
+                return None;
             }
-            Some(take(&mut pctxt.comp))
-            // pctxt.comp = null_mut();
-        };
 
+            if pctxt.cur < pctxt.base.len() {
+                // aleksey: in some cases this line prints *second* error message
+                // (see bug #78858) and probably this should be fixed.
+                // However, we are not sure that all error messages are printed
+                // out in other places. It's not critical so we leave it as-is for now
+                xml_xpath_err(Some(&mut pctxt), XmlXPathError::XPathExprError as i32);
+                None
+            } else {
+                // comp = pctxt.comp;
+                if pctxt.comp.steps.len() > 1 && pctxt.comp.last >= 0 {
+                    let old_depth = pctxt.context.depth;
+                    let op = &raw mut pctxt.comp.steps[pctxt.comp.last as usize];
+                    pctxt.optimize_expression(op);
+                    pctxt.context.depth = old_depth;
+                }
+                Some(take(&mut pctxt.comp))
+                // pctxt.comp = null_mut();
+            }
+        } else {
+            let mut ctxt = XmlXPathContext::default();
+            let mut pctxt = XmlXPathParserContext::new(xpath, &mut ctxt);
+
+            pctxt.compile_expr(true);
+
+            if pctxt.error != XmlXPathError::XPathExpressionOK as i32 {
+                return None;
+            }
+
+            if pctxt.cur < pctxt.base.len() {
+                // aleksey: in some cases this line prints *second* error message
+                // (see bug #78858) and probably this should be fixed.
+                // However, we are not sure that all error messages are printed
+                // out in other places. It's not critical so we leave it as-is for now
+                xml_xpath_err(Some(&mut pctxt), XmlXPathError::XPathExprError as i32);
+                None
+            } else {
+                // comp = pctxt.comp;
+                if pctxt.comp.steps.len() > 1 && pctxt.comp.last >= 0 {
+                    let op = &raw mut pctxt.comp.steps[pctxt.comp.last as usize];
+                    pctxt.optimize_expression(op);
+                }
+                Some(take(&mut pctxt.comp))
+                // pctxt.comp = null_mut();
+            }
+        };
         if let Some(comp) = comp.as_mut() {
             comp.expr = xpath.into();
         }
@@ -866,38 +858,14 @@ pub unsafe fn xml_xpath_ctxt_compile(
 #[doc(alias = "xmlXPathCompiledEvalInternal")]
 unsafe fn xml_xpath_compiled_eval_internal(
     comp: XmlXPathCompExpr,
-    ctxt: XmlXPathContextPtr,
+    ctxt: &mut XmlXPathContext,
     res_obj_ptr: &mut Option<XmlXPathObject>,
     to_bool: bool,
 ) -> i32 {
     unsafe {
-        if ctxt.is_null() {
-            crate::error::__xml_raise_error!(
-                None,
-                None,
-                None,
-                null_mut(),
-                None,
-                crate::error::XmlErrorDomain::XmlFromXPath,
-                crate::error::XmlParserErrors::XmlErrInternalError,
-                crate::error::XmlErrorLevel::XmlErrFatal,
-                Some(file!().into()),
-                line!() as i32,
-                None,
-                None,
-                None,
-                0,
-                0,
-                "NULL context pointer\n",
-            );
-            return -1;
-        };
-
         xml_init_parser();
 
-        let Some(mut pctxt) = XmlXPathParserContext::from_compiled_expression(comp, ctxt) else {
-            return -1;
-        };
+        let mut pctxt = XmlXPathParserContext::from_compiled_expression(comp, ctxt);
         let res: i32 = pctxt.run_evaluate(to_bool);
 
         let res_obj = if pctxt.error != XmlXPathError::XPathExpressionOK as i32 {
@@ -931,7 +899,7 @@ unsafe fn xml_xpath_compiled_eval_internal(
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_xpath_compiled_eval(
     comp: XmlXPathCompExpr,
-    ctx: XmlXPathContextPtr,
+    ctx: &mut XmlXPathContext,
 ) -> Option<XmlXPathObject> {
     unsafe {
         let mut ret = None;
@@ -949,7 +917,7 @@ pub unsafe fn xml_xpath_compiled_eval(
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_xpath_compiled_eval_to_boolean(
     comp: XmlXPathCompExpr,
-    ctxt: XmlXPathContextPtr,
+    ctxt: &mut XmlXPathContext,
 ) -> i32 {
     unsafe { xml_xpath_compiled_eval_internal(comp, ctxt, &mut None, true) }
 }

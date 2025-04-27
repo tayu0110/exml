@@ -37,7 +37,7 @@ use super::{
 
 type StepOpIndex = usize;
 
-impl XmlXPathParserContext {
+impl XmlXPathParserContext<'_> {
     /// Adds opCount to the running total of operations and returns -1 if the
     /// operation limit is exceeded. Returns 0 otherwise.
     #[doc(alias = "xmlXPathCheckOpLimit")]
@@ -61,10 +61,8 @@ impl XmlXPathParserContext {
     #[doc(alias = "xmlXPathEvalExpr")]
     pub unsafe fn evaluate_expression(&mut self) {
         unsafe {
-            let mut old_depth: i32 = 0;
-
             #[cfg(feature = "libxml_pattern")]
-            let comp = (*self.context).try_stream_compile(&self.base);
+            let comp = self.context.try_stream_compile(&self.base);
 
             match () {
                 #[cfg(feature = "libxml_pattern")]
@@ -72,13 +70,9 @@ impl XmlXPathParserContext {
                     self.comp = comp.unwrap();
                 }
                 _ => {
-                    if !self.context.is_null() {
-                        old_depth = (*self.context).depth;
-                    }
+                    let old_depth = self.context.depth;
                     self.compile_expr(true);
-                    if !self.context.is_null() {
-                        (*self.context).depth = old_depth;
-                    }
+                    self.context.depth = old_depth;
                     if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
                         return;
                     };
@@ -90,15 +84,11 @@ impl XmlXPathParserContext {
                     }
 
                     if self.comp.steps.len() > 1 && self.comp.last >= 0 {
-                        if !self.context.is_null() {
-                            old_depth = (*self.context).depth;
-                        }
+                        let old_depth = self.context.depth;
                         let last = self.comp.last as usize;
                         let op = &raw mut self.comp.steps[last];
                         self.optimize_expression(op);
-                        if !self.context.is_null() {
-                            (*self.context).depth = old_depth;
-                        }
+                        self.context.depth = old_depth;
                     }
                 }
             }
@@ -115,7 +105,7 @@ impl XmlXPathParserContext {
             if self.comp.stream.is_some() {
                 if to_bool {
                     // Evaluation to boolean result.
-                    let res = (*self.context).run_stream_eval(
+                    let res = self.context.run_stream_eval(
                         self.comp.stream.as_deref().unwrap(),
                         &mut None,
                         1,
@@ -127,7 +117,7 @@ impl XmlXPathParserContext {
                     let mut res_obj = None;
 
                     // Evaluation to a sequence.
-                    let res = (*self.context).run_stream_eval(
+                    let res = self.context.run_stream_eval(
                         self.comp.stream.as_deref().unwrap(),
                         &mut res_obj,
                         0,
@@ -146,14 +136,14 @@ impl XmlXPathParserContext {
                 generic_error!("xmlXPathRunEval: last is less than zero\n");
                 return -1;
             }
-            let old_depth: i32 = (*self.context).depth;
+            let old_depth: i32 = self.context.depth;
             if to_bool {
                 return self
                     .evaluate_precompiled_operation_to_boolean(self.comp.last as usize, false);
             } else {
                 self.evaluate_precompiled_operation(self.comp.last as usize);
             }
-            (*self.context).depth = old_depth;
+            self.context.depth = old_depth;
 
             0
         }
@@ -171,17 +161,17 @@ impl XmlXPathParserContext {
             if self.error != XmlXPathError::XPathExpressionOK as i32 {
                 return 0;
             };
-            if (*self.context).op_limit != 0 && self.check_operation_limit(1) < 0 {
+            if self.context.op_limit != 0 && self.check_operation_limit(1) < 0 {
                 return 0;
             }
-            if (*self.context).depth >= XPATH_MAX_RECURSION_DEPTH as i32 {
+            if self.context.depth >= XPATH_MAX_RECURSION_DEPTH as i32 {
                 xml_xpath_err(
                     Some(self),
                     XmlXPathError::XPathRecursionLimitExceeded as i32,
                 );
                 return 0;
             }
-            (*self.context).depth += 1;
+            self.context.depth += 1;
             match self.comp.steps[op].op {
                 XmlXPathOp::XPathOpEnd => {}
                 XmlXPathOp::XPathOpAnd => 'to_break: {
@@ -326,7 +316,7 @@ impl XmlXPathParserContext {
                         xml_xpath_err(Some(self), XmlXPathError::XPathInvalidType as i32);
                         return 0;
                     };
-                    if (*self.context).op_limit != 0
+                    if self.context.op_limit != 0
                         && (arg1
                             .nodesetval
                             .as_deref()
@@ -371,7 +361,7 @@ impl XmlXPathParserContext {
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
-                    self.value_push(xml_xpath_new_node_set((*self.context).node));
+                    self.value_push(xml_xpath_new_node_set(self.context.node));
                 }
                 XmlXPathOp::XPathOpCollect => 'to_break: {
                     if self.comp.steps[op].ch1 == -1 {
@@ -404,7 +394,7 @@ impl XmlXPathParserContext {
                         .as_ref()
                         .and_then(|val| val.as_str())
                     {
-                        let uri = (*self.context).lookup_ns(value5);
+                        let uri = self.context.lookup_ns(value5);
                         let value4 = self.comp.steps[op]
                             .value4
                             .as_ref()
@@ -419,8 +409,7 @@ impl XmlXPathParserContext {
                             self.error = XmlXPathError::XPathUndefPrefixError as _;
                             break 'to_break;
                         };
-                        let Some(val) = (*self.context).lookup_variable_ns(value4, Some(&uri))
-                        else {
+                        let Some(val) = self.context.lookup_variable_ns(value4, Some(&uri)) else {
                             xml_xpath_err(
                                 Some(self),
                                 XmlXPathError::XPathUndefVariableError as i32,
@@ -434,7 +423,7 @@ impl XmlXPathParserContext {
                             .as_ref()
                             .and_then(|val| val.as_str())
                             .unwrap();
-                        let Some(val) = (*self.context).lookup_variable(value4) else {
+                        let Some(val) = self.context.lookup_variable(value4) else {
                             xml_xpath_err(
                                 Some(self),
                                 XmlXPathError::XPathUndefVariableError as i32,
@@ -474,7 +463,7 @@ impl XmlXPathParserContext {
                             .as_ref()
                             .and_then(|val| val.as_str())
                         {
-                            uri = (*self.context).lookup_ns(value5);
+                            uri = self.context.lookup_ns(value5);
                             let Some(uri) = uri.as_deref() else {
                                 generic_error!(
                                     "xmlXPathCompOpEval: function {} bound to undefined prefix {}\n",
@@ -484,9 +473,9 @@ impl XmlXPathParserContext {
                                 self.error = XmlXPathError::XPathUndefPrefixError as i32;
                                 break 'to_break;
                             };
-                            (*self.context).lookup_function_ns(value4, Some(uri))
+                            self.context.lookup_function_ns(value4, Some(uri))
                         } else {
-                            (*self.context).lookup_function(value4)
+                            self.context.lookup_function(value4)
                         };
                         if let Some(f) = f {
                             func = f;
@@ -500,12 +489,12 @@ impl XmlXPathParserContext {
                         self.comp.steps[op].cache_uri = uri;
                     }
 
-                    let old_func = (*self.context).function.take();
+                    let old_func = self.context.function.take();
                     let old_func_uri = replace(
-                        &mut (*self.context).function_uri,
+                        &mut self.context.function_uri,
                         self.comp.steps[op].cache_uri.clone(),
                     );
-                    (*self.context).function = Some(
+                    self.context.function = Some(
                         self.comp.steps[op]
                             .value4
                             .as_ref()
@@ -515,8 +504,8 @@ impl XmlXPathParserContext {
                             .into(),
                     );
                     func(self, self.comp.steps[op].value as usize);
-                    (*self.context).function = old_func;
-                    (*self.context).function_uri = old_func_uri;
+                    self.context.function = old_func;
+                    self.context.function_uri = old_func_uri;
                     if self.error == XmlXPathError::XPathExpressionOK as i32
                         && self.value_tab.len() != frame + 1
                     {
@@ -749,9 +738,9 @@ impl XmlXPathParserContext {
                 #[cfg(feature = "libxml_xptr_locs")]
                 XmlXPathOp::XPathOpRangeto => 'to_break: {
                     let mut newlocset;
-                    let oldnode = (*self.context).node;
-                    let oldcs: i32 = (*self.context).context_size;
-                    let oldpp: i32 = (*self.context).proximity_position;
+                    let oldnode = self.context.node;
+                    let oldcs: i32 = self.context.context_size;
+                    let oldpp: i32 = self.context.proximity_position;
 
                     if self.comp.steps[op].ch1 != -1 {
                         total +=
@@ -807,11 +796,11 @@ impl XmlXPathParserContext {
                             for (i, iloc) in oldlocset.loc_tab.iter().enumerate() {
                                 // Run the evaluation with a node list made of a
                                 // single item in the nodelocset.
-                                (*self.context).node =
+                                self.context.node =
                                     iloc.user.as_ref().and_then(|user| user.as_node()).copied();
-                                (*self.context).context_size = oldlocset.loc_tab.len() as i32;
-                                (*self.context).proximity_position = i as i32 + 1;
-                                let tmp = xml_xpath_new_node_set((*self.context).node);
+                                self.context.context_size = oldlocset.loc_tab.len() as i32;
+                                self.context.proximity_position = i as i32 + 1;
+                                let tmp = xml_xpath_new_node_set(self.context.node);
                                 self.value_push(tmp);
                                 let keep_stack_len = self.value_tab.len();
 
@@ -881,9 +870,9 @@ impl XmlXPathParserContext {
                                 for &node in &oldset.node_tab {
                                     // Run the evaluation with a node list made of a single item
                                     // in the nodeset.
-                                    (*self.context).node = Some(node);
+                                    self.context.node = Some(node);
                                     // OPTIMIZE TODO: Avoid recreation for every iteration.
-                                    let tmp = xml_xpath_new_node_set((*self.context).node);
+                                    let tmp = xml_xpath_new_node_set(self.context.node);
                                     self.value_push(tmp);
                                     let keep_stack_len = self.value_tab.len();
 
@@ -914,13 +903,13 @@ impl XmlXPathParserContext {
                         self.value_push(xml_xptr_wrap_location_set(newlocset));
                     }
                     // rangeto_error:
-                    (*self.context).node = oldnode;
-                    (*self.context).context_size = oldcs;
-                    (*self.context).proximity_position = oldpp;
+                    self.context.node = oldnode;
+                    self.context.context_size = oldcs;
+                    self.context.proximity_position = oldpp;
                 }
             }
 
-            (*self.context).depth -= 1;
+            self.context.depth -= 1;
             total
         }
     }
@@ -941,17 +930,17 @@ impl XmlXPathParserContext {
             if self.error != XmlXPathError::XPathExpressionOK as i32 {
                 return 0;
             };
-            if (*self.context).op_limit != 0 && self.check_operation_limit(1) < 0 {
+            if self.context.op_limit != 0 && self.check_operation_limit(1) < 0 {
                 return 0;
             }
-            if (*self.context).depth >= XPATH_MAX_RECURSION_DEPTH as i32 {
+            if self.context.depth >= XPATH_MAX_RECURSION_DEPTH as i32 {
                 xml_xpath_err(
                     Some(self),
                     XmlXPathError::XPathRecursionLimitExceeded as i32,
                 );
                 return 0;
             }
-            (*self.context).depth += 1;
+            self.context.depth += 1;
             match self.comp.steps[op].op {
                 XmlXPathOp::XPathOpEnd => {}
                 XmlXPathOp::XPathOpUnion => {
@@ -1005,7 +994,7 @@ impl XmlXPathParserContext {
                         xml_xpath_err(Some(self), XmlXPathError::XPathInvalidType as i32);
                         return 0;
                     };
-                    if (*self.context).op_limit != 0
+                    if self.context.op_limit != 0
                         && (arg1
                             .nodesetval
                             .as_deref()
@@ -1048,7 +1037,7 @@ impl XmlXPathParserContext {
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
-                    self.value_push(xml_xpath_new_node_set((*self.context).node));
+                    self.value_push(xml_xpath_new_node_set(self.context.node));
                 }
                 XmlXPathOp::XPathOpCollect => {
                     if self.comp.steps[op].ch1 == -1 {
@@ -1104,7 +1093,7 @@ impl XmlXPathParserContext {
                 }
             }
 
-            (*self.context).depth -= 1;
+            self.context.depth -= 1;
             total
         }
     }
@@ -1126,17 +1115,17 @@ impl XmlXPathParserContext {
             if self.error != XmlXPathError::XPathExpressionOK as i32 {
                 return 0;
             };
-            if (*self.context).op_limit != 0 && self.check_operation_limit(1) < 0 {
+            if self.context.op_limit != 0 && self.check_operation_limit(1) < 0 {
                 return 0;
             }
-            if (*self.context).depth >= XPATH_MAX_RECURSION_DEPTH as i32 {
+            if self.context.depth >= XPATH_MAX_RECURSION_DEPTH as i32 {
                 xml_xpath_err(
                     Some(self),
                     XmlXPathError::XPathRecursionLimitExceeded as i32,
                 );
                 return 0;
             }
-            (*self.context).depth += 1;
+            self.context.depth += 1;
             match self.comp.steps[op].op {
                 XmlXPathOp::XPathOpEnd => {}
                 XmlXPathOp::XPathOpUnion => {
@@ -1193,7 +1182,7 @@ impl XmlXPathParserContext {
                         xml_xpath_err(Some(self), XmlXPathError::XPathInvalidType as i32);
                         return 0;
                     };
-                    if (*self.context).op_limit != 0
+                    if self.context.op_limit != 0
                         && (arg1
                             .nodesetval
                             .as_deref()
@@ -1236,7 +1225,7 @@ impl XmlXPathParserContext {
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
                         return 0;
                     };
-                    self.value_push(xml_xpath_new_node_set((*self.context).node));
+                    self.value_push(xml_xpath_new_node_set(self.context.node));
                 }
                 XmlXPathOp::XPathOpCollect => {
                     if self.comp.steps[op].ch1 == -1 {
@@ -1289,7 +1278,7 @@ impl XmlXPathParserContext {
                 }
             }
 
-            (*self.context).depth -= 1;
+            self.context.depth -= 1;
             total
         }
     }
@@ -1444,7 +1433,7 @@ impl XmlXPathParserContext {
 
             // start:
             loop {
-                if (*self.context).op_limit != 0 && self.check_operation_limit(1) < 0 {
+                if self.context.op_limit != 0 && self.check_operation_limit(1) < 0 {
                     return 0;
                 }
                 // comp = self.comp;
@@ -1535,40 +1524,37 @@ impl XmlXPathParserContext {
     ///
     /// Returns 1 if predicate is true, 0 otherwise
     #[doc(alias = "xmlXPathEvaluatePredicateResult")]
-    pub unsafe fn evaluate_predicate_result(&self, res: &XmlXPathObject) -> i32 {
-        unsafe {
-            match res.typ {
-                XmlXPathObjectType::XPathBoolean => {
-                    return res.boolval as i32;
-                }
-                XmlXPathObjectType::XPathNumber => {
-                    return (res.floatval == (*self.context).proximity_position as f64) as i32;
-                }
-                XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
-                    if let Some(nodeset) = res.nodesetval.as_deref() {
-                        return !nodeset.is_empty() as i32;
-                    } else {
-                        return 0;
-                    }
-                }
-                XmlXPathObjectType::XPathString => {
-                    return res.stringval.as_deref().is_some_and(|s| !s.is_empty()) as i32;
-                }
-                #[cfg(feature = "libxml_xptr_locs")]
-                XmlXPathObjectType::XPathLocationset => {
-                    let Some(loc) = res.user.as_ref().and_then(|user| user.as_location_set())
-                    else {
-                        return 0;
-                    };
-
-                    return (!loc.loc_tab.is_empty()) as i32;
-                }
-                _ => {
-                    generic_error!("Internal error at {}:{}\n", file!(), line!());
+    pub fn evaluate_predicate_result(&self, res: &XmlXPathObject) -> i32 {
+        match res.typ {
+            XmlXPathObjectType::XPathBoolean => {
+                return res.boolval as i32;
+            }
+            XmlXPathObjectType::XPathNumber => {
+                return (res.floatval == self.context.proximity_position as f64) as i32;
+            }
+            XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
+                if let Some(nodeset) = res.nodesetval.as_deref() {
+                    return !nodeset.is_empty() as i32;
+                } else {
+                    return 0;
                 }
             }
-            0
+            XmlXPathObjectType::XPathString => {
+                return res.stringval.as_deref().is_some_and(|s| !s.is_empty()) as i32;
+            }
+            #[cfg(feature = "libxml_xptr_locs")]
+            XmlXPathObjectType::XPathLocationset => {
+                let Some(loc) = res.user.as_ref().and_then(|user| user.as_location_set()) else {
+                    return 0;
+                };
+
+                return (!loc.loc_tab.is_empty()) as i32;
+            }
+            _ => {
+                generic_error!("Internal error at {}:{}\n", file!(), line!());
+            }
         }
+        0
     }
 }
 
@@ -2208,7 +2194,7 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
             let mut cur = None;
             has_ns_nodes = false;
             while let Some(cur) = {
-                if (*ctxt.context).op_limit != 0 && ctxt.check_operation_limit(1) < 0 {
+                if ctxt.context.op_limit != 0 && ctxt.check_operation_limit(1) < 0 {
                     // goto error;
                     break 'main;
                 }
@@ -2524,14 +2510,14 @@ pub(super) unsafe fn xml_xpath_comp_op_eval_predicate(
                 xml_xpath_err(Some(ctxt), XmlXPathError::XPathInvalidOperand as i32);
                 return;
             }
-            if (*ctxt.context).depth >= XPATH_MAX_RECURSION_DEPTH as i32 {
+            if ctxt.context.depth >= XPATH_MAX_RECURSION_DEPTH as i32 {
                 xml_xpath_err(
                     Some(ctxt),
                     XmlXPathError::XPathRecursionLimitExceeded as i32,
                 );
                 return;
             }
-            (*ctxt.context).depth += 1;
+            ctxt.context.depth += 1;
             xml_xpath_comp_op_eval_predicate(
                 ctxt,
                 ctxt.comp.steps[op].ch1 as usize,
@@ -2540,7 +2526,7 @@ pub(super) unsafe fn xml_xpath_comp_op_eval_predicate(
                 set.node_tab.len() as i32,
                 has_ns_nodes,
             );
-            (*ctxt.context).depth -= 1;
+            ctxt.context.depth -= 1;
             if ctxt.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
                 return;
             };

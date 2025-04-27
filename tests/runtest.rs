@@ -2446,7 +2446,7 @@ unsafe fn test_xpath(xpath: &str, xptr: i32, expr: i32) {
             #[cfg(feature = "xpointer")]
             {
                 ctxt = xml_xptr_new_context(XPATH_DOCUMENT.get(), None, None);
-                res = xml_xptr_eval(xpath, ctxt);
+                res = xml_xptr_eval(xpath, &mut *ctxt);
             }
         } else {
             let xpath_document = XPATH_DOCUMENT.get();
@@ -2455,12 +2455,12 @@ unsafe fn test_xpath(xpath: &str, xptr: i32, expr: i32) {
                 .and_then(|doc| doc.get_root_element())
                 .map(|root| root.into());
             if expr != 0 {
-                res = xml_xpath_eval_expression(xpath, ctxt);
+                res = xml_xpath_eval_expression(xpath, &mut *ctxt);
             } else {
                 /* res = xmlXPathEval(str, ctxt); */
 
                 if let Some(comp) = xml_xpath_compile(xpath) {
-                    res = xml_xpath_compiled_eval(comp, ctxt);
+                    res = xml_xpath_compiled_eval(comp, &mut *ctxt);
                 } else {
                     res = None;
                 }
@@ -3941,7 +3941,7 @@ unsafe fn load_xpath_expr(parent_doc: XmlDocPtr, filename: &str) -> Option<XmlXP
         }
 
         // Evaluate xpath
-        let Some(xpath) = xml_xpath_eval_expression(&expr, ctx) else {
+        let Some(xpath) = xml_xpath_eval_expression(&expr, &mut *ctx) else {
             eprintln!("Error: unable to evaluate xpath expression");
             xml_xpath_free_context(ctx);
             xml_free_doc(doc);

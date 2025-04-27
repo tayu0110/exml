@@ -2805,7 +2805,7 @@ pub unsafe fn xml_shell<'a>(
                     #[cfg(feature = "xpath")]
                     let list = {
                         (*ctxt.pctxt).node = ctxt.node;
-                        xml_xpath_eval(arg, ctxt.pctxt)
+                        xml_xpath_eval(arg, &mut *ctxt.pctxt)
                     };
                     #[cfg(not(feature = "xpath"))]
                     let list = None;
@@ -2879,7 +2879,7 @@ pub unsafe fn xml_shell<'a>(
                         generic_error!("xpath: expression required\n");
                     } else {
                         (*ctxt.pctxt).node = ctxt.node;
-                        let list = xml_xpath_eval(arg, ctxt.pctxt);
+                        let list = xml_xpath_eval(arg, &mut *ctxt.pctxt);
                         xml_xpath_debug_dump_object(&mut ctxt.output, list.as_ref(), 0);
                     }
                 }
@@ -2902,7 +2902,7 @@ pub unsafe fn xml_shell<'a>(
                     #[cfg(feature = "xpath")]
                     let list = {
                         (*ctxt.pctxt).node = ctxt.node;
-                        xml_xpath_eval(arg, ctxt.pctxt)
+                        xml_xpath_eval(arg, &mut *ctxt.pctxt)
                     };
                     #[cfg(not(feature = "xpath"))]
                     let list = None;
@@ -2967,7 +2967,7 @@ pub unsafe fn xml_shell<'a>(
                     } else {
                         (*ctxt.pctxt).node = ctxt.node;
                         #[cfg(feature = "xpath")]
-                        let list = xml_xpath_eval(arg, ctxt.pctxt);
+                        let list = xml_xpath_eval(arg, &mut *ctxt.pctxt);
                         #[cfg(not(feature = "xpath"))]
                         let list = None;
                         if let Some(list) = list {
@@ -3033,7 +3033,7 @@ pub unsafe fn xml_shell<'a>(
                                 arg = new;
                             }
                         }
-                        xml_xpath_eval(arg, ctxt.pctxt)
+                        xml_xpath_eval(arg, &mut *ctxt.pctxt)
                     };
                     #[cfg(not(feature = "xpath"))]
                     let list = None;
@@ -3110,7 +3110,7 @@ pub unsafe fn xml_shell<'a>(
                     #[cfg(feature = "xpath")]
                     let list = {
                         (*ctxt.pctxt).node = ctxt.node;
-                        xml_xpath_eval(arg, ctxt.pctxt)
+                        xml_xpath_eval(arg, &mut *ctxt.pctxt)
                     };
                     #[cfg(not(feature = "xpath"))]
                     let list = None;

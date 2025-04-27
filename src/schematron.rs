@@ -37,9 +37,9 @@ use crate::{
         xml_free_doc,
     },
     xpath::{
-        XML_XPATH_CHECKNS, XmlXPathCompExpr, XmlXPathContextPtr, XmlXPathObjectType,
-        xml_xpath_compiled_eval, xml_xpath_ctxt_compile, xml_xpath_eval, xml_xpath_free_context,
-        xml_xpath_is_nan, xml_xpath_new_context,
+        XML_XPATH_CHECKNS, XmlXPathCompExpr, XmlXPathContext, XmlXPathContextPtr,
+        XmlXPathObjectType, xml_xpath_compiled_eval, xml_xpath_ctxt_compile, xml_xpath_eval,
+        xml_xpath_free_context, xml_xpath_is_nan, xml_xpath_new_context,
     },
 };
 
@@ -160,14 +160,14 @@ fn next_schematron(mut node: Option<XmlNodePtr>) -> Option<XmlNodePtr> {
 /// Returns -1 in case of errors, otherwise 0
 #[doc(alias = "xmlSchematronRegisterVariables")]
 unsafe fn xml_schematron_register_variables(
-    ctxt: XmlXPathContextPtr,
+    ctxt: &mut XmlXPathContext,
     mut letr: Option<&XmlSchematronLet>,
     instance: XmlDocPtr,
     cur: Option<XmlGenericNodePtr>,
 ) -> i32 {
     unsafe {
-        (*ctxt).doc = Some(instance);
-        (*ctxt).node = cur;
+        ctxt.doc = Some(instance);
+        ctxt.node = cur;
         while let Some(now) = letr {
             let Some(let_eval) = xml_xpath_compiled_eval(now.comp.clone(), ctxt) else {
                 generic_error!("Evaluation of compiled expression failed\n");
@@ -443,7 +443,7 @@ impl<'a> XmlSchematronValidCtxt<'a> {
         unsafe {
             (*self.xctxt).doc = cur?.document();
             (*self.xctxt).node = cur;
-            let ret = xml_xpath_eval(xpath, self.xctxt)?;
+            let ret = xml_xpath_eval(xpath, &mut *self.xctxt)?;
 
             if ret.typ == XmlXPathObjectType::XPathNodeset {
                 if let Some(nodeset) = ret.nodesetval.as_deref() {
@@ -513,9 +513,9 @@ impl<'a> XmlSchematronValidCtxt<'a> {
                 } else if is_schematron(cur_node, "value-of") {
                     let comp = cur_node
                         .get_no_ns_prop("select")
-                        .and_then(|select| xml_xpath_ctxt_compile(self.xctxt, &select))
+                        .and_then(|select| xml_xpath_ctxt_compile(Some(&mut *self.xctxt), &select))
                         .unwrap();
-                    let eval = xml_xpath_compiled_eval(comp, self.xctxt).unwrap();
+                    let eval = xml_xpath_compiled_eval(comp, &mut *self.xctxt).unwrap();
 
                     match eval.typ {
                         XmlXPathObjectType::XPathNodeset => {
@@ -700,7 +700,7 @@ impl<'a> XmlSchematronValidCtxt<'a> {
             failed = 0;
             (*self.xctxt).doc = Some(instance);
             (*self.xctxt).node = Some(cur.into());
-            if let Some(ret) = xml_xpath_compiled_eval(test.comp.clone(), self.xctxt) {
+            if let Some(ret) = xml_xpath_compiled_eval(test.comp.clone(), &mut *self.xctxt) {
                 match ret.typ {
                     XmlXPathObjectType::XPathXSLTTree | XmlXPathObjectType::XPathNodeset => {
                         if ret.nodesetval.as_deref().is_none_or(|n| n.is_empty()) {
@@ -781,7 +781,7 @@ impl<'a> XmlSchematronValidCtxt<'a> {
                             let mut test = rule.tests.as_deref();
 
                             if xml_schematron_register_variables(
-                                self.xctxt,
+                                &mut *self.xctxt,
                                 rule.lets.as_deref(),
                                 instance,
                                 Some(cur_node.into()),
@@ -838,7 +838,7 @@ impl<'a> XmlSchematronValidCtxt<'a> {
                                 let rule = rule.borrow();
                                 let mut test = rule.tests.as_deref();
                                 xml_schematron_register_variables(
-                                    self.xctxt,
+                                    &mut *self.xctxt,
                                     rule.lets.as_deref(),
                                     instance,
                                     Some(cur_node.into()),
@@ -1116,7 +1116,7 @@ impl<'a> XmlSchematronParserCtxt<'a> {
     ) {
         unsafe {
             // try first to compile the test expression
-            let Some(comp) = xml_xpath_ctxt_compile(self.xctxt, test) else {
+            let Some(comp) = xml_xpath_ctxt_compile(Some(&mut *self.xctxt), test) else {
                 xml_schematron_perr!(
                     self,
                     Some(node.into()),
@@ -1231,7 +1231,8 @@ impl<'a> XmlSchematronParserCtxt<'a> {
                         }
                     };
 
-                    let Some(var_comp) = xml_xpath_ctxt_compile(self.xctxt, &value) else {
+                    let Some(var_comp) = xml_xpath_ctxt_compile(Some(&mut *self.xctxt), &value)
+                    else {
                         xml_schematron_perr!(
                             self,
                             Some(cur_node.into()),
@@ -1398,7 +1399,7 @@ impl<'a> XmlSchematronParserCtxt<'a> {
                 } else if is_schematron(cur_node, "value-of") {
                     if let Some(select) = cur_node.get_no_ns_prop("select") {
                         // try first to compile the test expression
-                        if xml_xpath_ctxt_compile(self.xctxt, &select).is_some() {
+                        if xml_xpath_ctxt_compile(Some(&mut *self.xctxt), &select).is_some() {
                             xml_schematron_perr!(
                                 self,
                                 Some(cur_node.into()),

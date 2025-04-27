@@ -1283,7 +1283,7 @@ impl XmlXIncludeCtxt {
                         );
                         return ret;
                     }
-                    let Some(mut xptr) = xml_xptr_eval(&fragment, xptrctxt) else {
+                    let Some(mut xptr) = xml_xptr_eval(&fragment, &mut *xptrctxt) else {
                         xml_xinclude_err!(
                             self,
                             self.inc_tab[ref_index].elem.map(|node| node.into()),

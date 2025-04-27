@@ -2316,7 +2316,7 @@ unsafe fn do_xpath_query(doc: XmlDocPtr, query: &str) {
             return;
         }
         (*ctxt).node = Some(doc.into());
-        let res = xml_xpath_eval(query, ctxt);
+        let res = xml_xpath_eval(query, &mut *ctxt);
         xml_xpath_free_context(ctxt);
 
         let Some(res) = res else {

@@ -227,7 +227,7 @@ unsafe fn get_next(cur: Option<XmlNodePtr>, xpath: &str) -> Option<XmlNodePtr> {
             eprintln!("Failed to compile {}", xpath);
             return None;
         };
-        let res = xml_xpath_compiled_eval(comp, CTXT_XPATH.load(Ordering::Relaxed))?;
+        let res = xml_xpath_compiled_eval(comp, &mut *CTXT_XPATH.load(Ordering::Relaxed))?;
         let mut ret = None;
         if res.typ == XmlXPathObjectType::XPathNodeset {
             if let Some(nodeset) = res.nodesetval.as_deref() {
@@ -249,7 +249,7 @@ unsafe fn get_string(cur: XmlNodePtr, xpath: &str) -> Option<String> {
             eprintln!("Failed to compile {}", xpath);
             return None;
         };
-        let mut res = xml_xpath_compiled_eval(comp, CTXT_XPATH.load(Ordering::Relaxed))?;
+        let mut res = xml_xpath_compiled_eval(comp, &mut *CTXT_XPATH.load(Ordering::Relaxed))?;
         let mut ret = None;
         if res.typ == XmlXPathObjectType::XPathString {
             ret = res.stringval.take();

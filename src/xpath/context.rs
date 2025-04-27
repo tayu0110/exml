@@ -63,14 +63,14 @@ use super::{
 /// an xmlXPathContext, and the stack of objects.
 #[doc(alias = "xmlXPathParserContext")]
 #[repr(C)]
-pub struct XmlXPathParserContext {
+pub struct XmlXPathParserContext<'a> {
     pub(crate) cur: usize,     /* the current char being parsed */
     pub(crate) base: Box<str>, /* the full expression */
 
     pub(crate) error: i32, /* error code */
 
-    pub(crate) context: XmlXPathContextPtr, /* the evaluation context */
-    pub(crate) value_tab: Vec<XmlXPathObject>, /* stack of values */
+    pub(crate) context: &'a mut XmlXPathContext, /* the evaluation context */
+    pub(crate) value_tab: Vec<XmlXPathObject>,   /* stack of values */
 
     pub(crate) comp: XmlXPathCompExpr, /* the precompiled expression */
     pub(crate) xptr: i32,              /* it this an XPointer expression */
@@ -79,17 +79,22 @@ pub struct XmlXPathParserContext {
     pub(crate) value_frame: i32, /* unused */
 }
 
-impl XmlXPathParserContext {
+impl<'a> XmlXPathParserContext<'a> {
     /// Create a new xmlXPathParserContext
     ///
     /// Returns the xmlXPathParserContext just allocated.
     #[doc(alias = "xmlXPathNewParserContext")]
-    pub fn new(xpath: &str, ctxt: XmlXPathContextPtr) -> Self {
-        XmlXPathParserContext {
+    pub fn new(xpath: &str, ctxt: &'a mut XmlXPathContext) -> Self {
+        Self {
             cur: 0,
             base: xpath.into(),
+            error: 0,
             context: ctxt,
-            ..Default::default()
+            value_tab: vec![],
+            comp: XmlXPathCompExpr::default(),
+            xptr: 0,
+            ancestor: None,
+            value_frame: 0,
         }
     }
 
@@ -99,13 +104,19 @@ impl XmlXPathParserContext {
     #[doc(alias = "xmlXPathCompParserContext")]
     pub(super) fn from_compiled_expression(
         comp: XmlXPathCompExpr,
-        ctxt: XmlXPathContextPtr,
-    ) -> Option<Self> {
-        let mut ret = XmlXPathParserContext::default();
-        ret.value_tab.reserve(10);
-        ret.context = ctxt;
-        ret.comp = comp;
-        Some(ret)
+        ctxt: &'a mut XmlXPathContext,
+    ) -> Self {
+        Self {
+            cur: 0,
+            base: "".into(),
+            error: 0,
+            context: ctxt,
+            value_tab: vec![],
+            comp,
+            xptr: 0,
+            ancestor: None,
+            value_frame: 0,
+        }
     }
 
     pub(crate) fn next_char(&mut self) -> Option<char> {
@@ -213,15 +224,13 @@ impl XmlXPathParserContext {
     ///
     /// The object is destroyed in case of error.
     #[doc(alias = "valuePush")]
-    pub unsafe fn value_push(&mut self, value: XmlXPathObject) -> i32 {
-        unsafe {
-            if self.value_tab.len() == XPATH_MAX_STACK_DEPTH {
-                xml_xpath_perr_memory(Some(self), Some("XPath stack depth limit reached\n"));
-                return -1;
-            }
-            self.value_tab.push(value);
-            self.value_tab.len() as i32 - 1
+    pub fn value_push(&mut self, value: XmlXPathObject) -> i32 {
+        if self.value_tab.len() == XPATH_MAX_STACK_DEPTH {
+            xml_xpath_perr_memory(Some(self), Some("XPath stack depth limit reached\n"));
+            return -1;
         }
+        self.value_tab.push(value);
+        self.value_tab.len() as i32 - 1
     }
 
     // TODO: remap to xmlXPathValuePop and Push.
@@ -238,18 +247,16 @@ impl XmlXPathParserContext {
     ///
     /// Returns the number
     #[doc(alias = "xmlXPathPopNumber")]
-    pub unsafe fn pop_number(&mut self) -> f64 {
-        unsafe {
-            let Some(mut obj) = self.value_pop() else {
-                xml_xpath_err(Some(self), XmlXPathError::XPathInvalidOperand as i32);
-                self.error = XmlXPathError::XPathInvalidOperand as i32;
-                return 0.0;
-            };
-            if obj.typ != XmlXPathObjectType::XPathNumber {
-                xml_xpath_cast_to_number(&mut obj)
-            } else {
-                obj.floatval
-            }
+    pub fn pop_number(&mut self) -> f64 {
+        let Some(mut obj) = self.value_pop() else {
+            xml_xpath_err(Some(self), XmlXPathError::XPathInvalidOperand as i32);
+            self.error = XmlXPathError::XPathInvalidOperand as i32;
+            return 0.0;
+        };
+        if obj.typ != XmlXPathObjectType::XPathNumber {
+            xml_xpath_cast_to_number(&mut obj)
+        } else {
+            obj.floatval
         }
     }
 
@@ -258,18 +265,16 @@ impl XmlXPathParserContext {
     ///
     /// Returns the boolean
     #[doc(alias = "xmlXPathPopBoolean")]
-    pub unsafe fn pop_boolean(&mut self) -> bool {
-        unsafe {
-            let Some(obj) = self.value_pop() else {
-                xml_xpath_err(Some(self), XmlXPathError::XPathInvalidOperand as i32);
-                self.error = XmlXPathError::XPathInvalidOperand as i32;
-                return false;
-            };
-            if obj.typ != XmlXPathObjectType::XPathBoolean {
-                xml_xpath_cast_to_boolean(&obj)
-            } else {
-                obj.boolval
-            }
+    pub fn pop_boolean(&mut self) -> bool {
+        let Some(obj) = self.value_pop() else {
+            xml_xpath_err(Some(self), XmlXPathError::XPathInvalidOperand as i32);
+            self.error = XmlXPathError::XPathInvalidOperand as i32;
+            return false;
+        };
+        if obj.typ != XmlXPathObjectType::XPathBoolean {
+            xml_xpath_cast_to_boolean(&obj)
+        } else {
+            obj.boolval
         }
     }
 
@@ -278,20 +283,18 @@ impl XmlXPathParserContext {
     ///
     /// Returns the string
     #[doc(alias = "xmlXPathPopString")]
-    pub unsafe fn pop_string(&mut self) -> Option<Cow<'static, str>> {
-        unsafe {
-            let Some(mut obj) = self.value_pop() else {
-                xml_xpath_err(Some(self), XmlXPathError::XPathInvalidOperand as i32);
-                self.error = XmlXPathError::XPathInvalidOperand as i32;
-                return None;
-            };
-            let ret = xml_xpath_cast_to_string(&mut obj); /* this does required strdup */
-            /* TODO: needs refactoring somewhere else */
-            // if (*obj).stringval == ret {
-            //     (*obj).stringval = null_mut();
-            // }
-            Some(ret)
-        }
+    pub fn pop_string(&mut self) -> Option<Cow<'static, str>> {
+        let Some(mut obj) = self.value_pop() else {
+            xml_xpath_err(Some(self), XmlXPathError::XPathInvalidOperand as i32);
+            self.error = XmlXPathError::XPathInvalidOperand as i32;
+            return None;
+        };
+        let ret = xml_xpath_cast_to_string(&mut obj); /* this does required strdup */
+        /* TODO: needs refactoring somewhere else */
+        // if (*obj).stringval == ret {
+        //     (*obj).stringval = null_mut();
+        // }
+        Some(ret)
     }
 
     /// Pops a node-set from the stack, handling conversion if needed.
@@ -299,26 +302,24 @@ impl XmlXPathParserContext {
     ///
     /// Returns the node-set
     #[doc(alias = "xmlXPathPopNodeSet")]
-    pub unsafe fn pop_node_set(&mut self) -> Option<Box<XmlNodeSet>> {
-        unsafe {
-            if self.value().is_none() {
-                xml_xpath_err(Some(self), XmlXPathError::XPathInvalidOperand as i32);
-                self.error = XmlXPathError::XPathInvalidOperand as i32;
-                return None;
-            }
-            if !self.stack_is_node_set() {
-                xml_xpath_err(Some(self), XmlXPathError::XPathInvalidType as i32);
-                self.error = XmlXPathError::XPathInvalidType as i32;
-                return None;
-            }
-            let mut obj = self.value_pop().unwrap();
-            obj.nodesetval.take()
-            // #if 0
-            // /* to fix memory leak of not clearing (*obj).user */
-            // if ((*obj).boolval && !(*obj).user.is_null())
-            //     xmlFreeNodeList((xmlNodePtr) (*obj).user);
-            // #endif
+    pub fn pop_node_set(&mut self) -> Option<Box<XmlNodeSet>> {
+        if self.value().is_none() {
+            xml_xpath_err(Some(self), XmlXPathError::XPathInvalidOperand as i32);
+            self.error = XmlXPathError::XPathInvalidOperand as i32;
+            return None;
         }
+        if !self.stack_is_node_set() {
+            xml_xpath_err(Some(self), XmlXPathError::XPathInvalidType as i32);
+            self.error = XmlXPathError::XPathInvalidType as i32;
+            return None;
+        }
+        let mut obj = self.value_pop().unwrap();
+        obj.nodesetval.take()
+        // #if 0
+        // /* to fix memory leak of not clearing (*obj).user */
+        // if ((*obj).boolval && !(*obj).user.is_null())
+        //     xmlFreeNodeList((xmlNodePtr) (*obj).user);
+        // #endif
     }
 
     /// Pops an external object from the stack, handling conversion if needed.
@@ -326,40 +327,22 @@ impl XmlXPathParserContext {
     ///
     /// Returns the object
     #[doc(alias = "xmlXPathPopExternal")]
-    pub unsafe fn pop_external(&mut self) -> *mut c_void {
-        unsafe {
-            let Some(value) = self.value() else {
-                xml_xpath_err(Some(self), XmlXPathError::XPathInvalidOperand as i32);
-                self.error = XmlXPathError::XPathInvalidOperand as i32;
-                return null_mut();
-            };
-            if value.typ != XmlXPathObjectType::XPathUsers {
-                xml_xpath_err(Some(self), XmlXPathError::XPathInvalidType as i32);
-                self.error = XmlXPathError::XPathInvalidType as i32;
-                return null_mut();
-            }
-            let mut obj = self.value_pop().unwrap();
-            obj.user
-                .take()
-                .and_then(|ret| ret.as_external().copied())
-                .unwrap_or(null_mut())
+    pub fn pop_external(&mut self) -> *mut c_void {
+        let Some(value) = self.value() else {
+            xml_xpath_err(Some(self), XmlXPathError::XPathInvalidOperand as i32);
+            self.error = XmlXPathError::XPathInvalidOperand as i32;
+            return null_mut();
+        };
+        if value.typ != XmlXPathObjectType::XPathUsers {
+            xml_xpath_err(Some(self), XmlXPathError::XPathInvalidType as i32);
+            self.error = XmlXPathError::XPathInvalidType as i32;
+            return null_mut();
         }
-    }
-}
-
-impl Default for XmlXPathParserContext {
-    fn default() -> Self {
-        Self {
-            cur: 0,
-            base: "".into(),
-            error: 0,
-            context: null_mut(),
-            value_tab: vec![],
-            comp: Default::default(),
-            xptr: 0,
-            ancestor: None,
-            value_frame: 0,
-        }
+        let mut obj = self.value_pop().unwrap();
+        obj.user
+            .take()
+            .and_then(|ret| ret.as_external().copied())
+            .unwrap_or(null_mut())
     }
 }
 
