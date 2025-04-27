@@ -2483,136 +2483,113 @@ thread_local! {
 /// Returns 0 in case of success, an error code otherwise
 #[doc(alias = "xpathExprTest")]
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
-unsafe fn xpath_common_test(filename: &str, result: Option<String>, xptr: i32, expr: i32) -> i32 {
-    unsafe {
-        use std::io::{BufRead, BufReader};
+fn xpath_common_test(filename: &str, result: Option<String>, xptr: i32, expr: i32) -> i32 {
+    use std::io::{BufRead, BufReader};
 
-        use exml::generic_error;
+    use exml::generic_error;
 
-        let mut ret: i32 = 0;
+    let mut ret: i32 = 0;
 
-        let suffix = XPATH_TEST_TEMP_SUFFIX
-            .with(|suf| format!("{}.res", suf.get().copied().unwrap_or_default()));
-        let temp = result_filename(
-            filename,
-            TEMP_DIRECTORY.get().cloned().as_deref(),
-            Some(&suffix),
-        );
+    let suffix = XPATH_TEST_TEMP_SUFFIX
+        .with(|suf| format!("{}.res", suf.get().copied().unwrap_or_default()));
+    let temp = result_filename(
+        filename,
+        TEMP_DIRECTORY.get().cloned().as_deref(),
+        Some(&suffix),
+    );
 
-        let Ok(out) = File::options()
-            .write(true)
-            .truncate(true)
-            .create(true)
-            .open(temp.as_str())
-        else {
-            eprintln!("failed to open output file {temp}",);
+    let Ok(out) = File::options()
+        .write(true)
+        .truncate(true)
+        .create(true)
+        .open(temp.as_str())
+    else {
+        eprintln!("failed to open output file {temp}",);
+        return -1;
+    };
+    XPATH_OUTPUT.with_borrow_mut(|f| *f = Some(out));
+
+    let input = match File::open(filename) {
+        Ok(file) => BufReader::new(file),
+        _ => {
+            generic_error!("Cannot open {filename} for reading\n");
             return -1;
-        };
-        XPATH_OUTPUT.with_borrow_mut(|f| *f = Some(out));
-
-        let mut input = match File::open(filename) {
-            Ok(file) => BufReader::new(file),
-            _ => {
-                generic_error!("Cannot open {filename} for reading\n");
-                return -1;
-            }
-        };
-
-        let mut expression = vec![];
-        while input
-            .read_until(b'\n', &mut expression)
-            .ok()
-            .filter(|&len| len > 0)
-            .map(|len| len as i32)
-            .is_some()
-        {
-            while expression
-                .last()
-                .filter(|&c| matches!(c, b'\n' | b'\t' | b'\r' | b' '))
-                .is_some()
-            {
-                expression.pop();
-            }
-            if !expression.is_empty() {
-                expression.push(0);
-                XPATH_OUTPUT.with_borrow_mut(|f| {
-                    writeln!(
-                        f.as_mut().unwrap(),
-                        "\n========================\nExpression: {}",
-                        CStr::from_ptr(expression.as_ptr() as _).to_string_lossy(),
-                    )
-                    .ok()
-                });
-                test_xpath(
-                    CStr::from_ptr(expression.as_ptr() as _)
-                        .to_string_lossy()
-                        .as_ref(),
-                    xptr,
-                    expr,
-                );
-            }
-            expression.clear();
         }
+    };
 
-        if let Some(result) = result {
-            ret = compare_files(temp.as_str(), result.as_str());
-            if ret != 0 {
-                // Rust `format!` does not support the similar of `%g` of C lang.
-                // Therefore, the representation of the floating point number may be different
-                // from result files of the original libxml2.
-                let mut t = BufReader::new(File::open(temp.as_str()).unwrap());
-                let mut r = BufReader::new(File::open(result.as_str()).unwrap());
-                let (mut ts, mut rs) = (String::new(), String::new());
-                let mut ok = true;
-                let mut cache = String::new();
-                while t.read_line(&mut ts).ok().filter(|&len| len > 0).is_none() {
-                    if r.read_line(&mut rs).ok().filter(|&len| len > 0).is_none() {
-                        ok = false;
-                        break;
-                    }
-                    if ts.starts_with("Expression") {
-                        if ts != rs {
-                            ok = false;
-                            break;
-                        }
-                        cache = ts.clone();
-                    } else if ts.starts_with("Object is a number") {
-                        if ts == rs {
-                            ts.clear();
-                            rs.clear();
-                            continue;
-                        }
-                        let Some((_, expr)) = cache.split_once(' ') else {
-                            ok = false;
-                            break;
-                        };
-                        let Ok(float) = expr.trim().parse::<f64>() else {
-                            ok = false;
-                            break;
-                        };
-                        let s = format!("Object is a number : {float}\n");
-                        if ts != s {
-                            ok = false;
-                            break;
-                        }
-                    } else if ts != rs {
-                        ok = false;
-                        break;
-                    }
-                    ts.clear();
-                    rs.clear();
-                }
-                if ok {
-                    ret = 0;
-                } else {
-                    eprintln!("Result for {filename} failed in {}", result);
-                }
-            }
+    for expression in input.lines().map(|exp| exp.unwrap()) {
+        let expression = expression.trim();
+        if !expression.is_empty() {
+            XPATH_OUTPUT.with_borrow_mut(|f| {
+                writeln!(
+                    f.as_mut().unwrap(),
+                    "\n========================\nExpression: {}",
+                    expression
+                )
+                .ok()
+            });
+            test_xpath(expression, xptr, expr);
         }
-
-        remove_file(temp).ok();
-        ret
     }
+
+    if let Some(result) = result {
+        ret = compare_files(temp.as_str(), result.as_str());
+        if ret != 0 {
+            // Rust `format!` does not support the similar of `%g` of C lang.
+            // Therefore, the representation of the floating point number may be different
+            // from result files of the original libxml2.
+            let mut t = BufReader::new(File::open(temp.as_str()).unwrap());
+            let mut r = BufReader::new(File::open(result.as_str()).unwrap());
+            let (mut ts, mut rs) = (String::new(), String::new());
+            let mut ok = true;
+            let mut cache = String::new();
+            while t.read_line(&mut ts).ok().filter(|&len| len > 0).is_none() {
+                if r.read_line(&mut rs).ok().filter(|&len| len > 0).is_none() {
+                    ok = false;
+                    break;
+                }
+                if ts.starts_with("Expression") {
+                    if ts != rs {
+                        ok = false;
+                        break;
+                    }
+                    cache = ts.clone();
+                } else if ts.starts_with("Object is a number") {
+                    if ts == rs {
+                        ts.clear();
+                        rs.clear();
+                        continue;
+                    }
+                    let Some((_, expr)) = cache.split_once(' ') else {
+                        ok = false;
+                        break;
+                    };
+                    let Ok(float) = expr.trim().parse::<f64>() else {
+                        ok = false;
+                        break;
+                    };
+                    let s = format!("Object is a number : {float}\n");
+                    if ts != s {
+                        ok = false;
+                        break;
+                    }
+                } else if ts != rs {
+                    ok = false;
+                    break;
+                }
+                ts.clear();
+                rs.clear();
+            }
+            if ok {
+                ret = 0;
+            } else {
+                eprintln!("Result for {filename} failed in {}", result);
+            }
+        }
+    }
+
+    remove_file(temp).ok();
+    ret
 }
 
 /// Parse a file containing XPath standalone expressions and evaluate them
@@ -2620,13 +2597,13 @@ unsafe fn xpath_common_test(filename: &str, result: Option<String>, xptr: i32, e
 /// Returns 0 in case of success, an error code otherwise
 #[doc(alias = "xpathExprTest")]
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
-unsafe fn xpath_expr_test(
+fn xpath_expr_test(
     filename: &str,
     result: Option<String>,
     _err: Option<String>,
     _options: i32,
 ) -> i32 {
-    unsafe { xpath_common_test(filename, result, 0, 1) }
+    xpath_common_test(filename, result, 0, 1)
 }
 
 /// Parse a file containing XPath expressions and evaluate them against
