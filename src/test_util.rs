@@ -27,7 +27,7 @@ use crate::{
         xmlstring::XmlChar,
     },
     tree::{XmlAttr, XmlDoc, XmlDtd, XmlNode, XmlNs},
-    xpath::{XmlNodeSet, XmlXPathContextPtr},
+    xpath::XmlNodeSet,
 };
 
 pub(crate) static TEST_CATALOG_LOCK: Mutex<()> = Mutex::new(());
@@ -130,14 +130,6 @@ pub(crate) fn des_double(_no: i32, _val: f64, _nr: i32) {}
 
 #[cfg(feature = "xpath")]
 pub(crate) fn desret_double(_val: f64) {}
-
-#[cfg(feature = "xpath")]
-pub(crate) fn gen_xml_xpath_context_ptr(_no: i32, _nr: i32) -> XmlXPathContextPtr {
-    null_mut()
-}
-
-#[cfg(feature = "xpath")]
-pub(crate) fn des_xml_xpath_context_ptr(_no: i32, _val: XmlXPathContextPtr, _nr: i32) {}
 
 #[cfg(feature = "schema")]
 pub(crate) fn gen_unsigned_long(no: i32, _nr: i32) -> u64 {

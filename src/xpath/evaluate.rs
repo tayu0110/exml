@@ -17,10 +17,9 @@ use crate::{
 };
 
 use super::{
-    XPATH_MAX_RECURSION_DEPTH, XmlNodeSet, XmlXPathAxisVal, XmlXPathContext, XmlXPathContextPtr,
-    XmlXPathFunction, XmlXPathNodeSetMergeFunction, XmlXPathObject, XmlXPathObjectType,
-    XmlXPathObjectUserData, XmlXPathParserContext, XmlXPathTestVal, XmlXPathTraversalFunction,
-    XmlXPathTypeVal,
+    XPATH_MAX_RECURSION_DEPTH, XmlNodeSet, XmlXPathAxisVal, XmlXPathContext, XmlXPathFunction,
+    XmlXPathNodeSetMergeFunction, XmlXPathObject, XmlXPathObjectType, XmlXPathObjectUserData,
+    XmlXPathParserContext, XmlXPathTestVal, XmlXPathTraversalFunction, XmlXPathTypeVal,
     functions::{xml_xpath_boolean_function, xml_xpath_number_function},
     xml_xpath_add_values, xml_xpath_cast_to_boolean, xml_xpath_cmp_nodes_ext,
     xml_xpath_compare_values, xml_xpath_div_values, xml_xpath_equal_values, xml_xpath_err,
@@ -41,19 +40,17 @@ impl XmlXPathParserContext<'_> {
     /// Adds opCount to the running total of operations and returns -1 if the
     /// operation limit is exceeded. Returns 0 otherwise.
     #[doc(alias = "xmlXPathCheckOpLimit")]
-    pub(super) unsafe fn check_operation_limit(&mut self, op_count: u64) -> i32 {
-        unsafe {
-            let xpctxt: XmlXPathContextPtr = self.context;
-
-            if op_count > (*xpctxt).op_limit || (*xpctxt).op_count > (*xpctxt).op_limit - op_count {
-                (*xpctxt).op_count = (*xpctxt).op_limit;
-                xml_xpath_err(Some(self), XmlXPathError::XPathOpLimitExceeded as i32);
-                return -1;
-            }
-
-            (*xpctxt).op_count += op_count;
-            0
+    pub(super) fn check_operation_limit(&mut self, op_count: u64) -> i32 {
+        if op_count > self.context.op_limit
+            || self.context.op_count > self.context.op_limit - op_count
+        {
+            self.context.op_count = self.context.op_limit;
+            xml_xpath_err(Some(self), XmlXPathError::XPathOpLimitExceeded as i32);
+            return -1;
         }
+
+        self.context.op_count += op_count;
+        0
     }
 
     /// Parse and evaluate an XPath expression in the given context,
@@ -86,8 +83,7 @@ impl XmlXPathParserContext<'_> {
                     if self.comp.steps.len() > 1 && self.comp.last >= 0 {
                         let old_depth = self.context.depth;
                         let last = self.comp.last as usize;
-                        let op = &raw mut self.comp.steps[last];
-                        self.optimize_expression(op);
+                        self.optimize_expression(last);
                         self.context.depth = old_depth;
                     }
                 }
@@ -1556,6 +1552,67 @@ impl XmlXPathParserContext<'_> {
         }
         0
     }
+
+    #[doc(alias = "xmlXPathOptimizeExpression")]
+    pub fn optimize_expression(&mut self, op: StepOpIndex) {
+        // Try to rewrite "descendant-or-self::node()/foo" to an optimized
+        // internal representation.
+
+        if matches!(
+            self.comp.steps[op].op,
+            XmlXPathOp::XPathOpCollect /* 11 */
+        ) && self.comp.steps[op].ch1 != -1
+            && self.comp.steps[op].ch2 == -1
+        {
+            let prevop = &self.comp.steps[self.comp.steps[op].ch1 as usize];
+
+            if matches!(prevop.op, XmlXPathOp::XPathOpCollect /* 11 */)
+                && prevop.value == XmlXPathAxisVal::AxisDescendantOrSelf as i32
+                && prevop.ch2 == -1
+                && prevop.value2 == XmlXPathTestVal::NodeTestType as i32
+                && prevop.value3 == XmlXPathTypeVal::NodeTypeNode as i32
+            {
+                // This is a "descendant-or-self::node()" without predicates.
+                // Try to eliminate it.
+
+                if self.comp.steps[op].value == XmlXPathAxisVal::AxisChild as i32
+                    || self.comp.steps[op].value == XmlXPathAxisVal::AxisDescendant as i32
+                {
+                    // Convert "descendant-or-self::node()/child::" or
+                    // "descendant-or-self::node()/descendant::" to
+                    // "descendant::"
+                    self.comp.steps[op].ch1 = prevop.ch1;
+                    self.comp.steps[op].value = XmlXPathAxisVal::AxisDescendant as i32;
+                } else if self.comp.steps[op].value == XmlXPathAxisVal::AxisSelf as i32
+                    || self.comp.steps[op].value == XmlXPathAxisVal::AxisDescendantOrSelf as i32
+                {
+                    // Convert "descendant-or-self::node()/self::" or
+                    // "descendant-or-self::node()/descendant-or-self::" to
+                    // to "descendant-or-self::"
+                    self.comp.steps[op].ch1 = prevop.ch1;
+                    self.comp.steps[op].value = XmlXPathAxisVal::AxisDescendantOrSelf as i32;
+                }
+            }
+        }
+
+        // OP_VALUE has invalid ch1.
+        if matches!(self.comp.steps[op].op, XmlXPathOp::XPathOpValue) {
+            return;
+        }
+
+        // Recurse
+        if self.context.depth >= XPATH_MAX_RECURSION_DEPTH as i32 {
+            return;
+        }
+        self.context.depth += 1;
+        if self.comp.steps[op].ch1 != -1 {
+            self.optimize_expression(self.comp.steps[op].ch1 as usize);
+        }
+        if self.comp.steps[op].ch2 != -1 {
+            self.optimize_expression(self.comp.steps[op].ch2 as usize);
+        }
+        self.context.depth -= 1;
+    }
 }
 
 impl XmlXPathContext {
@@ -2011,7 +2068,6 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
         let mut pos: i32;
 
         let next: Option<XmlXPathTraversalFunction>;
-        let xpctxt: XmlXPathContextPtr = ctxt.context;
 
         if ctxt
             .value()
@@ -2024,7 +2080,7 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
         let mut obj = ctxt.value_pop().unwrap();
         // Setup namespaces.
         if let Some(prefix) = prefix.as_deref() {
-            uri = (*xpctxt).lookup_ns(prefix);
+            uri = ctxt.context.lookup_ns(prefix);
             if uri.is_none() {
                 xml_xpath_err(Some(ctxt), XmlXPathError::XPathUndefPrefixError as i32);
                 return 0;
@@ -2167,7 +2223,7 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
         // A node test * is true for any node of the
         // principal node type. For example, child::* will
         // select all element children of the context node
-        let old_context_node = (*xpctxt).node;
+        let old_context_node = ctxt.context.node;
         // The final resulting node set wrt to all context nodes
         let mut out_seq = None;
         // Used to feed predicate evaluation.
@@ -2177,7 +2233,7 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
         'main: while context_idx < context_seq.node_tab.len()
             && ctxt.error == XmlXPathError::XPathExpressionOK as i32
         {
-            (*xpctxt).node = Some(context_seq.node_tab[context_idx]);
+            ctxt.context.node = Some(context_seq.node_tab[context_idx]);
             context_idx += 1;
 
             if seq.is_none() {
@@ -2250,7 +2306,7 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
                                 }
                                 XmlElementType::XmlNamespaceDecl => {
                                     if matches!(axis, XmlXPathAxisVal::AxisNamespace) {
-                                        xp_test_hit_ns!(has_axis_range, pos, max_pos, has_ns_nodes, seq, xpctxt, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                                        xp_test_hit_ns!(has_axis_range, pos, max_pos, has_ns_nodes, seq, ctxt.context, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                                     } else {
                                         has_ns_nodes = true;
                                         xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
@@ -2260,7 +2316,7 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
                             }
                         } else if cur.element_type() as isize == typ as isize {
                             if matches!(cur.element_type(), XmlElementType::XmlNamespaceDecl) {
-                                xp_test_hit_ns!(has_axis_range, pos, max_pos, has_ns_nodes, seq, xpctxt, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                                xp_test_hit_ns!(has_axis_range, pos, max_pos, has_ns_nodes, seq, ctxt.context, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                             } else {
                                 xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                             }
@@ -2294,7 +2350,7 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
                             }
                         } else if matches!(axis, XmlXPathAxisVal::AxisNamespace) {
                             if matches!(cur.element_type(), XmlElementType::XmlNamespaceDecl) {
-                                xp_test_hit_ns!(has_axis_range, pos, max_pos, has_ns_nodes, seq, xpctxt, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                                xp_test_hit_ns!(has_axis_range, pos, max_pos, has_ns_nodes, seq, ctxt.context, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                             }
                         } else if matches!(cur.element_type(), XmlElementType::XmlElementNode)
                             && (prefix.is_none()
@@ -2364,7 +2420,7 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
                                 if ns.prefix.as_deref().is_some_and(|prefix| {
                                     name.as_deref().is_some_and(|name| prefix == name)
                                 }) {
-                                    xp_test_hit_ns!(has_axis_range, pos, max_pos, has_ns_nodes, seq, xpctxt, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                                    xp_test_hit_ns!(has_axis_range, pos, max_pos, has_ns_nodes, seq, ctxt.context, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                                 }
                             }
                             _ => {}
@@ -2478,10 +2534,10 @@ pub(super) unsafe fn xml_xpath_node_collect_and_test(
         // Hand over the result. Better to push the set also in case of errors.
         ctxt.value_push(xml_xpath_wrap_node_set(out_seq));
         // Reset the context node.
-        (*xpctxt).node = old_context_node;
+        ctxt.context.node = old_context_node;
         // When traversing the namespace axis in "toBool" mode, it's
         // possible that tmpNsList wasn't freed.
-        (*xpctxt).tmp_ns_list = None;
+        ctxt.context.tmp_ns_list = None;
 
         total
     }

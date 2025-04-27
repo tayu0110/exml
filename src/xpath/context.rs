@@ -346,7 +346,6 @@ impl<'a> XmlXPathParserContext<'a> {
     }
 }
 
-pub type XmlXPathContextPtr = *mut XmlXPathContext;
 /// Expression evaluation occurs with respect to a context.  
 /// he context consists of:
 ///    - a node (the context node)
@@ -474,6 +473,20 @@ impl XmlXPathContext {
         ret.proximity_position = -1;
         ret.register_all_functions();
         ret
+    }
+
+    /// Sets 'node' as the context node. The node must be in the same
+    /// document as that associated with the context.
+    ///
+    /// Returns -1 in case of error or 0 if successful
+    #[doc(alias = "xmlXPathSetContextNode")]
+    #[cfg(feature = "xpath")]
+    pub fn set_context_node(&mut self, node: XmlGenericNodePtr) -> i32 {
+        if node.document() == self.doc {
+            self.node = Some(node);
+            return 0;
+        }
+        -1
     }
 
     /// Register a new function. If @f is NULL it unregisters the function

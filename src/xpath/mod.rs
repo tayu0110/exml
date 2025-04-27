@@ -670,26 +670,6 @@ pub fn xml_xpath_order_doc_elems(doc: XmlDocPtr) -> i64 {
     count
 }
 
-/// Sets 'node' as the context node. The node must be in the same
-/// document as that associated with the context.
-///
-/// Returns -1 in case of error or 0 if successful
-#[doc(alias = "xmlXPathSetContextNode")]
-#[cfg(feature = "xpath")]
-pub unsafe fn xml_xpath_set_context_node(node: XmlGenericNodePtr, ctx: XmlXPathContextPtr) -> i32 {
-    unsafe {
-        if ctx.is_null() {
-            return -1;
-        }
-
-        if node.document() == (*ctx).doc {
-            (*ctx).node = Some(node);
-            return 0;
-        }
-        -1
-    }
-}
-
 /// Evaluate the XPath Location Path in the given context. The node 'node'
 /// is set as the context node. The context node is not restored.
 ///
@@ -703,7 +683,7 @@ pub unsafe fn xml_xpath_node_eval(
     ctx: &mut XmlXPathContext,
 ) -> Option<XmlXPathObject> {
     unsafe {
-        if xml_xpath_set_context_node(node, ctx) < 0 {
+        if ctx.set_context_node(node) < 0 {
             return None;
         }
         xml_xpath_eval(xpath, ctx)
@@ -809,8 +789,7 @@ pub unsafe fn xml_xpath_ctxt_compile(
                 // comp = pctxt.comp;
                 if pctxt.comp.steps.len() > 1 && pctxt.comp.last >= 0 {
                     let old_depth = pctxt.context.depth;
-                    let op = &raw mut pctxt.comp.steps[pctxt.comp.last as usize];
-                    pctxt.optimize_expression(op);
+                    pctxt.optimize_expression(pctxt.comp.last as usize);
                     pctxt.context.depth = old_depth;
                 }
                 Some(take(&mut pctxt.comp))
@@ -836,8 +815,7 @@ pub unsafe fn xml_xpath_ctxt_compile(
             } else {
                 // comp = pctxt.comp;
                 if pctxt.comp.steps.len() > 1 && pctxt.comp.last >= 0 {
-                    let op = &raw mut pctxt.comp.steps[pctxt.comp.last as usize];
-                    pctxt.optimize_expression(op);
+                    pctxt.optimize_expression(pctxt.comp.last as usize);
                 }
                 Some(take(&mut pctxt.comp))
                 // pctxt.comp = null_mut();

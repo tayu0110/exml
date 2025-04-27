@@ -43,7 +43,7 @@ use crate::{
         XmlGenericNodePtr, XmlNodePtr, XmlNs, XmlNsPtr,
     },
     xpath::{
-        XML_XPATH_NAN, XmlXPathContextPtr, XmlXPathError, XmlXPathObjectType,
+        XML_XPATH_NAN, XmlXPathError, XmlXPathObjectType,
         functions::{cast_to_number, xml_xpath_number_function},
         xml_xpath_cast_node_to_number, xml_xpath_cast_node_to_string,
         xml_xpath_cast_number_to_boolean, xml_xpath_cast_to_number, xml_xpath_is_inf,
@@ -400,12 +400,12 @@ impl TryFrom<i32> for XmlXPathTypeVal {
 // Used for merging node sets in xmlXPathCollectAndTest().
 #[doc(alias = "xmlXPathNodeSetMergeFunction")]
 pub type XmlXPathNodeSetMergeFunction =
-    unsafe fn(Option<Box<XmlNodeSet>>, Option<&mut XmlNodeSet>) -> Option<Box<XmlNodeSet>>;
+    fn(Option<Box<XmlNodeSet>>, Option<&mut XmlNodeSet>) -> Option<Box<XmlNodeSet>>;
 
 // A traversal function enumerates nodes along an axis.
 // Initially it must be called with NULL, and it indicates
 // termination on the axis by returning NULL.
-pub type XmlXPathTraversalFunction = unsafe fn(
+pub type XmlXPathTraversalFunction = fn(
     ctxt: &mut XmlXPathParserContext,
     cur: Option<XmlGenericNodePtr>,
 ) -> Option<XmlGenericNodePtr>;
@@ -550,13 +550,12 @@ pub(super) unsafe fn xml_xpath_node_set_filter(
             return;
         }
 
-        let xpctxt: XmlXPathContextPtr = ctxt.context;
-        let oldnode = (*xpctxt).node;
-        let olddoc = (*xpctxt).doc;
-        let oldcs: i32 = (*xpctxt).context_size;
-        let oldpp: i32 = (*xpctxt).proximity_position;
+        let oldnode = ctxt.context.node;
+        let olddoc = ctxt.context.doc;
+        let oldcs: i32 = ctxt.context.context_size;
+        let oldpp: i32 = ctxt.context.proximity_position;
 
-        (*xpctxt).context_size = set.node_tab.len() as i32;
+        ctxt.context.context_size = set.node_tab.len() as i32;
 
         let mut i = 0;
         let mut j = 0;
@@ -564,8 +563,8 @@ pub(super) unsafe fn xml_xpath_node_set_filter(
         while i < set.node_tab.len() {
             let node = set.node_tab[i];
 
-            (*xpctxt).node = Some(node);
-            (*xpctxt).proximity_position = i as i32 + 1;
+            ctxt.context.node = Some(node);
+            ctxt.context.proximity_position = i as i32 + 1;
 
             // Also set the xpath document in case things like
             // key() are evaluated in the predicate.
@@ -574,7 +573,7 @@ pub(super) unsafe fn xml_xpath_node_set_filter(
             if !matches!(node.element_type(), XmlElementType::XmlNamespaceDecl)
                 && node.document().is_some()
             {
-                (*xpctxt).doc = node.document();
+                ctxt.context.doc = node.document();
             }
 
             let res =
@@ -630,10 +629,10 @@ pub(super) unsafe fn xml_xpath_node_set_filter(
         set.node_tab.truncate(j);
         set.node_tab.shrink_to_fit();
 
-        (*xpctxt).node = oldnode;
-        (*xpctxt).doc = olddoc;
-        (*xpctxt).context_size = oldcs;
-        (*xpctxt).proximity_position = oldpp;
+        ctxt.context.node = oldnode;
+        ctxt.context.doc = olddoc;
+        ctxt.context.context_size = oldcs;
+        ctxt.context.proximity_position = oldpp;
     }
 }
 
@@ -671,13 +670,12 @@ pub(super) unsafe fn xml_xpath_location_set_filter(
             return;
         }
 
-        let xpctxt: XmlXPathContextPtr = ctxt.context;
-        let oldnode = (*xpctxt).node;
-        let olddoc = (*xpctxt).doc;
-        let oldcs: i32 = (*xpctxt).context_size;
-        let oldpp: i32 = (*xpctxt).proximity_position;
+        let oldnode = ctxt.context.node;
+        let olddoc = ctxt.context.doc;
+        let oldcs: i32 = ctxt.context.context_size;
+        let oldpp: i32 = ctxt.context.proximity_position;
 
-        (*xpctxt).context_size = locset.loc_tab.len() as i32;
+        ctxt.context.context_size = locset.loc_tab.len() as i32;
 
         let mut i = 0;
         let mut j = 0;
@@ -690,8 +688,8 @@ pub(super) unsafe fn xml_xpath_location_set_filter(
                 .copied()
                 .unwrap();
 
-            (*xpctxt).node = Some(context_node);
-            (*xpctxt).proximity_position = i as i32 + 1;
+            ctxt.context.node = Some(context_node);
+            ctxt.context.proximity_position = i as i32 + 1;
 
             // Also set the xpath document in case things like
             // key() are evaluated in the predicate.
@@ -702,7 +700,7 @@ pub(super) unsafe fn xml_xpath_location_set_filter(
                 XmlElementType::XmlNamespaceDecl
             ) && context_node.document().is_some()
             {
-                (*xpctxt).doc = context_node.document();
+                ctxt.context.doc = context_node.document();
             }
 
             let res: i32 =
@@ -747,10 +745,10 @@ pub(super) unsafe fn xml_xpath_location_set_filter(
         // If too many elements were removed, shrink table to preserve memory.
         locset.loc_tab.shrink_to(XML_NODESET_DEFAULT);
 
-        (*xpctxt).node = oldnode;
-        (*xpctxt).doc = olddoc;
-        (*xpctxt).context_size = oldcs;
-        (*xpctxt).proximity_position = oldpp;
+        ctxt.context.node = oldnode;
+        ctxt.context.doc = olddoc;
+        ctxt.context.context_size = oldcs;
+        ctxt.context.proximity_position = oldpp;
     }
 }
 

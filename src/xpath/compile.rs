@@ -10,8 +10,8 @@ use crate::{
     },
     parser::{XML_MAX_NAME_LENGTH, xml_is_letter},
     xpath::{
-        XML_XPATH_CHECKNS, XPATH_MAX_RECURSION_DEPTH, XmlXPathAxisVal, XmlXPathContextPtr,
-        XmlXPathError, XmlXPathOp, xml_xpath_err,
+        XML_XPATH_CHECKNS, XPATH_MAX_RECURSION_DEPTH, XmlXPathAxisVal, XmlXPathError, XmlXPathOp,
+        xml_xpath_err,
     },
 };
 
@@ -118,19 +118,15 @@ impl XmlXPathParserContext<'_> {
     #[doc(alias = "xmlXPathCompileExpr")]
     pub unsafe fn compile_expr(&mut self, sort: bool) {
         unsafe {
-            let xpctxt: XmlXPathContextPtr = self.context;
-
-            if !xpctxt.is_null() {
-                if (*xpctxt).depth >= XPATH_MAX_RECURSION_DEPTH as i32 {
-                    xml_xpath_err(
-                        Some(self),
-                        XmlXPathError::XPathRecursionLimitExceeded as i32,
-                    );
-                    return;
-                }
-                // Parsing a single '(' pushes about 10 functions on the call stack before recursing!
-                (*xpctxt).depth += 10;
+            if self.context.depth >= XPATH_MAX_RECURSION_DEPTH as i32 {
+                xml_xpath_err(
+                    Some(self),
+                    XmlXPathError::XPathRecursionLimitExceeded as i32,
+                );
+                return;
             }
+            // Parsing a single '(' pushes about 10 functions on the call stack before recursing!
+            self.context.depth += 10;
 
             self.compile_and_expr();
             if self.error != crate::xpath::XmlXPathError::XPathExpressionOK as i32 {
@@ -172,9 +168,7 @@ impl XmlXPathParserContext<'_> {
                 );
             }
 
-            if !xpctxt.is_null() {
-                (*xpctxt).depth -= 10;
-            }
+            self.context.depth -= 10;
         }
     }
 
@@ -1529,74 +1523,6 @@ impl XmlXPathParserContext<'_> {
         self.skip_blanks();
         if self.context.flags & XML_XPATH_NOVAR as i32 != 0 {
             xml_xpath_err(Some(self), XmlXPathError::XPathForbidVariableError as i32);
-        }
-    }
-
-    #[doc(alias = "xmlXPathOptimizeExpression")]
-    pub unsafe fn optimize_expression(&mut self, op: XmlXPathStepOpPtr) {
-        unsafe {
-            // Try to rewrite "descendant-or-self::node()/foo" to an optimized
-            // internal representation.
-
-            if matches!((*op).op, XmlXPathOp::XPathOpCollect /* 11 */)
-                && (*op).ch1 != -1
-                && (*op).ch2 == -1
-            {
-                let prevop = &self.comp.steps[(*op).ch1 as usize];
-
-                if matches!(prevop.op, XmlXPathOp::XPathOpCollect /* 11 */)
-                    && prevop.value == XmlXPathAxisVal::AxisDescendantOrSelf as i32
-                    && prevop.ch2 == -1
-                    && prevop.value2 == XmlXPathTestVal::NodeTestType as i32
-                    && prevop.value3 == XmlXPathTypeVal::NodeTypeNode as i32
-                {
-                    // This is a "descendant-or-self::node()" without predicates.
-                    // Try to eliminate it.
-
-                    if (*op).value == XmlXPathAxisVal::AxisChild as i32
-                        || (*op).value == XmlXPathAxisVal::AxisDescendant as i32
-                    {
-                        // Convert "descendant-or-self::node()/child::" or
-                        // "descendant-or-self::node()/descendant::" to
-                        // "descendant::"
-                        (*op).ch1 = prevop.ch1;
-                        (*op).value = XmlXPathAxisVal::AxisDescendant as i32;
-                    } else if (*op).value == XmlXPathAxisVal::AxisSelf as i32
-                        || (*op).value == XmlXPathAxisVal::AxisDescendantOrSelf as i32
-                    {
-                        // Convert "descendant-or-self::node()/self::" or
-                        // "descendant-or-self::node()/descendant-or-self::" to
-                        // to "descendant-or-self::"
-                        (*op).ch1 = prevop.ch1;
-                        (*op).value = XmlXPathAxisVal::AxisDescendantOrSelf as i32;
-                    }
-                }
-            }
-
-            // OP_VALUE has invalid ch1.
-            if matches!((*op).op, XmlXPathOp::XPathOpValue) {
-                return;
-            }
-
-            // Recurse
-            let ctxt: XmlXPathContextPtr = self.context;
-            if !ctxt.is_null() {
-                if (*ctxt).depth >= XPATH_MAX_RECURSION_DEPTH as i32 {
-                    return;
-                }
-                (*ctxt).depth += 1;
-            }
-            if (*op).ch1 != -1 {
-                let ptr = &raw mut self.comp.steps[(*op).ch1 as usize];
-                self.optimize_expression(ptr);
-            }
-            if (*op).ch2 != -1 {
-                let ptr = &raw mut self.comp.steps[(*op).ch2 as usize];
-                self.optimize_expression(ptr);
-            }
-            if !ctxt.is_null() {
-                (*ctxt).depth -= 1;
-            }
         }
     }
 
