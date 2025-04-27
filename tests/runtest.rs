@@ -2429,7 +2429,7 @@ fn test_xpath(xpath: &str, xptr: i32, expr: i32) {
         libxml::xpointer::{xml_xptr_eval, xml_xptr_new_context},
         xpath::{
             XmlXPathContext, xml_xpath_compile, xml_xpath_compiled_eval,
-            xml_xpath_debug_dump_object, xml_xpath_eval_expression,
+            xml_xpath_debug_dump_object,
         },
     };
 
@@ -2453,7 +2453,7 @@ fn test_xpath(xpath: &str, xptr: i32, expr: i32) {
             .and_then(|doc| doc.get_root_element())
             .map(|root| root.into());
         if expr != 0 {
-            res = xml_xpath_eval_expression(xpath, &mut ctxt);
+            res = ctxt.evaluate(xpath);
         } else {
             /* res = xmlXPathEval(str, ctxt); */
 
@@ -3848,7 +3848,6 @@ unsafe fn load_xpath_expr(parent_doc: XmlDocPtr, filename: &str) -> Option<XmlXP
             globals::{set_load_ext_dtd_default_value, set_substitute_entities_default_value},
             parser::{XML_COMPLETE_ATTRS, XML_DETECT_IDS},
             tree::NodeCommon,
-            xpath::xml_xpath_eval_expression,
         };
 
         // load XPath expr as a file
@@ -3907,7 +3906,7 @@ unsafe fn load_xpath_expr(parent_doc: XmlDocPtr, filename: &str) -> Option<XmlXP
         }
 
         // Evaluate xpath
-        let Some(xpath) = xml_xpath_eval_expression(&expr, &mut ctx) else {
+        let Some(xpath) = ctx.evaluate(&expr) else {
             eprintln!("Error: unable to evaluate xpath expression");
             xml_free_doc(doc);
             return None;

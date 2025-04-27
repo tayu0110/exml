@@ -38,7 +38,7 @@ use crate::{
     },
     xpath::{
         XML_XPATH_CHECKNS, XmlXPathCompExpr, XmlXPathContext, XmlXPathObjectType,
-        xml_xpath_compiled_eval, xml_xpath_ctxt_compile, xml_xpath_eval, xml_xpath_is_nan,
+        xml_xpath_compiled_eval, xml_xpath_ctxt_compile, xml_xpath_is_nan,
     },
 };
 
@@ -424,7 +424,7 @@ impl<'a> XmlSchematronValidCtxt<'a> {
     ) -> Option<XmlGenericNodePtr> {
         self.xctxt.doc = cur?.document();
         self.xctxt.node = cur;
-        let ret = xml_xpath_eval(xpath, &mut self.xctxt)?;
+        let ret = self.xctxt.evaluate(xpath)?;
 
         if ret.typ == XmlXPathObjectType::XPathNodeset {
             if let Some(nodeset) = ret.nodesetval.as_deref() {

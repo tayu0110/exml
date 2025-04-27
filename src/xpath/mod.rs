@@ -128,7 +128,7 @@ pub enum XmlXPathError {
 /// Returns -1 in case of error, 0 otherwise
 #[doc(alias = "xmlXPathConvertFunc")]
 #[cfg(feature = "xpath")]
-pub type XmlXPathConvertFunc = unsafe fn(obj: &XmlXPathObject, typ: i32) -> i32;
+pub type XmlXPathConvertFunc = fn(obj: &XmlXPathObject, typ: i32) -> i32;
 
 // Extra type: a name and a conversion function.
 #[cfg(feature = "xpath")]
@@ -153,7 +153,7 @@ pub struct XmlXPathVariable {
 /// An XPath evaluation function, the parameters are on the XPath context stack.
 #[doc(alias = "xmlXPathEvalFunc")]
 #[cfg(feature = "xpath")]
-pub type XmlXPathEvalFunc = unsafe fn(ctxt: &mut XmlXPathParserContext, nargs: i32);
+pub type XmlXPathEvalFunc = fn(ctxt: &mut XmlXPathParserContext, nargs: i32);
 
 // Extra function: a name and a evaluation function.
 #[cfg(feature = "xpath")]
@@ -668,67 +668,6 @@ pub fn xml_xpath_order_doc_elems(doc: XmlDocPtr) -> i64 {
         }
     }
     count
-}
-
-/// Evaluate the XPath Location Path in the given context. The node 'node'
-/// is set as the context node. The context node is not restored.
-///
-/// Returns the let resulting: xmlXPathObjectPtr from the evaluation or NULL.
-/// The caller has to free the object.
-#[doc(alias = "xmlXPathNodeEval")]
-#[cfg(feature = "xpath")]
-pub fn xml_xpath_node_eval(
-    node: XmlGenericNodePtr,
-    xpath: &str,
-    ctx: &mut XmlXPathContext,
-) -> Option<XmlXPathObject> {
-    if ctx.set_context_node(node) < 0 {
-        return None;
-    }
-    xml_xpath_eval(xpath, ctx)
-}
-
-/// Evaluate the XPath Location Path in the given context.
-///
-/// Returns the let resulting: xmlXPathObjectPtr from the evaluation or NULL.
-/// The caller has to free the object.
-#[doc(alias = "xmlXPathEval")]
-#[cfg(feature = "xpath")]
-pub fn xml_xpath_eval(xpath: &str, ctx: &mut XmlXPathContext) -> Option<XmlXPathObject> {
-    use crate::generic_error;
-
-    xml_init_parser();
-
-    let mut ctxt = XmlXPathParserContext::new(xpath, ctx);
-    ctxt.evaluate_expression();
-
-    if ctxt.error != XmlXPathError::XPathExpressionOK as i32 {
-        None
-    } else {
-        let res = ctxt.value_pop();
-        if res.is_none() {
-            generic_error!("xmlXPathCompiledEval: No result on the stack.\n");
-        } else if !ctxt.value_tab.is_empty() {
-            generic_error!(
-                "xmlXPathCompiledEval: {} object(s) left on the stack.\n",
-                ctxt.value_tab.len() as i32
-            );
-        }
-        res
-    }
-}
-
-/// Alias for xmlXPathEval().
-///
-/// Returns the let resulting: xmlXPathObjectPtr from the evaluation or NULL.
-/// The caller has to free the object.
-#[doc(alias = "xmlXPathEvalExpression")]
-#[cfg(feature = "xpath")]
-pub fn xml_xpath_eval_expression(
-    xpath: &str,
-    ctxt: &mut XmlXPathContext,
-) -> Option<XmlXPathObject> {
-    xml_xpath_eval(xpath, ctxt)
 }
 
 /// Compile an XPath expression

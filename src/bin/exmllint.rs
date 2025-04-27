@@ -2305,11 +2305,9 @@ unsafe fn do_xpath_query(doc: XmlDocPtr, query: &str) {
     use exml::xpath::XmlXPathContext;
 
     unsafe {
-        use exml::xpath::xml_xpath_eval;
-
         let mut ctxt = XmlXPathContext::new(Some(doc));
         ctxt.node = Some(doc.into());
-        let res = xml_xpath_eval(query, &mut ctxt);
+        let res = ctxt.evaluate(query);
 
         let Some(res) = res else {
             eprintln!("XPath evaluation failure");

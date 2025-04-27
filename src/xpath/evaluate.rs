@@ -1567,6 +1567,54 @@ impl XmlXPathParserContext<'_> {
 }
 
 impl XmlXPathContext {
+    /// Evaluate the XPath Location Path in the given context.
+    ///
+    /// Returns the let resulting: xmlXPathObjectPtr from the evaluation or NULL.
+    /// The caller has to free the object.
+    #[doc(alias = "xmlXPathEval", alias = "xmlXPathEvalExpression")]
+    #[cfg(feature = "xpath")]
+    pub fn evaluate(&mut self, xpath: &str) -> Option<XmlXPathObject> {
+        use crate::{generic_error, parser::xml_init_parser};
+
+        xml_init_parser();
+
+        let mut ctxt = XmlXPathParserContext::new(xpath, self);
+        ctxt.evaluate_expression();
+
+        if ctxt.error != XmlXPathError::XPathExpressionOK as i32 {
+            None
+        } else {
+            let res = ctxt.value_pop();
+            if res.is_none() {
+                generic_error!("xmlXPathCompiledEval: No result on the stack.\n");
+            } else if !ctxt.value_tab.is_empty() {
+                generic_error!(
+                    "xmlXPathCompiledEval: {} object(s) left on the stack.\n",
+                    ctxt.value_tab.len() as i32
+                );
+            }
+            res
+        }
+    }
+
+    /// Evaluate the XPath Location Path in the given context. The node 'node'
+    /// is set as the context node. The context node is not restored.
+    ///
+    /// Returns the let resulting: xmlXPathObjectPtr from the evaluation or NULL.
+    /// The caller has to free the object.
+    #[doc(alias = "xmlXPathNodeEval")]
+    #[cfg(feature = "xpath")]
+    pub fn node_evaluate(
+        &mut self,
+        node: XmlGenericNodePtr,
+        xpath: &str,
+    ) -> Option<XmlXPathObject> {
+        if self.set_context_node(node) < 0 {
+            return None;
+        }
+        self.evaluate(xpath)
+    }
+
     /// Evaluate the Precompiled Streamable XPath expression in the given context.
     #[doc(alias = "xmlXPathRunStreamEval")]
     #[cfg(feature = "libxml_pattern")]
