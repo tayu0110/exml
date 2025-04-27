@@ -26,18 +26,14 @@
 //
 // Author: daniel@veillard.com
 
-use std::{mem::size_of, ptr::null_mut};
+use std::ptr::null_mut;
 
 #[cfg(feature = "libxml_xptr_locs")]
 use crate::libxml::xpointer::XmlLocationSet;
 use crate::{
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     generic_error,
-    libxml::{
-        chvalid::xml_is_blank_char,
-        globals::{xml_free, xml_malloc},
-        valid::xml_get_id,
-    },
+    libxml::{chvalid::xml_is_blank_char, valid::xml_get_id},
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlAttrPtr, XmlDocPtr, XmlDtdPtr, XmlElementType,
         XmlGenericNodePtr, XmlNodePtr, XmlNs, XmlNsPtr,
@@ -591,13 +587,11 @@ pub(super) unsafe fn xml_xpath_node_set_filter(
             if res != 0 && (pos >= min_pos && pos <= max_pos) {
                 if i != j {
                     set.node_tab[j] = node;
-                    // set.node_tab[i] = null_mut();
                 }
 
                 j += 1;
             } else {
                 // Remove the entry from the initial node set.
-                // set.node_tab[i] = null_mut();
                 if let Ok(ns) = XmlNsPtr::try_from(node) {
                     xml_xpath_node_set_free_ns(ns);
                 }
@@ -718,14 +712,9 @@ pub(super) unsafe fn xml_xpath_location_set_filter(
             if res != 0 && (pos >= min_pos && pos <= max_pos) {
                 if i != j {
                     locset.loc_tab[j] = locset.loc_tab[i].clone();
-                    // locset.loc_tab[i] = null_mut();
                 }
 
                 j += 1;
-            } else {
-                /* Remove the entry from the initial location set. */
-                // xml_xpath_free_object(locset.loc_tab[i]);
-                // locset.loc_tab[i] = null_mut();
             }
 
             if res != 0 {
@@ -970,89 +959,73 @@ fn xml_xpath_node_val_hash(node: Option<XmlGenericNodePtr>) -> u32 {
 ///
 /// Returns 0 or 1 depending on the results of the test.
 #[doc(alias = "xmlXPathEqualNodeSets")]
-unsafe fn xml_xpath_equal_node_sets(arg1: XmlXPathObject, arg2: XmlXPathObject, neq: i32) -> i32 {
-    unsafe {
-        let mut ret: i32 = 0;
+fn xml_xpath_equal_node_sets(arg1: XmlXPathObject, arg2: XmlXPathObject, neq: i32) -> i32 {
+    let mut ret: i32 = 0;
 
-        if !matches!(
-            arg1.typ,
-            XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
-        ) {
-            return 0;
-        }
-        if !matches!(
-            arg2.typ,
-            XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
-        ) {
-            return 0;
-        }
-
-        let (Some(ns1), Some(ns2)) = (arg1.nodesetval.as_deref(), arg2.nodesetval.as_deref())
-        else {
-            return 0;
-        };
-        if ns1.node_tab.is_empty() || ns2.node_tab.is_empty() {
-            return 0;
-        }
-
-        // for equal, check if there is a node pertaining to both sets
-        if neq == 0 {
-            for &node1 in &ns1.node_tab {
-                for &node2 in &ns2.node_tab {
-                    if node1 == node2 {
-                        return 1;
-                    }
-                }
-            }
-        }
-
-        let mut values1 = vec![None; ns1.node_tab.len()];
-        let hashs1: *mut u32 = xml_malloc(ns1.node_tab.len() * size_of::<u32>()) as *mut u32;
-        if hashs1.is_null() {
-            // TODO: Propagate memory error.
-            xml_xpath_err_memory(None, Some("comparing nodesets\n"));
-            return 0;
-        }
-        let mut values2 = vec![None; ns2.node_tab.len()];
-        let hashs2: *mut u32 = xml_malloc(ns2.node_tab.len() * size_of::<u32>()) as *mut u32;
-        if hashs2.is_null() {
-            // TODO: Propagate memory error.
-            xml_xpath_err_memory(None, Some("comparing nodesets\n"));
-            xml_free(hashs1 as _);
-            return 0;
-        }
-        for (i, &node1) in ns1.node_tab.iter().enumerate() {
-            *hashs1.add(i) = xml_xpath_node_val_hash(Some(node1));
-            for (j, &node2) in ns2.node_tab.iter().enumerate() {
-                if i == 0 {
-                    *hashs2.add(j) = xml_xpath_node_val_hash(Some(node2));
-                }
-                if *hashs1.add(i) != *hashs2.add(j) {
-                    if neq != 0 {
-                        ret = 1;
-                        break;
-                    }
-                } else {
-                    if values1[i].is_none() {
-                        values1[i] = node1.get_content();
-                    }
-                    if values2[j].is_none() {
-                        values2[j] = node2.get_content();
-                    }
-                    ret = (values1[i] == values2[j]) as i32 ^ neq;
-                    if ret != 0 {
-                        break;
-                    }
-                }
-            }
-            if ret != 0 {
-                break;
-            }
-        }
-        xml_free(hashs1 as _);
-        xml_free(hashs2 as _);
-        ret
+    if !matches!(
+        arg1.typ,
+        XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
+    ) {
+        return 0;
     }
+    if !matches!(
+        arg2.typ,
+        XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
+    ) {
+        return 0;
+    }
+
+    let (Some(ns1), Some(ns2)) = (arg1.nodesetval.as_deref(), arg2.nodesetval.as_deref()) else {
+        return 0;
+    };
+    if ns1.node_tab.is_empty() || ns2.node_tab.is_empty() {
+        return 0;
+    }
+
+    // for equal, check if there is a node pertaining to both sets
+    if neq == 0 {
+        for &node1 in &ns1.node_tab {
+            for &node2 in &ns2.node_tab {
+                if node1 == node2 {
+                    return 1;
+                }
+            }
+        }
+    }
+
+    let mut values1 = vec![None; ns1.node_tab.len()];
+    let mut hashs1 = vec![0; ns1.node_tab.len()];
+    let mut values2 = vec![None; ns2.node_tab.len()];
+    let mut hashs2 = vec![0; ns2.node_tab.len()];
+    for (i, &node1) in ns1.node_tab.iter().enumerate() {
+        hashs1[i] = xml_xpath_node_val_hash(Some(node1));
+        for (j, &node2) in ns2.node_tab.iter().enumerate() {
+            if i == 0 {
+                hashs2[j] = xml_xpath_node_val_hash(Some(node2));
+            }
+            if hashs1[i] != hashs2[j] {
+                if neq != 0 {
+                    ret = 1;
+                    break;
+                }
+            } else {
+                if values1[i].is_none() {
+                    values1[i] = node1.get_content();
+                }
+                if values2[j].is_none() {
+                    values2[j] = node2.get_content();
+                }
+                ret = (values1[i] == values2[j]) as i32 ^ neq;
+                if ret != 0 {
+                    break;
+                }
+            }
+        }
+        if ret != 0 {
+            break;
+        }
+    }
+    ret
 }
 
 /// Implement the equal operation on XPath objects content: @arg1 == @arg2
@@ -1487,86 +1460,78 @@ pub unsafe fn xml_xpath_not_equal_values(ctxt: &mut XmlXPathParserContext) -> i3
 /// Conclusion all nodes need to be converted first to their string value
 /// and then the comparison must be done when possible
 #[doc(alias = "xmlXPathCompareNodeSets")]
-unsafe fn xml_xpath_compare_node_sets(
+fn xml_xpath_compare_node_sets(
     inf: i32,
     strict: i32,
     arg1: XmlXPathObject,
     arg2: XmlXPathObject,
 ) -> i32 {
-    unsafe {
-        let mut init: i32 = 0;
-        let mut val1: f64;
-        let mut ret: i32 = 0;
+    let mut init: i32 = 0;
+    let mut val1: f64;
+    let mut ret: i32 = 0;
 
-        if !matches!(
-            arg1.typ,
-            XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
-        ) {
-            return 0;
-        }
-        if !matches!(
-            arg2.typ,
-            XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
-        ) {
-            return 0;
-        }
+    if !matches!(
+        arg1.typ,
+        XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
+    ) {
+        return 0;
+    }
+    if !matches!(
+        arg2.typ,
+        XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
+    ) {
+        return 0;
+    }
 
-        let Some(ns1_table) = arg1
-            .nodesetval
-            .as_deref()
-            .filter(|set| !set.node_tab.is_empty())
-            .map(|n| n.node_tab.as_slice())
-        else {
-            return 0;
-        };
-        let Some(ns2_table) = arg2
-            .nodesetval
-            .as_deref()
-            .filter(|set| !set.node_tab.is_empty())
-            .map(|n| n.node_tab.as_slice())
-        else {
-            return 0;
-        };
+    let Some(ns1_table) = arg1
+        .nodesetval
+        .as_deref()
+        .filter(|set| !set.node_tab.is_empty())
+        .map(|n| n.node_tab.as_slice())
+    else {
+        return 0;
+    };
+    let Some(ns2_table) = arg2
+        .nodesetval
+        .as_deref()
+        .filter(|set| !set.node_tab.is_empty())
+        .map(|n| n.node_tab.as_slice())
+    else {
+        return 0;
+    };
 
-        let values2: *mut f64 = xml_malloc(ns2_table.len() * size_of::<f64>()) as *mut f64;
-        if values2.is_null() {
-            // TODO: Propagate memory error.
-            xml_xpath_err_memory(None, Some("comparing nodesets\n"));
-            return 0;
+    let mut values2 = vec![0.0; ns2_table.len()];
+    for &node1 in ns1_table {
+        val1 = xml_xpath_cast_node_to_number(Some(node1));
+        if xml_xpath_is_nan(val1) {
+            continue;
         }
-        for &node1 in ns1_table {
-            val1 = xml_xpath_cast_node_to_number(Some(node1));
-            if xml_xpath_is_nan(val1) {
+        for (j, &node2) in ns2_table.iter().enumerate() {
+            if init == 0 {
+                values2[j] = xml_xpath_cast_node_to_number(Some(node2));
+            }
+            if xml_xpath_is_nan(values2[j]) {
                 continue;
             }
-            for (j, &node2) in ns2_table.iter().enumerate() {
-                if init == 0 {
-                    *values2.add(j) = xml_xpath_cast_node_to_number(Some(node2));
-                }
-                if xml_xpath_is_nan(*values2.add(j)) {
-                    continue;
-                }
-                if inf != 0 && strict != 0 {
-                    ret = (val1 < *values2.add(j)) as i32;
-                } else if inf != 0 && strict == 0 {
-                    ret = (val1 <= *values2.add(j)) as i32;
-                } else if inf == 0 && strict != 0 {
-                    ret = (val1 > *values2.add(j)) as i32;
-                } else if inf == 0 && strict == 0 {
-                    ret = (val1 >= *values2.add(j)) as i32;
-                }
-                if ret != 0 {
-                    break;
-                }
+            if inf != 0 && strict != 0 {
+                ret = (val1 < values2[j]) as i32;
+            } else if inf != 0 && strict == 0 {
+                ret = (val1 <= values2[j]) as i32;
+            } else if inf == 0 && strict != 0 {
+                ret = (val1 > values2[j]) as i32;
+            } else if inf == 0 && strict == 0 {
+                ret = (val1 >= values2[j]) as i32;
             }
             if ret != 0 {
                 break;
             }
-            init = 1;
         }
-        xml_free(values2 as _);
-        ret
+        if ret != 0 {
+            break;
+        }
+        init = 1;
     }
+    ret
 }
 
 /// Implement the compare operation between a nodeset and a number
