@@ -635,23 +635,21 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
             if cmd_args.timing {
                 start_timer();
             }
-            unsafe {
-                let Some(mut ctxt) = XmlSchematronParserCtxt::new(s) else {
-                    PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
-                    // goto error;
-                    xml_cleanup_parser();
-                    exit(PROGRESULT.load(Ordering::Relaxed));
-                };
+            let Some(mut ctxt) = XmlSchematronParserCtxt::new(s) else {
+                PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
+                // goto error;
+                xml_cleanup_parser();
+                exit(PROGRESULT.load(Ordering::Relaxed));
+            };
 
-                let schematron = ctxt.parse();
-                if schematron.is_none() {
-                    generic_error!("Schematron schema {s} failed to compile\n",);
-                    PROGRESULT.store(ERR_SCHEMACOMP, Ordering::Relaxed);
-                }
-                *WXSCHEMATRON.lock().unwrap() = schematron;
-                if cmd_args.timing {
-                    end_timer!("Compiling the schemas");
-                }
+            let schematron = ctxt.parse();
+            if schematron.is_none() {
+                generic_error!("Schematron schema {s} failed to compile\n",);
+                PROGRESULT.store(ERR_SCHEMACOMP, Ordering::Relaxed);
+            }
+            *WXSCHEMATRON.lock().unwrap() = schematron;
+            if cmd_args.timing {
+                end_timer!("Compiling the schemas");
             }
         }
     }
