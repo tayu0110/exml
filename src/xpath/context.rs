@@ -782,19 +782,3 @@ impl Drop for XmlXPathContext {
         self.last_error.reset();
     }
 }
-
-/// Free up an xmlXPathContext
-#[doc(alias = "xmlXPathFreeContext")]
-pub unsafe fn xml_xpath_free_context(ctxt: XmlXPathContextPtr) {
-    unsafe {
-        if ctxt.is_null() {
-            return;
-        }
-
-        (*ctxt).cleanup_registered_ns();
-        (*ctxt).cleanup_registered_func();
-        (*ctxt).cleanup_registered_variables();
-        (*ctxt).last_error.reset();
-        let _ = Box::from_raw(ctxt);
-    }
-}
