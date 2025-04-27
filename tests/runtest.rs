@@ -2424,58 +2424,54 @@ thread_local! {
 fn ignore_generic_error(_ctx: Option<GenericErrorContext>, _msg: &str) {}
 
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
-unsafe fn test_xpath(xpath: &str, xptr: i32, expr: i32) {
-    use exml::xpath::XmlXPathContext;
+fn test_xpath(xpath: &str, xptr: i32, expr: i32) {
+    use exml::{
+        libxml::xpointer::{xml_xptr_eval, xml_xptr_new_context},
+        xpath::{
+            XmlXPathContext, xml_xpath_compile, xml_xpath_compiled_eval,
+            xml_xpath_debug_dump_object, xml_xpath_eval_expression,
+        },
+    };
 
-    unsafe {
-        use exml::{
-            libxml::xpointer::{xml_xptr_eval, xml_xptr_new_context},
-            xpath::{
-                xml_xpath_compile, xml_xpath_compiled_eval, xml_xpath_debug_dump_object,
-                xml_xpath_eval_expression,
-            },
-        };
+    let res;
+    let mut ctxt;
 
-        let res;
-        let mut ctxt;
+    // Don't print generic errors to stderr.
+    set_generic_error(Some(ignore_generic_error), None);
 
-        // Don't print generic errors to stderr.
-        set_generic_error(Some(ignore_generic_error), None);
-
-        NB_TESTS.set(NB_TESTS.get() + 1);
-        if cfg!(feature = "xpointer") && xptr != 0 {
-            #[cfg(feature = "xpointer")]
-            {
-                ctxt = xml_xptr_new_context(XPATH_DOCUMENT.get(), None, None);
-                res = xml_xptr_eval(xpath, &mut ctxt);
-            }
+    NB_TESTS.set(NB_TESTS.get() + 1);
+    if cfg!(feature = "xpointer") && xptr != 0 {
+        #[cfg(feature = "xpointer")]
+        {
+            ctxt = xml_xptr_new_context(XPATH_DOCUMENT.get(), None, None);
+            res = xml_xptr_eval(xpath, &mut ctxt);
+        }
+    } else {
+        let xpath_document = XPATH_DOCUMENT.get();
+        ctxt = XmlXPathContext::new(xpath_document);
+        ctxt.node = xpath_document
+            .and_then(|doc| doc.get_root_element())
+            .map(|root| root.into());
+        if expr != 0 {
+            res = xml_xpath_eval_expression(xpath, &mut ctxt);
         } else {
-            let xpath_document = XPATH_DOCUMENT.get();
-            ctxt = XmlXPathContext::new(xpath_document);
-            ctxt.node = xpath_document
-                .and_then(|doc| doc.get_root_element())
-                .map(|root| root.into());
-            if expr != 0 {
-                res = xml_xpath_eval_expression(xpath, &mut ctxt);
-            } else {
-                /* res = xmlXPathEval(str, ctxt); */
+            /* res = xmlXPathEval(str, ctxt); */
 
-                if let Some(comp) = xml_xpath_compile(xpath) {
-                    res = xml_xpath_compiled_eval(comp, &mut ctxt);
-                } else {
-                    res = None;
-                }
+            if let Some(comp) = xml_xpath_compile(xpath) {
+                res = xml_xpath_compiled_eval(comp, &mut ctxt);
+            } else {
+                res = None;
             }
         }
-        XPATH_OUTPUT.with_borrow_mut(|out| {
-            let out = out.as_mut().unwrap();
-            xml_xpath_debug_dump_object(out, res.as_ref(), 0);
-            out.flush().ok();
-        });
-
-        // Reset generic error handler.
-        set_generic_error(None, None);
     }
+    XPATH_OUTPUT.with_borrow_mut(|out| {
+        let out = out.as_mut().unwrap();
+        xml_xpath_debug_dump_object(out, res.as_ref(), 0);
+        out.flush().ok();
+    });
+
+    // Reset generic error handler.
+    set_generic_error(None, None);
 }
 
 thread_local! {

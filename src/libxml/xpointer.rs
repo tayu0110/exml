@@ -33,7 +33,8 @@
 //
 // daniel@veillard.com
 
-use std::{ffi::CStr, mem::replace, ptr::null_mut, rc::Rc};
+use std::borrow::Cow;
+use std::{mem::replace, ptr::null_mut, rc::Rc};
 
 use crate::xpath::XmlXPathContext;
 use crate::xpath::functions::xml_xpath_id_function;
@@ -43,10 +44,6 @@ use crate::xpath::{XmlNodeSet, XmlXPathParserContext, functions::check_arity};
 use crate::xpath::{XmlXPathObject, internals::xml_xpath_err, xml_xpath_cmp_nodes};
 use crate::{
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
-    libxml::{
-        globals::xml_free,
-        xmlstring::{XmlChar, xml_str_equal},
-    },
     parser::xml_init_parser,
     tree::{NodeCommon, XmlDocPtr, XmlElementType, XmlGenericNodePtr},
     xpath::{
@@ -54,8 +51,6 @@ use crate::{
         xml_xpath_new_string,
     },
 };
-
-use super::xmlstring::xml_strndup;
 
 /// A Location Set
 #[cfg(feature = "libxml_xptr_locs")]
@@ -1978,139 +1973,106 @@ fn xml_xptr_eval_child_seq(ctxt: &mut XmlXPathParserContext, name: Option<&str>)
 ///
 /// TODO: there is no new scheme registration mechanism
 #[doc(alias = "xmlXPtrEvalXPtrPart")]
-unsafe fn xml_xptr_eval_xptr_part(ctxt: &mut XmlXPathParserContext, mut name: *mut XmlChar) {
-    unsafe {
-        if name.is_null() {
-            name = ctxt.parse_name().map_or(null_mut(), |name| {
-                xml_strndup(name.as_ptr(), name.len() as i32)
-            });
-        }
-        if name.is_null() {
-            xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathExprError as i32);
-            return;
-        }
+fn xml_xptr_eval_xptr_part(ctxt: &mut XmlXPathParserContext, name: &str) {
+    if ctxt.current_char() != Some('(') {
+        xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathExprError as i32);
+        return;
+    }
+    ctxt.next_char();
+    let mut level = 1;
 
-        if ctxt.current_char() != Some('(') {
-            xml_free(name as _);
-            xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathExprError as i32);
+    let mut buffer = String::with_capacity(ctxt.current_str().len());
+    while let Some(c) = ctxt.current_char() {
+        if c == ')' {
+            level -= 1;
+            if level == 0 {
+                ctxt.next_char();
+                break;
+            }
+        } else if c == '(' {
+            level += 1;
+        } else if c == '^' && matches!(ctxt.nth_byte(1), Some(b')' | b'(' | b'^')) {
+            ctxt.next_char();
+        }
+        if let Some(c) = ctxt.next_char() {
+            buffer.push(c);
+        }
+    }
+
+    if level != 0 && ctxt.current_char().is_none() {
+        xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPtrSyntaxError as i32);
+        return;
+    }
+
+    if name == "xpointer" || name == "xpath1" {
+        let old_base = replace(&mut ctxt.base, buffer.into_boxed_str());
+        let old_cur = ctxt.cur;
+        ctxt.cur = 0;
+        // To evaluate an xpointer scheme element (4.3) we need:
+        //   context initialized to the root
+        //   context position initialized to 1
+        //   context size initialized to 1
+        ctxt.context.node = ctxt.context.doc.map(|doc| doc.into());
+        ctxt.context.proximity_position = 1;
+        ctxt.context.context_size = 1;
+        #[cfg(feature = "libxml_xptr_locs")]
+        {
+            ctxt.xptr = (name == "xpointer") as i32;
+        }
+        ctxt.evaluate_expression();
+        ctxt.base = old_base;
+        ctxt.cur = old_cur;
+    } else if name == "element" {
+        let old_base = replace(&mut ctxt.base, buffer.into_boxed_str());
+        let old_cur = ctxt.cur;
+        ctxt.cur = 0;
+
+        if ctxt.base.starts_with('/') {
+            xml_xpath_root(ctxt);
+            xml_xptr_eval_child_seq(ctxt, None);
+        } else {
+            let Some(name2) = ctxt.parse_name() else {
+                ctxt.base = old_base;
+                ctxt.cur = old_cur;
+                xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathExprError as i32);
+                return;
+            };
+            xml_xptr_eval_child_seq(ctxt, Some(&name2));
+        }
+        ctxt.base = old_base;
+        ctxt.cur = old_cur;
+    } else if name == "xmlns" {
+        let old_base = replace(&mut ctxt.base, buffer.into_boxed_str());
+        let old_cur = ctxt.cur;
+        ctxt.cur = 0;
+
+        let Some(prefix) = ctxt.parse_ncname() else {
+            ctxt.base = old_base;
+            ctxt.cur = old_cur;
+            xml_xpath_err(Some(ctxt), XmlXPathError::XPtrSyntaxError as i32);
+            return;
+        };
+        ctxt.skip_blanks();
+        if ctxt.current_char() != Some('=') {
+            ctxt.base = old_base;
+            ctxt.cur = old_cur;
+            xml_xpath_err(Some(ctxt), XmlXPathError::XPtrSyntaxError as i32);
             return;
         }
         ctxt.next_char();
-        let mut level = 1;
+        ctxt.skip_blanks();
 
-        let mut buffer = String::with_capacity(ctxt.current_str().len());
-        while let Some(c) = ctxt.current_char() {
-            if c == ')' {
-                level -= 1;
-                if level == 0 {
-                    ctxt.next_char();
-                    break;
-                }
-            } else if c == '(' {
-                level += 1;
-            } else if c == '^' && matches!(ctxt.nth_byte(1), Some(b')' | b'(' | b'^')) {
-                ctxt.next_char();
-            }
-            if let Some(c) = ctxt.next_char() {
-                buffer.push(c);
-            }
-        }
-
-        if level != 0 && ctxt.current_char().is_none() {
-            xml_free(name as _);
-            xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPtrSyntaxError as i32);
-            return;
-        }
-
-        if xml_str_equal(name, c"xpointer".as_ptr() as _)
-            || xml_str_equal(name, c"xpath1".as_ptr() as _)
-        {
-            let old_base = replace(&mut ctxt.base, buffer.into_boxed_str());
-            let old_cur = ctxt.cur;
-            ctxt.cur = 0;
-            // To evaluate an xpointer scheme element (4.3) we need:
-            //   context initialized to the root
-            //   context position initialized to 1
-            //   context size initialized to 1
-            ctxt.context.node = ctxt.context.doc.map(|doc| doc.into());
-            ctxt.context.proximity_position = 1;
-            ctxt.context.context_size = 1;
-            #[cfg(feature = "libxml_xptr_locs")]
-            {
-                ctxt.xptr = xml_str_equal(name, c"xpointer".as_ptr() as _) as i32;
-            }
-            ctxt.evaluate_expression();
-            ctxt.base = old_base;
-            ctxt.cur = old_cur;
-        } else if xml_str_equal(name, c"element".as_ptr() as _) {
-            let old_base = replace(&mut ctxt.base, buffer.into_boxed_str());
-            let old_cur = ctxt.cur;
-            ctxt.cur = 0;
-
-            let name2: *mut XmlChar;
-
-            if ctxt.base.starts_with('/') {
-                xml_xpath_root(ctxt);
-                xml_xptr_eval_child_seq(ctxt, None);
-            } else {
-                name2 = ctxt.parse_name().map_or(null_mut(), |name| {
-                    xml_strndup(name.as_ptr(), name.len() as i32)
-                });
-                if name2.is_null() {
-                    ctxt.base = old_base;
-                    ctxt.cur = old_cur;
-                    xml_free(name as _);
-                    xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathExprError as i32);
-                    return;
-                }
-                xml_xptr_eval_child_seq(
-                    ctxt,
-                    Some(
-                        CStr::from_ptr(name2 as *const i8)
-                            .to_string_lossy()
-                            .as_ref(),
-                    ),
-                );
-                xml_free(name2 as _);
-            }
-            ctxt.base = old_base;
-            ctxt.cur = old_cur;
-        } else if xml_str_equal(name, c"xmlns".as_ptr() as _) {
-            let old_base = replace(&mut ctxt.base, buffer.into_boxed_str());
-            let old_cur = ctxt.cur;
-            ctxt.cur = 0;
-
-            let Some(prefix) = ctxt.parse_ncname() else {
-                ctxt.base = old_base;
-                ctxt.cur = old_cur;
-                xml_free(name as _);
-                xml_xpath_err(Some(ctxt), XmlXPathError::XPtrSyntaxError as i32);
-                return;
-            };
-            ctxt.skip_blanks();
-            if ctxt.current_char() != Some('=') {
-                ctxt.base = old_base;
-                ctxt.cur = old_cur;
-                xml_free(name as _);
-                xml_xpath_err(Some(ctxt), XmlXPathError::XPtrSyntaxError as i32);
-                return;
-            }
-            ctxt.next_char();
-            ctxt.skip_blanks();
-
-            let ns_uri = ctxt.current_str().to_owned();
-            ctxt.context.register_ns(&prefix, Some(&ns_uri));
-            ctxt.base = old_base;
-            ctxt.cur = old_cur;
-        } else {
-            xml_xptr_err!(
-                ctxt,
-                XmlParserErrors::XmlXPtrUnknownScheme,
-                "unsupported scheme '{}'\n",
-                CStr::from_ptr(name as *const i8).to_string_lossy()
-            );
-        }
-        xml_free(name as _);
+        let ns_uri = ctxt.current_str().to_owned();
+        ctxt.context.register_ns(&prefix, Some(&ns_uri));
+        ctxt.base = old_base;
+        ctxt.cur = old_cur;
+    } else {
+        xml_xptr_err!(
+            ctxt,
+            XmlParserErrors::XmlXPtrUnknownScheme,
+            "unsupported scheme '{}'\n",
+            name
+        );
     }
 }
 
@@ -2136,59 +2098,47 @@ unsafe fn xml_xptr_eval_xptr_part(ctxt: &mut XmlXPathParserContext, mut name: *m
 /// Parse and evaluate a Full XPtr i.e. possibly a cascade of XPath based
 /// expressions or other schemes.
 #[doc(alias = "xmlXPtrEvalFullXPtr")]
-unsafe fn xml_xptr_eval_full_xptr(ctxt: &mut XmlXPathParserContext, mut name: *mut XmlChar) {
-    unsafe {
-        if name.is_null() {
-            name = ctxt.parse_name().map_or(null_mut(), |name| {
-                xml_strndup(name.as_ptr(), name.len() as i32)
-            });
-        }
-        if name.is_null() {
-            xml_xpath_err(Some(&mut *ctxt), XmlXPathError::XPathExprError as i32);
+fn xml_xptr_eval_full_xptr(ctxt: &mut XmlXPathParserContext, name: &str) {
+    let mut next = Some(Cow::Borrowed(name));
+    while let Some(name) = next {
+        ctxt.error = XmlXPathError::XPathExpressionOK as i32;
+        xml_xptr_eval_xptr_part(ctxt, &name);
+
+        // in case of syntax error, break here
+        if ctxt.error != XmlXPathError::XPathExpressionOK as i32
+            && ctxt.error != XmlParserErrors::XmlXPtrUnknownScheme as i32
+        {
             return;
         }
-        while !name.is_null() {
-            ctxt.error = XmlXPathError::XPathExpressionOK as i32;
-            xml_xptr_eval_xptr_part(ctxt, name);
 
-            // in case of syntax error, break here
-            if ctxt.error != XmlXPathError::XPathExpressionOK as i32
-                && ctxt.error != XmlParserErrors::XmlXPtrUnknownScheme as i32
-            {
-                return;
-            }
+        // If the returned value is a non-empty nodeset or location set, return here.
+        if let Some(obj) = ctxt.value() {
+            match obj.typ {
+                #[cfg(feature = "libxml_xptr_locs")]
+                XmlXPathObjectType::XPathLocationset => {
+                    let loc = obj.user.as_ref().and_then(|user| user.as_location_set());
 
-            // If the returned value is a non-empty nodeset or location set, return here.
-            if let Some(obj) = ctxt.value() {
-                match obj.typ {
-                    #[cfg(feature = "libxml_xptr_locs")]
-                    XmlXPathObjectType::XPathLocationset => {
-                        let loc = obj.user.as_ref().and_then(|user| user.as_location_set());
-
-                        if loc.is_some_and(|loc| !loc.loc_tab.is_empty()) {
-                            return;
-                        }
+                    if loc.is_some_and(|loc| !loc.loc_tab.is_empty()) {
+                        return;
                     }
-                    XmlXPathObjectType::XPathNodeset => {
-                        let loc = obj.nodesetval.as_deref();
-                        if loc.is_some_and(|l| !l.is_empty()) {
-                            return;
-                        }
-                    }
-                    _ => {}
                 }
-
-                // Evaluating to improper values is equivalent to
-                // a sub-resource error, clean-up the stack
-                while ctxt.value_pop().is_some() {}
+                XmlXPathObjectType::XPathNodeset => {
+                    let loc = obj.nodesetval.as_deref();
+                    if loc.is_some_and(|l| !l.is_empty()) {
+                        return;
+                    }
+                }
+                _ => {}
             }
 
-            // Is there another XPointer part.
-            ctxt.skip_blanks();
-            name = ctxt.parse_name().map_or(null_mut(), |name| {
-                xml_strndup(name.as_ptr(), name.len() as i32)
-            });
+            // Evaluating to improper values is equivalent to
+            // a sub-resource error, clean-up the stack
+            while ctxt.value_pop().is_some() {}
         }
+
+        // Is there another XPointer part.
+        ctxt.skip_blanks();
+        next = ctxt.parse_name().map(Cow::Owned);
     }
 }
 
@@ -2196,103 +2146,88 @@ unsafe fn xml_xptr_eval_full_xptr(ctxt: &mut XmlXPathParserContext, mut name: *m
 ///
 /// Parse and evaluate an XPointer
 #[doc(alias = "xmlXPtrEvalXPointer")]
-unsafe fn xml_xptr_eval_xpointer(ctxt: &mut XmlXPathParserContext) {
-    unsafe {
-        ctxt.skip_blanks();
-        if ctxt.current_char() == Some('/') {
-            xml_xpath_root(ctxt);
-            xml_xptr_eval_child_seq(ctxt, None);
-        } else {
-            let name: *mut XmlChar = ctxt.parse_name().map_or(null_mut(), |name| {
-                xml_strndup(name.as_ptr(), name.len() as i32)
-            });
-            if name.is_null() {
-                xml_xpath_err(Some(ctxt), XmlXPathError::XPathExprError as i32);
-                return;
-            }
-            if ctxt.current_char() == Some('(') {
-                xml_xptr_eval_full_xptr(ctxt, name);
-                // Short evaluation
-                return;
-            } else {
-                // this handle both Bare Names and Child Sequences
-                xml_xptr_eval_child_seq(
-                    ctxt,
-                    Some(CStr::from_ptr(name as *const i8).to_string_lossy().as_ref()),
-                );
-                xml_free(name as _);
-            }
-        }
-        ctxt.skip_blanks();
-        if ctxt.current_char().is_some() {
+fn xml_xptr_eval_xpointer(ctxt: &mut XmlXPathParserContext) {
+    ctxt.skip_blanks();
+    if ctxt.current_char() == Some('/') {
+        xml_xpath_root(ctxt);
+        xml_xptr_eval_child_seq(ctxt, None);
+    } else {
+        let Some(name) = ctxt.parse_name() else {
             xml_xpath_err(Some(ctxt), XmlXPathError::XPathExprError as i32);
+            return;
+        };
+        if ctxt.current_char() == Some('(') {
+            xml_xptr_eval_full_xptr(ctxt, &name);
+            // Short evaluation
+            return;
+        } else {
+            // this handle both Bare Names and Child Sequences
+            xml_xptr_eval_child_seq(ctxt, Some(&name));
         }
+    }
+    ctxt.skip_blanks();
+    if ctxt.current_char().is_some() {
+        xml_xpath_err(Some(ctxt), XmlXPathError::XPathExprError as i32);
     }
 }
 
 /// Evaluate the XPath Location Path in the given context.  
 /// Please refer to the document of `xmlXPtrEval` in original libxml2.
-///
-/// # Safety
-/// - A valid pointer generated by the API for this crate must be given.
-/// - If the evaluation fails or arguments is invalid, this method may return null.
-pub unsafe fn xml_xptr_eval(xpath: &str, ctx: &mut XmlXPathContext) -> Option<XmlXPathObject> {
-    unsafe {
-        let mut res = None;
-        let mut stack: i32 = 0;
+pub fn xml_xptr_eval(xpath: &str, ctx: &mut XmlXPathContext) -> Option<XmlXPathObject> {
+    let mut res = None;
+    let mut stack: i32 = 0;
 
-        xml_init_parser();
+    xml_init_parser();
 
-        let mut ctxt = XmlXPathParserContext::new(xpath, ctx);
-        xml_xptr_eval_xpointer(&mut ctxt);
+    let mut ctxt = XmlXPathParserContext::new(xpath, ctx);
+    xml_xptr_eval_xpointer(&mut ctxt);
 
-        #[cfg(feature = "libxml_xptr_locs")]
-        let f = ctxt.value().is_some_and(|value| {
-            !matches!(
-                value.typ,
-                XmlXPathObjectType::XPathLocationset | XmlXPathObjectType::XPathNodeset
-            )
-        });
-        #[cfg(not(feature = "libxml_xptr_locs"))]
-        let f = ctxt
-            .value()
-            .is_some_and(|value| (*value).typ != XmlXPathObjectType::XPathNodeset);
-        if f {
-            xml_xptr_err!(
-                &mut ctxt,
-                XmlParserErrors::XmlXPtrEvalFailed,
-                "xmlXPtrEval: evaluation failed to return a node set\n"
-            );
-        } else {
-            res = ctxt.value_pop();
-        }
+    #[cfg(feature = "libxml_xptr_locs")]
+    let f = ctxt.value().is_some_and(|value| {
+        !matches!(
+            value.typ,
+            XmlXPathObjectType::XPathLocationset | XmlXPathObjectType::XPathNodeset
+        )
+    });
+    #[cfg(not(feature = "libxml_xptr_locs"))]
+    let f = ctxt
+        .value()
+        .is_some_and(|value| (*value).typ != XmlXPathObjectType::XPathNodeset);
+    if f {
+        xml_xptr_err!(
+            &mut ctxt,
+            XmlParserErrors::XmlXPtrEvalFailed,
+            "xmlXPtrEval: evaluation failed to return a node set\n"
+        );
+    } else {
+        res = ctxt.value_pop();
+    }
 
-        while let Some(tmp) = ctxt.value_pop() {
-            if tmp.typ == XmlXPathObjectType::XPathNodeset {
-                // Evaluation may push a root nodeset which is unused
-                let set = tmp.nodesetval.as_deref();
-                if set.is_none_or(|s| {
-                    s.len() != 1 || s.get(0) != ctxt.context.doc.map(|doc| doc.into())
-                }) {
-                    stack += 1;
-                }
-            } else {
+    while let Some(tmp) = ctxt.value_pop() {
+        if tmp.typ == XmlXPathObjectType::XPathNodeset {
+            // Evaluation may push a root nodeset which is unused
+            let set = tmp.nodesetval.as_deref();
+            if set
+                .is_none_or(|s| s.len() != 1 || s.get(0) != ctxt.context.doc.map(|doc| doc.into()))
+            {
                 stack += 1;
             }
+        } else {
+            stack += 1;
         }
-        if stack != 0 {
-            xml_xptr_err!(
-                &mut ctxt,
-                XmlParserErrors::XmlXPtrExtraObjects,
-                "xmlXPtrEval: object(s) left on the eval stack\n"
-            );
-        }
-        if ctxt.error != XmlXPathError::XPathExpressionOK as i32 {
-            res = None;
-        }
-
-        res
     }
+    if stack != 0 {
+        xml_xptr_err!(
+            &mut ctxt,
+            XmlParserErrors::XmlXPtrExtraObjects,
+            "xmlXPtrEval: object(s) left on the eval stack\n"
+        );
+    }
+    if ctxt.error != XmlXPathError::XPathExpressionOK as i32 {
+        res = None;
+    }
+
+    res
 }
 
 /// Implement the range-to() XPointer function
