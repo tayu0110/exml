@@ -1687,7 +1687,7 @@ impl XmlParserCtxt {
             // references, or a document with "standalone='yes'", ...
             // ... The declaration of a parameter entity must precede
             // any reference to it...
-            if self.standalone == 1 || (!self.has_external_subset && self.has_perefs == 0) {
+            if self.standalone == 1 || (!self.has_external_subset && !self.has_perefs) {
                 xml_fatal_err_msg_str!(
                     self,
                     XmlParserErrors::XmlErrUndeclaredEntity,
@@ -1718,7 +1718,7 @@ impl XmlParserCtxt {
                 self.valid = 0;
             }
         }
-        self.has_perefs = 1;
+        self.has_perefs = true;
     }
 
     /// Parse an entity declaration. Always consumes '<!'.

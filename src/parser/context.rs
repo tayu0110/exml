@@ -158,7 +158,7 @@ pub struct XmlParserCtxt {
     // reference and external subset
     pub(crate) has_external_subset: bool,
     // the internal subset has PE refs
-    pub(crate) has_perefs: i32,
+    pub(crate) has_perefs: bool,
     // are we parsing an external entity
     pub(crate) external: i32,
 
@@ -530,7 +530,7 @@ impl XmlParserCtxt {
         self.encoding = None;
         self.standalone = -1;
         self.has_external_subset = false;
-        self.has_perefs = 0;
+        self.has_perefs = false;
         self.html = 0;
         self.external = 0;
         self.instate = XmlParserInputState::XmlParserStart;
@@ -823,7 +823,7 @@ impl XmlParserCtxt {
 
         self.standalone = -1;
         self.has_external_subset = false;
-        self.has_perefs = 0;
+        self.has_perefs = false;
         self.html = 0;
         self.external = 0;
         self.instate = XmlParserInputState::XmlParserStart;
@@ -2033,7 +2033,7 @@ impl Default for XmlParserCtxt {
             node_seq: XmlParserNodeInfoSeq::default(),
             err_no: 0,
             has_external_subset: false,
-            has_perefs: 0,
+            has_perefs: false,
             external: 0,
             valid: 0,
             validate: 0,
