@@ -4668,7 +4668,7 @@ fn test_initialize() {
             break;
         }
     }
-    set_pedantic_parser_default_value(0);
+    set_pedantic_parser_default_value(false);
     set_structured_error(Some(test_structured_error_handler), None);
     #[cfg(feature = "schema")]
     {

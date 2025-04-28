@@ -482,7 +482,7 @@ impl XmlParserCtxt {
                         break 'next_attr;
                     }
                     if let Some(uri) = XmlURI::parse(&url) {
-                        if self.pedantic != 0 && uri.scheme.is_none() {
+                        if self.pedantic && uri.scheme.is_none() {
                             xml_ns_warn!(
                                 self,
                                 XmlParserErrors::XmlWarNsURIRelative,

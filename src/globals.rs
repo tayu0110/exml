@@ -111,7 +111,7 @@ pub struct XmlGlobalState {
     line_numbers_default_value: i32,
     load_ext_dtd_default_value: i32,
     parser_debug_entities: i32,
-    pedantic_parser_default_value: i32,
+    pedantic_parser_default_value: bool,
     pub(crate) save_no_empty_tags: i32,
     indent_tree_output: i32,
     pub(crate) tree_indent_string: Cow<'static, str>,
@@ -157,7 +157,7 @@ impl XmlGlobalState {
             line_numbers_default_value: 0,
             load_ext_dtd_default_value: 0,
             parser_debug_entities: 0,
-            pedantic_parser_default_value: 0,
+            pedantic_parser_default_value: false,
             save_no_empty_tags: 0,
             indent_tree_output: 1,
             tree_indent_string: Cow::Borrowed("  "),
@@ -285,11 +285,11 @@ pub fn set_parser_debug_entities(value: i32) {
     GLOBAL_STATE.with_borrow_mut(|state| state.parser_debug_entities = value)
 }
 
-pub fn get_pedantic_parser_default_value() -> i32 {
+pub fn get_pedantic_parser_default_value() -> bool {
     GLOBAL_STATE.with_borrow(|state| state.pedantic_parser_default_value)
 }
 
-pub fn set_pedantic_parser_default_value(value: i32) {
+pub fn set_pedantic_parser_default_value(value: bool) {
     GLOBAL_STATE.with_borrow_mut(|state| state.pedantic_parser_default_value = value)
 }
 

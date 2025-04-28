@@ -217,7 +217,7 @@ pub struct XmlParserCtxt {
     // Speed up large node parsing
     pub(crate) nodemem: i32,
     // signal pedantic warnings
-    pub(crate) pedantic: i32,
+    pub(crate) pedantic: bool,
     // For user data, libxml won't touch it
     pub(crate) _private: *mut c_void,
 
@@ -559,7 +559,7 @@ impl XmlParserCtxt {
         }
         self.validate = get_do_validity_checking_default_value();
         self.pedantic = get_pedantic_parser_default_value();
-        if self.pedantic != 0 {
+        if self.pedantic {
             self.options |= XmlParserOption::XmlParsePedantic as i32;
         }
         self.linenumbers = get_line_numbers_default_value();
@@ -1647,11 +1647,11 @@ impl XmlParserCtxt {
             self.replace_entities = false;
         }
         if options & XmlParserOption::XmlParsePedantic as i32 != 0 {
-            self.pedantic = 1;
+            self.pedantic = true;
             options -= XmlParserOption::XmlParsePedantic as i32;
             self.options |= XmlParserOption::XmlParsePedantic as i32;
         } else {
-            self.pedantic = 0;
+            self.pedantic = false;
         }
         if options & XmlParserOption::XmlParseNoBlanks as i32 != 0 {
             self.keep_blanks = false;
@@ -2056,7 +2056,7 @@ impl Default for XmlParserCtxt {
             charset: XmlCharEncoding::None,
             nodelen: 0,
             nodemem: 0,
-            pedantic: 0,
+            pedantic: get_pedantic_parser_default_value(),
             _private: null_mut(),
             loadsubset: 0,
             linenumbers: 0,

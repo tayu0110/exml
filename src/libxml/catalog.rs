@@ -3103,7 +3103,7 @@ pub fn xml_parse_catalog_file(filename: &str) -> Option<XmlDocPtr> {
     ctxt.valid = 0;
     ctxt.validate = false;
     ctxt.loadsubset = 0;
-    ctxt.pedantic = 0;
+    ctxt.pedantic = false;
     ctxt.dict_names = 1;
 
     ctxt.parse_document();

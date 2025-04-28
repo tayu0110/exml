@@ -4402,11 +4402,11 @@ pub fn html_ctxt_use_options(ctxt: &mut HtmlParserCtxt, mut options: i32) -> i32
         ctxt.options |= XmlParserOption::XmlParseNoError as i32;
     }
     if options & HtmlParserOption::HtmlParsePedantic as i32 != 0 {
-        ctxt.pedantic = 1;
+        ctxt.pedantic = true;
         options -= XmlParserOption::XmlParsePedantic as i32;
         ctxt.options |= XmlParserOption::XmlParsePedantic as i32;
     } else {
-        ctxt.pedantic = 0;
+        ctxt.pedantic = false;
     }
     if options & XmlParserOption::XmlParseNoBlanks as i32 != 0 {
         ctxt.keep_blanks = false;

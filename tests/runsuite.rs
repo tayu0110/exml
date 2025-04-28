@@ -193,7 +193,7 @@ thread_local! {
 unsafe fn initialize_libxml2() {
     unsafe {
         set_get_warnings_default_value(0);
-        set_pedantic_parser_default_value(0);
+        set_pedantic_parser_default_value(false);
 
         xml_mem_setup(
             Some(xml_mem_free),

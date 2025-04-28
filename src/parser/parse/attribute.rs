@@ -559,7 +559,7 @@ impl XmlParserCtxt {
         // Check that xml:lang conforms to the specification
         // No more registered as an error, just generate a warning now
         // since this was deprecated in XML second edition
-        if self.pedantic != 0 && name == "xml:lang" && !check_language_id(&val) {
+        if self.pedantic && name == "xml:lang" && !check_language_id(&val) {
             xml_warning_msg!(
                 self,
                 XmlParserErrors::XmlWarLangValue,
@@ -648,7 +648,7 @@ impl XmlParserCtxt {
             // Check that xml:lang conforms to the specification
             // No more registered as an error, just generate a warning now
             // since this was deprecated in XML second edition
-            if self.pedantic != 0 && name == "lang" && !check_language_id(&val) {
+            if self.pedantic && name == "lang" && !check_language_id(&val) {
                 xml_warning_msg!(
                     self,
                     XmlParserErrors::XmlWarLangValue,

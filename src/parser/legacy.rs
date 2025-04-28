@@ -95,7 +95,7 @@ pub fn xml_keep_blanks_default(val: bool) -> bool {
 /// Returns the last value for 0 for no substitution, 1 for substitution.
 #[doc(alias = "xmlPedanticParserDefault")]
 #[deprecated = "Use the modern options API with XML_PARSE_PEDANTIC"]
-pub fn xml_pedantic_parser_default(val: i32) -> i32 {
+pub fn xml_pedantic_parser_default(val: bool) -> bool {
     let old = get_pedantic_parser_default_value();
 
     set_pedantic_parser_default_value(val);

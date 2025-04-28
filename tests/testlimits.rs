@@ -543,7 +543,7 @@ fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlErr
 unsafe fn initialize_libxml2() {
     unsafe {
         set_get_warnings_default_value(0);
-        set_pedantic_parser_default_value(0);
+        set_pedantic_parser_default_value(false);
 
         xml_mem_setup(
             Some(xml_mem_free),

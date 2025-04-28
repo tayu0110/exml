@@ -483,7 +483,7 @@ pub fn xml_sax2_entity_decl(
                 system_id,
                 content,
             );
-            if ent.is_none() && ctxt.pedantic != 0 {
+            if ent.is_none() && ctxt.pedantic {
                 xml_warn_msg!(
                     ctxt,
                     XmlParserErrors::XmlWarEntityRedefined,
@@ -517,7 +517,7 @@ pub fn xml_sax2_entity_decl(
                 system_id,
                 content,
             );
-            if ent.is_none() && ctxt.pedantic != 0 {
+            if ent.is_none() && ctxt.pedantic {
                 if let Some(warning) = ctxt.sax.as_deref_mut().and_then(|sax| sax.warning) {
                     warning(
                         ctxt.user_data.clone(),
@@ -814,7 +814,7 @@ pub fn xml_sax2_unparsed_entity_decl(
                 system_id,
                 notation_name,
             );
-            if ent.is_none() && ctxt.pedantic != 0 {
+            if ent.is_none() && ctxt.pedantic {
                 if let Some(warning) = ctxt.sax.as_deref_mut().and_then(|sax| sax.warning) {
                     warning(
                         ctxt.user_data.clone(),
@@ -844,7 +844,7 @@ pub fn xml_sax2_unparsed_entity_decl(
                 system_id,
                 notation_name,
             );
-            if ent.is_none() && ctxt.pedantic != 0 {
+            if ent.is_none() && ctxt.pedantic {
                 if let Some(warning) = ctxt.sax.as_deref_mut().and_then(|sax| sax.warning) {
                     warning(
                         ctxt.user_data.clone(),
@@ -1242,7 +1242,7 @@ unsafe fn xml_sax2_attribute_internal(
             }
             if let Some(val) = val
                 .as_deref()
-                .filter(|val| ctxt.pedantic != 0 && !val.is_empty())
+                .filter(|val| ctxt.pedantic && !val.is_empty())
             {
                 if let Some(uri) = XmlURI::parse(val) {
                     if uri.scheme.is_none() {
