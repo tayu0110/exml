@@ -235,8 +235,6 @@ pub struct XmlParserCtxt {
     pub(crate) atts: Vec<(String, Option<String>)>,
     // the size of the array
     pub(crate) maxatts: i32,
-    // use strings from dict to build tree
-    pub(crate) docdict: i32,
 
     // pre-interned strings
     pub(crate) str_xml: Option<Cow<'static, str>>,
@@ -2054,7 +2052,6 @@ impl Default for XmlParserCtxt {
             progressive: false,
             atts: vec![],
             maxatts: 0,
-            docdict: 0,
             str_xml: None,
             str_xml_ns: None,
             str_xmlns: None,
