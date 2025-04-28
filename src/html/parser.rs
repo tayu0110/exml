@@ -2727,7 +2727,7 @@ fn html_init_parser_ctxt(
     ctxt.vctxt.user_data = None;
     ctxt.vctxt.error = Some(parser_validity_error);
     ctxt.vctxt.warning = Some(parser_validity_warning);
-    ctxt.record_info = 0;
+    ctxt.record_info = false;
     ctxt.validate = 0;
     ctxt.check_index = 0;
     #[cfg(feature = "catalog")]
@@ -2779,7 +2779,7 @@ pub fn html_create_memory_parser_ctxt(buffer: Vec<u8>) -> Option<HtmlParserCtxt>
 fn html_parser_finish_element_parsing(ctxt: &mut HtmlParserCtxt) {
     // Capture end position and add node
     if let Some(node) = ctxt.node {
-        if ctxt.record_info != 0 {
+        if ctxt.record_info {
             let end_pos =
                 ctxt.input().unwrap().consumed + ctxt.input().unwrap().offset_from_base() as u64;
             let end_line = ctxt.input().unwrap().line as u64;
@@ -2834,7 +2834,7 @@ fn html_parse_element_internal(ctxt: &mut HtmlParserCtxt) {
     }
 
     // Capture start position
-    if ctxt.record_info != 0 {
+    if ctxt.record_info {
         node_info.begin_pos =
             ctxt.input().unwrap().consumed + ctxt.input().unwrap().offset_from_base() as u64;
         node_info.begin_line = ctxt.input().unwrap().line as _;
@@ -2887,7 +2887,7 @@ fn html_parse_element_internal(ctxt: &mut HtmlParserCtxt) {
             html_name_pop(ctxt);
         }
 
-        if ctxt.record_info != 0 {
+        if ctxt.record_info {
             html_node_info_push(ctxt, Rc::new(RefCell::new(node_info)));
         }
         html_parser_finish_element_parsing(ctxt);
@@ -2903,7 +2903,7 @@ fn html_parse_element_internal(ctxt: &mut HtmlParserCtxt) {
         return;
     }
 
-    if ctxt.record_info != 0 {
+    if ctxt.record_info {
         html_node_info_push(ctxt, Rc::new(RefCell::new(node_info)));
     }
 }
@@ -3818,7 +3818,7 @@ fn html_parse_try_or_finish(ctxt: &mut HtmlParserCtxt, terminate: i32) -> i32 {
 
                 // Capture start position
                 let mut node_info = HtmlParserNodeInfo::default();
-                if ctxt.record_info != 0 {
+                if ctxt.record_info {
                     node_info.begin_pos = ctxt.input().unwrap().consumed
                         + ctxt.input().unwrap().offset_from_base() as u64;
                     node_info.begin_line = ctxt.input().unwrap().line as _;
@@ -3874,7 +3874,7 @@ fn html_parse_try_or_finish(ctxt: &mut HtmlParserCtxt, terminate: i32) -> i32 {
                         html_name_pop(ctxt);
                     }
 
-                    if ctxt.record_info != 0 {
+                    if ctxt.record_info {
                         html_node_info_push(ctxt, Rc::new(RefCell::new(node_info)));
                     }
 
@@ -3892,7 +3892,7 @@ fn html_parse_try_or_finish(ctxt: &mut HtmlParserCtxt, terminate: i32) -> i32 {
                     html_name_pop(ctxt);
                 }
 
-                if ctxt.record_info != 0 {
+                if ctxt.record_info {
                     html_node_info_push(ctxt, Rc::new(RefCell::new(node_info)));
                 }
 
@@ -4356,7 +4356,7 @@ pub fn html_ctxt_reset(ctxt: &mut HtmlParserCtxt) {
     ctxt.vctxt.flags = XML_VCTXT_USE_PCTXT as _;
     ctxt.vctxt.error = Some(parser_validity_error);
     ctxt.vctxt.warning = Some(parser_validity_warning);
-    ctxt.record_info = 0;
+    ctxt.record_info = false;
     ctxt.check_index = 0;
     ctxt.end_check_state = 0;
     ctxt.in_subset = 0;

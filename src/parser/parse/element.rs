@@ -75,7 +75,7 @@ impl XmlParserCtxt {
         }
 
         // Capture start position
-        let (begin_pos, begin_line) = if self.record_info != 0 {
+        let (begin_pos, begin_line) = if self.record_info {
             (
                 self.input().unwrap().consumed + self.input().unwrap().offset_from_base() as u64,
                 self.input().unwrap().line as u64,
@@ -157,7 +157,7 @@ impl XmlParserCtxt {
                 self.ns_pop(self.ns_tab.len() - ns_nr);
             }
             if let Some(cur) = cur {
-                if self.record_info != 0 {
+                if self.record_info {
                     let node_info = XmlParserNodeInfo {
                         node: Some(cur),
                         begin_pos,
@@ -174,7 +174,7 @@ impl XmlParserCtxt {
         if self.current_byte() == b'>' {
             self.advance(1);
             if let Some(cur) = cur {
-                if self.record_info != 0 {
+                if self.record_info {
                     let node_info = XmlParserNodeInfo {
                         node: Some(cur),
                         begin_pos,
@@ -723,7 +723,7 @@ impl XmlParserCtxt {
 
         // Capture end position
         if let Some(cur) = cur {
-            if self.record_info != 0 {
+            if self.record_info {
                 if let Some(node_info) = self.find_node_info(cur) {
                     node_info.borrow_mut().end_pos = self.input().unwrap().consumed
                         + self.input().unwrap().offset_from_base() as u64;

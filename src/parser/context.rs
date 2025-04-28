@@ -149,7 +149,7 @@ pub struct XmlParserCtxt {
     pub(crate) node_tab: Vec<XmlNodePtr>,
 
     // Whether node info should be kept
-    pub(crate) record_info: i32,
+    pub(crate) record_info: bool,
     // info about each node parsed
     pub(crate) node_seq: XmlParserNodeInfoSeq,
 
@@ -589,7 +589,7 @@ impl XmlParserCtxt {
         if self.replace_entities {
             self.options |= XmlParserOption::XmlParseNoEnt as i32;
         }
-        self.record_info = 0;
+        self.record_info = false;
         self.check_index = 0;
         self.in_subset = 0;
         self.err_no = XmlParserErrors::XmlErrOK as i32;
@@ -833,7 +833,7 @@ impl XmlParserCtxt {
         self.ns_well_formed = 1;
         self.disable_sax = 0;
         self.valid = 1;
-        self.record_info = 0;
+        self.record_info = false;
         self.check_index = 0;
         self.end_check_state = 0;
         self.in_subset = 0;
@@ -2030,7 +2030,7 @@ impl Default for XmlParserCtxt {
             input_tab: vec![],
             node: None,
             node_tab: vec![],
-            record_info: 0,
+            record_info: false,
             node_seq: XmlParserNodeInfoSeq::default(),
             err_no: 0,
             has_external_subset: 0,
