@@ -29,7 +29,6 @@ use crate::{
     libxml::{
         catalog::XmlCatalogEntry,
         chvalid::{xml_is_blank_char, xml_is_char},
-        globals::xml_free,
         sax2::{
             xml_sax_version, xml_sax2_end_element, xml_sax2_ignorable_whitespace,
             xml_sax2_start_element,
@@ -249,8 +248,6 @@ pub struct XmlParserCtxt {
     pub(crate) sax2: bool,
     // the array of prefix/namespace name
     pub(crate) ns_tab: Vec<(Option<String>, String)>,
-    // which attribute were allocated
-    pub(crate) attallocs: *mut i32,
     // array of data for push
     pub(crate) push_tab: Vec<XmlStartTag>,
     // defaulted attributes if any
@@ -2063,7 +2060,6 @@ impl Default for XmlParserCtxt {
             str_xmlns: None,
             sax2: false,
             ns_tab: vec![],
-            attallocs: null_mut(),
             push_tab: vec![],
             atts_default: HashMap::new(),
             atts_special: None,
@@ -2093,9 +2089,6 @@ impl Drop for XmlParserCtxt {
     #[doc(alias = "xmlFreeParserCtxt")]
     fn drop(&mut self) {
         unsafe {
-            if !self.attallocs.is_null() {
-                xml_free(self.attallocs as _);
-            }
             let _ = self.atts_special.take().map(|t| t.into_inner());
             let mut cur = self.free_elems;
             while let Some(now) = cur {
