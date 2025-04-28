@@ -115,7 +115,6 @@ pub type XmlParserCtxtPtr = *mut XmlParserCtxt;
 /// takes as the only argument the parser context pointer, so migrating
 /// to a state based parser for progressive parsing shouldn't be too hard.
 #[doc(alias = "xmlParserCtxt")]
-#[repr(C)]
 pub struct XmlParserCtxt {
     // The SAX handler
     pub sax: Option<Box<XmlSAXHandler>>,
