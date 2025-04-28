@@ -146,7 +146,7 @@ impl XmlParserCtxt {
             } else {
                 self.version = Some(XML_DEFAULT_VERSION.to_owned());
             }
-            if self.disable_sax == 0 {
+            if !self.disable_sax {
                 if let Some(start_document) =
                     self.sax.as_deref_mut().and_then(|sax| sax.start_document)
                 {
@@ -188,7 +188,7 @@ impl XmlParserCtxt {
 
                 // Create and update the external subset.
                 self.in_subset = 2;
-                if self.disable_sax == 0 {
+                if !self.disable_sax {
                     if let Some(external_subset) =
                         self.sax.as_deref_mut().and_then(|sax| sax.external_subset)
                     {

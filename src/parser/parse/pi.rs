@@ -148,7 +148,7 @@ impl XmlParserCtxt {
                     self.advance(2);
 
                     // SAX: PI detected.
-                    if self.disable_sax == 0 {
+                    if !self.disable_sax {
                         if let Some(processing_instruction) = self
                             .sax
                             .as_deref_mut()
@@ -219,7 +219,7 @@ impl XmlParserCtxt {
                     }
 
                     // SAX: PI detected.
-                    if self.disable_sax == 0 {
+                    if !self.disable_sax {
                         if let Some(processing_instruction) = self
                             .sax
                             .as_deref_mut()

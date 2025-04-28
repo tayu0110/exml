@@ -158,7 +158,7 @@ impl XmlParserCtxt {
         self.skip_blanks();
 
         // Create and update the internal subset.
-        if self.disable_sax == 0 {
+        if !self.disable_sax {
             if let Some(internal_subset) =
                 self.sax.as_deref_mut().and_then(|sax| sax.internal_subset)
             {
@@ -463,7 +463,7 @@ impl XmlParserCtxt {
             if let Some(element_decl) = self
                 .sax
                 .as_deref_mut()
-                .filter(|_| self.disable_sax == 0)
+                .filter(|_| !self.disable_sax)
                 .and_then(|sax| sax.element_decl)
             {
                 if let Some(content) = content.as_ref() {
@@ -1069,7 +1069,7 @@ impl XmlParserCtxt {
                 if let Some(attribute_decl) = self
                     .sax
                     .as_deref_mut()
-                    .filter(|_| self.disable_sax == 0)
+                    .filter(|_| !self.disable_sax)
                     .and_then(|sax| sax.attribute_decl)
                 {
                     attribute_decl(
@@ -1802,7 +1802,7 @@ impl XmlParserCtxt {
                     let (value, original) = self.parse_entity_value();
                     orig = original;
                     if let Some(value) = value {
-                        if self.disable_sax == 0 {
+                        if !self.disable_sax {
                             if let Some(entity_decl) =
                                 self.sax.as_deref_mut().and_then(|sax| sax.entity_decl)
                             {
@@ -1830,7 +1830,7 @@ impl XmlParserCtxt {
                             if parsed_uri.fragment.is_some() {
                                 // Okay this is foolish to block those but not invalid URIs.
                                 xml_fatal_err(self, XmlParserErrors::XmlErrURIFragment, None);
-                            } else if self.disable_sax == 0 {
+                            } else if !self.disable_sax {
                                 if let Some(entity_decl) =
                                     self.sax.as_deref_mut().and_then(|sax| sax.entity_decl)
                                 {
@@ -1857,7 +1857,7 @@ impl XmlParserCtxt {
             } else if self.current_byte() == b'"' || self.current_byte() == b'\'' {
                 let (value, original) = self.parse_entity_value();
                 orig = original;
-                if self.disable_sax == 0 {
+                if !self.disable_sax {
                     if let Some(entity_decl) =
                         self.sax.as_deref_mut().and_then(|sax| sax.entity_decl)
                     {
@@ -1940,7 +1940,7 @@ impl XmlParserCtxt {
                         );
                     }
                     let ndata = self.parse_name();
-                    if self.disable_sax == 0 {
+                    if !self.disable_sax {
                         if let Some(unparsed_ent) = self
                             .sax
                             .as_deref_mut()
@@ -1956,7 +1956,7 @@ impl XmlParserCtxt {
                         }
                     }
                 } else {
-                    if self.disable_sax == 0 {
+                    if !self.disable_sax {
                         if let Some(entity_decl) =
                             self.sax.as_deref_mut().and_then(|sax| sax.entity_decl)
                         {
@@ -2118,7 +2118,7 @@ impl XmlParserCtxt {
                     );
                 }
                 self.skip_char();
-                if self.disable_sax == 0 {
+                if !self.disable_sax {
                     if let Some(notation_decl) =
                         self.sax.as_deref_mut().and_then(|sax| sax.notation_decl)
                     {

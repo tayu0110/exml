@@ -190,7 +190,7 @@ pub struct XmlParserCtxt {
     // ugly but ...
     pub(crate) keep_blanks: bool,
     // SAX callbacks are disabled
-    pub(crate) disable_sax: i32,
+    pub(crate) disable_sax: bool,
     // Parsing is in int 1/ext 2 subset
     pub in_subset: i32,
     // name of subset
@@ -778,7 +778,7 @@ impl XmlParserCtxt {
     #[doc(alias = "xmlHaltParser")]
     pub(crate) fn halt(&mut self) {
         self.instate = XmlParserInputState::XmlParserEOF;
-        self.disable_sax = 1;
+        self.disable_sax = true;
         while self.input_tab.len() > 1 {
             self.input_pop();
         }
@@ -830,7 +830,7 @@ impl XmlParserCtxt {
         self.token = 0;
         self.well_formed = true;
         self.ns_well_formed = 1;
-        self.disable_sax = 0;
+        self.disable_sax = false;
         self.valid = 1;
         self.record_info = false;
         self.check_index = 0;
@@ -2046,7 +2046,7 @@ impl Default for XmlParserCtxt {
             nb_chars: 0,
             check_index: 0,
             keep_blanks: get_keep_blanks_default_value(),
-            disable_sax: 0,
+            disable_sax: false,
             in_subset: 0,
             int_sub_name: None,
             ext_sub_uri: None,

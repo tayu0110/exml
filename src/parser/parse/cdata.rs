@@ -102,7 +102,7 @@ impl XmlParserCtxt {
             self.advance_with_line_handling(l as usize);
             if buf.len() >= XML_PARSER_BIG_BUFFER_SIZE {
                 // OK the segment is to be consumed as chars.
-                if self.disable_sax == 0 {
+                if !self.disable_sax {
                     let blank = self.are_blanks(&buf, false);
                     if let Some(sax) = self.sax.as_deref_mut() {
                         if blank {
@@ -140,7 +140,7 @@ impl XmlParserCtxt {
         }
         if !buf.is_empty() {
             // OK the segment is to be consumed as chars.
-            if self.disable_sax == 0 {
+            if !self.disable_sax {
                 let blank = self.are_blanks(&buf, false);
                 if let Some(sax) = self.sax.as_deref_mut() {
                     if blank {
@@ -513,7 +513,7 @@ impl XmlParserCtxt {
         self.advance_with_line_handling(l as usize);
 
         // OK the buffer is to be consumed as cdata.
-        if self.disable_sax == 0 {
+        if !self.disable_sax {
             if let Some(sax) = self.sax.as_deref_mut() {
                 if let Some(cdata) = sax.cdata_block {
                     cdata(self, &buf);

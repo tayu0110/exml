@@ -134,7 +134,7 @@ impl XmlParserCtxt {
         if self.content_bytes().starts_with(b"/>") {
             self.advance(2);
             if self.sax2 != 0 {
-                if self.disable_sax == 0 {
+                if !self.disable_sax {
                     if let Some(end_element_ns) =
                         self.sax.as_deref_mut().and_then(|sax| sax.end_element_ns)
                     {
@@ -143,7 +143,7 @@ impl XmlParserCtxt {
                 }
             } else {
                 #[cfg(feature = "sax1")]
-                if self.disable_sax == 0 {
+                if !self.disable_sax {
                     if let Some(end_element) =
                         self.sax.as_deref_mut().and_then(|sax| sax.end_element)
                     {
@@ -294,7 +294,7 @@ impl XmlParserCtxt {
         }
 
         // SAX: Start of Element !
-        if self.disable_sax == 0 {
+        if !self.disable_sax {
             if let Some(start_element) = self.sax.as_deref_mut().and_then(|sax| sax.start_element) {
                 if !atts.is_empty() {
                     start_element(self, &name, atts.as_slice());
@@ -678,7 +678,7 @@ impl XmlParserCtxt {
         }
 
         // SAX: Start of Element !
-        if self.disable_sax == 0 {
+        if !self.disable_sax {
             if let Some(start_element_ns) =
                 self.sax.as_deref_mut().and_then(|sax| sax.start_element_ns)
             {
@@ -851,7 +851,7 @@ impl XmlParserCtxt {
         }
 
         // SAX: End of Tag
-        if self.disable_sax == 0 {
+        if !self.disable_sax {
             if let Some(end_element) = self.sax.as_deref_mut().and_then(|sax| sax.end_element) {
                 end_element(self, self.name.clone().as_deref().unwrap());
             }
@@ -912,7 +912,7 @@ impl XmlParserCtxt {
         }
 
         // SAX: End of Tag
-        if self.disable_sax == 0 {
+        if !self.disable_sax {
             if let Some(end_element_ns) = self.sax.as_deref_mut().and_then(|sax| sax.end_element_ns)
             {
                 end_element_ns(

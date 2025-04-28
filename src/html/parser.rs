@@ -206,7 +206,7 @@ fn html_skip_blank_chars(ctxt: &mut XmlParserCtxt) -> i32 {
 #[doc(alias = "htmlParseErrInt")]
 macro_rules! html_parse_err_int {
     ($ctxt:expr, $error:expr, $msg:literal, $val:expr) => {
-        if $ctxt.disable_sax == 0 || !matches!($ctxt.instate, XmlParserInputState::XmlParserEOF) {
+        if !$ctxt.disable_sax || !matches!($ctxt.instate, XmlParserInputState::XmlParserEOF) {
             $ctxt.err_no = $error as i32;
             __xml_raise_error!(
                 None,
@@ -294,7 +294,7 @@ fn html_parse_err(
     str2: Option<&str>,
 ) {
     if ctxt.as_ref().is_none_or(|ctxt| {
-        ctxt.disable_sax != 0 && matches!(ctxt.instate, XmlParserInputState::XmlParserEOF)
+        ctxt.disable_sax && matches!(ctxt.instate, XmlParserInputState::XmlParserEOF)
     }) {
         return;
     }
@@ -762,7 +762,7 @@ const HTML_PARSER_BUFFER_SIZE: usize = 100;
 #[doc(alias = "htmlErrMemory")]
 pub(crate) fn html_err_memory(ctxt: Option<&mut XmlParserCtxt>, extra: Option<&str>) {
     if ctxt.as_ref().is_none_or(|ctxt| {
-        ctxt.disable_sax != 0 && matches!(ctxt.instate, XmlParserInputState::XmlParserEOF)
+        ctxt.disable_sax && matches!(ctxt.instate, XmlParserInputState::XmlParserEOF)
     }) {
         return;
     }
@@ -770,7 +770,7 @@ pub(crate) fn html_err_memory(ctxt: Option<&mut XmlParserCtxt>, extra: Option<&s
     if let Some(ctxt) = ctxt {
         ctxt.err_no = XmlParserErrors::XmlErrNoMemory as i32;
         ctxt.instate = XmlParserInputState::XmlParserEOF;
-        ctxt.disable_sax = 1;
+        ctxt.disable_sax = true;
         ptr = ctxt as *mut XmlParserCtxt;
     }
     if let Some(extra) = extra {
@@ -1778,7 +1778,7 @@ fn html_parse_script(ctxt: &mut HtmlParserCtxt) {
         return;
     }
 
-    if nbchar != 0 && ctxt.disable_sax == 0 {
+    if nbchar != 0 && !ctxt.disable_sax {
         if let Some(sax) = ctxt.sax.as_deref_mut() {
             buf[nbchar as usize] = 0;
             let s = from_utf8(&buf[..nbchar as usize]).expect("Internal Error");
@@ -2044,7 +2044,7 @@ fn html_parse_doc_type_decl(ctxt: &mut HtmlParserCtxt) {
     }
 
     // Create or update the document accordingly to the DOCTYPE
-    if ctxt.disable_sax == 0 {
+    if !ctxt.disable_sax {
         if let Some(internal_subset) = ctxt.sax.as_deref_mut().and_then(|sax| sax.internal_subset) {
             internal_subset(
                 ctxt,
@@ -2185,7 +2185,7 @@ fn html_parse_comment(ctxt: &mut HtmlParserCtxt) {
         }
         if cur == b'>' as i32 {
             ctxt.skip_char();
-            if ctxt.disable_sax == 0 {
+            if !ctxt.disable_sax {
                 if let Some(comment) = ctxt.sax.as_deref_mut().and_then(|sax| sax.comment) {
                     comment(&mut *ctxt, &buf);
                 }
@@ -2253,7 +2253,7 @@ fn html_parse_pi(ctxt: &mut HtmlParserCtxt) {
                 ctxt.advance(1);
 
                 // SAX: PI detected.
-                if ctxt.disable_sax == 0 {
+                if !ctxt.disable_sax {
                     if let Some(processing_instruction) = ctxt
                         .sax
                         .as_deref_mut()
@@ -2319,7 +2319,7 @@ fn html_parse_pi(ctxt: &mut HtmlParserCtxt) {
                 ctxt.advance(1);
 
                 // SAX: PI detected.
-                if ctxt.disable_sax == 0 {
+                if !ctxt.disable_sax {
                     if let Some(processing_instruction) = ctxt
                         .sax
                         .as_deref_mut()
@@ -2604,7 +2604,7 @@ fn html_parse_char_data_internal(ctxt: &mut HtmlParserCtxt, readahead: i32) {
             buf[nbchar as usize] = 0;
 
             // Ok the segment is to be consumed as chars.
-            if ctxt.disable_sax == 0 && ctxt.sax.is_some() {
+            if !ctxt.disable_sax && ctxt.sax.is_some() {
                 let s = from_utf8(&buf[..nbchar as usize]).expect("Internal Error");
                 if are_blanks(ctxt, s) != 0 {
                     if ctxt.keep_blanks {
@@ -2635,7 +2635,7 @@ fn html_parse_char_data_internal(ctxt: &mut HtmlParserCtxt, readahead: i32) {
         buf[nbchar as usize] = 0;
 
         // Ok the segment is to be consumed as chars.
-        if ctxt.disable_sax == 0 && ctxt.sax.is_some() {
+        if !ctxt.disable_sax && ctxt.sax.is_some() {
             let s = from_utf8(&buf[..nbchar as usize]).expect("Internal Error");
             if are_blanks(ctxt, s) != 0 {
                 if ctxt.keep_blanks {
@@ -3008,7 +3008,7 @@ fn html_parse_content_internal(ctxt: &mut HtmlParserCtxt) {
             current_node = ctxt.name.clone();
             depth = ctxt.name_tab.len();
         } else if ctxt.current_byte() == b'<' {
-            if ctxt.disable_sax == 0 {
+            if !ctxt.disable_sax {
                 if let Some(characters) = ctxt.sax.as_deref_mut().and_then(|sax| sax.characters) {
                     characters(ctxt, "<");
                 }
@@ -3083,7 +3083,7 @@ pub fn html_parse_document(ctxt: &mut HtmlParserCtxt) -> i32 {
         );
     }
 
-    if ctxt.disable_sax == 0 {
+    if !ctxt.disable_sax {
         if let Some(start_document) = ctxt.sax.as_deref_mut().and_then(|sax| sax.start_document) {
             start_document(ctxt);
         }
@@ -3652,7 +3652,7 @@ fn html_parse_try_or_finish(ctxt: &mut HtmlParserCtxt, terminate: i32) -> i32 {
                 {
                     set_document_locator(&mut *ctxt, XmlSAXLocator::default());
                 }
-                if ctxt.disable_sax == 0 {
+                if !ctxt.disable_sax {
                     if let Some(start_document) =
                         ctxt.sax.as_deref_mut().and_then(|sax| sax.start_document)
                     {
@@ -4025,7 +4025,7 @@ fn html_parse_try_or_finish(ctxt: &mut HtmlParserCtxt, terminate: i32) -> i32 {
                     ctxt.check_index = 0;
                     break 'to_break;
                 } else if ctxt.current_byte() == b'<' {
-                    if ctxt.disable_sax == 0 {
+                    if !ctxt.disable_sax {
                         if let Some(characters) =
                             ctxt.sax.as_deref_mut().and_then(|sax| sax.characters)
                         {
@@ -4350,7 +4350,7 @@ pub fn html_ctxt_reset(ctxt: &mut HtmlParserCtxt) {
     ctxt.token = 0;
     ctxt.well_formed = true;
     ctxt.ns_well_formed = 1;
-    ctxt.disable_sax = 0;
+    ctxt.disable_sax = false;
     ctxt.valid = 1;
     ctxt.vctxt.user_data = None;
     ctxt.vctxt.flags = XML_VCTXT_USE_PCTXT as _;

@@ -328,7 +328,7 @@ impl XmlParserCtxt {
 
             'encoding_error: {
                 while !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                    if self.err_no != XmlParserErrors::XmlErrOK as i32 && self.disable_sax == 1 {
+                    if self.err_no != XmlParserErrors::XmlErrOK as i32 && self.disable_sax {
                         return 0;
                     }
 
@@ -448,7 +448,7 @@ impl XmlParserCtxt {
                                     {
                                         self.encoding = self.input().unwrap().encoding.clone();
                                     }
-                                    if self.disable_sax == 0 {
+                                    if !self.disable_sax {
                                         if let Some(start_document) = self
                                             .sax
                                             .as_deref_mut()
@@ -460,7 +460,7 @@ impl XmlParserCtxt {
                                     self.instate = XmlParserInputState::XmlParserMisc;
                                 } else {
                                     self.version = Some(XML_DEFAULT_VERSION.to_owned());
-                                    if self.disable_sax == 0 {
+                                    if !self.disable_sax {
                                         if let Some(start_document) = self
                                             .sax
                                             .as_deref_mut()
@@ -480,7 +480,7 @@ impl XmlParserCtxt {
                                     set_document_locator(self, XmlSAXLocator::default());
                                 }
                                 self.version = Some(XML_DEFAULT_VERSION.to_owned());
-                                if self.disable_sax == 0 {
+                                if !self.disable_sax {
                                     if let Some(start_document) =
                                         self.sax.as_deref_mut().and_then(|sax| sax.start_document)
                                     {
@@ -562,7 +562,7 @@ impl XmlParserCtxt {
                                 self.advance(2);
 
                                 if self.sax2 != 0 {
-                                    if self.disable_sax == 0 {
+                                    if !self.disable_sax {
                                         if let Some(end_element_ns) = self
                                             .sax
                                             .as_deref_mut()
@@ -581,7 +581,7 @@ impl XmlParserCtxt {
                                     }
                                 } else {
                                     #[cfg(feature = "sax1")]
-                                    if self.disable_sax == 0 {
+                                    if !self.disable_sax {
                                         if let Some(end_element) =
                                             self.sax.as_deref_mut().and_then(|sax| sax.end_element)
                                         {
@@ -753,7 +753,7 @@ impl XmlParserCtxt {
                                         break 'encoding_error;
                                     }
                                 }
-                                if self.disable_sax == 0 {
+                                if !self.disable_sax {
                                     if let Some(cdata_block) = self
                                         .sax
                                         .as_deref_mut()
@@ -817,7 +817,7 @@ impl XmlParserCtxt {
                                             break 'encoding_error;
                                         }
                                     };
-                                if self.disable_sax == 0 {
+                                if !self.disable_sax {
                                     if let Some(sax) = self.sax.as_deref_mut() {
                                         if let Some(cdata_block) = sax.cdata_block {
                                             // # Safety
@@ -896,7 +896,7 @@ impl XmlParserCtxt {
                                     } else {
                                         // Create and update the external subset.
                                         self.in_subset = 2;
-                                        if self.disable_sax == 0 {
+                                        if !self.disable_sax {
                                             if let Some(external_subset) = self
                                                 .sax
                                                 .as_deref_mut()
@@ -961,7 +961,7 @@ impl XmlParserCtxt {
                                 return ret;
                             }
                             self.in_subset = 2;
-                            if self.disable_sax == 0 {
+                            if !self.disable_sax {
                                 if let Some(external_subset) =
                                     self.sax.as_deref_mut().and_then(|sax| sax.external_subset)
                                 {
@@ -1054,7 +1054,7 @@ impl XmlParserCtxt {
         unsafe {
             let mut end_in_lf: i32 = 0;
 
-            if self.err_no != XmlParserErrors::XmlErrOK as i32 && self.disable_sax == 1 {
+            if self.err_no != XmlParserErrors::XmlErrOK as i32 && self.disable_sax {
                 return self.err_no;
             }
             if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
@@ -1133,7 +1133,7 @@ impl XmlParserCtxt {
                 );
                 self.halt();
             }
-            if self.err_no != XmlParserErrors::XmlErrOK as i32 && self.disable_sax == 1 {
+            if self.err_no != XmlParserErrors::XmlErrOK as i32 && self.disable_sax {
                 return self.err_no;
             }
 

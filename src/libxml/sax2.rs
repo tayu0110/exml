@@ -175,7 +175,7 @@ fn xml_sax2_err_memory(ctxt: &mut XmlParserCtxt, msg: &str) {
     );
     ctxt.err_no = XmlParserErrors::XmlErrNoMemory as i32;
     ctxt.instate = XmlParserInputState::XmlParserEOF;
-    ctxt.disable_sax = 1;
+    ctxt.disable_sax = true;
 }
 
 /// Callback on internal subset declaration.
@@ -318,7 +318,7 @@ macro_rules! xml_fatal_err_msg {
     (@inner, $ctxt:expr, $error:expr, $msg:expr, $str1:expr, $str2:expr) => {
         let ctxt = $ctxt as *mut $crate::parser::XmlParserCtxt;
         if ctxt.is_null()
-            || (*ctxt).disable_sax == 0
+            || !(*ctxt).disable_sax
             || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
         {
             if !ctxt.is_null() {
@@ -346,7 +346,7 @@ macro_rules! xml_fatal_err_msg {
                 (*ctxt).well_formed = false;
                 (*ctxt).valid = 0;
                 if (*ctxt).recovery == 0 {
-                    (*ctxt).disable_sax = 1;
+                    (*ctxt).disable_sax = true;
                 }
             }
         }
@@ -435,7 +435,7 @@ macro_rules! xml_warn_msg {
     ($ctxt:expr, $error:expr, $msg:literal, $str1:expr) => {
         let ctxt = $ctxt as *mut $crate::parser::XmlParserCtxt;
         if ctxt.is_null()
-            || (*ctxt).disable_sax == 0
+            || !(*ctxt).disable_sax
             || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
         {
             if !ctxt.is_null() {
@@ -573,7 +573,7 @@ macro_rules! xml_err_valid {
         let mut schannel: Option<StructuredError> = None;
 
         if ctxt.is_null()
-            || (*ctxt).disable_sax == 0
+            || !(*ctxt).disable_sax
             || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
         {
             if !ctxt.is_null() {
@@ -902,7 +902,7 @@ pub fn xml_sax2_start_document(ctxt: &mut XmlParserCtxt) {
             generic_error!("libxml2 built without HTML support\n",);
             ctxt.err_no = XmlParserErrors::XmlErrInternalError as i32;
             ctxt.instate = XmlParserInputState::XmlParserEOF;
-            ctxt.disable_sax = 1;
+            ctxt.disable_sax = true;
             return;
         }
     } else {
@@ -997,7 +997,7 @@ macro_rules! xml_ns_warn_msg {
     (@inner, $ctxt:expr, $error:expr, $msg:expr, $str1:expr, $str2:expr) => {
         let ctxt = $ctxt as *mut $crate::parser::XmlParserCtxt;
         if ctxt.is_null()
-            || (*ctxt).disable_sax == 0
+            || !(*ctxt).disable_sax
             || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
         {
             if !ctxt.is_null() {
@@ -1064,7 +1064,7 @@ macro_rules! xml_ns_err_msg {
     (@inner, $ctxt:expr, $error:expr, $msg:expr, $str1:expr, $str2:expr) => {
         let ctxt = $ctxt as *mut $crate::parser::XmlParserCtxt;
         if ctxt.is_null()
-            || (*ctxt).disable_sax == 0
+            || !(*ctxt).disable_sax
             || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
         {
             if !ctxt.is_null() {
@@ -1303,7 +1303,7 @@ unsafe fn xml_sax2_attribute_internal(
                         );
                         ctxt.well_formed = false;
                         if ctxt.recovery == 0 {
-                            ctxt.disable_sax = 1;
+                            ctxt.disable_sax = true;
                         }
                         return;
                     }

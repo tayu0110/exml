@@ -118,7 +118,7 @@ impl XmlParserCtxt {
                 );
             }
             self.skip_char();
-            if self.disable_sax == 0 {
+            if !self.disable_sax {
                 if let Some(comment) = self.sax.as_deref_mut().and_then(|sax| sax.comment) {
                     comment(self, buf);
                 }
@@ -213,7 +213,7 @@ impl XmlParserCtxt {
                             );
                         }
                         self.advance(3);
-                        if self.disable_sax == 0 {
+                        if !self.disable_sax {
                             if let Some(comment) =
                                 self.sax.as_deref_mut().and_then(|sax| sax.comment)
                             {

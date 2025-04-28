@@ -700,7 +700,7 @@ impl XmlParserCtxt {
                     // generate a CharRef.
                     if value as u32 <= 0xFF {
                         let out = value.encode_utf8(&mut out[..]);
-                        if self.disable_sax == 0 {
+                        if !self.disable_sax {
                             if let Some(characters) =
                                 self.sax.as_deref_mut().and_then(|sax| sax.characters)
                             {
@@ -717,7 +717,7 @@ impl XmlParserCtxt {
                         }
                         let rem = slice.len();
                         let len = out.len() - rem;
-                        if self.disable_sax == 0 {
+                        if !self.disable_sax {
                             if let Some(reference) =
                                 self.sax.as_deref_mut().and_then(|sax| sax.reference)
                             {
@@ -732,7 +732,7 @@ impl XmlParserCtxt {
                 } else {
                     // Just encode the value in UTF-8
                     let out = value.encode_utf8(&mut out[..]);
-                    if self.disable_sax == 0 {
+                    if !self.disable_sax {
                         if let Some(characters) =
                             self.sax.as_deref_mut().and_then(|sax| sax.characters)
                         {
@@ -758,7 +758,7 @@ impl XmlParserCtxt {
                     return;
                 };
                 // inline the entity.
-                if self.disable_sax == 0 {
+                if !self.disable_sax {
                     if let Some(characters) = self.sax.as_deref_mut().and_then(|sax| sax.characters)
                     {
                         characters(self, val);
@@ -969,7 +969,7 @@ impl XmlParserCtxt {
                         return;
                     }
                 }
-                if !self.replace_entities && self.disable_sax == 0 {
+                if !self.replace_entities && !self.disable_sax {
                     if let Some(reference) = self.sax.as_deref_mut().and_then(|sax| sax.reference) {
                         // Entity reference callback comes second, it's somewhat
                         // superfluous but a compatibility to historical behaviour
@@ -986,7 +986,7 @@ impl XmlParserCtxt {
             }
 
             // If we didn't get any children for the entity being built
-            if !self.replace_entities && self.disable_sax == 0 {
+            if !self.replace_entities && !self.disable_sax {
                 if let Some(reference) = self.sax.as_deref_mut().and_then(|sax| sax.reference) {
                     // Create a node.
                     reference(self, &ent.name().unwrap());

@@ -2089,7 +2089,7 @@ fn xml_text_writer_start_document_callback(ctxt: &mut XmlParserCtxt) {
                 }
                 ctxt.err_no = XmlParserErrors::XmlErrNoMemory as i32;
                 ctxt.instate = XmlParserInputState::XmlParserEOF;
-                ctxt.disable_sax = 1;
+                ctxt.disable_sax = true;
                 return;
             }
         }
@@ -2102,7 +2102,7 @@ fn xml_text_writer_start_document_callback(ctxt: &mut XmlParserCtxt) {
             );
             ctxt.err_no = XmlParserErrors::XmlErrInternalError as i32;
             ctxt.instate = XmlParserInputState::XmlParserEOF;
-            ctxt.disable_sax = 1;
+            ctxt.disable_sax = true;
             return;
         }
     } else {
@@ -2124,7 +2124,7 @@ fn xml_text_writer_start_document_callback(ctxt: &mut XmlParserCtxt) {
             }
             ctxt.err_no = XmlParserErrors::XmlErrNoMemory as i32;
             ctxt.instate = XmlParserInputState::XmlParserEOF;
-            ctxt.disable_sax = 1;
+            ctxt.disable_sax = true;
             return;
         }
     }
