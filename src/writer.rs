@@ -212,149 +212,137 @@ impl<'a> XmlTextWriter<'a> {
     ///
     /// Returns the new xmlTextWriterPtr or NULL in case of error
     #[doc(alias = "xmlNewTextWriterDoc")]
-    pub unsafe fn with_doc(doc: Option<&mut Option<XmlDocPtr>>, compression: i32) -> Option<Self> {
-        unsafe {
-            let mut sax_handler = XmlSAXHandler::default();
-            xml_sax2_init_default_sax_handler(&mut sax_handler, 1);
-            sax_handler.start_document = Some(xml_text_writer_start_document_callback);
-            sax_handler.start_element = Some(xml_sax2_start_element);
-            sax_handler.end_element = Some(xml_sax2_end_element);
+    pub fn with_doc(doc: Option<&mut Option<XmlDocPtr>>, compression: i32) -> Option<Self> {
+        let mut sax_handler = XmlSAXHandler::default();
+        xml_sax2_init_default_sax_handler(&mut sax_handler, 1);
+        sax_handler.start_document = Some(xml_text_writer_start_document_callback);
+        sax_handler.start_element = Some(xml_sax2_start_element);
+        sax_handler.end_element = Some(xml_sax2_end_element);
 
-            let Some(mut ctxt) =
-                XmlParserCtxt::new_push_parser(Some(Box::new(sax_handler)), None, b"", None)
-            else {
-                xml_writer_err_msg(
-                    None,
-                    XmlParserErrors::XmlErrInternalError,
-                    "xmlNewTextWriterDoc : error at xmlCreatePushParserCtxt!\n",
-                );
-                return None;
-            };
-            // For some reason this seems to completely break if node names are interned.
-            ctxt.dict_names = 0;
+        let Some(mut ctxt) =
+            XmlParserCtxt::new_push_parser(Some(Box::new(sax_handler)), None, b"", None)
+        else {
+            xml_writer_err_msg(
+                None,
+                XmlParserErrors::XmlErrInternalError,
+                "xmlNewTextWriterDoc : error at xmlCreatePushParserCtxt!\n",
+            );
+            return None;
+        };
+        // For some reason this seems to completely break if node names are interned.
+        ctxt.dict_names = 0;
 
-            ctxt.my_doc = xml_new_doc(Some(XML_DEFAULT_VERSION));
-            let Some(mut my_doc) = ctxt.my_doc else {
-                xml_writer_err_msg(
-                    None,
-                    XmlParserErrors::XmlErrInternalError,
-                    "xmlNewTextWriterDoc : error at xmlNewDoc!\n",
-                );
-                return None;
-            };
+        ctxt.my_doc = xml_new_doc(Some(XML_DEFAULT_VERSION));
+        let Some(mut my_doc) = ctxt.my_doc else {
+            xml_writer_err_msg(
+                None,
+                XmlParserErrors::XmlErrInternalError,
+                "xmlNewTextWriterDoc : error at xmlNewDoc!\n",
+            );
+            return None;
+        };
 
-            let Some(mut ret) = XmlTextWriter::from_push_parser(&mut ctxt, compression) else {
+        let Some(mut ret) = XmlTextWriter::from_push_parser(&mut ctxt, compression) else {
+            unsafe {
                 xml_free_doc(my_doc);
-                xml_writer_err_msg(
-                    None,
-                    XmlParserErrors::XmlErrInternalError,
-                    "xmlNewTextWriterDoc : error at xmlNewTextWriterPushParser!\n",
-                );
-                return None;
-            };
-
-            my_doc.set_compress_mode(compression);
-
-            if let Some(doc) = doc {
-                *doc = Some(my_doc);
-                ret.no_doc_free = 1;
             }
+            xml_writer_err_msg(
+                None,
+                XmlParserErrors::XmlErrInternalError,
+                "xmlNewTextWriterDoc : error at xmlNewTextWriterPushParser!\n",
+            );
+            return None;
+        };
 
-            Some(ret)
+        my_doc.set_compress_mode(compression);
+
+        if let Some(doc) = doc {
+            *doc = Some(my_doc);
+            ret.no_doc_free = 1;
         }
+
+        Some(ret)
     }
 
     /// Create a new xmlNewTextWriter structure with @doc as output starting at @node
     ///
     /// Returns the new xmlTextWriterPtr or NULL in case of error
     #[doc(alias = "xmlNewTextWriterTree")]
-    pub unsafe fn with_tree(
-        mut doc: XmlDocPtr,
-        node: XmlNodePtr,
-        compression: i32,
-    ) -> Option<Self> {
-        unsafe {
-            let mut sax_handler = XmlSAXHandler::default();
-            xml_sax2_init_default_sax_handler(&mut sax_handler, 1);
-            sax_handler.start_document = Some(xml_text_writer_start_document_callback);
-            sax_handler.start_element = Some(xml_sax2_start_element);
-            sax_handler.end_element = Some(xml_sax2_end_element);
+    pub fn with_tree(mut doc: XmlDocPtr, node: XmlNodePtr, compression: i32) -> Option<Self> {
+        let mut sax_handler = XmlSAXHandler::default();
+        xml_sax2_init_default_sax_handler(&mut sax_handler, 1);
+        sax_handler.start_document = Some(xml_text_writer_start_document_callback);
+        sax_handler.start_element = Some(xml_sax2_start_element);
+        sax_handler.end_element = Some(xml_sax2_end_element);
 
-            let Some(mut ctxt) =
-                XmlParserCtxt::new_push_parser(Some(Box::new(sax_handler)), None, b"", None)
-            else {
-                xml_writer_err_msg(
-                    None,
-                    XmlParserErrors::XmlErrInternalError,
-                    "xmlNewTextWriterDoc : error at xmlCreatePushParserCtxt!\n",
-                );
-                return None;
-            };
-            // For some reason this seems to completely break if node names are interned.
-            ctxt.dict_names = 0;
+        let Some(mut ctxt) =
+            XmlParserCtxt::new_push_parser(Some(Box::new(sax_handler)), None, b"", None)
+        else {
+            xml_writer_err_msg(
+                None,
+                XmlParserErrors::XmlErrInternalError,
+                "xmlNewTextWriterDoc : error at xmlCreatePushParserCtxt!\n",
+            );
+            return None;
+        };
+        // For some reason this seems to completely break if node names are interned.
+        ctxt.dict_names = 0;
 
-            let Some(mut ret) = XmlTextWriter::from_push_parser(&mut ctxt, compression) else {
-                xml_writer_err_msg(
-                    None,
-                    XmlParserErrors::XmlErrInternalError,
-                    "xmlNewTextWriterDoc : error at xmlNewTextWriterPushParser!\n",
-                );
-                return None;
-            };
+        let Some(mut ret) = XmlTextWriter::from_push_parser(&mut ctxt, compression) else {
+            xml_writer_err_msg(
+                None,
+                XmlParserErrors::XmlErrInternalError,
+                "xmlNewTextWriterDoc : error at xmlNewTextWriterPushParser!\n",
+            );
+            return None;
+        };
 
-            ctxt.my_doc = Some(doc);
-            ctxt.node = Some(node);
-            ret.no_doc_free = 1;
+        ctxt.my_doc = Some(doc);
+        ctxt.node = Some(node);
+        ret.no_doc_free = 1;
 
-            doc.set_compress_mode(compression);
+        doc.set_compress_mode(compression);
 
-            Some(ret)
-        }
+        Some(ret)
     }
 
     /// Write state dependent strings.
     ///
     /// Returns -1 on error or the number of characters written.
     #[doc(alias = "xmlTextWriterHandleStateDependencies")]
-    unsafe fn handle_state_dependencies(
-        &mut self,
-        p: Rc<XmlTextWriterStackEntry>,
-    ) -> io::Result<usize> {
-        unsafe {
-            let mut sum = 0;
-            match p.state.get() {
-                XmlTextWriterState::XmlTextwriterName => {
-                    // Output namespace declarations
-                    sum += self.output_nsdecl()?;
-                    sum += self.out.write_str(">")?;
-                    p.state.set(XmlTextWriterState::XmlTextwriterText);
-                }
-                XmlTextWriterState::XmlTextwriterPI => {
-                    sum += self.out.write_str(" ")?;
-                    p.state.set(XmlTextWriterState::XmlTextwriterPIText);
-                }
-                XmlTextWriterState::XmlTextwriterDTD => {
-                    sum += self.out.write_str(" [")?;
-                    p.state.set(XmlTextWriterState::XmlTextwriterDTDText);
-                }
-                XmlTextWriterState::XmlTextwriterDTDElem => {
-                    sum += self.out.write_str(" ")?;
-                    p.state.set(XmlTextWriterState::XmlTextwriterDTDElemText);
-                }
-                XmlTextWriterState::XmlTextwriterDTDAttl => {
-                    sum += self.out.write_str(" ")?;
-                    p.state.set(XmlTextWriterState::XmlTextwriterDTDAttlText);
-                }
-                XmlTextWriterState::XmlTextwriterDTDEnty
-                | XmlTextWriterState::XmlTextwriterDTDPEnt => {
-                    sum += self.out.write_bytes(&[b' ', self.qchar])?;
-                    p.state.set(XmlTextWriterState::XmlTextwriterDTDEntyText);
-                }
-                _ => {}
+    fn handle_state_dependencies(&mut self, p: Rc<XmlTextWriterStackEntry>) -> io::Result<usize> {
+        let mut sum = 0;
+        match p.state.get() {
+            XmlTextWriterState::XmlTextwriterName => {
+                // Output namespace declarations
+                sum += self.output_nsdecl()?;
+                sum += self.out.write_str(">")?;
+                p.state.set(XmlTextWriterState::XmlTextwriterText);
             }
-
-            Ok(sum)
+            XmlTextWriterState::XmlTextwriterPI => {
+                sum += self.out.write_str(" ")?;
+                p.state.set(XmlTextWriterState::XmlTextwriterPIText);
+            }
+            XmlTextWriterState::XmlTextwriterDTD => {
+                sum += self.out.write_str(" [")?;
+                p.state.set(XmlTextWriterState::XmlTextwriterDTDText);
+            }
+            XmlTextWriterState::XmlTextwriterDTDElem => {
+                sum += self.out.write_str(" ")?;
+                p.state.set(XmlTextWriterState::XmlTextwriterDTDElemText);
+            }
+            XmlTextWriterState::XmlTextwriterDTDAttl => {
+                sum += self.out.write_str(" ")?;
+                p.state.set(XmlTextWriterState::XmlTextwriterDTDAttlText);
+            }
+            XmlTextWriterState::XmlTextwriterDTDEnty | XmlTextWriterState::XmlTextwriterDTDPEnt => {
+                sum += self.out.write_bytes(&[b' ', self.qchar])?;
+                p.state.set(XmlTextWriterState::XmlTextwriterDTDEntyText);
+            }
+            _ => {}
         }
+
+        Ok(sum)
     }
 
     /// Set indentation output. indent = 0 do not indentation. indent > 0 do indentation.
@@ -409,94 +397,85 @@ impl<'a> XmlTextWriter<'a> {
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterWriteRawLen")]
     #[doc(alias = "xmlTextWriterWriteRaw")]
-    pub unsafe fn write_bytes(&mut self, content: &[u8]) -> io::Result<usize> {
-        unsafe {
-            let mut sum = 0;
-            if let Some(lk) = self.nodes.front().cloned() {
-                sum += self.handle_state_dependencies(lk)?;
-            }
-
-            if self.indent != 0 {
-                self.doindent = 0;
-            }
-
-            sum += self.out.write_bytes(content)?;
-            Ok(sum)
+    pub fn write_bytes(&mut self, content: &[u8]) -> io::Result<usize> {
+        let mut sum = 0;
+        if let Some(lk) = self.nodes.front().cloned() {
+            sum += self.handle_state_dependencies(lk)?;
         }
+
+        if self.indent != 0 {
+            self.doindent = 0;
+        }
+
+        sum += self.out.write_bytes(content)?;
+        Ok(sum)
     }
 
     /// Write an xml text.
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterWriteString")]
-    pub unsafe fn write_string(&mut self, content: &str) -> io::Result<usize> {
-        unsafe {
-            let mut sum = 0;
-            if let Some(lk) = self.nodes.front() {
-                match lk.state.get() {
-                    XmlTextWriterState::XmlTextwriterName
-                    | XmlTextWriterState::XmlTextwriterText => {
-                        let buf = xml_encode_special_chars(None, content);
-                        sum += self.write_bytes(buf.as_bytes())?;
-                    }
-                    XmlTextWriterState::XmlTextwriterAttribute => {
-                        attr_serialize_text_content(&mut self.out, self.doc, None, content);
-                    }
-                    _ => {
-                        sum += self.write_bytes(content.as_bytes())?;
-                    }
+    pub fn write_string(&mut self, content: &str) -> io::Result<usize> {
+        let mut sum = 0;
+        if let Some(lk) = self.nodes.front() {
+            match lk.state.get() {
+                XmlTextWriterState::XmlTextwriterName | XmlTextWriterState::XmlTextwriterText => {
+                    let buf = xml_encode_special_chars(None, content);
+                    sum += self.write_bytes(buf.as_bytes())?;
+                }
+                XmlTextWriterState::XmlTextwriterAttribute => {
+                    attr_serialize_text_content(&mut self.out, self.doc, None, content);
+                }
+                _ => {
+                    sum += self.write_bytes(content.as_bytes())?;
                 }
             }
-
-            Ok(sum)
         }
+
+        Ok(sum)
     }
 
     /// Write an base64 encoded xml text.
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterWriteBase64")]
-    pub unsafe fn write_base64(&mut self, data: &[u8]) -> io::Result<usize> {
-        unsafe {
-            let mut sum = 0;
-            if let Some(lk) = self.nodes.front().cloned() {
-                sum += self.handle_state_dependencies(lk)?;
-            }
-
-            if self.indent != 0 {
-                self.doindent = 0;
-            }
-
-            sum += xml_output_buffer_write_base64(&mut self.out, data)?;
-            Ok(sum)
+    pub fn write_base64(&mut self, data: &[u8]) -> io::Result<usize> {
+        let mut sum = 0;
+        if let Some(lk) = self.nodes.front().cloned() {
+            sum += self.handle_state_dependencies(lk)?;
         }
+
+        if self.indent != 0 {
+            self.doindent = 0;
+        }
+
+        sum += xml_output_buffer_write_base64(&mut self.out, data)?;
+        Ok(sum)
     }
 
     /// Write a BinHex encoded xml text.
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterWriteBinHex")]
-    pub unsafe fn write_bin_hex(&mut self, data: &[u8]) -> io::Result<usize> {
-        unsafe {
-            let mut sum = 0;
-            if let Some(lk) = self.nodes.front().cloned() {
-                sum += self.handle_state_dependencies(lk)?;
-            }
-
-            if self.indent != 0 {
-                self.doindent = 0;
-            }
-
-            sum += xml_output_buffer_write_bin_hex(&mut self.out, data)?;
-            Ok(sum)
+    pub fn write_bin_hex(&mut self, data: &[u8]) -> io::Result<usize> {
+        let mut sum = 0;
+        if let Some(lk) = self.nodes.front().cloned() {
+            sum += self.handle_state_dependencies(lk)?;
         }
+
+        if self.indent != 0 {
+            self.doindent = 0;
+        }
+
+        sum += xml_output_buffer_write_bin_hex(&mut self.out, data)?;
+        Ok(sum)
     }
 
     /// Write indent string.
     ///
     /// Returns -1 on error or the number of strings written.
     #[doc(alias = "xmlTextWriterWriteIndent")]
-    unsafe fn write_indent(&mut self) -> io::Result<usize> {
+    fn write_indent(&mut self) -> io::Result<usize> {
         let lksize = self.nodes.len();
         if lksize < 1 {
             return Err(io::Error::other("List is empty"));
@@ -594,354 +573,334 @@ impl<'a> XmlTextWriter<'a> {
     ///
     /// Returns the bytes written or -1 in case of error
     #[doc(alias = "xmlTextWriterEndDocument")]
-    pub unsafe fn end_document(&mut self) -> io::Result<usize> {
-        unsafe {
-            let mut sum = 0;
-            while let Some(lk) = self.nodes.front() {
-                match lk.state.get() {
-                    XmlTextWriterState::XmlTextwriterName
-                    | XmlTextWriterState::XmlTextwriterAttribute
-                    | XmlTextWriterState::XmlTextwriterText => {
-                        sum += self.end_element()?;
-                    }
-                    XmlTextWriterState::XmlTextwriterPI
-                    | XmlTextWriterState::XmlTextwriterPIText => {
-                        sum += self.end_pi()?;
-                    }
-                    XmlTextWriterState::XmlTextwriterCDATA => {
-                        sum += self.end_cdata()?;
-                    }
-                    XmlTextWriterState::XmlTextwriterDTD
-                    | XmlTextWriterState::XmlTextwriterDTDText
-                    | XmlTextWriterState::XmlTextwriterDTDElem
-                    | XmlTextWriterState::XmlTextwriterDTDElemText
-                    | XmlTextWriterState::XmlTextwriterDTDAttl
-                    | XmlTextWriterState::XmlTextwriterDTDAttlText
-                    | XmlTextWriterState::XmlTextwriterDTDEnty
-                    | XmlTextWriterState::XmlTextwriterDTDEntyText
-                    | XmlTextWriterState::XmlTextwriterDTDPEnt => {
-                        sum += self.end_dtd()?;
-                    }
-                    XmlTextWriterState::XmlTextwriterComment => {
-                        sum += self.end_comment()?;
-                    }
-                    _ => {}
+    pub fn end_document(&mut self) -> io::Result<usize> {
+        let mut sum = 0;
+        while let Some(lk) = self.nodes.front() {
+            match lk.state.get() {
+                XmlTextWriterState::XmlTextwriterName
+                | XmlTextWriterState::XmlTextwriterAttribute
+                | XmlTextWriterState::XmlTextwriterText => {
+                    sum += self.end_element()?;
                 }
+                XmlTextWriterState::XmlTextwriterPI | XmlTextWriterState::XmlTextwriterPIText => {
+                    sum += self.end_pi()?;
+                }
+                XmlTextWriterState::XmlTextwriterCDATA => {
+                    sum += self.end_cdata()?;
+                }
+                XmlTextWriterState::XmlTextwriterDTD
+                | XmlTextWriterState::XmlTextwriterDTDText
+                | XmlTextWriterState::XmlTextwriterDTDElem
+                | XmlTextWriterState::XmlTextwriterDTDElemText
+                | XmlTextWriterState::XmlTextwriterDTDAttl
+                | XmlTextWriterState::XmlTextwriterDTDAttlText
+                | XmlTextWriterState::XmlTextwriterDTDEnty
+                | XmlTextWriterState::XmlTextwriterDTDEntyText
+                | XmlTextWriterState::XmlTextwriterDTDPEnt => {
+                    sum += self.end_dtd()?;
+                }
+                XmlTextWriterState::XmlTextwriterComment => {
+                    sum += self.end_comment()?;
+                }
+                _ => {}
             }
-
-            if self.indent == 0 {
-                sum += self.out.write_str("\n")?;
-            }
-
-            sum += self.flush() as usize;
-            Ok(sum)
         }
+
+        if self.indent == 0 {
+            sum += self.out.write_str("\n")?;
+        }
+
+        sum += self.flush() as usize;
+        Ok(sum)
     }
 
     /// Start an xml element.
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterStartElement")]
-    pub unsafe fn start_element(&mut self, name: &str) -> io::Result<usize> {
-        unsafe {
-            if name.is_empty() {
-                return Err(io::Error::other("Writer or name is NULL"));
-            }
-
-            let mut sum = 0;
-            if let Some(lk) = self.nodes.front().cloned() {
-                match lk.state.get() {
-                    XmlTextWriterState::XmlTextwriterPI
-                    | XmlTextWriterState::XmlTextwriterPIText => {
-                        return Err(io::Error::other("Not start element"));
-                    }
-                    XmlTextWriterState::XmlTextwriterNone => {}
-                    ty @ XmlTextWriterState::XmlTextwriterAttribute
-                    | ty @ XmlTextWriterState::XmlTextwriterName => {
-                        if matches!(ty, XmlTextWriterState::XmlTextwriterAttribute) {
-                            sum += self.end_attribute()?;
-                        }
-
-                        // Output namespace declarations
-                        sum += self.output_nsdecl()?;
-                        sum += self.out.write_str(">")?;
-                        if self.indent != 0 {
-                            // count =
-                            self.out.write_str("\n")?;
-                        }
-                        lk.state.set(XmlTextWriterState::XmlTextwriterText);
-                    }
-                    _ => {}
-                }
-            }
-
-            let p = XmlTextWriterStackEntry {
-                name: Some(name.to_owned()),
-                state: Cell::new(XmlTextWriterState::XmlTextwriterName),
-            };
-            self.nodes.push_front(p.into());
-
-            if self.indent != 0 {
-                sum += self.write_indent()?;
-            }
-
-            sum += self.out.write_str("<")?;
-            sum += self.out.write_str(name)?;
-            Ok(sum)
+    pub fn start_element(&mut self, name: &str) -> io::Result<usize> {
+        if name.is_empty() {
+            return Err(io::Error::other("Writer or name is NULL"));
         }
+
+        let mut sum = 0;
+        if let Some(lk) = self.nodes.front().cloned() {
+            match lk.state.get() {
+                XmlTextWriterState::XmlTextwriterPI | XmlTextWriterState::XmlTextwriterPIText => {
+                    return Err(io::Error::other("Not start element"));
+                }
+                XmlTextWriterState::XmlTextwriterNone => {}
+                ty @ XmlTextWriterState::XmlTextwriterAttribute
+                | ty @ XmlTextWriterState::XmlTextwriterName => {
+                    if matches!(ty, XmlTextWriterState::XmlTextwriterAttribute) {
+                        sum += self.end_attribute()?;
+                    }
+
+                    // Output namespace declarations
+                    sum += self.output_nsdecl()?;
+                    sum += self.out.write_str(">")?;
+                    if self.indent != 0 {
+                        // count =
+                        self.out.write_str("\n")?;
+                    }
+                    lk.state.set(XmlTextWriterState::XmlTextwriterText);
+                }
+                _ => {}
+            }
+        }
+
+        let p = XmlTextWriterStackEntry {
+            name: Some(name.to_owned()),
+            state: Cell::new(XmlTextWriterState::XmlTextwriterName),
+        };
+        self.nodes.push_front(p.into());
+
+        if self.indent != 0 {
+            sum += self.write_indent()?;
+        }
+
+        sum += self.out.write_str("<")?;
+        sum += self.out.write_str(name)?;
+        Ok(sum)
     }
 
     /// Write an xml element.
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterWriteElement")]
-    pub unsafe fn write_element(&mut self, name: &str, content: Option<&str>) -> io::Result<usize> {
-        unsafe {
-            let mut sum = self.start_element(name)?;
-            if let Some(content) = content {
-                sum += self.write_string(content)?;
-            }
-            sum += self.end_element()?;
-            Ok(sum)
+    pub fn write_element(&mut self, name: &str, content: Option<&str>) -> io::Result<usize> {
+        let mut sum = self.start_element(name)?;
+        if let Some(content) = content {
+            sum += self.write_string(content)?;
         }
+        sum += self.end_element()?;
+        Ok(sum)
     }
 
     /// End the current xml element.
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterEndElement")]
-    pub unsafe fn end_element(&mut self) -> io::Result<usize> {
-        unsafe {
-            let Some(lk) = self.nodes.front().cloned() else {
-                self.nsstack.clear();
-                return Err(io::Error::other("Nodes link is NULL"));
-            };
+    pub fn end_element(&mut self) -> io::Result<usize> {
+        let Some(lk) = self.nodes.front().cloned() else {
+            self.nsstack.clear();
+            return Err(io::Error::other("Nodes link is NULL"));
+        };
 
-            let mut sum = 0;
-            match lk.state.get() {
-                ty @ XmlTextWriterState::XmlTextwriterAttribute
-                | ty @ XmlTextWriterState::XmlTextwriterName => {
-                    if matches!(ty, XmlTextWriterState::XmlTextwriterAttribute) {
-                        let count = self.end_attribute();
-                        if count.is_err() {
-                            self.nsstack.clear();
-                            return count;
-                        }
-                        sum += count.unwrap();
+        let mut sum = 0;
+        match lk.state.get() {
+            ty @ XmlTextWriterState::XmlTextwriterAttribute
+            | ty @ XmlTextWriterState::XmlTextwriterName => {
+                if matches!(ty, XmlTextWriterState::XmlTextwriterAttribute) {
+                    let count = self.end_attribute();
+                    if count.is_err() {
+                        self.nsstack.clear();
+                        return count;
                     }
+                    sum += count.unwrap();
+                }
 
-                    // Output namespace declarations
-                    sum += self.output_nsdecl()?;
+                // Output namespace declarations
+                sum += self.output_nsdecl()?;
 
-                    // next element needs indent
-                    if self.indent != 0 {
-                        self.doindent = 1;
-                    }
-                    sum += self.out.write_str("/>")?;
+                // next element needs indent
+                if self.indent != 0 {
+                    self.doindent = 1;
                 }
-                XmlTextWriterState::XmlTextwriterText => {
-                    if self.indent != 0 && self.doindent != 0 {
-                        sum += self.write_indent()?;
-                        self.doindent = 1;
-                    } else {
-                        self.doindent = 1;
-                    }
-                    sum += self.out.write_str("</")?;
-                    sum += self.out.write_str(lk.name.as_deref().unwrap())?;
-                    sum += self.out.write_str(">")?;
-                }
-                _ => {
-                    return Err(io::Error::other("Invalid state"));
-                }
+                sum += self.out.write_str("/>")?;
             }
-
-            if self.indent != 0 {
-                sum += self.out.write_str("\n")?;
+            XmlTextWriterState::XmlTextwriterText => {
+                if self.indent != 0 && self.doindent != 0 {
+                    sum += self.write_indent()?;
+                    self.doindent = 1;
+                } else {
+                    self.doindent = 1;
+                }
+                sum += self.out.write_str("</")?;
+                sum += self.out.write_str(lk.name.as_deref().unwrap())?;
+                sum += self.out.write_str(">")?;
             }
-
-            self.nodes.pop_front();
-            Ok(sum)
+            _ => {
+                return Err(io::Error::other("Invalid state"));
+            }
         }
+
+        if self.indent != 0 {
+            sum += self.out.write_str("\n")?;
+        }
+
+        self.nodes.pop_front();
+        Ok(sum)
     }
 
     /// End the current xml element. Writes an end tag even if the element is empty
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterFullEndElement")]
-    pub unsafe fn full_end_element(&mut self) -> io::Result<usize> {
-        unsafe {
-            let Some(lk) = self.nodes.front().cloned() else {
-                return Err(io::Error::other("Nodes link is NULL"));
-            };
+    pub fn full_end_element(&mut self) -> io::Result<usize> {
+        let Some(lk) = self.nodes.front().cloned() else {
+            return Err(io::Error::other("Nodes link is NULL"));
+        };
 
-            let mut sum = 0;
-            match lk.state.get() {
-                ty @ XmlTextWriterState::XmlTextwriterAttribute
-                | ty @ XmlTextWriterState::XmlTextwriterName
-                | ty @ XmlTextWriterState::XmlTextwriterText => {
-                    if matches!(ty, XmlTextWriterState::XmlTextwriterAttribute) {
-                        sum += self.end_attribute()?;
-                    }
+        let mut sum = 0;
+        match lk.state.get() {
+            ty @ XmlTextWriterState::XmlTextwriterAttribute
+            | ty @ XmlTextWriterState::XmlTextwriterName
+            | ty @ XmlTextWriterState::XmlTextwriterText => {
+                if matches!(ty, XmlTextWriterState::XmlTextwriterAttribute) {
+                    sum += self.end_attribute()?;
+                }
 
-                    if matches!(
-                        ty,
-                        XmlTextWriterState::XmlTextwriterAttribute
-                            | XmlTextWriterState::XmlTextwriterName
-                    ) {
-                        // Output namespace declarations
-                        sum += self.output_nsdecl()?;
-                        sum += self.out.write_str(">")?;
-                        if self.indent != 0 {
-                            self.doindent = 0;
-                        }
-                    }
-
-                    if self.indent != 0 && self.doindent != 0 {
-                        sum += self.write_indent()?;
-                        self.doindent = 1;
-                    } else {
-                        self.doindent = 1;
-                    }
-                    sum += self.out.write_str("</")?;
-                    sum += self.out.write_str(lk.name.as_deref().unwrap())?;
+                if matches!(
+                    ty,
+                    XmlTextWriterState::XmlTextwriterAttribute
+                        | XmlTextWriterState::XmlTextwriterName
+                ) {
+                    // Output namespace declarations
+                    sum += self.output_nsdecl()?;
                     sum += self.out.write_str(">")?;
+                    if self.indent != 0 {
+                        self.doindent = 0;
+                    }
                 }
-                _ => {
-                    return Err(io::Error::other("Invalid state"));
+
+                if self.indent != 0 && self.doindent != 0 {
+                    sum += self.write_indent()?;
+                    self.doindent = 1;
+                } else {
+                    self.doindent = 1;
                 }
+                sum += self.out.write_str("</")?;
+                sum += self.out.write_str(lk.name.as_deref().unwrap())?;
+                sum += self.out.write_str(">")?;
             }
-
-            if self.indent != 0 {
-                sum += self.out.write_str("\n")?;
+            _ => {
+                return Err(io::Error::other("Invalid state"));
             }
-
-            self.nodes.pop_front();
-            Ok(sum)
         }
+
+        if self.indent != 0 {
+            sum += self.out.write_str("\n")?;
+        }
+
+        self.nodes.pop_front();
+        Ok(sum)
     }
 
     /// Start an xml element with namespace support.
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterStartElementNS")]
-    pub unsafe fn start_element_ns(
+    pub fn start_element_ns(
         &mut self,
         prefix: Option<&str>,
         name: &str,
         namespace_uri: Option<&str>,
     ) -> io::Result<usize> {
-        unsafe {
-            if name.is_empty() {
-                return Err(io::Error::other("Writer or name is NULL"));
-            }
-
-            let mut buf = String::new();
-            if let Some(prefix) = prefix {
-                buf.push_str(prefix);
-                buf.push(':');
-            }
-            buf.push_str(name);
-
-            let sum = self.start_element(&buf)?;
-
-            if let Some(namespace_uri) = namespace_uri {
-                let mut buf = "xmlns".to_owned();
-                if let Some(prefix) = prefix {
-                    buf.push(':');
-                    buf.push_str(prefix);
-                }
-
-                let p = XmlTextWriterNsStackEntry {
-                    prefix: buf,
-                    uri: namespace_uri.to_owned(),
-                    elem: self.nodes.front().cloned(),
-                };
-                self.nsstack.push_first(p);
-            }
-
-            Ok(sum)
+        if name.is_empty() {
+            return Err(io::Error::other("Writer or name is NULL"));
         }
+
+        let mut buf = String::new();
+        if let Some(prefix) = prefix {
+            buf.push_str(prefix);
+            buf.push(':');
+        }
+        buf.push_str(name);
+
+        let sum = self.start_element(&buf)?;
+
+        if let Some(namespace_uri) = namespace_uri {
+            let mut buf = "xmlns".to_owned();
+            if let Some(prefix) = prefix {
+                buf.push(':');
+                buf.push_str(prefix);
+            }
+
+            let p = XmlTextWriterNsStackEntry {
+                prefix: buf,
+                uri: namespace_uri.to_owned(),
+                elem: self.nodes.front().cloned(),
+            };
+            self.nsstack.push_first(p);
+        }
+
+        Ok(sum)
     }
 
     /// Write an xml element with namespace support.
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterWriteElementNS")]
-    pub unsafe fn write_element_ns(
+    pub fn write_element_ns(
         &mut self,
         prefix: Option<&str>,
         name: &str,
         namespace_uri: Option<&str>,
         content: &str,
     ) -> io::Result<usize> {
-        unsafe {
-            if name.is_empty() {
-                return Err(io::Error::other("Writer or name is NULL"));
-            }
-
-            let mut sum = self.start_element_ns(prefix, name, namespace_uri)?;
-            sum += self.write_string(content)?;
-            sum += self.end_element()?;
-            Ok(sum)
+        if name.is_empty() {
+            return Err(io::Error::other("Writer or name is NULL"));
         }
+
+        let mut sum = self.start_element_ns(prefix, name, namespace_uri)?;
+        sum += self.write_string(content)?;
+        sum += self.end_element()?;
+        Ok(sum)
     }
 
     /// Start an xml attribute.
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterStartAttribute")]
-    pub unsafe fn start_attribute(&mut self, name: &str) -> io::Result<usize> {
-        unsafe {
-            if name.is_empty() {
-                return Err(io::Error::other("Writer or name is invalid"));
-            }
-
-            let Some(lk) = self.nodes.front().cloned() else {
-                return Err(io::Error::other("Node link is NULL"));
-            };
-
-            let mut sum = 0;
-            match lk.state.get() {
-                ty @ XmlTextWriterState::XmlTextwriterAttribute
-                | ty @ XmlTextWriterState::XmlTextwriterName => {
-                    if matches!(ty, XmlTextWriterState::XmlTextwriterAttribute) {
-                        sum += self.end_attribute()?;
-                    }
-
-                    sum += self.out.write_str(" ")?;
-                    sum += self.out.write_str(name)?;
-                    sum += self.out.write_str("=")?;
-                    sum += self.out.write_bytes(&[self.qchar])?;
-                    lk.state.set(XmlTextWriterState::XmlTextwriterAttribute);
-                }
-                _ => {
-                    return Err(io::Error::other("State is invalid"));
-                }
-            }
-
-            Ok(sum)
+    pub fn start_attribute(&mut self, name: &str) -> io::Result<usize> {
+        if name.is_empty() {
+            return Err(io::Error::other("Writer or name is invalid"));
         }
+
+        let Some(lk) = self.nodes.front().cloned() else {
+            return Err(io::Error::other("Node link is NULL"));
+        };
+
+        let mut sum = 0;
+        match lk.state.get() {
+            ty @ XmlTextWriterState::XmlTextwriterAttribute
+            | ty @ XmlTextWriterState::XmlTextwriterName => {
+                if matches!(ty, XmlTextWriterState::XmlTextwriterAttribute) {
+                    sum += self.end_attribute()?;
+                }
+
+                sum += self.out.write_str(" ")?;
+                sum += self.out.write_str(name)?;
+                sum += self.out.write_str("=")?;
+                sum += self.out.write_bytes(&[self.qchar])?;
+                lk.state.set(XmlTextWriterState::XmlTextwriterAttribute);
+            }
+            _ => {
+                return Err(io::Error::other("State is invalid"));
+            }
+        }
+
+        Ok(sum)
     }
 
     /// Write an xml attribute.
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterWriteAttribute")]
-    pub unsafe fn write_attribute(&mut self, name: &str, content: &str) -> io::Result<usize> {
-        unsafe {
-            let mut sum = 0;
-            sum += self.start_attribute(name)?;
-            sum += self.write_string(content)?;
-            sum += self.end_attribute()?;
-            Ok(sum)
-        }
+    pub fn write_attribute(&mut self, name: &str, content: &str) -> io::Result<usize> {
+        let mut sum = 0;
+        sum += self.start_attribute(name)?;
+        sum += self.write_string(content)?;
+        sum += self.end_attribute()?;
+        Ok(sum)
     }
 
     /// End the current xml element.
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterEndAttribute")]
-    pub unsafe fn end_attribute(&mut self) -> io::Result<usize> {
+    pub fn end_attribute(&mut self) -> io::Result<usize> {
         let Some(lk) = self.nodes.front_mut() else {
             return Err(io::Error::other("List is NULL"));
         };
@@ -965,187 +924,176 @@ impl<'a> XmlTextWriter<'a> {
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterStartAttributeNS")]
-    pub unsafe fn start_attribute_ns(
+    pub fn start_attribute_ns(
         &mut self,
         prefix: Option<&str>,
         name: &str,
         namespace_uri: Option<&str>,
     ) -> io::Result<usize> {
-        unsafe {
-            if name.is_empty() {
-                return Err(io::Error::other("Writer or name is invalid"));
+        if name.is_empty() {
+            return Err(io::Error::other("Writer or name is invalid"));
+        }
+
+        // Handle namespace first in case of error
+        if let Some(namespace_uri) = namespace_uri {
+            let mut buf = "xmlns".to_owned();
+            if let Some(prefix) = prefix {
+                buf.push(':');
+                buf.push_str(prefix);
             }
 
-            // Handle namespace first in case of error
-            if let Some(namespace_uri) = namespace_uri {
-                let mut buf = "xmlns".to_owned();
-                if let Some(prefix) = prefix {
-                    buf.push(':');
-                    buf.push_str(prefix);
-                }
+            let nsentry = XmlTextWriterNsStackEntry {
+                prefix: buf.clone(),
+                uri: namespace_uri.to_owned(),
+                elem: self.nodes.front().cloned(),
+            };
 
-                let nsentry = XmlTextWriterNsStackEntry {
-                    prefix: buf.clone(),
+            if let Some(curns) = self.nsstack.search(&nsentry) {
+                if curns.uri == namespace_uri {
+                    // Namespace already defined on element skip
+                    buf.clear();
+                } else {
+                    // Prefix mismatch so error out
+                    return Err(io::Error::other("Prefix mismatch"));
+                }
+            }
+
+            // Do not add namespace decl to list - it is already there
+            if !buf.is_empty() {
+                let p = XmlTextWriterNsStackEntry {
+                    prefix: buf,
                     uri: namespace_uri.to_owned(),
                     elem: self.nodes.front().cloned(),
                 };
-
-                if let Some(curns) = self.nsstack.search(&nsentry) {
-                    if curns.uri == namespace_uri {
-                        // Namespace already defined on element skip
-                        buf.clear();
-                    } else {
-                        // Prefix mismatch so error out
-                        return Err(io::Error::other("Prefix mismatch"));
-                    }
-                }
-
-                // Do not add namespace decl to list - it is already there
-                if !buf.is_empty() {
-                    let p = XmlTextWriterNsStackEntry {
-                        prefix: buf,
-                        uri: namespace_uri.to_owned(),
-                        elem: self.nodes.front().cloned(),
-                    };
-                    self.nsstack.push_first(p);
-                }
+                self.nsstack.push_first(p);
             }
-
-            let mut buf = String::new();
-            if let Some(prefix) = prefix {
-                buf.push_str(prefix);
-                buf.push(':');
-            }
-            buf.push_str(name);
-
-            self.start_attribute(&buf)
         }
+
+        let mut buf = String::new();
+        if let Some(prefix) = prefix {
+            buf.push_str(prefix);
+            buf.push(':');
+        }
+        buf.push_str(name);
+
+        self.start_attribute(&buf)
     }
 
     /// Write an xml attribute.
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterWriteAttributeNS")]
-    pub unsafe fn write_attribute_ns(
+    pub fn write_attribute_ns(
         &mut self,
         prefix: Option<&str>,
         name: &str,
         namespace_uri: Option<&str>,
         content: &str,
     ) -> io::Result<usize> {
-        unsafe {
-            if name.is_empty() {
-                return Err(io::Error::other("Writer or name is NULL"));
-            }
-
-            let mut sum = self.start_attribute_ns(prefix, name, namespace_uri)?;
-            sum += self.write_string(content)?;
-            sum += self.end_attribute()?;
-            Ok(sum)
+        if name.is_empty() {
+            return Err(io::Error::other("Writer or name is NULL"));
         }
+
+        let mut sum = self.start_attribute_ns(prefix, name, namespace_uri)?;
+        sum += self.write_string(content)?;
+        sum += self.end_attribute()?;
+        Ok(sum)
     }
 
     /// Output the current namespace declarations.
     #[doc(alias = "xmlTextWriterOutputNSDecl")]
-    unsafe fn output_nsdecl(&mut self) -> io::Result<usize> {
-        unsafe {
-            let mut sum = 0;
-            while let Some(lk) = self.nsstack.pop_first() {
-                let count = self.write_attribute(&lk.prefix, &lk.uri);
-                if count.is_err() {
-                    self.nsstack.clear();
-                    return count;
-                }
-                sum += count.unwrap();
+    fn output_nsdecl(&mut self) -> io::Result<usize> {
+        let mut sum = 0;
+        while let Some(lk) = self.nsstack.pop_first() {
+            let count = self.write_attribute(&lk.prefix, &lk.uri);
+            if count.is_err() {
+                self.nsstack.clear();
+                return count;
             }
-            Ok(sum)
+            sum += count.unwrap();
         }
+        Ok(sum)
     }
 
     /// Start an xml PI.
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterStartPI")]
-    pub unsafe fn start_pi(&mut self, target: &str) -> io::Result<usize> {
-        unsafe {
-            if target.is_empty() {
-                return Err(io::Error::other("Writer or target is NULL"));
-            }
+    pub fn start_pi(&mut self, target: &str) -> io::Result<usize> {
+        if target.is_empty() {
+            return Err(io::Error::other("Writer or target is NULL"));
+        }
 
-            if target.eq_ignore_ascii_case("xml") {
-                xml_writer_err_msg(
-                    Some(self),
-                    XmlParserErrors::XmlErrInternalError,
-                    "xmlTextWriterStartPI : target name [Xx][Mm][Ll] is reserved for xml standardization!\n",
-                );
-                return Err(io::Error::other(
-                    "xmlTextWriterStartPI : target name [Xx][Mm][Ll] is reserved for xml standardization!",
-                ));
-            }
+        if target.eq_ignore_ascii_case("xml") {
+            xml_writer_err_msg(
+                Some(self),
+                XmlParserErrors::XmlErrInternalError,
+                "xmlTextWriterStartPI : target name [Xx][Mm][Ll] is reserved for xml standardization!\n",
+            );
+            return Err(io::Error::other(
+                "xmlTextWriterStartPI : target name [Xx][Mm][Ll] is reserved for xml standardization!",
+            ));
+        }
 
-            let mut sum = 0;
-            if let Some(lk) = self.nodes.front().cloned() {
-                match lk.state.get() {
-                    ty @ XmlTextWriterState::XmlTextwriterAttribute
-                    | ty @ XmlTextWriterState::XmlTextwriterName => {
-                        if matches!(ty, XmlTextWriterState::XmlTextwriterAttribute) {
-                            sum += self.end_attribute()?;
-                        }
-                        // Output namespace declarations
-                        sum += self.output_nsdecl()?;
-                        sum += self.out.write_str(">")?;
-                        lk.state.set(XmlTextWriterState::XmlTextwriterText);
+        let mut sum = 0;
+        if let Some(lk) = self.nodes.front().cloned() {
+            match lk.state.get() {
+                ty @ XmlTextWriterState::XmlTextwriterAttribute
+                | ty @ XmlTextWriterState::XmlTextwriterName => {
+                    if matches!(ty, XmlTextWriterState::XmlTextwriterAttribute) {
+                        sum += self.end_attribute()?;
                     }
-                    XmlTextWriterState::XmlTextwriterNone
-                    | XmlTextWriterState::XmlTextwriterText
-                    | XmlTextWriterState::XmlTextwriterDTD => {}
-                    XmlTextWriterState::XmlTextwriterPI
-                    | XmlTextWriterState::XmlTextwriterPIText => {
-                        xml_writer_err_msg(
-                            Some(self),
-                            XmlParserErrors::XmlErrInternalError,
-                            "xmlTextWriterStartPI : nested PI!\n",
-                        );
-                        return Err(io::Error::other("xmlTextWriterStartPI : nested PI!"));
-                    }
-                    _ => {
-                        return Err(io::Error::other("Invalid state"));
-                    }
+                    // Output namespace declarations
+                    sum += self.output_nsdecl()?;
+                    sum += self.out.write_str(">")?;
+                    lk.state.set(XmlTextWriterState::XmlTextwriterText);
+                }
+                XmlTextWriterState::XmlTextwriterNone
+                | XmlTextWriterState::XmlTextwriterText
+                | XmlTextWriterState::XmlTextwriterDTD => {}
+                XmlTextWriterState::XmlTextwriterPI | XmlTextWriterState::XmlTextwriterPIText => {
+                    xml_writer_err_msg(
+                        Some(self),
+                        XmlParserErrors::XmlErrInternalError,
+                        "xmlTextWriterStartPI : nested PI!\n",
+                    );
+                    return Err(io::Error::other("xmlTextWriterStartPI : nested PI!"));
+                }
+                _ => {
+                    return Err(io::Error::other("Invalid state"));
                 }
             }
-
-            let p = XmlTextWriterStackEntry {
-                name: Some(target.to_owned()),
-                state: Cell::new(XmlTextWriterState::XmlTextwriterPI),
-            };
-            self.nodes.push_front(p.into());
-
-            sum += self.out.write_str("<?")?;
-            sum += self.out.write_str(target)?;
-            Ok(sum)
         }
+
+        let p = XmlTextWriterStackEntry {
+            name: Some(target.to_owned()),
+            state: Cell::new(XmlTextWriterState::XmlTextwriterPI),
+        };
+        self.nodes.push_front(p.into());
+
+        sum += self.out.write_str("<?")?;
+        sum += self.out.write_str(target)?;
+        Ok(sum)
     }
 
     /// Write an xml PI.
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterWritePI")]
-    pub unsafe fn write_pi(&mut self, target: &str, content: Option<&str>) -> io::Result<usize> {
-        unsafe {
-            let mut sum = self.start_pi(target)?;
-            if let Some(content) = content {
-                sum += self.write_string(content)?;
-            }
-            sum += self.end_pi()?;
-            Ok(sum)
+    pub fn write_pi(&mut self, target: &str, content: Option<&str>) -> io::Result<usize> {
+        let mut sum = self.start_pi(target)?;
+        if let Some(content) = content {
+            sum += self.write_string(content)?;
         }
+        sum += self.end_pi()?;
+        Ok(sum)
     }
 
     /// End the current xml PI.
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterEndPI")]
-    pub unsafe fn end_pi(&mut self) -> io::Result<usize> {
+    pub fn end_pi(&mut self) -> io::Result<usize> {
         let Some(lk) = self.nodes.front() else {
             return Ok(0);
         };
@@ -1172,75 +1120,71 @@ impl<'a> XmlTextWriter<'a> {
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterStartCDATA")]
-    pub unsafe fn start_cdata(&mut self) -> io::Result<usize> {
-        unsafe {
-            let mut sum = 0;
-            if let Some(lk) = self.nodes.front().cloned() {
-                match lk.state.get() {
-                    XmlTextWriterState::XmlTextwriterNone
-                    | XmlTextWriterState::XmlTextwriterText
-                    | XmlTextWriterState::XmlTextwriterPI
-                    | XmlTextWriterState::XmlTextwriterPIText => {}
-                    ty @ XmlTextWriterState::XmlTextwriterAttribute
-                    | ty @ XmlTextWriterState::XmlTextwriterName => {
-                        if matches!(ty, XmlTextWriterState::XmlTextwriterAttribute) {
-                            sum += self.end_attribute()?;
-                        }
+    pub fn start_cdata(&mut self) -> io::Result<usize> {
+        let mut sum = 0;
+        if let Some(lk) = self.nodes.front().cloned() {
+            match lk.state.get() {
+                XmlTextWriterState::XmlTextwriterNone
+                | XmlTextWriterState::XmlTextwriterText
+                | XmlTextWriterState::XmlTextwriterPI
+                | XmlTextWriterState::XmlTextwriterPIText => {}
+                ty @ XmlTextWriterState::XmlTextwriterAttribute
+                | ty @ XmlTextWriterState::XmlTextwriterName => {
+                    if matches!(ty, XmlTextWriterState::XmlTextwriterAttribute) {
+                        sum += self.end_attribute()?;
+                    }
 
-                        // Output namespace declarations
-                        sum += self.output_nsdecl()?;
-                        sum += self.out.write_str(">")?;
-                        lk.state.set(XmlTextWriterState::XmlTextwriterText);
-                    }
-                    XmlTextWriterState::XmlTextwriterCDATA => {
-                        xml_writer_err_msg(
-                            Some(self),
-                            XmlParserErrors::XmlErrInternalError,
-                            "xmlTextWriterStartCDATA : CDATA not allowed in this context!\n",
-                        );
-                        return Err(io::Error::other(
-                            "xmlTextWriterStartCDATA : CDATA not allowed in this context!",
-                        ));
-                    }
-                    _ => {
-                        return Err(io::Error::other("Invalid State"));
-                    }
+                    // Output namespace declarations
+                    sum += self.output_nsdecl()?;
+                    sum += self.out.write_str(">")?;
+                    lk.state.set(XmlTextWriterState::XmlTextwriterText);
+                }
+                XmlTextWriterState::XmlTextwriterCDATA => {
+                    xml_writer_err_msg(
+                        Some(self),
+                        XmlParserErrors::XmlErrInternalError,
+                        "xmlTextWriterStartCDATA : CDATA not allowed in this context!\n",
+                    );
+                    return Err(io::Error::other(
+                        "xmlTextWriterStartCDATA : CDATA not allowed in this context!",
+                    ));
+                }
+                _ => {
+                    return Err(io::Error::other("Invalid State"));
                 }
             }
-
-            self.nodes.push_front(
-                XmlTextWriterStackEntry {
-                    name: None,
-                    state: Cell::new(XmlTextWriterState::XmlTextwriterCDATA),
-                }
-                .into(),
-            );
-
-            sum += self.out.write_str("<![CDATA[")?;
-            Ok(sum)
         }
+
+        self.nodes.push_front(
+            XmlTextWriterStackEntry {
+                name: None,
+                state: Cell::new(XmlTextWriterState::XmlTextwriterCDATA),
+            }
+            .into(),
+        );
+
+        sum += self.out.write_str("<![CDATA[")?;
+        Ok(sum)
     }
 
     /// Write an xml CDATA.
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterWriteCDATA")]
-    pub unsafe fn write_cdata(&mut self, content: Option<&str>) -> io::Result<usize> {
-        unsafe {
-            let mut sum = self.start_cdata()?;
-            if let Some(content) = content {
-                sum += self.write_string(content)?;
-            }
-            sum += self.end_cdata()?;
-            Ok(sum)
+    pub fn write_cdata(&mut self, content: Option<&str>) -> io::Result<usize> {
+        let mut sum = self.start_cdata()?;
+        if let Some(content) = content {
+            sum += self.write_string(content)?;
         }
+        sum += self.end_cdata()?;
+        Ok(sum)
     }
 
     /// End an xml CDATA section.
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterEndCDATA")]
-    pub unsafe fn end_cdata(&mut self) -> io::Result<usize> {
+    pub fn end_cdata(&mut self) -> io::Result<usize> {
         let Some(lk) = self.nodes.front() else {
             return Err(io::Error::other("Node list is NULL"));
         };
@@ -1263,56 +1207,51 @@ impl<'a> XmlTextWriter<'a> {
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterStartComment")]
-    pub unsafe fn start_comment(&mut self) -> io::Result<usize> {
-        unsafe {
-            let mut sum = 0;
-            if let Some(lk) = self.nodes.front().cloned() {
-                match lk.state.get() {
-                    XmlTextWriterState::XmlTextwriterText
-                    | XmlTextWriterState::XmlTextwriterNone => {}
-                    XmlTextWriterState::XmlTextwriterName => {
-                        // Output namespace declarations
-                        sum += self.output_nsdecl()?;
-                        sum += self.out.write_str(">")?;
-                        if self.indent != 0 {
-                            sum += self.out.write_str("\n")?;
-                        }
-                        lk.state.set(XmlTextWriterState::XmlTextwriterText);
+    pub fn start_comment(&mut self) -> io::Result<usize> {
+        let mut sum = 0;
+        if let Some(lk) = self.nodes.front().cloned() {
+            match lk.state.get() {
+                XmlTextWriterState::XmlTextwriterText | XmlTextWriterState::XmlTextwriterNone => {}
+                XmlTextWriterState::XmlTextwriterName => {
+                    // Output namespace declarations
+                    sum += self.output_nsdecl()?;
+                    sum += self.out.write_str(">")?;
+                    if self.indent != 0 {
+                        sum += self.out.write_str("\n")?;
                     }
-                    _ => {
-                        return Err(io::Error::other("Invalid state"));
-                    }
+                    lk.state.set(XmlTextWriterState::XmlTextwriterText);
+                }
+                _ => {
+                    return Err(io::Error::other("Invalid state"));
                 }
             }
-
-            self.nodes.push_front(
-                XmlTextWriterStackEntry {
-                    name: None,
-                    state: Cell::new(XmlTextWriterState::XmlTextwriterComment),
-                }
-                .into(),
-            );
-
-            if self.indent != 0 {
-                sum += self.write_indent()?;
-            }
-
-            sum += self.out.write_str("<!--")?;
-            Ok(sum)
         }
+
+        self.nodes.push_front(
+            XmlTextWriterStackEntry {
+                name: None,
+                state: Cell::new(XmlTextWriterState::XmlTextwriterComment),
+            }
+            .into(),
+        );
+
+        if self.indent != 0 {
+            sum += self.write_indent()?;
+        }
+
+        sum += self.out.write_str("<!--")?;
+        Ok(sum)
     }
 
     /// Write an xml comment.
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterWriteComment")]
-    pub unsafe fn write_comment(&mut self, content: &str) -> io::Result<usize> {
-        unsafe {
-            let mut sum = self.start_comment()?;
-            sum += self.write_string(content)?;
-            sum += self.end_comment()?;
-            Ok(sum)
-        }
+    pub fn write_comment(&mut self, content: &str) -> io::Result<usize> {
+        let mut sum = self.start_comment()?;
+        sum += self.write_string(content)?;
+        sum += self.end_comment()?;
+        Ok(sum)
     }
 
     /// End the current xml comment.
@@ -1435,135 +1374,126 @@ impl<'a> XmlTextWriter<'a> {
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterWriteDTD")]
-    pub unsafe fn write_dtd(
+    pub fn write_dtd(
         &mut self,
         name: &str,
         pubid: Option<&str>,
         sysid: Option<&str>,
         subset: Option<&str>,
     ) -> io::Result<usize> {
-        unsafe {
-            let mut sum = self.start_dtd(name, pubid, sysid)?;
-            if let Some(subset) = subset {
-                sum += self.write_string(subset)?;
-            }
-            sum += self.end_dtd()?;
-            Ok(sum)
+        let mut sum = self.start_dtd(name, pubid, sysid)?;
+        if let Some(subset) = subset {
+            sum += self.write_string(subset)?;
         }
+        sum += self.end_dtd()?;
+        Ok(sum)
     }
 
     /// End an xml DTD.
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterEndDTD")]
-    pub unsafe fn end_dtd(&mut self) -> io::Result<usize> {
-        unsafe {
-            let mut sum = 0;
-            while let Some(lk) = self.nodes.front() {
-                match lk.state.get() {
-                    ty @ XmlTextWriterState::XmlTextwriterDTDText
-                    | ty @ XmlTextWriterState::XmlTextwriterDTD => {
-                        if matches!(ty, XmlTextWriterState::XmlTextwriterDTDText) {
-                            sum += self.out.write_str("]")?;
-                        }
-                        sum += self.out.write_str(">")?;
+    pub fn end_dtd(&mut self) -> io::Result<usize> {
+        let mut sum = 0;
+        while let Some(lk) = self.nodes.front() {
+            match lk.state.get() {
+                ty @ XmlTextWriterState::XmlTextwriterDTDText
+                | ty @ XmlTextWriterState::XmlTextwriterDTD => {
+                    if matches!(ty, XmlTextWriterState::XmlTextwriterDTDText) {
+                        sum += self.out.write_str("]")?;
+                    }
+                    sum += self.out.write_str(">")?;
 
-                        if self.indent != 0 {
-                            sum += self.out.write_str("\n")?;
-                        }
+                    if self.indent != 0 {
+                        sum += self.out.write_str("\n")?;
+                    }
 
-                        self.nodes.pop_front();
-                    }
-                    XmlTextWriterState::XmlTextwriterDTDElem
-                    | XmlTextWriterState::XmlTextwriterDTDElemText => {
-                        sum += self.end_dtd_element()?;
-                    }
-                    XmlTextWriterState::XmlTextwriterDTDAttl
-                    | XmlTextWriterState::XmlTextwriterDTDAttlText => {
-                        sum += self.end_dtd_attlist()?;
-                    }
-                    XmlTextWriterState::XmlTextwriterDTDEnty
-                    | XmlTextWriterState::XmlTextwriterDTDPEnt
-                    | XmlTextWriterState::XmlTextwriterDTDEntyText => {
-                        sum += self.end_dtd_entity()?;
-                    }
-                    XmlTextWriterState::XmlTextwriterComment => {
-                        sum += self.end_comment()?;
-                    }
-                    _ => {
-                        break;
-                    }
+                    self.nodes.pop_front();
+                }
+                XmlTextWriterState::XmlTextwriterDTDElem
+                | XmlTextWriterState::XmlTextwriterDTDElemText => {
+                    sum += self.end_dtd_element()?;
+                }
+                XmlTextWriterState::XmlTextwriterDTDAttl
+                | XmlTextWriterState::XmlTextwriterDTDAttlText => {
+                    sum += self.end_dtd_attlist()?;
+                }
+                XmlTextWriterState::XmlTextwriterDTDEnty
+                | XmlTextWriterState::XmlTextwriterDTDPEnt
+                | XmlTextWriterState::XmlTextwriterDTDEntyText => {
+                    sum += self.end_dtd_entity()?;
+                }
+                XmlTextWriterState::XmlTextwriterComment => {
+                    sum += self.end_comment()?;
+                }
+                _ => {
+                    break;
                 }
             }
-
-            Ok(sum)
         }
+
+        Ok(sum)
     }
 
     /// Start an xml DTD element.
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterStartDTDElement")]
-    pub unsafe fn start_dtd_element(&mut self, name: &str) -> io::Result<usize> {
-        unsafe {
-            if name.is_empty() {
-                return Err(io::Error::other("Writer or name is NULL"));
-            }
-
-            let Some(lk) = self.nodes.front_mut() else {
-                return Err(io::Error::other("Node list is NULL"));
-            };
-
-            let mut sum = 0;
-            match lk.state.get() {
-                XmlTextWriterState::XmlTextwriterDTD => {
-                    sum += self.out.write_str(" [")?;
-                    if self.indent != 0 {
-                        sum += self.out.write_str("\n")?;
-                    }
-                    lk.state.set(XmlTextWriterState::XmlTextwriterDTDText);
-                }
-                XmlTextWriterState::XmlTextwriterDTDText
-                | XmlTextWriterState::XmlTextwriterNone => {}
-                _ => {
-                    return Err(io::Error::other("Invalid state"));
-                }
-            }
-
-            let p = XmlTextWriterStackEntry {
-                name: Some(name.to_owned()),
-                state: Cell::new(XmlTextWriterState::XmlTextwriterDTDElem),
-            };
-            self.nodes.push_front(p.into());
-
-            if self.indent != 0 {
-                sum += self.write_indent()?;
-            }
-
-            sum += self.out.write_str("<!ELEMENT ")?;
-            sum += self.out.write_str(name)?;
-            Ok(sum)
+    pub fn start_dtd_element(&mut self, name: &str) -> io::Result<usize> {
+        if name.is_empty() {
+            return Err(io::Error::other("Writer or name is NULL"));
         }
+
+        let Some(lk) = self.nodes.front_mut() else {
+            return Err(io::Error::other("Node list is NULL"));
+        };
+
+        let mut sum = 0;
+        match lk.state.get() {
+            XmlTextWriterState::XmlTextwriterDTD => {
+                sum += self.out.write_str(" [")?;
+                if self.indent != 0 {
+                    sum += self.out.write_str("\n")?;
+                }
+                lk.state.set(XmlTextWriterState::XmlTextwriterDTDText);
+            }
+            XmlTextWriterState::XmlTextwriterDTDText | XmlTextWriterState::XmlTextwriterNone => {}
+            _ => {
+                return Err(io::Error::other("Invalid state"));
+            }
+        }
+
+        let p = XmlTextWriterStackEntry {
+            name: Some(name.to_owned()),
+            state: Cell::new(XmlTextWriterState::XmlTextwriterDTDElem),
+        };
+        self.nodes.push_front(p.into());
+
+        if self.indent != 0 {
+            sum += self.write_indent()?;
+        }
+
+        sum += self.out.write_str("<!ELEMENT ")?;
+        sum += self.out.write_str(name)?;
+        Ok(sum)
     }
 
     /// Write a DTD element.
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterWriteDTDElement")]
-    pub unsafe fn write_dtd_element(&mut self, name: &str, content: &str) -> io::Result<usize> {
-        unsafe {
-            let mut sum = self.start_dtd_element(name)?;
-            sum += self.write_string(content)?;
-            sum += self.end_dtd_element()?;
-            Ok(sum)
-        }
+    pub fn write_dtd_element(&mut self, name: &str, content: &str) -> io::Result<usize> {
+        let mut sum = self.start_dtd_element(name)?;
+        sum += self.write_string(content)?;
+        sum += self.end_dtd_element()?;
+        Ok(sum)
     }
 
     /// End an xml DTD element.
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterEndDTDElement")]
-    pub unsafe fn end_dtd_element(&mut self) -> io::Result<usize> {
+    pub fn end_dtd_element(&mut self) -> io::Result<usize> {
         let Some(lk) = self.nodes.front() else {
             return Err(io::Error::other("Node list is NULL"));
         };
@@ -1591,66 +1521,61 @@ impl<'a> XmlTextWriter<'a> {
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterStartDTDAttlist")]
-    pub unsafe fn start_dtd_attlist(&mut self, name: &str) -> io::Result<usize> {
-        unsafe {
-            if name.is_empty() {
-                return Err(io::Error::other("Writer or name is NULL"));
-            }
-
-            let Some(lk) = self.nodes.front_mut() else {
-                return Err(io::Error::other("Node list is NULL"));
-            };
-
-            let mut sum = 0;
-            match lk.state.get() {
-                XmlTextWriterState::XmlTextwriterDTD => {
-                    sum += self.out.write_str(" [")?;
-                    if self.indent != 0 {
-                        sum += self.out.write_str("\n")?;
-                    }
-                    lk.state.set(XmlTextWriterState::XmlTextwriterDTDText);
-                }
-                XmlTextWriterState::XmlTextwriterDTDText
-                | XmlTextWriterState::XmlTextwriterNone => {}
-                _ => {
-                    return Err(io::Error::other("Invalid state"));
-                }
-            }
-
-            let p = XmlTextWriterStackEntry {
-                name: Some(name.to_owned()),
-                state: Cell::new(XmlTextWriterState::XmlTextwriterDTDAttl),
-            };
-            self.nodes.push_front(p.into());
-
-            if self.indent != 0 {
-                sum += self.write_indent()?;
-            }
-
-            sum += self.out.write_str("<!ATTLIST ")?;
-            sum += self.out.write_str(name)?;
-            Ok(sum)
+    pub fn start_dtd_attlist(&mut self, name: &str) -> io::Result<usize> {
+        if name.is_empty() {
+            return Err(io::Error::other("Writer or name is NULL"));
         }
+
+        let Some(lk) = self.nodes.front_mut() else {
+            return Err(io::Error::other("Node list is NULL"));
+        };
+
+        let mut sum = 0;
+        match lk.state.get() {
+            XmlTextWriterState::XmlTextwriterDTD => {
+                sum += self.out.write_str(" [")?;
+                if self.indent != 0 {
+                    sum += self.out.write_str("\n")?;
+                }
+                lk.state.set(XmlTextWriterState::XmlTextwriterDTDText);
+            }
+            XmlTextWriterState::XmlTextwriterDTDText | XmlTextWriterState::XmlTextwriterNone => {}
+            _ => {
+                return Err(io::Error::other("Invalid state"));
+            }
+        }
+
+        let p = XmlTextWriterStackEntry {
+            name: Some(name.to_owned()),
+            state: Cell::new(XmlTextWriterState::XmlTextwriterDTDAttl),
+        };
+        self.nodes.push_front(p.into());
+
+        if self.indent != 0 {
+            sum += self.write_indent()?;
+        }
+
+        sum += self.out.write_str("<!ATTLIST ")?;
+        sum += self.out.write_str(name)?;
+        Ok(sum)
     }
 
     /// Write a DTD ATTLIST.
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterWriteDTDAttlist")]
-    pub unsafe fn write_dtd_attlist(&mut self, name: &str, content: &str) -> io::Result<usize> {
-        unsafe {
-            let mut sum = self.start_dtd_attlist(name)?;
-            sum += self.write_string(content)?;
-            sum += self.end_dtd_attlist()?;
-            Ok(sum)
-        }
+    pub fn write_dtd_attlist(&mut self, name: &str, content: &str) -> io::Result<usize> {
+        let mut sum = self.start_dtd_attlist(name)?;
+        sum += self.write_string(content)?;
+        sum += self.end_dtd_attlist()?;
+        Ok(sum)
     }
 
     /// End an xml DTD attribute list.
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterEndDTDAttlist")]
-    pub unsafe fn end_dtd_attlist(&mut self) -> io::Result<usize> {
+    pub fn end_dtd_attlist(&mut self) -> io::Result<usize> {
         let Some(lk) = self.nodes.front() else {
             return Err(io::Error::other("Node list is NULL"));
         };
@@ -1677,57 +1602,55 @@ impl<'a> XmlTextWriter<'a> {
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterStartDTDEntity")]
-    pub unsafe fn start_dtd_entity(&mut self, pe: i32, name: &str) -> io::Result<usize> {
-        unsafe {
-            if name.is_empty() {
-                return Err(io::Error::other("Writer or name is NULL"));
-            }
+    pub fn start_dtd_entity(&mut self, pe: i32, name: &str) -> io::Result<usize> {
+        if name.is_empty() {
+            return Err(io::Error::other("Writer or name is NULL"));
+        }
 
-            let mut sum = 0;
-            if let Some(lk) = self.nodes.front_mut() {
-                match lk.state.get() {
-                    XmlTextWriterState::XmlTextwriterDTD => {
-                        sum += self.out.write_str(" [")?;
-                        if self.indent != 0 {
-                            sum += self.out.write_str("\n")?;
-                        }
-                        lk.state.set(XmlTextWriterState::XmlTextwriterDTDText);
+        let mut sum = 0;
+        if let Some(lk) = self.nodes.front_mut() {
+            match lk.state.get() {
+                XmlTextWriterState::XmlTextwriterDTD => {
+                    sum += self.out.write_str(" [")?;
+                    if self.indent != 0 {
+                        sum += self.out.write_str("\n")?;
                     }
-                    _ty @ XmlTextWriterState::XmlTextwriterDTDText
-                    | _ty @ XmlTextWriterState::XmlTextwriterNone => {}
-                    _ => {
-                        return Err(io::Error::other("Invalid state"));
-                    }
+                    lk.state.set(XmlTextWriterState::XmlTextwriterDTDText);
+                }
+                _ty @ XmlTextWriterState::XmlTextwriterDTDText
+                | _ty @ XmlTextWriterState::XmlTextwriterNone => {}
+                _ => {
+                    return Err(io::Error::other("Invalid state"));
                 }
             }
-
-            let p = XmlTextWriterStackEntry {
-                name: Some(name.to_owned()),
-                state: if pe != 0 {
-                    Cell::new(XmlTextWriterState::XmlTextwriterDTDPEnt)
-                } else {
-                    Cell::new(XmlTextWriterState::XmlTextwriterDTDEnty)
-                },
-            };
-            self.nodes.push_front(p.into());
-
-            if self.indent != 0 {
-                sum += self.write_indent()?;
-            }
-            sum += self.out.write_str("<!ENTITY ")?;
-            if pe != 0 {
-                sum += self.out.write_str("% ")?;
-            }
-            sum += self.out.write_str(name)?;
-            Ok(sum)
         }
+
+        let p = XmlTextWriterStackEntry {
+            name: Some(name.to_owned()),
+            state: if pe != 0 {
+                Cell::new(XmlTextWriterState::XmlTextwriterDTDPEnt)
+            } else {
+                Cell::new(XmlTextWriterState::XmlTextwriterDTDEnty)
+            },
+        };
+        self.nodes.push_front(p.into());
+
+        if self.indent != 0 {
+            sum += self.write_indent()?;
+        }
+        sum += self.out.write_str("<!ENTITY ")?;
+        if pe != 0 {
+            sum += self.out.write_str("% ")?;
+        }
+        sum += self.out.write_str(name)?;
+        Ok(sum)
     }
 
     /// Write a DTD entity.
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterWriteDTDEntity")]
-    pub unsafe fn write_dtd_entity(
+    pub fn write_dtd_entity(
         &mut self,
         pe: i32,
         name: &str,
@@ -1736,49 +1659,45 @@ impl<'a> XmlTextWriter<'a> {
         ndataid: Option<&str>,
         content: Option<&str>,
     ) -> io::Result<usize> {
-        unsafe {
-            if content.is_none() && pubid.is_none() && sysid.is_none() {
-                return Err(io::Error::other("Content, PublicID and SystemID are NULL"));
-            }
-            if pe != 0 && ndataid.is_some() {
-                return Err(io::Error::other("This is PE, but NDATAID is not NULL"));
-            }
-
-            if pubid.is_none() && sysid.is_none() {
-                return self.write_dtd_internal_entity(pe, name, content.unwrap());
-            }
-
-            self.write_dtd_external_entity(pe, name, pubid, sysid, ndataid)
+        if content.is_none() && pubid.is_none() && sysid.is_none() {
+            return Err(io::Error::other("Content, PublicID and SystemID are NULL"));
         }
+        if pe != 0 && ndataid.is_some() {
+            return Err(io::Error::other("This is PE, but NDATAID is not NULL"));
+        }
+
+        if pubid.is_none() && sysid.is_none() {
+            return self.write_dtd_internal_entity(pe, name, content.unwrap());
+        }
+
+        self.write_dtd_external_entity(pe, name, pubid, sysid, ndataid)
     }
 
     /// Write a DTD internal entity.
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterWriteDTDInternalEntity")]
-    pub unsafe fn write_dtd_internal_entity(
+    pub fn write_dtd_internal_entity(
         &mut self,
         pe: i32,
         name: &str,
         content: &str,
     ) -> io::Result<usize> {
-        unsafe {
-            if name.is_empty() {
-                return Err(io::Error::other("Writer or name is NULL"));
-            }
-
-            let mut sum = self.start_dtd_entity(pe, name)?;
-            sum += self.write_string(content)?;
-            sum += self.end_dtd_entity()?;
-            Ok(sum)
+        if name.is_empty() {
+            return Err(io::Error::other("Writer or name is NULL"));
         }
+
+        let mut sum = self.start_dtd_entity(pe, name)?;
+        sum += self.write_string(content)?;
+        sum += self.end_dtd_entity()?;
+        Ok(sum)
     }
 
     /// Write a DTD external entity. The entity must have been started with xmlTextWriterStartDTDEntity
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterWriteDTDExternalEntity")]
-    pub unsafe fn write_dtd_external_entity(
+    pub fn write_dtd_external_entity(
         &mut self,
         pe: i32,
         name: &str,
@@ -1786,19 +1705,17 @@ impl<'a> XmlTextWriter<'a> {
         sysid: Option<&str>,
         ndataid: Option<&str>,
     ) -> io::Result<usize> {
-        unsafe {
-            if pubid.is_none() && sysid.is_none() {
-                return Err(io::Error::other("Both ExternalID and PublicID is NULL"));
-            }
-            if pe != 0 && ndataid.is_some() {
-                return Err(io::Error::other("This is PE, but NDATAID is not NULL"));
-            }
-
-            let mut sum = self.start_dtd_entity(pe, name)?;
-            sum += self.write_dtd_external_entity_contents(pubid, sysid, ndataid)?;
-            sum += self.end_dtd_entity()?;
-            Ok(sum)
+        if pubid.is_none() && sysid.is_none() {
+            return Err(io::Error::other("Both ExternalID and PublicID is NULL"));
         }
+        if pe != 0 && ndataid.is_some() {
+            return Err(io::Error::other("This is PE, but NDATAID is not NULL"));
+        }
+
+        let mut sum = self.start_dtd_entity(pe, name)?;
+        sum += self.write_dtd_external_entity_contents(pubid, sysid, ndataid)?;
+        sum += self.end_dtd_entity()?;
+        Ok(sum)
     }
 
     /// Write the contents of a DTD external entity.
@@ -1888,7 +1805,7 @@ impl<'a> XmlTextWriter<'a> {
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterEndDTDEntity")]
-    pub unsafe fn end_dtd_entity(&mut self) -> io::Result<usize> {
+    pub fn end_dtd_entity(&mut self) -> io::Result<usize> {
         let Some(lk) = self.nodes.front() else {
             return Err(io::Error::other("Node list is NULL"));
         };
@@ -1919,63 +1836,61 @@ impl<'a> XmlTextWriter<'a> {
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterWriteDTDNotation")]
-    pub unsafe fn write_dtd_notation(
+    pub fn write_dtd_notation(
         &mut self,
         name: &str,
         pubid: Option<&str>,
         sysid: Option<&str>,
     ) -> io::Result<usize> {
-        unsafe {
-            if name.is_empty() {
-                return Err(io::Error::other("Writer or name is NULL"));
-            }
-
-            let Some(lk) = self.nodes.front_mut() else {
-                return Err(io::Error::other("Node list is NULL"));
-            };
-
-            let mut sum = 0;
-            match lk.state.get() {
-                XmlTextWriterState::XmlTextwriterDTD => {
-                    sum += self.out.write_str(" [")?;
-                    if self.indent != 0 {
-                        sum += self.out.write_str("\n")?;
-                    }
-                    lk.state.set(XmlTextWriterState::XmlTextwriterDTDText);
-                }
-                XmlTextWriterState::XmlTextwriterDTDText => {}
-                _ => {
-                    return Err(io::Error::other("Invalid state"));
-                }
-            }
-
-            if self.indent != 0 {
-                sum += self.write_indent()?;
-            }
-
-            sum += self.out.write_str("<!NOTATION ")?;
-            sum += self.out.write_str(name)?;
-
-            if let Some(pubid) = pubid {
-                sum += self.out.write_str(" PUBLIC ")?;
-                sum += self.out.write_bytes(&[self.qchar])?;
-                sum += self.out.write_str(pubid)?;
-                sum += self.out.write_bytes(&[self.qchar])?;
-            }
-
-            if let Some(sysid) = sysid {
-                if pubid.is_none() {
-                    sum += self.out.write_str(" SYSTEM")?;
-                }
-                sum += self.out.write_str(" ")?;
-                sum += self.out.write_bytes(&[self.qchar])?;
-                sum += self.out.write_str(sysid)?;
-                sum += self.out.write_bytes(&[self.qchar])?;
-            }
-
-            sum += self.out.write_str(">")?;
-            Ok(sum)
+        if name.is_empty() {
+            return Err(io::Error::other("Writer or name is NULL"));
         }
+
+        let Some(lk) = self.nodes.front_mut() else {
+            return Err(io::Error::other("Node list is NULL"));
+        };
+
+        let mut sum = 0;
+        match lk.state.get() {
+            XmlTextWriterState::XmlTextwriterDTD => {
+                sum += self.out.write_str(" [")?;
+                if self.indent != 0 {
+                    sum += self.out.write_str("\n")?;
+                }
+                lk.state.set(XmlTextWriterState::XmlTextwriterDTDText);
+            }
+            XmlTextWriterState::XmlTextwriterDTDText => {}
+            _ => {
+                return Err(io::Error::other("Invalid state"));
+            }
+        }
+
+        if self.indent != 0 {
+            sum += self.write_indent()?;
+        }
+
+        sum += self.out.write_str("<!NOTATION ")?;
+        sum += self.out.write_str(name)?;
+
+        if let Some(pubid) = pubid {
+            sum += self.out.write_str(" PUBLIC ")?;
+            sum += self.out.write_bytes(&[self.qchar])?;
+            sum += self.out.write_str(pubid)?;
+            sum += self.out.write_bytes(&[self.qchar])?;
+        }
+
+        if let Some(sysid) = sysid {
+            if pubid.is_none() {
+                sum += self.out.write_str(" SYSTEM")?;
+            }
+            sum += self.out.write_str(" ")?;
+            sum += self.out.write_bytes(&[self.qchar])?;
+            sum += self.out.write_str(sysid)?;
+            sum += self.out.write_bytes(&[self.qchar])?;
+        }
+
+        sum += self.out.write_str(">")?;
+        Ok(sum)
     }
 }
 
@@ -2244,10 +2159,7 @@ const B64CRLF: &str = "\r\n";
 ///
 /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
 #[doc(alias = "xmlOutputBufferWriteBase64")]
-unsafe fn xml_output_buffer_write_base64(
-    out: &mut XmlOutputBuffer,
-    data: &[u8],
-) -> io::Result<usize> {
+fn xml_output_buffer_write_base64(out: &mut XmlOutputBuffer, data: &[u8]) -> io::Result<usize> {
     const DTABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
     let mut linelen = 0;

@@ -19,7 +19,13 @@
 //
 // Daniel Veillard <daniel@veillard.com>
 
-use std::{cell::RefCell, ffi::c_void, mem::replace, rc::Rc};
+use std::{
+    cell::RefCell,
+    ffi::c_void,
+    mem::replace,
+    rc::Rc,
+    sync::atomic::{AtomicI32, Ordering},
+};
 
 #[cfg(not(feature = "html"))]
 use crate::generic_error;
@@ -2407,7 +2413,7 @@ pub fn xml_sax2_cdata_block(ctxt: &mut XmlParserCtxt, value: &str) {
     }
 }
 
-static mut XML_SAX2_DEFAULT_VERSION_VALUE: i32 = 2;
+static XML_SAX2_DEFAULT_VERSION_VALUE: AtomicI32 = AtomicI32::new(2);
 
 /// Set the default version of SAX used globally by the library.
 /// By default, during initialization the default is set to 2.
@@ -2419,16 +2425,13 @@ static mut XML_SAX2_DEFAULT_VERSION_VALUE: i32 = 2;
 #[doc(alias = "xmlSAXDefaultVersion")]
 #[deprecated = "Use parser option XML_PARSE_SAX1"]
 #[cfg(feature = "sax1")]
-pub unsafe fn xml_sax_default_version(version: i32) -> i32 {
-    unsafe {
-        let ret: i32 = XML_SAX2_DEFAULT_VERSION_VALUE;
-
-        if version != 1 && version != 2 {
-            return -1;
-        }
-        XML_SAX2_DEFAULT_VERSION_VALUE = version;
-        ret
+pub fn xml_sax_default_version(version: i32) -> i32 {
+    if version != 1 && version != 2 {
+        return -1;
     }
+    let ret = XML_SAX2_DEFAULT_VERSION_VALUE.load(Ordering::Relaxed);
+    XML_SAX2_DEFAULT_VERSION_VALUE.store(version, Ordering::Relaxed);
+    ret
 }
 
 /// Initialize the default XML SAX handler according to the version
@@ -2484,18 +2487,16 @@ pub fn xml_sax_version(hdlr: &mut XmlSAXHandler, version: i32) -> i32 {
 
 /// Initialize the default XML SAX2 handler
 #[doc(alias = "xmlSAX2InitDefaultSAXHandler")]
-pub unsafe fn xml_sax2_init_default_sax_handler(hdlr: &mut XmlSAXHandler, warning: i32) {
-    unsafe {
-        if hdlr.initialized != 0 {
-            return;
-        }
+pub fn xml_sax2_init_default_sax_handler(hdlr: &mut XmlSAXHandler, warning: i32) {
+    if hdlr.initialized != 0 {
+        return;
+    }
 
-        xml_sax_version(hdlr, XML_SAX2_DEFAULT_VERSION_VALUE);
-        if warning == 0 {
-            hdlr.warning = None;
-        } else {
-            hdlr.warning = Some(parser_warning);
-        }
+    xml_sax_version(hdlr, XML_SAX2_DEFAULT_VERSION_VALUE.load(Ordering::Relaxed));
+    if warning == 0 {
+        hdlr.warning = None;
+    } else {
+        hdlr.warning = Some(parser_warning);
     }
 }
 
@@ -2541,12 +2542,12 @@ pub fn xml_sax2_init_html_default_sax_handler(hdlr: &mut XmlSAXHandler) {
 #[doc(alias = "htmlDefaultSAXHandlerInit")]
 #[deprecated = "This function is a no-op. Call xmlInitParser to initialize the library"]
 #[cfg(feature = "html")]
-pub unsafe fn html_default_sax_handler_init() {}
+pub fn html_default_sax_handler_init() {}
 
 /// Initialize the default SAX2 handler
 #[doc(alias = "xmlDefaultSAXHandlerInit")]
 #[deprecated = "This function is a no-op. Call xmlInitParser to initialize the library"]
-pub unsafe fn xml_default_sax_handler_init() {}
+pub fn xml_default_sax_handler_init() {}
 
 #[cfg(test)]
 mod tests {
