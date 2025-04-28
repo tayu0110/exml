@@ -215,8 +215,7 @@ pub fn xml_sax2_external_subset(
     system_id: Option<&str>,
 ) {
     if (external_id.is_some() || system_id.is_some())
-        && ((ctxt.validate != 0 || ctxt.loadsubset != 0)
-            && (ctxt.well_formed && ctxt.my_doc.is_some()))
+        && ((ctxt.validate || ctxt.loadsubset != 0) && (ctxt.well_formed && ctxt.my_doc.is_some()))
     {
         let mut consumed: u64;
 
@@ -690,7 +689,7 @@ pub fn xml_sax2_attribute_decl(
             if ctxt.vctxt.valid == 0 {
                 ctxt.valid = 0;
             }
-            if ctxt.validate != 0 && ctxt.well_formed && my_doc.int_subset.is_some() {
+            if ctxt.validate && ctxt.well_formed && my_doc.int_subset.is_some() {
                 if let Some(attr) = attr {
                     ctxt.valid &= ctxt.validate_attribute_decl(ctxt.my_doc.unwrap(), attr);
                 }
@@ -731,7 +730,7 @@ pub fn xml_sax2_element_decl(
             if elem.is_none() {
                 ctxt.valid = 0;
             }
-            if ctxt.validate != 0 && ctxt.well_formed && my_doc.int_subset.is_some() {
+            if ctxt.validate && ctxt.well_formed && my_doc.int_subset.is_some() {
                 ctxt.valid &= ctxt.validate_element_decl(ctxt.my_doc.unwrap(), elem);
             }
         }
@@ -789,7 +788,7 @@ pub fn xml_sax2_notation_decl(
             if nota.is_none() {
                 ctxt.valid = 0;
             }
-            if ctxt.validate != 0 && ctxt.well_formed && have_int_subset {
+            if ctxt.validate && ctxt.well_formed && have_int_subset {
                 ctxt.valid &= xml_validate_notation_decl(&mut ctxt.vctxt, None, nota);
             }
         }
@@ -939,7 +938,7 @@ pub fn xml_sax2_end_document(ctxt: &mut XmlParserCtxt) {
         return;
     };
     #[cfg(feature = "libxml_valid")]
-    if ctxt.validate != 0 && ctxt.well_formed && my_doc.int_subset.is_some() {
+    if ctxt.validate && ctxt.well_formed && my_doc.int_subset.is_some() {
         ctxt.valid &= xml_validate_document_final(&mut ctxt.vctxt, my_doc);
     }
 
@@ -1205,7 +1204,7 @@ unsafe fn xml_sax2_attribute_internal(
 
             // Validate also for namespace decls, they are attributes from an XML-1.0 perspective
             #[cfg(feature = "libxml_valid")]
-            if nsret.is_some() && ctxt.validate != 0 && ctxt.well_formed {
+            if nsret.is_some() && ctxt.validate && ctxt.well_formed {
                 if let Some(my_doc) = ctxt.my_doc.filter(|doc| doc.int_subset.is_some()) {
                     ctxt.valid &= ctxt.validate_one_namespace(
                         my_doc,
@@ -1270,7 +1269,7 @@ unsafe fn xml_sax2_attribute_internal(
             let nsret = xml_new_ns(ctxt.node, val.as_deref(), Some(name));
             #[cfg(feature = "libxml_valid")]
             // Validate also for namespace decls, they are attributes from an XML-1.0 perspective
-            if nsret.is_some() && ctxt.validate != 0 && ctxt.well_formed {
+            if nsret.is_some() && ctxt.validate && ctxt.well_formed {
                 if let Some(my_doc) = ctxt.my_doc.filter(|doc| doc.int_subset.is_some()) {
                     ctxt.valid &= ctxt.validate_one_namespace(
                         my_doc,
@@ -1353,7 +1352,7 @@ unsafe fn xml_sax2_attribute_internal(
             #[cfg(feature = "libxml_valid")]
             Some(my_doc)
                 if ctxt.html == 0
-                    && ctxt.validate != 0
+                    && ctxt.validate
                     && ctxt.well_formed
                     && my_doc.int_subset.is_some() =>
             {
@@ -1475,7 +1474,7 @@ unsafe fn xml_check_defaulted_attributes(
             let mut attr = elem_decl.attributes;
             // Check against defaulted attributes from the external subset
             // if the document is stamped as standalone
-            if my_doc.standalone == 1 && my_doc.ext_subset.is_some() && ctxt.validate != 0 {
+            if my_doc.standalone == 1 && my_doc.ext_subset.is_some() && ctxt.validate {
                 while let Some(cur_attr) = attr {
                     if cur_attr.default_value.is_some()
                         && my_doc.ext_subset.and_then(|dtd| {
@@ -1577,7 +1576,7 @@ pub fn xml_sax2_start_element(
         let mut parent: Option<XmlGenericNodePtr> = ctxt.node.map(|node| node.into());
 
         // First check on validity:
-        if ctxt.validate != 0
+        if ctxt.validate
             && my_doc.ext_subset.is_none()
             && my_doc.int_subset.is_none_or(|int_subset| {
                 int_subset.notations.is_none()
@@ -1591,7 +1590,7 @@ pub fn xml_sax2_start_element(
                 XmlParserErrors::XmlErrNoDTD,
                 "Validation failed: no DTD found !"
             );
-            ctxt.validate = 0;
+            ctxt.validate = false;
         }
 
         let (prefix, name) = if ctxt.html != 0 {
@@ -1697,7 +1696,7 @@ pub fn xml_sax2_start_element(
         {
             // If it's the Document root, finish the DTD validation and
             // check the document root element for validity
-            if ctxt.validate != 0 && ctxt.vctxt.flags & XML_VCTXT_DTD_VALIDATED as u32 == 0 {
+            if ctxt.validate && ctxt.vctxt.flags & XML_VCTXT_DTD_VALIDATED as u32 == 0 {
                 let chk: i32 = ctxt.validate_dtd_final(ctxt.my_doc.unwrap());
                 if chk <= 0 {
                     ctxt.valid = 0;
@@ -1721,7 +1720,7 @@ pub fn xml_sax2_end_element(ctxt: &mut XmlParserCtxt, _name: &str) {
     ctxt.nodemem = -1;
 
     #[cfg(feature = "libxml_valid")]
-    if ctxt.validate != 0 && ctxt.well_formed {
+    if ctxt.validate && ctxt.well_formed {
         if let Some(my_doc) = ctxt.my_doc.filter(|doc| doc.int_subset.is_some()) {
             ctxt.valid &= ctxt.validate_one_element(my_doc, cur.map(|cur| cur.into()));
         }
@@ -1749,7 +1748,7 @@ pub fn xml_sax2_start_element_ns(
         let mut my_doc = ctxt.my_doc.unwrap();
         let parent = ctxt.node;
         // First check on validity:
-        if ctxt.validate != 0
+        if ctxt.validate
             && my_doc.ext_subset.is_none()
             && my_doc.int_subset.is_none_or(|int_subset| {
                 int_subset.notations.is_none()
@@ -1763,7 +1762,7 @@ pub fn xml_sax2_start_element_ns(
                 XmlParserErrors::XmlDTDNoDTD,
                 "Validation failed: no DTD found !"
             );
-            ctxt.validate = 0;
+            ctxt.validate = false;
         }
 
         // Take care of the rare case of an undefined namespace prefix
@@ -1835,7 +1834,7 @@ pub fn xml_sax2_start_element_ns(
             #[cfg(feature = "libxml_valid")]
             {
                 if ctxt.html == 0
-                    && ctxt.validate != 0
+                    && ctxt.validate
                     && ctxt.well_formed
                     && my_doc.int_subset.is_some()
                 {
@@ -1912,7 +1911,7 @@ pub fn xml_sax2_start_element_ns(
         {
             // If it's the Document root, finish the DTD validation and
             // check the document root element for validity
-            if ctxt.validate != 0 && ctxt.vctxt.flags & XML_VCTXT_DTD_VALIDATED as u32 == 0 {
+            if ctxt.validate && ctxt.vctxt.flags & XML_VCTXT_DTD_VALIDATED as u32 == 0 {
                 let chk: i32 = ctxt.validate_dtd_final(ctxt.my_doc.unwrap());
                 if chk <= 0 {
                     ctxt.valid = 0;
@@ -2061,7 +2060,7 @@ unsafe fn xml_sax2_attribute_ns(
             #[cfg(feature = "libxml_valid")]
             Some(my_doc)
                 if ctxt.html == 0
-                    && ctxt.validate != 0
+                    && ctxt.validate
                     && ctxt.well_formed
                     && my_doc.int_subset.is_some() =>
             {
@@ -2173,7 +2172,7 @@ pub fn xml_sax2_end_element_ns(
     ctxt.nodemem = -1;
 
     #[cfg(feature = "libxml_valid")]
-    if ctxt.validate != 0 && ctxt.well_formed {
+    if ctxt.validate && ctxt.well_formed {
         if let Some(my_doc) = ctxt.my_doc.filter(|doc| doc.int_subset.is_some()) {
             ctxt.valid &= ctxt.validate_one_element(my_doc, ctxt.node.map(|node| node.into()));
         }

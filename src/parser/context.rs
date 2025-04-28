@@ -165,7 +165,7 @@ pub struct XmlParserCtxt {
     // is the document valid
     pub valid: i32,
     // shall we try to validate ?
-    pub(crate) validate: i32,
+    pub(crate) validate: bool,
     // The validity context
     pub vctxt: XmlValidCtxt,
 
@@ -575,7 +575,7 @@ impl XmlParserCtxt {
         self.vctxt.user_data = None;
         self.vctxt.error = Some(parser_validity_error);
         self.vctxt.warning = Some(parser_validity_warning);
-        if self.validate != 0 {
+        if self.validate {
             if get_get_warnings_default_value() == 0 {
                 self.vctxt.warning = None;
             } else {
@@ -1664,7 +1664,7 @@ impl XmlParserCtxt {
             self.keep_blanks = 1;
         }
         if options & XmlParserOption::XmlParseDTDValid as i32 != 0 {
-            self.validate = 1;
+            self.validate = true;
             if options & XmlParserOption::XmlParseNoWarning as i32 != 0 {
                 self.vctxt.warning = None;
             }
@@ -1674,7 +1674,7 @@ impl XmlParserCtxt {
             options -= XmlParserOption::XmlParseDTDValid as i32;
             self.options |= XmlParserOption::XmlParseDTDValid as i32;
         } else {
-            self.validate = 0;
+            self.validate = false;
         }
         if options & XmlParserOption::XmlParseNoWarning as i32 != 0 {
             if let Some(sax) = self.sax.as_deref_mut() {
@@ -2036,7 +2036,7 @@ impl Default for XmlParserCtxt {
             has_perefs: false,
             external: 0,
             valid: 0,
-            validate: 0,
+            validate: get_do_validity_checking_default_value(),
             vctxt: XmlValidCtxt::default(),
             instate: XmlParserInputState::default(),
             token: 0,

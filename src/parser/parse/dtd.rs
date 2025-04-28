@@ -1618,7 +1618,7 @@ impl XmlParserCtxt {
                     && self.options & XmlParserOption::XmlParseDTDLoad as i32 == 0
                     && self.options & XmlParserOption::XmlParseDTDAttr as i32 == 0
                     && !self.replace_entities
-                    && self.validate == 0
+                    && !self.validate
                 {
                     return;
                 }
@@ -1700,7 +1700,7 @@ impl XmlParserCtxt {
                 // parameter entities with "standalone='no'", ...
                 // ... The declaration of a parameter entity must
                 // precede any reference to it...
-                if self.validate != 0 && self.vctxt.error.is_some() {
+                if self.validate && self.vctxt.error.is_some() {
                     xml_validity_error!(
                         self,
                         XmlParserErrors::XmlWarUndeclaredEntity,

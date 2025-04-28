@@ -410,7 +410,7 @@ pub unsafe fn xml_parse_in_node_context(
             }
         }
 
-        if ctxt.validate != 0 || ctxt.replace_entities {
+        if ctxt.validate || ctxt.replace_entities {
             // ID/IDREF registration will be done in xmlValidateElement below
             ctxt.loadsubset |= XML_SKIP_IDS as i32;
         }
@@ -580,9 +580,9 @@ pub(crate) fn xml_parse_balanced_chunk_memory_internal(
         ctxt.instate = XmlParserInputState::XmlParserContent;
         ctxt.depth = oldctxt.depth;
 
-        ctxt.validate = 0;
+        ctxt.validate = false;
         ctxt.loadsubset = oldctxt.loadsubset;
-        if oldctxt.validate != 0 || oldctxt.replace_entities {
+        if oldctxt.validate || oldctxt.replace_entities {
             // ID/IDREF registration will be done in xmlValidateElement below
             ctxt.loadsubset |= XML_SKIP_IDS as i32;
         }
@@ -617,7 +617,7 @@ pub(crate) fn xml_parse_balanced_chunk_memory_internal(
                 *lst = cur;
                 while let Some(mut now) = cur {
                     #[cfg(feature = "libxml_valid")]
-                    if oldctxt.validate != 0
+                    if oldctxt.validate
                         && oldctxt.well_formed
                         && now.element_type() == XmlElementType::XmlElementNode
                     {

@@ -2728,7 +2728,7 @@ fn html_init_parser_ctxt(
     ctxt.vctxt.error = Some(parser_validity_error);
     ctxt.vctxt.warning = Some(parser_validity_warning);
     ctxt.record_info = false;
-    ctxt.validate = 0;
+    ctxt.validate = false;
     ctxt.check_index = 0;
     #[cfg(feature = "catalog")]
     {

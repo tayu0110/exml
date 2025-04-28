@@ -105,7 +105,7 @@ pub struct XmlGlobalState {
     pub(crate) buffer_alloc_scheme: XmlBufferAllocationScheme,
     pub(crate) default_buffer_size: usize,
     substitute_entities_default_value: bool,
-    do_validity_checking_default_value: i32,
+    do_validity_checking_default_value: bool,
     pub(crate) get_warnings_default_value: i32,
     keep_blanks_default_value: i32,
     line_numbers_default_value: i32,
@@ -151,7 +151,7 @@ impl XmlGlobalState {
             buffer_alloc_scheme: XmlBufferAllocationScheme::XmlBufferAllocExact,
             default_buffer_size: BASE_BUFFER_SIZE,
             substitute_entities_default_value: false,
-            do_validity_checking_default_value: 0,
+            do_validity_checking_default_value: false,
             get_warnings_default_value: 1,
             keep_blanks_default_value: 1,
             line_numbers_default_value: 0,
@@ -229,11 +229,11 @@ pub fn get_default_buffer_size() -> usize {
     GLOBAL_STATE.with_borrow(|state| state.default_buffer_size)
 }
 
-pub fn get_do_validity_checking_default_value() -> i32 {
+pub fn get_do_validity_checking_default_value() -> bool {
     GLOBAL_STATE.with_borrow(|state| state.do_validity_checking_default_value)
 }
 
-pub fn set_do_validity_checking_default_value(value: i32) {
+pub fn set_do_validity_checking_default_value(value: bool) {
     GLOBAL_STATE.with_borrow_mut(|state| state.do_validity_checking_default_value = value)
 }
 

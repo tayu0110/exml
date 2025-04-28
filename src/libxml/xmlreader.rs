@@ -1373,7 +1373,7 @@ impl XmlTextReader {
             #[cfg(feature = "libxml_valid")]
             if self.validate == XmlTextReaderValidate::ValidateDtd
                 && self.ctxt.is_some()
-                && self.ctxt.as_deref_mut().unwrap().validate == 1
+                && self.ctxt.as_deref_mut().unwrap().validate
             {
                 let my_doc = self.ctxt.as_deref().unwrap().my_doc.unwrap();
                 if let Some(prefix) = node.ns.as_deref().and_then(|ns| ns.prefix()) {
@@ -1438,7 +1438,7 @@ impl XmlTextReader {
             #[cfg(feature = "libxml_valid")]
             if self.validate == XmlTextReaderValidate::ValidateDtd
                 && self.ctxt.is_some()
-                && self.ctxt.as_deref_mut().unwrap().validate == 1
+                && self.ctxt.as_deref_mut().unwrap().validate
             {
                 let my_doc = self.ctxt.as_deref().unwrap().my_doc;
                 if let Some(prefix) = node.ns.as_deref().and_then(|ns| ns.prefix()) {
@@ -1601,7 +1601,7 @@ impl XmlTextReader {
             #[cfg(feature = "libxml_valid")]
             if self.validate == XmlTextReaderValidate::ValidateDtd
                 && self.ctxt.is_some()
-                && self.ctxt.as_deref_mut().unwrap().validate == 1
+                && self.ctxt.as_deref_mut().unwrap().validate
             {
                 self.ctxt.as_deref_mut().unwrap().valid &=
                     self.ctxt.as_deref_mut().unwrap().vpush_cdata(data);
@@ -1928,7 +1928,7 @@ impl XmlTextReader {
                 return Some(self.xsd_valid_errors == 0);
             }
         }
-        if self.ctxt.is_some() && self.ctxt.as_deref().unwrap().validate == 1 {
+        if self.ctxt.is_some() && self.ctxt.as_deref().unwrap().validate {
             return if self.ctxt.as_deref().unwrap().valid < 0 {
                 None
             } else {
@@ -2167,7 +2167,7 @@ impl XmlTextReader {
 
         match prop {
             XmlParserProperties::XmlParserLoadDTD => {
-                if ctxt.loadsubset != 0 || ctxt.validate != 0 {
+                if ctxt.loadsubset != 0 || ctxt.validate {
                     return 1;
                 }
                 0
@@ -2290,11 +2290,11 @@ impl XmlTextReader {
             XmlParserProperties::XmlParserValidate => {
                 if value != 0 {
                     ctxt.options |= XmlParserOption::XmlParseDTDValid as i32;
-                    ctxt.validate = 1;
+                    ctxt.validate = true;
                     self.validate = XmlTextReaderValidate::ValidateDtd;
                 } else {
                     ctxt.options &= !(XmlParserOption::XmlParseDTDValid as i32);
-                    ctxt.validate = 0;
+                    ctxt.validate = false;
                 }
                 0
             }

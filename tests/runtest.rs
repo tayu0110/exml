@@ -4158,11 +4158,11 @@ unsafe fn thread_specific_data(params: &XmlThreadParams) -> i32 {
         let mut okay: i32 = 1;
 
         if filename == "./test/threads/invalid.xml" {
-            set_do_validity_checking_default_value(0);
+            set_do_validity_checking_default_value(false);
             let stdout: Box<dyn Write> = Box::new(stdout());
             set_generic_error(None, Some(GenericErrorContext::new(stdout)));
         } else {
-            set_do_validity_checking_default_value(1);
+            set_do_validity_checking_default_value(true);
             let stderr: Box<dyn Write> = Box::new(stderr());
             set_generic_error(None, Some(GenericErrorContext::new(stderr)));
         }
@@ -4177,11 +4177,11 @@ unsafe fn thread_specific_data(params: &XmlThreadParams) -> i32 {
             okay = 0;
         }
         if filename == "./test/threads/invalid.xml" {
-            if get_do_validity_checking_default_value() != 0 {
+            if get_do_validity_checking_default_value() {
                 println!("ValidityCheckingDefaultValue override failed");
                 okay = 0;
             }
-        } else if get_do_validity_checking_default_value() != 1 {
+        } else if !get_do_validity_checking_default_value() {
             println!("ValidityCheckingDefaultValue override failed");
             okay = 0;
         }

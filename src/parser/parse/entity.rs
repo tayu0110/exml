@@ -129,7 +129,7 @@ impl XmlParserCtxt {
                         // internal subset
                         if self.options & XmlParserOption::XmlParseNoEnt as i32 != 0
                             || self.options & XmlParserOption::XmlParseDTDValid as i32 != 0
-                            || self.validate != 0
+                            || self.validate
                         {
                             self.load_entity_content(ent);
                         } else {
@@ -571,7 +571,7 @@ impl XmlParserCtxt {
 
         // Doing validity checking on chunk doesn't make sense
         self.instate = XmlParserInputState::XmlParserContent;
-        self.validate = 0;
+        self.validate = false;
         self.loadsubset = 0;
         self.depth = 0;
 
@@ -712,7 +712,7 @@ pub(crate) fn parse_external_entity_private(
         ctxt.validate = oldctxt.validate;
         ctxt.valid = oldctxt.valid;
         ctxt.replace_entities = oldctxt.replace_entities;
-        if oldctxt.validate != 0 {
+        if oldctxt.validate {
             ctxt.vctxt.error = oldctxt.vctxt.error;
             ctxt.vctxt.warning = oldctxt.vctxt.warning;
             ctxt.vctxt.user_data = oldctxt.vctxt.user_data.clone();

@@ -716,7 +716,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
         ctxt.depth = depth;
 
         // Doing validity checking on chunk doesn't make sense
-        ctxt.validate = 0;
+        ctxt.validate = false;
         ctxt.loadsubset = 0;
         ctxt.detect_sax2();
 

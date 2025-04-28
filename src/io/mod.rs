@@ -343,7 +343,7 @@ macro_rules! __xml_loader_err {
             || !matches!($ctx.instate, $crate::parser::XmlParserInputState::XmlParserEOF)
         {
             if let Some(sax) = $ctx.sax.as_deref_mut() {
-                if $ctx.validate != 0 {
+                if $ctx.validate {
                     channel = sax.error;
                     level = XmlErrorLevel::XmlErrError;
                 } else {
