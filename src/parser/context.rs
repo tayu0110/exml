@@ -205,16 +205,10 @@ pub struct XmlParserCtxt {
 
     // to prevent entity substitution loops
     pub(crate) depth: i32,
-    // used to check entities boundaries
-    // pub(crate) entity: XmlParserInputPtr,
     // encoding of the in-memory content
     // actually an xmlCharEncoding
     pub charset: XmlCharEncoding,
 
-    // Those two fields are there to
-    pub(crate) nodelen: i32,
-    // Speed up large node parsing
-    pub(crate) nodemem: i32,
     // signal pedantic warnings
     pub(crate) pedantic: bool,
     // For user data, libxml won't touch it
@@ -2037,8 +2031,6 @@ impl Default for XmlParserCtxt {
             space_tab: vec![],
             depth: 0,
             charset: XmlCharEncoding::None,
-            nodelen: 0,
-            nodemem: 0,
             pedantic: get_pedantic_parser_default_value(),
             _private: null_mut(),
             loadsubset: 0,

@@ -1111,10 +1111,6 @@ impl XmlParserCtxt {
                         }
                         context_node.add_child_list(ent.children.unwrap().into());
                     }
-
-                    // This is to avoid a nasty side effect, see characters() in SAX.c
-                    self.nodemem = 0;
-                    self.nodelen = 0;
                 }
             }
         }

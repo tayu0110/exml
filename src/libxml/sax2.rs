@@ -1614,7 +1614,6 @@ pub fn xml_sax2_start_element(
         } else {
             my_doc.add_child(ret.into());
         }
-        ctxt.nodemem = -1;
         if ctxt.linenumbers != 0 && ctxt.input().is_some() {
             if (ctxt.input().unwrap().line as u32) < u16::MAX as u32 {
                 ret.line = ctxt.input().unwrap().line as _;
@@ -1716,8 +1715,6 @@ pub fn xml_sax2_start_element(
 #[cfg(any(feature = "sax1", feature = "html", feature = "libxml_writer",))]
 pub fn xml_sax2_end_element(ctxt: &mut XmlParserCtxt, _name: &str) {
     let cur = ctxt.node;
-
-    ctxt.nodemem = -1;
 
     #[cfg(feature = "libxml_valid")]
     if ctxt.validate && ctxt.well_formed {
@@ -1842,7 +1839,6 @@ pub fn xml_sax2_start_element_ns(
                 }
             }
         }
-        ctxt.nodemem = -1;
 
         // We are parsing a new node.
         if ctxt.node_push(ret) < 0 {
@@ -2169,8 +2165,6 @@ pub fn xml_sax2_end_element_ns(
     _prefix: Option<&str>,
     _uri: Option<&str>,
 ) {
-    ctxt.nodemem = -1;
-
     #[cfg(feature = "libxml_valid")]
     if ctxt.validate && ctxt.well_formed {
         if let Some(my_doc) = ctxt.my_doc.filter(|doc| doc.int_subset.is_some()) {
@@ -2220,37 +2214,18 @@ unsafe fn xml_sax2_text(ctxt: &mut XmlParserCtxt, ch: &str, typ: XmlElementType)
 
         // Here we needed an accelerator mechanism in case of very large elements.
         // Use an attribute in the structure !!!
-        if let Some(mut last_child) = last_child {
+        if let Some(last_child) = last_child {
             let coalesce_text = last_child.element_type() == typ
                 && (!matches!(typ, XmlElementType::XmlTextNode)
                     || last_child.name == XML_STRING_TEXT);
-            if coalesce_text && ctxt.nodemem != 0 {
-                // The whole point of maintaining nodelen and nodemem,
-                // xmlTextConcat is too costly, i.e. compute length,
-                // reallocate a new buffer, move data, append ch. Here
-                // We try to minimize realloc() uses and avoid copying
-                // and recomputing length over and over.
-                let (nodelen, overflowed) = ctxt.nodelen.overflowing_add(ch.len() as i32);
-                if overflowed {
-                    xml_sax2_err_memory(ctxt, "xmlSAX2Characters overflow prevented");
-                    return;
-                }
-                if nodelen > XML_MAX_TEXT_LENGTH as i32
-                    && ctxt.options & XmlParserOption::XmlParseHuge as i32 == 0
-                {
-                    xml_sax2_err_memory(ctxt, "xmlSAX2Characters: huge text node");
-                    return;
-                }
-                let buffer = last_child.content.get_or_insert_default();
-                buffer.push_str(ch);
-                ctxt.nodelen = nodelen;
-            } else if coalesce_text {
+            if coalesce_text {
                 if xml_text_concat(last_child, ch) != 0 {
                     xml_sax2_err_memory(ctxt, "xmlSAX2Characters");
                 }
-                if ctxt.node.unwrap().children().is_some() {
-                    ctxt.nodelen = last_child.content.as_deref().unwrap().len() as i32;
-                    ctxt.nodemem = ctxt.nodelen + 1;
+                if last_child.content.as_deref().unwrap().len() > XML_MAX_TEXT_LENGTH
+                    && ctxt.options & XmlParserOption::XmlParseHuge as i32 == 0
+                {
+                    xml_sax2_err_memory(ctxt, "xmlSAX2Characters: huge text node");
                 }
             } else {
                 // Mixed content, first time
@@ -2265,10 +2240,6 @@ unsafe fn xml_sax2_text(ctxt: &mut XmlParserCtxt, ch: &str, typ: XmlElementType)
                 };
                 if let Some(last_child) = last_child {
                     ctxt.node.unwrap().add_child(last_child.into());
-                    if ctxt.node.unwrap().children().is_some() {
-                        ctxt.nodelen = ch.len() as i32;
-                        ctxt.nodemem = ch.len() as i32 + 1;
-                    }
                 }
             }
         } else {
@@ -2282,8 +2253,6 @@ unsafe fn xml_sax2_text(ctxt: &mut XmlParserCtxt, ch: &str, typ: XmlElementType)
                 ctxt.node.unwrap().set_last(Some(last_child.into()));
                 last_child.parent = ctxt.node.map(|node| node.into());
                 last_child.doc = ctxt.node.unwrap().doc;
-                ctxt.nodelen = ch.len() as i32;
-                ctxt.nodemem = ch.len() as i32 + 1;
             } else {
                 xml_sax2_err_memory(ctxt, "xmlSAX2Characters");
             }
