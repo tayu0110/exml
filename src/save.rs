@@ -682,10 +682,8 @@ unsafe fn xml_buf_dump_notation_table<'a>(
 
 /// This will dump the content of the element declaration as an XML DTD definition
 #[doc(alias = "xmlBufDumpElementDecl")]
-unsafe fn xml_buf_dump_element_decl<'a>(buf: &mut (impl Write + 'a), elem: XmlElementPtr) {
-    unsafe {
-        xml_dump_element_decl(buf, elem);
-    }
+fn xml_buf_dump_element_decl<'a>(buf: &mut (impl Write + 'a), elem: XmlElementPtr) {
+    xml_dump_element_decl(buf, elem);
 }
 
 /// This will dump the content of the attribute declaration as an XML DTD definition

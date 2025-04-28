@@ -251,25 +251,23 @@ impl From<XmlElementPtr> for *mut XmlElement {
 /// Returns the new xmlElementPtr or null_mut() in case of error.
 #[doc(alias = "xmlCopyElement")]
 #[cfg(feature = "libxml_tree")]
-pub(crate) unsafe fn xml_copy_element(elem: XmlElementPtr) -> Option<XmlElementPtr> {
-    unsafe {
-        use crate::libxml::valid::{xml_copy_element_content, xml_verr_memory};
+pub(crate) fn xml_copy_element(elem: XmlElementPtr) -> Option<XmlElementPtr> {
+    use crate::libxml::valid::{xml_copy_element_content, xml_verr_memory};
 
-        let res = XmlElementPtr::new(XmlElement {
-            typ: XmlElementType::XmlElementDecl,
-            etype: elem.etype,
-            name: elem.name.clone(),
-            prefix: elem.prefix.clone(),
-            content: xml_copy_element_content(elem.content.clone()),
-            // TODO : rebuild the attribute list on the copy
-            attributes: None,
-            ..Default::default()
-        });
-        if res.is_none() {
-            xml_verr_memory(null_mut(), Some("malloc failed"));
-        }
-        res
+    let res = XmlElementPtr::new(XmlElement {
+        typ: XmlElementType::XmlElementDecl,
+        etype: elem.etype,
+        name: elem.name.clone(),
+        prefix: elem.prefix.clone(),
+        content: xml_copy_element_content(elem.content.clone()),
+        // TODO : rebuild the attribute list on the copy
+        attributes: None,
+        ..Default::default()
+    });
+    if res.is_none() {
+        xml_verr_memory(None, Some("malloc failed"));
     }
+    res
 }
 
 /// Deallocate the memory used by an element definition

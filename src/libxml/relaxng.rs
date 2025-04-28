@@ -9018,7 +9018,7 @@ unsafe fn xml_relaxng_validate_document(ctxt: XmlRelaxNGValidCtxtPtr, doc: XmlDo
             vctxt.warning = (*ctxt).warning;
             vctxt.user_data = (*ctxt).user_data.clone();
 
-            if xml_validate_document_final(addr_of_mut!(vctxt), doc) != 1 {
+            if xml_validate_document_final(&mut vctxt, doc) != 1 {
                 ret = -1;
             }
         }

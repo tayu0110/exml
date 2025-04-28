@@ -5,7 +5,7 @@
 //! As a workaround, I decided to implement it as a method of `XmlParserCtxt`
 //! so that `XmlValidCtxt` does not own a pointer to the parent.
 
-use std::{cell::RefCell, collections::HashMap, ptr::null_mut, rc::Rc};
+use std::{borrow::Cow, cell::RefCell, collections::HashMap, ptr::null_mut, rc::Rc};
 
 use crate::{
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
@@ -14,7 +14,7 @@ use crate::{
         chvalid::xml_is_blank_char,
         valid::{
             xml_get_dtd_element_desc, xml_get_dtd_notation_desc, xml_get_dtd_qelement_desc,
-            xml_snprintf_element_content, xml_snprintf_elements,
+            xml_snprintf_element_content, xml_snprintf_elements, xml_valid_normalize_string,
             xml_validate_attribute_value_internal,
         },
         xmlregexp::XmlRegExecCtxt,
@@ -585,6 +585,83 @@ impl XmlParserCtxt {
             }
         }
         cur
+    }
+
+    /// Does the validation related extra step of the normalization of attribute values:
+    ///
+    /// If the declared value is not CDATA, then the XML processor must further
+    /// process the normalized attribute value by discarding any leading and
+    /// trailing space (#x20) characters, and by replacing sequences of space
+    /// (#x20) characters by single space (#x20) character.
+    ///
+    /// Also  check VC: Standalone Document Declaration in P32, and update
+    ///  (*ctxt).valid accordingly
+    ///
+    /// Returns a new normalized string if normalization is needed, null_mut() otherwise
+    /// the caller must free the returned value.
+    #[doc(alias = "xmlValidCtxtNormalizeAttributeValue")]
+    pub fn normalize_attribute_value<'a>(
+        &mut self,
+        doc: XmlDocPtr,
+        elem: XmlNodePtr,
+        name: &str,
+        value: &'a str,
+    ) -> Option<Cow<'a, str>> {
+        let mut extsubset: i32 = 0;
+
+        let mut attr_decl = None;
+        if let Some(prefix) = elem.ns.as_deref().and_then(|ns| ns.prefix()) {
+            let elemname = elem.name().unwrap();
+            let fullname = build_qname(&elemname, Some(&prefix));
+            attr_decl = doc
+                .int_subset
+                .and_then(|dtd| dtd.get_attr_desc(&fullname, name));
+            if attr_decl.is_none() {
+                if let Some(ext_subset) = doc.ext_subset {
+                    attr_decl = ext_subset.get_attr_desc(&fullname, name);
+                    if attr_decl.is_some() {
+                        extsubset = 1;
+                    }
+                }
+            }
+        }
+        if attr_decl.is_none() {
+            if let Some(int_subset) = doc.int_subset {
+                attr_decl = int_subset.get_attr_desc(elem.name().as_deref().unwrap(), name);
+            }
+        }
+        if attr_decl.is_none() {
+            if let Some(ext_subset) = doc.ext_subset {
+                attr_decl = ext_subset.get_attr_desc(elem.name().as_deref().unwrap(), name);
+                if attr_decl.is_some() {
+                    extsubset = 1;
+                }
+            }
+        }
+
+        if matches!(attr_decl?.atype, XmlAttributeType::XmlAttributeCDATA) {
+            return None;
+        }
+
+        let ret = xml_valid_normalize_string(value);
+        if doc.standalone != 0 && extsubset == 1 && value != ret {
+            let elem_name = elem.name().unwrap();
+            xml_err_valid_node(
+            Some(self),
+            Some(XmlGenericNodePtr::from(elem)),
+            XmlParserErrors::XmlDTDNotStandalone,
+            format!(
+                "standalone: {} on {} value had to be normalized based on external subset declaration\n",
+                name,
+                elem_name
+            ).as_str(),
+            Some(name),
+            Some(&elem_name),
+            None
+        );
+            self.vctxt.valid = 0;
+        }
+        Some(ret)
     }
 
     #[doc(alias = "nodeVPush")]

@@ -2335,7 +2335,7 @@ unsafe fn xml_schema_val_atomic_type(
                                     if let Some(doc) = node.and_then(|node| node.document()) {
                                         if ret == 0 {
                                             ret = xml_validate_notation_use(
-                                                null_mut(),
+                                                None,
                                                 doc,
                                                 CStr::from_ptr(value as *const i8)
                                                     .to_string_lossy()

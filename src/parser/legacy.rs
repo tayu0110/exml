@@ -17,8 +17,8 @@ use crate::{
 #[doc(alias = "xmlParseDoc")]
 #[deprecated = "Use xmlReadDoc"]
 #[cfg(feature = "sax1")]
-pub unsafe fn xml_parse_doc(cur: Vec<u8>) -> Option<XmlDocPtr> {
-    unsafe { xml_sax_parse_doc(None, cur, 0) }
+pub fn xml_parse_doc(cur: Vec<u8>) -> Option<XmlDocPtr> {
+    xml_sax_parse_doc(None, cur, 0)
 }
 
 /// Parse an XML file and build a tree. Automatic support for ZLIB/Compress
@@ -29,8 +29,8 @@ pub unsafe fn xml_parse_doc(cur: Vec<u8>) -> Option<XmlDocPtr> {
 #[doc(alias = "xmlParseFile")]
 #[deprecated = "Use xmlReadFile"]
 #[cfg(feature = "sax1")]
-pub unsafe fn xml_parse_file(filename: Option<&str>) -> Option<XmlDocPtr> {
-    unsafe { xml_sax_parse_file(None, filename, 0) }
+pub fn xml_parse_file(filename: Option<&str>) -> Option<XmlDocPtr> {
+    xml_sax_parse_file(None, filename, 0)
 }
 
 /// Parse an XML in-memory block and build a tree.
@@ -39,8 +39,8 @@ pub unsafe fn xml_parse_file(filename: Option<&str>) -> Option<XmlDocPtr> {
 #[doc(alias = "xmlParseMemory")]
 #[deprecated = "Use xmlReadMemory"]
 #[cfg(feature = "sax1")]
-pub unsafe fn xml_parse_memory(buffer: Vec<u8>) -> Option<XmlDocPtr> {
-    unsafe { xml_sax_parse_memory(None, buffer, 0) }
+pub fn xml_parse_memory(buffer: Vec<u8>) -> Option<XmlDocPtr> {
+    xml_sax_parse_memory(None, buffer, 0)
 }
 
 /// Set and return the previous value for default entity support.
@@ -123,8 +123,8 @@ pub fn xml_line_numbers_default(val: i32) -> i32 {
 #[doc(alias = "xmlRecoverDoc")]
 #[deprecated = "Use xmlReadDoc with XML_PARSE_RECOVER"]
 #[cfg(feature = "sax1")]
-pub unsafe fn xml_recover_doc(cur: Vec<u8>) -> Option<XmlDocPtr> {
-    unsafe { xml_sax_parse_doc(None, cur, 1) }
+pub fn xml_recover_doc(cur: Vec<u8>) -> Option<XmlDocPtr> {
+    xml_sax_parse_doc(None, cur, 1)
 }
 
 /// Parse an XML in-memory block and build a tree.
@@ -135,8 +135,8 @@ pub unsafe fn xml_recover_doc(cur: Vec<u8>) -> Option<XmlDocPtr> {
 #[doc(alias = "xmlRecoverMemory")]
 #[deprecated = "Use xmlReadMemory with XML_PARSE_RECOVER"]
 #[cfg(feature = "sax1")]
-pub unsafe fn xml_recover_memory(buffer: Vec<u8>) -> Option<XmlDocPtr> {
-    unsafe { xml_sax_parse_memory(None, buffer, 1) }
+pub fn xml_recover_memory(buffer: Vec<u8>) -> Option<XmlDocPtr> {
+    xml_sax_parse_memory(None, buffer, 1)
 }
 
 /// Parse an XML file and build a tree. Automatic support for ZLIB/Compress
@@ -148,8 +148,8 @@ pub unsafe fn xml_recover_memory(buffer: Vec<u8>) -> Option<XmlDocPtr> {
 #[doc(alias = "xmlRecoverFile")]
 #[deprecated = "Use xmlReadFile with XML_PARSE_RECOVER"]
 #[cfg(feature = "sax1")]
-pub unsafe fn xml_recover_file(filename: Option<&str>) -> Option<XmlDocPtr> {
-    unsafe { xml_sax_parse_file(None, filename, 1) }
+pub fn xml_recover_file(filename: Option<&str>) -> Option<XmlDocPtr> {
+    xml_sax_parse_file(None, filename, 1)
 }
 
 /// parse an XML file and call the given SAX handler routines.
@@ -159,40 +159,40 @@ pub unsafe fn xml_recover_file(filename: Option<&str>) -> Option<XmlDocPtr> {
 #[doc(alias = "xmlSAXUserParseFile")]
 #[deprecated = "Use xmlNewSAXParserCtxt and xmlCtxtReadFile"]
 #[cfg(feature = "sax1")]
-pub unsafe fn xml_sax_user_parse_file(
+pub fn xml_sax_user_parse_file(
     sax: Option<Box<XmlSAXHandler>>,
     user_data: Option<GenericErrorContext>,
     filename: Option<&str>,
 ) -> i32 {
     use super::XmlParserCtxt;
 
-    unsafe {
-        let ret: i32;
+    let ret: i32;
 
-        let Some(mut ctxt) = XmlParserCtxt::from_filename(filename) else {
-            return -1;
-        };
-        ctxt.sax = sax;
-        ctxt.detect_sax2();
+    let Some(mut ctxt) = XmlParserCtxt::from_filename(filename) else {
+        return -1;
+    };
+    ctxt.sax = sax;
+    ctxt.detect_sax2();
 
-        ctxt.user_data = user_data;
+    ctxt.user_data = user_data;
 
-        ctxt.parse_document();
+    ctxt.parse_document();
 
-        if ctxt.well_formed != 0 {
-            ret = 0;
-        } else if ctxt.err_no != 0 {
-            ret = ctxt.err_no;
-        } else {
-            ret = -1;
-        }
-        ctxt.sax = None;
-        if let Some(my_doc) = ctxt.my_doc.take() {
+    if ctxt.well_formed != 0 {
+        ret = 0;
+    } else if ctxt.err_no != 0 {
+        ret = ctxt.err_no;
+    } else {
+        ret = -1;
+    }
+    ctxt.sax = None;
+    if let Some(my_doc) = ctxt.my_doc.take() {
+        unsafe {
             xml_free_doc(my_doc);
         }
-
-        ret
     }
+
+    ret
 }
 
 /// Parse an XML in-memory buffer and call the given SAX handler routines.
@@ -201,41 +201,41 @@ pub unsafe fn xml_sax_user_parse_file(
 #[doc(alias = "xmlSAXUserParseMemory")]
 #[deprecated = "Use xmlNewSAXParserCtxt and xmlCtxtReadMemory"]
 #[cfg(feature = "sax1")]
-pub unsafe fn xml_sax_user_parse_memory(
+pub fn xml_sax_user_parse_memory(
     sax: Option<Box<XmlSAXHandler>>,
     user_data: Option<GenericErrorContext>,
     buffer: Vec<u8>,
 ) -> i32 {
     use super::XmlParserCtxt;
 
-    unsafe {
-        let ret: i32;
+    let ret: i32;
 
-        xml_init_parser();
+    xml_init_parser();
 
-        let Some(mut ctxt) = XmlParserCtxt::from_memory(buffer) else {
-            return -1;
-        };
-        ctxt.sax = sax;
-        ctxt.detect_sax2();
-        ctxt.user_data = user_data;
+    let Some(mut ctxt) = XmlParserCtxt::from_memory(buffer) else {
+        return -1;
+    };
+    ctxt.sax = sax;
+    ctxt.detect_sax2();
+    ctxt.user_data = user_data;
 
-        ctxt.parse_document();
+    ctxt.parse_document();
 
-        if ctxt.well_formed != 0 {
-            ret = 0;
-        } else if ctxt.err_no != 0 {
-            ret = ctxt.err_no;
-        } else {
-            ret = -1;
-        }
-        ctxt.sax = None;
-        if let Some(my_doc) = ctxt.my_doc.take() {
+    if ctxt.well_formed != 0 {
+        ret = 0;
+    } else if ctxt.err_no != 0 {
+        ret = ctxt.err_no;
+    } else {
+        ret = -1;
+    }
+    ctxt.sax = None;
+    if let Some(my_doc) = ctxt.my_doc.take() {
+        unsafe {
             xml_free_doc(my_doc);
         }
-
-        ret
     }
+
+    ret
 }
 
 /// Parse an XML in-memory document and build a tree.
@@ -246,38 +246,38 @@ pub unsafe fn xml_sax_user_parse_memory(
 #[doc(alias = "xmlSAXParseDoc")]
 #[deprecated = "Use xmlNewSAXParserCtxt and xmlCtxtReadDoc"]
 #[cfg(feature = "sax1")]
-pub unsafe fn xml_sax_parse_doc(
+pub fn xml_sax_parse_doc(
     sax: Option<Box<XmlSAXHandler>>,
     cur: Vec<u8>,
     recovery: i32,
 ) -> Option<XmlDocPtr> {
     use super::XmlParserCtxt;
 
-    unsafe {
-        let replaced = sax.is_some();
-        let mut oldsax = None;
+    let replaced = sax.is_some();
+    let mut oldsax = None;
 
-        let mut ctxt = XmlParserCtxt::from_memory(cur)?;
-        if let Some(sax) = sax {
-            oldsax = ctxt.sax.replace(sax);
-            ctxt.user_data = None;
-        }
-        ctxt.detect_sax2();
-        ctxt.parse_document();
-        let ret = if ctxt.well_formed != 0 || recovery != 0 {
-            ctxt.my_doc
-        } else {
-            if let Some(my_doc) = ctxt.my_doc.take() {
+    let mut ctxt = XmlParserCtxt::from_memory(cur)?;
+    if let Some(sax) = sax {
+        oldsax = ctxt.sax.replace(sax);
+        ctxt.user_data = None;
+    }
+    ctxt.detect_sax2();
+    ctxt.parse_document();
+    let ret = if ctxt.well_formed != 0 || recovery != 0 {
+        ctxt.my_doc
+    } else {
+        if let Some(my_doc) = ctxt.my_doc.take() {
+            unsafe {
                 xml_free_doc(my_doc);
             }
-            None
-        };
-        if replaced {
-            ctxt.sax = oldsax;
         }
-
-        ret
+        None
+    };
+    if replaced {
+        ctxt.sax = oldsax;
     }
+
+    ret
 }
 
 /// Parse an XML in-memory block and use the given SAX function block
@@ -288,12 +288,12 @@ pub unsafe fn xml_sax_parse_doc(
 #[doc(alias = "xmlSAXParseMemory")]
 #[deprecated = "Use xmlNewSAXParserCtxt and xmlCtxtReadMemory"]
 #[cfg(feature = "sax1")]
-pub unsafe fn xml_sax_parse_memory(
+pub fn xml_sax_parse_memory(
     sax: Option<Box<XmlSAXHandler>>,
     buffer: Vec<u8>,
     recovery: i32,
 ) -> Option<XmlDocPtr> {
-    unsafe { xml_sax_parse_memory_with_data(sax, buffer, recovery, null_mut()) }
+    xml_sax_parse_memory_with_data(sax, buffer, recovery, null_mut())
 }
 
 /// Parse an XML in-memory block and use the given SAX function block
@@ -307,7 +307,7 @@ pub unsafe fn xml_sax_parse_memory(
 #[doc(alias = "xmlSAXParseMemoryWithData")]
 #[deprecated = "Use xmlNewSAXParserCtxt and xmlCtxtReadMemory"]
 #[cfg(feature = "sax1")]
-pub unsafe fn xml_sax_parse_memory_with_data(
+pub fn xml_sax_parse_memory_with_data(
     sax: Option<Box<XmlSAXHandler>>,
     buffer: Vec<u8>,
     recovery: i32,
@@ -315,37 +315,37 @@ pub unsafe fn xml_sax_parse_memory_with_data(
 ) -> Option<XmlDocPtr> {
     use super::XmlParserCtxt;
 
-    unsafe {
-        let replaced = sax.is_some();
+    let replaced = sax.is_some();
 
-        xml_init_parser();
+    xml_init_parser();
 
-        let mut ctxt = XmlParserCtxt::from_memory(buffer)?;
-        if let Some(sax) = sax {
-            ctxt.sax = Some(sax);
-        }
-        ctxt.detect_sax2();
-        if !data.is_null() {
-            ctxt._private = data;
-        }
+    let mut ctxt = XmlParserCtxt::from_memory(buffer)?;
+    if let Some(sax) = sax {
+        ctxt.sax = Some(sax);
+    }
+    ctxt.detect_sax2();
+    if !data.is_null() {
+        ctxt._private = data;
+    }
 
-        ctxt.recovery = recovery;
-        ctxt.parse_document();
+    ctxt.recovery = recovery;
+    ctxt.parse_document();
 
-        let ret = if ctxt.well_formed != 0 || recovery != 0 {
-            ctxt.my_doc
-        } else {
-            if let Some(my_doc) = ctxt.my_doc.take() {
+    let ret = if ctxt.well_formed != 0 || recovery != 0 {
+        ctxt.my_doc
+    } else {
+        if let Some(my_doc) = ctxt.my_doc.take() {
+            unsafe {
                 xml_free_doc(my_doc);
             }
-            None
-        };
-        if replaced {
-            ctxt.sax = None;
         }
-
-        ret
+        None
+    };
+    if replaced {
+        ctxt.sax = None;
     }
+
+    ret
 }
 
 /// parse an XML file and build a tree. Automatic support for ZLIB/Compress
@@ -357,12 +357,12 @@ pub unsafe fn xml_sax_parse_memory_with_data(
 #[doc(alias = "xmlSAXParseFile")]
 #[deprecated = "Use xmlNewSAXParserCtxt and xmlCtxtReadFile"]
 #[cfg(feature = "sax1")]
-pub unsafe fn xml_sax_parse_file(
+pub fn xml_sax_parse_file(
     sax: Option<Box<XmlSAXHandler>>,
     filename: Option<&str>,
     recovery: i32,
 ) -> Option<XmlDocPtr> {
-    unsafe { xml_sax_parse_file_with_data(sax, filename, recovery, null_mut()) }
+    xml_sax_parse_file_with_data(sax, filename, recovery, null_mut())
 }
 
 /// Parse an XML file and build a tree. Automatic support for ZLIB/Compress
@@ -377,7 +377,7 @@ pub unsafe fn xml_sax_parse_file(
 #[doc(alias = "xmlSAXParseFileWithData")]
 #[deprecated = "Use xmlNewSAXParserCtxt and xmlCtxtReadFile"]
 #[cfg(feature = "sax1")]
-pub unsafe fn xml_sax_parse_file_with_data(
+pub fn xml_sax_parse_file_with_data(
     sax: Option<Box<XmlSAXHandler>>,
     filename: Option<&str>,
     recovery: i32,
@@ -385,57 +385,57 @@ pub unsafe fn xml_sax_parse_file_with_data(
 ) -> Option<XmlDocPtr> {
     use crate::parser::XmlParserCtxt;
 
-    unsafe {
-        use crate::io::xml_parser_get_directory;
+    use crate::io::xml_parser_get_directory;
 
-        let replaced = sax.is_some();
+    let replaced = sax.is_some();
 
-        xml_init_parser();
+    xml_init_parser();
 
-        let mut ctxt = XmlParserCtxt::from_filename(filename)?;
-        if let Some(sax) = sax {
-            ctxt.sax = Some(sax);
+    let mut ctxt = XmlParserCtxt::from_filename(filename)?;
+    if let Some(sax) = sax {
+        ctxt.sax = Some(sax);
+    }
+    ctxt.detect_sax2();
+    if !data.is_null() {
+        ctxt._private = data;
+    }
+
+    if ctxt.directory.is_none() {
+        if let Some(filename) = filename {
+            if let Some(dir) = xml_parser_get_directory(filename) {
+                ctxt.directory = Some(dir.to_string_lossy().into_owned());
+            }
         }
-        ctxt.detect_sax2();
-        if !data.is_null() {
-            ctxt._private = data;
-        }
+    }
 
-        if ctxt.directory.is_none() {
-            if let Some(filename) = filename {
-                if let Some(dir) = xml_parser_get_directory(filename) {
-                    ctxt.directory = Some(dir.to_string_lossy().into_owned());
+    ctxt.recovery = recovery;
+    ctxt.parse_document();
+
+    let ret = if ctxt.well_formed != 0 || recovery != 0 {
+        let ret = ctxt.my_doc;
+        if ctxt.input().unwrap().buf.is_some() {
+            if let Some(mut ret) = ret {
+                if ctxt.input().unwrap().buf.as_ref().unwrap().compressed > 0 {
+                    ret.compression = 9;
+                } else {
+                    ret.compression = ctxt.input().unwrap().buf.as_ref().unwrap().compressed;
                 }
             }
         }
-
-        ctxt.recovery = recovery;
-        ctxt.parse_document();
-
-        let ret = if ctxt.well_formed != 0 || recovery != 0 {
-            let ret = ctxt.my_doc;
-            if ctxt.input().unwrap().buf.is_some() {
-                if let Some(mut ret) = ret {
-                    if ctxt.input().unwrap().buf.as_ref().unwrap().compressed > 0 {
-                        ret.compression = 9;
-                    } else {
-                        ret.compression = ctxt.input().unwrap().buf.as_ref().unwrap().compressed;
-                    }
-                }
-            }
-            ret
-        } else {
-            if let Some(my_doc) = ctxt.my_doc.take() {
+        ret
+    } else {
+        if let Some(my_doc) = ctxt.my_doc.take() {
+            unsafe {
                 xml_free_doc(my_doc);
             }
-            None
-        };
-        if replaced {
-            ctxt.sax = None;
         }
-
-        ret
+        None
+    };
+    if replaced {
+        ctxt.sax = None;
     }
+
+    ret
 }
 
 /// Parse an XML external entity out of context and build a tree.
@@ -452,37 +452,37 @@ pub unsafe fn xml_sax_parse_file_with_data(
 #[doc(alias = "xmlSAXParseEntity")]
 #[deprecated]
 #[cfg(feature = "sax1")]
-pub(crate) unsafe fn xml_sax_parse_entity(
+pub(crate) fn xml_sax_parse_entity(
     sax: Option<Box<XmlSAXHandler>>,
     filename: Option<&str>,
 ) -> Option<XmlDocPtr> {
     use super::XmlParserCtxt;
 
-    unsafe {
-        let replaced = sax.is_some();
+    let replaced = sax.is_some();
 
-        let mut ctxt = XmlParserCtxt::from_filename(filename)?;
-        if let Some(sax) = sax {
-            ctxt.sax = Some(sax);
-            ctxt.user_data = None;
-        }
+    let mut ctxt = XmlParserCtxt::from_filename(filename)?;
+    if let Some(sax) = sax {
+        ctxt.sax = Some(sax);
+        ctxt.user_data = None;
+    }
 
-        ctxt.parse_ext_parsed_ent();
+    ctxt.parse_ext_parsed_ent();
 
-        let ret = if ctxt.well_formed != 0 {
-            ctxt.my_doc
-        } else {
-            if let Some(my_doc) = ctxt.my_doc.take() {
+    let ret = if ctxt.well_formed != 0 {
+        ctxt.my_doc
+    } else {
+        if let Some(my_doc) = ctxt.my_doc.take() {
+            unsafe {
                 xml_free_doc(my_doc);
             }
-            None
-        };
-        if replaced {
-            ctxt.sax = None;
         }
-
-        ret
+        None
+    };
+    if replaced {
+        ctxt.sax = None;
     }
+
+    ret
 }
 
 /// Parse an XML external entity out of context and build a tree.
@@ -497,8 +497,8 @@ pub(crate) unsafe fn xml_sax_parse_entity(
 #[doc(alias = "xmlParseEntity")]
 #[deprecated]
 #[cfg(feature = "sax1")]
-pub unsafe fn xml_parse_entity(filename: Option<&str>) -> Option<XmlDocPtr> {
-    unsafe { xml_sax_parse_entity(None, filename) }
+pub fn xml_parse_entity(filename: Option<&str>) -> Option<XmlDocPtr> {
+    xml_sax_parse_entity(None, filename)
 }
 
 /// Load and parse an external subset.
@@ -507,7 +507,7 @@ pub unsafe fn xml_parse_entity(filename: Option<&str>) -> Option<XmlDocPtr> {
 #[doc(alias = "xmlSAXParseDTD")]
 #[deprecated]
 #[cfg(feature = "libxml_valid")]
-pub(crate) unsafe fn xml_sax_parse_dtd(
+pub(crate) fn xml_sax_parse_dtd(
     sax: Option<Box<XmlSAXHandler>>,
     external_id: Option<&str>,
     system_id: Option<&str>,
@@ -519,82 +519,82 @@ pub(crate) unsafe fn xml_sax_parse_dtd(
         uri::canonic_path,
     };
 
-    unsafe {
-        if external_id.is_none() && system_id.is_none() {
-            return None;
+    if external_id.is_none() && system_id.is_none() {
+        return None;
+    }
+
+    let Ok(mut ctxt) = XmlParserCtxt::new_sax_parser(sax, None) else {
+        return None;
+    };
+
+    // We are loading a DTD
+    ctxt.options |= XmlParserOption::XmlParseDTDLoad as i32;
+
+    // Canonicalise the system ID
+    let system_id_canonic = system_id.map(|s| canonic_path(s));
+
+    // Ask the Entity resolver to load the damn thing
+    let input = ctxt
+        .sax
+        .as_deref_mut()
+        .and_then(|sax| sax.resolve_entity)
+        .and_then(|resolve_entity| {
+            resolve_entity(&mut ctxt, external_id, system_id_canonic.as_deref())
+        })?;
+
+    // plug some encoding conversion routines here.
+    if ctxt.push_input(input) < 0 {
+        return None;
+    }
+    if ctxt.input().unwrap().remainder_len() >= 4 {
+        let enc = detect_encoding(&ctxt.content_bytes()[..4]);
+        ctxt.switch_encoding(enc);
+    }
+
+    if let Some(input) = ctxt.input_mut() {
+        if input.filename.is_none() {
+            if let Some(canonic) = system_id_canonic {
+                input.filename = Some(canonic.into_owned());
+            }
         }
+        input.line = 1;
+        input.col = 1;
+        input.base += input.cur;
+        input.cur = 0;
+    }
 
-        let Ok(mut ctxt) = XmlParserCtxt::new_sax_parser(sax, None) else {
-            return None;
-        };
+    // let's parse that entity knowing it's an external subset.
+    ctxt.in_subset = 2;
+    ctxt.my_doc = xml_new_doc(Some("1.0"));
+    let Some(mut my_doc) = ctxt.my_doc else {
+        xml_err_memory(Some(&mut ctxt), Some("New Doc failed"));
+        return None;
+    };
+    my_doc.properties = XmlDocProperties::XmlDocInternal as i32;
+    my_doc.ext_subset = xml_new_dtd(ctxt.my_doc, Some("none"), external_id, system_id);
+    ctxt.parse_external_subset(external_id, system_id);
 
-        // We are loading a DTD
-        ctxt.options |= XmlParserOption::XmlParseDTDLoad as i32;
-
-        // Canonicalise the system ID
-        let system_id_canonic = system_id.map(|s| canonic_path(s));
-
-        // Ask the Entity resolver to load the damn thing
-        let input = ctxt
-            .sax
-            .as_deref_mut()
-            .and_then(|sax| sax.resolve_entity)
-            .and_then(|resolve_entity| {
-                resolve_entity(&mut ctxt, external_id, system_id_canonic.as_deref())
-            })?;
-
-        // plug some encoding conversion routines here.
-        if ctxt.push_input(input) < 0 {
-            return None;
-        }
-        if ctxt.input().unwrap().remainder_len() >= 4 {
-            let enc = detect_encoding(&ctxt.content_bytes()[..4]);
-            ctxt.switch_encoding(enc);
-        }
-
-        if let Some(input) = ctxt.input_mut() {
-            if input.filename.is_none() {
-                if let Some(canonic) = system_id_canonic {
-                    input.filename = Some(canonic.into_owned());
+    let mut ret = None;
+    if let Some(mut my_doc) = ctxt.my_doc.take() {
+        if ctxt.well_formed != 0 {
+            ret = my_doc.ext_subset.take();
+            if let Some(mut ret) = ret {
+                ret.doc = None;
+                let mut tmp = ret.children;
+                while let Some(mut now) = tmp {
+                    now.set_document(None);
+                    tmp = now.next();
                 }
             }
-            input.line = 1;
-            input.col = 1;
-            input.base += input.cur;
-            input.cur = 0;
+        } else {
+            ret = None;
         }
-
-        // let's parse that entity knowing it's an external subset.
-        ctxt.in_subset = 2;
-        ctxt.my_doc = xml_new_doc(Some("1.0"));
-        let Some(mut my_doc) = ctxt.my_doc else {
-            xml_err_memory(Some(&mut ctxt), Some("New Doc failed"));
-            return None;
-        };
-        my_doc.properties = XmlDocProperties::XmlDocInternal as i32;
-        my_doc.ext_subset = xml_new_dtd(ctxt.my_doc, Some("none"), external_id, system_id);
-        ctxt.parse_external_subset(external_id, system_id);
-
-        let mut ret = None;
-        if let Some(mut my_doc) = ctxt.my_doc.take() {
-            if ctxt.well_formed != 0 {
-                ret = my_doc.ext_subset.take();
-                if let Some(mut ret) = ret {
-                    ret.doc = None;
-                    let mut tmp = ret.children;
-                    while let Some(mut now) = tmp {
-                        now.set_document(None);
-                        tmp = now.next();
-                    }
-                }
-            } else {
-                ret = None;
-            }
+        unsafe {
             xml_free_doc(my_doc);
         }
-
-        ret
     }
+
+    ret
 }
 
 /// Parse a well-balanced chunk of an XML document

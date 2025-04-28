@@ -53,8 +53,7 @@ use crate::{
 
 use super::valid::{
     xml_add_notation_decl, xml_get_dtd_qelement_desc, xml_is_id, xml_is_ref,
-    xml_valid_ctxt_normalize_attribute_value, xml_valid_normalize_attribute_value,
-    xml_validate_notation_decl,
+    xml_valid_normalize_attribute_value, xml_validate_notation_decl,
 };
 
 /// Provides the public ID e.g. "-//SGMLSOURCE//DTD DEMO//EN"
@@ -779,7 +778,7 @@ pub fn xml_sax2_notation_decl(
             return;
         } else if ctxt.in_subset == 1 {
             xml_add_notation_decl(
-                &raw mut ctxt.vctxt,
+                Some(&mut ctxt.vctxt),
                 my_doc.int_subset.as_deref_mut(),
                 name,
                 public_id,
@@ -787,7 +786,7 @@ pub fn xml_sax2_notation_decl(
             )
         } else if ctxt.in_subset == 2 {
             xml_add_notation_decl(
-                &raw mut ctxt.vctxt,
+                Some(&mut ctxt.vctxt),
                 my_doc.ext_subset.as_deref_mut(),
                 name,
                 public_id,
@@ -808,7 +807,7 @@ pub fn xml_sax2_notation_decl(
                 ctxt.valid = 0;
             }
             if ctxt.validate != 0 && ctxt.well_formed != 0 && have_int_subset {
-                ctxt.valid &= xml_validate_notation_decl(&raw mut ctxt.vctxt, None, nota);
+                ctxt.valid &= xml_validate_notation_decl(&mut ctxt.vctxt, None, nota);
             }
         }
     }
@@ -955,32 +954,28 @@ pub fn xml_sax2_start_document(ctxt: &mut XmlParserCtxt) {
 /// called when the document end has been detected.
 #[doc(alias = "xmlSAX2EndDocument")]
 pub fn xml_sax2_end_document(ctxt: &mut XmlParserCtxt) {
-    unsafe {
-        let Some(mut my_doc) = ctxt.my_doc else {
-            return;
-        };
-        #[cfg(feature = "libxml_valid")]
-        {
-            if ctxt.validate != 0 && ctxt.well_formed != 0 && my_doc.int_subset.is_some() {
-                ctxt.valid &= xml_validate_document_final(&raw mut ctxt.vctxt, my_doc);
-            }
-        }
+    let Some(mut my_doc) = ctxt.my_doc else {
+        return;
+    };
+    #[cfg(feature = "libxml_valid")]
+    if ctxt.validate != 0 && ctxt.well_formed != 0 && my_doc.int_subset.is_some() {
+        ctxt.valid &= xml_validate_document_final(&mut ctxt.vctxt, my_doc);
+    }
 
-        // Grab the encoding if it was added on-the-fly
-        if ctxt.encoding.is_some() && my_doc.encoding.is_none() {
-            if let Some(enc) = ctxt.encoding.take() {
-                my_doc.encoding = Some(enc);
-            }
+    // Grab the encoding if it was added on-the-fly
+    if ctxt.encoding.is_some() && my_doc.encoding.is_none() {
+        if let Some(enc) = ctxt.encoding.take() {
+            my_doc.encoding = Some(enc);
         }
-        if !ctxt.input_tab.is_empty()
-            && ctxt.input_tab[0].encoding.is_some()
-            && my_doc.encoding.is_none()
-        {
-            my_doc.encoding = ctxt.input_tab[0].encoding.clone();
-        }
-        if ctxt.charset != XmlCharEncoding::None && my_doc.charset == XmlCharEncoding::None {
-            my_doc.charset = ctxt.charset;
-        }
+    }
+    if !ctxt.input_tab.is_empty()
+        && ctxt.input_tab[0].encoding.is_some()
+        && my_doc.encoding.is_none()
+    {
+        my_doc.encoding = ctxt.input_tab[0].encoding.clone();
+    }
+    if ctxt.charset != XmlCharEncoding::None && my_doc.charset == XmlCharEncoding::None {
+        my_doc.charset = ctxt.charset;
     }
 }
 
@@ -1171,8 +1166,7 @@ unsafe fn xml_sax2_attribute_internal(
                 // Needed for HTML too:
                 //   http://www.w3.org/TR/html4/types.html#h-6.2
                 ctxt.vctxt.valid = 1;
-                let val = xml_valid_ctxt_normalize_attribute_value(
-                    &raw mut ctxt.vctxt,
+                let val = ctxt.normalize_attribute_value(
                     ctxt.my_doc.unwrap(),
                     ctxt.node.unwrap(),
                     fullname,
@@ -2102,8 +2096,7 @@ unsafe fn xml_sax2_attribute_ns(
                         if ctxt.atts_special.is_some() {
                             let fullname = build_qname(localname, prefix);
                             ctxt.vctxt.valid = 1;
-                            let nvalnorm = xml_valid_ctxt_normalize_attribute_value(
-                                &raw mut ctxt.vctxt,
+                            let nvalnorm = ctxt.normalize_attribute_value(
                                 ctxt.my_doc.unwrap(),
                                 ctxt.node.unwrap(),
                                 &fullname,

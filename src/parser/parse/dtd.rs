@@ -2137,13 +2137,10 @@ impl XmlParserCtxt {
 /// Returns the resulting xmlDtdPtr or NULL in case of error.
 #[doc(alias = "xmlParseDTD")]
 #[cfg(feature = "libxml_valid")]
-pub unsafe fn xml_parse_dtd(
-    external_id: Option<&str>,
-    system_id: Option<&str>,
-) -> Option<XmlDtdPtr> {
+pub fn xml_parse_dtd(external_id: Option<&str>, system_id: Option<&str>) -> Option<XmlDtdPtr> {
     use crate::parser::xml_sax_parse_dtd;
 
-    unsafe { xml_sax_parse_dtd(None, external_id, system_id) }
+    xml_sax_parse_dtd(None, external_id, system_id)
 }
 
 /// Load and parse a DTD
