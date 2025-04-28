@@ -4342,7 +4342,7 @@ pub fn html_ctxt_reset(ctxt: &mut HtmlParserCtxt) {
         }
     }
     ctxt.standalone = -1;
-    ctxt.has_external_subset = 0;
+    ctxt.has_external_subset = false;
     ctxt.has_perefs = 0;
     ctxt.html = 1;
     ctxt.external = 0;

@@ -3937,8 +3937,6 @@ unsafe fn c14n_run_test(
             None,
             XmlParserOption::XmlParseDTDAttr as i32 | XmlParserOption::XmlParseNoEnt as i32,
         ) else {
-            // let last_error = get_last_error();
-            // eprintln!("last_error: {last_error:?}");
             eprintln!("Error: unable to parse file \"{xml_filename}\"");
             return -1;
         };

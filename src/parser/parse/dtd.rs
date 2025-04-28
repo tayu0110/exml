@@ -150,7 +150,7 @@ impl XmlParserCtxt {
         let (external_id, uri) = self.parse_external_id(true);
 
         if uri.is_some() || external_id.is_some() {
-            self.has_external_subset = 1;
+            self.has_external_subset = true;
         }
         self.ext_sub_uri = uri.map(|uri| uri.into());
         self.ext_sub_system = external_id.map(|id| id.into());
@@ -1687,7 +1687,7 @@ impl XmlParserCtxt {
             // references, or a document with "standalone='yes'", ...
             // ... The declaration of a parameter entity must precede
             // any reference to it...
-            if self.standalone == 1 || (self.has_external_subset == 0 && self.has_perefs == 0) {
+            if self.standalone == 1 || (!self.has_external_subset && self.has_perefs == 0) {
                 xml_fatal_err_msg_str!(
                     self,
                     XmlParserErrors::XmlErrUndeclaredEntity,
