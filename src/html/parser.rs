@@ -2607,7 +2607,7 @@ fn html_parse_char_data_internal(ctxt: &mut HtmlParserCtxt, readahead: i32) {
             if ctxt.disable_sax == 0 && ctxt.sax.is_some() {
                 let s = from_utf8(&buf[..nbchar as usize]).expect("Internal Error");
                 if are_blanks(ctxt, s) != 0 {
-                    if ctxt.keep_blanks != 0 {
+                    if ctxt.keep_blanks {
                         if let Some(characters) = ctxt.sax.as_deref_mut().unwrap().characters {
                             characters(ctxt, s);
                         }
@@ -2638,7 +2638,7 @@ fn html_parse_char_data_internal(ctxt: &mut HtmlParserCtxt, readahead: i32) {
         if ctxt.disable_sax == 0 && ctxt.sax.is_some() {
             let s = from_utf8(&buf[..nbchar as usize]).expect("Internal Error");
             if are_blanks(ctxt, s) != 0 {
-                if ctxt.keep_blanks != 0 {
+                if ctxt.keep_blanks {
                     if let Some(characters) = ctxt.sax.as_deref_mut().unwrap().characters {
                         characters(ctxt, s);
                     }
@@ -3920,7 +3920,7 @@ fn html_parse_try_or_finish(ctxt: &mut HtmlParserCtxt, terminate: i32) -> i32 {
                             chr[0] = cur;
                             let s = from_utf8(&chr[..1]).expect("Internal Error");
                             if xml_is_blank_char(cur as u32) {
-                                if ctxt.keep_blanks != 0 {
+                                if ctxt.keep_blanks {
                                     if let Some(characters) = sax.characters {
                                         characters(ctxt, s);
                                     }
@@ -4409,14 +4409,14 @@ pub fn html_ctxt_use_options(ctxt: &mut HtmlParserCtxt, mut options: i32) -> i32
         ctxt.pedantic = 0;
     }
     if options & XmlParserOption::XmlParseNoBlanks as i32 != 0 {
-        ctxt.keep_blanks = 0;
+        ctxt.keep_blanks = false;
         if let Some(sax) = ctxt.sax.as_deref_mut() {
             sax.ignorable_whitespace = Some(xml_sax2_ignorable_whitespace);
         }
         options -= XmlParserOption::XmlParseNoBlanks as i32;
         ctxt.options |= XmlParserOption::XmlParseNoBlanks as i32;
     } else {
-        ctxt.keep_blanks = 1;
+        ctxt.keep_blanks = true;
     }
     if options & HtmlParserOption::HtmlParseRecover as i32 != 0 {
         ctxt.recovery = 1;

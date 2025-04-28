@@ -80,11 +80,11 @@ pub fn xml_substitute_entities_default(val: bool) -> bool {
 /// Returns the last value for 0 for no substitution, 1 for substitution.
 #[doc(alias = "xmlKeepBlanksDefault")]
 #[deprecated = "Use the modern options API with XML_PARSE_NOBLANKS"]
-pub fn xml_keep_blanks_default(val: i32) -> i32 {
+pub fn xml_keep_blanks_default(val: bool) -> bool {
     let old = get_keep_blanks_default_value();
 
     set_keep_blanks_default_value(val);
-    if val == 0 {
+    if !val {
         set_indent_tree_output(1);
     }
     old

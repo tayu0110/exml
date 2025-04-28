@@ -107,7 +107,7 @@ pub struct XmlGlobalState {
     substitute_entities_default_value: bool,
     do_validity_checking_default_value: bool,
     pub(crate) get_warnings_default_value: i32,
-    keep_blanks_default_value: i32,
+    keep_blanks_default_value: bool,
     line_numbers_default_value: i32,
     load_ext_dtd_default_value: i32,
     parser_debug_entities: i32,
@@ -153,7 +153,7 @@ impl XmlGlobalState {
             substitute_entities_default_value: false,
             do_validity_checking_default_value: false,
             get_warnings_default_value: 1,
-            keep_blanks_default_value: 1,
+            keep_blanks_default_value: true,
             line_numbers_default_value: 0,
             load_ext_dtd_default_value: 0,
             parser_debug_entities: 0,
@@ -253,11 +253,11 @@ pub fn set_indent_tree_output(value: i32) {
     GLOBAL_STATE.with_borrow_mut(|state| state.indent_tree_output = value)
 }
 
-pub fn get_keep_blanks_default_value() -> i32 {
+pub fn get_keep_blanks_default_value() -> bool {
     GLOBAL_STATE.with_borrow(|state| state.keep_blanks_default_value)
 }
 
-pub fn set_keep_blanks_default_value(value: i32) {
+pub fn set_keep_blanks_default_value(value: bool) {
     GLOBAL_STATE.with_borrow_mut(|state| state.keep_blanks_default_value = value)
 }
 

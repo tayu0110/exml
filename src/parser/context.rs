@@ -188,7 +188,7 @@ pub struct XmlParserCtxt {
     // used by progressive parsing lookup
     pub(crate) check_index: i64,
     // ugly but ...
-    pub(crate) keep_blanks: i32,
+    pub(crate) keep_blanks: bool,
     // SAX callbacks are disabled
     pub(crate) disable_sax: i32,
     // Parsing is in int 1/ext 2 subset
@@ -564,7 +564,7 @@ impl XmlParserCtxt {
         }
         self.linenumbers = get_line_numbers_default_value();
         self.keep_blanks = get_keep_blanks_default_value();
-        if self.keep_blanks == 0 {
+        if !self.keep_blanks {
             if let Some(sax) = self.sax.as_deref_mut() {
                 sax.ignorable_whitespace = Some(xml_sax2_ignorable_whitespace);
             }
@@ -1654,14 +1654,14 @@ impl XmlParserCtxt {
             self.pedantic = 0;
         }
         if options & XmlParserOption::XmlParseNoBlanks as i32 != 0 {
-            self.keep_blanks = 0;
+            self.keep_blanks = false;
             if let Some(sax) = self.sax.as_deref_mut() {
                 sax.ignorable_whitespace = Some(xml_sax2_ignorable_whitespace);
             }
             options -= XmlParserOption::XmlParseNoBlanks as i32;
             self.options |= XmlParserOption::XmlParseNoBlanks as i32;
         } else {
-            self.keep_blanks = 1;
+            self.keep_blanks = true;
         }
         if options & XmlParserOption::XmlParseDTDValid as i32 != 0 {
             self.validate = true;
@@ -2045,7 +2045,7 @@ impl Default for XmlParserCtxt {
             name_tab: vec![],
             nb_chars: 0,
             check_index: 0,
-            keep_blanks: 0,
+            keep_blanks: get_keep_blanks_default_value(),
             disable_sax: 0,
             in_subset: 0,
             int_sub_name: None,
