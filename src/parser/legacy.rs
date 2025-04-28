@@ -30,7 +30,7 @@ pub fn xml_parse_doc(cur: Vec<u8>) -> Option<XmlDocPtr> {
 #[deprecated = "Use xmlReadFile"]
 #[cfg(feature = "sax1")]
 pub fn xml_parse_file(filename: Option<&str>) -> Option<XmlDocPtr> {
-    xml_sax_parse_file(None, filename, 0)
+    xml_sax_parse_file(None, filename, false)
 }
 
 /// Parse an XML in-memory block and build a tree.
@@ -40,7 +40,7 @@ pub fn xml_parse_file(filename: Option<&str>) -> Option<XmlDocPtr> {
 #[deprecated = "Use xmlReadMemory"]
 #[cfg(feature = "sax1")]
 pub fn xml_parse_memory(buffer: Vec<u8>) -> Option<XmlDocPtr> {
-    xml_sax_parse_memory(None, buffer, 0)
+    xml_sax_parse_memory(None, buffer, false)
 }
 
 /// Set and return the previous value for default entity support.
@@ -136,7 +136,7 @@ pub fn xml_recover_doc(cur: Vec<u8>) -> Option<XmlDocPtr> {
 #[deprecated = "Use xmlReadMemory with XML_PARSE_RECOVER"]
 #[cfg(feature = "sax1")]
 pub fn xml_recover_memory(buffer: Vec<u8>) -> Option<XmlDocPtr> {
-    xml_sax_parse_memory(None, buffer, 1)
+    xml_sax_parse_memory(None, buffer, true)
 }
 
 /// Parse an XML file and build a tree. Automatic support for ZLIB/Compress
@@ -149,7 +149,7 @@ pub fn xml_recover_memory(buffer: Vec<u8>) -> Option<XmlDocPtr> {
 #[deprecated = "Use xmlReadFile with XML_PARSE_RECOVER"]
 #[cfg(feature = "sax1")]
 pub fn xml_recover_file(filename: Option<&str>) -> Option<XmlDocPtr> {
-    xml_sax_parse_file(None, filename, 1)
+    xml_sax_parse_file(None, filename, true)
 }
 
 /// parse an XML file and call the given SAX handler routines.
@@ -291,7 +291,7 @@ pub fn xml_sax_parse_doc(
 pub fn xml_sax_parse_memory(
     sax: Option<Box<XmlSAXHandler>>,
     buffer: Vec<u8>,
-    recovery: i32,
+    recovery: bool,
 ) -> Option<XmlDocPtr> {
     xml_sax_parse_memory_with_data(sax, buffer, recovery, null_mut())
 }
@@ -310,7 +310,7 @@ pub fn xml_sax_parse_memory(
 pub fn xml_sax_parse_memory_with_data(
     sax: Option<Box<XmlSAXHandler>>,
     buffer: Vec<u8>,
-    recovery: i32,
+    recovery: bool,
     data: *mut c_void,
 ) -> Option<XmlDocPtr> {
     use super::XmlParserCtxt;
@@ -331,7 +331,7 @@ pub fn xml_sax_parse_memory_with_data(
     ctxt.recovery = recovery;
     ctxt.parse_document();
 
-    let ret = if ctxt.well_formed || recovery != 0 {
+    let ret = if ctxt.well_formed || recovery {
         ctxt.my_doc
     } else {
         if let Some(my_doc) = ctxt.my_doc.take() {
@@ -360,7 +360,7 @@ pub fn xml_sax_parse_memory_with_data(
 pub fn xml_sax_parse_file(
     sax: Option<Box<XmlSAXHandler>>,
     filename: Option<&str>,
-    recovery: i32,
+    recovery: bool,
 ) -> Option<XmlDocPtr> {
     xml_sax_parse_file_with_data(sax, filename, recovery, null_mut())
 }
@@ -380,7 +380,7 @@ pub fn xml_sax_parse_file(
 pub fn xml_sax_parse_file_with_data(
     sax: Option<Box<XmlSAXHandler>>,
     filename: Option<&str>,
-    recovery: i32,
+    recovery: bool,
     data: *mut c_void,
 ) -> Option<XmlDocPtr> {
     use crate::parser::XmlParserCtxt;
@@ -411,7 +411,7 @@ pub fn xml_sax_parse_file_with_data(
     ctxt.recovery = recovery;
     ctxt.parse_document();
 
-    let ret = if ctxt.well_formed || recovery != 0 {
+    let ret = if ctxt.well_formed || recovery {
         let ret = ctxt.my_doc;
         if ctxt.input().unwrap().buf.is_some() {
             if let Some(mut ret) = ret {

@@ -1720,7 +1720,7 @@ fn html_parse_script(ctxt: &mut HtmlParserCtxt) {
             // current tag, effectively ignoring all tags inside the
             // script/style block and treating the entire block as
             // CDATA.
-            if ctxt.recovery != 0 {
+            if ctxt.recovery {
                 let context_name = ctxt.name.as_deref().unwrap();
                 let content = &ctxt.content_bytes()[2..];
                 if context_name.len() <= content.len()
@@ -4419,10 +4419,10 @@ pub fn html_ctxt_use_options(ctxt: &mut HtmlParserCtxt, mut options: i32) -> i32
         ctxt.keep_blanks = true;
     }
     if options & HtmlParserOption::HtmlParseRecover as i32 != 0 {
-        ctxt.recovery = 1;
+        ctxt.recovery = true;
         options -= HtmlParserOption::HtmlParseRecover as i32;
     } else {
-        ctxt.recovery = 0;
+        ctxt.recovery = false;
     }
     if options & HtmlParserOption::HtmlParseCompact as i32 != 0 {
         ctxt.options |= HtmlParserOption::HtmlParseCompact as i32;

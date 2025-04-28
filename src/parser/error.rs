@@ -123,7 +123,7 @@ pub(crate) fn xml_fatal_err(ctxt: &mut XmlParserCtxt, error: XmlParserErrors, in
         );
     }
     ctxt.well_formed = false;
-    if ctxt.recovery == 0 {
+    if !ctxt.recovery {
         ctxt.disable_sax = true;
     }
 }
@@ -154,7 +154,7 @@ pub(crate) fn xml_fatal_err_msg(ctxt: &mut XmlParserCtxt, error: XmlParserErrors
         Some(msg),
     );
     ctxt.well_formed = false;
-    if ctxt.recovery == 0 {
+    if !ctxt.recovery {
         ctxt.disable_sax = true;
     }
 }
@@ -193,7 +193,7 @@ macro_rules! xml_fatal_err_msg_str {
                 Some($msg),
             );
             $ctxt.well_formed = false;
-            if $ctxt.recovery == 0 {
+            if !$ctxt.recovery {
                 $ctxt.disable_sax = true;
             }
         }
@@ -310,7 +310,7 @@ macro_rules! xml_fatal_err_msg_int {
                 Some($msg),
             );
             $ctxt.well_formed = false;
-            if $ctxt.recovery == 0 {
+            if !$ctxt.recovery {
                 $ctxt.disable_sax = true;
             }
         }
@@ -417,7 +417,7 @@ macro_rules! xml_fatal_err_msg_str_int_str {
                 Some($msg),
             );
             $ctxt.well_formed = false;
-            if $ctxt.recovery == 0 {
+            if !$ctxt.recovery {
                 $ctxt.disable_sax = true;
             }
         }
@@ -506,7 +506,7 @@ macro_rules! xml_err_internal {
                 Some($msg),
             );
             $ctxt.well_formed = false;
-            if $ctxt.recovery == 0 {
+            if !$ctxt.recovery {
                 $ctxt.disable_sax = true;
             }
         }
@@ -607,7 +607,7 @@ macro_rules! __xml_err_encoding {
                 Some($msg),
             );
             $ctxt.well_formed = false;
-            if $ctxt.recovery == 0 {
+            if !$ctxt.recovery {
                 $ctxt.disable_sax = true;
             }
         }
@@ -645,7 +645,7 @@ macro_rules! xml_err_encoding_int {
                 Some(format!($msg, $val).as_str()),
             );
             $ctxt.well_formed = false;
-            if $ctxt.recovery == 0 {
+            if $ctxt.recovery {
                 $ctxt.disable_sax = true;
             }
         }
@@ -787,7 +787,7 @@ pub(crate) fn xml_err_attribute_dup(
         );
     }
     ctxt.well_formed = false;
-    if ctxt.recovery == 0 {
+    if !ctxt.recovery {
         ctxt.disable_sax = true;
     }
 }

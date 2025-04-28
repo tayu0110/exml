@@ -229,7 +229,7 @@ pub struct XmlParserCtxt {
     #[cfg(feature = "catalog")]
     pub(crate) catalogs: Option<XmlCatalogEntry>,
     // run in recovery mode
-    pub(crate) recovery: i32,
+    pub(crate) recovery: bool,
     // is this a progressive parsing
     pub(crate) progressive: i32,
     // array for the attributes callbacks
@@ -1620,11 +1620,11 @@ impl XmlParserCtxt {
             self.encoding = Some(encoding.to_owned());
         }
         if options & XmlParserOption::XmlParseRecover as i32 != 0 {
-            self.recovery = 1;
+            self.recovery = true;
             options -= XmlParserOption::XmlParseRecover as i32;
             self.options |= XmlParserOption::XmlParseRecover as i32;
         } else {
-            self.recovery = 0;
+            self.recovery = false;
         }
         if options & XmlParserOption::XmlParseDTDLoad as i32 != 0 {
             self.loadsubset = XML_DETECT_IDS as i32;
@@ -1790,7 +1790,7 @@ impl XmlParserCtxt {
             }
         }
         self.parse_document();
-        if self.well_formed || self.recovery != 0 {
+        if self.well_formed || self.recovery {
             self.my_doc.take()
         } else {
             if let Some(my_doc) = self.my_doc.take() {
@@ -2062,7 +2062,7 @@ impl Default for XmlParserCtxt {
             linenumbers: 0,
             #[cfg(feature = "catalog")]
             catalogs: None,
-            recovery: 0,
+            recovery: false,
             progressive: 0,
             atts: vec![],
             maxatts: 0,

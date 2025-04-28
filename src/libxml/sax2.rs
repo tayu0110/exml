@@ -345,7 +345,7 @@ macro_rules! xml_fatal_err_msg {
             if !ctxt.is_null() {
                 (*ctxt).well_formed = false;
                 (*ctxt).valid = 0;
-                if (*ctxt).recovery == 0 {
+                if !(*ctxt).recovery {
                     (*ctxt).disable_sax = true;
                 }
             }
@@ -1302,7 +1302,7 @@ unsafe fn xml_sax2_attribute_internal(
                             namespace.href().unwrap().into_owned()
                         );
                         ctxt.well_formed = false;
-                        if ctxt.recovery == 0 {
+                        if !ctxt.recovery {
                             ctxt.disable_sax = true;
                         }
                         return;
