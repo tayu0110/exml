@@ -237,8 +237,8 @@ pub fn xml_sax2_external_subset(
         let oldinput_tab = replace(&mut ctxt.input_tab, Vec::with_capacity(5));
         let oldcharset = ctxt.charset;
         let oldencoding = ctxt.encoding.take();
-        let oldprogressive: i32 = ctxt.progressive;
-        ctxt.progressive = 0;
+        let oldprogressive = ctxt.progressive;
+        ctxt.progressive = false;
         ctxt.push_input(input);
 
         // On the fly encoding conversion if needed

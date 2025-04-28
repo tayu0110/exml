@@ -3476,7 +3476,7 @@ pub fn html_create_push_parser_ctxt(
             .push_bytes(chunk);
         ctxt.input_mut().unwrap().set_base_and_cursor(base, cur);
     }
-    ctxt.progressive = 1;
+    ctxt.progressive = true;
     Some(ctxt)
 }
 

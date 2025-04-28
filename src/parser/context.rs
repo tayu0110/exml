@@ -231,7 +231,7 @@ pub struct XmlParserCtxt {
     // run in recovery mode
     pub(crate) recovery: bool,
     // is this a progressive parsing
-    pub(crate) progressive: i32,
+    pub(crate) progressive: bool,
     // array for the attributes callbacks
     pub(crate) atts: Vec<(String, Option<String>)>,
     // the size of the array
@@ -684,7 +684,7 @@ impl XmlParserCtxt {
     #[doc(alias = "xmlParserGrow")]
     pub(crate) fn force_grow(&mut self) -> i32 {
         // Don't grow push parser buffer.
-        if self.progressive != 0 {
+        if self.progressive {
             return 0;
         }
 
@@ -726,7 +726,7 @@ impl XmlParserCtxt {
     }
 
     pub(crate) fn grow(&mut self) {
-        if self.progressive == 0 && self.input().unwrap().remainder_len() < INPUT_CHUNK {
+        if !self.progressive && self.input().unwrap().remainder_len() < INPUT_CHUNK {
             self.force_grow();
         }
     }
@@ -742,7 +742,7 @@ impl XmlParserCtxt {
         let Some(buf) = input.buf.as_mut() else {
             return;
         };
-        if progressive == 0 && buf.encoder.is_none() && buf.context.is_none() {
+        if !progressive && buf.encoder.is_none() && buf.context.is_none() {
             return;
         }
 
@@ -766,7 +766,7 @@ impl XmlParserCtxt {
     }
 
     pub(crate) fn shrink(&mut self) {
-        if self.progressive == 0
+        if !self.progressive
             && self.input().unwrap().offset_from_base() > 2 * INPUT_CHUNK
             && self.input().unwrap().remainder_len() < 2 * INPUT_CHUNK
         {
@@ -2063,7 +2063,7 @@ impl Default for XmlParserCtxt {
             #[cfg(feature = "catalog")]
             catalogs: None,
             recovery: false,
-            progressive: 0,
+            progressive: false,
             atts: vec![],
             maxatts: 0,
             docdict: 0,

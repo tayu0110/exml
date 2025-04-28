@@ -1064,7 +1064,7 @@ impl XmlParserCtxt {
                 return -1;
             }
 
-            self.progressive = 1;
+            self.progressive = true;
             if matches!(self.instate, XmlParserInputState::XmlParserStart) {
                 self.detect_sax2();
             }
