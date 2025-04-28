@@ -78,7 +78,6 @@ impl XmlParserCtxt {
             xml_err_memory(None, Some("creating parser: out of memory\n"));
             return None;
         };
-        ctxt.dict_names = 1;
         if filename.is_none() {
             ctxt.directory = None;
         } else if let Some(dir) = filename.and_then(xml_parser_get_directory) {

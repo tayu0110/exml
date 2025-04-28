@@ -586,7 +586,6 @@ pub(crate) fn xml_parse_balanced_chunk_memory_internal(
             // ID/IDREF registration will be done in xmlValidateElement below
             ctxt.loadsubset |= XML_SKIP_IDS as i32;
         }
-        ctxt.dict_names = oldctxt.dict_names;
         ctxt.atts_default = take(&mut oldctxt.atts_default);
         ctxt.atts_special = oldctxt.atts_special;
 

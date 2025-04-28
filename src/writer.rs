@@ -221,8 +221,6 @@ impl<'a> XmlTextWriter<'a> {
             );
             return None;
         };
-        // For some reason this seems to completely break if node names are interned.
-        ctxt.dict_names = 0;
 
         ctxt.my_doc = xml_new_doc(Some(XML_DEFAULT_VERSION));
         let Some(mut my_doc) = ctxt.my_doc else {
@@ -280,7 +278,6 @@ impl<'a> XmlTextWriter<'a> {
             return None;
         };
         // For some reason this seems to completely break if node names are interned.
-        ctxt.dict_names = 0;
         ctxt.my_doc = Some(doc);
         ctxt.node = Some(node);
 

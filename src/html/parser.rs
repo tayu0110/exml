@@ -4444,7 +4444,6 @@ pub fn html_ctxt_use_options(ctxt: &mut HtmlParserCtxt, mut options: i32) -> i32
         ctxt.options |= HtmlParserOption::HtmlParseNoimplied as i32;
         options -= HtmlParserOption::HtmlParseNoimplied as i32;
     }
-    ctxt.dict_names = 0;
     ctxt.linenumbers = 1;
     options
 }

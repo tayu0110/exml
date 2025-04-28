@@ -435,7 +435,6 @@ impl XmlTextReader {
         }
         self.ctxt.as_deref_mut().unwrap()._private = self as *mut Self as _;
         self.ctxt.as_deref_mut().unwrap().linenumbers = 1;
-        self.ctxt.as_deref_mut().unwrap().dict_names = 1;
         // use the parser dictionary to allocate all elements and attributes names
         self.ctxt.as_deref_mut().unwrap().docdict = 1;
         self.ctxt.as_deref_mut().unwrap().parse_mode = XmlParserMode::XmlParseReader;
@@ -3864,7 +3863,6 @@ pub unsafe fn xml_new_text_reader(
         ctxt.parse_mode = XmlParserMode::XmlParseReader;
         ctxt._private = ret as _;
         ctxt.linenumbers = 1;
-        ctxt.dict_names = 1;
         (*ret).allocs = XML_TEXTREADER_CTXT;
         // use the parser dictionary to allocate all elements and attributes names
         ctxt.docdict = 1;

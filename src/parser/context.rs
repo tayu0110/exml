@@ -269,8 +269,6 @@ pub struct XmlParserCtxt {
     pub(crate) options: i32,
 
     // Those fields are needed only for streaming parsing so far
-    // Use dictionary names for the tree
-    pub(crate) dict_names: i32,
     // number of freed element nodes
     pub(crate) free_elems_nr: i32,
     // List of freed element nodes
@@ -1701,13 +1699,6 @@ impl XmlParserCtxt {
             options -= XmlParserOption::XmlParseSAX1 as i32;
             self.options |= XmlParserOption::XmlParseSAX1 as i32;
         }
-        if options & XmlParserOption::XmlParseNoDict as i32 != 0 {
-            self.dict_names = 0;
-            options -= XmlParserOption::XmlParseNoDict as i32;
-            self.options |= XmlParserOption::XmlParseNoDict as i32;
-        } else {
-            self.dict_names = 1;
-        }
         if options & XmlParserOption::XmlParseNoCDATA as i32 != 0 {
             if let Some(sax) = self.sax.as_deref_mut() {
                 sax.cdata_block = None;
@@ -2078,7 +2069,6 @@ impl Default for XmlParserCtxt {
             atts_special: None,
             ns_well_formed: true,
             options: 0,
-            dict_names: 0,
             free_elems_nr: 0,
             free_elems: None,
             free_attrs_nr: 0,
