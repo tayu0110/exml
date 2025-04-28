@@ -1,7 +1,7 @@
 use std::io::Write;
 
 #[cfg(feature = "libxml_xptr_locs")]
-use crate::libxml::xpointer::XmlLocationSet;
+use crate::xpointer::XmlLocationSet;
 use crate::{
     debug_xml::{xml_debug_dump_attr, xml_debug_dump_one_node, xml_debug_dump_string},
     tree::{XmlAttrPtr, XmlElementType, XmlGenericNodePtr},

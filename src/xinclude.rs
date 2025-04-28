@@ -30,10 +30,7 @@ use crate::{
     encoding::{XmlCharEncoding, get_encoding_handler},
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     io::xml_parser_get_directory,
-    libxml::{
-        chvalid::xml_is_char,
-        xpointer::{xml_xptr_eval, xml_xptr_new_context},
-    },
+    libxml::chvalid::xml_is_char,
     parser::{
         XML_DETECT_IDS, XmlParserCtxt, XmlParserOption, xml_init_parser, xml_load_external_entity,
     },
@@ -45,6 +42,7 @@ use crate::{
     },
     uri::{XmlURI, build_relative_uri, build_uri, escape_url},
     xpath::{XmlXPathObject, XmlXPathObjectType},
+    xpointer::{xml_xptr_eval, xml_xptr_new_context},
 };
 
 /// A constant defining the Xinclude namespace: `http://www.w3.org/2003/XInclude`
@@ -925,7 +923,7 @@ impl XmlXIncludeCtxt {
     #[cfg(feature = "libxml_xptr_locs")]
     unsafe fn copy_range(&self, range: &XmlXPathObject) -> Option<XmlGenericNodePtr> {
         unsafe {
-            use crate::{libxml::xpointer::xml_xptr_advance_node, tree::xml_new_doc_text};
+            use crate::{tree::xml_new_doc_text, xpointer::xml_xptr_advance_node};
 
             // pointers to generated nodes
             let mut list = None;

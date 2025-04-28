@@ -1,19 +1,17 @@
 use std::{mem::replace, rc::Rc};
 
-#[cfg(feature = "libxml_xptr_locs")]
-use crate::libxml::xpointer::XmlLocationSet;
 #[cfg(feature = "libxml_pattern")]
 use crate::pattern::XmlPattern;
+#[cfg(feature = "libxml_xptr_locs")]
+use crate::xpointer::XmlLocationSet;
 use crate::{
     generic_error,
-    libxml::xpointer::{
-        xml_xptr_new_range, xml_xptr_new_range_node_object, xml_xptr_wrap_location_set,
-    },
     tree::{XmlAttrPtr, XmlElementType, XmlGenericNodePtr, XmlNodePtr, XmlNsPtr},
     xpath::{
         XmlXPathError, XmlXPathOp, xml_xpath_location_set_filter, xml_xpath_node_set_filter,
         xml_xpath_node_set_keep_last,
     },
+    xpointer::{xml_xptr_new_range, xml_xptr_new_range_node_object, xml_xptr_wrap_location_set},
 };
 
 use super::{

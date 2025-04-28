@@ -1,6 +1,6 @@
 use std::{borrow::Cow, ffi::c_void};
 
-use crate::{generic_error, libxml::xpointer::XmlLocationSet, tree::XmlGenericNodePtr};
+use crate::{generic_error, tree::XmlGenericNodePtr, xpointer::XmlLocationSet};
 
 use super::{
     XML_XPATH_NAN, XmlNodeSet, xml_xpath_cast_boolean_to_number, xml_xpath_cast_boolean_to_string,

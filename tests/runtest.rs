@@ -2426,11 +2426,11 @@ fn ignore_generic_error(_ctx: Option<GenericErrorContext>, _msg: &str) {}
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
 fn test_xpath(xpath: &str, xptr: i32, expr: i32) {
     use exml::{
-        libxml::xpointer::{xml_xptr_eval, xml_xptr_new_context},
         xpath::{
             XmlXPathContext, xml_xpath_compile, xml_xpath_compiled_eval,
             xml_xpath_debug_dump_object,
         },
+        xpointer::{xml_xptr_eval, xml_xptr_new_context},
     };
 
     let res;

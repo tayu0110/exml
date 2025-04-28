@@ -29,7 +29,7 @@
 use std::ptr::null_mut;
 
 #[cfg(feature = "libxml_xptr_locs")]
-use crate::libxml::xpointer::XmlLocationSet;
+use crate::xpointer::XmlLocationSet;
 use crate::{
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     generic_error,

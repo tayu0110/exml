@@ -51,6 +51,8 @@ pub mod xmlschemas;
 #[cfg(feature = "schema")]
 pub mod xmlschemastypes;
 pub mod xpath;
+#[cfg(feature = "xpointer")]
+pub mod xpointer;
 
 pub const SYSCONFDIR: &str = if let Some(sysconfdir) = option_env!("SYSCONFDIR") {
     sysconfdir
