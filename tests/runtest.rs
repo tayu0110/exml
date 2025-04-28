@@ -1353,11 +1353,7 @@ unsafe fn sax_parse_test(
             ctxt.sax = Some(Box::new(sax));
             ctxt.use_options(options);
             ctxt.parse_document();
-            ret = if ctxt.well_formed != 0 {
-                0
-            } else {
-                ctxt.err_no
-            };
+            ret = if ctxt.well_formed { 0 } else { ctxt.err_no };
             if let Some(my_doc) = ctxt.my_doc {
                 xml_free_doc(my_doc);
             }
@@ -1371,11 +1367,7 @@ unsafe fn sax_parse_test(
             ctxt.sax = Some(Box::new(sax));
             ctxt.use_options(options);
             ctxt.parse_document();
-            ret = if ctxt.well_formed != 0 {
-                0
-            } else {
-                ctxt.err_no
-            };
+            ret = if ctxt.well_formed { 0 } else { ctxt.err_no };
             if let Some(my_doc) = ctxt.my_doc.take() {
                 xml_free_doc(my_doc);
             }
@@ -1410,11 +1402,7 @@ unsafe fn sax_parse_test(
                 ctxt.sax = Some(Box::new(sax));
                 ctxt.use_options(options);
                 ctxt.parse_document();
-                ret = if ctxt.well_formed != 0 {
-                    0
-                } else {
-                    ctxt.err_no
-                };
+                ret = if ctxt.well_formed { 0 } else { ctxt.err_no };
                 if let Some(my_doc) = ctxt.my_doc {
                     xml_free_doc(my_doc);
                 }
@@ -1432,11 +1420,7 @@ unsafe fn sax_parse_test(
                 ctxt.sax = Some(Box::new(sax));
                 ctxt.use_options(options);
                 ctxt.parse_document();
-                ret = if ctxt.well_formed != 0 {
-                    0
-                } else {
-                    ctxt.err_no
-                };
+                ret = if ctxt.well_formed { 0 } else { ctxt.err_no };
                 if let Some(my_doc) = ctxt.my_doc {
                     xml_free_doc(my_doc);
                 }
@@ -1602,14 +1586,14 @@ unsafe fn push_parse_test(
         let doc = ctxt.my_doc;
         #[cfg(feature = "html")]
         let res = if options & XML_PARSE_HTML != 0 {
-            1
+            true
         } else {
             ctxt.well_formed
         };
         #[cfg(not(feature = "html"))]
         let res = ctxt.well_formed;
 
-        if res == 0 {
+        if !res {
             if let Some(doc) = doc {
                 xml_free_doc(doc);
             }
@@ -1814,7 +1798,6 @@ unsafe fn push_boundary_test(
         };
 
         let mut bnd_sax = XmlSAXHandler::default();
-        let mut res: i32;
         let mut old_consumed: u64 = 0;
 
         // If the parser made progress, check that exactly one construct was
@@ -1984,11 +1967,11 @@ unsafe fn push_boundary_test(
         }
         let doc = ctxt.my_doc;
         #[cfg(feature = "html")]
-        if options & XML_PARSE_HTML != 0 {
-            res = 1;
+        let res = if options & XML_PARSE_HTML != 0 {
+            true
         } else {
-            res = ctxt.well_formed;
-        }
+            ctxt.well_formed
+        };
         #[cfg(not(feature = "html"))]
         {
             res = ctxt.well_formed;
@@ -2011,7 +1994,7 @@ unsafe fn push_boundary_test(
             );
             return -1;
         }
-        if res == 0 {
+        if !res {
             xml_free_doc(doc.unwrap());
             eprintln!("Failed to parse {filename}",);
             return -1;
@@ -2028,7 +2011,7 @@ unsafe fn push_boundary_test(
             doc.unwrap().dump_memory(&mut base);
         }
         xml_free_doc(doc.unwrap());
-        res = compare_file_mem(result.as_deref().unwrap(), &base);
+        let mut res = compare_file_mem(result.as_deref().unwrap(), &base);
         if res != 0 {
             eprintln!("Result for {filename} failed in {}", result.unwrap());
             eprintln!("{}", from_utf8(&base).unwrap());

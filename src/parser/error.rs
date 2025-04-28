@@ -122,7 +122,7 @@ pub(crate) fn xml_fatal_err(ctxt: &mut XmlParserCtxt, error: XmlParserErrors, in
             errmsg
         );
     }
-    ctxt.well_formed = 0;
+    ctxt.well_formed = false;
     if ctxt.recovery == 0 {
         ctxt.disable_sax = 1;
     }
@@ -153,7 +153,7 @@ pub(crate) fn xml_fatal_err_msg(ctxt: &mut XmlParserCtxt, error: XmlParserErrors
         0,
         Some(msg),
     );
-    ctxt.well_formed = 0;
+    ctxt.well_formed = false;
     if ctxt.recovery == 0 {
         ctxt.disable_sax = 1;
     }
@@ -192,7 +192,7 @@ macro_rules! xml_fatal_err_msg_str {
                 0,
                 Some($msg),
             );
-            $ctxt.well_formed = 0;
+            $ctxt.well_formed = false;
             if $ctxt.recovery == 0 {
                 $ctxt.disable_sax = 1;
             }
@@ -309,7 +309,7 @@ macro_rules! xml_fatal_err_msg_int {
                 0,
                 Some($msg),
             );
-            $ctxt.well_formed = 0;
+            $ctxt.well_formed = false;
             if $ctxt.recovery == 0 {
                 $ctxt.disable_sax = 1;
             }
@@ -416,7 +416,7 @@ macro_rules! xml_fatal_err_msg_str_int_str {
                 0,
                 Some($msg),
             );
-            $ctxt.well_formed = 0;
+            $ctxt.well_formed = false;
             if $ctxt.recovery == 0 {
                 $ctxt.disable_sax = 1;
             }
@@ -505,7 +505,7 @@ macro_rules! xml_err_internal {
                 0,
                 Some($msg),
             );
-            $ctxt.well_formed = 0;
+            $ctxt.well_formed = false;
             if $ctxt.recovery == 0 {
                 $ctxt.disable_sax = 1;
             }
@@ -606,7 +606,7 @@ macro_rules! __xml_err_encoding {
                 0,
                 Some($msg),
             );
-            $ctxt.well_formed = 0;
+            $ctxt.well_formed = false;
             if $ctxt.recovery == 0 {
                 $ctxt.disable_sax = 1;
             }
@@ -644,7 +644,7 @@ macro_rules! xml_err_encoding_int {
                 0,
                 Some(format!($msg, $val).as_str()),
             );
-            $ctxt.well_formed = 0;
+            $ctxt.well_formed = false;
             if $ctxt.recovery == 0 {
                 $ctxt.disable_sax = 1;
             }
@@ -786,7 +786,7 @@ pub(crate) fn xml_err_attribute_dup(
             localname
         );
     }
-    ctxt.well_formed = 0;
+    ctxt.well_formed = false;
     if ctxt.recovery == 0 {
         ctxt.disable_sax = 1;
     }

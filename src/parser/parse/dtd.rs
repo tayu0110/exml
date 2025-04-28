@@ -2207,7 +2207,7 @@ pub fn xml_io_parse_dtd(
 
     let mut ret = None;
     if let Some(mut my_doc) = ctxt.my_doc.take() {
-        if ctxt.well_formed != 0 {
+        if ctxt.well_formed {
             ret = my_doc.ext_subset.take();
             if let Some(mut ret) = ret {
                 ret.doc = None;

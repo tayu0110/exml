@@ -124,7 +124,7 @@ pub struct XmlParserCtxt {
     // the document being built
     pub my_doc: Option<XmlDocPtr>,
     // is the document well formed
-    pub well_formed: i32,
+    pub well_formed: bool,
     // shall we replace entities ?
     pub(crate) replace_entities: i32,
     // the XML version string
@@ -551,7 +551,7 @@ impl XmlParserCtxt {
         self.space_tab.push(-1);
 
         self.my_doc = None;
-        self.well_formed = 1;
+        self.well_formed = true;
         self.ns_well_formed = 1;
         self.valid = 1;
         self.loadsubset = get_load_ext_dtd_default_value();
@@ -829,7 +829,7 @@ impl XmlParserCtxt {
         self.external = 0;
         self.instate = XmlParserInputState::XmlParserStart;
         self.token = 0;
-        self.well_formed = 1;
+        self.well_formed = true;
         self.ns_well_formed = 1;
         self.disable_sax = 0;
         self.valid = 1;
@@ -1791,7 +1791,7 @@ impl XmlParserCtxt {
             }
         }
         self.parse_document();
-        if self.well_formed != 0 || self.recovery != 0 {
+        if self.well_formed || self.recovery != 0 {
             self.my_doc.take()
         } else {
             if let Some(my_doc) = self.my_doc.take() {
@@ -2021,7 +2021,7 @@ impl Default for XmlParserCtxt {
             sax: None,
             user_data: None,
             my_doc: None,
-            well_formed: 0,
+            well_formed: true,
             replace_entities: 0,
             version: None,
             encoding: None,

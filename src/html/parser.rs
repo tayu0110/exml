@@ -226,7 +226,7 @@ macro_rules! html_parse_err_int {
                 0,
                 Some(format!($msg, $val).as_str()),
             );
-            $ctxt.well_formed = 0;
+            $ctxt.well_formed = false;
         }
     };
 }
@@ -323,7 +323,7 @@ fn html_parse_err(
         Some(msg),
     );
     if let Some(ctxt) = ctxt {
-        ctxt.well_formed = 0;
+        ctxt.well_formed = false;
     }
 }
 
@@ -2718,7 +2718,7 @@ fn html_init_parser_ctxt(
     ctxt.node_info_tab.clear();
 
     ctxt.my_doc = None;
-    ctxt.well_formed = 1;
+    ctxt.well_formed = true;
     ctxt.replace_entities = 0;
     ctxt.linenumbers = get_line_numbers_default_value();
     ctxt.keep_blanks = get_keep_blanks_default_value();
@@ -3137,7 +3137,7 @@ pub fn html_parse_document(ctxt: &mut HtmlParserCtxt) -> i32 {
             }
         }
     }
-    if ctxt.well_formed == 0 {
+    if !ctxt.well_formed {
         return -1;
     }
     0
@@ -3780,7 +3780,7 @@ fn html_parse_try_or_finish(ctxt: &mut HtmlParserCtxt, terminate: i32) -> i32 {
                     break 'done;
                 } else {
                     ctxt.err_no = XmlParserErrors::XmlErrDocumentEnd as i32;
-                    ctxt.well_formed = 0;
+                    ctxt.well_formed = false;
                     ctxt.instate = XmlParserInputState::XmlParserEOF;
                     if let Some(end_document) =
                         ctxt.sax.as_deref_mut().and_then(|sax| sax.end_document)
@@ -4290,7 +4290,7 @@ pub fn html_parse_chunk(ctxt: &mut HtmlParserCtxt, chunk: &[u8], terminate: i32)
                 | XmlParserInputState::XmlParserMisc
         ) {
             ctxt.err_no = XmlParserErrors::XmlErrDocumentEnd as i32;
-            ctxt.well_formed = 0;
+            ctxt.well_formed = false;
         }
         if !matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
             if let Some(end_document) = ctxt.sax.as_deref_mut().and_then(|sax| sax.end_document) {
@@ -4348,7 +4348,7 @@ pub fn html_ctxt_reset(ctxt: &mut HtmlParserCtxt) {
     ctxt.external = 0;
     ctxt.instate = XmlParserInputState::XmlParserStart;
     ctxt.token = 0;
-    ctxt.well_formed = 1;
+    ctxt.well_formed = true;
     ctxt.ns_well_formed = 1;
     ctxt.disable_sax = 0;
     ctxt.valid = 1;

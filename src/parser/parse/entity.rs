@@ -591,7 +591,7 @@ impl XmlParserCtxt {
             end_document(self);
         }
 
-        if self.well_formed == 0 {
+        if !self.well_formed {
             return -1;
         }
         0
@@ -740,9 +740,9 @@ pub(crate) fn parse_external_entity_private(
             xml_fatal_err(&mut ctxt, XmlParserErrors::XmlErrNotWellBalanced, None);
         }
 
-        let ret = if ctxt.well_formed == 0 {
+        let ret = if !ctxt.well_formed {
             oldctxt.err_no = ctxt.err_no;
-            oldctxt.well_formed = 0;
+            oldctxt.well_formed = false;
             oldctxt.last_error = ctxt.last_error.clone();
             XmlParserErrors::try_from(ctxt.err_no).unwrap()
         } else {

@@ -3108,7 +3108,7 @@ pub fn xml_parse_catalog_file(filename: &str) -> Option<XmlDocPtr> {
 
     ctxt.parse_document();
 
-    if ctxt.well_formed != 0 {
+    if ctxt.well_formed {
         ctxt.my_doc
     } else {
         if let Some(my_doc) = ctxt.my_doc.take() {

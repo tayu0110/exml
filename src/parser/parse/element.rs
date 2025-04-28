@@ -119,7 +119,7 @@ impl XmlParserCtxt {
         // [ VC: Root Element Type ]
         // The Name in the document type declaration must match the element type of the root element.
         #[cfg(feature = "libxml_valid")]
-        if self.validate != 0 && self.well_formed != 0 {
+        if self.validate != 0 && self.well_formed {
             if let Some(context_node) = self.node {
                 if let Some(my_doc) = self
                     .my_doc

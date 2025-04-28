@@ -244,7 +244,7 @@ impl XmlParserCtxt {
                 xml_free_doc(my_doc);
             }
 
-            if self.well_formed != 0 {
+            if self.well_formed {
                 if let Some(mut my_doc) = self.my_doc {
                     my_doc.properties |= XmlDocProperties::XmlDocWellformed as i32;
                     if self.valid != 0 {
@@ -258,7 +258,7 @@ impl XmlParserCtxt {
                     }
                 }
             }
-            if self.well_formed == 0 {
+            if !self.well_formed {
                 self.valid = 0;
                 return -1;
             }
@@ -439,10 +439,10 @@ pub unsafe fn xml_parse_in_node_context(
             .is_some_and(|ctxt_node| XmlGenericNodePtr::from(ctxt_node) != node)
         {
             xml_fatal_err(&mut ctxt, XmlParserErrors::XmlErrNotWellBalanced, None);
-            ctxt.well_formed = 0;
+            ctxt.well_formed = false;
         }
 
-        if ctxt.well_formed == 0 {
+        if !ctxt.well_formed {
             if ctxt.err_no == 0 {
                 ret = XmlParserErrors::XmlErrInternalError;
             } else {
@@ -600,10 +600,10 @@ pub(crate) fn xml_parse_balanced_chunk_memory_internal(
             xml_fatal_err(&mut ctxt, XmlParserErrors::XmlErrNotWellBalanced, None);
         }
 
-        if ctxt.well_formed == 0 {
+        if !ctxt.well_formed {
             ret = XmlParserErrors::try_from(ctxt.err_no).unwrap();
             oldctxt.err_no = ctxt.err_no;
-            oldctxt.well_formed = 0;
+            oldctxt.well_formed = false;
             oldctxt.last_error = ctxt.last_error.clone();
         } else {
             ret = XmlParserErrors::XmlErrOK;
@@ -618,7 +618,7 @@ pub(crate) fn xml_parse_balanced_chunk_memory_internal(
                 while let Some(mut now) = cur {
                     #[cfg(feature = "libxml_valid")]
                     if oldctxt.validate != 0
-                        && oldctxt.well_formed != 0
+                        && oldctxt.well_formed
                         && now.element_type() == XmlElementType::XmlElementNode
                     {
                         if let Some(my_doc) = oldctxt.my_doc.filter(|doc| doc.int_subset.is_some())

@@ -1774,7 +1774,7 @@ impl XmlXIncludeCtxt {
             pctxt.loadsubset |= XML_DETECT_IDS as i32;
             pctxt.parse_document();
 
-            if pctxt.well_formed != 0 {
+            if pctxt.well_formed {
                 pctxt.my_doc
             } else {
                 if let Some(my_doc) = pctxt.my_doc.take() {

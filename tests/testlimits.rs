@@ -934,7 +934,7 @@ unsafe fn sax_test(filename: &str, limit: usize, options: i32, fail: i32) -> i32
             eprintln!("SAX parsing generated a document !");
             xml_free_doc(doc);
             0
-        } else if ctxt.well_formed == 0 {
+        } else if !ctxt.well_formed {
             if fail != 0 {
                 0
             } else {

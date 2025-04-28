@@ -18613,7 +18613,7 @@ pub unsafe fn xml_schema_validate_stream(
                 ret = xml_schema_vstart(ctxt);
 
                 let ctxt = (*ctxt).parser_ctxt.take().unwrap();
-                if ret == 0 && ctxt.well_formed == 0 {
+                if ret == 0 && !ctxt.well_formed {
                     ret = ctxt.err_no;
                     if ret == 0 {
                         ret = 1;

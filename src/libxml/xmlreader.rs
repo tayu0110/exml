@@ -1277,9 +1277,9 @@ impl XmlTextReader {
                     );
                     self.cur += CHUNK_SIZE as u32;
                     if val != 0 {
-                        self.ctxt.as_deref_mut().unwrap().well_formed = 0;
+                        self.ctxt.as_deref_mut().unwrap().well_formed = false;
                     }
-                    if self.ctxt.as_deref_mut().unwrap().well_formed == 0 {
+                    if !self.ctxt.as_deref_mut().unwrap().well_formed {
                         break;
                     }
                 } else {
@@ -1291,7 +1291,7 @@ impl XmlTextReader {
                         .parse_chunk(&inbuf.as_ref()[self.cur as usize..], 0);
                     self.cur += s as u32;
                     if val != 0 {
-                        self.ctxt.as_deref_mut().unwrap().well_formed = 0;
+                        self.ctxt.as_deref_mut().unwrap().well_formed = false;
                     }
                     break;
                 }
@@ -1319,15 +1319,15 @@ impl XmlTextReader {
                 self.cur = inbuf.len() as _;
                 self.state = XmlTextReaderState::Done;
                 if val != 0 {
-                    if self.ctxt.as_deref_mut().unwrap().well_formed != 0 {
-                        self.ctxt.as_deref_mut().unwrap().well_formed = 0;
+                    if self.ctxt.as_deref_mut().unwrap().well_formed {
+                        self.ctxt.as_deref_mut().unwrap().well_formed = false;
                     } else {
                         return -1;
                     }
                 }
             }
             self.state = oldstate;
-            if self.ctxt.as_deref_mut().unwrap().well_formed == 0 {
+            if !self.ctxt.as_deref_mut().unwrap().well_formed {
                 self.mode = XmlTextReaderMode::XmlTextreaderModeEof;
                 return -1;
             }

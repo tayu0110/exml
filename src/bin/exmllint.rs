@@ -2424,7 +2424,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: Option<XmlParserC
                         ctxt.parse_chunk(b"", 1);
                         doc = ctxt.my_doc;
                         let ret = ctxt.well_formed;
-                        if ret == 0 && !CMD_ARGS.recover {
+                        if !ret && !CMD_ARGS.recover {
                             if let Some(doc) = doc.take() {
                                 xml_free_doc(doc);
                             }

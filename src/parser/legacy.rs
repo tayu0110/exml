@@ -178,7 +178,7 @@ pub fn xml_sax_user_parse_file(
 
     ctxt.parse_document();
 
-    if ctxt.well_formed != 0 {
+    if ctxt.well_formed {
         ret = 0;
     } else if ctxt.err_no != 0 {
         ret = ctxt.err_no;
@@ -221,7 +221,7 @@ pub fn xml_sax_user_parse_memory(
 
     ctxt.parse_document();
 
-    if ctxt.well_formed != 0 {
+    if ctxt.well_formed {
         ret = 0;
     } else if ctxt.err_no != 0 {
         ret = ctxt.err_no;
@@ -263,7 +263,7 @@ pub fn xml_sax_parse_doc(
     }
     ctxt.detect_sax2();
     ctxt.parse_document();
-    let ret = if ctxt.well_formed != 0 || recovery != 0 {
+    let ret = if ctxt.well_formed || recovery != 0 {
         ctxt.my_doc
     } else {
         if let Some(my_doc) = ctxt.my_doc.take() {
@@ -331,7 +331,7 @@ pub fn xml_sax_parse_memory_with_data(
     ctxt.recovery = recovery;
     ctxt.parse_document();
 
-    let ret = if ctxt.well_formed != 0 || recovery != 0 {
+    let ret = if ctxt.well_formed || recovery != 0 {
         ctxt.my_doc
     } else {
         if let Some(my_doc) = ctxt.my_doc.take() {
@@ -411,7 +411,7 @@ pub fn xml_sax_parse_file_with_data(
     ctxt.recovery = recovery;
     ctxt.parse_document();
 
-    let ret = if ctxt.well_formed != 0 || recovery != 0 {
+    let ret = if ctxt.well_formed || recovery != 0 {
         let ret = ctxt.my_doc;
         if ctxt.input().unwrap().buf.is_some() {
             if let Some(mut ret) = ret {
@@ -468,7 +468,7 @@ pub(crate) fn xml_sax_parse_entity(
 
     ctxt.parse_ext_parsed_ent();
 
-    let ret = if ctxt.well_formed != 0 {
+    let ret = if ctxt.well_formed {
         ctxt.my_doc
     } else {
         if let Some(my_doc) = ctxt.my_doc.take() {
@@ -576,7 +576,7 @@ pub(crate) fn xml_sax_parse_dtd(
 
     let mut ret = None;
     if let Some(mut my_doc) = ctxt.my_doc.take() {
-        if ctxt.well_formed != 0 {
+        if ctxt.well_formed {
             ret = my_doc.ext_subset.take();
             if let Some(mut ret) = ret {
                 ret.doc = None;
@@ -736,7 +736,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
             xml_fatal_err(&mut ctxt, XmlParserErrors::XmlErrNotWellBalanced, None);
         }
 
-        if ctxt.well_formed == 0 {
+        if !ctxt.well_formed {
             if ctxt.err_no == 0 {
                 ret = 1;
             } else {

@@ -261,13 +261,13 @@ impl XmlParserCtxt {
             if let Some(get_entity) = sax.get_entity {
                 ent = get_entity(self, &name);
             }
-            if self.well_formed == 1
+            if self.well_formed
                 && ent.is_none()
                 && self.options & XmlParserOption::XmlParseOldSAX as i32 != 0
             {
                 ent = xml_get_predefined_entity(&name);
             }
-            if self.well_formed == 1 && ent.is_none() && self.user_data.is_none() {
+            if self.well_formed && ent.is_none() && self.user_data.is_none() {
                 ent = xml_sax2_get_entity(self, &name);
             }
         }
@@ -747,7 +747,7 @@ impl XmlParserCtxt {
             let Some(mut ent) = self.parse_entity_ref() else {
                 return;
             };
-            if self.well_formed == 0 {
+            if !self.well_formed {
                 return;
             }
             was_checked = ent.flags & XML_ENT_PARSED as i32;
