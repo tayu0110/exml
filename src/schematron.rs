@@ -25,9 +25,7 @@ use libc::FILE;
 #[cfg(feature = "libxml_pattern")]
 use crate::pattern::{XmlPattern, XmlPatternFlags, xml_pattern_compile};
 use crate::{
-    error::{
-        __xml_raise_error, __xml_simple_oom_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors,
-    },
+    error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     generic_error,
     globals::{GenericError, GenericErrorContext, StructuredError},
     io::{XmlOutputCloseCallback, XmlOutputWriteCallback},
@@ -116,12 +114,6 @@ const SCT_OLD_NS: &str = "http://www.ascc.net/xml/schematron";
 const XML_SCHEMATRON_NS: &str = "http://purl.oclc.org/dsdl/schematron";
 
 const XML_OLD_SCHEMATRON_NS: &str = SCT_OLD_NS;
-
-/// Handle an out of memory condition
-#[doc(alias = "xmlSchematronPErrMemory")]
-fn xml_schematron_perr_memory(extra: &str, node: Option<XmlGenericNodePtr>) {
-    __xml_simple_oom_error(XmlErrorDomain::XmlFromSchemasp, node, Some(extra));
-}
 
 fn is_schematron(node: XmlNodePtr, elem: &str) -> bool {
     node.element_type() == XmlElementType::XmlElementNode

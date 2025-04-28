@@ -217,7 +217,7 @@ enum XmlDomreconcileNsoptions {
 }
 
 const XML_TREE_NSMAP_PARENT: i32 = -1;
-const XML_TREE_NSMAP_XML: i32 = -2;
+// const XML_TREE_NSMAP_XML: i32 = -2;
 const XML_TREE_NSMAP_DOC: i32 = -3;
 const XML_TREE_NSMAP_CUSTOM: i32 = -4;
 

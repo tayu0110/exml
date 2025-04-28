@@ -26,15 +26,13 @@
 // Gary Pennington <Gary.Pennington@uk.sun.com>
 // daniel@veillard.com
 
-use std::{ffi::c_void, sync::atomic::AtomicPtr};
+use std::ffi::c_void;
 
 use libc::{free, malloc, realloc};
 
 use crate::{
     error::XmlError,
     libxml::xmlmemory::{XmlFreeFunc, XmlMallocFunc, XmlReallocFunc, XmlStrdupFunc},
-    parser::XmlSAXLocator,
-    tree::XmlBufferAllocationScheme,
 };
 
 use super::{
@@ -45,32 +43,30 @@ use super::{
 pub type XmlGlobalStatePtr = *mut XmlGlobalState;
 pub struct XmlGlobalState {
     // pub(crate) xml_parser_version: *const c_char,
-    pub(crate) xml_default_sax_locator: XmlSAXLocator,
-
+    // pub(crate) xml_default_sax_locator: XmlSAXLocator,
     pub(crate) xml_free: Option<XmlFreeFunc>,
     pub(crate) xml_malloc: Option<XmlMallocFunc>,
     pub(crate) xml_mem_strdup: Option<XmlStrdupFunc>,
     pub(crate) xml_realloc: Option<XmlReallocFunc>,
 
-    pub(crate) old_xml_wd_compatibility: i32,
+    // pub(crate) old_xml_wd_compatibility: i32,
 
-    pub(crate) xml_buffer_alloc_scheme: XmlBufferAllocationScheme,
-    pub(crate) xml_default_buffer_size: i32,
+    // pub(crate) xml_buffer_alloc_scheme: XmlBufferAllocationScheme,
+    // pub(crate) xml_default_buffer_size: i32,
 
-    pub(crate) xml_substitute_entities_default_value: i32,
-    pub(crate) xml_do_validity_checking_default_value: i32,
-    pub(crate) xml_get_warnings_default_value: i32,
-    pub(crate) xml_keep_blanks_default_value: i32,
-    pub(crate) xml_line_numbers_default_value: i32,
-    pub(crate) xml_load_ext_dtd_default_value: i32,
-    pub(crate) xml_parser_debug_entities: i32,
-    pub(crate) xml_pedantic_parser_default_value: i32,
+    // pub(crate) xml_substitute_entities_default_value: i32,
+    // pub(crate) xml_do_validity_checking_default_value: i32,
+    // pub(crate) xml_get_warnings_default_value: i32,
+    // pub(crate) xml_keep_blanks_default_value: i32,
+    // pub(crate) xml_line_numbers_default_value: i32,
+    // pub(crate) xml_load_ext_dtd_default_value: i32,
+    // pub(crate) xml_parser_debug_entities: i32,
+    // pub(crate) xml_pedantic_parser_default_value: i32,
 
-    pub(crate) xml_indent_tree_output: i32,
-    pub(crate) xml_malloc_atomic: Option<XmlMallocFunc>,
+    // pub(crate) xml_indent_tree_output: i32,
+    // pub(crate) xml_malloc_atomic: Option<XmlMallocFunc>,
     pub(crate) xml_last_error: XmlError,
-
-    pub(crate) xml_structured_error_context: AtomicPtr<c_void>,
+    // pub(crate) xml_structured_error_context: AtomicPtr<c_void>,
 }
 
 /// The variable holding the libxml malloc() implementation

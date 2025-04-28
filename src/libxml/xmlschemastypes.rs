@@ -260,12 +260,6 @@ thread_local! {
     static XML_SCHEMA_TYPE_NMTOKENS_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
 }
 
-macro_rules! IS_TZO_CHAR {
-    ($c:expr) => {
-        $c == 0 || $c == b'Z' || $c == b'+' || $c == b'-'
-    };
-}
-
 macro_rules! VALID_YEAR {
     ($yr:expr) => {
         $yr != 0
@@ -274,32 +268,6 @@ macro_rules! VALID_YEAR {
 macro_rules! VALID_MONTH {
     ($mon:expr) => {
         (1..=12).contains(&$mon)
-    };
-}
-/* VALID_DAY should only be used when month is unknown */
-macro_rules! VALID_DAY {
-    ($day:expr) => {
-        (1..=31).contains(&$day)
-    };
-}
-macro_rules! VALID_HOUR {
-    ($hr:expr) => {
-        (0..=23).contains(&$hr)
-    };
-}
-macro_rules! VALID_MIN {
-    ($min:expr) => {
-        (0..=59).contains(&$min)
-    };
-}
-macro_rules! VALID_SEC {
-    ($sec:expr) => {
-        $sec >= 0.0 && $sec < 60.0
-    };
-}
-macro_rules! VALID_TZO {
-    ($tzo:expr) => {
-        $tzo >= -840 && $tzo <= 840
     };
 }
 macro_rules! IS_LEAP {
@@ -321,48 +289,12 @@ macro_rules! MAX_DAYINMONTH {
     };
 }
 
-macro_rules! VALID_MDAY {
-    ($dt:expr) => {
-        if IS_LEAP!((*$dt).year) {
-            (*$dt).day <= DAYS_IN_MONTH_LEAP[(*$dt).mon as usize - 1]
-        } else {
-            (*$dt).day <= DAYS_IN_MONTH[(*$dt).mon as usize - 1]
-        }
-    };
-}
-
-macro_rules! VALID_DATE {
-    ($dt:expr) => {
-        VALID_YEAR!((*$dt).year) && VALID_MONTH!((*$dt).mon) && VALID_MDAY!($dt)
-    };
-}
-
-macro_rules! VALID_END_OF_DAY {
-    ($dt:expr) => {
-        (*$dt).hour == 24 && (*$dt).min == 0 && (*$dt).sec == 0.0
-    };
-}
-
-macro_rules! VALID_TIME {
-    ($dt:expr) => {
-        ((VALID_HOUR!((*$dt).hour) && VALID_MIN!((*$dt).min) && VALID_SEC!((*$dt).sec))
-            || VALID_END_OF_DAY!($dt))
-            && VALID_TZO!((*$dt).tzo)
-    };
-}
-
-macro_rules! VALID_DATETIME {
-    ($dt:expr) => {
-        VALID_DATE!($dt) && VALID_TIME!($dt)
-    };
-}
-
 const SECS_PER_MIN: i32 = 60;
 const MINS_PER_HOUR: i32 = 60;
 const HOURS_PER_DAY: i32 = 24;
 const SECS_PER_HOUR: i32 = MINS_PER_HOUR * SECS_PER_MIN;
 const SECS_PER_DAY: i32 = HOURS_PER_DAY * SECS_PER_HOUR;
-const MINS_PER_DAY: i32 = HOURS_PER_DAY * MINS_PER_HOUR;
+// const MINS_PER_DAY: i32 = HOURS_PER_DAY * MINS_PER_HOUR;
 
 const DAY_IN_YEAR_BY_MONTH: [i64; 12] = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
 const DAY_IN_LEAP_YEAR_BY_MONTH: [i64; 12] =

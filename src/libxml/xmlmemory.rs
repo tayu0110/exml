@@ -46,7 +46,7 @@ const MEMTAG: usize = 0x5aa5;
 const MALLOC_TYPE: usize = 1;
 const REALLOC_TYPE: usize = 2;
 const STRDUP_TYPE: usize = 3;
-const MALLOC_ATOMIC_TYPE: usize = 4;
+// const MALLOC_ATOMIC_TYPE: usize = 4;
 // const REALLOC_ATOMIC_TYPE: usize = 5;
 
 #[repr(C)]

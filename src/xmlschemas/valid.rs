@@ -20,12 +20,6 @@ use super::{
     items::{XmlSchemaBasicItemPtr, XmlSchemaTypePtr},
 };
 
-macro_rules! PERROR_INT {
-    ($pctxt:expr, $func:expr, $msg:expr) => {
-        xml_schema_internal_err($pctxt as XmlSchemaAbstractCtxtPtr, $func, $msg);
-    };
-}
-
 impl XmlSchemaParserCtxt {
     /// Extracts and validates a value against the given built-in type.
     /// This one is intended to be used internally for validation

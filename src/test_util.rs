@@ -2,7 +2,6 @@ use std::{
     cell::{Cell, RefCell},
     ffi::c_char,
     fs::File,
-    os::raw::c_void,
     ptr::{addr_of_mut, null_mut},
     sync::Mutex,
 };
@@ -44,23 +43,17 @@ thread_local! {
     static API_NS: Cell<*mut XmlNs> = const { Cell::new(null_mut()) };
 }
 
-pub(crate) const GEN_NB_UNSIGNED_CHAR_PTR: i32 = 1;
-pub(crate) const GEN_NB_INT_PTR: i32 = 2;
-pub(crate) const GEN_NB_CONST_UNSIGNED_CHAR_PTR: i32 = 1;
 pub(crate) const GEN_NB_CONST_CHAR_PTR: i32 = 4;
 pub(crate) const GEN_NB_CONST_XML_CHAR_PTR: i32 = 5;
 pub(crate) const GEN_NB_INT: i32 = 4;
 pub(crate) const GEN_NB_CONST_XML_CHAR_PTR_PTR: i32 = 1;
 pub(crate) const GEN_NB_FILE_PTR: i32 = 1;
-pub(crate) const GEN_NB_XML_CHAR_PTR_PTR: i32 = 1;
-pub(crate) const GEN_NB_VOID_PTR: i32 = 2;
 #[cfg(feature = "xpath")]
 pub(crate) const GEN_NB_XML_NODE_SET_PTR: i32 = 1;
 #[cfg(feature = "catalog")]
 pub(crate) const GEN_NB_XML_CATALOG_ALLOW: i32 = 4;
 #[cfg(feature = "catalog")]
 pub(crate) const GEN_NB_XML_CATALOG_PREFER: i32 = 3;
-pub(crate) const GEN_NB_XML_CHAR: i32 = 4;
 #[cfg(feature = "schema")]
 pub(crate) const GEN_NB_XML_RELAXNG_PTR: i32 = 1;
 #[cfg(feature = "libxml_reader")]
@@ -91,16 +84,8 @@ pub(crate) const GEN_NB_XML_SCHEMA_VAL_TYPE: i32 = 4;
 pub(crate) const GEN_NB_UNSIGNED_LONG: i32 = 4;
 #[cfg(feature = "schema")]
 pub(crate) const GEN_NB_UNSIGNED_LONG_PTR: i32 = 2;
-#[cfg(feature = "xpath")]
-pub(crate) const GEN_NB_XML_XPATH_COMP_EXPR_PTR: i32 = 1;
-#[cfg(feature = "xpath")]
-pub(crate) const GEN_NB_XML_XPATH_CONTEXT_PTR: i32 = 1;
-#[cfg(feature = "xpath")]
-pub(crate) const GEN_NB_XML_XPATH_OBJECT_PTR: i32 = 5;
 #[cfg(any(feature = "xpath", feature = "schema"))]
 pub(crate) const GEN_NB_DOUBLE: i32 = 4;
-#[cfg(feature = "xpath")]
-pub(crate) const GEN_NB_XML_XPATH_PARSER_CONTEXT_PTR: i32 = 1;
 
 #[cfg(feature = "xpath")]
 pub(crate) fn desret_xml_node_set_ptr(val: Option<Box<crate::xpath::XmlNodeSet>>) {
@@ -311,23 +296,6 @@ pub(crate) fn gen_xml_relaxng_ptr(_no: i32, _nr: i32) -> XmlRelaxNGPtr {
 #[cfg(feature = "schema")]
 pub(crate) fn des_xml_relaxng_ptr(_no: i32, _val: XmlRelaxNGPtr, _nr: i32) {}
 
-pub(crate) fn gen_xml_char(no: i32, _nr: i32) -> XmlChar {
-    if no == 0 {
-        return b'a';
-    }
-    if no == 1 {
-        return b' ';
-    }
-    if no == 2 {
-        return 0xf8;
-    }
-    0
-}
-
-pub(crate) fn des_xml_char(_no: i32, _val: XmlChar, _nr: i32) {}
-
-pub(crate) fn desret_unsigned_long(_val: u64) {}
-
 #[cfg(feature = "catalog")]
 pub(crate) fn gen_xml_catalog_prefer(no: i32, _nr: i32) -> XmlCatalogPrefer {
     if no == 1 {
@@ -383,31 +351,7 @@ pub(crate) fn gen_xml_node_set_ptr(_no: i32, _nr: i32) -> Option<Box<XmlNodeSet>
 #[cfg(feature = "xpath")]
 pub(crate) fn des_xml_node_set_ptr(_no: i32, _val: Option<Box<XmlNodeSet>>, _nr: i32) {}
 
-pub(crate) fn gen_unsigned_char_ptr(_no: i32, _nr: i32) -> *mut u8 {
-    null_mut()
-}
-
-pub(crate) unsafe fn gen_int_ptr(no: i32, nr: i32) -> *mut i32 {
-    INTTAB.with_borrow_mut(|table| {
-        if no == 0 {
-            addr_of_mut!(table[nr as usize])
-        } else {
-            null_mut()
-        }
-    })
-}
-
-pub(crate) fn gen_const_unsigned_char_ptr(_no: i32, _nr: i32) -> *mut u8 {
-    null_mut()
-}
-
 pub(crate) fn desret_int(_val: i32) {}
-
-pub(crate) fn des_unsigned_char_ptr(_no: i32, _val: *mut u8, _nr: i32) {}
-
-pub(crate) fn des_int_ptr(_no: i32, _val: *mut i32, _nr: i32) {}
-
-pub(crate) fn des_const_unsigned_char_ptr(_no: i32, _val: *const u8, _nr: i32) {}
 
 pub(crate) fn gen_const_xml_char_ptr_ptr(_no: i32, _nr: i32) -> *mut *mut XmlChar {
     null_mut()
@@ -450,11 +394,6 @@ pub(crate) fn gen_int(no: i32, _nr: i32) -> i32 {
 
 pub(crate) fn des_int(_no: i32, _val: i32, _nr: i32) {}
 
-pub(crate) fn gen_void_ptr(_no: i32, _nr: i32) -> *mut c_void {
-    null_mut()
-}
-pub(crate) fn des_void_ptr(_no: i32, _val: *mut c_void, _nr: i32) {}
-
 pub(crate) fn gen_const_char_ptr(no: i32, _nr: i32) -> *mut c_char {
     if no == 0 {
         return c"foo".as_ptr() as _;
@@ -482,8 +421,3 @@ pub(crate) fn gen_file_ptr(_no: i32, _nr: i32) -> Option<File> {
         .open("test.out")
         .ok()
 }
-
-pub(crate) fn gen_xml_char_ptr_ptr(_no: i32, _nr: i32) -> *mut *mut XmlChar {
-    null_mut()
-}
-pub(crate) fn des_xml_char_ptr_ptr(_no: i32, _val: *mut *mut XmlChar, _nr: i32) {}

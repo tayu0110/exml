@@ -1868,19 +1868,8 @@ pub fn xml_add_id(
         doc: Some(doc),
         ..Default::default()
     };
-    // `XmlValidCtxt` no longer contains `XmlParserCtxt` as user data.
-    // Therefore, this condition is always `false`.
-    // if ctxt
-    //     .as_mut()
-    //     .is_some_and(|ctxt| xml_is_streaming(ctxt) != 0)
-    // {
-    //     // Operating in streaming mode, attr is gonna disappear
-    //     ret.name = attr.name().map(|n| n.into_owned());
-    //     ret.attr = None;
-    // } else {
     ret.attr = Some(attr);
     ret.name = None;
-    // }
     ret.lineno = attr.parent().map_or(-1, |p| p.get_line_no() as i32);
 
     // Create the ID table if needed.

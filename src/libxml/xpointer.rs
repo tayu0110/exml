@@ -90,17 +90,17 @@ impl XmlLocationSet {
         self.loc_tab.push(val);
     }
 
-    /// Merges two rangesets, all ranges from @val2 are added to @val1
-    ///
-    /// Returns val1 once extended or NULL in case of error.
-    #[doc(alias = "xmlXPtrLocationSetMerge")]
-    pub(crate) fn merge(&mut self, val2: &XmlLocationSet) {
-        // !!!!! this can be optimized a lot, knowing that both
-        //       val1 and val2 already have unicity of their values.
-        for loc in &val2.loc_tab {
-            self.push(loc.clone());
-        }
-    }
+    // /// Merges two rangesets, all ranges from @val2 are added to @val1
+    // ///
+    // /// Returns val1 once extended or NULL in case of error.
+    // #[doc(alias = "xmlXPtrLocationSetMerge")]
+    // pub(crate) fn merge(&mut self, val2: &XmlLocationSet) {
+    //     // !!!!! this can be optimized a lot, knowing that both
+    //     //       val1 and val2 already have unicity of their values.
+    //     for loc in &val2.loc_tab {
+    //         self.push(loc.clone());
+    //     }
+    // }
 }
 
 #[cfg(feature = "libxml_xptr_locs")]
@@ -111,30 +111,6 @@ macro_rules! STRANGE {
     () => {
         $crate::generic_error!("Internal error at {}:{}\n", file!(), line!());
     };
-}
-
-/// Handle a redefinition of attribute error
-#[doc(alias = "xmlXPtrErrMemory")]
-fn xml_xptr_err_memory(extra: &str) {
-    __xml_raise_error!(
-        None,
-        None,
-        None,
-        null_mut(),
-        None,
-        XmlErrorDomain::XmlFromXPointer,
-        XmlParserErrors::XmlErrNoMemory,
-        XmlErrorLevel::XmlErrError,
-        None,
-        0,
-        Some(extra.to_owned().into()),
-        None,
-        None,
-        0,
-        0,
-        "Memory allocation failed : {}\n",
-        extra
-    );
 }
 
 /// Create a new xmlXPathObjectPtr of type LocationSet and initialize
