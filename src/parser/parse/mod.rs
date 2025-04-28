@@ -250,7 +250,7 @@ impl XmlParserCtxt {
                     if self.valid != 0 {
                         my_doc.properties |= XmlDocProperties::XmlDocDTDValid as i32;
                     }
-                    if self.ns_well_formed != 0 {
+                    if self.ns_well_formed {
                         my_doc.properties |= XmlDocProperties::XmlDocNsvalid as i32;
                     }
                     if self.options & XmlParserOption::XmlParseOld10 as i32 != 0 {

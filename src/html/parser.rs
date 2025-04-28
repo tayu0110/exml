@@ -4349,7 +4349,7 @@ pub fn html_ctxt_reset(ctxt: &mut HtmlParserCtxt) {
     ctxt.instate = XmlParserInputState::XmlParserStart;
     ctxt.token = 0;
     ctxt.well_formed = true;
-    ctxt.ns_well_formed = 1;
+    ctxt.ns_well_formed = true;
     ctxt.disable_sax = false;
     ctxt.valid = 1;
     ctxt.vctxt.user_data = None;

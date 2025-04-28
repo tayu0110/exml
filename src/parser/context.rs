@@ -264,7 +264,7 @@ pub struct XmlParserCtxt {
     // non-CDATA attributes if any
     pub(crate) atts_special: Option<XmlHashTableRef<'static, XmlAttributeType>>,
     // is the document XML Namespace okay
-    pub(crate) ns_well_formed: i32,
+    pub(crate) ns_well_formed: bool,
     // Extra options
     pub(crate) options: i32,
 
@@ -551,7 +551,7 @@ impl XmlParserCtxt {
 
         self.my_doc = None;
         self.well_formed = true;
-        self.ns_well_formed = 1;
+        self.ns_well_formed = true;
         self.valid = 1;
         self.loadsubset = get_load_ext_dtd_default_value();
         if self.loadsubset != 0 {
@@ -829,7 +829,7 @@ impl XmlParserCtxt {
         self.instate = XmlParserInputState::XmlParserStart;
         self.token = 0;
         self.well_formed = true;
-        self.ns_well_formed = 1;
+        self.ns_well_formed = true;
         self.disable_sax = false;
         self.valid = 1;
         self.record_info = false;
@@ -2076,7 +2076,7 @@ impl Default for XmlParserCtxt {
             push_tab: vec![],
             atts_default: HashMap::new(),
             atts_special: None,
-            ns_well_formed: 0,
+            ns_well_formed: true,
             options: 0,
             dict_names: 0,
             free_elems_nr: 0,

@@ -466,7 +466,7 @@ macro_rules! xml_ns_err {
                 0,
                 Some($msg),
             );
-            $ctxt.ns_well_formed = 0;
+            $ctxt.ns_well_formed = false;
         }
     };
 }
