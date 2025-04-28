@@ -41,9 +41,9 @@ use crate::{
     libxml::valid::xml_validate_document_final,
     parser::{
         XML_COMPLETE_ATTRS, XML_MAX_TEXT_LENGTH, XML_SAX2_MAGIC, XML_SKIP_IDS, XML_STRING_TEXT,
-        XML_SUBSTITUTE_REF, XML_VCTXT_DTD_VALIDATED, XmlParserCtxt, XmlParserCtxtPtr,
-        XmlParserInput, XmlParserInputState, XmlParserOption, XmlSAXHandler, XmlSAXLocator,
-        build_qname, split_qname, xml_err_memory, xml_load_external_entity,
+        XML_SUBSTITUTE_REF, XML_VCTXT_DTD_VALIDATED, XmlParserCtxt, XmlParserInput,
+        XmlParserInputState, XmlParserOption, XmlSAXHandler, XmlSAXLocator, build_qname,
+        split_qname, xml_err_memory, xml_load_external_entity,
     },
     tree::{
         NodeCommon, XmlAttr, XmlAttributeDefault, XmlAttributeType, XmlDocProperties,
@@ -143,62 +143,39 @@ pub fn xml_sax2_has_external_subset(ctxt: &mut XmlParserCtxt) -> i32 {
 }
 
 #[doc(alias = "xmlSAX2ErrMemory")]
-unsafe fn xml_sax2_err_memory(ctxt: XmlParserCtxtPtr, msg: &str) {
-    unsafe {
-        let mut schannel: Option<StructuredError> = None;
-        const MSG: &str = "out of memory\n";
+fn xml_sax2_err_memory(ctxt: &mut XmlParserCtxt, msg: &str) {
+    let mut schannel: Option<StructuredError> = None;
+    const MSG: &str = "out of memory\n";
 
-        if !ctxt.is_null() {
-            (*ctxt).err_no = XmlParserErrors::XmlErrNoMemory as i32;
-            if let Some(sax) = (*ctxt)
-                .sax
-                .as_deref()
-                .filter(|sax| sax.initialized == XML_SAX2_MAGIC as u32)
-            {
-                schannel = sax.serror;
-            }
-            __xml_raise_error!(
-                schannel,
-                (*ctxt).vctxt.error,
-                (*ctxt).vctxt.user_data.clone(),
-                ctxt as _,
-                None,
-                XmlErrorDomain::XmlFromParser,
-                XmlParserErrors::XmlErrNoMemory,
-                XmlErrorLevel::XmlErrError,
-                None,
-                0,
-                Some(MSG.into()),
-                None,
-                None,
-                0,
-                0,
-                Some(msg),
-            );
-            (*ctxt).err_no = XmlParserErrors::XmlErrNoMemory as i32;
-            (*ctxt).instate = XmlParserInputState::XmlParserEOF;
-            (*ctxt).disable_sax = 1;
-        } else {
-            __xml_raise_error!(
-                schannel,
-                None,
-                None,
-                ctxt as _,
-                None,
-                XmlErrorDomain::XmlFromParser,
-                XmlParserErrors::XmlErrNoMemory,
-                XmlErrorLevel::XmlErrError,
-                None,
-                0,
-                Some(MSG.into()),
-                None,
-                None,
-                0,
-                0,
-                Some(msg),
-            );
-        }
+    ctxt.err_no = XmlParserErrors::XmlErrNoMemory as i32;
+    if let Some(sax) = ctxt
+        .sax
+        .as_deref()
+        .filter(|sax| sax.initialized == XML_SAX2_MAGIC as u32)
+    {
+        schannel = sax.serror;
     }
+    __xml_raise_error!(
+        schannel,
+        ctxt.vctxt.error,
+        ctxt.vctxt.user_data.clone(),
+        ctxt as *mut XmlParserCtxt as _,
+        None,
+        XmlErrorDomain::XmlFromParser,
+        XmlParserErrors::XmlErrNoMemory,
+        XmlErrorLevel::XmlErrError,
+        None,
+        0,
+        Some(MSG.into()),
+        None,
+        None,
+        0,
+        0,
+        Some(msg),
+    );
+    ctxt.err_no = XmlParserErrors::XmlErrNoMemory as i32;
+    ctxt.instate = XmlParserInputState::XmlParserEOF;
+    ctxt.disable_sax = 1;
 }
 
 /// Callback on internal subset declaration.
@@ -908,50 +885,48 @@ pub fn xml_sax2_unparsed_entity_decl(
 /// called when the document start being processed.
 #[doc(alias = "xmlSAX2StartDocument")]
 pub fn xml_sax2_start_document(ctxt: &mut XmlParserCtxt) {
-    unsafe {
-        if ctxt.html != 0 {
-            #[cfg(feature = "html")]
-            {
-                if ctxt.my_doc.is_none() {
-                    ctxt.my_doc = html_new_doc_no_dtd(None, None);
-                }
-                let Some(mut my_doc) = ctxt.my_doc else {
-                    xml_sax2_err_memory(ctxt, "xmlSAX2StartDocument");
-                    return;
-                };
-                my_doc.properties = XmlDocProperties::XmlDocHTML as i32;
-                my_doc.parse_flags = ctxt.options;
+    if ctxt.html != 0 {
+        #[cfg(feature = "html")]
+        {
+            if ctxt.my_doc.is_none() {
+                ctxt.my_doc = html_new_doc_no_dtd(None, None);
             }
-            #[cfg(not(feature = "html"))]
-            {
-                generic_error!("libxml2 built without HTML support\n",);
-                ctxt.err_no = XmlParserErrors::XmlErrInternalError as i32;
-                ctxt.instate = XmlParserInputState::XmlParserEOF;
-                ctxt.disable_sax = 1;
-                return;
-            }
-        } else {
-            let doc = xml_new_doc(ctxt.version.as_deref());
-            ctxt.my_doc = doc;
-            if let Some(mut doc) = doc {
-                doc.properties = 0;
-                if ctxt.options & XmlParserOption::XmlParseOld10 as i32 != 0 {
-                    doc.properties |= XmlDocProperties::XmlDocOld10 as i32;
-                }
-                doc.parse_flags = ctxt.options;
-                doc.encoding = ctxt.encoding().map(|e| e.to_owned());
-                doc.standalone = ctxt.standalone;
-            } else {
+            let Some(mut my_doc) = ctxt.my_doc else {
                 xml_sax2_err_memory(ctxt, "xmlSAX2StartDocument");
                 return;
-            }
+            };
+            my_doc.properties = XmlDocProperties::XmlDocHTML as i32;
+            my_doc.parse_flags = ctxt.options;
         }
-        if let Some(input) = ctxt.input() {
-            if let Some(mut my_doc) = ctxt.my_doc.filter(|doc| doc.url.is_none()) {
-                if let Some(filename) = input.filename.as_deref() {
-                    let url = path_to_uri(filename);
-                    my_doc.url = Some(url.into_owned());
-                }
+        #[cfg(not(feature = "html"))]
+        {
+            generic_error!("libxml2 built without HTML support\n",);
+            ctxt.err_no = XmlParserErrors::XmlErrInternalError as i32;
+            ctxt.instate = XmlParserInputState::XmlParserEOF;
+            ctxt.disable_sax = 1;
+            return;
+        }
+    } else {
+        let doc = xml_new_doc(ctxt.version.as_deref());
+        ctxt.my_doc = doc;
+        if let Some(mut doc) = doc {
+            doc.properties = 0;
+            if ctxt.options & XmlParserOption::XmlParseOld10 as i32 != 0 {
+                doc.properties |= XmlDocProperties::XmlDocOld10 as i32;
+            }
+            doc.parse_flags = ctxt.options;
+            doc.encoding = ctxt.encoding().map(|e| e.to_owned());
+            doc.standalone = ctxt.standalone;
+        } else {
+            xml_sax2_err_memory(ctxt, "xmlSAX2StartDocument");
+            return;
+        }
+    }
+    if let Some(input) = ctxt.input() {
+        if let Some(mut my_doc) = ctxt.my_doc.filter(|doc| doc.url.is_none()) {
+            if let Some(filename) = input.filename.as_deref() {
+                let url = path_to_uri(filename);
+                my_doc.url = Some(url.into_owned());
             }
         }
     }

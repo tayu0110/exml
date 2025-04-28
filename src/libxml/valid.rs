@@ -38,7 +38,7 @@ use crate::{
         hash::XmlHashTable,
     },
     list::XmlList,
-    parser::{XML_VCTXT_USE_PCTXT, XmlParserCtxtPtr, build_qname, split_qname2},
+    parser::{XML_VCTXT_USE_PCTXT, build_qname, split_qname2},
     tree::{
         NodeCommon, XmlAttrPtr, XmlAttribute, XmlAttributeDefault, XmlAttributePtr,
         XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElement,
@@ -63,29 +63,17 @@ macro_rules! xml_err_valid {
     };
     (@inner, $ctxt:expr, $error:expr, $msg:expr, $extra:expr) => {
         let mut channel: Option<GenericError> = None;
-        let mut pctxt: XmlParserCtxtPtr = null_mut();
         let mut data = None;
 
         if let Some(ctxt) = $ctxt {
             channel = ctxt.error;
             data = ctxt.user_data.clone();
-            // Look up flag to detect if it is part of a parsing context
-            if ctxt.flags & XML_VCTXT_USE_PCTXT as u32 != 0 {
-                pctxt = ctxt
-                    .user_data
-                    .as_ref()
-                    .and_then(|d| {
-                        let lock = d.lock();
-                        lock.downcast_ref::<XmlParserCtxtPtr>().copied()
-                    })
-                    .unwrap();
-            }
         }
         __xml_raise_error!(
             None,
             channel,
             data,
-            pctxt as _,
+            null_mut(),
             None,
             XmlErrorDomain::XmlFromValid,
             $error,
@@ -1138,33 +1126,21 @@ fn xml_err_valid_node(
     str2: Option<&str>,
     str3: Option<&str>,
 ) {
-    use crate::{globals::StructuredError, parser::XML_VCTXT_USE_PCTXT};
+    use crate::globals::StructuredError;
 
     let schannel: Option<StructuredError> = None;
     let mut channel: Option<GenericError> = None;
-    let mut pctxt: XmlParserCtxtPtr = null_mut();
     let mut data = None;
 
     if let Some(ctxt) = ctxt {
         channel = ctxt.error;
         data = ctxt.user_data.clone();
-        // Look up flag to detect if it is part of a parsing context
-        if ctxt.flags & XML_VCTXT_USE_PCTXT as u32 != 0 {
-            pctxt = ctxt
-                .user_data
-                .as_ref()
-                .and_then(|d| {
-                    let lock = d.lock();
-                    lock.downcast_ref::<XmlParserCtxtPtr>().copied()
-                })
-                .unwrap();
-        }
     }
     __xml_raise_error!(
         schannel,
         channel,
         data,
-        pctxt as _,
+        null_mut(),
         node,
         XmlErrorDomain::XmlFromValid,
         error,

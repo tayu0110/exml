@@ -103,6 +103,7 @@ pub enum XmlParserMode {
     XmlParseReader = 5,
 }
 
+pub type XmlParserCtxtPtr = *mut XmlParserCtxt;
 /// The parser context.
 ///
 /// # Note
@@ -113,7 +114,6 @@ pub enum XmlParserMode {
 /// also reflect the parser state. However most of the parsing routines
 /// takes as the only argument the parser context pointer, so migrating
 /// to a state based parser for progressive parsing shouldn't be too hard.
-pub type XmlParserCtxtPtr = *mut XmlParserCtxt;
 #[doc(alias = "xmlParserCtxt")]
 #[repr(C)]
 pub struct XmlParserCtxt {
