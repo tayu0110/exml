@@ -126,7 +126,7 @@ pub struct XmlParserCtxt {
     // is the document well formed
     pub well_formed: bool,
     // shall we replace entities ?
-    pub(crate) replace_entities: i32,
+    pub(crate) replace_entities: bool,
     // the XML version string
     pub(crate) version: Option<String>,
     // the declared encoding, if any
@@ -586,7 +586,7 @@ impl XmlParserCtxt {
             self.options |= XmlParserOption::XmlParseDTDValid as i32;
         }
         self.replace_entities = get_substitute_entities_default_value();
-        if self.replace_entities != 0 {
+        if self.replace_entities {
             self.options |= XmlParserOption::XmlParseNoEnt as i32;
         }
         self.record_info = 0;
@@ -1640,12 +1640,12 @@ impl XmlParserCtxt {
             self.options |= XmlParserOption::XmlParseDTDAttr as i32;
         }
         if options & XmlParserOption::XmlParseNoEnt as i32 != 0 {
-            self.replace_entities = 1;
+            self.replace_entities = true;
             // self.loadsubset |= XML_DETECT_IDS;
             options -= XmlParserOption::XmlParseNoEnt as i32;
             self.options |= XmlParserOption::XmlParseNoEnt as i32;
         } else {
-            self.replace_entities = 0;
+            self.replace_entities = false;
         }
         if options & XmlParserOption::XmlParsePedantic as i32 != 0 {
             self.pedantic = 1;
@@ -2022,7 +2022,7 @@ impl Default for XmlParserCtxt {
             user_data: None,
             my_doc: None,
             well_formed: true,
-            replace_entities: 0,
+            replace_entities: get_substitute_entities_default_value(),
             version: None,
             encoding: None,
             standalone: 0,

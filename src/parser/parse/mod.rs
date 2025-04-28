@@ -410,7 +410,7 @@ pub unsafe fn xml_parse_in_node_context(
             }
         }
 
-        if ctxt.validate != 0 || ctxt.replace_entities != 0 {
+        if ctxt.validate != 0 || ctxt.replace_entities {
             // ID/IDREF registration will be done in xmlValidateElement below
             ctxt.loadsubset |= XML_SKIP_IDS as i32;
         }
@@ -582,7 +582,7 @@ pub(crate) fn xml_parse_balanced_chunk_memory_internal(
 
         ctxt.validate = 0;
         ctxt.loadsubset = oldctxt.loadsubset;
-        if oldctxt.validate != 0 || oldctxt.replace_entities != 0 {
+        if oldctxt.validate != 0 || oldctxt.replace_entities {
             // ID/IDREF registration will be done in xmlValidateElement below
             ctxt.loadsubset |= XML_SKIP_IDS as i32;
         }

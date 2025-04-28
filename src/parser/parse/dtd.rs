@@ -1617,7 +1617,7 @@ impl XmlParserCtxt {
                     && self.options & XmlParserOption::XmlParseDTDValid as i32 == 0
                     && self.options & XmlParserOption::XmlParseDTDLoad as i32 == 0
                     && self.options & XmlParserOption::XmlParseDTDAttr as i32 == 0
-                    && self.replace_entities == 0
+                    && !self.replace_entities
                     && self.validate == 0
                 {
                     return;
@@ -1972,7 +1972,7 @@ impl XmlParserCtxt {
                     }
                     // For expat compatibility in SAX mode.
                     // assuming the entity replacement was asked for
-                    if self.replace_entities != 0
+                    if self.replace_entities
                         && self
                             .my_doc
                             .is_none_or(|doc| doc.version.as_deref() == Some(SAX_COMPAT_MODE))

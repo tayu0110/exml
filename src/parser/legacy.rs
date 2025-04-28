@@ -53,7 +53,7 @@ pub fn xml_parse_memory(buffer: Vec<u8>) -> Option<XmlDocPtr> {
 /// Returns the last value for 0 for no substitution, 1 for substitution.
 #[doc(alias = "xmlSubstituteEntitiesDefault")]
 #[deprecated = "Use the modern options API with XML_PARSE_NOENT"]
-pub fn xml_substitute_entities_default(val: i32) -> i32 {
+pub fn xml_substitute_entities_default(val: bool) -> bool {
     let old = get_substitute_entities_default_value();
 
     set_substitute_entities_default_value(val);

@@ -104,7 +104,7 @@ pub struct XmlGlobalState {
     old_xml_wd_compatibility: bool,
     pub(crate) buffer_alloc_scheme: XmlBufferAllocationScheme,
     pub(crate) default_buffer_size: usize,
-    substitute_entities_default_value: i32,
+    substitute_entities_default_value: bool,
     do_validity_checking_default_value: i32,
     pub(crate) get_warnings_default_value: i32,
     keep_blanks_default_value: i32,
@@ -150,7 +150,7 @@ impl XmlGlobalState {
             old_xml_wd_compatibility: false,
             buffer_alloc_scheme: XmlBufferAllocationScheme::XmlBufferAllocExact,
             default_buffer_size: BASE_BUFFER_SIZE,
-            substitute_entities_default_value: 0,
+            substitute_entities_default_value: false,
             do_validity_checking_default_value: 0,
             get_warnings_default_value: 1,
             keep_blanks_default_value: 1,
@@ -293,11 +293,11 @@ pub fn set_pedantic_parser_default_value(value: i32) {
     GLOBAL_STATE.with_borrow_mut(|state| state.pedantic_parser_default_value = value)
 }
 
-pub fn get_substitute_entities_default_value() -> i32 {
+pub fn get_substitute_entities_default_value() -> bool {
     GLOBAL_STATE.with_borrow(|state| state.substitute_entities_default_value)
 }
 
-pub fn set_substitute_entities_default_value(value: i32) {
+pub fn set_substitute_entities_default_value(value: bool) {
     GLOBAL_STATE.with_borrow_mut(|state| state.substitute_entities_default_value = value)
 }
 

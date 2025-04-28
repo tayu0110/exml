@@ -3835,7 +3835,7 @@ unsafe fn load_xpath_expr(parent_doc: XmlDocPtr, filename: &str) -> Option<XmlXP
 
         // load XPath expr as a file
         set_load_ext_dtd_default_value(XML_DETECT_IDS as i32 | XML_COMPLETE_ATTRS as i32);
-        set_substitute_entities_default_value(1);
+        set_substitute_entities_default_value(true);
 
         let Some(doc) = xml_read_file(
             filename,
@@ -3930,7 +3930,7 @@ unsafe fn c14n_run_test(
         // build an XML tree from a the file; we need to add default
         // attributes and resolve all character and entities references
         set_load_ext_dtd_default_value(XML_DETECT_IDS as i32 | XML_COMPLETE_ATTRS as i32);
-        set_substitute_entities_default_value(1);
+        set_substitute_entities_default_value(true);
 
         let Some(doc) = xml_read_file(
             xml_filename,

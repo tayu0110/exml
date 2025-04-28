@@ -1169,7 +1169,7 @@ unsafe fn xml_sax2_attribute_internal(
         if ctxt.html == 0 && ns.is_none() && name == "xmlns" {
             let mut val = None;
 
-            if ctxt.replace_entities == 0 {
+            if !ctxt.replace_entities {
                 ctxt.depth += 1;
                 let value = value.as_deref().and_then(|val| {
                     ctxt.string_decode_entities(val, XML_SUBSTITUTE_REF as _, '\0', '\0', '\0')
@@ -1220,7 +1220,7 @@ unsafe fn xml_sax2_attribute_internal(
         }
         if ctxt.html != 0 && ns == Some("xmlns") {
             let mut val = None;
-            if !ctxt.replace_entities != 0 {
+            if !ctxt.replace_entities {
                 ctxt.depth += 1;
                 let value = value.as_deref().and_then(|val| {
                     ctxt.string_decode_entities(val, XML_SUBSTITUTE_REF as i32, '\0', '\0', '\0')
@@ -1329,7 +1329,7 @@ unsafe fn xml_sax2_attribute_internal(
             return;
         };
 
-        if ctxt.replace_entities == 0 && ctxt.html == 0 {
+        if !ctxt.replace_entities && ctxt.html == 0 {
             ret.children = ctxt
                 .my_doc
                 .and_then(|doc| doc.get_node_list(value.as_deref().unwrap()));
@@ -1359,7 +1359,7 @@ unsafe fn xml_sax2_attribute_internal(
             {
                 // If we don't substitute entities, the validation should be
                 // done on a value with replaced entities anyway.
-                if ctxt.replace_entities == 0 {
+                if !ctxt.replace_entities {
                     ctxt.depth += 1;
                     let val = value.as_deref().and_then(|value| {
                         ctxt.string_decode_entities(
@@ -1411,8 +1411,8 @@ unsafe fn xml_sax2_attribute_internal(
             _ => {
                 // Don't create IDs containing entity references
                 if ctxt.loadsubset & XML_SKIP_IDS as i32 == 0
-                    && ((ctxt.replace_entities == 0 && ctxt.external != 2)
-                        || (ctxt.replace_entities != 0 && ctxt.in_subset == 0))
+                    && ((!ctxt.replace_entities && ctxt.external != 2)
+                        || (ctxt.replace_entities && ctxt.in_subset == 0))
                     && ret
                         .children()
                         .filter(|c| {
@@ -2033,7 +2033,7 @@ unsafe fn xml_sax2_attribute_ns(
             ret
         };
 
-        if ctxt.replace_entities == 0 && ctxt.html == 0 {
+        if !ctxt.replace_entities && ctxt.html == 0 {
             // We know that if there is an entity reference, then
             // the string has been dup'ed and terminates with 0
             // otherwise with ' or "
@@ -2067,7 +2067,7 @@ unsafe fn xml_sax2_attribute_ns(
             {
                 // If we don't substitute entities, the validation should be
                 // done on a value with replaced entities anyway.
-                if ctxt.replace_entities == 0 {
+                if !ctxt.replace_entities {
                     if let Some(mut dup) = xml_sax2_decode_attr_entities(ctxt, value) {
                         // dup now contains a string of the flattened attribute
                         // content with entities substituted. Check if we need to
@@ -2119,8 +2119,8 @@ unsafe fn xml_sax2_attribute_ns(
             // Don't create IDs containing entity references
             _ => {
                 if ctxt.loadsubset & XML_SKIP_IDS as i32 == 0
-                    && ((ctxt.replace_entities == 0 && ctxt.external != 2)
-                        || (ctxt.replace_entities != 0 && ctxt.in_subset == 0))
+                    && ((!ctxt.replace_entities && ctxt.external != 2)
+                        || (ctxt.replace_entities && ctxt.in_subset == 0))
                     && ret
                         .children()
                         .filter(|c| {

@@ -308,7 +308,7 @@ impl XmlParserCtxt {
                 if self.nth_byte(1) == b'#' {
                     let val = self.parse_char_ref();
                     if val == Some('&') {
-                        if self.replace_entities != 0 {
+                        if self.replace_entities {
                             buf.push('&');
                         } else {
                             // The reparsing will be done in xmlStringGetNodeList()
@@ -324,12 +324,12 @@ impl XmlParserCtxt {
                         matches!(ent.etype, XmlEntityType::XmlInternalPredefinedEntity)
                     }) {
                         let content = ent.content.as_deref().unwrap();
-                        if self.replace_entities == 0 && content.starts_with('&') {
+                        if !self.replace_entities && content.starts_with('&') {
                             buf.push_str("&#38;");
                         } else {
                             buf.push_str(content);
                         }
-                    } else if let Some(ent) = ent.filter(|_| self.replace_entities != 0) {
+                    } else if let Some(ent) = ent.filter(|_| self.replace_entities) {
                         if !matches!(ent.etype, XmlEntityType::XmlInternalPredefinedEntity) {
                             if self.parser_entity_check(ent.length as _) != 0 {
                                 return None;

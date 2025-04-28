@@ -859,7 +859,7 @@ impl XmlTextReader {
                     .filter(|_| {
                         self.ctxt
                             .as_deref()
-                            .is_some_and(|ctxt| ctxt.replace_entities == 1)
+                            .is_some_and(|ctxt| ctxt.replace_entities)
                     })
                 {
                     if let Some(children) = node.children().filter(|children| {
@@ -2179,7 +2179,7 @@ impl XmlTextReader {
                 0
             }
             XmlParserProperties::XmlParserValidate => self.validate as i32,
-            XmlParserProperties::XmlParserSubstEntities => ctxt.replace_entities,
+            XmlParserProperties::XmlParserSubstEntities => ctxt.replace_entities as i32,
         }
     }
 
@@ -2301,10 +2301,10 @@ impl XmlTextReader {
             XmlParserProperties::XmlParserSubstEntities => {
                 if value != 0 {
                     ctxt.options |= XmlParserOption::XmlParseNoEnt as i32;
-                    ctxt.replace_entities = 1;
+                    ctxt.replace_entities = true;
                 } else {
                     ctxt.options &= !(XmlParserOption::XmlParseNoEnt as i32);
-                    ctxt.replace_entities = 0;
+                    ctxt.replace_entities = false;
                 }
                 0
             }

@@ -2719,7 +2719,7 @@ fn html_init_parser_ctxt(
 
     ctxt.my_doc = None;
     ctxt.well_formed = true;
-    ctxt.replace_entities = 0;
+    ctxt.replace_entities = false;
     ctxt.linenumbers = get_line_numbers_default_value();
     ctxt.keep_blanks = get_keep_blanks_default_value();
     ctxt.html = 1;

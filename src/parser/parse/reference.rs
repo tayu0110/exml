@@ -856,7 +856,7 @@ impl XmlParserCtxt {
                     ent.children = Some(XmlNodePtr::try_from(l).unwrap());
                     // Prune it directly in the generated document
                     // except for single text nodes.
-                    if self.replace_entities == 0
+                    if !self.replace_entities
                         || matches!(self.parse_mode, XmlParserMode::XmlParseReader)
                         || (matches!(l.element_type(), XmlElementType::XmlTextNode)
                             && l.next().is_none())
@@ -969,7 +969,7 @@ impl XmlParserCtxt {
                         return;
                     }
                 }
-                if self.replace_entities == 0 && self.disable_sax == 0 {
+                if !self.replace_entities && self.disable_sax == 0 {
                     if let Some(reference) = self.sax.as_deref_mut().and_then(|sax| sax.reference) {
                         // Entity reference callback comes second, it's somewhat
                         // superfluous but a compatibility to historical behaviour
@@ -986,7 +986,7 @@ impl XmlParserCtxt {
             }
 
             // If we didn't get any children for the entity being built
-            if self.replace_entities == 0 && self.disable_sax == 0 {
+            if !self.replace_entities && self.disable_sax == 0 {
                 if let Some(reference) = self.sax.as_deref_mut().and_then(|sax| sax.reference) {
                     // Create a node.
                     reference(self, &ent.name().unwrap());
@@ -994,7 +994,7 @@ impl XmlParserCtxt {
                 }
             }
 
-            if self.replace_entities != 0 {
+            if self.replace_entities {
                 // There is a problem on the handling of _private for entities
                 // (bug 155816): Should we copy the content of the field from
                 // the entity (possibly overwriting some value set by the user
