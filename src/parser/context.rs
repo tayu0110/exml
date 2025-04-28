@@ -233,8 +233,6 @@ pub struct XmlParserCtxt {
     pub(crate) progressive: bool,
     // array for the attributes callbacks
     pub(crate) atts: Vec<(String, Option<String>)>,
-    // the size of the array
-    pub(crate) maxatts: i32,
 
     // pre-interned strings
     pub(crate) str_xml: Option<Cow<'static, str>>,
@@ -515,7 +513,6 @@ impl XmlParserCtxt {
             self.user_data = None;
         }
 
-        self.maxatts = 0;
         self.atts = vec![];
         // Allocate the Input stack
         self.input_tab.clear();
@@ -2051,7 +2048,6 @@ impl Default for XmlParserCtxt {
             recovery: false,
             progressive: false,
             atts: vec![],
-            maxatts: 0,
             str_xml: None,
             str_xml_ns: None,
             str_xmlns: None,
