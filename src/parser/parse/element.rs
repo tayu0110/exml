@@ -92,7 +92,7 @@ impl XmlParserCtxt {
 
         let line: i32 = self.input().unwrap().line;
         #[cfg(feature = "sax1")]
-        let tag = if self.sax2 != 0 {
+        let tag = if self.sax2 {
             self.parse_start_tag2()
         } else {
             self.parse_start_tag().map(|name| (name, None, None))
@@ -133,7 +133,7 @@ impl XmlParserCtxt {
         // Check for an Empty Element.
         if self.content_bytes().starts_with(b"/>") {
             self.advance(2);
-            if self.sax2 != 0 {
+            if self.sax2 {
                 if !self.disable_sax {
                     if let Some(end_element_ns) =
                         self.sax.as_deref_mut().and_then(|sax| sax.end_element_ns)
@@ -711,7 +711,7 @@ impl XmlParserCtxt {
         }
 
         // parse the end of tag: '</' should be here.
-        if self.sax2 != 0 {
+        if self.sax2 {
             self.parse_end_tag2();
             self.name_pop();
         } else {

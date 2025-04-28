@@ -246,7 +246,7 @@ pub struct XmlParserCtxt {
 
     // Everything below is used only by the new SAX mode
     // operating in the new SAX mode
-    pub(crate) sax2: i32,
+    pub(crate) sax2: bool,
     // the array of prefix/namespace name
     pub(crate) ns_tab: Vec<(Option<String>, String)>,
     // which attribute were allocated
@@ -1598,12 +1598,12 @@ impl XmlParserCtxt {
                         || sax.end_element_ns.is_some()
                         || (sax.start_element.is_none() && sax.end_element.is_none()))
             }) {
-                self.sax2 = 1;
+                self.sax2 = true;
             }
         }
         #[cfg(not(feature = "sax1"))]
         {
-            self.sax2 = 1;
+            self.sax2 = true;
         }
 
         self.str_xml = Some(Cow::Borrowed("xml"));
@@ -2070,7 +2070,7 @@ impl Default for XmlParserCtxt {
             str_xml: None,
             str_xml_ns: None,
             str_xmlns: None,
-            sax2: 0,
+            sax2: false,
             ns_tab: vec![],
             attallocs: null_mut(),
             push_tab: vec![],

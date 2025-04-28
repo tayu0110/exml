@@ -1083,14 +1083,14 @@ impl XmlParserCtxt {
                     );
                 }
 
-                if self.sax2 != 0
+                if self.sax2
                     && default_value.is_some()
                     && def != XmlAttributeDefault::XmlAttributeImplied
                     && def != XmlAttributeDefault::XmlAttributeRequired
                 {
                     self.add_def_attrs(&elem_name, &attr_name, default_value.as_deref().unwrap());
                 }
-                if self.sax2 != 0 {
+                if self.sax2 {
                     self.add_special_attr(&elem_name, &attr_name, typ);
                 }
                 self.grow();

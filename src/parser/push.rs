@@ -520,7 +520,7 @@ impl XmlParserCtxt {
                                 self.space_push(self.space());
                             }
                             #[cfg(feature = "sax1")]
-                            let tag = if self.sax2 != 0 {
+                            let tag = if self.sax2 {
                                 self.parse_start_tag2()
                             } else {
                                 self.parse_start_tag().map(|name| (name, None, None))
@@ -561,7 +561,7 @@ impl XmlParserCtxt {
                             if self.content_bytes().starts_with(b"/>") {
                                 self.advance(2);
 
-                                if self.sax2 != 0 {
+                                if self.sax2 {
                                     if !self.disable_sax {
                                         if let Some(end_element_ns) = self
                                             .sax
@@ -710,7 +710,7 @@ impl XmlParserCtxt {
                                 // goto done;
                                 return ret;
                             }
-                            if self.sax2 != 0 {
+                            if self.sax2 {
                                 self.parse_end_tag2();
                                 self.name_ns_pop();
                             } else {
