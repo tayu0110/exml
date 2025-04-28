@@ -4,7 +4,7 @@ use std::{
     collections::HashMap,
     ffi::c_void,
     io::Read,
-    ptr::{drop_in_place, null_mut},
+    ptr::null_mut,
     rc::Rc,
     str::{from_utf8, from_utf8_unchecked},
     sync::atomic::AtomicPtr,
@@ -2123,18 +2123,5 @@ impl Drop for XmlParserCtxt {
                 }
             }
         }
-    }
-}
-
-/// Free all the memory used by a parser context. However the parsed
-/// document in (*ctxt).myDoc is not freed.
-#[doc(alias = "xmlFreeParserCtxt")]
-pub unsafe fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
-    unsafe {
-        if ctxt.is_null() {
-            return;
-        }
-        drop_in_place(ctxt);
-        xml_free(ctxt as _);
     }
 }

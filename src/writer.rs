@@ -29,7 +29,6 @@ use std::{
     cell::{Cell, RefCell},
     collections::VecDeque,
     io::{self, Write},
-    os::raw::c_void,
     ptr::null_mut,
     rc::Rc,
 };
@@ -44,10 +43,7 @@ use crate::{
         xml_sax2_end_element, xml_sax2_init_default_sax_handler, xml_sax2_start_element,
     },
     list::XmlList,
-    parser::{
-        XML_DEFAULT_VERSION, XmlParserCtxt, XmlParserCtxtPtr, XmlParserInputState, XmlSAXHandler,
-        xml_free_parser_ctxt,
-    },
+    parser::{XML_DEFAULT_VERSION, XmlParserCtxt, XmlParserInputState, XmlSAXHandler},
     save::attr_serialize_text_content,
     tree::{XmlDocPtr, XmlNodePtr, xml_encode_special_chars, xml_free_doc, xml_new_doc},
     uri::canonic_path,
@@ -106,7 +102,7 @@ pub struct XmlTextWriter<'a> {
     ichar: Cow<'static, str>,
     // character used for quoting attribute values
     qchar: u8,
-    ctxt: XmlParserCtxtPtr,
+    ctxt: Option<Rc<RefCell<XmlParserCtxt>>>,
     no_doc_free: i32,
     doc: Option<XmlDocPtr>,
 }
@@ -152,6 +148,7 @@ impl<'a> XmlTextWriter<'a> {
             doc: xml_new_doc(None),
             no_doc_free: 0,
             nodes: VecDeque::new(),
+            ctxt: None,
             ..Default::default()
         }
     }
@@ -183,18 +180,13 @@ impl<'a> XmlTextWriter<'a> {
     ///
     /// Returns the new xmlTextWriterPtr or NULL in case of error
     #[doc(alias = "xmlNewTextWriterPushParser")]
-    pub fn from_push_parser(ctxt: XmlParserCtxtPtr, _compression: i32) -> Option<Self> {
-        if ctxt.is_null() {
-            xml_writer_err_msg(
-                None,
-                XmlParserErrors::XmlErrInternalError,
-                "xmlNewTextWriterPushParser : invalid context!\n",
-            );
-            return None;
-        }
-
-        let Some(out) = XmlOutputBuffer::from_writer(TextWriterPushContext { context: ctxt }, None)
-        else {
+    pub fn from_push_parser(ctxt: Rc<RefCell<XmlParserCtxt>>, _compression: i32) -> Option<Self> {
+        let Some(out) = XmlOutputBuffer::from_writer(
+            TextWriterPushContext {
+                context: ctxt.clone(),
+            },
+            None,
+        ) else {
             xml_writer_err_msg(
                 None,
                 XmlParserErrors::XmlErrInternalError,
@@ -204,7 +196,7 @@ impl<'a> XmlTextWriter<'a> {
         };
 
         let mut ret = XmlTextWriter::new(out);
-        ret.ctxt = ctxt;
+        ret.ctxt = Some(ctxt);
         Some(ret)
     }
 
@@ -242,7 +234,9 @@ impl<'a> XmlTextWriter<'a> {
             return None;
         };
 
-        let Some(mut ret) = XmlTextWriter::from_push_parser(&mut ctxt, compression) else {
+        let Some(mut ret) =
+            XmlTextWriter::from_push_parser(Rc::new(RefCell::new(ctxt)), compression)
+        else {
             unsafe {
                 xml_free_doc(my_doc);
             }
@@ -287,8 +281,12 @@ impl<'a> XmlTextWriter<'a> {
         };
         // For some reason this seems to completely break if node names are interned.
         ctxt.dict_names = 0;
+        ctxt.my_doc = Some(doc);
+        ctxt.node = Some(node);
 
-        let Some(mut ret) = XmlTextWriter::from_push_parser(&mut ctxt, compression) else {
+        let Some(mut ret) =
+            XmlTextWriter::from_push_parser(Rc::new(RefCell::new(ctxt)), compression)
+        else {
             xml_writer_err_msg(
                 None,
                 XmlParserErrors::XmlErrInternalError,
@@ -297,8 +295,6 @@ impl<'a> XmlTextWriter<'a> {
             return None;
         };
 
-        ctxt.my_doc = Some(doc);
-        ctxt.node = Some(node);
         ret.no_doc_free = 1;
 
         doc.set_compress_mode(compression);
@@ -1905,7 +1901,7 @@ impl Default for XmlTextWriter<'_> {
             doindent: 0,
             ichar: Cow::Borrowed(" "),
             qchar: b'"',
-            ctxt: null_mut(),
+            ctxt: None,
             no_doc_free: 0,
             doc: None,
         }
@@ -1919,11 +1915,10 @@ impl Drop for XmlTextWriter<'_> {
         self.out.flush();
 
         unsafe {
-            if !self.ctxt.is_null() {
-                if let Some(my_doc) = (*self.ctxt).my_doc.take_if(|_| self.no_doc_free == 0) {
+            if let Some(ctxt) = self.ctxt.take() {
+                if let Some(my_doc) = ctxt.borrow_mut().my_doc.take_if(|_| self.no_doc_free == 0) {
                     xml_free_doc(my_doc);
                 }
-                xml_free_parser_ctxt(self.ctxt);
             }
 
             if let Some(doc) = self.doc.take() {
@@ -1935,62 +1930,62 @@ impl Drop for XmlTextWriter<'_> {
 
 /// Handle a writer error
 #[doc(alias = "xmlWriterErrMsg")]
-fn xml_writer_err_msg(ctxt: Option<&XmlTextWriter>, error: XmlParserErrors, msg: &str) {
-    if let Some(ctxt) = ctxt {
-        __xml_raise_error!(
-            None,
-            None,
-            None,
-            ctxt.ctxt as _,
-            None,
-            XmlErrorDomain::XmlFromWriter,
-            error,
-            XmlErrorLevel::XmlErrFatal,
-            None,
-            0,
-            None,
-            None,
-            None,
-            0,
-            0,
-            Some(msg),
-        );
-    } else {
-        __xml_raise_error!(
-            None,
-            None,
-            None,
-            null_mut(),
-            None,
-            XmlErrorDomain::XmlFromWriter,
-            error,
-            XmlErrorLevel::XmlErrFatal,
-            None,
-            0,
-            None,
-            None,
-            None,
-            0,
-            0,
-            Some(msg),
-        );
-    }
+fn xml_writer_err_msg(_ctxt: Option<&XmlTextWriter>, error: XmlParserErrors, msg: &str) {
+    // if let Some(ctxt) = ctxt {
+    //     __xml_raise_error!(
+    //         None,
+    //         None,
+    //         None,
+    //         ctxt.ctxt as _,
+    //         None,
+    //         XmlErrorDomain::XmlFromWriter,
+    //         error,
+    //         XmlErrorLevel::XmlErrFatal,
+    //         None,
+    //         0,
+    //         None,
+    //         None,
+    //         None,
+    //         0,
+    //         0,
+    //         Some(msg),
+    //     );
+    // } else {
+    __xml_raise_error!(
+        None,
+        None,
+        None,
+        null_mut(),
+        None,
+        XmlErrorDomain::XmlFromWriter,
+        error,
+        XmlErrorLevel::XmlErrFatal,
+        None,
+        0,
+        None,
+        None,
+        None,
+        0,
+        0,
+        Some(msg),
+    );
+    // }
 }
 
 /// Handle a writer error
 #[doc(alias = "xmlWriterErrMsgInt")]
 macro_rules! xml_writer_err_msg_int {
     ($ctxt:expr, $error:expr, $msg:literal, $val:expr) => {
-        let ctxt = $ctxt as *mut XmlTextWriter;
+        // let ctxt = $ctxt as *mut XmlTextWriter;
         __xml_raise_error!(
             None,
             None,
             None,
-            if !ctxt.is_null() {
-                (*ctxt).ctxt as _
-            } else {
-                null_mut()
-            },
+            // if !ctxt.is_null() {
+            //     (*ctxt).ctxt as _
+            // } else {
+            null_mut(),
+            // },
             None,
             XmlErrorDomain::XmlFromWriter,
             $error,
@@ -2011,11 +2006,9 @@ macro_rules! xml_writer_err_msg_int {
 ///
 /// Returns -1, 0, 1
 #[doc(alias = "xmlTextWriterWriteDocCallback")]
-unsafe fn xml_text_writer_write_doc_callback(context: *mut c_void, s: &[u8]) -> i32 {
+unsafe fn xml_text_writer_write_doc_callback(context: &mut XmlParserCtxt, s: &[u8]) -> i32 {
     unsafe {
-        let ctxt: XmlParserCtxtPtr = context as XmlParserCtxtPtr;
-
-        let rc = (*ctxt).parse_chunk(s, 0);
+        let rc = context.parse_chunk(s, 0);
         if rc != 0 {
             xml_writer_err_msg_int!(
                 null_mut(),
@@ -2034,16 +2027,10 @@ unsafe fn xml_text_writer_write_doc_callback(context: *mut c_void, s: &[u8]) -> 
 ///
 /// Returns -1, 0, 1
 #[doc(alias = "xmlTextWriterCloseDocCallback")]
-unsafe fn xml_text_writer_close_doc_callback(context: *mut c_void) -> i32 {
+unsafe fn xml_text_writer_close_doc_callback(context: &mut XmlParserCtxt) -> i32 {
     unsafe {
-        let ctxt: XmlParserCtxtPtr = context as XmlParserCtxtPtr;
-        let rc: i32;
-
-        let res = {
-            rc = (*ctxt).parse_chunk(&[], 1);
-            rc != 0
-        };
-        if res {
+        let rc = context.parse_chunk(&[], 1);
+        if rc != 0 {
             xml_writer_err_msg_int!(
                 null_mut(),
                 XmlParserErrors::XmlErrInternalError,
@@ -2058,12 +2045,13 @@ unsafe fn xml_text_writer_close_doc_callback(context: *mut c_void) -> i32 {
 }
 
 struct TextWriterPushContext {
-    context: XmlParserCtxtPtr,
+    context: Rc<RefCell<XmlParserCtxt>>,
 }
 
 impl Write for TextWriterPushContext {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        let res = unsafe { xml_text_writer_write_doc_callback(self.context as _, buf) };
+        let res =
+            unsafe { xml_text_writer_write_doc_callback(&mut self.context.borrow_mut(), buf) };
         if res >= 0 {
             Ok(res as usize)
         } else {
@@ -2078,7 +2066,7 @@ impl Write for TextWriterPushContext {
 impl Drop for TextWriterPushContext {
     fn drop(&mut self) {
         unsafe {
-            xml_text_writer_close_doc_callback(self.context as _);
+            xml_text_writer_close_doc_callback(&mut self.context.borrow_mut());
         }
     }
 }
