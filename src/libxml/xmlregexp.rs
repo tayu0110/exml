@@ -4574,7 +4574,6 @@ pub type XmlExpCtxtPtr = *mut XmlExpCtxt;
 pub struct XmlExpCtxt {
     dict: XmlDictPtr,
     table: Vec<XmlExpNodePtr>,
-    size: i32,
     nb_elems: i32,
     nb_nodes: i32,
     max_nodes: i32,
@@ -4590,7 +4589,6 @@ impl Default for XmlExpCtxt {
         Self {
             dict: null_mut(),
             table: vec![],
-            size: 0,
             nb_elems: 0,
             nb_nodes: 0,
             max_nodes: 0,
@@ -4629,7 +4627,7 @@ pub unsafe fn xml_exp_new_ctxt(mut max_nodes: i32, dict: XmlDictPtr) -> XmlExpCt
     unsafe {
         use crate::libxml::dict::{xml_dict_create, xml_dict_reference};
 
-        let size: i32 = 256;
+        let size = 256;
 
         if max_nodes <= 4096 {
             max_nodes = 4096;
@@ -4640,10 +4638,9 @@ pub unsafe fn xml_exp_new_ctxt(mut max_nodes: i32, dict: XmlDictPtr) -> XmlExpCt
             return null_mut();
         }
         memset(ret as _, 0, size_of::<XmlExpCtxt>());
-        (*ret).size = size;
         (*ret).nb_elems = 0;
         (*ret).max_nodes = max_nodes;
-        (*ret).table = vec![null_mut(); size as usize];
+        (*ret).table = vec![null_mut(); size];
         if dict.is_null() {
             (*ret).dict = xml_dict_create();
             if (*ret).dict.is_null() {
@@ -4752,7 +4749,7 @@ pub unsafe fn xml_exp_free(ctxt: XmlExpCtxtPtr, exp: XmlExpNodePtr) {
         (*exp).refe -= 1;
         if (*exp).refe == 0 {
             /* Unlink it first from the hash table */
-            let key: u16 = (*exp).key % (*ctxt).size as u16;
+            let key: u16 = (*exp).key % (*ctxt).table.len() as u16;
             if (*ctxt).table[key as usize] == exp {
                 (*ctxt).table[key as usize] = (*exp).next;
             } else {
@@ -5315,7 +5312,7 @@ unsafe fn xml_exp_hash_get_entry(
             return null_mut();
         }
 
-        let key: u16 = kbase % (*ctxt).size as u16;
+        let key: u16 = kbase % (*ctxt).table.len() as u16;
         if !(*ctxt).table[key as usize].is_null() {
             insert = (*ctxt).table[key as usize];
             while !insert.is_null() {
