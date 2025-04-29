@@ -34,8 +34,8 @@ use std::{
 use crate::{
     globals::{get_deregister_node_func, get_register_node_func},
     hash::{XmlHashTable, XmlHashTableRef},
-    libxml::valid::xml_free_attribute_table,
     parser::split_qname2,
+    valid::xml_free_attribute_table,
 };
 
 use super::{

@@ -44,7 +44,6 @@ use crate::{
         hash::{
             XmlHashTablePtr, xml_hash_add_entry2, xml_hash_create, xml_hash_free, xml_hash_lookup2,
         },
-        valid::{XmlValidCtxt, xml_validate_document_final},
         xmlstring::{XmlChar, xml_str_equal, xml_strdup, xml_strlen},
     },
     parser::{split_qname2, xml_read_file, xml_read_memory},
@@ -65,6 +64,7 @@ use crate::{
         xml_new_doc_node, xml_new_doc_text,
     },
     uri::{XmlURI, build_uri, escape_url_except},
+    valid::{XmlValidCtxt, xml_validate_document_final},
 };
 
 use super::{

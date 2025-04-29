@@ -27,7 +27,7 @@ use std::{
     sync::atomic::Ordering,
 };
 
-use crate::{libxml::valid::xml_remove_id, tree::xml_free_node_list};
+use crate::{tree::xml_free_node_list, valid::xml_remove_id};
 
 use super::{
     InvalidNodePointerCastError, NodeCommon, XML_CHECK_DTD, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
@@ -1911,8 +1911,8 @@ impl XmlNodePtr {
         value: Option<&str>,
     ) -> Option<XmlAttrPtr> {
         use crate::{
-            libxml::valid::{xml_add_id, xml_remove_id},
             tree::{XmlAttributeType, xml_free_node_list, xml_new_doc_text, xml_new_prop_internal},
+            valid::{xml_add_id, xml_remove_id},
         };
 
         if ns.is_some_and(|ns| ns.href.is_none()) {

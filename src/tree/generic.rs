@@ -4,7 +4,7 @@ use std::{
     ptr::NonNull,
 };
 
-use crate::{libxml::valid::xml_remove_id, uri::build_uri};
+use crate::{uri::build_uri, valid::xml_remove_id};
 
 use super::{
     XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE, XmlAttr, XmlAttrPtr, XmlAttribute, XmlAttributePtr,

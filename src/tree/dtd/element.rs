@@ -252,7 +252,7 @@ impl From<XmlElementPtr> for *mut XmlElement {
 #[doc(alias = "xmlCopyElement")]
 #[cfg(feature = "libxml_tree")]
 pub(crate) fn xml_copy_element(elem: XmlElementPtr) -> Option<XmlElementPtr> {
-    use crate::libxml::valid::{xml_copy_element_content, xml_verr_memory};
+    use crate::valid::{xml_copy_element_content, xml_verr_memory};
 
     let res = XmlElementPtr::new(XmlElement {
         typ: XmlElementType::XmlElementDecl,

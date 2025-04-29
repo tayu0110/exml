@@ -29,7 +29,7 @@ use crate::xpath::XmlXPathObjectType;
 use crate::{
     error::{__xml_raise_error, XmlParserErrors},
     generic_error,
-    libxml::{chvalid::xml_is_blank_char, valid::xml_snprintf_element_content},
+    libxml::chvalid::xml_is_blank_char,
     parser::{
         XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC, xml_parse_in_node_context,
     },
@@ -39,6 +39,7 @@ use crate::{
         XmlEntityType, XmlGenericNodePtr, XmlNodePtr, XmlNs, XmlNsPtr, validate_name,
         xml_free_node_list, xml_get_doc_entity,
     },
+    valid::xml_snprintf_element_content,
     xpath::{XmlXPathContext, XmlXPathObject},
 };
 
@@ -2056,16 +2057,14 @@ impl XmlShellCtxt<'_> {
         _node: Option<XmlGenericNodePtr>,
         _node2: Option<XmlGenericNodePtr>,
     ) -> i32 {
-        use crate::libxml::valid::XmlValidCtxt;
+        use crate::{
+            globals::GLOBAL_STATE,
+            parser::xml_parse_dtd,
+            tree::xml_free_dtd,
+            valid::{XmlValidCtxt, xml_validate_document, xml_validate_dtd},
+        };
 
         unsafe {
-            use crate::{
-                globals::GLOBAL_STATE,
-                libxml::valid::{xml_validate_document, xml_validate_dtd},
-                parser::xml_parse_dtd,
-                tree::xml_free_dtd,
-            };
-
             let mut vctxt = XmlValidCtxt::default();
             let mut res: i32 = -1;
 

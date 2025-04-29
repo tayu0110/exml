@@ -38,7 +38,6 @@ use crate::{
         parser_warning,
     },
     globals::{StructuredError, get_register_node_func},
-    libxml::valid::xml_validate_document_final,
     parser::{
         XML_COMPLETE_ATTRS, XML_MAX_TEXT_LENGTH, XML_SAX2_MAGIC, XML_SKIP_IDS, XML_STRING_TEXT,
         XML_SUBSTITUTE_REF, XML_VCTXT_DTD_VALIDATED, XmlParserCtxt, XmlParserInput,
@@ -55,11 +54,11 @@ use crate::{
         xml_new_dtd, xml_new_ns, xml_new_ns_prop, xml_new_reference, xml_text_concat,
     },
     uri::{build_uri, canonic_path, path_to_uri},
-};
-
-use super::valid::{
-    xml_add_notation_decl, xml_get_dtd_qelement_desc, xml_is_id, xml_is_ref,
-    xml_valid_normalize_attribute_value, xml_validate_notation_decl,
+    valid::{
+        xml_add_notation_decl, xml_get_dtd_qelement_desc, xml_is_id, xml_is_ref,
+        xml_valid_normalize_attribute_value, xml_validate_document_final,
+        xml_validate_notation_decl,
+    },
 };
 
 /// Provides the public ID e.g. "-//SGMLSOURCE//DTD DEMO//EN"

@@ -35,16 +35,14 @@ use crate::{
     error::{__xml_simple_error, __xml_simple_oom_error, XmlErrorDomain, XmlParserErrors},
     globals::{GLOBAL_STATE, get_indent_tree_output},
     io::XmlOutputBuffer,
-    libxml::{
-        chvalid::xml_is_char,
-        valid::{xml_dump_attribute_decl, xml_dump_element_decl, xml_dump_notation_table},
-    },
+    libxml::chvalid::xml_is_char,
     parser::{XML_STRING_TEXT_NOENC, xml_init_parser},
     tree::{
         NodeCommon, XML_LOCAL_NAMESPACE, XmlAttrPtr, XmlAttributePtr, XmlDocPtr, XmlDtdPtr,
         XmlElementPtr, XmlElementType, XmlEntityPtr, XmlGenericNodePtr, XmlNodePtr, XmlNotation,
         XmlNsPtr, xml_dump_entity_decl,
     },
+    valid::{xml_dump_attribute_decl, xml_dump_element_decl, xml_dump_notation_table},
 };
 #[cfg(feature = "html")]
 use crate::{

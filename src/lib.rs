@@ -42,6 +42,7 @@ pub mod schematron;
 pub(crate) mod test_util;
 pub mod tree;
 pub mod uri;
+pub mod valid;
 #[cfg(feature = "libxml_writer")]
 pub mod writer;
 #[cfg(feature = "xinclude")]

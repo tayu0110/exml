@@ -13,7 +13,6 @@ use crate::{
     libxml::{
         chvalid::xml_is_blank_char,
         sax2::{xml_sax2_entity_decl, xml_sax2_get_entity},
-        valid::xml_new_doc_element_content,
     },
     parser::{
         XmlParserCtxt, XmlParserInput, XmlParserInputState, XmlParserOption, split_qname2,
@@ -27,6 +26,7 @@ use crate::{
         xml_new_dtd,
     },
     uri::XmlURI,
+    valid::xml_new_doc_element_content,
 };
 #[cfg(feature = "libxml_valid")]
 use crate::{io::XmlParserInputBuffer, parser::XmlSAXHandler, tree::XmlDtdPtr};

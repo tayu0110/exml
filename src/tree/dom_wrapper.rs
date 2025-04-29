@@ -20,8 +20,8 @@
 
 use std::{os::raw::c_void, ptr::null_mut};
 
-use crate::libxml::{
-    globals::{xml_free, xml_malloc},
+use crate::{
+    libxml::globals::{xml_free, xml_malloc},
     valid::{xml_add_id, xml_is_id, xml_remove_id},
 };
 

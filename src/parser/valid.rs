@@ -10,15 +10,7 @@ use std::{borrow::Cow, cell::RefCell, collections::HashMap, ptr::null_mut, rc::R
 use crate::{
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     hash::{XmlHashTable, XmlHashTableRef},
-    libxml::{
-        chvalid::xml_is_blank_char,
-        valid::{
-            xml_get_dtd_element_desc, xml_get_dtd_notation_desc, xml_get_dtd_qelement_desc,
-            xml_snprintf_element_content, xml_snprintf_elements, xml_valid_normalize_string,
-            xml_validate_attribute_value_internal,
-        },
-        xmlregexp::XmlRegExecCtxt,
-    },
+    libxml::{chvalid::xml_is_blank_char, xmlregexp::XmlRegExecCtxt},
     list::XmlList,
     parser::build_qname,
     tree::{
@@ -27,6 +19,11 @@ use crate::{
         XmlElementContentOccur, XmlElementContentType, XmlElementPtr, XmlElementType,
         XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlGenericNodePtr, XmlID,
         XmlNodePtr, XmlNsPtr, XmlRef, xml_free_attribute, xml_free_element, xml_get_doc_entity,
+    },
+    valid::{
+        xml_get_dtd_element_desc, xml_get_dtd_notation_desc, xml_get_dtd_qelement_desc,
+        xml_snprintf_element_content, xml_snprintf_elements, xml_valid_normalize_string,
+        xml_validate_attribute_value_internal,
     },
 };
 
@@ -680,7 +677,7 @@ impl XmlParserCtxt {
 
     #[cfg(feature = "libxml_regexp")]
     fn vstate_vpush(&mut self, elem_decl: Option<XmlElementPtr>, node: XmlNodePtr) -> usize {
-        use crate::libxml::valid::XmlValidState;
+        use crate::valid::XmlValidState;
 
         // self.vctxt.vstate = self.vctxt.vstate_tab.add(self.vctxt.vstate_nr as usize);
         self.vctxt.vstate_tab.push(XmlValidState {
@@ -1195,7 +1192,7 @@ impl XmlParserCtxt {
     #[doc(alias = "xmlValidBuildContentModel")]
     #[cfg(all(feature = "libxml_valid", feature = "libxml_regexp"))]
     pub fn build_content_model(&mut self, mut elem: XmlElementPtr) -> i32 {
-        use crate::libxml::{valid::xml_snprintf_element_content, xmlautomata::XmlAutomata};
+        use crate::{libxml::xmlautomata::XmlAutomata, valid::xml_snprintf_element_content};
 
         if !matches!(elem.element_type(), XmlElementType::XmlElementDecl) {
             return 0;
@@ -2120,7 +2117,7 @@ impl XmlParserCtxt {
         attr: Option<XmlAttrPtr>,
         value: &str,
     ) -> i32 {
-        use crate::libxml::valid::xml_get_dtd_notation_desc;
+        use crate::valid::xml_get_dtd_notation_desc;
 
         let mut ret: i32 = 1;
 

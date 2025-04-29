@@ -33,7 +33,6 @@ use crate::{
             xml_sax_version, xml_sax2_end_element, xml_sax2_ignorable_whitespace,
             xml_sax2_start_element,
         },
-        valid::XmlValidCtxt,
     },
     parser::{
         __xml_err_encoding, INPUT_CHUNK, LINE_LEN, XML_COMPLETE_ATTRS, XML_DETECT_IDS,
@@ -46,6 +45,7 @@ use crate::{
         XmlDocPtr, XmlEntityType, XmlNodePtr, xml_free_doc,
     },
     uri::{build_uri, canonic_path},
+    valid::XmlValidCtxt,
 };
 
 use super::{

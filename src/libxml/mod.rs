@@ -10,7 +10,6 @@ pub mod sax2;
 #[cfg(feature = "schema")]
 pub mod schemas_internals;
 pub mod threads;
-pub mod valid;
 #[cfg(feature = "xpointer")]
 pub mod xlink;
 #[cfg(any(feature = "libxml_regexp", feature = "libxml_automata"))]

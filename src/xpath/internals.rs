@@ -33,11 +33,12 @@ use crate::xpointer::XmlLocationSet;
 use crate::{
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     generic_error,
-    libxml::{chvalid::xml_is_blank_char, valid::xml_get_id},
+    libxml::chvalid::xml_is_blank_char,
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlAttrPtr, XmlDocPtr, XmlDtdPtr, XmlElementType,
         XmlGenericNodePtr, XmlNodePtr, XmlNs, XmlNsPtr,
     },
+    valid::xml_get_id,
     xpath::{
         XML_XPATH_NAN, XmlXPathError, XmlXPathObjectType,
         functions::{cast_to_number, xml_xpath_number_function},

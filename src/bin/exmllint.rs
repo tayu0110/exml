@@ -67,9 +67,6 @@ use exml::{
             XmlRelaxNG, xml_relaxng_free, xml_relaxng_parse, xml_relaxng_set_valid_errors,
             xml_relaxng_validate_doc,
         },
-        valid::{
-            XmlValidCtxt, xml_valid_get_valid_elements, xml_validate_document, xml_validate_dtd,
-        },
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_size,
             xml_mem_used, xml_memory_strdup,
@@ -94,6 +91,7 @@ use exml::{
         XmlEntityType, XmlEnumeration, XmlGenericNodePtr, XmlNodePtr, XmlNsPtr, xml_copy_doc,
         xml_encode_entities_reentrant, xml_free_doc, xml_free_dtd, xml_new_doc, xml_new_doc_node,
     },
+    valid::{XmlValidCtxt, xml_valid_get_valid_elements, xml_validate_document, xml_validate_dtd},
     xmlschemas::{
         context::{
             XmlSchemaParserCtxtPtr, XmlSchemaValidCtxtPtr, xml_schema_free_parser_ctxt,

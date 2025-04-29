@@ -32,7 +32,7 @@ use crate::{
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     globals::{GenericError, GenericErrorContext, StructuredError},
     hash::XmlHashTableRef,
-    libxml::hash::XmlHashTable,
+    libxml::{chvalid::xml_is_blank_char, hash::XmlHashTable},
     list::XmlList,
     parser::{XML_VCTXT_USE_PCTXT, build_qname, split_qname2},
     tree::{
@@ -44,8 +44,6 @@ use crate::{
         xml_get_doc_entity, xml_new_doc_node,
     },
 };
-
-use super::chvalid::xml_is_blank_char;
 
 /// Handle a validation error
 #[doc(alias = "xmlErrValid")]
@@ -1532,11 +1530,9 @@ fn xml_is_doc_name_start_char(doc: Option<XmlDocPtr>, c: i32) -> i32 {
 #[cfg(feature = "libxml_valid")]
 fn xml_is_doc_name_char(doc: Option<XmlDocPtr>, c: i32) -> i32 {
     use crate::{
-        libxml::chvalid::{xml_is_digit, xml_is_extender},
+        libxml::chvalid::{xml_is_combining, xml_is_digit, xml_is_extender},
         parser::xml_is_letter,
     };
-
-    use super::chvalid::xml_is_combining;
 
     if doc.is_none_or(|doc| doc.properties & XmlDocProperties::XmlDocOld10 as i32 == 0) {
         // Use the new checks of production [4] [4a] amd [5] of the
@@ -1630,7 +1626,7 @@ fn xml_validate_name_value_internal(doc: Option<XmlDocPtr>, value: &str) -> i32 
 #[doc(alias = "xmlValidateNmtokensValueInternal")]
 #[cfg(feature = "libxml_valid")]
 fn xml_validate_nmtokens_value_internal(doc: Option<XmlDocPtr>, mut value: &str) -> i32 {
-    use super::chvalid::xml_is_blank_char;
+    use crate::libxml::chvalid::xml_is_blank_char;
 
     value = value.trim_matches(|c: char| xml_is_blank_char(c as u32));
     if value

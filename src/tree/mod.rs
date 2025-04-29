@@ -860,7 +860,7 @@ pub(crate) unsafe fn xml_static_copy_node_list(
 #[cfg(feature = "libxml_tree")]
 pub unsafe fn xml_copy_dtd(dtd: XmlDtdPtr) -> Option<XmlDtdPtr> {
     unsafe {
-        use crate::libxml::valid::{
+        use crate::valid::{
             xml_copy_attribute_table, xml_copy_notation_table, xml_get_dtd_qelement_desc,
         };
 

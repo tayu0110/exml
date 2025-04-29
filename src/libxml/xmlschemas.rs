@@ -83,7 +83,6 @@ use crate::{
             xml_schema_free_annot, xml_schema_free_type, xml_schema_free_wildcard,
             xml_schema_free_wildcard_ns_set,
         },
-        valid::xml_add_id,
         xmlregexp::{XmlRegExecCtxtPtr, xml_regexp_exec},
         xmlschemastypes::{
             XmlSchemaValPtr, XmlSchemaWhitespaceValueType, xml_schema_check_facet,
@@ -112,6 +111,7 @@ use crate::{
         xml_free_doc, xml_free_node, xml_new_doc_text, xml_new_ns, xml_new_ns_prop, xml_new_prop,
     },
     uri::build_uri,
+    valid::xml_add_id,
     xmlschemas::{
         context::{
             XmlSchemaParserCtxtPtr, XmlSchemaValidCtxtPtr, xml_schema_new_parser_ctxt,

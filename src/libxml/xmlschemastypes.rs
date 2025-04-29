@@ -45,7 +45,6 @@ use crate::{
             XmlSchemaTypeType, XmlSchemaValType, XmlSchemaWildcard, XmlSchemaWildcardPtr,
             xml_schema_free_annot, xml_schema_free_type, xml_schema_free_wildcard,
         },
-        valid::{xml_add_id, xml_add_ref, xml_validate_notation_use},
         xmlregexp::xml_regexp_exec,
         xmlschemas::{
             XmlSchemaAbstractCtxtPtr, xml_schema_facet_type_to_string, xml_schema_format_qname,
@@ -59,6 +58,7 @@ use crate::{
         validate_ncname, validate_nmtoken, validate_qname, xml_get_doc_entity,
     },
     uri::XmlURI,
+    valid::{xml_add_id, xml_add_ref, xml_validate_notation_use},
     xmlschemas::{
         context::{
             XmlSchemaParserCtxtPtr, xml_schema_free_parser_ctxt, xml_schema_new_parser_ctxt,

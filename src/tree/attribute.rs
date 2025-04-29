@@ -28,7 +28,7 @@ use std::{
 
 use crate::{
     globals::{get_deregister_node_func, get_register_node_func},
-    libxml::valid::{xml_add_id, xml_is_id, xml_remove_id},
+    valid::{xml_add_id, xml_is_id, xml_remove_id},
 };
 
 use super::{
