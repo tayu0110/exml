@@ -21,8 +21,7 @@
 #[cfg(feature = "libxml_output")]
 use std::io::Write;
 use std::{
-    borrow::Cow, cell::RefCell, collections::HashMap, mem::size_of, os::raw::c_void, ptr::null_mut,
-    rc::Rc,
+    borrow::Cow, cell::RefCell, collections::HashMap, os::raw::c_void, ptr::null_mut, rc::Rc,
 };
 
 #[cfg(feature = "libxml_regexp")]
@@ -33,10 +32,7 @@ use crate::{
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     globals::{GenericError, GenericErrorContext, StructuredError},
     hash::XmlHashTableRef,
-    libxml::{
-        globals::{xml_free, xml_malloc},
-        hash::XmlHashTable,
-    },
+    libxml::hash::XmlHashTable,
     list::XmlList,
     parser::{XML_VCTXT_USE_PCTXT, build_qname, split_qname2},
     tree::{
@@ -175,7 +171,7 @@ macro_rules! xml_err_valid_warning {
 }
 
 // Validation state added for non-determinist content model.
-pub type XmlValidStatePtr = *mut XmlValidState;
+//
 // If regexp are enabled we can do continuous validation without the
 // need of a tree to validate the content model. this is done in each
 // callbacks.
@@ -199,7 +195,6 @@ pub type XmlValidityErrorFunc = unsafe fn(ctx: *mut c_void, msg: *const i8);
 #[doc(alias = "xmlValidityWarningFunc")]
 pub type XmlValidityWarningFunc = unsafe fn(ctx: *mut c_void, msg: *const i8);
 
-pub type XmlValidCtxtPtr = *mut XmlValidCtxt;
 /// An xmlValidCtxt is used for error reporting when validating.
 #[doc(alias = "xmlValidCtxt")]
 #[repr(C)]
@@ -226,6 +221,15 @@ pub struct XmlValidCtxt {
 }
 
 impl XmlValidCtxt {
+    /// Allocate a validation context structure.
+    ///
+    /// Returns the new validation context structure
+    #[doc(alias = "xmlNewValidCtxt")]
+    #[cfg(feature = "libxml_valid")]
+    pub fn new() -> XmlValidCtxt {
+        XmlValidCtxt::default()
+    }
+
     /// Search the DTD for the description of this element
     ///
     /// returns the xmlElementPtr if found or null_mut()
@@ -1371,9 +1375,6 @@ fn xml_dump_element_content<'a>(
 
     while !Rc::ptr_eq(&cur, &content) || !init {
         init = true;
-        // if cur.is_null() {
-        //     return;
-        // }
 
         let now = cur.borrow();
         match now.typ {
@@ -2142,40 +2143,6 @@ pub(crate) fn xml_is_ref(
 // ) -> Option<&'a XmlList<Box<XmlRef>>> {
 //     doc.refs.as_ref()?.get(id)
 // }
-
-/// Allocate a validation context structure.
-///
-/// Returns null_mut() if not, otherwise the new validation context structure
-#[doc(alias = "xmlNewValidCtxt")]
-#[cfg(feature = "libxml_valid")]
-pub unsafe fn xml_new_valid_ctxt() -> XmlValidCtxtPtr {
-    unsafe {
-        let ret: XmlValidCtxtPtr = xml_malloc(size_of::<XmlValidCtxt>()) as _;
-        if ret.is_null() {
-            xml_verr_memory(None, Some("malloc failed"));
-            return null_mut();
-        }
-
-        std::ptr::write(&mut *ret, XmlValidCtxt::default());
-
-        ret
-    }
-}
-
-/// Free a validation context structure.
-#[doc(alias = "xmlFreeValidCtxt")]
-#[cfg(feature = "libxml_valid")]
-pub unsafe fn xml_free_valid_ctxt(cur: XmlValidCtxtPtr) {
-    unsafe {
-        use std::ptr::drop_in_place;
-
-        if cur.is_null() {
-            return;
-        }
-        drop_in_place(cur);
-        xml_free(cur as _);
-    }
-}
 
 /// Try to validate a the root element
 /// basically it does the following check as described by the

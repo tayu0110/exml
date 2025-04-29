@@ -68,8 +68,7 @@ use exml::{
             xml_relaxng_validate_doc,
         },
         valid::{
-            xml_free_valid_ctxt, xml_new_valid_ctxt, xml_valid_get_valid_elements,
-            xml_validate_document, xml_validate_dtd,
+            XmlValidCtxt, xml_valid_get_valid_elements, xml_validate_document, xml_validate_dtd,
         },
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_size,
@@ -2835,20 +2834,14 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: Option<XmlParserC
                 end_timer!("Parsing DTD");
             }
             if let Some(dtd) = dtd {
-                let cvp = xml_new_valid_ctxt();
-                if cvp.is_null() {
-                    generic_error!("Couldn't allocate validation context\n");
-                    PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
-                    xml_free_dtd(dtd);
-                    return;
-                }
-                (*cvp).error = Some(generic_error_default);
-                (*cvp).warning = Some(generic_error_default);
+                let mut cvp = XmlValidCtxt::new();
+                cvp.error = Some(generic_error_default);
+                cvp.warning = Some(generic_error_default);
 
                 if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
                     start_timer();
                 }
-                if xml_validate_dtd(&mut *cvp, doc, dtd) == 0 {
+                if xml_validate_dtd(&mut cvp, doc, dtd) == 0 {
                     let filename = filename.unwrap();
                     if let Some(dtd_valid) = CMD_ARGS.dtdvalid.as_deref() {
                         generic_error!(
@@ -2865,7 +2858,6 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: Option<XmlParserC
                 if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
                     end_timer!("Validating against DTD");
                 }
-                xml_free_valid_ctxt(cvp);
                 xml_free_dtd(dtd);
             } else {
                 if let Some(dtd_valid) = CMD_ARGS.dtdvalid.as_deref() {
@@ -2879,20 +2871,14 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: Option<XmlParserC
                 PROGRESULT.store(ERR_DTD, Ordering::Relaxed);
             }
         } else if CMD_ARGS.postvalid {
-            let cvp = xml_new_valid_ctxt();
-            if cvp.is_null() {
-                generic_error!("Couldn't allocate validation context\n");
-                PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
-                xml_free_doc(doc);
-                return;
-            }
+            let mut cvp = XmlValidCtxt::new();
 
             if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
                 start_timer();
             }
-            (*cvp).error = Some(generic_error_default);
-            (*cvp).warning = Some(generic_error_default);
-            if xml_validate_document(&mut *cvp, doc) == 0 {
+            cvp.error = Some(generic_error_default);
+            cvp.warning = Some(generic_error_default);
+            if xml_validate_document(&mut cvp, doc) == 0 {
                 let filename = filename.unwrap();
                 generic_error!("Document {filename} does not validate\n");
                 PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
@@ -2900,7 +2886,6 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: Option<XmlParserC
             if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
                 end_timer!("Validating");
             }
-            xml_free_valid_ctxt(cvp);
         }
         #[cfg(feature = "schematron")]
         if let Some(schematron) = WXSCHEMATRON.lock().unwrap().as_mut() {
