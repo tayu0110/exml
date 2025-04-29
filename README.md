@@ -3,7 +3,7 @@
 Re-implementation of [libxml2](https://gitlab.gnome.org/GNOME/libxml2) by Rust.\
 This library is based on v2.11.8.
 
-Some modules are now safe, but most major components are still unsafe.
+Most modules are now safe, but a part of major modules are still unsafe.
 
 For usage, please refer to the code under the `tests/` directory because `examples/` has not been implemented.
 
@@ -25,7 +25,6 @@ Since the implementation is still insufficient, it may not be possible to build 
 | xpointer           | Corresponds to `XML_WITH_XPTR`                                            |
 | libxml_automata    | Corresponds to `XML_WITH_AUTOMATA`                                        |
 | libxml_debug       | Corresponds to `XML_WITH_DEBUG`                                           |
-| libxml_expr        | Corresponds to `XML_WITH_EXPR`                                            |
 | libxml_iso8859x    | Corresponds to `XML_WITH_ISO8859X`                                        |
 | libxml_output      | Corresponds to `XML_WITH_OUTPUT`                                          |
 | libxml_pattern     | Corresponds to `XML_WITH_PATTERN`                                         |
@@ -53,6 +52,7 @@ Some features will be substituted or not supported.
 | XML_WITH_ZLIB      | Not planed. Please use other crates.                                      |
 | XML_WITH_LZMA      | Not planed. Please use other crates.                                      |
 | XML_WITH_ICU       | Only the encodings provided by `encoding_rs` are supported by default.    |
+| XML_WITH_EXPR      | Removed.                                                                  |
 
 
 # Tests
