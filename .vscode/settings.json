@@ -12,7 +12,6 @@
         "xpath",
         "libxml_automata",
         "libxml_debug",
-        "libxml_expr",
         "libxml_iso8859x",
         "libxml_output",
         "libxml_pattern",

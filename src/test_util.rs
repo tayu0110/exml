@@ -21,7 +21,6 @@ use crate::{
         globals::xml_free,
         relaxng::XmlRelaxNGPtr,
         schemas_internals::{XmlSchemaFacetPtr, XmlSchemaValType},
-        xmlregexp::{XmlExpCtxtPtr, XmlExpNodePtr},
         xmlschemastypes::{XmlSchemaValPtr, XmlSchemaWhitespaceValueType},
         xmlstring::XmlChar,
     },
@@ -62,9 +61,9 @@ pub(crate) const GEN_NB_XML_TEXT_READER_LOCATOR_PTR: i32 = 1;
 pub(crate) const GEN_NB_XML_SCHEMA_PTR: i32 = 1;
 #[cfg(feature = "schema")]
 pub(crate) const GEN_NB_XML_SCHEMA_VALID_CTXT_PTR: i32 = 1;
-#[cfg(all(feature = "libxml_regexp", feature = "libxml_expr"))]
+#[cfg(feature = "libxml_regexp")]
 pub(crate) const GEN_NB_XML_EXP_CTXT_PTR: i32 = 1;
-#[cfg(all(feature = "libxml_regexp", feature = "libxml_expr"))]
+#[cfg(feature = "libxml_regexp")]
 pub(crate) const GEN_NB_XML_EXP_NODE_PTR: i32 = 1;
 #[cfg(feature = "schema")]
 pub(crate) const GEN_NB_XML_SCHEMA_PARSER_CTXT_PTR: i32 = 1;
@@ -236,21 +235,6 @@ pub(crate) fn gen_xml_schema_parser_ctxt_ptr(_no: i32, _nr: i32) -> XmlSchemaPar
 
 #[cfg(feature = "schema")]
 pub(crate) fn des_xml_schema_parser_ctxt_ptr(_no: i32, _val: XmlSchemaParserCtxtPtr, _nr: i32) {}
-
-#[cfg(all(feature = "libxml_regexp", feature = "libxml_expr"))]
-pub(crate) fn gen_xml_exp_ctxt_ptr(_no: i32, _nr: i32) -> XmlExpCtxtPtr {
-    null_mut()
-}
-
-#[cfg(all(feature = "libxml_regexp", feature = "libxml_expr"))]
-pub(crate) fn des_xml_exp_ctxt_ptr(_no: i32, _val: XmlExpCtxtPtr, _nr: i32) {}
-
-#[cfg(all(feature = "libxml_regexp", feature = "libxml_expr"))]
-pub(crate) fn gen_xml_exp_node_ptr(_no: i32, _nr: i32) -> XmlExpNodePtr {
-    null_mut()
-}
-#[cfg(all(feature = "libxml_regexp", feature = "libxml_expr"))]
-pub(crate) fn des_xml_exp_node_ptr(_no: i32, _val: XmlExpNodePtr, _nr: i32) {}
 
 #[cfg(feature = "schema")]
 pub(crate) fn gen_xml_schema_ptr(_no: i32, _nr: i32) -> XmlSchemaPtr {
