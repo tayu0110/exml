@@ -1172,7 +1172,7 @@ unsafe fn xml_schema_strip(value: *const XmlChar) -> *mut XmlChar {
 ///
 /// Returns 0-63 (value), 64 (pad), or -1 (not recognized)
 #[doc(alias = "_xmlSchemaBase64Decode")]
-unsafe fn _xml_schema_base64_decode(ch: XmlChar) -> i32 {
+fn _xml_schema_base64_decode(ch: XmlChar) -> i32 {
     if ch.is_ascii_uppercase() {
         (ch - b'A') as i32
     } else if ch.is_ascii_lowercase() {

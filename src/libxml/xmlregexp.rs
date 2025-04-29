@@ -3287,198 +3287,187 @@ impl XmlRegExecCtxt {
     /// If successfully collected, return `Some((num_val, num_neg, values_slice))`.  
     /// Otherwise, return `None`.
     #[doc(alias = "xmlRegExecGetValues")]
-    unsafe fn get_values<'a>(
+    fn get_values<'a>(
         &self,
         err: i32,
         values: &'a mut [Cow<'static, str>],
-        terminal: *mut i32,
+        terminal: &mut i32,
     ) -> Option<(usize, usize, &'a [Cow<'static, str>])> {
-        unsafe {
-            if values.is_empty() {
-                return None;
-            }
-
-            let maxval = values.len();
-            let mut nb = 0;
-            let mut nbval = 0;
-            let mut nbneg = 0;
-            if !self.comp.compact.is_empty() {
-                let mut target: i32;
-                let comp = self.comp.clone();
-
-                let state = if err != 0 {
-                    if self.err_state_no == -1 {
-                        return None;
-                    }
-                    self.err_state_no
-                } else {
-                    self.index as i32
-                };
-                if !terminal.is_null() {
-                    if comp.compact[state as usize][0]
-                        == XmlRegStateType::XmlRegexpFinalState as i32
-                    {
-                        *terminal = 1;
-                    } else {
-                        *terminal = 0;
-                    }
-                }
-                if nb < maxval {
-                    for i in 0..comp.string_map.len() {
-                        target = comp.compact[state as usize][i + 1];
-                        if target > 0
-                            && target <= comp.nbstates
-                            && comp.compact[(target - 1) as usize][0]
-                                != XmlRegStateType::XmlRegexpSinkState as i32
-                        {
-                            values[nb] = Cow::Owned(comp.string_map[i].clone());
-                            nb += 1;
-                            nbval += 1;
-                        }
-                        if nb >= maxval {
-                            break;
-                        }
-                    }
-                }
-                if nb < maxval {
-                    for i in 0..comp.string_map.len() {
-                        target = comp.compact[state as usize][i + 1];
-                        if target > 0
-                            && target <= comp.nbstates
-                            && comp.compact[(target - 1) as usize][0]
-                                == XmlRegStateType::XmlRegexpSinkState as i32
-                        {
-                            values[nb] = Cow::Owned(comp.string_map[i].clone());
-                            nb += 1;
-                            nbneg += 1;
-                        }
-                        if nb >= maxval {
-                            break;
-                        }
-                    }
-                }
-            } else {
-                if !terminal.is_null() {
-                    if matches!(
-                        self.comp.states[self.state].as_ref().unwrap().typ,
-                        XmlRegStateType::XmlRegexpFinalState
-                    ) {
-                        *terminal = 1;
-                    } else {
-                        *terminal = 0;
-                    }
-                }
-
-                let state = if err != 0 {
-                    if self.err_state == usize::MAX || self.comp.states[self.err_state].is_none() {
-                        return None;
-                    }
-                    self.err_state
-                } else {
-                    if self.state == usize::MAX || self.comp.states[self.state].is_none() {
-                        return None;
-                    }
-                    self.state
-                };
-                if nb < maxval {
-                    for trans in &self.comp.states[state].as_ref().unwrap().trans {
-                        if trans.to < 0 {
-                            continue;
-                        }
-                        if trans.atom_index == usize::MAX {
-                            continue;
-                        }
-                        let atom = &self.comp.atoms[trans.atom_index];
-                        if atom.valuep.is_none() {
-                            continue;
-                        }
-                        if trans.count as usize == REGEXP_ALL_LAX_COUNTER {
-                            // this should not be reached but ...
-                            todo!()
-                        } else if trans.count as usize == REGEXP_ALL_COUNTER {
-                            // this should not be reached but ...
-                            todo!()
-                        } else if trans.counter >= 0 {
-                            let count = if err != 0 {
-                                self.err_counts[trans.counter as usize]
-                            } else {
-                                self.counts[trans.counter as usize]
-                            };
-                            let counter = self.comp.counters[trans.counter as usize];
-                            if count < counter.max {
-                                if atom.neg != 0 {
-                                    values[nb] =
-                                        Cow::Owned(atom.valuep2.as_deref().unwrap().to_owned());
-                                    nb += 1;
-                                } else {
-                                    values[nb] =
-                                        Cow::Owned(atom.valuep.as_deref().unwrap().to_owned());
-                                    nb += 1;
-                                }
-                                nbval += 1;
-                            }
-                        } else if self.comp.states[trans.to as usize].is_some()
-                            && !matches!(
-                                self.comp.states[trans.to as usize].as_ref().unwrap().typ,
-                                XmlRegStateType::XmlRegexpSinkState,
-                            )
-                        {
-                            if atom.neg != 0 {
-                                values[nb] =
-                                    Cow::Owned(atom.valuep2.as_deref().unwrap().to_owned());
-                                nb += 1;
-                            } else {
-                                values[nb] = Cow::Owned(atom.valuep.as_deref().unwrap().to_owned());
-                                nb += 1;
-                            }
-                            nbval += 1;
-                        }
-                        if nb >= maxval {
-                            break;
-                        }
-                    }
-                }
-                if nb < maxval {
-                    for trans in &self.comp.states[state].as_ref().unwrap().trans {
-                        if trans.to < 0 {
-                            continue;
-                        }
-                        if trans.atom_index == usize::MAX {
-                            continue;
-                        }
-                        let atom = &self.comp.atoms[trans.atom_index];
-                        if atom.valuep.is_none() {
-                            continue;
-                        }
-                        if trans.count as usize == REGEXP_ALL_LAX_COUNTER
-                            || trans.count as usize == REGEXP_ALL_COUNTER
-                            || trans.counter >= 0
-                        {
-                            continue;
-                        } else if (self.comp.states[trans.to as usize]).is_some()
-                            && matches!(
-                                self.comp.states[trans.to as usize].as_ref().unwrap().typ,
-                                XmlRegStateType::XmlRegexpSinkState
-                            )
-                        {
-                            if atom.neg != 0 {
-                                values[nb] =
-                                    Cow::Owned(atom.valuep2.as_deref().unwrap().to_owned());
-                                nb += 1
-                            } else {
-                                values[nb] = Cow::Owned(atom.valuep.as_deref().unwrap().to_owned());
-                                nb += 1;
-                            }
-                            nbneg += 1;
-                        }
-                        if nb >= maxval {
-                            break;
-                        }
-                    }
-                }
-            }
-            Some((nbval, nbneg, &values[..nb]))
+        if values.is_empty() {
+            return None;
         }
+
+        let maxval = values.len();
+        let mut nb = 0;
+        let mut nbval = 0;
+        let mut nbneg = 0;
+        if !self.comp.compact.is_empty() {
+            let mut target: i32;
+            let comp = self.comp.clone();
+
+            let state = if err != 0 {
+                if self.err_state_no == -1 {
+                    return None;
+                }
+                self.err_state_no
+            } else {
+                self.index as i32
+            };
+            if comp.compact[state as usize][0] == XmlRegStateType::XmlRegexpFinalState as i32 {
+                *terminal = 1;
+            } else {
+                *terminal = 0;
+            }
+            if nb < maxval {
+                for i in 0..comp.string_map.len() {
+                    target = comp.compact[state as usize][i + 1];
+                    if target > 0
+                        && target <= comp.nbstates
+                        && comp.compact[(target - 1) as usize][0]
+                            != XmlRegStateType::XmlRegexpSinkState as i32
+                    {
+                        values[nb] = Cow::Owned(comp.string_map[i].clone());
+                        nb += 1;
+                        nbval += 1;
+                    }
+                    if nb >= maxval {
+                        break;
+                    }
+                }
+            }
+            if nb < maxval {
+                for i in 0..comp.string_map.len() {
+                    target = comp.compact[state as usize][i + 1];
+                    if target > 0
+                        && target <= comp.nbstates
+                        && comp.compact[(target - 1) as usize][0]
+                            == XmlRegStateType::XmlRegexpSinkState as i32
+                    {
+                        values[nb] = Cow::Owned(comp.string_map[i].clone());
+                        nb += 1;
+                        nbneg += 1;
+                    }
+                    if nb >= maxval {
+                        break;
+                    }
+                }
+            }
+        } else {
+            if matches!(
+                self.comp.states[self.state].as_ref().unwrap().typ,
+                XmlRegStateType::XmlRegexpFinalState
+            ) {
+                *terminal = 1;
+            } else {
+                *terminal = 0;
+            }
+
+            let state = if err != 0 {
+                if self.err_state == usize::MAX || self.comp.states[self.err_state].is_none() {
+                    return None;
+                }
+                self.err_state
+            } else {
+                if self.state == usize::MAX || self.comp.states[self.state].is_none() {
+                    return None;
+                }
+                self.state
+            };
+            if nb < maxval {
+                for trans in &self.comp.states[state].as_ref().unwrap().trans {
+                    if trans.to < 0 {
+                        continue;
+                    }
+                    if trans.atom_index == usize::MAX {
+                        continue;
+                    }
+                    let atom = &self.comp.atoms[trans.atom_index];
+                    if atom.valuep.is_none() {
+                        continue;
+                    }
+                    if trans.count as usize == REGEXP_ALL_LAX_COUNTER {
+                        // this should not be reached but ...
+                        todo!()
+                    } else if trans.count as usize == REGEXP_ALL_COUNTER {
+                        // this should not be reached but ...
+                        todo!()
+                    } else if trans.counter >= 0 {
+                        let count = if err != 0 {
+                            self.err_counts[trans.counter as usize]
+                        } else {
+                            self.counts[trans.counter as usize]
+                        };
+                        let counter = self.comp.counters[trans.counter as usize];
+                        if count < counter.max {
+                            if atom.neg != 0 {
+                                values[nb] =
+                                    Cow::Owned(atom.valuep2.as_deref().unwrap().to_owned());
+                                nb += 1;
+                            } else {
+                                values[nb] = Cow::Owned(atom.valuep.as_deref().unwrap().to_owned());
+                                nb += 1;
+                            }
+                            nbval += 1;
+                        }
+                    } else if self.comp.states[trans.to as usize].is_some()
+                        && !matches!(
+                            self.comp.states[trans.to as usize].as_ref().unwrap().typ,
+                            XmlRegStateType::XmlRegexpSinkState,
+                        )
+                    {
+                        if atom.neg != 0 {
+                            values[nb] = Cow::Owned(atom.valuep2.as_deref().unwrap().to_owned());
+                            nb += 1;
+                        } else {
+                            values[nb] = Cow::Owned(atom.valuep.as_deref().unwrap().to_owned());
+                            nb += 1;
+                        }
+                        nbval += 1;
+                    }
+                    if nb >= maxval {
+                        break;
+                    }
+                }
+            }
+            if nb < maxval {
+                for trans in &self.comp.states[state].as_ref().unwrap().trans {
+                    if trans.to < 0 {
+                        continue;
+                    }
+                    if trans.atom_index == usize::MAX {
+                        continue;
+                    }
+                    let atom = &self.comp.atoms[trans.atom_index];
+                    if atom.valuep.is_none() {
+                        continue;
+                    }
+                    if trans.count as usize == REGEXP_ALL_LAX_COUNTER
+                        || trans.count as usize == REGEXP_ALL_COUNTER
+                        || trans.counter >= 0
+                    {
+                        continue;
+                    } else if (self.comp.states[trans.to as usize]).is_some()
+                        && matches!(
+                            self.comp.states[trans.to as usize].as_ref().unwrap().typ,
+                            XmlRegStateType::XmlRegexpSinkState
+                        )
+                    {
+                        if atom.neg != 0 {
+                            values[nb] = Cow::Owned(atom.valuep2.as_deref().unwrap().to_owned());
+                            nb += 1
+                        } else {
+                            values[nb] = Cow::Owned(atom.valuep.as_deref().unwrap().to_owned());
+                            nb += 1;
+                        }
+                        nbneg += 1;
+                    }
+                    if nb >= maxval {
+                        break;
+                    }
+                }
+            }
+        }
+        Some((nbval, nbneg, &values[..nb]))
     }
 
     /// Extract information from the regexp execution,
@@ -3490,12 +3479,12 @@ impl XmlRegExecCtxt {
     /// If successfully collected, return `Some((num_val, num_neg, values_slice))`.  
     /// Otherwise, return `None`.
     #[doc(alias = "xmlRegExecNextValues")]
-    pub unsafe fn next_values<'a>(
+    pub fn next_values<'a>(
         &self,
         values: &'a mut [Cow<'static, str>],
-        terminal: *mut i32,
+        terminal: &mut i32,
     ) -> Option<(usize, usize, &'a [Cow<'static, str>])> {
-        unsafe { self.get_values(0, values, terminal) }
+        self.get_values(0, values, terminal)
     }
 
     /// Extract error information from the regexp execution, the parameter
@@ -3508,22 +3497,20 @@ impl XmlRegExecCtxt {
     /// If successfully collected, return `Some((num_val, num_neg, values_slice))`.  
     /// Otherwise, return `None`.
     #[doc(alias = "xmlRegExecErrInfo")]
-    pub unsafe fn err_info<'a>(
+    pub fn err_info<'a>(
         &self,
         string: Option<&mut Option<Box<str>>>,
         values: &'a mut [Cow<'static, str>],
-        terminal: *mut i32,
+        terminal: &mut i32,
     ) -> Option<(usize, usize, &'a [Cow<'static, str>])> {
-        unsafe {
-            if let Some(string) = string {
-                if self.status != 0 {
-                    *string = self.err_string.clone();
-                } else {
-                    *string = None;
-                }
+        if let Some(string) = string {
+            if self.status != 0 {
+                *string = self.err_string.clone();
+            } else {
+                *string = None;
             }
-            self.get_values(1, values, terminal)
         }
+        self.get_values(1, values, terminal)
     }
 }
 

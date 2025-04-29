@@ -416,7 +416,7 @@ fn xml_relaxng_default_type_have(_data: *mut c_void, typ: &str) -> bool {
 ///
 /// Returns 1 if yes, 0 if no and -1 in case of error.
 #[doc(alias = "xmlRelaxNGDefaultTypeCheck")]
-unsafe fn xml_relaxng_default_type_check(
+fn xml_relaxng_default_type_check(
     _data: *mut c_void,
     typ: &str,
     value: *const u8,

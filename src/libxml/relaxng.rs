@@ -905,10 +905,7 @@ unsafe fn xml_relaxng_compare_elem_def_lists(
 ///     flag this in the define and simplify the runtime checking
 ///     algorithm
 #[doc(alias = "xmlRelaxNGComputeInterleaves")]
-extern "C" fn xml_relaxng_compute_interleaves(
-    def: XmlRelaxNGDefinePtr,
-    ctxt: XmlRelaxNGParserCtxtPtr,
-) {
+fn xml_relaxng_compute_interleaves(def: XmlRelaxNGDefinePtr, ctxt: XmlRelaxNGParserCtxtPtr) {
     let mut cur: XmlRelaxNGDefinePtr;
     let mut tmp: *mut XmlRelaxNGDefinePtr;
     let mut partitions: XmlRelaxNGPartitionPtr = null_mut();
@@ -2210,7 +2207,7 @@ unsafe fn xml_relaxng_check_combine(
 /// Applies the 4.17. combine attribute rule for all the define
 /// element of a given grammar using the same name.
 #[doc(alias = "xmlRelaxNGCheckReference")]
-extern "C" fn xml_relaxng_check_reference(
+fn xml_relaxng_check_reference(
     refe: XmlRelaxNGDefinePtr,
     ctxt: XmlRelaxNGParserCtxtPtr,
     name: *const XmlChar,
@@ -3166,7 +3163,7 @@ unsafe fn xml_relaxng_parse_interleave(
 
 /// Import import one references into the current grammar
 #[doc(alias = "xmlRelaxNGParseImportRef")]
-extern "C" fn xml_relaxng_parse_import_ref(
+fn xml_relaxng_parse_import_ref(
     def: XmlRelaxNGDefinePtr,
     ctxt: XmlRelaxNGParserCtxtPtr,
     name: *const XmlChar,
@@ -4886,7 +4883,7 @@ unsafe fn xml_relaxng_check_group_attrs(ctxt: XmlRelaxNGParserCtxtPtr, def: XmlR
 ///
 /// Returns the content type
 #[doc(alias = "xmlRelaxNGGroupContentType")]
-unsafe fn xml_relaxng_group_content_type(
+fn xml_relaxng_group_content_type(
     ct1: XmlRelaxNGContentType,
     ct2: XmlRelaxNGContentType,
 ) -> XmlRelaxNGContentType {
@@ -9039,7 +9036,7 @@ unsafe fn xml_relaxng_validate_document(ctxt: XmlRelaxNGValidCtxtPtr, doc: XmlDo
 /// Returns the number of elements found in the document or -1 in case of error.
 #[doc(alias = "xmlRelaxNGCleanPSVI")]
 #[cfg(feature = "schema")]
-unsafe fn xml_relaxng_clean_psvi(node: XmlGenericNodePtr) {
+fn xml_relaxng_clean_psvi(node: XmlGenericNodePtr) {
     if !matches!(
         node.element_type(),
         XmlElementType::XmlElementNode

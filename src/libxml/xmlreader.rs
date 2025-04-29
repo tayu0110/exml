@@ -3437,7 +3437,7 @@ impl XmlTextReader {
     ///
     /// Returns the xmlNodePtr or NULL in case of error.
     #[doc(alias = "xmlTextReaderPreserve")]
-    pub unsafe fn preserve(&mut self) -> Option<XmlGenericNodePtr> {
+    pub fn preserve(&mut self) -> Option<XmlGenericNodePtr> {
         let cur = self.curnode.or(self.node)?;
 
         if !matches!(

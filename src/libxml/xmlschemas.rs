@@ -1365,14 +1365,6 @@ unsafe fn xml_schema_get_canon_value_whtsp_ext_1(
         } {}
 
         0
-        // internal_error:
-        //     if !(*retValue).is_null() {
-        //         xml_free((*retValue) as _);
-        //     }
-        //     if !value2.is_null() {
-        //         xml_free(value2 as _);
-        //     }
-        //     return -1;
     }
 }
 
@@ -11452,7 +11444,7 @@ unsafe fn xml_schema_check_subst_group_circular(
     }
 }
 
-unsafe fn xml_schema_are_equal_types(type_a: XmlSchemaTypePtr, type_b: XmlSchemaTypePtr) -> i32 {
+fn xml_schema_are_equal_types(type_a: XmlSchemaTypePtr, type_b: XmlSchemaTypePtr) -> i32 {
     // TODO: This should implement component-identity in the future.
     if type_a.is_null() || type_b.is_null() {
         return 0;
@@ -14600,7 +14592,7 @@ unsafe fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                     }
                     if ret < 0 {
                         if let Some((nbval, nbneg, values)) =
-                            regex_ctxt.err_info(None, &mut values, &raw mut terminal)
+                            regex_ctxt.err_info(None, &mut values, &mut terminal)
                         {
                             xml_schema_complex_type_err(
                                 vctxt as XmlSchemaAbstractCtxtPtr,
@@ -17772,7 +17764,7 @@ unsafe fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                                 }
                                 // Get hold of the still expected content, since a further
                                 // call to xmlRegExecPushString() will lose this information.
-                                let values = regex_ctxt.next_values(&mut values, &raw mut terminal);
+                                let values = regex_ctxt.next_values(&mut values, &mut terminal);
                                 ret = regex_ctxt.push_string(None, null_mut());
                                 if ret < 0 || (ret == 0 && !INODE_NILLED!(inode)) {
                                     // Still missing something.
