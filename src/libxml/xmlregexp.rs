@@ -4573,7 +4573,7 @@ pub type XmlExpCtxtPtr = *mut XmlExpCtxt;
 #[repr(C)]
 pub struct XmlExpCtxt {
     dict: XmlDictPtr,
-    table: *mut XmlExpNodePtr,
+    table: Vec<XmlExpNodePtr>,
     size: i32,
     nb_elems: i32,
     nb_nodes: i32,
@@ -4584,10 +4584,30 @@ pub struct XmlExpCtxt {
     tab_size: i32,
 }
 
+#[cfg(feature = "libxml_expr")]
+impl Default for XmlExpCtxt {
+    fn default() -> Self {
+        Self {
+            dict: null_mut(),
+            table: vec![],
+            size: 0,
+            nb_elems: 0,
+            nb_nodes: 0,
+            max_nodes: 0,
+            expr: null_mut(),
+            cur: null_mut(),
+            nb_cons: 0,
+            tab_size: 0,
+        }
+    }
+}
+
 /// Free an expression context
 #[doc(alias = "xmlExpFreeCtxt")]
 #[cfg(feature = "libxml_expr")]
 pub unsafe fn xml_exp_free_ctxt(ctxt: XmlExpCtxtPtr) {
+    use std::ptr::drop_in_place;
+
     unsafe {
         use super::dict::xml_dict_free;
 
@@ -4595,9 +4615,7 @@ pub unsafe fn xml_exp_free_ctxt(ctxt: XmlExpCtxtPtr) {
             return;
         }
         xml_dict_free((*ctxt).dict);
-        if !(*ctxt).table.is_null() {
-            xml_free((*ctxt).table as _);
-        }
+        drop_in_place(ctxt);
         xml_free(ctxt as _);
     }
 }
@@ -4625,20 +4643,10 @@ pub unsafe fn xml_exp_new_ctxt(mut max_nodes: i32, dict: XmlDictPtr) -> XmlExpCt
         (*ret).size = size;
         (*ret).nb_elems = 0;
         (*ret).max_nodes = max_nodes;
-        (*ret).table = xml_malloc(size as usize * size_of::<XmlExpNodePtr>()) as _;
-        if (*ret).table.is_null() {
-            xml_free(ret as _);
-            return null_mut();
-        }
-        memset(
-            (*ret).table as _,
-            0,
-            size as usize * size_of::<XmlExpNodePtr>(),
-        );
+        (*ret).table = vec![null_mut(); size as usize];
         if dict.is_null() {
             (*ret).dict = xml_dict_create();
             if (*ret).dict.is_null() {
-                xml_free((*ret).table as _);
                 xml_free(ret as _);
                 return null_mut();
             }
@@ -4745,12 +4753,12 @@ pub unsafe fn xml_exp_free(ctxt: XmlExpCtxtPtr, exp: XmlExpNodePtr) {
         if (*exp).refe == 0 {
             /* Unlink it first from the hash table */
             let key: u16 = (*exp).key % (*ctxt).size as u16;
-            if *(*ctxt).table.add(key as usize) == exp {
-                *(*ctxt).table.add(key as usize) = (*exp).next;
+            if (*ctxt).table[key as usize] == exp {
+                (*ctxt).table[key as usize] = (*exp).next;
             } else {
                 let mut tmp: XmlExpNodePtr;
 
-                tmp = *(*ctxt).table.add(key as usize);
+                tmp = (*ctxt).table[key as usize];
                 while !tmp.is_null() {
                     if (*tmp).next == exp {
                         (*tmp).next = (*exp).next;
@@ -5308,8 +5316,8 @@ unsafe fn xml_exp_hash_get_entry(
         }
 
         let key: u16 = kbase % (*ctxt).size as u16;
-        if !(*(*ctxt).table.add(key as usize)).is_null() {
-            insert = *(*ctxt).table.add(key as usize);
+        if !(*ctxt).table[key as usize].is_null() {
+            insert = (*ctxt).table[key as usize];
             while !insert.is_null() {
                 if (*insert).key == kbase && (*insert).typ == typ as u8 {
                     if matches!(typ, XmlExpNodeType::XmlExpAtom) {
@@ -5390,11 +5398,11 @@ unsafe fn xml_exp_hash_get_entry(
             }
         }
         (*entry).refe = 1;
-        if !(*(*ctxt).table.add(key as usize)).is_null() {
-            (*entry).next = *(*ctxt).table.add(key as usize);
+        if !(*ctxt).table[key as usize].is_null() {
+            (*entry).next = (*ctxt).table[key as usize];
         }
 
-        *(*ctxt).table.add(key as usize) = entry;
+        (*ctxt).table[key as usize] = entry;
         (*ctxt).nb_elems += 1;
 
         entry
