@@ -12,7 +12,6 @@
 #![warn(unused_variables)]
 #![warn(unused_unsafe)]
 
-pub mod buf;
 #[cfg(all(feature = "c14n", feature = "libxml_output"))]
 pub mod c14n;
 #[cfg(feature = "libxml_debug")]
