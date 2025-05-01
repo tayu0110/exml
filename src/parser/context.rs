@@ -733,7 +733,7 @@ impl XmlParserCtxt {
         // Do not shrink on large buffers whose only a tiny fraction was consumed
         if used > INPUT_CHUNK && used - LINE_LEN > 0 {
             let diff = used - LINE_LEN;
-            buf.buffer.drain(..diff);
+            buf.trim_head(diff);
             used -= diff;
             input.consumed = input.consumed.saturating_add(diff as u64);
         }
@@ -1841,7 +1841,7 @@ impl XmlParserCtxt {
         // Shrink the current input buffer.
         // Move it as the raw buffer and create a new input buffer
         let processed = input.offset_from_base();
-        input.buf.as_mut().unwrap().buffer.drain(..processed);
+        input.buf.as_mut().unwrap().trim_head(processed);
         input.consumed += processed as u64;
         let input_buf = input.buf.as_mut().unwrap();
         let using = input_buf.buffer.len();

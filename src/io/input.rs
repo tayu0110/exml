@@ -42,7 +42,7 @@ use super::{DefaultFileIOCallbacks, MINLEN, xml_ioerr};
 pub struct XmlParserInputBuffer {
     pub(crate) context: Option<Box<dyn Read>>,
     pub(crate) encoder: Option<XmlCharEncodingHandler>, /* I18N conversions to UTF-8 */
-    pub buffer: Vec<u8>,                                /* Local buffer encoded in UTF-8 */
+    pub(crate) buffer: Vec<u8>,                         /* Local buffer encoded in UTF-8 */
     pub(crate) raw: Vec<u8>,    /* if encoder != NULL buffer for raw input */
     pub(crate) compressed: i32, /* -1=unknown, 0=not compressed, 1=compressed */
     pub(crate) error: XmlParserErrors,
@@ -269,6 +269,15 @@ impl XmlParserInputBuffer {
             self.rawconsumed = self.rawconsumed.saturating_add(consumed as u64);
         }
         res
+    }
+
+    /// Trim `len` bytes at the head of `self.buffer`.
+    ///
+    /// # Panics
+    /// - `len <= self.buffer.len()` must be satisfied.
+    pub(crate) fn trim_head(&mut self, len: usize) {
+        assert!(len <= self.buffer.len());
+        self.buffer.drain(..len);
     }
 
     /// Push the content of the arry in the input buffer.  

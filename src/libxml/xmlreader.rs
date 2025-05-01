@@ -1294,11 +1294,7 @@ impl XmlTextReader {
                         && self.input.as_ref().unwrap().buffer.len() - self.cur as usize
                             <= CHUNK_SIZE)
                 {
-                    self.input
-                        .as_mut()
-                        .unwrap()
-                        .buffer
-                        .drain(..self.cur as usize);
+                    self.input.as_mut().unwrap().trim_head(self.cur as usize);
                     self.cur = 0;
                 }
             } else if self.mode == XmlTextReaderMode::XmlTextreaderModeEof

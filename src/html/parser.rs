@@ -1260,8 +1260,7 @@ fn html_check_encoding_direct(ctxt: &mut HtmlParserCtxt, encoding: Option<&str>)
                 .buf
                 .as_mut()
                 .unwrap()
-                .buffer
-                .drain(..processed);
+                .trim_head(processed);
             let res = ctxt.input_mut().unwrap().buf.as_mut().unwrap().decode(true);
             ctxt.input_mut().unwrap().reset_base();
             if res.is_err() {
