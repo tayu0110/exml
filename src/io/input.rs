@@ -18,7 +18,7 @@
 use std::{
     any::{type_name, type_name_of_val},
     io::{self, Cursor, Read},
-    str::from_utf8_mut,
+    str::from_utf8_unchecked_mut,
     sync::{
         Mutex,
         atomic::{AtomicBool, Ordering},
@@ -82,8 +82,8 @@ impl XmlParserInputBuffer {
         //
         // Until the cause is found, push data directly into the buffer
         // and set the `context` to an empty source, as in the original code.
-        ret.context = Some(Box::new(Cursor::new(vec![])));
-        ret.buffer.extend(mem);
+        ret.context = Some(Box::new(Cursor::new(mem)));
+        // ret.buffer.extend(mem);
         Some(ret)
     }
 
@@ -144,15 +144,22 @@ impl XmlParserInputBuffer {
         let c_in = toconv;
         let c_out = written;
         let src = &self.raw[..c_in];
-        let mut outstr = vec![0; c_out];
-        let dst = from_utf8_mut(&mut outstr).unwrap();
+        let start = self.buffer.len();
+        self.buffer.resize(start + c_out, 0);
+        let dst = unsafe {
+            // # Safety
+            // `self.buffer[start..]` contains only NULL characters ('\0').
+            // Therefore, UTF-8 validation won't fail.
+            from_utf8_unchecked_mut(&mut self.buffer[start..])
+        };
         let ret = match self.encoder.as_mut().unwrap().decode(src, dst) {
             Ok((read, write)) => {
                 self.raw.drain(..read);
-                self.buffer.extend(outstr[..write].iter());
+                self.buffer.truncate(start + write);
                 Ok(write)
             }
             Err(EncodingError::BufferTooShort) => {
+                self.buffer.truncate(start);
                 // no-op
                 Ok(0)
             }
@@ -165,7 +172,7 @@ impl XmlParserInputBuffer {
                 },
             ) => {
                 self.raw.drain(..read - length - offset);
-                self.buffer.extend(outstr[..write].iter());
+                self.buffer.truncate(start + write);
                 let buf = format!(
                     "0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}",
                     self.raw.first().unwrap_or(&0),
@@ -181,7 +188,10 @@ impl XmlParserInputBuffer {
                 );
                 if write > 0 { Ok(write) } else { Err(e) }
             }
-            _ => Ok(0),
+            _ => {
+                self.buffer.truncate(start);
+                Ok(0)
+            }
         };
         ret
     }
