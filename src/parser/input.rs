@@ -314,8 +314,7 @@ impl XmlParserInput {
         &self
             .buf
             .as_ref()
-            .and_then(|buf| buf.buffer.as_deref())
-            .map(|buf| buf.as_ref())
+            .map(|buf| buf.buffer.as_ref())
             .or_else(|| {
                 self.entity
                     .as_deref()
@@ -345,14 +344,6 @@ impl XmlParserInput {
     /// Returns `-1` in case of error, `0` otherwise
     #[doc(alias = "xmlBufResetInput")]
     pub(crate) fn reset_base(&mut self) -> i32 {
-        if self
-            .buf
-            .as_ref()
-            .and_then(|buf| buf.buffer)
-            .is_none_or(|buf| !buf.is_ok())
-        {
-            return -1;
-        }
         self.base = 0;
         self.cur = 0;
         0
@@ -361,14 +352,6 @@ impl XmlParserInput {
     /// Returns the distance between the base and the top of the buffer.
     #[doc(alias = "xmlBufGetInputBase")]
     pub(crate) fn get_base(&self) -> usize {
-        if self
-            .buf
-            .as_ref()
-            .and_then(|buf| buf.buffer)
-            .is_none_or(|buf| !buf.is_ok())
-        {
-            return 0;
-        }
         self.base
     }
 
@@ -378,17 +361,6 @@ impl XmlParserInput {
     /// Returns -1 in case of error, 0 otherwise
     #[doc(alias = "xmlBufSetInputBaseCur")]
     pub(crate) fn set_base_and_cursor(&mut self, base: usize, cur: usize) -> i32 {
-        if self
-            .buf
-            .as_ref()
-            .and_then(|buf| buf.buffer)
-            .is_none_or(|buf| !buf.is_ok())
-        {
-            self.base = usize::MAX;
-            self.cur = 0;
-            return -1;
-        };
-
         self.base = base;
         self.cur = cur;
         0

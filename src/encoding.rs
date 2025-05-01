@@ -505,8 +505,12 @@ fn encode_utf16(src: &str, dst: &mut [u8]) -> Result<(usize, usize), EncodingErr
 }
 
 fn decode_utf16le(src: &[u8], dst: &mut str) -> Result<(usize, usize), EncodingError> {
+    if src.is_empty() {
+        return Ok((0, 0));
+    }
     let bytes = unsafe { dst.as_bytes_mut() };
     let (mut read, mut write) = (0, 0);
+    let src = &src[..src.len() / 2 * 2];
     let mut chunks = src.chunks_exact(2);
     for c in char::decode_utf16(
         chunks
@@ -564,8 +568,12 @@ fn encode_utf16be(src: &str, dst: &mut [u8]) -> Result<(usize, usize), EncodingE
 }
 
 fn decode_utf16be(src: &[u8], dst: &mut str) -> Result<(usize, usize), EncodingError> {
+    if src.is_empty() {
+        return Ok((0, 0));
+    }
     let bytes = unsafe { dst.as_bytes_mut() };
     let (mut read, mut write) = (0, 0);
+    let src = &src[..src.len() / 2 * 2];
     let mut chunks = src.chunks_exact(2);
     for c in char::decode_utf16(
         chunks

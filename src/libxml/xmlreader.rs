@@ -403,14 +403,7 @@ impl XmlTextReader {
         self.node = None;
         self.curnode = None;
         if replaced {
-            if self
-                .input
-                .as_ref()
-                .unwrap()
-                .buffer
-                .map_or(0, |buf| buf.len())
-                < 4
-            {
+            if self.input.as_ref().unwrap().buffer.len() < 4 {
                 self.input.as_mut().unwrap().read(4);
             }
             let enc = XmlCharEncoding::None;
@@ -1230,21 +1223,20 @@ impl XmlTextReader {
         unsafe {
             let mut val: i32;
 
-            if self.input.is_none() || self.input.as_ref().unwrap().buffer.is_none() {
+            if self.input.is_none() {
                 return -1;
             }
 
             let oldstate: XmlTextReaderState = self.state;
             self.state = XmlTextReaderState::None;
-            let mut inbuf = self.input.as_ref().unwrap().buffer.unwrap();
 
             while self.state == XmlTextReaderState::None {
-                if inbuf.len() < self.cur as usize + CHUNK_SIZE {
+                if self.input.as_ref().unwrap().buffer.len() < self.cur as usize + CHUNK_SIZE {
                     // Refill the buffer unless we are at the end of the stream
                     if self.mode != XmlTextReaderMode::XmlTextreaderModeEof {
                         val = self.input.as_mut().unwrap().read(4096);
                         if val == 0 && self.input.as_ref().unwrap().context.is_none() {
-                            if inbuf.len() == self.cur as _ {
+                            if self.input.as_ref().unwrap().buffer.len() == self.cur as _ {
                                 self.mode = XmlTextReaderMode::XmlTextreaderModeEof;
                                 self.state = oldstate;
                             }
@@ -1267,9 +1259,10 @@ impl XmlTextReader {
                 }
                 // parse by block of CHUNK_SIZE bytes, various tests show that
                 // it's the best tradeoff at least on a 1.2GH Duron
-                if inbuf.len() >= self.cur as usize + CHUNK_SIZE {
+                if self.input.as_ref().unwrap().buffer.len() >= self.cur as usize + CHUNK_SIZE {
                     val = self.ctxt.as_deref_mut().unwrap().parse_chunk(
-                        &inbuf.as_ref()[self.cur as usize..self.cur as usize + CHUNK_SIZE],
+                        &self.input.as_ref().unwrap().buffer
+                            [self.cur as usize..self.cur as usize + CHUNK_SIZE],
                         0,
                     );
                     self.cur += CHUNK_SIZE as u32;
@@ -1280,12 +1273,12 @@ impl XmlTextReader {
                         break;
                     }
                 } else {
-                    let s = inbuf.len() as i32 - self.cur as i32;
+                    let s = self.input.as_ref().unwrap().buffer.len() as i32 - self.cur as i32;
                     val = self
                         .ctxt
                         .as_deref_mut()
                         .unwrap()
-                        .parse_chunk(&inbuf.as_ref()[self.cur as usize..], 0);
+                        .parse_chunk(&self.input.as_ref().unwrap().buffer[self.cur as usize..], 0);
                     self.cur += s as u32;
                     if val != 0 {
                         self.ctxt.as_deref_mut().unwrap().well_formed = false;
@@ -1297,12 +1290,16 @@ impl XmlTextReader {
             // Discard the consumed input when needed and possible
             if self.mode == XmlTextReaderMode::XmlTextreaderModeInteractive {
                 if self.input.as_ref().unwrap().context.is_some()
-                    && (self.cur >= 4096 && inbuf.len() - self.cur as usize <= CHUNK_SIZE)
+                    && (self.cur >= 4096
+                        && self.input.as_ref().unwrap().buffer.len() - self.cur as usize
+                            <= CHUNK_SIZE)
                 {
-                    val = inbuf.trim_head(self.cur as _) as _;
-                    if val >= 0 {
-                        self.cur -= val as u32;
-                    }
+                    self.input
+                        .as_mut()
+                        .unwrap()
+                        .buffer
+                        .drain(..self.cur as usize);
+                    self.cur = 0;
                 }
             } else if self.mode == XmlTextReaderMode::XmlTextreaderModeEof
                 && self.state != XmlTextReaderState::Done
@@ -1312,8 +1309,8 @@ impl XmlTextReader {
                     .ctxt
                     .as_deref_mut()
                     .unwrap()
-                    .parse_chunk(&inbuf.as_ref()[self.cur as usize..], 1);
-                self.cur = inbuf.len() as _;
+                    .parse_chunk(&self.input.as_ref().unwrap().buffer[self.cur as usize..], 1);
+                self.cur = self.input.as_ref().unwrap().buffer.len() as _;
                 self.state = XmlTextReaderState::Done;
                 if val != 0 {
                     if self.ctxt.as_deref_mut().unwrap().well_formed {
@@ -3811,34 +3808,14 @@ pub unsafe fn xml_new_text_reader(
         (*ret).mode = XmlTextReaderMode::XmlTextreaderModeInitial as _;
         (*ret).node = None;
         (*ret).curnode = None;
-        if (*ret)
-            .input
-            .as_ref()
-            .unwrap()
-            .buffer
-            .map_or(0, |buf| buf.len())
-            < 4
-        {
+        if (*ret).input.as_ref().unwrap().buffer.len() < 4 {
             (*ret).input.as_mut().unwrap().read(4);
         }
-        if (*ret)
-            .input
-            .as_ref()
-            .unwrap()
-            .buffer
-            .map_or(0, |buf| buf.len())
-            >= 4
-        {
+        if (*ret).input.as_ref().unwrap().buffer.len() >= 4 {
             (*ret).ctxt = XmlParserCtxt::new_push_parser(
                 Some(Box::new(sax)),
                 None,
-                &(*ret)
-                    .input
-                    .as_ref()
-                    .unwrap()
-                    .buffer
-                    .expect("Internal Error")
-                    .as_ref()[..4],
+                &(*ret).input.as_ref().unwrap().buffer[..4],
                 uri,
             )
             .map(Box::new);

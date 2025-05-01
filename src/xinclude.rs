@@ -1567,8 +1567,7 @@ impl XmlXIncludeCtxt {
             // Scan all chars from the resource and add the to the node
             while buf.grow(4096) > 0 {}
 
-            let content = buf.buffer.unwrap();
-            let content = content.as_ref();
+            let content = buf.buffer.as_ref();
             match std::str::from_utf8(content) {
                 Ok(content) if content.chars().all(|c| xml_is_char(c as u32)) => {
                     node.add_content(content);

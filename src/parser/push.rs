@@ -337,11 +337,7 @@ impl XmlParserCtxt {
                     if let Some(input_buffer) = self.input().unwrap().buf.as_ref() {
                         // If we are operating on converted input, try to flush
                         // remaining chars to avoid them stalling in the non-converted buffer.
-                        if input_buffer
-                            .raw
-                            .as_deref()
-                            .is_some_and(|raw| !raw.is_empty())
-                        {
+                        if input_buffer.encoder.is_some() && !input_buffer.raw.is_empty() {
                             let base = self.input().unwrap().get_base();
                             let current = self.input().unwrap().offset_from_base();
 
@@ -1079,7 +1075,7 @@ impl XmlParserCtxt {
                 && self.input().unwrap().buf.is_some()
                 && !matches!(self.instate, XmlParserInputState::XmlParserEOF)
             {
-                let base: usize = self.input().unwrap().get_base();
+                let base = self.input().unwrap().get_base();
                 let cur = self.input().unwrap().offset_from_base();
 
                 let res: i32 = self
@@ -1099,7 +1095,7 @@ impl XmlParserCtxt {
                 && (self.input().is_some() && self.input().unwrap().buf.is_some())
             {
                 let input = self.input().unwrap().buf.as_ref().unwrap();
-                if input.encoder.is_some() && input.buffer.is_some() && input.raw.is_some() {
+                if input.encoder.is_some() {
                     let base: usize = self.input().unwrap().get_base();
                     let current = self.input().unwrap().offset_from_base();
 

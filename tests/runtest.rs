@@ -1569,7 +1569,6 @@ unsafe fn push_parse_test(
             {
                 ctxt.parse_chunk(chunk, terminate);
             }
-            eprintln!("terminate: {terminate}");
         }
         if len == 0 {
             #[cfg(feature = "html")]
@@ -1620,15 +1619,15 @@ unsafe fn push_parse_test(
         if res != 0 {
             eprintln!("Result for {filename} failed in {}", result.unwrap());
             if options & XML_PARSE_HTML != 0 {
-                if TEST_ERRORS_SIZE.get() > 0 {
-                    TEST_ERRORS.with_borrow(|errors| {
-                        eprintln!(
-                            "errors: {}",
-                            std::str::from_utf8(&errors[..TEST_ERRORS_SIZE.get()]).unwrap()
-                        )
-                    });
-                }
-                eprintln!("{}", from_utf8(&base).unwrap());
+                // if TEST_ERRORS_SIZE.get() > 0 {
+                //     TEST_ERRORS.with_borrow(|errors| {
+                //         eprintln!(
+                //             "errors: {}",
+                //             std::str::from_utf8(&errors[..TEST_ERRORS_SIZE.get()]).unwrap()
+                //         )
+                //     });
+                // }
+                // eprintln!("{}", from_utf8(&base).unwrap());
             }
             return -1;
         }
@@ -1860,7 +1859,7 @@ unsafe fn push_boundary_test(
         let mut ctxt = XmlParserCtxt::new_push_parser(
             Some(Box::new(bnd_sax)),
             None,
-            &[*base as u8],
+            &base[..1],
             Some(filename),
         )
         .unwrap();
@@ -2014,7 +2013,7 @@ unsafe fn push_boundary_test(
         let mut res = compare_file_mem(result.as_deref().unwrap(), &base);
         if res != 0 {
             eprintln!("Result for {filename} failed in {}", result.unwrap());
-            eprintln!("{}", from_utf8(&base).unwrap());
+            // eprintln!("{}", from_utf8(&base).unwrap());
             return -1;
         }
         if let Some(err) = err {
@@ -3253,10 +3252,10 @@ unsafe fn schemas_test(
             TEST_ERRORS.with_borrow(|errors| {
                 if compare_file_mem(&err, &errors[..TEST_ERRORS_SIZE.get()]) != 0 {
                     eprintln!("Error for {instance} on {filename} failed");
-                    eprintln!(
-                        "{}",
-                        CStr::from_ptr(errors.as_ptr() as *const i8).to_string_lossy()
-                    );
+                    // eprintln!(
+                    //     "{}",
+                    //     CStr::from_ptr(errors.as_ptr() as *const i8).to_string_lossy()
+                    // );
                     res = 1;
                 }
             });
@@ -3624,8 +3623,8 @@ unsafe fn schematron_test(
             TEST_ERRORS.with_borrow(|errors| {
                 if compare_file_mem(&err, &errors[..TEST_ERRORS_SIZE.get()]) != 0 {
                     eprintln!("Error for {} on {} failed", instance, filename);
-                    let errstr = std::str::from_utf8(&errors[..TEST_ERRORS_SIZE.get()]).unwrap();
-                    eprintln!("Result:\n{errstr}");
+                    // let errstr = std::str::from_utf8(&errors[..TEST_ERRORS_SIZE.get()]).unwrap();
+                    // eprintln!("Result:\n{errstr}");
                     ret = 1;
                 }
             });
@@ -3983,7 +3982,7 @@ unsafe fn c14n_run_test(
         if ret >= 0 {
             if compare_file_mem(result_file, result.as_bytes()) != 0 {
                 eprintln!("Result mismatch for {xml_filename}");
-                eprintln!("RESULT:\n{result}");
+                // eprintln!("RESULT:\n{result}");
                 ret = -1;
             }
         } else {

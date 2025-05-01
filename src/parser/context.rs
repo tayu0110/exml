@@ -4,6 +4,7 @@ use std::{
     collections::HashMap,
     ffi::c_void,
     io::Read,
+    mem::take,
     ptr::null_mut,
     rc::Rc,
     str::{from_utf8, from_utf8_unchecked},
@@ -11,7 +12,6 @@ use std::{
 };
 
 use crate::{
-    buf::XmlBufRef,
     encoding::{
         XmlCharEncoding, XmlCharEncodingHandler, detect_encoding, find_encoding_handler,
         get_encoding_handler,
@@ -731,19 +731,11 @@ impl XmlParserCtxt {
         }
 
         // Do not shrink on large buffers whose only a tiny fraction was consumed
-        if used > INPUT_CHUNK {
-            let res = buf
-                .buffer
-                .map_or(0, |mut buf| buf.trim_head(used - LINE_LEN));
-
-            if res > 0 {
-                used -= res;
-                if res > u64::MAX as usize || input.consumed > u64::MAX - res as u64 {
-                    input.consumed = u64::MAX;
-                } else {
-                    input.consumed += res as u64;
-                }
-            }
+        if used > INPUT_CHUNK && used - LINE_LEN > 0 {
+            let diff = used - LINE_LEN;
+            buf.buffer.drain(..diff);
+            used -= diff;
+            input.consumed = input.consumed.saturating_add(diff as u64);
         }
 
         input.set_base_and_cursor(0, used);
@@ -1816,15 +1808,9 @@ impl XmlParserCtxt {
         self.charset = XmlCharEncoding::UTF8;
 
         // Is there already some content down the pipe to convert ?
-        let Some(mut buf) = input
-            .buf
-            .as_mut()
-            .unwrap()
-            .buffer
-            .filter(|buf| !buf.is_empty())
-        else {
+        if input.buf.as_mut().unwrap().buffer.is_empty() {
             return 0;
-        };
+        }
         // FIXME: The BOM shouldn't be skipped here, but in the parsing code.
 
         // Specific handling of the Byte Order Mark for UTF-16
@@ -1855,14 +1841,12 @@ impl XmlParserCtxt {
         // Shrink the current input buffer.
         // Move it as the raw buffer and create a new input buffer
         let processed = input.offset_from_base();
-        buf.trim_head(processed);
+        input.buf.as_mut().unwrap().buffer.drain(..processed);
         input.consumed += processed as u64;
         let input_buf = input.buf.as_mut().unwrap();
-        input_buf.raw = Some(buf);
-        input_buf.buffer = XmlBufRef::new();
-        assert!(input_buf.buffer.is_some());
+        let using = input_buf.buffer.len();
+        input_buf.raw = take(&mut input_buf.buffer);
         input_buf.rawconsumed = processed as u64;
-        let using = buf.len();
 
         // TODO: We must flush and decode the whole buffer to make functions
         // like xmlReadMemory work with a user-provided encoding. If the
@@ -1881,7 +1865,7 @@ impl XmlParserCtxt {
             return -1;
         }
         let input_buf = input.buf.as_mut().unwrap();
-        let consumed = using - input_buf.raw.map_or(0, |raw| raw.len());
+        let consumed = using - input_buf.raw.len();
         let rawconsumed = input_buf.rawconsumed.saturating_add(consumed as u64);
         input_buf.rawconsumed = rawconsumed;
         0

@@ -26,7 +26,6 @@ use std::{
 };
 
 use crate::{
-    buf::XmlBufRef,
     encoding::{
         EncodingError, XmlCharEncoding, XmlCharEncodingHandler, get_encoding_handler,
         xml_encoding_err,
@@ -35,18 +34,17 @@ use crate::{
     globals::GLOBAL_STATE,
     io::DefaultHTTPIOCallbacks,
     nanohttp::XmlNanoHTTPCtxt,
-    tree::XmlBufferAllocationScheme,
 };
 
-use super::{DefaultFileIOCallbacks, MINLEN, xml_ioerr, xml_ioerr_memory};
+use super::{DefaultFileIOCallbacks, MINLEN, xml_ioerr};
 
 #[repr(C)]
 pub struct XmlParserInputBuffer {
     pub(crate) context: Option<Box<dyn Read>>,
     pub(crate) encoder: Option<XmlCharEncodingHandler>, /* I18N conversions to UTF-8 */
-    pub buffer: Option<XmlBufRef>,                      /* Local buffer encoded in UTF-8 */
-    pub(crate) raw: Option<XmlBufRef>, /* if encoder != NULL buffer for raw input */
-    pub(crate) compressed: i32,        /* -1=unknown, 0=not compressed, 1=compressed */
+    pub buffer: Vec<u8>,                                /* Local buffer encoded in UTF-8 */
+    pub(crate) raw: Vec<u8>,    /* if encoder != NULL buffer for raw input */
+    pub(crate) compressed: i32, /* -1=unknown, 0=not compressed, 1=compressed */
     pub(crate) error: XmlParserErrors,
     pub(crate) rawconsumed: u64, /* amount consumed from raw */
     pub(in crate::io) use_nanohttp: bool,
@@ -55,28 +53,18 @@ pub struct XmlParserInputBuffer {
 impl XmlParserInputBuffer {
     #[doc(alias = "xmlAllocParserInputBuffer")]
     pub fn new(enc: XmlCharEncoding) -> Self {
+        let default_buffer_size = GLOBAL_STATE.with_borrow(|state| state.default_buffer_size);
         let mut ret = XmlParserInputBuffer {
             context: None,
             encoder: None,
-            buffer: None,
-            raw: None,
+            buffer: Vec::with_capacity(2 * default_buffer_size),
+            raw: vec![],
             compressed: 0,
             error: XmlParserErrors::default(),
             rawconsumed: 0,
             use_nanohttp: false,
         };
-        let default_buffer_size = GLOBAL_STATE.with_borrow(|state| state.default_buffer_size);
-        let mut new_buf = XmlBufRef::with_capacity(2 * default_buffer_size).unwrap();
-        ret.buffer = Some(new_buf);
-        new_buf
-            .set_allocation_scheme(XmlBufferAllocationScheme::XmlBufferAllocDoubleit)
-            .ok();
         ret.encoder = get_encoding_handler(enc);
-        ret.raw = if ret.encoder.is_some() {
-            XmlBufRef::with_capacity(2 * default_buffer_size)
-        } else {
-            None
-        };
         ret.compressed = -1;
         ret.rawconsumed = 0;
         ret
@@ -95,7 +83,7 @@ impl XmlParserInputBuffer {
         // Until the cause is found, push data directly into the buffer
         // and set the `context` to an empty source, as in the original code.
         ret.context = Some(Box::new(Cursor::new(vec![])));
-        ret.buffer.as_mut().unwrap().push_bytes(&mem).ok()?;
+        ret.buffer.extend(mem);
         Some(ret)
     }
 
@@ -136,45 +124,33 @@ impl XmlParserInputBuffer {
     /// - general error (`EncodingError::Other`)
     /// - encoding failure (`EncodingError::Malformed`)
     pub(crate) fn decode(&mut self, flush: bool) -> Result<usize, EncodingError> {
-        if self.encoder.is_none() || self.buffer.is_none() || self.raw.is_none() {
+        if self.encoder.is_none() {
             return Err(EncodingError::Other {
                 msg: "Encoder or Buffer is not set.".into(),
             });
         }
-        let mut out = self.buffer.expect("Internal Error");
-        let mut bufin = self.raw.expect("Internal Error");
-
-        let mut toconv = bufin.len();
+        let mut toconv = self.raw.len();
         if toconv == 0 {
             return Ok(0);
         }
         if !flush {
             toconv = toconv.min(64 * 1024);
         }
-        let mut written = out.avail();
-        if toconv * 2 >= written {
-            if out.grow(toconv * 2).is_err() {
-                return Err(EncodingError::Other {
-                    msg: "Failed to grow output buffer.".into(),
-                });
-            }
-            written = out.avail();
-        }
+        let mut written = (toconv * 2).max(6);
         if !flush {
             written = written.min(128 * 1024);
         }
 
         let c_in = toconv;
         let c_out = written;
-        let src = &bufin.as_ref()[..c_in];
+        let src = &self.raw[..c_in];
         let mut outstr = vec![0; c_out];
         let dst = from_utf8_mut(&mut outstr).unwrap();
         let ret = match self.encoder.as_mut().unwrap().decode(src, dst) {
             Ok((read, write)) => {
-                bufin.trim_head(read);
-                out.push_bytes(&outstr[..write]).ok();
-                // no-op
-                Ok(0)
+                self.raw.drain(..read);
+                self.buffer.extend(outstr[..write].iter());
+                Ok(write)
             }
             Err(EncodingError::BufferTooShort) => {
                 // no-op
@@ -188,15 +164,14 @@ impl XmlParserInputBuffer {
                     offset,
                 },
             ) => {
-                bufin.trim_head(read - length - offset);
-                out.push_bytes(&outstr[..write]).ok();
-                let content = bufin.as_ref();
+                self.raw.drain(..read - length - offset);
+                self.buffer.extend(outstr[..write].iter());
                 let buf = format!(
                     "0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}",
-                    content.first().unwrap_or(&0),
-                    content.get(1).unwrap_or(&0),
-                    content.get(2).unwrap_or(&0),
-                    content.get(3).unwrap_or(&0)
+                    self.raw.first().unwrap_or(&0),
+                    self.raw.get(1).unwrap_or(&0),
+                    self.raw.get(2).unwrap_or(&0),
+                    self.raw.get(3).unwrap_or(&0)
                 );
 
                 xml_encoding_err!(
@@ -204,11 +179,11 @@ impl XmlParserInputBuffer {
                     "input conversion failed due to input error, bytes {}\n",
                     buf.as_str()
                 );
-                Err(e)
+                if write > 0 { Ok(write) } else { Err(e) }
             }
             _ => Ok(0),
         };
-        if c_out != 0 { Ok(c_out) } else { ret }
+        ret
     }
 
     /// Refresh the content of the input buffer, the old data are considered consumed.  
@@ -239,31 +214,21 @@ impl XmlParserInputBuffer {
             len = MINLEN as i32;
         }
 
-        let mut buf = if self.encoder.is_none() {
-            if self.context.is_none() {
-                return 0;
-            }
-            self.buffer
-        } else {
-            if self.raw.is_none() {
-                self.raw = XmlBufRef::new();
-            }
-            self.raw
-        };
+        if self.encoder.is_none() && self.context.is_none() {
+            return 0;
+        }
 
         // Call the read method for this I/O type.
         if let Some(context) = self.context.as_mut() {
-            if buf.is_none_or(|mut buf| buf.grow((len + 1) as usize).is_err()) {
-                xml_ioerr_memory("growing input buffer");
-                self.error = XmlParserErrors::XmlErrNoMemory;
-                return -1;
-            }
-
             let mut buffer = vec![0; len as usize];
             let Ok(len) = context.read(&mut buffer) else {
                 return -1;
             };
-            buf.as_mut().unwrap().push_bytes(&buffer[..len]).ok();
+            if self.encoder.is_none() {
+                self.buffer.extend(buffer[..len].iter());
+            } else {
+                self.raw.extend(buffer[..len].iter());
+            };
             res = len as i32;
         }
 
@@ -274,14 +239,23 @@ impl XmlParserInputBuffer {
 
         if self.encoder.is_some() {
             // convert as much as possible to the parser reading buffer.
-            let using = buf.map_or(0, |buf| buf.len());
+            let using = if self.encoder.is_none() {
+                self.buffer.len()
+            } else {
+                self.raw.len()
+            };
             let Ok(written) = self.decode(true) else {
                 xml_ioerr(XmlParserErrors::XmlIOEncoder, None);
                 self.error = XmlParserErrors::XmlIOEncoder;
                 return -1;
             };
             res = written as i32;
-            let consumed = using - buf.map_or(0, |buf| buf.len());
+            let consumed = using
+                - if self.encoder.is_none() {
+                    self.buffer.len()
+                } else {
+                    self.raw.len()
+                };
             self.rawconsumed = self.rawconsumed.saturating_add(consumed as u64);
         }
         res
@@ -298,33 +272,19 @@ impl XmlParserInputBuffer {
             return -1;
         }
         if self.encoder.is_some() {
-            // Store the data in the incoming raw buffer
-            if self.raw.is_none() {
-                self.raw = XmlBufRef::new();
-            }
-            if self.raw.is_none_or(|mut raw| raw.push_bytes(buf).is_err()) {
-                return -1;
-            }
-
+            self.raw.extend(buf);
             // convert as much as possible to the parser reading buffer.
-            let using = self.raw.map_or(0, |raw| raw.len());
+            let using = self.raw.len();
             let Ok(written) = self.decode(true) else {
                 xml_ioerr(XmlParserErrors::XmlIOEncoder, None);
                 self.error = XmlParserErrors::XmlIOEncoder;
                 return -1;
             };
-            let consumed = using - self.raw.map_or(0, |raw| raw.len());
+            let consumed = using - self.raw.len();
             self.rawconsumed = self.rawconsumed.saturating_add(consumed as u64);
             written as i32
         } else {
-            if self
-                .buffer
-                .expect("Internal Error")
-                .push_bytes(buf)
-                .is_err()
-            {
-                return -1;
-            }
+            self.buffer.extend(buf);
             buf.len() as i32
         }
     }
@@ -346,17 +306,6 @@ impl XmlParserInputBuffer {
                 })
             })
             .flatten()
-    }
-}
-
-impl Drop for XmlParserInputBuffer {
-    fn drop(&mut self) {
-        if let Some(buffer) = self.buffer.take() {
-            buffer.free();
-        }
-        if let Some(raw) = self.raw.take() {
-            raw.free();
-        }
     }
 }
 

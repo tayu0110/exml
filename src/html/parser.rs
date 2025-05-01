@@ -1251,7 +1251,7 @@ fn html_check_encoding_direct(ctxt: &mut HtmlParserCtxt, encoding: Option<&str>)
             .unwrap()
             .buf
             .as_ref()
-            .is_some_and(|buf| buf.encoder.is_some() && buf.buffer.is_some() && buf.raw.is_some())
+            .is_some_and(|buf| buf.encoder.is_some())
         {
             // convert as much as possible to the parser reading buffer.
             let processed = ctxt.input().unwrap().offset_from_base();
@@ -1261,8 +1261,7 @@ fn html_check_encoding_direct(ctxt: &mut HtmlParserCtxt, encoding: Option<&str>)
                 .as_mut()
                 .unwrap()
                 .buffer
-                .unwrap()
-                .trim_head(processed);
+                .drain(..processed);
             let res = ctxt.input_mut().unwrap().buf.as_mut().unwrap().decode(true);
             ctxt.input_mut().unwrap().reset_base();
             if res.is_err() {
@@ -4257,7 +4256,7 @@ pub fn html_parse_chunk(ctxt: &mut HtmlParserCtxt, chunk: &[u8], terminate: i32)
         && (ctxt.input().is_some() && ctxt.input().unwrap().buf.is_some())
     {
         let input = ctxt.input_mut().unwrap().buf.as_mut().unwrap();
-        if input.encoder.is_some() && input.buffer.is_some() && input.raw.is_some() {
+        if input.encoder.is_some() {
             let base: size_t = ctxt.input().unwrap().get_base();
             let current = ctxt.input().unwrap().offset_from_base();
 
