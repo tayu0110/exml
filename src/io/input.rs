@@ -201,7 +201,7 @@ impl XmlParserInputBuffer {
     ///
     /// Returns the number of chars read and stored in the buffer, or -1 in case of error.
     #[doc(alias = "xmlParserInputBufferRead")]
-    pub fn read(&mut self, len: i32) -> i32 {
+    pub fn read(&mut self, len: usize) -> i32 {
         self.grow(len)
     }
 
@@ -214,14 +214,14 @@ impl XmlParserInputBuffer {
     ///
     /// Returns the number of chars read and stored in the buffer, or -1 in case of error.
     #[doc(alias = "xmlParserInputBufferGrow")]
-    pub fn grow(&mut self, mut len: i32) -> i32 {
+    pub fn grow(&mut self, mut len: usize) -> i32 {
         let mut res: i32 = 0;
 
         if !self.error.is_ok() {
             return -1;
         }
-        if len <= MINLEN as i32 && len != 4 {
-            len = MINLEN as i32;
+        if len <= MINLEN && len != 4 {
+            len = MINLEN;
         }
 
         if self.encoder.is_none() && self.context.is_none() {
@@ -230,7 +230,7 @@ impl XmlParserInputBuffer {
 
         // Call the read method for this I/O type.
         if let Some(context) = self.context.as_mut() {
-            let mut buffer = vec![0; len as usize];
+            let mut buffer = vec![0; len];
             let Ok(len) = context.read(&mut buffer) else {
                 return -1;
             };
