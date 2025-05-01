@@ -86,10 +86,10 @@ impl XmlDoc {
             ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
             ctxt.doc_content_dump_output(XmlDocPtr::from_raw(self).unwrap().unwrap());
             ctxt.buf.flush();
-            if let Some(conv) = ctxt.buf.conv {
-                txt.extend_from_slice(conv.as_ref());
+            if ctxt.buf.encoder.is_some() {
+                txt.extend(&ctxt.buf.conv);
             } else {
-                txt.extend_from_slice(ctxt.buf.buffer.unwrap().as_ref());
+                txt.extend(&ctxt.buf.buffer);
             }
         }
     }

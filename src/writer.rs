@@ -34,7 +34,6 @@ use std::{
 };
 
 use crate::{
-    buf::XmlBufRef,
     encoding::find_encoding_handler,
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     html::tree::html_new_doc_no_dtd,
@@ -519,16 +518,13 @@ impl<'a> XmlTextWriter<'a> {
 
         self.out.encoder = encoder.map(|e| Rc::new(RefCell::new(e)));
         if self.out.encoder.is_some() {
-            if self.out.conv.is_none() {
-                self.out.conv = XmlBufRef::with_capacity(4000);
-            }
             self.out.encode(true).ok();
             if let Some(mut doc) = self.doc.filter(|doc| doc.encoding.is_none()) {
                 let encoder = self.out.encoder.as_ref().unwrap().borrow();
                 doc.encoding = Some(encoder.name().to_owned());
             }
         } else {
-            self.out.conv = None;
+            self.out.conv.clear();
         }
 
         let mut sum = self.out.write_str("<?xml version=")?;

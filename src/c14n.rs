@@ -30,7 +30,7 @@
 //
 // Author: Aleksey Sanin <aleksey@aleksey.com>
 
-use std::{cmp::Ordering, ptr::null_mut, rc::Rc};
+use std::{cmp::Ordering, mem::take, ptr::null_mut, rc::Rc};
 
 use crate::{
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
@@ -1300,18 +1300,14 @@ pub fn xml_c14n_doc_dump_memory(
     // canonize document and write to buffer
     match xml_c14n_doc_save_to(doc, nodes, mode, inclusive_ns_prefixes, with_comments, buf) {
         Ok(mut ctx) => {
-            let ret = ctx.buf.buffer.map_or(0, |buf| buf.len() as i32);
+            let ret = ctx.buf.buffer.len() as i32;
             if ret >= 0 {
-                if let Some(buffer) = ctx.buf.buffer.take() {
-                    let mut bytes = vec![];
-                    buffer.dump(Some(&mut bytes)).ok();
-                    let text = String::from_utf8(bytes);
-                    match text {
-                        Ok(text) => *doc_txt_ptr = text,
-                        Err(_) => {
-                            xml_c14n_err_memory("copying canonicalized document");
-                            return -1;
-                        }
+                let text = String::from_utf8(take(&mut ctx.buf.buffer));
+                match text {
+                    Ok(text) => *doc_txt_ptr = text,
+                    Err(_) => {
+                        xml_c14n_err_memory("copying canonicalized document");
+                        return -1;
                     }
                 }
             }

@@ -21,7 +21,6 @@
 use std::{
     borrow::Cow,
     cell::RefCell,
-    ffi::CString,
     io::Write,
     os::raw::c_void,
     ptr::{fn_addr_eq, null_mut},
@@ -30,11 +29,10 @@ use std::{
 };
 
 use crate::{
-    buf::XmlBufRef,
     encoding::{XmlCharEncoding, XmlCharEncodingHandler, find_encoding_handler},
     error::{__xml_simple_error, __xml_simple_oom_error, XmlErrorDomain, XmlParserErrors},
     globals::{GLOBAL_STATE, get_indent_tree_output},
-    io::XmlOutputBuffer,
+    io::{XmlOutputBuffer, write_quoted},
     libxml::chvalid::xml_is_char,
     parser::{XML_STRING_TEXT_NOENC, xml_init_parser},
     tree::{
@@ -186,7 +184,7 @@ impl<'a> XmlSaveCtxt<'a> {
     }
 
     fn switch_encoding(&mut self, encoding: &str) -> i32 {
-        if self.buf.encoder.is_none() && self.buf.conv.is_none() {
+        if self.buf.encoder.is_none() && self.buf.conv.is_empty() {
             self.buf.encoder = find_encoding_handler(encoding).map(|e| Rc::new(RefCell::new(e)));
             if self.buf.encoder.is_none() {
                 xml_save_err(
@@ -194,11 +192,6 @@ impl<'a> XmlSaveCtxt<'a> {
                     None,
                     Some(encoding),
                 );
-                return -1;
-            }
-            self.buf.conv = XmlBufRef::new();
-            if self.buf.conv.is_none() {
-                xml_save_err_memory("creating encoding buffer");
                 return -1;
             }
             // initialize the state, e.g. if outputting a BOM
@@ -210,9 +203,7 @@ impl<'a> XmlSaveCtxt<'a> {
     fn clear_encoding(&mut self) -> i32 {
         self.buf.flush();
         let _ = self.buf.encoder.take();
-        if let Some(conv) = self.buf.conv.take() {
-            conv.free();
-        }
+        self.buf.conv.clear();
         0
     }
 
@@ -359,10 +350,9 @@ impl<'a> XmlSaveCtxt<'a> {
                     if encoding.is_none() {
                         encoding = Some("HTML".to_owned());
                     }
-                    if (encoding.is_some()
+                    if encoding.is_some()
                         && oldctxtenc.is_none()
                         && self.buf.encoder.is_none()
-                        && self.buf.conv.is_none())
                         && self.switch_encoding(encoding.as_deref().unwrap()) < 0
                     {
                         cur.encoding = oldenc;
@@ -406,8 +396,7 @@ impl<'a> XmlSaveCtxt<'a> {
                 if encoding.is_some()
                     && oldctxtenc.is_none()
                     && self.buf.encoder.is_none()
-                    && self.buf.conv.is_none()
-                    && (self.options & XmlSaveOption::XmlSaveNoDecl as i32) == 0
+                    && self.options & XmlSaveOption::XmlSaveNoDecl as i32 == 0
                 {
                     if !matches!(
                         enc,
@@ -438,19 +427,13 @@ impl<'a> XmlSaveCtxt<'a> {
                 if self.options & XmlSaveOption::XmlSaveNoDecl as i32 == 0 {
                     self.buf.write_bytes(b"<?xml version=").ok();
                     if let Some(version) = cur.version.as_deref() {
-                        if let Some(mut buf) = self.buf.buffer {
-                            let version = CString::new(version).unwrap();
-                            buf.push_quoted_cstr(&version).ok();
-                        }
+                        write_quoted(&mut self.buf.buffer, version).ok();
                     } else {
                         self.buf.write_bytes(b"\"1.0\"").ok();
                     }
                     if let Some(encoding) = encoding.as_deref() {
                         self.buf.write_bytes(b" encoding=").ok();
-                        if let Some(mut buf) = self.buf.buffer {
-                            let enc = CString::new(encoding).unwrap();
-                            buf.push_quoted_cstr(enc.as_c_str()).ok();
-                        }
+                        write_quoted(&mut self.buf.buffer, encoding).ok();
                     }
                     match cur.standalone {
                         0 => {
@@ -656,10 +639,7 @@ fn xml_ns_dump_output(
                 buf.write_bytes(b"xmlns").ok();
             }
             buf.write_bytes(b"=").ok();
-            if let Some(mut buf) = buf.buffer {
-                buf.push_quoted_cstr(&CString::new(cur.href.as_deref().unwrap()).unwrap())
-                    .ok();
-            }
+            write_quoted(&mut buf.buffer, cur.href.as_deref().unwrap()).ok();
         };
         if let Some(buf) = buf {
             write(buf);
@@ -725,11 +705,7 @@ fn xml_attr_serialize_content(buf: &mut XmlOutputBuffer, attr: XmlAttrPtr) {
             }
             XmlElementType::XmlEntityRefNode => {
                 let now = XmlNodePtr::try_from(now).unwrap();
-                if let Some(mut buf) = buf.buffer {
-                    buf.push_bytes(b"&").ok();
-                    buf.push_bytes(now.name.as_bytes()).ok();
-                    buf.push_bytes(b";").ok();
-                }
+                write!(buf.buffer, "&{};", now.name).ok();
             }
             _ => { /* should not happen unless we have a badly built tree */ }
         }
@@ -1053,21 +1029,12 @@ unsafe fn xml_dtd_dump_output(ctxt: &mut XmlSaveCtxt, dtd: XmlDtdPtr) {
         ctxt.buf.write_str(dtd.name.as_deref().unwrap()).ok();
         if let Some(external_id) = dtd.external_id.as_deref() {
             ctxt.buf.write_bytes(b" PUBLIC ").ok();
-            if let Some(mut buf) = ctxt.buf.buffer {
-                let external_id = CString::new(external_id).unwrap();
-                buf.push_quoted_cstr(external_id.as_c_str()).ok();
-            }
+            write_quoted(&mut ctxt.buf.buffer, external_id).ok();
             ctxt.buf.write_bytes(b" ").ok();
-            if let Some(mut buf) = ctxt.buf.buffer {
-                let system_id = CString::new(dtd.system_id.as_deref().unwrap()).unwrap();
-                buf.push_quoted_cstr(&system_id).ok();
-            }
+            write_quoted(&mut ctxt.buf.buffer, dtd.system_id.as_deref().unwrap());
         } else if let Some(system_id) = dtd.system_id.as_deref() {
             ctxt.buf.write_bytes(b" SYSTEM ").ok();
-            if let Some(mut buf) = ctxt.buf.buffer {
-                let system_id = CString::new(system_id).unwrap();
-                buf.push_quoted_cstr(&system_id).ok();
-            }
+            write_quoted(&mut ctxt.buf.buffer, system_id).ok();
         }
         if dtd.entities.is_none()
             && dtd.elements.is_none()
@@ -1610,11 +1577,7 @@ unsafe fn html_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, cur: XmlGeneric
         if encoding.is_none() {
             encoding = Some("HTML".to_owned());
         }
-        if encoding.is_some()
-            && oldctxtenc.is_none()
-            && ctxt.buf.encoder.is_none()
-            && ctxt.buf.conv.is_none()
-        {
+        if encoding.is_some() && oldctxtenc.is_none() && ctxt.buf.encoder.is_none() {
             if ctxt.switch_encoding(encoding.as_deref().unwrap()) < 0 {
                 if let Some(mut doc) = doc {
                     doc.encoding = oldenc;

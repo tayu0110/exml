@@ -21,10 +21,7 @@
 
 #[cfg(feature = "libxml_output")]
 use std::io::Write;
-use std::{
-    ffi::{CString, c_char},
-    ptr::null_mut,
-};
+use std::ptr::null_mut;
 
 use crate::{
     encoding::XmlCharEncoding,
@@ -453,10 +450,10 @@ pub unsafe fn html_doc_dump_memory_format(cur: XmlDocPtr, mem: &mut Vec<u8>, for
         html_doc_content_dump_format_output(&mut buf, Some(cur), None, format);
 
         buf.flush();
-        if let Some(conv) = buf.conv {
-            mem.extend_from_slice(conv.as_ref());
+        if buf.encoder.is_some() {
+            mem.extend(&buf.conv);
         } else {
-            mem.extend_from_slice(buf.buffer.unwrap().as_ref());
+            mem.extend(&buf.buffer);
         }
         buf.flush();
     }
@@ -612,7 +609,7 @@ pub unsafe fn html_node_dump_file<'a>(
     cur: Option<XmlGenericNodePtr>,
 ) {
     unsafe {
-        html_node_dump_file_format(out, doc, cur, null_mut(), 1);
+        html_node_dump_file_format(out, doc, cur, None, 1);
     }
 }
 
@@ -627,12 +624,10 @@ pub unsafe fn html_node_dump_file_format<'a>(
     out: &mut (impl Write + 'a),
     doc: Option<XmlDocPtr>,
     cur: Option<XmlGenericNodePtr>,
-    encoding: *const c_char,
+    encoding: Option<&str>,
     format: i32,
 ) -> i32 {
     unsafe {
-        use std::ffi::CStr;
-
         use crate::{
             encoding::{XmlCharEncoding, find_encoding_handler},
             parser::xml_init_parser,
@@ -640,9 +635,7 @@ pub unsafe fn html_node_dump_file_format<'a>(
 
         xml_init_parser();
 
-        let handler = if let Some(Ok(enc)) =
-            (!encoding.is_null()).then(|| CStr::from_ptr(encoding).to_str())
-        {
+        let handler = if let Some(enc) = encoding {
             let e = enc.parse::<XmlCharEncoding>();
             if !matches!(e, Ok(XmlCharEncoding::UTF8)) {
                 let handler = find_encoding_handler(enc);
@@ -751,6 +744,8 @@ pub unsafe fn html_save_file_format(
 #[doc(alias = "htmlDtdDumpOutput")]
 #[cfg(feature = "libxml_output")]
 fn html_dtd_dump_output(buf: &mut XmlOutputBuffer, doc: XmlDocPtr, _encoding: Option<&str>) {
+    use crate::io::write_quoted;
+
     let Some(cur) = doc.int_subset else {
         html_save_err(XmlParserErrors::XmlSaveNoDoctype, Some(doc.into()), None);
         return;
@@ -760,16 +755,10 @@ fn html_dtd_dump_output(buf: &mut XmlOutputBuffer, doc: XmlDocPtr, _encoding: Op
     buf.write_str(cur.name.as_deref().unwrap()).ok();
     if let Some(external_id) = cur.external_id.as_deref() {
         buf.write_str(" PUBLIC ").ok();
-        if let Some(mut buf) = buf.buffer {
-            let external_id = CString::new(external_id).unwrap();
-            buf.push_quoted_cstr(&external_id).ok();
-        }
+        write_quoted(&mut buf.buffer, external_id).ok();
         if let Some(system_id) = cur.system_id.as_deref() {
             buf.write_str(" ").ok();
-            if let Some(mut buf) = buf.buffer {
-                let system_id = CString::new(system_id).unwrap();
-                buf.push_quoted_cstr(&system_id).ok();
-            }
+            write_quoted(&mut buf.buffer, system_id).ok();
         }
     } else if let Some(system_id) = cur
         .system_id
@@ -777,10 +766,7 @@ fn html_dtd_dump_output(buf: &mut XmlOutputBuffer, doc: XmlDocPtr, _encoding: Op
         .filter(|&s| s != "about:legacy-compat")
     {
         buf.write_str(" SYSTEM ").ok();
-        if let Some(mut buf) = buf.buffer {
-            let system_id = CString::new(system_id).unwrap();
-            buf.push_quoted_cstr(&system_id).ok();
-        }
+        write_quoted(&mut buf.buffer, system_id).ok();
     }
     buf.write_str(">\n").ok();
 }
@@ -789,7 +775,7 @@ fn html_dtd_dump_output(buf: &mut XmlOutputBuffer, doc: XmlDocPtr, _encoding: Op
 #[doc(alias = "htmlAttrDumpOutput")]
 #[cfg(feature = "libxml_output")]
 fn html_attr_dump_output(buf: &mut XmlOutputBuffer, doc: Option<XmlDocPtr>, cur: &XmlAttr) {
-    use crate::{libxml::chvalid::xml_is_blank_char, uri::escape_url_except};
+    use crate::{io::write_quoted, libxml::chvalid::xml_is_blank_char, uri::escape_url_except};
 
     // The html output method should not escape a & character
     // occurring in an attribute value immediately followed by
@@ -832,13 +818,9 @@ fn html_attr_dump_output(buf: &mut XmlOutputBuffer, doc: Option<XmlDocPtr>, cur:
                 // improved interoperability. Only escape space, control
                 // and non-ASCII chars.
                 let escaped = escape_url_except(tmp, b"\"#$%&+,/:;<=>?@[\\]^`{|}");
-                if let Some(mut buf) = buf.buffer {
-                    let escaped = CString::new(escaped.as_ref()).unwrap();
-                    buf.push_quoted_cstr(&escaped).ok();
-                }
-            } else if let Some(mut buf) = buf.buffer {
-                let value = CString::new(value.as_str()).unwrap();
-                buf.push_quoted_cstr(&value).ok();
+                write_quoted(&mut buf.buffer, &escaped).ok();
+            } else {
+                write_quoted(&mut buf.buffer, &value).ok();
             }
         } else {
             buf.write_str("=\"\"").ok();
