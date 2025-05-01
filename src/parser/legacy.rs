@@ -412,17 +412,7 @@ pub fn xml_sax_parse_file_with_data(
     ctxt.parse_document();
 
     let ret = if ctxt.well_formed || recovery {
-        let ret = ctxt.my_doc;
-        if ctxt.input().unwrap().buf.is_some() {
-            if let Some(mut ret) = ret {
-                if ctxt.input().unwrap().buf.as_ref().unwrap().compressed > 0 {
-                    ret.compression = 9;
-                } else {
-                    ret.compression = ctxt.input().unwrap().buf.as_ref().unwrap().compressed;
-                }
-            }
-        }
-        ret
+        ctxt.my_doc
     } else {
         if let Some(my_doc) = ctxt.my_doc.take() {
             unsafe {

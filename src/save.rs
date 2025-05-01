@@ -134,10 +134,8 @@ impl<'a> XmlSaveCtxt<'a> {
         encoding: Option<&'b str>,
         options: i32,
     ) -> Option<Self> {
-        let compression: i32 = 0; /* TODO handle compression option */
-
         let mut ret = Self::new(encoding, options)?;
-        let buf = XmlOutputBuffer::from_uri(filename, ret.handler.clone(), compression)?;
+        let buf = XmlOutputBuffer::from_uri(filename, ret.handler.clone())?;
         ret.buf = buf;
         Some(ret)
     }

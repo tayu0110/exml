@@ -1337,10 +1337,9 @@ pub fn xml_c14n_doc_save(
     inclusive_ns_prefixes: Option<Vec<String>>,
     with_comments: bool,
     filename: &str,
-    compression: i32,
 ) -> i32 {
     // save the content to a temp buffer, use default UTF8 encoding.
-    let Some(buf) = XmlOutputBuffer::from_uri(filename, None, compression) else {
+    let Some(buf) = XmlOutputBuffer::from_uri(filename, None) else {
         xml_c14n_err_internal("creating temporary filename");
         return -1;
     };

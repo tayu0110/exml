@@ -156,8 +156,8 @@ impl<'a> XmlTextWriter<'a> {
     ///
     /// Returns the new xmlTextWriterPtr or NULL in case of error
     #[doc(alias = "xmlNewTextWriterFilename")]
-    pub fn from_filename<'b: 'a>(uri: &'b str, compression: i32) -> Option<Self> {
-        let Some(out) = XmlOutputBuffer::from_uri(uri, None, compression) else {
+    pub fn from_filename<'b: 'a>(uri: &'b str) -> Option<Self> {
+        let Some(out) = XmlOutputBuffer::from_uri(uri, None) else {
             xml_writer_err_msg(
                 None,
                 XmlParserErrors::XmlIOEIO,
@@ -179,7 +179,7 @@ impl<'a> XmlTextWriter<'a> {
     ///
     /// Returns the new xmlTextWriterPtr or NULL in case of error
     #[doc(alias = "xmlNewTextWriterPushParser")]
-    pub fn from_push_parser(ctxt: Rc<RefCell<XmlParserCtxt>>, _compression: i32) -> Option<Self> {
+    pub fn from_push_parser(ctxt: Rc<RefCell<XmlParserCtxt>>) -> Option<Self> {
         let Some(out) = XmlOutputBuffer::from_writer(
             TextWriterPushContext {
                 context: ctxt.clone(),
@@ -203,7 +203,7 @@ impl<'a> XmlTextWriter<'a> {
     ///
     /// Returns the new xmlTextWriterPtr or NULL in case of error
     #[doc(alias = "xmlNewTextWriterDoc")]
-    pub fn with_doc(doc: Option<&mut Option<XmlDocPtr>>, compression: i32) -> Option<Self> {
+    pub fn with_doc(doc: Option<&mut Option<XmlDocPtr>>) -> Option<Self> {
         let mut sax_handler = XmlSAXHandler::default();
         xml_sax2_init_default_sax_handler(&mut sax_handler, 1);
         sax_handler.start_document = Some(xml_text_writer_start_document_callback);
@@ -222,7 +222,7 @@ impl<'a> XmlTextWriter<'a> {
         };
 
         ctxt.my_doc = xml_new_doc(Some(XML_DEFAULT_VERSION));
-        let Some(mut my_doc) = ctxt.my_doc else {
+        let Some(my_doc) = ctxt.my_doc else {
             xml_writer_err_msg(
                 None,
                 XmlParserErrors::XmlErrInternalError,
@@ -231,9 +231,7 @@ impl<'a> XmlTextWriter<'a> {
             return None;
         };
 
-        let Some(mut ret) =
-            XmlTextWriter::from_push_parser(Rc::new(RefCell::new(ctxt)), compression)
-        else {
+        let Some(mut ret) = XmlTextWriter::from_push_parser(Rc::new(RefCell::new(ctxt))) else {
             unsafe {
                 xml_free_doc(my_doc);
             }
@@ -244,8 +242,6 @@ impl<'a> XmlTextWriter<'a> {
             );
             return None;
         };
-
-        my_doc.set_compress_mode(compression);
 
         if let Some(doc) = doc {
             *doc = Some(my_doc);
@@ -259,7 +255,7 @@ impl<'a> XmlTextWriter<'a> {
     ///
     /// Returns the new xmlTextWriterPtr or NULL in case of error
     #[doc(alias = "xmlNewTextWriterTree")]
-    pub fn with_tree(mut doc: XmlDocPtr, node: XmlNodePtr, compression: i32) -> Option<Self> {
+    pub fn with_tree(doc: XmlDocPtr, node: XmlNodePtr) -> Option<Self> {
         let mut sax_handler = XmlSAXHandler::default();
         xml_sax2_init_default_sax_handler(&mut sax_handler, 1);
         sax_handler.start_document = Some(xml_text_writer_start_document_callback);
@@ -280,9 +276,7 @@ impl<'a> XmlTextWriter<'a> {
         ctxt.my_doc = Some(doc);
         ctxt.node = Some(node);
 
-        let Some(mut ret) =
-            XmlTextWriter::from_push_parser(Rc::new(RefCell::new(ctxt)), compression)
-        else {
+        let Some(mut ret) = XmlTextWriter::from_push_parser(Rc::new(RefCell::new(ctxt))) else {
             xml_writer_err_msg(
                 None,
                 XmlParserErrors::XmlErrInternalError,
@@ -292,8 +286,6 @@ impl<'a> XmlTextWriter<'a> {
         };
 
         ret.no_doc_free = 1;
-
-        doc.set_compress_mode(compression);
 
         Some(ret)
     }

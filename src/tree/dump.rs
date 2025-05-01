@@ -214,11 +214,9 @@ impl XmlDoc {
             };
 
             // save the content to a temp buffer.
-            let Some(buf) = XmlOutputBuffer::from_uri(
-                filename,
-                handler.map(|e| Rc::new(RefCell::new(e))),
-                self.compression,
-            ) else {
+            let Some(buf) =
+                XmlOutputBuffer::from_uri(filename, handler.map(|e| Rc::new(RefCell::new(e))))
+            else {
                 return -1;
             };
             let mut ctxt = XmlSaveCtxt {

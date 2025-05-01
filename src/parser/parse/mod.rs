@@ -156,18 +156,6 @@ impl XmlParserCtxt {
             if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
                 return -1;
             }
-            if self.input().is_some()
-                && self
-                    .input()
-                    .unwrap()
-                    .buf
-                    .as_ref()
-                    .is_some_and(|buf| buf.compressed >= 0)
-            {
-                if let Some(mut my_doc) = self.my_doc {
-                    my_doc.compression = self.input().unwrap().buf.as_ref().unwrap().compressed;
-                }
-            }
 
             // The Misc part of the Prolog
             self.parse_misc();

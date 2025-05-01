@@ -234,13 +234,12 @@ impl<'a> XmlOutputBuffer<'a> {
     pub fn from_uri<'b: 'a>(
         uri: &'b str,
         encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
-        compression: i32,
     ) -> Option<Self> {
         if let Some(f) = GLOBAL_STATE.with_borrow(|state| state.output_buffer_create_filename_value)
         {
-            return f(uri, encoder, compression);
+            return f(uri, encoder);
         }
-        __xml_output_buffer_create_filename(uri, encoder, compression)
+        __xml_output_buffer_create_filename(uri, encoder)
     }
 
     /// Create a buffered output for the progressive saving to a *mut FILE buffered C I/O.
@@ -613,7 +612,6 @@ pub fn register_output_callbacks(callback: impl XmlOutputCallback + 'static) -> 
 pub(crate) fn __xml_output_buffer_create_filename(
     uri: &str,
     encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
-    _compression: i32,
 ) -> Option<XmlOutputBuffer> {
     let is_initialized = XML_OUTPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire);
     if !is_initialized {

@@ -43,8 +43,7 @@ pub struct XmlParserInputBuffer {
     pub(crate) context: Option<Box<dyn Read>>,
     pub(crate) encoder: Option<XmlCharEncodingHandler>, /* I18N conversions to UTF-8 */
     pub(crate) buffer: Vec<u8>,                         /* Local buffer encoded in UTF-8 */
-    pub(crate) raw: Vec<u8>,    /* if encoder != NULL buffer for raw input */
-    pub(crate) compressed: i32, /* -1=unknown, 0=not compressed, 1=compressed */
+    pub(crate) raw: Vec<u8>, /* if encoder != NULL buffer for raw input */
     pub(crate) error: XmlParserErrors,
     pub(crate) rawconsumed: u64, /* amount consumed from raw */
     pub(in crate::io) use_nanohttp: bool,
@@ -59,13 +58,11 @@ impl XmlParserInputBuffer {
             encoder: None,
             buffer: Vec::with_capacity(2 * default_buffer_size),
             raw: vec![],
-            compressed: 0,
             error: XmlParserErrors::default(),
             rawconsumed: 0,
             use_nanohttp: false,
         };
         ret.encoder = get_encoding_handler(enc);
-        ret.compressed = -1;
         ret.rawconsumed = 0;
         ret
     }
@@ -240,11 +237,6 @@ impl XmlParserInputBuffer {
                 self.raw.extend(buffer[..len].iter());
             };
             res = len as i32;
-        }
-
-        // try to establish compressed status of input if not done already
-        if self.compressed == -1 {
-            // TODO: related with LIBXML_LZMA_ENABLED
         }
 
         if self.encoder.is_some() {

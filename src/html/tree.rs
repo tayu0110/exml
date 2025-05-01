@@ -83,7 +83,6 @@ pub fn html_new_doc_no_dtd(uri: Option<&str>, external_id: Option<&str>) -> Opti
         old_ns: None,
         encoding: None,
         standalone: 1,
-        compression: 0,
         ids: None,
         refs: None,
         _private: null_mut(),
@@ -538,11 +537,9 @@ pub unsafe fn html_save_file(filename: &str, cur: XmlDocPtr) -> i32 {
         };
 
         // save the content to a temp buffer.
-        let Some(mut buf) = XmlOutputBuffer::from_uri(
-            filename,
-            handler.map(|e| Rc::new(RefCell::new(e))),
-            cur.compression,
-        ) else {
+        let Some(mut buf) =
+            XmlOutputBuffer::from_uri(filename, handler.map(|e| Rc::new(RefCell::new(e))))
+        else {
             return 0;
         };
 
@@ -723,7 +720,7 @@ pub unsafe fn html_save_file_format(
 
         // save the content to a temp buffer.
         let Some(mut buf) =
-            XmlOutputBuffer::from_uri(filename, handler.map(|e| Rc::new(RefCell::new(e))), 0)
+            XmlOutputBuffer::from_uri(filename, handler.map(|e| Rc::new(RefCell::new(e))))
         else {
             return 0;
         };

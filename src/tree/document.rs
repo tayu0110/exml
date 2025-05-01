@@ -56,7 +56,6 @@ pub struct XmlDoc {
     pub(crate) doc: Option<XmlDocPtr>,          /* autoreference to itself */
 
     /* End of common part */
-    pub(crate) compression: i32, /* level of zlib compression */
     // standalone document (no external refs)
     //   1 if standalone="yes"
     //   0 if standalone="no"
@@ -179,14 +178,6 @@ impl XmlDoc {
         None
     }
 
-    /// Get the compression ratio for a document, ZLIB based.
-    ///
-    /// Returns 0 (uncompressed) to 9 (max compression)
-    #[doc(alias = "xmlGetDocCompressMode")]
-    pub fn get_compress_mode(&self) -> i32 {
-        self.compression
-    }
-
     /// Read the value of a node, this can be either the text carried
     /// directly by this node if it's a TEXT node or the aggregate string
     /// of the values carried by this node child's (TEXT and ENTITY_REF).  
@@ -276,20 +267,6 @@ impl XmlDoc {
         }
     }
 
-    /// Set the compression ratio for a document, ZLIB based.
-    ///
-    /// Correct values: 0 (uncompressed) to 9 (max compression)
-    #[doc(alias = "xmlSetDocCompressMode")]
-    pub fn set_compress_mode(&mut self, mode: i32) {
-        if mode < 0 {
-            self.compression = 0;
-        } else if mode > 9 {
-            self.compression = 9;
-        } else {
-            self.compression = mode;
-        }
-    }
-
     /// Ensures that there is an XML namespace declaration on the doc.
     ///
     /// Returns the XML ns-struct or null_mut() on API and internal errors.
@@ -369,7 +346,6 @@ impl Default for XmlDoc {
             next: None,
             prev: None,
             doc: None,
-            compression: 0,
             standalone: 0,
             int_subset: None,
             ext_subset: None,
@@ -727,7 +703,6 @@ pub fn xml_new_doc(version: Option<&str>) -> Option<XmlDocPtr> {
         typ: XmlElementType::XmlDocumentNode,
         version: Some(version.to_owned()),
         standalone: -1,
-        compression: -1, /* not initialized */
         parse_flags: 0,
         properties: XmlDocProperties::XmlDocUserbuilt as i32,
         // The in memory encoding is always UTF8
@@ -765,7 +740,6 @@ pub unsafe fn xml_copy_doc(doc: XmlDocPtr, recursive: i32) -> Option<XmlDocPtr> 
             ret.url = Some(url.to_owned());
         }
         ret.charset = doc.charset;
-        ret.compression = doc.compression;
         ret.standalone = doc.standalone;
         if recursive == 0 {
             return Some(ret);
