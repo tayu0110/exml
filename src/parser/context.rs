@@ -1167,9 +1167,8 @@ impl XmlParserCtxt {
     /// line breaks to #xA on input, before parsing.
     ///
     /// Returns the current char value and its length
-    #[doc(hidden)]
     #[doc(alias = "xmlCurrentChar")]
-    pub fn current_char(&mut self, len: &mut i32) -> Option<char> {
+    pub(crate) fn current_char(&mut self, len: &mut i32) -> Option<char> {
         let input = self.input()?;
         if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
             return None;
@@ -1179,7 +1178,6 @@ impl XmlParserCtxt {
             return None;
         }
 
-        self.input()?;
         if (0x20..0x80).contains(&self.current_byte()) {
             *len = 1;
             return Some(self.current_byte() as char);

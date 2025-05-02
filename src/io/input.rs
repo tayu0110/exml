@@ -237,28 +237,8 @@ impl XmlParserInputBuffer {
             res = len as i32;
         }
 
-        if self.encoder.is_some() {
-            // convert as much as possible to the parser reading buffer.
-            let using = if self.encoder.is_none() {
-                self.buffer.len()
-            } else {
-                self.raw.len()
-            };
-            let Ok(written) = self.decode(true) else {
-                xml_ioerr(XmlParserErrors::XmlIOEncoder, None);
-                self.error = XmlParserErrors::XmlIOEncoder;
-                return -1;
-            };
-            res = written as i32;
-            let consumed = using
-                - if self.encoder.is_none() {
-                    self.buffer.len()
-                } else {
-                    self.raw.len()
-                };
-            self.rawconsumed = self.rawconsumed.saturating_add(consumed as u64);
-        }
-        res
+        let written = self.push_bytes(&[]);
+        if self.encoder.is_some() { written } else { res }
     }
 
     /// Trim `len` bytes at the head of `self.buffer`.
