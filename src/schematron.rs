@@ -1378,12 +1378,9 @@ impl<'a> XmlSchematronParserCtxt<'a> {
             self.preserve = 0;
             doc
         } else if !self.buffer.is_empty() {
-            let Some(mut doc) = xml_read_memory(
-                self.buffer.to_owned(),
-                None,
-                None,
-                SCHEMATRON_PARSE_OPTIONS as i32,
-            ) else {
+            let Some(mut doc) =
+                xml_read_memory(self.buffer, None, None, SCHEMATRON_PARSE_OPTIONS as i32)
+            else {
                 xml_schematron_perr!(
                     self,
                     None::<XmlGenericNodePtr>,

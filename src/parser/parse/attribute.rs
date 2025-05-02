@@ -44,7 +44,7 @@ pub(crate) fn attr_normalize_space(mut src: &str) -> Cow<'_, str> {
     Cow::Owned(dst)
 }
 
-impl XmlParserCtxt {
+impl XmlParserCtxt<'_> {
     /// Parse a value for an attribute.
     ///
     /// # Note

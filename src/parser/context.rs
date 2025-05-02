@@ -102,7 +102,7 @@ pub enum XmlParserMode {
     XmlParseReader = 5,
 }
 
-pub type XmlParserCtxtPtr = *mut XmlParserCtxt;
+pub type XmlParserCtxtPtr<'a> = *mut XmlParserCtxt<'a>;
 /// The parser context.
 ///
 /// # Note
@@ -114,7 +114,7 @@ pub type XmlParserCtxtPtr = *mut XmlParserCtxt;
 /// takes as the only argument the parser context pointer, so migrating
 /// to a state based parser for progressive parsing shouldn't be too hard.
 #[doc(alias = "xmlParserCtxt")]
-pub struct XmlParserCtxt {
+pub struct XmlParserCtxt<'a> {
     // The SAX handler
     pub sax: Option<Box<XmlSAXHandler>>,
     // For SAX interface only, used by DOM build
@@ -138,7 +138,7 @@ pub struct XmlParserCtxt {
 
     // Input stream stack
     // stack of inputs
-    pub input_tab: Vec<XmlParserInput>,
+    pub input_tab: Vec<XmlParserInput<'a>>,
 
     // Node analysis stack only used for DOM building
     // Current parsed Node
@@ -291,12 +291,12 @@ pub struct XmlParserCtxt {
     pub(crate) nb_warnings: u16,
 }
 
-impl XmlParserCtxt {
+impl<'a> XmlParserCtxt<'a> {
     /// Allocate and initialize a new parser context.
     ///
     /// Returns the xmlParserCtxtPtr or NULL
     #[doc(alias = "xmlNewParserCtxt")]
-    pub fn new() -> Option<XmlParserCtxt> {
+    pub fn new() -> Option<Self> {
         Self::new_sax_parser(None, None).ok()
     }
 
@@ -308,7 +308,7 @@ impl XmlParserCtxt {
     pub fn new_sax_parser(
         sax: Option<Box<XmlSAXHandler>>,
         user_data: Option<GenericErrorContext>,
-    ) -> Result<XmlParserCtxt, Option<Box<XmlSAXHandler>>> {
+    ) -> Result<Self, Option<Box<XmlSAXHandler>>> {
         let mut ctxt = XmlParserCtxt::default();
         ctxt.init_sax_parser(sax, user_data).map(|_| ctxt)
     }
@@ -368,9 +368,9 @@ impl XmlParserCtxt {
     pub fn from_io(
         sax: Option<Box<XmlSAXHandler>>,
         user_data: Option<GenericErrorContext>,
-        ioctx: impl Read + 'static,
+        ioctx: impl Read + 'a,
         enc: XmlCharEncoding,
-    ) -> Option<XmlParserCtxt> {
+    ) -> Option<Self> {
         let buf = XmlParserInputBuffer::from_reader(ioctx, enc);
         let mut ctxt = XmlParserCtxt::new_sax_parser(sax, user_data).ok()?;
 
@@ -383,7 +383,7 @@ impl XmlParserCtxt {
     ///
     /// Returns the new parser context or NULL
     #[doc(alias = "xmlCreateMemoryParserCtxt", alias = "xmlCreateDocParserCtxt")]
-    pub fn from_memory(buffer: Vec<u8>) -> Option<XmlParserCtxt> {
+    pub fn from_memory(buffer: &'a [u8]) -> Option<Self> {
         if buffer.is_empty() {
             return None;
         }
@@ -417,7 +417,7 @@ impl XmlParserCtxt {
         id: Option<&str>,
         base: Option<&str>,
         pctxt: Option<&XmlParserCtxt>,
-    ) -> Result<XmlParserCtxt, Option<Box<XmlSAXHandler>>> {
+    ) -> Result<Self, Option<Box<XmlSAXHandler>>> {
         let mut ctxt = XmlParserCtxt::new_sax_parser(sax, user_data)?;
 
         if let Some(pctxt) = pctxt {
@@ -475,7 +475,7 @@ impl XmlParserCtxt {
         url: Option<&str>,
         id: Option<&str>,
         base: Option<&str>,
-    ) -> Result<XmlParserCtxt, Option<Box<XmlSAXHandler>>> {
+    ) -> Result<Self, Option<Box<XmlSAXHandler>>> {
         Self::new_entity_parser_internal(None, None, url, id, base, None)
     }
 
@@ -605,7 +605,7 @@ impl XmlParserCtxt {
         self.input_tab.last()
     }
 
-    pub fn input_mut(&mut self) -> Option<&mut XmlParserInput> {
+    pub fn input_mut(&mut self) -> Option<&mut XmlParserInput<'a>> {
         self.input_tab.last_mut()
     }
 
@@ -1317,7 +1317,7 @@ impl XmlParserCtxt {
     ///
     /// Returns -1 in case of error, the index in the stack otherwise
     #[doc(alias = "inputPush")]
-    pub fn input_push(&mut self, value: XmlParserInput) -> i32 {
+    pub fn input_push(&mut self, value: XmlParserInput<'a>) -> i32 {
         self.input_tab.push(value);
         self.input_tab.len() as i32 - 1
     }
@@ -1326,7 +1326,7 @@ impl XmlParserCtxt {
     ///
     /// Returns the input just removed
     #[doc(alias = "inputPop")]
-    pub fn input_pop(&mut self) -> Option<XmlParserInput> {
+    pub fn input_pop(&mut self) -> Option<XmlParserInput<'a>> {
         self.input_tab.pop()
     }
 
@@ -1483,7 +1483,7 @@ impl XmlParserCtxt {
     ///
     /// Returns -1 in case of error or the index in the input stack
     #[doc(alias = "xmlPushInput")]
-    pub fn push_input(&mut self, input: XmlParserInput) -> i32 {
+    pub fn push_input(&mut self, input: XmlParserInput<'a>) -> i32 {
         if get_parser_debug_entities() != 0 {
             if self.input().is_some() && self.input().unwrap().filename.is_some() {
                 generic_error!(
@@ -1778,7 +1778,7 @@ impl XmlParserCtxt {
     #[doc(alias = "xmlSwitchInputEncoding")]
     pub(crate) fn switch_input_encoding(
         &mut self,
-        input: &mut XmlParserInput,
+        input: &mut XmlParserInput<'_>,
         handler: XmlCharEncodingHandler,
     ) -> i32 {
         if input.buf.as_mut().is_none() {
@@ -1973,7 +1973,7 @@ impl XmlParserCtxt {
     }
 }
 
-impl Default for XmlParserCtxt {
+impl Default for XmlParserCtxt<'_> {
     fn default() -> Self {
         Self {
             sax: None,
@@ -2050,7 +2050,7 @@ impl Default for XmlParserCtxt {
     }
 }
 
-impl Drop for XmlParserCtxt {
+impl Drop for XmlParserCtxt<'_> {
     /// Free all the memory used by a parser context. However the parsed
     /// document in self.myDoc is not freed.
     #[doc(alias = "xmlFreeParserCtxt")]

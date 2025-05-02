@@ -6103,7 +6103,7 @@ pub unsafe fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> XmlRelaxNGPtr 
             };
             doc
         } else if !(*ctxt).buffer.is_null() {
-            let mem = from_raw_parts((*ctxt).buffer as *const u8, (*ctxt).size as usize).to_vec();
+            let mem = from_raw_parts((*ctxt).buffer as *const u8, (*ctxt).size as usize);
             let Some(mut doc) = xml_read_memory(mem, None, None, 0) else {
                 xml_rng_perr!(
                     ctxt,

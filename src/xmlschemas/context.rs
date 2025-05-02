@@ -57,10 +57,10 @@ use super::{
 
 /// A schemas validation context
 #[doc(alias = "xmlSchemaParserCtxtPtr")]
-pub type XmlSchemaParserCtxtPtr = *mut XmlSchemaParserCtxt;
+pub type XmlSchemaParserCtxtPtr<'a> = *mut XmlSchemaParserCtxt<'a>;
 #[doc(alias = "xmlSchemaParserCtxt")]
 #[repr(C)]
-pub struct XmlSchemaParserCtxt {
+pub struct XmlSchemaParserCtxt<'a> {
     pub(crate) typ: i32,
     pub(crate) err_ctxt: Option<GenericErrorContext>, /* user specific error context */
     pub(crate) error: Option<GenericError>,           /* the callback in case of errors */
@@ -93,7 +93,7 @@ pub struct XmlSchemaParserCtxt {
     pub(crate) dict: XmlDictPtr, /* dictionary for interned string names */
     pub(crate) ctxt_type: XmlSchemaTypePtr, /* The current context simple/complex type */
     options: i32,
-    pub(crate) vctxt: XmlSchemaValidCtxtPtr,
+    pub(crate) vctxt: XmlSchemaValidCtxtPtr<'a>,
     pub(crate) is_s4s: i32,
     pub(crate) is_redefine: i32,
     pub(crate) xsi_assemble: i32,
@@ -106,7 +106,7 @@ pub struct XmlSchemaParserCtxt {
     pub(crate) attr_prohibs: XmlSchemaItemListPtr<XmlSchemaAttributeUseProhibPtr>,
 }
 
-impl XmlSchemaParserCtxt {
+impl XmlSchemaParserCtxt<'_> {
     #[doc(alias = "xmlSchemaGetNodeContent")]
     pub(crate) fn get_node_content(&self, node: Option<XmlGenericNodePtr>) -> String {
         node.and_then(|node| node.get_content()).unwrap_or_default()
@@ -177,7 +177,7 @@ impl XmlSchemaParserCtxt {
     }
 }
 
-impl Default for XmlSchemaParserCtxt {
+impl Default for XmlSchemaParserCtxt<'_> {
     fn default() -> Self {
         Self {
             typ: XML_SCHEMA_CTXT_PARSER,
@@ -217,7 +217,7 @@ impl Default for XmlSchemaParserCtxt {
     }
 }
 
-pub(crate) unsafe fn xml_schema_parser_ctxt_create() -> XmlSchemaParserCtxtPtr {
+pub(crate) unsafe fn xml_schema_parser_ctxt_create<'a>() -> XmlSchemaParserCtxtPtr<'a> {
     let mut ret = Box::new(XmlSchemaParserCtxt::default());
     ret.attr_prohibs = xml_schema_item_list_create();
     if ret.attr_prohibs.is_null() {
@@ -231,7 +231,7 @@ pub(crate) unsafe fn xml_schema_parser_ctxt_create() -> XmlSchemaParserCtxtPtr {
 ///
 /// Returns the parser context or NULL in case of error
 #[doc(alias = "xmlSchemaNewParserCtxt")]
-pub unsafe fn xml_schema_new_parser_ctxt(url: &str) -> XmlSchemaParserCtxtPtr {
+pub unsafe fn xml_schema_new_parser_ctxt<'a>(url: &str) -> XmlSchemaParserCtxtPtr<'a> {
     unsafe {
         let ret: XmlSchemaParserCtxtPtr = xml_schema_parser_ctxt_create();
         if ret.is_null() {
@@ -271,10 +271,10 @@ pub(crate) unsafe fn xml_schema_new_parser_ctxt_use_dict(
 ///
 /// Returns the parser context or NULL in case of error
 #[doc(alias = "xmlSchemaNewMemParserCtxt")]
-pub unsafe fn xml_schema_new_mem_parser_ctxt(
+pub unsafe fn xml_schema_new_mem_parser_ctxt<'a>(
     buffer: *const i8,
     size: i32,
-) -> XmlSchemaParserCtxtPtr {
+) -> XmlSchemaParserCtxtPtr<'a> {
     unsafe {
         if buffer.is_null() || size <= 0 {
             return null_mut();
@@ -295,7 +295,7 @@ pub unsafe fn xml_schema_new_mem_parser_ctxt(
 ///
 /// Returns the parser context or NULL in case of error
 #[doc(alias = "xmlSchemaNewDocParserCtxt")]
-pub unsafe fn xml_schema_new_doc_parser_ctxt(doc: XmlDocPtr) -> XmlSchemaParserCtxtPtr {
+pub unsafe fn xml_schema_new_doc_parser_ctxt<'a>(doc: XmlDocPtr) -> XmlSchemaParserCtxtPtr<'a> {
     unsafe {
         let ret: XmlSchemaParserCtxtPtr = xml_schema_parser_ctxt_create();
         if ret.is_null() {
@@ -344,11 +344,11 @@ pub unsafe fn xml_schema_free_parser_ctxt(ctxt: XmlSchemaParserCtxtPtr) {
 }
 
 #[doc(alias = "xmlSchemaValidCtxtPtr")]
-pub type XmlSchemaValidCtxtPtr = *mut XmlSchemaValidCtxt;
+pub type XmlSchemaValidCtxtPtr<'a> = *mut XmlSchemaValidCtxt<'a>;
 /// A Schemas validation context
 #[doc(alias = "xmlSchemaValidCtxt")]
 #[repr(C)]
-pub struct XmlSchemaValidCtxt {
+pub struct XmlSchemaValidCtxt<'a> {
     typ: i32,
     pub(crate) err_ctxt: Option<GenericErrorContext>, /* user specific data block */
     pub(crate) error: Option<GenericError>,           /* the callback in case of errors */
@@ -360,7 +360,7 @@ pub struct XmlSchemaValidCtxt {
     // pub(crate) input: Option<Rc<RefCell<XmlParserInputBuffer>>>,
     pub(crate) enc: XmlCharEncoding,
     // sax: XmlSAXHandlerPtr,
-    pub(crate) parser_ctxt: Option<Box<XmlParserCtxt>>,
+    pub(crate) parser_ctxt: Option<Box<XmlParserCtxt<'a>>>,
     user_data: *mut c_void, /* TODO: What is this for? */
     pub(crate) filename: Option<String>,
 
@@ -376,7 +376,7 @@ pub struct XmlSchemaValidCtxt {
     value_ws: i32,
     pub(crate) options: i32,
     pub(crate) validation_root: Option<XmlNodePtr>,
-    pub(crate) pctxt: XmlSchemaParserCtxtPtr,
+    pub(crate) pctxt: XmlSchemaParserCtxtPtr<'a>,
     pub(crate) xsi_assemble: i32,
 
     pub(crate) depth: i32,
@@ -403,7 +403,7 @@ pub struct XmlSchemaValidCtxt {
     pub(crate) dict: XmlDictPtr,
 
     #[cfg(feature = "libxml_reader")]
-    pub(crate) reader: XmlTextReaderPtr,
+    pub(crate) reader: XmlTextReaderPtr<'a>,
 
     pub(crate) attr_infos: *mut XmlSchemaAttrInfoPtr,
     pub(crate) nb_attr_infos: i32,
@@ -420,7 +420,7 @@ pub struct XmlSchemaValidCtxt {
     pub(crate) loc_ctxt: *mut c_void,
 }
 
-impl XmlSchemaValidCtxt {
+impl XmlSchemaValidCtxt<'_> {
     #[doc(alias = "xmlSchemaLookupNamespace")]
     pub(crate) unsafe fn lookup_namespace(&self, prefix: Option<&str>) -> Option<String> {
         unsafe {
@@ -773,7 +773,7 @@ impl XmlSchemaValidCtxt {
     }
 }
 
-impl Default for XmlSchemaValidCtxt {
+impl Default for XmlSchemaValidCtxt<'_> {
     fn default() -> Self {
         Self {
             typ: XML_SCHEMA_CTXT_VALIDATOR,
@@ -834,7 +834,7 @@ impl Default for XmlSchemaValidCtxt {
 ///
 /// Returns the validation context or NULL in case of error
 #[doc(alias = "xmlSchemaNewValidCtxt")]
-pub fn xml_schema_new_valid_ctxt(schema: XmlSchemaPtr) -> XmlSchemaValidCtxtPtr {
+pub fn xml_schema_new_valid_ctxt<'a>(schema: XmlSchemaPtr) -> XmlSchemaValidCtxtPtr<'a> {
     let mut ret = Box::new(XmlSchemaValidCtxt::default());
     ret.typ = XML_SCHEMA_CTXT_VALIDATOR;
     ret.dict = xml_dict_create();

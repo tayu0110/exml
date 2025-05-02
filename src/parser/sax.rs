@@ -99,7 +99,7 @@ impl Default for XmlSAXLocator {
 /// Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
 #[doc(alias = "resolveEntitySAXFunc")]
 pub type ResolveEntitySAXFunc =
-    fn(&mut XmlParserCtxt, Option<&str>, Option<&str>) -> Option<XmlParserInput>;
+    fn(&mut XmlParserCtxt, Option<&str>, Option<&str>) -> Option<XmlParserInput<'static>>;
 /// Callback on internal subset declaration.
 #[doc(alias = "internalSubsetSAXFunc")]
 pub type InternalSubsetSAXFunc = fn(&mut XmlParserCtxt, Option<&str>, Option<&str>, Option<&str>);

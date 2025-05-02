@@ -9,7 +9,7 @@ use crate::{
     },
 };
 
-impl XmlParserCtxt {
+impl XmlParserCtxt<'_> {
     /// Parse the XML version.
     ///
     /// ```text

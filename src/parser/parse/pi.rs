@@ -12,7 +12,7 @@ use crate::{
 // List of XML prefixed PI allowed by W3C specs
 const XML_W3_CPIS: &[&str] = &["xml-stylesheet", "xml-model"];
 
-impl XmlParserCtxt {
+impl XmlParserCtxt<'_> {
     /// Parse the name of a PI
     ///
     /// ```text

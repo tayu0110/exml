@@ -21,7 +21,7 @@ use crate::{
 
 use super::XML_DEFAULT_VERSION;
 
-impl XmlParserCtxt {
+impl XmlParserCtxt<'_> {
     #[doc(alias = "xmlStringDecodeEntitiesInt")]
     pub(super) fn string_decode_entities_int(
         &mut self,

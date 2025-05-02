@@ -7,7 +7,7 @@ use crate::{
     },
 };
 
-impl XmlParserCtxt {
+impl XmlParserCtxt<'_> {
     /// Parse an XML Nmtoken.
     ///
     /// ```text

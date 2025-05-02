@@ -100,7 +100,7 @@ use super::{
     schema::XmlSchemaPtr,
 };
 
-impl XmlSchemaParserCtxt {
+impl XmlSchemaParserCtxt<'_> {
     /// parse a schema definition resource and build an internal
     /// XML Schema structure which can be used to validate instances.
     ///
@@ -276,14 +276,10 @@ impl XmlSchemaParserCtxt {
                 return -1;
             }
             // Create and init the temporary parser context.
-            let newpctxt: XmlSchemaParserCtxtPtr = xml_schema_new_parser_ctxt_use_dict(
-                (!(*bucket).schema_location.is_null())
-                    .then(|| {
-                        CStr::from_ptr((*bucket).schema_location as *const i8).to_string_lossy()
-                    })
-                    .as_deref(),
-                self.dict,
-            );
+            let url = (!(*bucket).schema_location.is_null())
+                .then(|| CStr::from_ptr((*bucket).schema_location as *const i8).to_string_lossy());
+            let newpctxt: XmlSchemaParserCtxtPtr =
+                xml_schema_new_parser_ctxt_use_dict(url.as_deref(), self.dict);
             if newpctxt.is_null() {
                 return -1;
             }

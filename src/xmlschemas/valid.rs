@@ -20,7 +20,7 @@ use super::{
     items::{XmlSchemaBasicItemPtr, XmlSchemaTypePtr},
 };
 
-impl XmlSchemaParserCtxt {
+impl XmlSchemaParserCtxt<'_> {
     /// Extracts and validates a value against the given built-in type.
     /// This one is intended to be used internally for validation
     /// of schema attribute values during parsing of the schema.

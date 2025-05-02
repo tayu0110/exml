@@ -29,7 +29,7 @@ use crate::{
 
 use super::{XmlParserCtxt, XmlParserCtxtPtr, XmlParserMode, split_qname2};
 
-impl XmlParserCtxt {
+impl XmlParserCtxt<'_> {
     #[doc(alias = "xmlIsStreaming")]
     fn is_streaming(&self) -> bool {
         matches!(self.parse_mode, XmlParserMode::XmlParseReader)

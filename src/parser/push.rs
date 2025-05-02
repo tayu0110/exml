@@ -53,7 +53,7 @@ pub(crate) fn check_cdata_push(utf: &[u8], complete: bool) -> Result<usize, usiz
         .map_or(Ok(s.len()), Err)
 }
 
-impl XmlParserCtxt {
+impl XmlParserCtxt<'_> {
     /// Create a parser context for using the XML parser in push mode.
     /// If @buffer and @size are non-NULL, the data is used to detect
     /// the encoding.  The remaining characters will be parsed so they
@@ -69,7 +69,7 @@ impl XmlParserCtxt {
         user_data: Option<GenericErrorContext>,
         chunk: &[u8],
         filename: Option<&str>,
-    ) -> Option<XmlParserCtxt> {
+    ) -> Option<Self> {
         use crate::{io::xml_parser_get_directory, parser::XmlParserInput};
 
         let buf = XmlParserInputBuffer::new(XmlCharEncoding::None);

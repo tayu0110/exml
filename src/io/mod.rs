@@ -385,10 +385,10 @@ pub(crate) use __xml_loader_err;
 ///
 /// Returns the input or NULL in case of HTTP error.
 #[doc(alias = "xmlCheckHTTPInput")]
-pub fn xml_check_http_input(
+pub fn xml_check_http_input<'a>(
     ctxt: &mut XmlParserCtxt,
-    mut ret: Option<XmlParserInput>,
-) -> Option<XmlParserInput> {
+    mut ret: Option<XmlParserInput<'a>>,
+) -> Option<XmlParserInput<'a>> {
     #[cfg(feature = "http")]
     {
         if ret.is_some()

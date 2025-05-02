@@ -84,7 +84,7 @@ pub(crate) const XML_DEFAULT_VERSION: &str = "1.0";
 
 pub(crate) const SAX_COMPAT_MODE: &str = "SAX compatibility mode document";
 
-impl XmlParserCtxt {
+impl XmlParserCtxt<'_> {
     /// Parse an XML document (and build a tree if using the standard SAX
     /// interface).
     ///
@@ -288,7 +288,7 @@ impl XmlParserCtxt {
 #[doc(alias = "xmlParseInNodeContext")]
 pub unsafe fn xml_parse_in_node_context(
     node: XmlGenericNodePtr,
-    data: Vec<u8>,
+    data: &[u8],
     mut options: i32,
     lst: &mut Option<XmlGenericNodePtr>,
 ) -> XmlParserErrors {
@@ -508,7 +508,7 @@ pub(crate) fn xml_parse_balanced_chunk_memory_internal(
             **lst = None;
         }
 
-        let Some(mut ctxt) = XmlParserCtxt::from_memory(string.as_bytes().to_vec()) else {
+        let Some(mut ctxt) = XmlParserCtxt::from_memory(string.as_bytes()) else {
             return XmlParserErrors::XmlWarUndeclaredEntity;
         };
         ctxt.nb_errors = oldctxt.nb_errors;

@@ -111,7 +111,7 @@ pub struct XmlParserNodeInfo {
     pub(crate) end_line: u64,
 }
 
-impl XmlParserCtxt {
+impl XmlParserCtxt<'_> {
     /// Insert node info record into the sorted sequence
     #[doc(alias = "xmlParserAddNodeInfo")]
     pub(crate) fn add_node_info(&mut self, info: Rc<RefCell<XmlParserNodeInfo>>) {

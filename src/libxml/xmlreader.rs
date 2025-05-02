@@ -181,11 +181,11 @@ enum XmlTextReaderValidate {
 
 /// Pointer to an xmlReader context.
 #[doc(alias = "xmlTextReaderPtr")]
-pub type XmlTextReaderPtr = *mut XmlTextReader;
+pub type XmlTextReaderPtr<'a> = *mut XmlTextReader<'a>;
 /// Structure for an xmlReader context.
 #[doc(alias = "xmlTextReader")]
 #[repr(C)]
-pub struct XmlTextReader {
+pub struct XmlTextReader<'a> {
     // the parsing mode
     mode: XmlTextReaderMode,
     // when walking an existing doc
@@ -196,9 +196,9 @@ pub struct XmlTextReader {
     allocs: i32,
     state: XmlTextReaderState,
     // the parser context
-    ctxt: Option<Box<XmlParserCtxt>>,
+    ctxt: Option<Box<XmlParserCtxt<'a>>>,
     // the input
-    input: Option<XmlParserInputBuffer>,
+    input: Option<XmlParserInputBuffer<'a>>,
     // initial SAX callbacks
     start_element: Option<StartElementSAXFunc>,
     // idem
@@ -261,7 +261,7 @@ pub struct XmlTextReader {
     xsd_schemas: XmlSchemaPtr,
     // The Schemas validation context
     #[cfg(feature = "schema")]
-    xsd_valid_ctxt: XmlSchemaValidCtxtPtr,
+    xsd_valid_ctxt: XmlSchemaValidCtxtPtr<'a>,
     // 1 if the context was provided by the user
     #[cfg(feature = "schema")]
     xsd_preserve_ctxt: i32,
@@ -270,7 +270,7 @@ pub struct XmlTextReader {
     xsd_valid_errors: i32,
     // the schemas plug in SAX pipeline
     #[cfg(feature = "schema")]
-    xsd_plug: XmlSchemaSAXPlugPtr,
+    xsd_plug: XmlSchemaSAXPlugPtr<'a>,
 
     // Handling of XInclude processing
     // is xinclude asked for
@@ -297,7 +297,7 @@ pub struct XmlTextReader {
     serror_func: Option<StructuredError>, /* callback function */
 }
 
-impl XmlTextReader {
+impl<'a> XmlTextReader<'a> {
     /// Setup an xmltextReader to parse a preparsed XML document.
     /// This reuses the existing @reader xmlTextReader.
     ///
@@ -330,7 +330,7 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderSetup")]
     pub fn setup(
         &mut self,
-        input: Option<XmlParserInputBuffer>,
+        input: Option<XmlParserInputBuffer<'a>>,
         url: Option<&str>,
         encoding: Option<&str>,
         mut options: i32,
@@ -1620,7 +1620,7 @@ impl XmlTextReader {
     unsafe fn schema_validate_internal(
         &mut self,
         xsd: Option<&str>,
-        ctxt: XmlSchemaValidCtxtPtr,
+        ctxt: XmlSchemaValidCtxtPtr<'a>,
         _options: i32,
     ) -> i32 {
         use crate::xmlschemas::{
@@ -1664,7 +1664,7 @@ impl XmlTextReader {
                 return 0;
             }
 
-            let ctx = GenericErrorContext::new(self as *mut Self);
+            let ctx = GenericErrorContext::new(self as *const Self as *mut XmlTextReader<'static>);
             if let Some(xsd) = xsd {
                 // Parse the schema and create validation environment.
                 let pctxt: XmlSchemaParserCtxtPtr = xml_schema_new_parser_ctxt(xsd);
@@ -1763,7 +1763,7 @@ impl XmlTextReader {
     #[cfg(all(feature = "libxml_reader", feature = "schema"))]
     pub unsafe fn schema_validate_ctxt(
         &mut self,
-        ctxt: XmlSchemaValidCtxtPtr,
+        ctxt: XmlSchemaValidCtxtPtr<'a>,
         options: i32,
     ) -> i32 {
         unsafe { self.schema_validate_internal(None, ctxt, options) }
@@ -1820,7 +1820,8 @@ impl XmlTextReader {
                 // Parse the schema and create validation environment.
 
                 let pctxt = xml_relaxng_new_parser_ctxt(rng);
-                let ctx = GenericErrorContext::new(self as *mut Self);
+                let ctx =
+                    GenericErrorContext::new(self as *const Self as *mut XmlTextReader<'static>);
                 if self.error_func.is_some() {
                     (*pctxt).set_parser_errors(
                         Some(xml_text_reader_validity_error_relay),
@@ -1855,7 +1856,7 @@ impl XmlTextReader {
             // the reader channels.
             // TODO: In case the user provides the validation context we
             //    could make this redirection optional.
-            let ctx = GenericErrorContext::new(self as *mut Self);
+            let ctx = GenericErrorContext::new(self as *const Self as *mut XmlTextReader<'static>);
             if self.error_func.is_some() {
                 xml_relaxng_set_valid_errors(
                     self.rng_valid_ctxt,
@@ -2326,7 +2327,9 @@ impl XmlTextReader {
                 self.error_func_arg = arg;
                 #[cfg(feature = "schema")]
                 {
-                    let ctx = GenericErrorContext::new(self as *mut Self);
+                    let ctx = GenericErrorContext::new(
+                        self as *const Self as *mut XmlTextReader<'static>,
+                    );
                     if !self.rng_valid_ctxt.is_null() {
                         xml_relaxng_set_valid_errors(
                             self.rng_valid_ctxt,
@@ -2362,7 +2365,9 @@ impl XmlTextReader {
                 self.error_func_arg = None;
                 #[cfg(feature = "schema")]
                 {
-                    let ctx = GenericErrorContext::new(self as *mut Self);
+                    let ctx = GenericErrorContext::new(
+                        self as *const Self as *mut XmlTextReader<'static>,
+                    );
                     if !self.rng_valid_ctxt.is_null() {
                         xml_relaxng_set_valid_errors(
                             self.rng_valid_ctxt,
@@ -2412,7 +2417,9 @@ impl XmlTextReader {
                 self.error_func_arg = arg;
                 #[cfg(feature = "schema")]
                 {
-                    let ctx = GenericErrorContext::new(self as *mut Self);
+                    let ctx = GenericErrorContext::new(
+                        self as *const Self as *mut XmlTextReader<'static>,
+                    );
                     if !self.rng_valid_ctxt.is_null() {
                         xml_relaxng_set_valid_errors(
                             self.rng_valid_ctxt,
@@ -2448,7 +2455,9 @@ impl XmlTextReader {
                 self.error_func_arg = None;
                 #[cfg(feature = "schema")]
                 {
-                    let ctx = GenericErrorContext::new(self as *mut Self);
+                    let ctx = GenericErrorContext::new(
+                        self as *const Self as *mut XmlTextReader<'static>,
+                    );
                     if !self.rng_valid_ctxt.is_null() {
                         xml_relaxng_set_valid_errors(
                             self.rng_valid_ctxt,
@@ -2548,7 +2557,7 @@ impl XmlTextReader {
                 self as *mut Self as *mut c_void,
             );
 
-            let ctx = GenericErrorContext::new(self as *mut Self);
+            let ctx = GenericErrorContext::new(self as *const Self as *mut XmlTextReader<'static>);
             if self.error_func.is_some() {
                 (*self.xsd_valid_ctxt).set_errors(
                     Some(xml_text_reader_validity_error_relay),
@@ -2613,7 +2622,7 @@ impl XmlTextReader {
             if self.rng_valid_ctxt.is_null() {
                 return -1;
             }
-            let ctx = GenericErrorContext::new(self as *mut Self);
+            let ctx = GenericErrorContext::new(self as *const Self as *mut XmlTextReader<'static>);
             if self.error_func.is_some() {
                 xml_relaxng_set_valid_errors(
                     self.rng_valid_ctxt,
@@ -3552,7 +3561,7 @@ impl XmlTextReader {
     }
 }
 
-impl Default for XmlTextReader {
+impl Default for XmlTextReader<'_> {
     fn default() -> Self {
         Self {
             mode: XmlTextReaderMode::default(),
@@ -3753,10 +3762,10 @@ fn xml_text_reader_cdata_block(ctxt: &mut XmlParserCtxt, ch: &str) {
 ///
 /// Returns the new xmlTextReaderPtr or NULL in case of error
 #[doc(alias = "xmlNewTextReader")]
-pub unsafe fn xml_new_text_reader(
-    input: XmlParserInputBuffer,
+pub unsafe fn xml_new_text_reader<'a>(
+    input: XmlParserInputBuffer<'a>,
     uri: Option<&str>,
-) -> XmlTextReaderPtr {
+) -> XmlTextReaderPtr<'a> {
     unsafe {
         use std::ptr::drop_in_place;
 
@@ -3852,7 +3861,7 @@ pub unsafe fn xml_new_text_reader(
 ///
 /// Returns the new xmlTextReaderPtr or NULL in case of error
 #[doc(alias = "xmlNewTextReaderFilename")]
-pub unsafe fn xml_new_text_reader_filename(uri: &str) -> XmlTextReaderPtr {
+pub unsafe fn xml_new_text_reader_filename<'a>(uri: &str) -> XmlTextReaderPtr<'a> {
     unsafe {
         use crate::{encoding::XmlCharEncoding, io::xml_parser_get_directory};
 
@@ -4501,7 +4510,7 @@ unsafe fn xml_text_reader_locator(
 ///
 /// Returns the new reader or NULL in case of error.
 #[doc(alias = "xmlReaderWalker")]
-pub unsafe fn xml_reader_walker(doc: XmlDocPtr) -> XmlTextReaderPtr {
+pub unsafe fn xml_reader_walker<'a>(doc: XmlDocPtr) -> XmlTextReaderPtr<'a> {
     unsafe {
         use crate::generic_error;
 
@@ -4528,13 +4537,13 @@ pub unsafe fn xml_reader_walker(doc: XmlDocPtr) -> XmlTextReaderPtr {
 ///
 /// Returns the new reader or NULL in case of error.
 #[doc(alias = "xmlReaderForDoc")]
-pub unsafe fn xml_reader_for_doc(
-    cur: &[u8],
+pub unsafe fn xml_reader_for_doc<'a>(
+    cur: &'a [u8],
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
-) -> XmlTextReaderPtr {
-    unsafe { xml_reader_for_memory(cur.to_vec(), url, encoding, options) }
+) -> XmlTextReaderPtr<'a> {
+    unsafe { xml_reader_for_memory(cur, url, encoding, options) }
 }
 
 /// Parse an XML file from the filesystem or the network.
@@ -4542,11 +4551,11 @@ pub unsafe fn xml_reader_for_doc(
 ///
 /// Returns the new reader or NULL in case of error.
 #[doc(alias = "xmlReaderForFile")]
-pub unsafe fn xml_reader_for_file(
+pub unsafe fn xml_reader_for_file<'a>(
     filename: &str,
     encoding: Option<&str>,
     options: i32,
-) -> XmlTextReaderPtr {
+) -> XmlTextReaderPtr<'a> {
     unsafe {
         let reader: XmlTextReaderPtr = xml_new_text_reader_filename(filename);
         if reader.is_null() {
@@ -4562,12 +4571,12 @@ pub unsafe fn xml_reader_for_file(
 ///
 /// Returns the new reader or NULL in case of error.
 #[doc(alias = "xmlReaderForMemory")]
-pub unsafe fn xml_reader_for_memory(
-    buffer: Vec<u8>,
+pub unsafe fn xml_reader_for_memory<'a>(
+    buffer: &'a [u8],
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
-) -> XmlTextReaderPtr {
+) -> XmlTextReaderPtr<'a> {
     unsafe {
         use crate::encoding::XmlCharEncoding;
 
@@ -4589,12 +4598,12 @@ pub unsafe fn xml_reader_for_memory(
 ///
 /// Returns the new reader or NULL in case of error.
 #[doc(alias = "xmlReaderForIO")]
-pub unsafe fn xml_reader_for_io(
-    ioctx: impl Read + 'static,
+pub unsafe fn xml_reader_for_io<'a>(
+    ioctx: impl Read + 'a,
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
-) -> XmlTextReaderPtr {
+) -> XmlTextReaderPtr<'a> {
     unsafe {
         use crate::encoding::XmlCharEncoding;
 
@@ -4615,9 +4624,9 @@ pub unsafe fn xml_reader_for_io(
 ///
 /// Returns 0 in case of success and -1 in case of error
 #[doc(alias = "xmlReaderNewDoc")]
-pub unsafe fn xml_reader_new_doc(
-    reader: XmlTextReaderPtr,
-    cur: &[u8],
+pub unsafe fn xml_reader_new_doc<'a>(
+    reader: XmlTextReaderPtr<'a>,
+    cur: &'a [u8],
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
@@ -4627,7 +4636,7 @@ pub unsafe fn xml_reader_new_doc(
             return -1;
         }
 
-        xml_reader_new_memory(reader, cur.to_vec(), url, encoding, options)
+        xml_reader_new_memory(reader, cur, url, encoding, options)
     }
 }
 
@@ -4663,9 +4672,9 @@ pub unsafe fn xml_reader_new_file(
 ///
 /// Returns 0 in case of success and -1 in case of error
 #[doc(alias = "xmlReaderNewMemory")]
-pub unsafe fn xml_reader_new_memory(
-    reader: XmlTextReaderPtr,
-    buffer: Vec<u8>,
+pub unsafe fn xml_reader_new_memory<'a>(
+    reader: XmlTextReaderPtr<'a>,
+    buffer: &'a [u8],
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,

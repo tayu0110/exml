@@ -17,7 +17,7 @@ use crate::{
 #[doc(alias = "xmlParseDoc")]
 #[deprecated = "Use xmlReadDoc"]
 #[cfg(feature = "sax1")]
-pub fn xml_parse_doc(cur: Vec<u8>) -> Option<XmlDocPtr> {
+pub fn xml_parse_doc(cur: &[u8]) -> Option<XmlDocPtr> {
     xml_sax_parse_doc(None, cur, 0)
 }
 
@@ -39,7 +39,7 @@ pub fn xml_parse_file(filename: Option<&str>) -> Option<XmlDocPtr> {
 #[doc(alias = "xmlParseMemory")]
 #[deprecated = "Use xmlReadMemory"]
 #[cfg(feature = "sax1")]
-pub fn xml_parse_memory(buffer: Vec<u8>) -> Option<XmlDocPtr> {
+pub fn xml_parse_memory(buffer: &[u8]) -> Option<XmlDocPtr> {
     xml_sax_parse_memory(None, buffer, false)
 }
 
@@ -123,7 +123,7 @@ pub fn xml_line_numbers_default(val: i32) -> i32 {
 #[doc(alias = "xmlRecoverDoc")]
 #[deprecated = "Use xmlReadDoc with XML_PARSE_RECOVER"]
 #[cfg(feature = "sax1")]
-pub fn xml_recover_doc(cur: Vec<u8>) -> Option<XmlDocPtr> {
+pub fn xml_recover_doc(cur: &[u8]) -> Option<XmlDocPtr> {
     xml_sax_parse_doc(None, cur, 1)
 }
 
@@ -135,7 +135,7 @@ pub fn xml_recover_doc(cur: Vec<u8>) -> Option<XmlDocPtr> {
 #[doc(alias = "xmlRecoverMemory")]
 #[deprecated = "Use xmlReadMemory with XML_PARSE_RECOVER"]
 #[cfg(feature = "sax1")]
-pub fn xml_recover_memory(buffer: Vec<u8>) -> Option<XmlDocPtr> {
+pub fn xml_recover_memory(buffer: &[u8]) -> Option<XmlDocPtr> {
     xml_sax_parse_memory(None, buffer, true)
 }
 
@@ -204,7 +204,7 @@ pub fn xml_sax_user_parse_file(
 pub fn xml_sax_user_parse_memory(
     sax: Option<Box<XmlSAXHandler>>,
     user_data: Option<GenericErrorContext>,
-    buffer: Vec<u8>,
+    buffer: &[u8],
 ) -> i32 {
     use super::XmlParserCtxt;
 
@@ -248,7 +248,7 @@ pub fn xml_sax_user_parse_memory(
 #[cfg(feature = "sax1")]
 pub fn xml_sax_parse_doc(
     sax: Option<Box<XmlSAXHandler>>,
-    cur: Vec<u8>,
+    cur: &[u8],
     recovery: i32,
 ) -> Option<XmlDocPtr> {
     use super::XmlParserCtxt;
@@ -290,7 +290,7 @@ pub fn xml_sax_parse_doc(
 #[cfg(feature = "sax1")]
 pub fn xml_sax_parse_memory(
     sax: Option<Box<XmlSAXHandler>>,
-    buffer: Vec<u8>,
+    buffer: &[u8],
     recovery: bool,
 ) -> Option<XmlDocPtr> {
     xml_sax_parse_memory_with_data(sax, buffer, recovery, null_mut())
@@ -309,7 +309,7 @@ pub fn xml_sax_parse_memory(
 #[cfg(feature = "sax1")]
 pub fn xml_sax_parse_memory_with_data(
     sax: Option<Box<XmlSAXHandler>>,
-    buffer: Vec<u8>,
+    buffer: &[u8],
     recovery: bool,
     data: *mut c_void,
 ) -> Option<XmlDocPtr> {
@@ -603,7 +603,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory(
     sax: Option<Box<XmlSAXHandler>>,
     user_data: Option<GenericErrorContext>,
     depth: i32,
-    string: *const u8,
+    string: &str,
     lst: Option<&mut Option<XmlGenericNodePtr>>,
 ) -> i32 {
     unsafe { xml_parse_balanced_chunk_memory_recover(doc, sax, user_data, depth, string, lst, 0) }
@@ -629,12 +629,10 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
     sax: Option<Box<XmlSAXHandler>>,
     user_data: Option<GenericErrorContext>,
     depth: i32,
-    string: *const u8,
+    string: &str,
     mut lst: Option<&mut Option<XmlGenericNodePtr>>,
     recover: i32,
 ) -> i32 {
-    use std::ffi::CStr;
-
     use crate::{
         error::XmlParserErrors,
         parser::{XmlParserCtxt, XmlParserInputState, XmlParserOption, xml_fatal_err},
@@ -653,13 +651,8 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
         if let Some(lst) = lst.as_mut() {
             **lst = None;
         }
-        if string.is_null() {
-            return -1;
-        }
 
-        let Some(mut ctxt) =
-            XmlParserCtxt::from_memory(CStr::from_ptr(string as *const i8).to_bytes().to_vec())
-        else {
+        let Some(mut ctxt) = XmlParserCtxt::from_memory(string.as_bytes()) else {
             return -1;
         };
         ctxt.user_data = None;

@@ -2670,7 +2670,7 @@ fn html_parse_char_data(ctxt: &mut HtmlParserCtxt) {
 ///
 /// Returns the `htmlParserCtxtPtr` or NULL in case of allocation error
 #[doc(alias = "htmlNewParserCtxt")]
-pub fn html_new_parser_ctxt() -> Option<XmlParserCtxt> {
+pub fn html_new_parser_ctxt<'a>() -> Option<XmlParserCtxt<'a>> {
     html_new_sax_parser_ctxt(None, None)
 }
 
@@ -2741,10 +2741,10 @@ fn html_init_parser_ctxt(
 ///
 /// Returns the `htmlParserCtxtPtr` or NULL in case of allocation error
 #[doc(alias = "htmlNewSAXParserCtxt")]
-pub fn html_new_sax_parser_ctxt(
+pub fn html_new_sax_parser_ctxt<'a>(
     sax: Option<Box<XmlSAXHandler>>,
     user_data: Option<GenericErrorContext>,
-) -> Option<HtmlParserCtxt> {
+) -> Option<HtmlParserCtxt<'a>> {
     let mut ctxt = XmlParserCtxt::default();
     if html_init_parser_ctxt(&mut ctxt, sax, user_data) < 0 {
         return None;
@@ -2756,7 +2756,7 @@ pub fn html_new_sax_parser_ctxt(
 ///
 /// Returns the new parser context or NULL
 #[doc(alias = "htmlCreateMemoryParserCtxt")]
-pub fn html_create_memory_parser_ctxt(buffer: Vec<u8>) -> Option<HtmlParserCtxt> {
+pub fn html_create_memory_parser_ctxt(buffer: &[u8]) -> Option<HtmlParserCtxt> {
     if buffer.is_empty() {
         return None;
     }
@@ -3147,7 +3147,10 @@ pub fn html_parse_document(ctxt: &mut HtmlParserCtxt) -> i32 {
 ///
 /// Returns the new parser context or NULL
 #[doc(alias = "htmlCreateDocParserCtxt")]
-fn html_create_doc_parser_ctxt(cur: Vec<u8>, encoding: Option<&str>) -> Option<HtmlParserCtxt> {
+fn html_create_doc_parser_ctxt<'a>(
+    cur: &'a [u8],
+    encoding: Option<&str>,
+) -> Option<HtmlParserCtxt<'a>> {
     let mut ctxt = html_create_memory_parser_ctxt(cur)?;
 
     if let Some(encoding) = encoding {
@@ -3192,7 +3195,7 @@ fn html_create_doc_parser_ctxt(cur: Vec<u8>, encoding: Option<&str>) -> Option<H
 #[doc(alias = "htmlSAXParseDoc")]
 #[deprecated = "Use htmlNewSAXParserCtxt and htmlCtxtReadDoc"]
 pub fn html_sax_parse_doc(
-    cur: Vec<u8>,
+    cur: &[u8],
     encoding: Option<&str>,
     sax: Option<Box<HtmlSAXHandler>>,
     user_data: Option<GenericErrorContext>,
@@ -3220,7 +3223,7 @@ pub fn html_sax_parse_doc(
 ///
 /// Returns the resulting document tree
 #[doc(alias = "htmlParseDoc")]
-pub fn html_parse_doc(cur: Vec<u8>, encoding: Option<&str>) -> Option<HtmlDocPtr> {
+pub fn html_parse_doc(cur: &[u8], encoding: Option<&str>) -> Option<HtmlDocPtr> {
     html_sax_parse_doc(cur, encoding, None, None)
 }
 
@@ -3232,10 +3235,10 @@ pub fn html_parse_doc(cur: Vec<u8>, encoding: Option<&str>) -> Option<HtmlDocPtr
 ///
 /// Returns the new parser context or NULL
 #[doc(alias = "htmlCreateFileParserCtxt")]
-pub fn html_create_file_parser_ctxt(
+pub fn html_create_file_parser_ctxt<'a>(
     filename: &str,
     encoding: Option<&str>,
-) -> Option<HtmlParserCtxt> {
+) -> Option<HtmlParserCtxt<'a>> {
     let mut ctxt = html_new_parser_ctxt()?;
     let canonic_filename = canonic_path(filename);
     let input_stream = xml_load_external_entity(Some(&canonic_filename), None, &mut ctxt)?;
@@ -3401,7 +3404,7 @@ pub fn html_handle_omitted_elem(val: i32) -> i32 {
 /// Returns the new input stream or NULL
 #[doc(alias = "htmlNewInputStream")]
 #[cfg(feature = "libxml_push")]
-fn html_new_input_stream(ctxt: &mut HtmlParserCtxt) -> HtmlParserInput {
+fn html_new_input_stream<'a>(ctxt: &mut HtmlParserCtxt) -> HtmlParserInput<'a> {
     let mut input = HtmlParserInput {
         filename: None,
         directory: None,
@@ -3427,13 +3430,13 @@ fn html_new_input_stream(ctxt: &mut HtmlParserCtxt) -> HtmlParserInput {
 /// Returns the new parser context or NULL
 #[doc(alias = "htmlCreatePushParserCtxt")]
 #[cfg(feature = "libxml_push")]
-pub fn html_create_push_parser_ctxt(
+pub fn html_create_push_parser_ctxt<'a>(
     sax: Option<Box<XmlSAXHandler>>,
     user_data: Option<GenericErrorContext>,
     chunk: &[u8],
     filename: Option<&str>,
     enc: XmlCharEncoding,
-) -> Option<HtmlParserCtxt> {
+) -> Option<HtmlParserCtxt<'a>> {
     use crate::io::{XmlParserInputBuffer, xml_parser_get_directory};
 
     xml_init_parser();
@@ -4478,7 +4481,7 @@ fn html_do_read(
 /// Returns the resulting document tree
 #[doc(alias = "htmlReadDoc")]
 pub fn html_read_doc(
-    cur: Vec<u8>,
+    cur: &[u8],
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
@@ -4503,7 +4506,7 @@ pub fn html_read_file(filename: &str, encoding: Option<&str>, options: i32) -> O
 /// Returns the resulting document tree
 #[doc(alias = "htmlReadMemory")]
 pub fn html_read_memory(
-    buffer: Vec<u8>,
+    buffer: &[u8],
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
@@ -4517,8 +4520,8 @@ pub fn html_read_memory(
 ///
 /// Returns the resulting document tree
 #[doc(alias = "htmlReadIO")]
-pub fn html_read_io(
-    ioctx: impl Read + 'static,
+pub fn html_read_io<'a>(
+    ioctx: impl Read + 'a,
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
@@ -4537,9 +4540,9 @@ pub fn html_read_io(
 ///
 /// Returns the resulting document tree
 #[doc(alias = "htmlCtxtReadDoc")]
-pub fn html_ctxt_read_doc(
-    ctxt: &mut XmlParserCtxt,
-    cur: Vec<u8>,
+pub fn html_ctxt_read_doc<'a>(
+    ctxt: &mut XmlParserCtxt<'a>,
+    cur: &'a [u8],
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
@@ -4572,9 +4575,9 @@ pub fn html_ctxt_read_file(
 ///
 /// Returns the resulting document tree
 #[doc(alias = "htmlCtxtReadMemory")]
-pub fn html_ctxt_read_memory(
-    ctxt: &mut XmlParserCtxt,
-    buffer: Vec<u8>,
+pub fn html_ctxt_read_memory<'a>(
+    ctxt: &mut XmlParserCtxt<'a>,
+    buffer: &'a [u8],
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
@@ -4595,9 +4598,9 @@ pub fn html_ctxt_read_memory(
 ///
 /// Returns the resulting document tree
 #[doc(alias = "htmlCtxtReadIO")]
-pub fn html_ctxt_read_io(
-    ctxt: &mut XmlParserCtxt,
-    ioctx: impl Read + 'static,
+pub fn html_ctxt_read_io<'a>(
+    ctxt: &mut XmlParserCtxt<'a>,
+    ioctx: impl Read + 'a,
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,

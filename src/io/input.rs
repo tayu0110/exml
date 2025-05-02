@@ -39,8 +39,8 @@ use crate::{
 use super::{DefaultFileIOCallbacks, MINLEN, xml_ioerr};
 
 #[repr(C)]
-pub struct XmlParserInputBuffer {
-    pub(crate) context: Option<Box<dyn Read>>,
+pub struct XmlParserInputBuffer<'a> {
+    pub(crate) context: Option<Box<dyn Read + 'a>>,
     pub(crate) encoder: Option<XmlCharEncodingHandler>, /* I18N conversions to UTF-8 */
     pub(crate) buffer: Vec<u8>,                         /* Local buffer encoded in UTF-8 */
     pub(crate) raw: Vec<u8>, /* if encoder != NULL buffer for raw input */
@@ -49,7 +49,7 @@ pub struct XmlParserInputBuffer {
     pub(in crate::io) use_nanohttp: bool,
 }
 
-impl XmlParserInputBuffer {
+impl<'a> XmlParserInputBuffer<'a> {
     #[doc(alias = "xmlAllocParserInputBuffer")]
     pub fn new(enc: XmlCharEncoding) -> Self {
         let default_buffer_size = GLOBAL_STATE.with_borrow(|state| state.default_buffer_size);
@@ -72,7 +72,7 @@ impl XmlParserInputBuffer {
     ///
     /// TODO: Allow the slice as memory.
     #[doc(alias = "xmlParserInputBufferCreateMem")]
-    pub fn from_memory(mem: Vec<u8>, enc: XmlCharEncoding) -> Option<Self> {
+    pub fn from_memory(mem: &'a [u8], enc: XmlCharEncoding) -> Option<Self> {
         let mut ret = XmlParserInputBuffer::new(enc);
         ret.context = Some(Box::new(Cursor::new(mem)));
         Some(ret)
@@ -84,7 +84,7 @@ impl XmlParserInputBuffer {
         alias = "xmlParserInputBufferCreateIO",
         alias = "xmlParserInputBufferCreateFile"
     )]
-    pub fn from_reader(reader: impl Read + 'static, enc: XmlCharEncoding) -> Self {
+    pub fn from_reader(reader: impl Read + 'a, enc: XmlCharEncoding) -> Self {
         if !XML_INPUT_CALLBACK_INITIALIZED.load(Ordering::Relaxed) {
             register_default_input_callbacks();
         }
@@ -100,7 +100,7 @@ impl XmlParserInputBuffer {
     /// If successfully created, return the new parser input wrapped `Some`,
     /// otherwise return `None`.
     #[doc(alias = "xmlParserInputBufferCreateFilename")]
-    pub fn from_uri(uri: &str, enc: XmlCharEncoding) -> Option<XmlParserInputBuffer> {
+    pub fn from_uri(uri: &str, enc: XmlCharEncoding) -> Option<XmlParserInputBuffer<'a>> {
         if let Some(f) =
             GLOBAL_STATE.with_borrow(|state| state.parser_input_buffer_create_filename_value)
         {
@@ -372,7 +372,7 @@ pub fn register_input_callbacks(callback: impl XmlInputCallback + 'static) -> io
 pub(crate) fn __xml_parser_input_buffer_create_filename(
     uri: &str,
     enc: XmlCharEncoding,
-) -> Option<XmlParserInputBuffer> {
+) -> Option<XmlParserInputBuffer<'static>> {
     if !XML_INPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire) {
         register_default_input_callbacks();
     }

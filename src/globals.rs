@@ -58,7 +58,7 @@ pub type XmlDeregisterNodeFunc = fn(node: XmlGenericNodePtr);
 pub type GenericError = for<'a> fn(Option<GenericErrorContext>, &str);
 pub type StructuredError = fn(Option<GenericErrorContext>, &XmlError);
 type ParserInputBufferCreateFilename =
-    fn(uri: &str, enc: XmlCharEncoding) -> Option<XmlParserInputBuffer>;
+    fn(uri: &str, enc: XmlCharEncoding) -> Option<XmlParserInputBuffer<'static>>;
 type OutputBufferCreateFilename =
     fn(uri: &str, encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>) -> Option<XmlOutputBuffer>;
 

@@ -185,7 +185,7 @@ fn test_external_entity_loader(
     url: Option<&str>,
     id: Option<&str>,
     ctxt: &mut XmlParserCtxt,
-) -> Option<XmlParserInput> {
+) -> Option<XmlParserInput<'static>> {
     unsafe {
         if check_test_file(url.unwrap()) != 0 {
             xml_no_net_external_entity_loader(url, id, ctxt)

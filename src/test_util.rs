@@ -229,7 +229,10 @@ pub(crate) fn gen_xml_schema_val_ptr_ptr(_no: i32, _nr: i32) -> *mut XmlSchemaVa
 pub(crate) fn des_xml_schema_val_ptr_ptr(_no: i32, _val: *mut XmlSchemaValPtr, _nr: i32) {}
 
 #[cfg(feature = "schema")]
-pub(crate) fn gen_xml_schema_parser_ctxt_ptr(_no: i32, _nr: i32) -> XmlSchemaParserCtxtPtr {
+pub(crate) fn gen_xml_schema_parser_ctxt_ptr(
+    _no: i32,
+    _nr: i32,
+) -> XmlSchemaParserCtxtPtr<'static> {
     null_mut()
 }
 
@@ -245,7 +248,7 @@ pub(crate) fn gen_xml_schema_ptr(_no: i32, _nr: i32) -> XmlSchemaPtr {
 pub(crate) fn des_xml_schema_ptr(_no: i32, _val: XmlSchemaPtr, _nr: i32) {}
 
 #[cfg(feature = "schema")]
-pub(crate) fn gen_xml_schema_valid_ctxt_ptr(_no: i32, _nr: i32) -> XmlSchemaValidCtxtPtr {
+pub(crate) fn gen_xml_schema_valid_ctxt_ptr(_no: i32, _nr: i32) -> XmlSchemaValidCtxtPtr<'static> {
     null_mut()
 }
 

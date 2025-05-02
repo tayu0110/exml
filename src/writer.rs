@@ -101,7 +101,7 @@ pub struct XmlTextWriter<'a> {
     ichar: Cow<'static, str>,
     // character used for quoting attribute values
     qchar: u8,
-    ctxt: Option<Rc<RefCell<XmlParserCtxt>>>,
+    ctxt: Option<Rc<RefCell<XmlParserCtxt<'a>>>>,
     no_doc_free: i32,
     doc: Option<XmlDocPtr>,
 }
@@ -179,7 +179,7 @@ impl<'a> XmlTextWriter<'a> {
     ///
     /// Returns the new xmlTextWriterPtr or NULL in case of error
     #[doc(alias = "xmlNewTextWriterPushParser")]
-    pub fn from_push_parser(ctxt: Rc<RefCell<XmlParserCtxt>>) -> Option<Self> {
+    pub fn from_push_parser(ctxt: Rc<RefCell<XmlParserCtxt<'a>>>) -> Option<Self> {
         let Some(out) = XmlOutputBuffer::from_writer(
             TextWriterPushContext {
                 context: ctxt.clone(),
@@ -2029,11 +2029,11 @@ unsafe fn xml_text_writer_close_doc_callback(context: &mut XmlParserCtxt) -> i32
     }
 }
 
-struct TextWriterPushContext {
-    context: Rc<RefCell<XmlParserCtxt>>,
+struct TextWriterPushContext<'a> {
+    context: Rc<RefCell<XmlParserCtxt<'a>>>,
 }
 
-impl Write for TextWriterPushContext {
+impl Write for TextWriterPushContext<'_> {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         let res =
             unsafe { xml_text_writer_write_doc_callback(&mut self.context.borrow_mut(), buf) };
@@ -2048,7 +2048,7 @@ impl Write for TextWriterPushContext {
     }
 }
 
-impl Drop for TextWriterPushContext {
+impl Drop for TextWriterPushContext<'_> {
     fn drop(&mut self) {
         unsafe {
             xml_text_writer_close_doc_callback(&mut self.context.borrow_mut());

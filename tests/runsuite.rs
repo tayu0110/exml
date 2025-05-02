@@ -115,13 +115,13 @@ fn test_external_entity_loader(
     url: Option<&str>,
     id: Option<&str>,
     ctxt: &mut XmlParserCtxt,
-) -> Option<XmlParserInput> {
+) -> Option<XmlParserInput<'static>> {
     unsafe {
         for i in 0..NB_ENTITIES {
             if TEST_ENTITIES_NAME[i].as_deref() == url {
                 let mut ret = XmlParserInput::from_str(
                     Some(ctxt),
-                    &CStr::from_ptr(TEST_ENTITIES_VALUE[i]).to_string_lossy(),
+                    CStr::from_ptr(TEST_ENTITIES_VALUE[i]).to_str().unwrap(),
                 );
                 if let Some(ret) = ret.as_mut() {
                     ret.filename = Some(TEST_ENTITIES_NAME[i].as_deref().unwrap().to_owned());
@@ -448,8 +448,7 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: Option<XmlNodePtr>) -> 
                 // We are ready to run the test
                 mem = xml_mem_used();
                 EXTRA_MEMORY_FROM_RESOLVER.store(0, Ordering::Relaxed);
-                let buffer = buf.clone();
-                if let Some(doc) = xml_read_memory(buffer, Some("test"), None, 0) {
+                if let Some(doc) = xml_read_memory(&buf, Some("test"), None, 0) {
                     NB_TESTS.fetch_add(1, Ordering::Relaxed);
                     ctxt = xml_relaxng_new_valid_ctxt(rng);
                     xml_relaxng_set_valid_errors(
@@ -518,8 +517,7 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: Option<XmlNodePtr>) -> 
                 // We are ready to run the test
                 mem = xml_mem_used();
                 EXTRA_MEMORY_FROM_RESOLVER.store(0, Ordering::Relaxed);
-                let buffer = buf.clone();
-                if let Some(doc) = xml_read_memory(buffer, Some("test"), None, 0) {
+                if let Some(doc) = xml_read_memory(&buf, Some("test"), None, 0) {
                     NB_TESTS.fetch_add(1, Ordering::Relaxed);
                     ctxt = xml_relaxng_new_valid_ctxt(rng);
                     xml_relaxng_set_valid_errors(

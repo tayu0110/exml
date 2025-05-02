@@ -384,7 +384,7 @@ impl Default for XmlSchema {
     }
 }
 
-impl XmlSchemaParserCtxt {
+impl XmlSchemaParserCtxt<'_> {
     /// Allocate a new Schema structure.
     ///
     /// Returns the newly allocated structure or NULL in case or error

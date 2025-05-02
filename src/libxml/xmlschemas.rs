@@ -3342,8 +3342,7 @@ pub(crate) unsafe fn xml_schema_add_schema_doc(
                             let mem = from_raw_parts(
                                 schema_buffer as *const u8,
                                 schema_buffer_len as usize,
-                            )
-                            .to_vec();
+                            );
                             // Parse from memory buffer.
                             doc = xml_ctxt_read_memory(
                                 &mut parser_ctxt,
@@ -18555,9 +18554,9 @@ unsafe fn xml_schema_validate_stream_locator(
 /// Returns 0 if the document is schemas valid, a positive error code
 /// number otherwise and -1 in case of internal or API error.
 #[doc(alias = "xmlSchemaValidateStream")]
-pub unsafe fn xml_schema_validate_stream(
-    ctxt: XmlSchemaValidCtxtPtr,
-    input: XmlParserInputBuffer,
+pub unsafe fn xml_schema_validate_stream<'a>(
+    ctxt: XmlSchemaValidCtxtPtr<'a>,
+    input: XmlParserInputBuffer<'a>,
     enc: XmlCharEncoding,
     sax: Option<Box<XmlSAXHandler>>,
     user_data: Option<GenericErrorContext>,
@@ -18626,9 +18625,9 @@ pub unsafe fn xml_schema_validate_stream(
 
 const XML_SAX_PLUG_MAGIC: u32 = 0xdc43ba21;
 
-pub type XmlSchemaSAXPlugPtr = *mut XmlSchemaSAXPlugStruct;
+pub type XmlSchemaSAXPlugPtr<'a> = *mut XmlSchemaSAXPlugStruct<'a>;
 #[repr(C)]
-pub struct XmlSchemaSAXPlugStruct {
+pub struct XmlSchemaSAXPlugStruct<'a> {
     magic: u32,
 
     /* the original callbacks information */
@@ -18639,7 +18638,7 @@ pub struct XmlSchemaSAXPlugStruct {
 
     /* the block plugged back and validation information */
     schemas_sax: XmlSAXHandler,
-    ctxt: XmlSchemaValidCtxtPtr,
+    ctxt: XmlSchemaValidCtxtPtr<'a>,
 }
 
 fn xml_schema_sax_handle_start_element_ns(
@@ -19044,7 +19043,7 @@ fn resolve_entity_split(
     ctxt: &mut XmlParserCtxt,
     public_id: Option<&str>,
     system_id: Option<&str>,
-) -> Option<XmlParserInput> {
+) -> Option<XmlParserInput<'static>> {
     unsafe {
         let user_data = ctxt.user_data.clone().unwrap();
         let lock = user_data.lock();
@@ -19479,11 +19478,11 @@ fn end_element_ns_split(
 /// Returns a pointer to a data structure needed to unplug the validation layer
 /// or NULL in case of errors.
 #[doc(alias = "xmlSchemaSAXPlug")]
-pub unsafe fn xml_schema_sax_plug(
-    ctxt: XmlSchemaValidCtxtPtr,
+pub unsafe fn xml_schema_sax_plug<'a>(
+    ctxt: XmlSchemaValidCtxtPtr<'a>,
     sax: &mut Option<Box<XmlSAXHandler>>,
     user_data: *mut Option<GenericErrorContext>,
-) -> XmlSchemaSAXPlugPtr {
+) -> XmlSchemaSAXPlugPtr<'a> {
     unsafe {
         if ctxt.is_null() || user_data.is_null() {
             return null_mut();
@@ -19605,7 +19604,9 @@ pub unsafe fn xml_schema_sax_plug(
 
             // (*ret).user_data_ptr = user_data;
             (*ret).user_data = (*user_data).clone();
-            *user_data = Some(GenericErrorContext::new(ret));
+            *user_data = Some(GenericErrorContext::new(
+                ret as XmlSchemaSAXPlugPtr<'static>,
+            ));
         } else {
             // go direct, no need for the split block and functions.
             (*ret).schemas_sax.start_element_ns = Some(xml_schema_sax_handle_start_element_ns);
@@ -19618,7 +19619,9 @@ pub unsafe fn xml_schema_sax_plug(
             (*ret).schemas_sax.cdata_block = Some(xml_schema_sax_handle_cdata_section);
             (*ret).schemas_sax.reference = Some(xml_schema_sax_handle_reference);
 
-            (*ret).user_data = Some(GenericErrorContext::new(ctxt));
+            (*ret).user_data = Some(GenericErrorContext::new(
+                ctxt as XmlSchemaValidCtxtPtr<'static>,
+            ));
             *user_data = (*ret).user_data.clone();
         }
         (*ret).user_sax = old_sax;

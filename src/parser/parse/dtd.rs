@@ -33,7 +33,7 @@ use crate::{io::XmlParserInputBuffer, parser::XmlSAXHandler, tree::XmlDtdPtr};
 
 use super::{SAX_COMPAT_MODE, attr_normalize_space};
 
-impl XmlParserCtxt {
+impl XmlParserCtxt<'_> {
     /// Add a defaulted attribute for an element
     #[doc(alias = "xmlAddDefAttrs")]
     fn add_def_attrs(&mut self, fullname: &str, fullattr: &str, value: &str) {

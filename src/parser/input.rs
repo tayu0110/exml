@@ -91,9 +91,9 @@ pub enum XmlParserInputState {
 #[doc(alias = "xmlParserInput")]
 #[repr(C)]
 #[derive(Default)]
-pub struct XmlParserInput {
+pub struct XmlParserInput<'a> {
     // UTF-8 encoded buffer
-    pub buf: Option<XmlParserInputBuffer>,
+    pub buf: Option<XmlParserInputBuffer<'a>>,
     // The file analyzed, if any
     pub filename: Option<String>,
     // the directory/base of the file
@@ -124,7 +124,7 @@ pub struct XmlParserInput {
     pub(crate) entity: Option<XmlEntityPtr>,
 }
 
-impl XmlParserInput {
+impl<'a> XmlParserInput<'a> {
     /// Create a new input stream structure.
     ///
     /// Returns the new input stream or NULL
@@ -156,12 +156,11 @@ impl XmlParserInput {
     ///
     /// Returns the new input stream
     #[doc(alias = "xmlNewStringInputStream")]
-    pub fn from_str(ctxt: Option<&mut XmlParserCtxt>, buffer: &str) -> Option<Self> {
+    pub fn from_str(ctxt: Option<&mut XmlParserCtxt>, buffer: &'a str) -> Option<Self> {
         if get_parser_debug_entities() != 0 {
             generic_error!("new fixed input: {buffer}\n");
         }
-        let Some(buf) =
-            XmlParserInputBuffer::from_memory(buffer.as_bytes().to_vec(), XmlCharEncoding::None)
+        let Some(buf) = XmlParserInputBuffer::from_memory(buffer.as_bytes(), XmlCharEncoding::None)
         else {
             xml_err_memory(ctxt, None);
             return None;
@@ -182,9 +181,9 @@ impl XmlParserInput {
     #[doc(alias = "xmlNewIOInputStream")]
     pub fn from_io(
         ctxt: &mut XmlParserCtxt,
-        input: XmlParserInputBuffer,
+        input: XmlParserInputBuffer<'a>,
         enc: XmlCharEncoding,
-    ) -> Option<XmlParserInput> {
+    ) -> Option<XmlParserInput<'a>> {
         if get_parser_debug_entities() != 0 {
             generic_error!("new input from I/O\n");
         }
@@ -204,7 +203,7 @@ impl XmlParserInput {
     ///
     /// Returns the new input stream or NULL in case of error
     #[doc(alias = "xmlNewInputFromFile")]
-    pub fn from_filename(ctxt: &mut XmlParserCtxt, filename: &str) -> Option<XmlParserInput> {
+    pub fn from_filename(ctxt: &mut XmlParserCtxt, filename: &str) -> Option<XmlParserInput<'a>> {
         if get_parser_debug_entities() != 0 {
             generic_error!("new input from file: {filename}\n");
         }
@@ -244,10 +243,7 @@ impl XmlParserInput {
     ///
     /// Returns the new input stream or NULL
     #[doc(alias = "xmlNewEntityInputStream")]
-    pub(crate) fn from_entity(
-        ctxt: &mut XmlParserCtxt,
-        mut entity: XmlEntityPtr,
-    ) -> Option<XmlParserInput> {
+    pub(crate) fn from_entity(ctxt: &mut XmlParserCtxt, mut entity: XmlEntityPtr) -> Option<Self> {
         if get_parser_debug_entities() != 0 {
             generic_error!("new input from entity: {}\n", entity.name);
         }

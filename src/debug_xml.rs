@@ -2350,7 +2350,7 @@ impl XmlShellCtxt<'_> {
             };
 
             let mut results = None;
-            let ret = xml_parse_in_node_context(node, value.as_bytes().to_vec(), 0, &mut results);
+            let ret = xml_parse_in_node_context(node, value.as_bytes(), 0, &mut results);
             if ret == XmlParserErrors::XmlErrOK {
                 if let Some(children) = node.children() {
                     xml_free_node_list(Some(children));

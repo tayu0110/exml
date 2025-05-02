@@ -75,10 +75,10 @@ use exml::{
     },
     parser::{
         XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SAX2_MAGIC, XmlExternalEntityLoader, XmlParserCtxt,
-        XmlParserInput, XmlParserOption, XmlSAXHandler, XmlSAXLocator, xml_cleanup_parser,
-        xml_ctxt_read_file, xml_ctxt_read_io, xml_ctxt_read_memory, xml_get_external_entity_loader,
-        xml_no_net_external_entity_loader, xml_parse_dtd, xml_read_file, xml_read_io,
-        xml_read_memory, xml_set_external_entity_loader,
+        XmlParserCtxtPtr, XmlParserInput, XmlParserOption, XmlSAXHandler, XmlSAXLocator,
+        xml_cleanup_parser, xml_ctxt_read_file, xml_ctxt_read_io, xml_ctxt_read_memory,
+        xml_get_external_entity_loader, xml_no_net_external_entity_loader, xml_parse_dtd,
+        xml_read_file, xml_read_io, xml_read_memory, xml_set_external_entity_loader,
     },
     relaxng::{
         xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt, xml_relaxng_new_parser_ctxt,
@@ -781,7 +781,7 @@ fn xmllint_external_entity_loader(
     url: Option<&str>,
     id: Option<&str>,
     ctxt: &mut XmlParserCtxt,
-) -> Option<XmlParserInput> {
+) -> Option<XmlParserInput<'static>> {
     unsafe {
         let mut warning: Option<GenericError> = None;
         let mut err: Option<GenericError> = None;
@@ -860,12 +860,16 @@ fn xmllint_external_entity_loader(
             }
             if let Some(url) = url {
                 warning(
-                    Some(GenericErrorContext::new(ctxt as *mut XmlParserCtxt)),
+                    Some(GenericErrorContext::new(
+                        ctxt as XmlParserCtxtPtr as XmlParserCtxtPtr<'static>,
+                    )),
                     format!("failed to load external entity \"{url}\"\n").as_str(),
                 );
             } else if let Some(id) = id {
                 warning(
-                    Some(GenericErrorContext::new(ctxt as *mut XmlParserCtxt)),
+                    Some(GenericErrorContext::new(
+                        ctxt as XmlParserCtxtPtr as XmlParserCtxtPtr<'static>,
+                    )),
                     format!("failed to load external entity \"{id}\"\n").as_str(),
                 );
             }
@@ -1344,7 +1348,7 @@ fn resolve_entity_debug(
     _ctx: &mut XmlParserCtxt,
     public_id: Option<&str>,
     system_id: Option<&str>,
-) -> Option<XmlParserInput> {
+) -> Option<XmlParserInput<'static>> {
     CALLBACKS.fetch_add(1, Ordering::Relaxed);
     if CMD_ARGS.noout {
         return None;
@@ -1993,17 +1997,17 @@ unsafe fn stream_file(filename: &str) {
 
         let mut ret: i32;
 
+        let mut mem = vec![];
         let reader = if CMD_ARGS.memory {
             let Ok(mut file) = File::open(filename) else {
                 return;
             };
-            let mut mem = vec![];
             if file.read_to_end(&mut mem).is_err() {
                 eprintln!("mmap failure for file {}", filename);
                 PROGRESULT.store(ERR_RDFILE, Ordering::Relaxed);
                 return;
             }
-            xml_reader_for_memory(mem, Some(filename), None, OPTIONS.load(Ordering::Relaxed))
+            xml_reader_for_memory(&mem, Some(filename), None, OPTIONS.load(Ordering::Relaxed))
         } else {
             xml_reader_for_file(filename, None, OPTIONS.load(Ordering::Relaxed))
         };
@@ -2382,7 +2386,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: Option<XmlParserC
                     return;
                 }
 
-                html_read_memory(mem, filename, None, OPTIONS.load(Ordering::Relaxed))
+                html_read_memory(&mem, filename, None, OPTIONS.load(Ordering::Relaxed))
             }
             #[cfg(feature = "html")]
             _ if CMD_ARGS.html => {
@@ -2488,13 +2492,13 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: Option<XmlParserC
                 if let Some(mut rectxt) = rectxt {
                     xml_ctxt_read_memory(
                         &mut rectxt,
-                        mem,
+                        &mem,
                         filename,
                         None,
                         OPTIONS.load(Ordering::Relaxed),
                     )
                 } else {
-                    xml_read_memory(mem, filename, None, OPTIONS.load(Ordering::Relaxed))
+                    xml_read_memory(&mem, filename, None, OPTIONS.load(Ordering::Relaxed))
                 }
             }
             #[cfg(feature = "libxml_valid")]

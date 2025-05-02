@@ -8,11 +8,11 @@ mod taginfo;
 pub mod tree;
 
 // Most of the back-end structures from XML and HTML are shared.
-pub type HtmlParserCtxt = XmlParserCtxt;
-pub type HtmlParserCtxtPtr = XmlParserCtxtPtr;
+pub type HtmlParserCtxt<'a> = XmlParserCtxt<'a>;
+pub type HtmlParserCtxtPtr<'a> = XmlParserCtxtPtr<'a>;
 pub type HtmlParserNodeInfo = XmlParserNodeInfo;
 pub type HtmlSAXHandler = XmlSAXHandler;
 // pub type HtmlSAXHandlerPtr = XmlSAXHandlerPtr;
-pub type HtmlParserInput = XmlParserInput;
+pub type HtmlParserInput<'a> = XmlParserInput<'a>;
 pub type HtmlDocPtr = XmlDocPtr;
 pub type HtmlNodePtr = XmlNodePtr;

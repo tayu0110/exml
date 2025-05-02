@@ -68,7 +68,7 @@ fn test_external_entity_loader(
     url: Option<&str>,
     _id: Option<&str>,
     ctxt: &mut XmlParserCtxt,
-) -> Option<XmlParserInput> {
+) -> Option<XmlParserInput<'static>> {
     XmlParserInput::from_filename(&mut *ctxt, url.unwrap())
 }
 

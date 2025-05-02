@@ -107,7 +107,7 @@ fn test_external_entity_loader(
     url: Option<&str>,
     id: Option<&str>,
     ctxt: &mut XmlParserCtxt,
-) -> Option<XmlParserInput> {
+) -> Option<XmlParserInput<'static>> {
     unsafe {
         if check_test_file(url.unwrap()) {
             xml_no_net_external_entity_loader(url, id, ctxt)
@@ -655,7 +655,7 @@ fn resolve_entity_debug(
     _ctx: &mut XmlParserCtxt,
     public_id: Option<&str>,
     system_id: Option<&str>,
-) -> Option<XmlParserInput> {
+) -> Option<XmlParserInput<'static>> {
     increment_callbacks_counter();
     // xmlParserCtxtPtr ctxt = (xmlParserCtxtPtr) ctx;
 
@@ -2048,7 +2048,7 @@ unsafe fn mem_parse_test(
             return -1;
         };
 
-        let doc = xml_read_memory(buffer, Some(filename), None, 0);
+        let doc = xml_read_memory(&buffer, Some(filename), None, 0);
         let Some(mut doc) = doc else {
             return 1;
         };
@@ -2388,7 +2388,8 @@ unsafe fn stream_mem_parse_test(
             eprintln!("Failed to load {filename}");
             return -1;
         };
-        let reader: XmlTextReaderPtr = xml_reader_for_memory(buffer, Some(filename), None, options);
+        let reader: XmlTextReaderPtr =
+            xml_reader_for_memory(&buffer, Some(filename), None, options);
         let ret: i32 = stream_process_test(filename, result, err, reader, None, options);
         xml_free_text_reader(reader);
         ret

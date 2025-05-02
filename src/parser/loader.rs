@@ -12,8 +12,11 @@ use super::{XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput, XmlParserOption};
 ///
 /// Returns the entity input parser.
 #[doc(alias = "xmlExternalEntityLoader")]
-pub type XmlExternalEntityLoader =
-    fn(url: Option<&str>, id: Option<&str>, context: &mut XmlParserCtxt) -> Option<XmlParserInput>;
+pub type XmlExternalEntityLoader = fn(
+    url: Option<&str>,
+    id: Option<&str>,
+    context: &mut XmlParserCtxt,
+) -> Option<XmlParserInput<'static>>;
 
 static XML_CURRENT_EXTERNAL_ENTITY_LOADER: RwLock<XmlExternalEntityLoader> =
     RwLock::new(xml_default_external_entity_loader);
@@ -39,7 +42,7 @@ pub fn xml_load_external_entity(
     url: Option<&str>,
     id: Option<&str>,
     ctxt: &mut XmlParserCtxt,
-) -> Option<XmlParserInput> {
+) -> Option<XmlParserInput<'static>> {
     let loader = xml_get_external_entity_loader();
     if let Some(url) = url.filter(|_| xml_no_net_exists(url) == 0) {
         let canonic_filename = canonic_path(url);
@@ -56,7 +59,7 @@ pub(crate) fn xml_default_external_entity_loader(
     url: Option<&str>,
     id: Option<&str>,
     ctxt: &mut XmlParserCtxt,
-) -> Option<XmlParserInput> {
+) -> Option<XmlParserInput<'static>> {
     if ctxt.options & XmlParserOption::XmlParseNoNet as i32 != 0 {
         let options = ctxt.options;
 
@@ -184,7 +187,7 @@ pub fn xml_no_net_external_entity_loader(
     url: Option<&str>,
     id: Option<&str>,
     ctxt: &mut XmlParserCtxt,
-) -> Option<XmlParserInput> {
+) -> Option<XmlParserInput<'static>> {
     #[cfg(feature = "catalog")]
     let resource =
         xml_resolve_resource_from_catalog(url, id, ctxt).or_else(|| url.map(|u| u.to_owned()));

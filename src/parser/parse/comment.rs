@@ -9,7 +9,7 @@ use crate::{
     },
 };
 
-impl XmlParserCtxt {
+impl XmlParserCtxt<'_> {
     /// Skip an XML (SGML) comment `<!-- .... -->`.  
     /// The spec says that "For compatibility, the string `"--"` (double-hyphen)
     /// must not occur within comments."  
@@ -283,7 +283,7 @@ mod tests {
         }
     }
 
-    fn make_parser_context() -> XmlParserCtxt {
+    fn make_parser_context<'a>() -> XmlParserCtxt<'a> {
         XmlParserCtxt::new_sax_parser(Some(Box::new(make_sax_handler_only_comment())), None)
             .unwrap()
     }
@@ -291,7 +291,7 @@ mod tests {
     fn do_test(docs: &[(&str, &str)]) {
         for &(doc, res) in docs {
             let mut ctxt = make_parser_context();
-            xml_ctxt_read_memory(&mut ctxt, doc.as_bytes().to_vec(), None, None, 0);
+            xml_ctxt_read_memory(&mut ctxt, doc.as_bytes(), None, None, 0);
             let result = RESULT.with_borrow(|result| result.clone());
             assert_eq!(result, res);
             RESULT.with_borrow_mut(|result| result.clear());

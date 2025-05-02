@@ -555,7 +555,7 @@ pub(crate) fn check_language_id(lang: &str) -> bool {
 /// Returns the resulting document tree
 #[doc(alias = "xmlReadDoc")]
 pub fn xml_read_doc(
-    cur: Vec<u8>,
+    cur: &[u8],
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
@@ -580,7 +580,7 @@ pub fn xml_read_file(filename: &str, encoding: Option<&str>, options: i32) -> Op
 /// Returns the resulting document tree
 #[doc(alias = "xmlReadMemory")]
 pub fn xml_read_memory(
-    buffer: Vec<u8>,
+    buffer: &[u8],
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
@@ -593,8 +593,8 @@ pub fn xml_read_memory(
 ///
 /// Returns the resulting document tree
 #[doc(alias = "xmlReadIO")]
-pub fn xml_read_io(
-    ioctx: impl Read + 'static,
+pub fn xml_read_io<'a>(
+    ioctx: impl Read + 'a,
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
@@ -613,9 +613,9 @@ pub fn xml_read_io(
 ///
 /// Returns the resulting document tree
 #[doc(alias = "xmlCtxtReadDoc")]
-pub fn xml_ctxt_read_doc(
-    ctxt: &mut XmlParserCtxt,
-    cur: Vec<u8>,
+pub fn xml_ctxt_read_doc<'a>(
+    ctxt: &mut XmlParserCtxt<'a>,
+    cur: &'a [u8],
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
@@ -648,9 +648,9 @@ pub fn xml_ctxt_read_file(
 ///
 /// Returns the resulting document tree
 #[doc(alias = "xmlCtxtReadMemory")]
-pub fn xml_ctxt_read_memory(
-    ctxt: &mut XmlParserCtxt,
-    buffer: Vec<u8>,
+pub fn xml_ctxt_read_memory<'a>(
+    ctxt: &mut XmlParserCtxt<'a>,
+    buffer: &'a [u8],
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
@@ -669,9 +669,9 @@ pub fn xml_ctxt_read_memory(
 ///
 /// Returns the resulting document tree
 #[doc(alias = "xmlCtxtReadIO")]
-pub fn xml_ctxt_read_io(
-    ctxt: &mut XmlParserCtxt,
-    ioctx: impl Read + 'static,
+pub fn xml_ctxt_read_io<'a>(
+    ctxt: &mut XmlParserCtxt<'a>,
+    ioctx: impl Read + 'a,
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,

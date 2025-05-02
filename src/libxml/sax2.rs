@@ -413,7 +413,7 @@ pub fn xml_sax2_resolve_entity(
     ctxt: &mut XmlParserCtxt,
     public_id: Option<&str>,
     system_id: Option<&str>,
-) -> Option<XmlParserInput> {
+) -> Option<XmlParserInput<'static>> {
     let base = if let Some(input) = ctxt.input() {
         input
             .filename

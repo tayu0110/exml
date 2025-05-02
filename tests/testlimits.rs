@@ -374,7 +374,7 @@ fn test_external_entity_loader(
     url: Option<&str>,
     id: Option<&str>,
     ctxt: &mut XmlParserCtxt,
-) -> Option<XmlParserInput> {
+) -> Option<XmlParserInput<'static>> {
     unsafe {
         let memused: i32 = xml_mem_used();
 
@@ -695,7 +695,7 @@ fn resolve_entity_callback(
     _ctx: &mut XmlParserCtxt,
     _public_id: Option<&str>,
     _system_id: Option<&str>,
-) -> Option<XmlParserInput> {
+) -> Option<XmlParserInput<'static>> {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
     None
 }

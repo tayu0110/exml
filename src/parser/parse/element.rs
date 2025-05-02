@@ -12,7 +12,7 @@ use crate::{
     uri::XmlURI,
 };
 
-impl XmlParserCtxt {
+impl XmlParserCtxt<'_> {
     /// parse an XML element
     ///
     /// ```text

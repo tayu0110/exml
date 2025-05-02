@@ -12,7 +12,7 @@ use crate::{
     valid::xml_is_mixed_element,
 };
 
-impl XmlParserCtxt {
+impl XmlParserCtxt<'_> {
     /// Is this a sequence of blank chars that one can ignore ?
     ///
     /// Returns 1 if ignorable 0 otherwise.
@@ -85,7 +85,7 @@ impl XmlParserCtxt {
     /// of xmlParseCharData() when the parsing requires handling
     /// of non-ASCII characters.
     #[doc(alias = "xmlParseCharDataComplex")]
-    fn parse_char_data_complex(self: &mut XmlParserCtxt, partial: i32) {
+    fn parse_char_data_complex(&mut self, partial: i32) {
         let mut l: i32 = 0;
 
         let mut buf = String::with_capacity(XML_PARSER_BIG_BUFFER_SIZE + 5);

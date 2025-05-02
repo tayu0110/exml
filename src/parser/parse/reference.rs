@@ -17,7 +17,7 @@ use crate::{
     },
 };
 
-impl XmlParserCtxt {
+impl XmlParserCtxt<'_> {
     /// Parse a numeric character reference. Always consumes '&'.
     ///
     /// ```text
