@@ -1169,12 +1169,11 @@ impl<'a> XmlParserCtxt<'a> {
     /// Returns the current char value and its length
     #[doc(alias = "xmlCurrentChar")]
     pub(crate) fn current_char(&mut self, len: &mut i32) -> Option<char> {
-        let input = self.input()?;
         if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
             return None;
         }
 
-        if input.remainder_len() < INPUT_CHUNK && self.force_grow() < 0 {
+        if self.input()?.remainder_len() < INPUT_CHUNK && self.force_grow() < 0 {
             return None;
         }
 
@@ -1197,64 +1196,80 @@ impl<'a> XmlParserCtxt<'a> {
             }
             return Some(self.current_byte() as char);
         }
-        let content = self.content_bytes();
-        let l = 4.min(content.len());
-        let c = match from_utf8(&content[..l]) {
-            Ok(s) => {
-                let Some(c) = s.chars().next() else {
-                    *len = 0;
-                    return None;
-                };
-                *len = c.len_utf8() as i32;
-                c
-            }
-            Err(e) if e.valid_up_to() > 0 => {
-                let s = unsafe {
+
+        *len = 0;
+        let input = self.input().unwrap();
+        let c = if let Some(buf) = input.buf.as_ref() {
+            if buf.encoder.is_some() {
+                unsafe {
                     // # Safety
-                    // Refer to the documents for `from_utf8_unchecked` and `Utf8Error`.
-                    from_utf8_unchecked(&content[..e.valid_up_to()])
-                };
-                let c = s.chars().next().unwrap();
-                *len = c.len_utf8() as i32;
-                c
-            }
-            Err(e) => {
-                match e.error_len() {
-                    Some(l) => {
-                        *len = l as i32;
-                        // If we detect an UTF8 error that probably mean that the
-                        // input encoding didn't get properly advertised in the
-                        // declaration header. Report the error and switch the encoding
-                        // to ISO-Latin-1 (if you don't like this policy, just declare the encoding !)
-                        if self.input().unwrap().remainder_len() < 4 {
-                            __xml_err_encoding!(
-                                self,
-                                XmlParserErrors::XmlErrInvalidChar,
-                                "Input is not proper UTF-8, indicate encoding !\n"
-                            );
-                        } else {
-                            let buffer = format!(
-                                "Bytes: 0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}\n",
-                                content[0], content[1], content[2], content[3],
-                            );
-                            __xml_err_encoding!(
-                                self,
-                                XmlParserErrors::XmlErrInvalidChar,
-                                "Input is not proper UTF-8, indicate encoding !\n{}",
-                                buffer
-                            );
-                        }
-                        self.charset = XmlCharEncoding::ISO8859_1;
-                        *len = 1;
-                        return Some(self.current_byte() as char);
+                    // If `buf.encoder` is `Some`, `buf.buffer` is decoded by `buf.encoder`.
+                    // Decoded buffer is already validated as UTF-8 byte sequence,
+                    // so this function works well.
+                    from_utf8_unchecked(&buf.buffer[input.cur..])
+                        .chars()
+                        .next()?
+                }
+            } else {
+                let l = 4.min(buf.buffer[input.cur..].len());
+                match from_utf8(&buf.buffer[input.cur..][..l]) {
+                    Ok(s) => s.chars().next()?,
+                    Err(e) if e.valid_up_to() > 0 => {
+                        let s = unsafe {
+                            // # Safety
+                            // Refer to the documents for `from_utf8_unchecked` and `Utf8Error`.
+                            from_utf8_unchecked(&buf.buffer[input.cur..][..e.valid_up_to()])
+                        };
+                        s.chars().next().unwrap()
                     }
-                    None => {
-                        *len = 0;
-                        return Some('\0');
+                    Err(e) => {
+                        return match e.error_len() {
+                            Some(_) => {
+                                // If we detect an UTF8 error that probably mean that the
+                                // input encoding didn't get properly advertised in the
+                                // declaration header. Report the error and switch the encoding
+                                // to ISO-Latin-1 (if you don't like this policy, just declare the encoding !)
+                                if self.input().unwrap().remainder_len() < 4 {
+                                    __xml_err_encoding!(
+                                        self,
+                                        XmlParserErrors::XmlErrInvalidChar,
+                                        "Input is not proper UTF-8, indicate encoding !\n"
+                                    );
+                                } else {
+                                    let buffer = format!(
+                                        "Bytes: 0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}\n",
+                                        buf.buffer[input.cur],
+                                        buf.buffer[input.cur + 1],
+                                        buf.buffer[input.cur + 2],
+                                        buf.buffer[input.cur + 3],
+                                    );
+                                    __xml_err_encoding!(
+                                        self,
+                                        XmlParserErrors::XmlErrInvalidChar,
+                                        "Input is not proper UTF-8, indicate encoding !\n{}",
+                                        buffer
+                                    );
+                                }
+                                self.charset = XmlCharEncoding::ISO8859_1;
+                                *len = 1;
+                                Some(self.current_byte() as char)
+                            }
+                            None => Some('\0'),
+                        };
                     }
                 }
             }
+        } else if let Some(content) = input
+            .entity
+            .as_deref()
+            .and_then(|ent| ent.content.as_deref())
+        {
+            content[input.cur..].chars().next()?
+        } else {
+            return None;
         };
+        *len = c.len_utf8() as i32;
+
         if (*len > 1 && !xml_is_char(c as u32))
             || (*len == 1 && c == '\0' && !self.content_bytes().is_empty())
         {
