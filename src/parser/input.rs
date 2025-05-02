@@ -52,7 +52,10 @@ use crate::{
     uri::canonic_path,
 };
 
-use super::{XmlParserCtxt, XmlParserCtxtPtr, xml_err_memory, xml_load_external_entity};
+use super::{
+    INPUT_CHUNK, LINE_LEN, XmlParserCtxt, XmlParserCtxtPtr, xml_err_memory,
+    xml_load_external_entity,
+};
 
 /// The parser is now working also as a state based parser.
 /// The recursive one use the state info for entities processing.
@@ -355,20 +358,27 @@ impl<'a> XmlParserInput<'a> {
         self.base
     }
 
-    /// Update the input to use the base and cur relative to the buffer
-    /// after a possible reallocation of its content
+    /// Reduce buffer capacity.  
+    /// The `base` and `cur` are automatically aligned according to the number of bytes removed.
     ///
-    /// Returns -1 in case of error, 0 otherwise
-    #[doc(alias = "xmlBufSetInputBaseCur")]
-    pub(crate) fn set_base_and_cursor(&mut self, base: usize, cur: usize) -> i32 {
+    /// # Panics
+    /// - The `buf` must not be `None`.
+    pub(crate) fn shrink(&mut self) {
+        if self.cur <= INPUT_CHUNK {
+            return;
+        }
+
+        let buf = self.buf.as_mut().unwrap();
+        let diff = self.cur - LINE_LEN;
+        self.consumed = self.consumed.saturating_add(diff as u64);
+        buf.buffer.drain(..diff);
         if self.cur < self.valid_up_to {
-            self.valid_up_to = cur + (self.valid_up_to - self.cur);
+            self.valid_up_to -= diff;
         } else {
             self.valid_up_to = 0;
         }
-        self.base = base;
-        self.cur = cur;
-        0
+        self.base = 0;
+        self.cur = LINE_LEN;
     }
 
     #[doc(alias = "xmlDetectEBCDIC")]

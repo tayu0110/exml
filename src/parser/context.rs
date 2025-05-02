@@ -35,10 +35,10 @@ use crate::{
         },
     },
     parser::{
-        __xml_err_encoding, INPUT_CHUNK, LINE_LEN, XML_COMPLETE_ATTRS, XML_DETECT_IDS,
-        XML_MAX_LOOKUP_LIMIT, XML_PARSER_MAX_DEPTH, XML_VCTXT_USE_PCTXT, XmlParserInputState,
-        XmlSAXHandler, XmlStartTag, xml_err_encoding_int, xml_err_internal, xml_fatal_err_msg_int,
-        xml_fatal_err_msg_str, xml_init_parser,
+        __xml_err_encoding, INPUT_CHUNK, XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_MAX_LOOKUP_LIMIT,
+        XML_PARSER_MAX_DEPTH, XML_VCTXT_USE_PCTXT, XmlParserInputState, XmlSAXHandler, XmlStartTag,
+        xml_err_encoding_int, xml_err_internal, xml_fatal_err_msg_int, xml_fatal_err_msg_str,
+        xml_init_parser,
     },
     tree::{
         XML_ENT_EXPANDING, XML_ENT_PARSED, XML_XML_NAMESPACE, XmlAttrPtr, XmlAttributeType,
@@ -721,7 +721,6 @@ impl<'a> XmlParserCtxt<'a> {
         let input = self.input_mut().unwrap();
 
         // Don't shrink pull parser memory buffers.
-        let mut used = input.offset_from_base();
         let Some(buf) = input.buf.as_mut() else {
             return;
         };
@@ -730,14 +729,7 @@ impl<'a> XmlParserCtxt<'a> {
         }
 
         // Do not shrink on large buffers whose only a tiny fraction was consumed
-        if used > INPUT_CHUNK && used - LINE_LEN > 0 {
-            let diff = used - LINE_LEN;
-            buf.trim_head(diff);
-            used -= diff;
-            input.consumed = input.consumed.saturating_add(diff as u64);
-        }
-
-        input.set_base_and_cursor(0, used);
+        input.shrink();
     }
 
     pub(crate) fn shrink(&mut self) {
