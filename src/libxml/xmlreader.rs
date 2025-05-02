@@ -212,7 +212,7 @@ pub struct XmlTextReader<'a> {
     // base of the segment in the input
     base: u32,
     // current position in the input
-    cur: u32,
+    cur: usize,
     // current node
     node: Option<XmlGenericNodePtr>,
     // current attribute node
@@ -403,8 +403,8 @@ impl<'a> XmlTextReader<'a> {
         self.node = None;
         self.curnode = None;
         if replaced {
-            if self.input.as_ref().unwrap().buffer.len() < 4 {
-                self.input.as_mut().unwrap().read(4);
+            if let Some(input) = self.input.as_mut().filter(|input| input.buffer.len() < 4) {
+                input.read(4);
             }
             let enc = XmlCharEncoding::None;
 
@@ -518,8 +518,9 @@ impl<'a> XmlTextReader<'a> {
                         && (self.mode != XmlTextReaderMode::XmlTextreaderModeEof
                             && self.state != XmlTextReaderState::Done)
                 } {}
-                if self.ctxt.as_deref_mut().unwrap().node.is_none() {
-                    if let Some(my_doc) = self.ctxt.as_deref_mut().unwrap().my_doc {
+                let ctxt = self.ctxt.as_deref_mut().unwrap();
+                if ctxt.node.is_none() {
+                    if let Some(my_doc) = ctxt.my_doc {
                         self.node = my_doc.children;
                     }
                     if self.node.is_none() {
@@ -529,16 +530,16 @@ impl<'a> XmlTextReader<'a> {
                     }
                     self.state = XmlTextReaderState::Element;
                 } else {
-                    if let Some(my_doc) = self.ctxt.as_deref_mut().unwrap().my_doc {
+                    if let Some(my_doc) = ctxt.my_doc {
                         self.node = my_doc.children;
                     }
                     if self.node.is_none() {
-                        self.node = Some(self.ctxt.as_deref_mut().unwrap().node_tab[0].into());
+                        self.node = Some(ctxt.node_tab[0].into());
                     }
                     self.state = XmlTextReaderState::Element;
                 }
                 self.depth = 0;
-                self.ctxt.as_deref_mut().unwrap().parse_mode = XmlParserMode::XmlParseReader;
+                ctxt.parse_mode = XmlParserMode::XmlParseReader;
                 // goto node_found;
                 node_found = true;
             } else {
@@ -568,22 +569,16 @@ impl<'a> XmlTextReader<'a> {
                                 cur_node.next().is_none()
                                     && self.ctxt.as_deref_mut().unwrap().node_tab.len() == olddepth
                                     && (oldstate == XmlTextReaderState::Backtrack
-                                        || cur_node.children().is_none()
-                                        || cur_node.element_type()
-                                            == XmlElementType::XmlEntityRefNode
-                                        || cur_node
-                                            .children()
-                                            .filter(|children| {
-                                                children.element_type()
-                                                    == XmlElementType::XmlTextNode
-                                                    && children.next().is_none()
-                                            })
-                                            .is_some()
+                                        || cur_node.children().is_none_or(|children| {
+                                            children.element_type() == XmlElementType::XmlTextNode
+                                                && children.next().is_none()
+                                        })
                                         || matches!(
                                             cur_node.element_type(),
                                             XmlElementType::XmlDTDNode
                                                 | XmlElementType::XmlDocumentNode
                                                 | XmlElementType::XmlHTMLDocumentNode
+                                                | XmlElementType::XmlEntityRefNode
                                         ))
                                     && self.ctxt.as_deref_mut().unwrap().node.is_none_or(|node| {
                                         cur_node == XmlGenericNodePtr::from(node)
@@ -608,15 +603,19 @@ impl<'a> XmlTextReader<'a> {
                                 return 0;
                             }
                         }
-                        if let Some(children) = self.node.unwrap().children().filter(|_| {
-                            oldstate != XmlTextReaderState::Backtrack
-                                && !matches!(
-                                    self.node.unwrap().element_type(),
-                                    XmlElementType::XmlEntityRefNode
-                                        | XmlElementType::XmlXIncludeStart
-                                        | XmlElementType::XmlDTDNode
-                                )
-                        }) {
+                        if let Some(children) = self
+                            .node
+                            .filter(|node| {
+                                oldstate != XmlTextReaderState::Backtrack
+                                    && !matches!(
+                                        node.element_type(),
+                                        XmlElementType::XmlEntityRefNode
+                                            | XmlElementType::XmlXIncludeStart
+                                            | XmlElementType::XmlDTDNode
+                                    )
+                            })
+                            .and_then(|node| node.children())
+                        {
                             self.node = Some(children);
                             self.depth += 1;
                             self.state = XmlTextReaderState::Element;
@@ -628,12 +627,14 @@ impl<'a> XmlTextReader<'a> {
                             #[cfg(feature = "xinclude")]
                             let f = self.in_xinclude <= 0;
                             if oldstate == XmlTextReaderState::Element
-                                && self.node.unwrap().element_type()
-                                    == XmlElementType::XmlElementNode
-                                && self.node.unwrap().children().is_none()
-                                && XmlNodePtr::try_from(self.node.unwrap()).unwrap().extra
-                                    & NODE_IS_EMPTY as u16
-                                    == 0
+                                && self
+                                    .node
+                                    .filter(|node| {
+                                        node.element_type() == XmlElementType::XmlElementNode
+                                    })
+                                    .filter(|node| node.children().is_none())
+                                    .and_then(|node| XmlNodePtr::try_from(node).ok())
+                                    .is_some_and(|node| node.extra & NODE_IS_EMPTY as u16 == 0)
                                 && f
                             {
                                 self.state = XmlTextReaderState::End;
@@ -661,19 +662,15 @@ impl<'a> XmlTextReader<'a> {
                             let f = true;
                             #[cfg(feature = "xinclude")]
                             let f = self.in_xinclude == 0;
-                            if self.preserves == 0
-                                && f
-                                && self.ent_tab.is_empty()
-                                && self.node.unwrap().prev().is_some_and(|prev| {
+                            if let Some(prev) =
+                                self.node.and_then(|node| node.prev()).filter(|prev| {
                                     prev.element_type() != XmlElementType::XmlDTDNode
+                                        && self.preserves == 0
+                                        && f
+                                        && self.ent_tab.is_empty()
                                 })
                             {
-                                let mut tmp = self
-                                    .node
-                                    .unwrap()
-                                    .prev()
-                                    .map(|prev| XmlNodePtr::try_from(prev).unwrap())
-                                    .unwrap();
+                                let mut tmp = XmlNodePtr::try_from(prev).unwrap();
                                 if tmp.extra & NODE_IS_PRESERVED as u16 == 0 {
                                     if oldnode == Some(tmp.into()) {
                                         oldnode = None;
@@ -686,11 +683,13 @@ impl<'a> XmlTextReader<'a> {
                             break 'goto_node_found;
                         }
                         if oldstate == XmlTextReaderState::Element
-                            && self.node.unwrap().element_type() == XmlElementType::XmlElementNode
-                            && self.node.unwrap().children().is_none()
-                            && XmlNodePtr::try_from(self.node.unwrap()).unwrap().extra
-                                & NODE_IS_EMPTY as u16
-                                == 0
+                            && self.node.is_some_and(|node| {
+                                node.element_type() == XmlElementType::XmlElementNode
+                                    && node.children().is_none()
+                                    && XmlNodePtr::try_from(node).unwrap().extra
+                                        & NODE_IS_EMPTY as u16
+                                        == 0
+                            })
                         {
                             self.state = XmlTextReaderState::End;
                             break 'goto_node_found;
@@ -709,13 +708,13 @@ impl<'a> XmlTextReader<'a> {
                             self.preserves -= 1;
                         }
                         self.node = self.node.unwrap().parent();
-                        if self.node.is_none()
-                            || matches!(
-                                self.node.unwrap().element_type(),
+                        if self.node.is_none_or(|node| {
+                            matches!(
+                                node.element_type(),
                                 XmlElementType::XmlDocumentNode
                                     | XmlElementType::XmlHTMLDocumentNode
                             )
-                        {
+                        }) {
                             if self.mode != XmlTextReaderMode::XmlTextreaderModeEof {
                                 val = self.ctxt.as_deref_mut().unwrap().parse_chunk(b"", 1);
                                 self.state = XmlTextReaderState::Done;
@@ -755,12 +754,10 @@ impl<'a> XmlTextReader<'a> {
                         if self.preserves == 0
                             && f
                             && self.ent_tab.is_empty()
-                            && self.node.unwrap().last().is_some()
-                            && XmlNodePtr::try_from(self.node.unwrap().last().unwrap())
-                                .unwrap()
-                                .extra
-                                & NODE_IS_PRESERVED as u16
-                                == 0
+                            && self.node.and_then(|node| node.last()).is_some_and(|last| {
+                                XmlNodePtr::try_from(last).unwrap().extra & NODE_IS_PRESERVED as u16
+                                    == 0
+                            })
                         {
                             let mut tmp = self.node.unwrap().last().unwrap();
                             tmp.unlink();
@@ -780,8 +777,8 @@ impl<'a> XmlTextReader<'a> {
                     node.next().is_none()
                         && (node.element_type() == XmlElementType::XmlTextNode
                             || node.element_type() == XmlElementType::XmlCDATASectionNode)
-                        && self.expand().is_none()
-                }) {
+                }) && self.expand().is_none()
+                {
                     return -1;
                 }
 
@@ -793,16 +790,12 @@ impl<'a> XmlTextReader<'a> {
                         && self.state != XmlTextReaderState::Backtrack
                         && self
                             .node
-                            .and_then(|node| {
-                                XmlNodePtr::try_from(node).ok().filter(|node| {
-                                    node.element_type() == XmlElementType::XmlElementNode
-                                })
-                            })
-                            .is_some_and(|node| {
-                                node.ns.is_some_and(|ns| {
-                                    ns.href.as_deref() == Some(XINCLUDE_NS)
-                                        || ns.href.as_deref() == Some(XINCLUDE_OLD_NS)
-                                })
+                            .and_then(|node| XmlNodePtr::try_from(node).ok())
+                            .filter(|node| node.element_type() == XmlElementType::XmlElementNode)
+                            .and_then(|node| node.ns)
+                            .is_some_and(|ns| {
+                                ns.href.as_deref() == Some(XINCLUDE_NS)
+                                    || ns.href.as_deref() == Some(XINCLUDE_OLD_NS)
                             })
                     {
                         if self.xincctxt.is_none() {
@@ -864,8 +857,9 @@ impl<'a> XmlTextReader<'a> {
                     }
                 } else {
                     #[cfg(feature = "libxml_regexp")]
-                    if self.node.is_some()
-                        && self.node.unwrap().element_type() == XmlElementType::XmlEntityRefNode
+                    if self
+                        .node
+                        .is_some_and(|node| node.element_type() == XmlElementType::XmlEntityRefNode)
                         && self.ctxt.is_some()
                         && self.validate as i32 != 0
                     {
@@ -1169,7 +1163,7 @@ impl<'a> XmlTextReader<'a> {
             }
             while {
                 if matches!(
-                    self.ctxt.as_deref_mut().unwrap().instate,
+                    self.ctxt.as_deref().unwrap().instate,
                     XmlParserInputState::XmlParserEOF
                 ) {
                     return 1;
@@ -1178,7 +1172,7 @@ impl<'a> XmlTextReader<'a> {
                 if xml_text_reader_get_successor(self.node.unwrap()).is_some() {
                     return 1;
                 }
-                if (self.ctxt.as_deref_mut().unwrap().node_tab.len() as i32) < self.depth {
+                if (self.ctxt.as_deref().unwrap().node_tab.len() as i32) < self.depth {
                     return 1;
                 }
                 if self.mode == XmlTextReaderMode::XmlTextreaderModeEof {
@@ -1223,29 +1217,28 @@ impl<'a> XmlTextReader<'a> {
         unsafe {
             let mut val: i32;
 
-            if self.input.is_none() {
+            let Some(input) = self.input.as_mut() else {
                 return -1;
-            }
+            };
+            let ctxt = self.ctxt.as_deref_mut().unwrap();
 
             let oldstate: XmlTextReaderState = self.state;
             self.state = XmlTextReaderState::None;
 
             while self.state == XmlTextReaderState::None {
-                if self.input.as_ref().unwrap().buffer.len() < self.cur as usize + CHUNK_SIZE {
+                if input.buffer.len() < self.cur + CHUNK_SIZE {
                     // Refill the buffer unless we are at the end of the stream
                     if self.mode != XmlTextReaderMode::XmlTextreaderModeEof {
-                        val = self.input.as_mut().unwrap().read(4096);
-                        if val == 0 && self.input.as_ref().unwrap().context.is_none() {
-                            if self.input.as_ref().unwrap().buffer.len() == self.cur as _ {
+                        val = input.read(4096);
+                        if val == 0 && input.context.is_none() {
+                            if input.buffer.len() == self.cur as _ {
                                 self.mode = XmlTextReaderMode::XmlTextreaderModeEof;
                                 self.state = oldstate;
                             }
                         } else if val < 0 {
                             self.mode = XmlTextReaderMode::XmlTextreaderModeEof;
                             self.state = oldstate;
-                            if oldstate != XmlTextReaderState::Start
-                                || self.ctxt.as_deref_mut().unwrap().my_doc.is_some()
-                            {
+                            if oldstate != XmlTextReaderState::Start || ctxt.my_doc.is_some() {
                                 return val;
                             }
                         } else if val == 0 {
@@ -1259,29 +1252,21 @@ impl<'a> XmlTextReader<'a> {
                 }
                 // parse by block of CHUNK_SIZE bytes, various tests show that
                 // it's the best tradeoff at least on a 1.2GH Duron
-                if self.input.as_ref().unwrap().buffer.len() >= self.cur as usize + CHUNK_SIZE {
-                    val = self.ctxt.as_deref_mut().unwrap().parse_chunk(
-                        &self.input.as_ref().unwrap().buffer
-                            [self.cur as usize..self.cur as usize + CHUNK_SIZE],
-                        0,
-                    );
-                    self.cur += CHUNK_SIZE as u32;
+                if input.buffer.len() >= self.cur + CHUNK_SIZE {
+                    val = ctxt.parse_chunk(&input.buffer[self.cur..self.cur + CHUNK_SIZE], 0);
+                    self.cur += CHUNK_SIZE;
                     if val != 0 {
-                        self.ctxt.as_deref_mut().unwrap().well_formed = false;
+                        ctxt.well_formed = false;
                     }
-                    if !self.ctxt.as_deref_mut().unwrap().well_formed {
+                    if !ctxt.well_formed {
                         break;
                     }
                 } else {
-                    let s = self.input.as_ref().unwrap().buffer.len() as i32 - self.cur as i32;
-                    val = self
-                        .ctxt
-                        .as_deref_mut()
-                        .unwrap()
-                        .parse_chunk(&self.input.as_ref().unwrap().buffer[self.cur as usize..], 0);
-                    self.cur += s as u32;
+                    let s = input.buffer.len() - self.cur;
+                    val = ctxt.parse_chunk(&input.buffer[self.cur..], 0);
+                    self.cur += s;
                     if val != 0 {
-                        self.ctxt.as_deref_mut().unwrap().well_formed = false;
+                        ctxt.well_formed = false;
                     }
                     break;
                 }
@@ -1289,35 +1274,30 @@ impl<'a> XmlTextReader<'a> {
 
             // Discard the consumed input when needed and possible
             if self.mode == XmlTextReaderMode::XmlTextreaderModeInteractive {
-                if self.input.as_ref().unwrap().context.is_some()
-                    && (self.cur >= 4096
-                        && self.input.as_ref().unwrap().buffer.len() - self.cur as usize
-                            <= CHUNK_SIZE)
+                if input.context.is_some()
+                    && self.cur >= 4096
+                    && input.buffer.len() - self.cur <= CHUNK_SIZE
                 {
-                    self.input.as_mut().unwrap().trim_head(self.cur as usize);
+                    input.trim_head(self.cur);
                     self.cur = 0;
                 }
             } else if self.mode == XmlTextReaderMode::XmlTextreaderModeEof
                 && self.state != XmlTextReaderState::Done
             {
                 // At the end of the stream signal that the work is done to the Push parser.
-                val = self
-                    .ctxt
-                    .as_deref_mut()
-                    .unwrap()
-                    .parse_chunk(&self.input.as_ref().unwrap().buffer[self.cur as usize..], 1);
-                self.cur = self.input.as_ref().unwrap().buffer.len() as _;
+                val = ctxt.parse_chunk(&input.buffer[self.cur..], 1);
+                self.cur = input.buffer.len();
                 self.state = XmlTextReaderState::Done;
                 if val != 0 {
-                    if self.ctxt.as_deref_mut().unwrap().well_formed {
-                        self.ctxt.as_deref_mut().unwrap().well_formed = false;
+                    if ctxt.well_formed {
+                        ctxt.well_formed = false;
                     } else {
                         return -1;
                     }
                 }
             }
             self.state = oldstate;
-            if !self.ctxt.as_deref_mut().unwrap().well_formed {
+            if !ctxt.well_formed {
                 self.mode = XmlTextReaderMode::XmlTextreaderModeEof;
                 return -1;
             }
