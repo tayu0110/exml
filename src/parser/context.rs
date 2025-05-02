@@ -697,8 +697,7 @@ impl<'a> XmlParserCtxt<'a> {
         }
 
         let input = self.input_mut().unwrap();
-        let ret: i32 = input.buf.as_mut().unwrap().grow(INPUT_CHUNK as _);
-        input.set_base_and_cursor(0, cur_base);
+        let ret: i32 = input.buf.as_mut().unwrap().grow(INPUT_CHUNK);
 
         // TODO: Get error code from xmlParserInputBufferGrow
         if ret < 0 {
@@ -875,16 +874,12 @@ impl<'a> XmlParserCtxt<'a> {
         self.input_push(input_stream);
 
         if !chunk.is_empty() && self.input().is_some() && self.input().unwrap().buf.is_some() {
-            let base = self.input().unwrap().get_base();
-            let cur = self.input().unwrap().offset_from_base();
-
             self.input_mut()
                 .unwrap()
                 .buf
                 .as_mut()
                 .unwrap()
                 .push_bytes(chunk);
-            self.input_mut().unwrap().set_base_and_cursor(base, cur);
         }
 
         if let Some(encoding) = encoding {
@@ -1198,7 +1193,7 @@ impl<'a> XmlParserCtxt<'a> {
         }
 
         *len = 0;
-        let input = self.input().unwrap();
+        let input = self.input_mut().unwrap();
         let c = if let Some(buf) = input.buf.as_ref() {
             if buf.encoder.is_some() {
                 unsafe {
@@ -1210,11 +1205,23 @@ impl<'a> XmlParserCtxt<'a> {
                         .chars()
                         .next()?
                 }
+            } else if input.cur < input.valid_up_to {
+                unsafe {
+                    // # Safety
+                    // `buf.buffer[input.cur..input.valid_up_to]` is kept valid
+                    // as a UTF-8 byte sequence.
+                    from_utf8_unchecked(&buf.buffer[input.cur..input.valid_up_to])
+                        .chars()
+                        .next()?
+                }
             } else {
-                let l = 4.min(buf.buffer[input.cur..].len());
-                match from_utf8(&buf.buffer[input.cur..][..l]) {
-                    Ok(s) => s.chars().next()?,
+                match from_utf8(&buf.buffer[input.cur..]) {
+                    Ok(s) => {
+                        input.valid_up_to = input.cur + s.len();
+                        s.chars().next()?
+                    }
                     Err(e) if e.valid_up_to() > 0 => {
+                        input.valid_up_to = input.cur + e.valid_up_to();
                         let s = unsafe {
                             // # Safety
                             // Refer to the documents for `from_utf8_unchecked` and `Utf8Error`.
@@ -1229,7 +1236,7 @@ impl<'a> XmlParserCtxt<'a> {
                                 // input encoding didn't get properly advertised in the
                                 // declaration header. Report the error and switch the encoding
                                 // to ISO-Latin-1 (if you don't like this policy, just declare the encoding !)
-                                if self.input().unwrap().remainder_len() < 4 {
+                                if input.remainder_len() < 4 {
                                     __xml_err_encoding!(
                                         self,
                                         XmlParserErrors::XmlErrInvalidChar,

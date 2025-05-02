@@ -122,6 +122,9 @@ pub struct XmlParserInput<'a> {
     pub(crate) parent_consumed: u64,
     // entity, if any
     pub(crate) entity: Option<XmlEntityPtr>,
+    // Indicates how far `buf.buffer` is valid as UTF-8.
+    // If `buf.encoder` is `Some`, `buf.buffer` is always valid, so this is always 0.
+    pub(crate) valid_up_to: usize,
 }
 
 impl<'a> XmlParserInput<'a> {
@@ -342,6 +345,7 @@ impl<'a> XmlParserInput<'a> {
     pub(crate) fn reset_base(&mut self) -> i32 {
         self.base = 0;
         self.cur = 0;
+        self.valid_up_to = 0;
         0
     }
 
@@ -357,6 +361,11 @@ impl<'a> XmlParserInput<'a> {
     /// Returns -1 in case of error, 0 otherwise
     #[doc(alias = "xmlBufSetInputBaseCur")]
     pub(crate) fn set_base_and_cursor(&mut self, base: usize, cur: usize) -> i32 {
+        if self.cur < self.valid_up_to {
+            self.valid_up_to = cur + (self.valid_up_to - self.cur);
+        } else {
+            self.valid_up_to = 0;
+        }
         self.base = base;
         self.cur = cur;
         0

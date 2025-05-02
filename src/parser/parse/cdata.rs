@@ -270,9 +270,10 @@ impl XmlParserCtxt<'_> {
                     }
 
                     // commit consumed bytes for SAX interface
-                    self.input_mut().unwrap().cur += len;
-                    self.input_mut().unwrap().line = line;
-                    self.input_mut().unwrap().col = col;
+                    let input = self.input_mut().unwrap();
+                    input.cur += len;
+                    input.line = line;
+                    input.col = col;
 
                     let blank = self.are_blanks(&buf, true);
 
@@ -328,9 +329,10 @@ impl XmlParserCtxt<'_> {
                     if rem.starts_with(b"]>") {
                         // commit consumed bytes before raise an error
                         let diff = self.content_bytes().len() - input.len();
-                        self.input_mut().unwrap().line = line;
-                        self.input_mut().unwrap().col = col;
-                        self.input_mut().unwrap().cur += diff;
+                        let input = self.input_mut().unwrap();
+                        input.line = line;
+                        input.col = col;
+                        input.cur += diff;
                         xml_fatal_err(self, XmlParserErrors::XmlErrMisplacedCDATAEnd, None);
                         if !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
                             // if the parser input state is not EOF,
@@ -355,9 +357,10 @@ impl XmlParserCtxt<'_> {
                 }
 
                 // commit consumed bytes for SAX interface
-                self.input_mut().unwrap().cur += len;
-                self.input_mut().unwrap().line = line;
-                self.input_mut().unwrap().col = col;
+                let input_mut = self.input_mut().unwrap();
+                input_mut.cur += len;
+                input_mut.line = line;
+                input_mut.col = col;
 
                 let blank = self.are_blanks(&buf, false);
 

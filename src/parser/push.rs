@@ -102,16 +102,12 @@ impl XmlParserCtxt<'_> {
         ctxt.charset = XmlCharEncoding::None;
 
         if !chunk.is_empty() && ctxt.input().is_some_and(|input| input.buf.is_some()) {
-            let base: usize = ctxt.input().unwrap().get_base();
-            let cur = ctxt.input().unwrap().offset_from_base();
-
             ctxt.input_mut()
                 .unwrap()
                 .buf
                 .as_mut()
                 .unwrap()
                 .push_bytes(chunk);
-            ctxt.input_mut().unwrap().set_base_and_cursor(base, cur);
         }
 
         Some(ctxt)
@@ -338,12 +334,8 @@ impl XmlParserCtxt<'_> {
                         // If we are operating on converted input, try to flush
                         // remaining chars to avoid them stalling in the non-converted buffer.
                         if input_buffer.encoder.is_some() && !input_buffer.raw.is_empty() {
-                            let base = self.input().unwrap().get_base();
-                            let current = self.input().unwrap().offset_from_base();
-
                             let input_buffer = self.input_mut().unwrap().buf.as_mut().unwrap();
                             input_buffer.push_bytes(b"");
-                            self.input_mut().unwrap().set_base_and_cursor(base, current);
                         }
                     }
                     let mut avail = self.input().unwrap().remainder_len();
@@ -1075,9 +1067,6 @@ impl XmlParserCtxt<'_> {
                 && self.input().unwrap().buf.is_some()
                 && !matches!(self.instate, XmlParserInputState::XmlParserEOF)
             {
-                let base = self.input().unwrap().get_base();
-                let cur = self.input().unwrap().offset_from_base();
-
                 let res: i32 = self
                     .input_mut()
                     .unwrap()
@@ -1085,7 +1074,6 @@ impl XmlParserCtxt<'_> {
                     .as_mut()
                     .unwrap()
                     .push_bytes(chunk);
-                self.input_mut().unwrap().set_base_and_cursor(base, cur);
                 if res < 0 {
                     self.err_no = XmlParserInputState::XmlParserEOF as i32;
                     self.halt();
@@ -1096,12 +1084,8 @@ impl XmlParserCtxt<'_> {
             {
                 let input = self.input().unwrap().buf.as_ref().unwrap();
                 if input.encoder.is_some() {
-                    let base: usize = self.input().unwrap().get_base();
-                    let current = self.input().unwrap().offset_from_base();
-
                     let input = self.input_mut().unwrap().buf.as_mut().unwrap();
                     let res = input.decode(terminate != 0);
-                    self.input_mut().unwrap().set_base_and_cursor(base, current);
                     if res.is_err() {
                         // TODO 2.6.0
                         generic_error!("xmlParseChunk: encoder error\n");
@@ -1133,16 +1117,12 @@ impl XmlParserCtxt<'_> {
             }
 
             if end_in_lf == 1 && self.input().is_some() && self.input().unwrap().buf.is_some() {
-                let base: usize = self.input().unwrap().get_base();
-                let current = self.input().unwrap().offset_from_base();
-
                 self.input_mut()
                     .unwrap()
                     .buf
                     .as_mut()
                     .unwrap()
                     .push_bytes(b"\r");
-                self.input_mut().unwrap().set_base_and_cursor(base, current);
             }
             if terminate != 0 {
                 // Check for termination

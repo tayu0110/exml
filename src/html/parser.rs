@@ -3466,16 +3466,12 @@ pub fn html_create_push_parser_ctxt<'a>(
     ctxt.input_push(input_stream);
 
     if !chunk.is_empty() && ctxt.input().is_some() && ctxt.input().unwrap().buf.is_some() {
-        let base: size_t = ctxt.input().unwrap().get_base();
-        let cur = ctxt.input().unwrap().offset_from_base();
-
         ctxt.input_mut()
             .unwrap()
             .buf
             .as_mut()
             .unwrap()
             .push_bytes(chunk);
-        ctxt.input_mut().unwrap().set_base_and_cursor(base, cur);
     }
     ctxt.progressive = true;
     Some(ctxt)
@@ -4239,9 +4235,6 @@ pub fn html_parse_chunk(ctxt: &mut HtmlParserCtxt, chunk: &[u8], terminate: i32)
         && ctxt.input().unwrap().buf.is_some()
         && !matches!(ctxt.instate, XmlParserInputState::XmlParserEOF)
     {
-        let base = ctxt.input().unwrap().get_base();
-        let cur = ctxt.input().unwrap().offset_from_base();
-
         let res: i32 = ctxt
             .input_mut()
             .unwrap()
@@ -4249,7 +4242,6 @@ pub fn html_parse_chunk(ctxt: &mut HtmlParserCtxt, chunk: &[u8], terminate: i32)
             .as_mut()
             .unwrap()
             .push_bytes(chunk);
-        ctxt.input_mut().unwrap().set_base_and_cursor(base, cur);
         if res < 0 {
             html_err_memory(Some(ctxt), None);
             return ctxt.err_no;
@@ -4259,17 +4251,7 @@ pub fn html_parse_chunk(ctxt: &mut HtmlParserCtxt, chunk: &[u8], terminate: i32)
     {
         let input = ctxt.input_mut().unwrap().buf.as_mut().unwrap();
         if input.encoder.is_some() {
-            let base: size_t = ctxt.input().unwrap().get_base();
-            let current = ctxt.input().unwrap().offset_from_base();
-
-            let res = ctxt
-                .input_mut()
-                .unwrap()
-                .buf
-                .as_mut()
-                .unwrap()
-                .decode(terminate != 0);
-            ctxt.input_mut().unwrap().set_base_and_cursor(base, current);
+            let res = input.decode(terminate != 0);
             if res.is_err() {
                 html_parse_err(
                     Some(ctxt),
