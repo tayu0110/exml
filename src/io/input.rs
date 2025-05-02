@@ -74,20 +74,16 @@ impl XmlParserInputBuffer {
     #[doc(alias = "xmlParserInputBufferCreateMem")]
     pub fn from_memory(mem: Vec<u8>, enc: XmlCharEncoding) -> Option<Self> {
         let mut ret = XmlParserInputBuffer::new(enc);
-        // I believe `mem` should be set as `context`,
-        // but for some reason the `testchar::test_user_encoding` test fails...
-        //
-        // Until the cause is found, push data directly into the buffer
-        // and set the `context` to an empty source, as in the original code.
         ret.context = Some(Box::new(Cursor::new(mem)));
-        // ret.buffer.extend(mem);
         Some(ret)
     }
 
     /// Create a buffered parser input for the progressive parsing for the input from an I/O handler.  
     /// Returns the new parser input buffer.
-    #[doc(alias = "xmlParserInputBufferCreateIO")]
-    #[doc(alias = "xmlParserInputBufferCreateFile")]
+    #[doc(
+        alias = "xmlParserInputBufferCreateIO",
+        alias = "xmlParserInputBufferCreateFile"
+    )]
     pub fn from_reader(reader: impl Read + 'static, enc: XmlCharEncoding) -> Self {
         if !XML_INPUT_CALLBACK_INITIALIZED.load(Ordering::Relaxed) {
             register_default_input_callbacks();
@@ -227,15 +223,17 @@ impl XmlParserInputBuffer {
 
         // Call the read method for this I/O type.
         if let Some(context) = self.context.as_mut() {
-            let mut buffer = vec![0; len];
-            let Ok(len) = context.read(&mut buffer) else {
+            let buffer = if self.encoder.is_none() {
+                &mut self.buffer
+            } else {
+                &mut self.raw
+            };
+            let start = buffer.len();
+            buffer.resize(start + len, 0);
+            let Ok(len) = context.read(&mut buffer[start..start + len]) else {
                 return -1;
             };
-            if self.encoder.is_none() {
-                self.buffer.extend(buffer[..len].iter());
-            } else {
-                self.raw.extend(buffer[..len].iter());
-            };
+            buffer.truncate(start + len);
             res = len as i32;
         }
 
