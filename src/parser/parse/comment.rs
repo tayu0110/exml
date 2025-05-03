@@ -52,7 +52,7 @@ impl XmlParserCtxt<'_> {
             );
             return;
         }
-        self.consume_char_if(|_, _| true);
+        self.skip_char();
         let Some(mut r) = self.current_char() else {
             not_terminated!();
         };
@@ -65,7 +65,7 @@ impl XmlParserCtxt<'_> {
             );
             return;
         }
-        self.consume_char_if(|_, _| true);
+        self.skip_char();
         let mut cur = self.current_char();
         if cur.is_none() {
             not_terminated!();
@@ -89,7 +89,7 @@ impl XmlParserCtxt<'_> {
             q = r;
             r = nc;
 
-            self.consume_char_if(|_, _| true);
+            self.skip_char();
             cur = self.current_char();
         }
         if matches!(self.instate, XmlParserInputState::XmlParserEOF) {

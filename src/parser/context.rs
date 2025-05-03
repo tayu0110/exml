@@ -916,15 +916,15 @@ impl<'a> XmlParserCtxt<'a> {
             self.force_grow();
         }
         let input = self.input_mut().unwrap();
-        for _ in 0..nth {
-            if input.base_contents()[input.cur] == b'\n' {
+        for i in input.cur..input.cur + nth {
+            if input.base_contents()[i] == b'\n' {
                 input.line += 1;
                 input.col = 1;
             } else {
                 input.col += 1;
             }
-            input.cur += 1;
         }
+        input.cur += nth;
     }
 
     pub fn content_bytes(&self) -> &[u8] {
@@ -956,22 +956,6 @@ impl<'a> XmlParserCtxt<'a> {
             if self.content_bytes().is_empty() {
                 return;
             }
-        }
-
-        if self.charset != XmlCharEncoding::UTF8 {
-            // Assume it's a fixed length encoding (1) with
-            // a compatible encoding for the ASCII set, since
-            // XML constructs only use < 128 chars
-
-            let input = self.input_mut().unwrap();
-            if input.base_contents()[input.cur] == b'\n' {
-                input.line += 1;
-                input.col = 1;
-            } else {
-                input.col += 1;
-            }
-            input.cur += 1;
-            return;
         }
 
         let Some(c) = self.current_char() else {
@@ -1210,9 +1194,7 @@ impl<'a> XmlParserCtxt<'a> {
             return None;
         };
 
-        if (c.len_utf8() > 1 && !xml_is_char(c as u32))
-            || (c.len_utf8() == 1 && c == '\0' && !self.content_bytes().is_empty())
-        {
+        if (c.len_utf8() > 1 && !xml_is_char(c as u32)) || (c.len_utf8() == 1 && c == '\0') {
             xml_err_encoding_int!(
                 self,
                 XmlParserErrors::XmlErrInvalidChar,
@@ -1221,7 +1203,7 @@ impl<'a> XmlParserCtxt<'a> {
             );
         }
         if c == '\r' {
-            if self.content_bytes().get(1) == Some(&b'\n') {
+            if self.nth_byte(1) == b'\n' {
                 let input = self.input_mut().unwrap();
                 input.cur += 1;
             }
