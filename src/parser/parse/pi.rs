@@ -189,7 +189,7 @@ impl XmlParserCtxt<'_> {
                     return;
                 }
                 let mut l = 0;
-                if self.current_char(&mut l).unwrap_or('\0') != '?' {
+                if self.current_char(&mut l) != Some('?') {
                     xml_fatal_err_msg_str!(
                         self,
                         XmlParserErrors::XmlErrPINotFinished,

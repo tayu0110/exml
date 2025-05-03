@@ -34,9 +34,9 @@ impl XmlParserCtxt<'_> {
 
         let mut buf = String::new();
         self.instate = XmlParserInputState::XmlParserSystemLiteral;
-        let mut cur = self.current_char(&mut l).unwrap_or('\0');
-        while xml_is_char(cur as u32) && cur as i32 != stop as i32 {
-            buf.push(cur);
+        let mut cur = self.current_char(&mut l);
+        while let Some(nc) = cur.filter(|&cur| xml_is_char(cur as u32) && cur != stop as char) {
+            buf.push(nc);
             if buf.len() > max_length {
                 xml_fatal_err(
                     self,
@@ -46,14 +46,14 @@ impl XmlParserCtxt<'_> {
                 self.instate = state;
                 return None;
             }
-            self.advance_with_line_handling(cur.len_utf8());
-            cur = self.current_char(&mut l).unwrap_or('\0');
+            self.advance_with_line_handling(l as usize);
+            cur = self.current_char(&mut l);
         }
         if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
             return None;
         }
         self.instate = state;
-        if !xml_is_char(cur as u32) {
+        if cur.is_none_or(|cur| !xml_is_char(cur as u32)) {
             xml_fatal_err(self, XmlParserErrors::XmlErrLiteralNotFinished, None);
         } else {
             self.skip_char();

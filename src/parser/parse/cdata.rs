@@ -89,13 +89,14 @@ impl XmlParserCtxt<'_> {
         let mut l: i32 = 0;
 
         let mut buf = String::with_capacity(XML_PARSER_BIG_BUFFER_SIZE + 5);
-        let mut cur = self.current_char(&mut l).unwrap_or('\0');
+        let mut cur = self.current_char(&mut l);
         // test also done in xmlCurrentChar()
-        while cur != '<' && cur != '&' && xml_is_char(cur as u32) {
-            if cur == ']' && self.nth_byte(1) == b']' && self.nth_byte(2) == b'>' {
+        while let Some(nc) = cur.filter(|&cur| cur != '<' && cur != '&' && xml_is_char(cur as u32))
+        {
+            if nc == ']' && self.nth_byte(1) == b']' && self.nth_byte(2) == b'>' {
                 xml_fatal_err(self, XmlParserErrors::XmlErrMisplacedCDATAEnd, None);
             }
-            buf.push(cur);
+            buf.push(nc);
             // move current position before possible calling of (*self.sax).characters
             self.advance_with_line_handling(l as usize);
             if buf.len() >= XML_PARSER_BIG_BUFFER_SIZE {
@@ -131,7 +132,7 @@ impl XmlParserCtxt<'_> {
                 }
                 self.shrink();
             }
-            cur = self.current_char(&mut l).unwrap_or('\0');
+            cur = self.current_char(&mut l);
         }
         if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
             return;
@@ -170,7 +171,7 @@ impl XmlParserCtxt<'_> {
         // - End of buffer.
         // - An incomplete UTF-8 sequence. This is allowed if partial is set.
         if !self.content_bytes().is_empty() {
-            if cur == '\0' && self.current_byte() != 0 {
+            if cur.is_none_or(|cur| cur == '\0') && self.current_byte() != 0 {
                 if partial == 0 {
                     xml_fatal_err_msg_int!(
                         self,
@@ -184,8 +185,9 @@ impl XmlParserCtxt<'_> {
                     );
                     self.advance_with_line_handling(1);
                 }
-            } else if cur != '<' && cur != '&' {
+            } else if !matches!(cur, Some('<' | '&')) {
                 // Generate the error and skip the offending character
+                let cur = cur.unwrap_or('\0');
                 xml_fatal_err_msg_int!(
                     self,
                     XmlParserErrors::XmlErrInvalidChar,
@@ -457,27 +459,33 @@ impl XmlParserCtxt<'_> {
         self.advance(9);
 
         self.instate = XmlParserInputState::XmlParserCDATASection;
-        let mut r = self.current_char(&mut rl).unwrap_or('\0');
-        if !xml_is_char(r as u32) {
+        let Some(mut r) = self
+            .current_char(&mut rl)
+            .filter(|&r| xml_is_char(r as u32))
+        else {
             xml_fatal_err(self, XmlParserErrors::XmlErrCDATANotFinished, None);
             if !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
                 self.instate = XmlParserInputState::XmlParserContent;
             }
             return;
-        }
+        };
         self.advance_with_line_handling(rl as usize);
-        let mut s = self.current_char(&mut sl).unwrap_or('\0');
-        if !xml_is_char(s as u32) {
+        let Some(mut s) = self
+            .current_char(&mut sl)
+            .filter(|&s| xml_is_char(s as u32))
+        else {
             xml_fatal_err(self, XmlParserErrors::XmlErrCDATANotFinished, None);
             if !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
                 self.instate = XmlParserInputState::XmlParserContent;
             }
             return;
-        }
+        };
         self.advance_with_line_handling(sl as usize);
-        let mut cur = self.current_char(&mut l).unwrap_or('\0');
+        let mut cur = self.current_char(&mut l);
         let mut buf = String::new();
-        while xml_is_char(cur as u32) && (r != ']' || s != ']' || cur != '>') {
+        while let Some(nc) =
+            cur.filter(|&cur| xml_is_char(cur as u32) && (r != ']' || s != ']' || cur != '>'))
+        {
             buf.push(r);
             if buf.len() > max_length {
                 xml_fatal_err_msg(
@@ -491,14 +499,14 @@ impl XmlParserCtxt<'_> {
                 return;
             }
             r = s;
-            s = cur;
+            s = nc;
             self.advance_with_line_handling(l as usize);
-            cur = self.current_char(&mut l).unwrap_or('\0');
+            cur = self.current_char(&mut l);
         }
         if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
             return;
         }
-        if cur != '>' {
+        if cur != Some('>') {
             xml_fatal_err_msg_str!(
                 self,
                 XmlParserErrors::XmlErrCDATANotFinished,

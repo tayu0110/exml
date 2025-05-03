@@ -245,14 +245,15 @@ impl XmlParserCtxt<'_> {
 
         self.grow();
         let mut buf = String::new();
-        let mut c = self.current_char(&mut l).unwrap_or('\0');
-        while self.input().unwrap().id == input_id
-            && !self.content_bytes().is_empty()
-            && xml_is_char(c as u32)
-        {
-            buf.push(c);
-            self.advance_with_line_handling(c.len_utf8());
-            c = self.current_char(&mut l).unwrap_or('\0');
+        let mut c = self.current_char(&mut l);
+        while let Some(nc) = c.filter(|&c| {
+            self.input().unwrap().id == input_id
+                && !self.content_bytes().is_empty()
+                && xml_is_char(c as u32)
+        }) {
+            buf.push(nc);
+            self.advance_with_line_handling(nc.len_utf8());
+            c = self.current_char(&mut l);
         }
         if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
             return -1;
@@ -266,7 +267,8 @@ impl XmlParserCtxt<'_> {
                 .sizeentities
                 .saturating_add(self.input().unwrap().consumed);
             self.pop_input();
-        } else if !xml_is_char(c as u32) {
+        } else if c.is_none_or(|c| !xml_is_char(c as u32)) {
+            let c = c.unwrap_or('\0');
             xml_fatal_err_msg_int!(
                 self,
                 XmlParserErrors::XmlErrInvalidChar,
@@ -372,7 +374,7 @@ impl XmlParserCtxt<'_> {
             return (None, None);
         }
         self.skip_char();
-        let mut c = self.current_char(&mut l).unwrap_or('\0');
+        let mut c = self.current_char(&mut l);
         // NOTE: 4.4.5 Included in Literal
         // When a parameter entity reference appears in a literal entity
         // value, ... a single or double quote character in the replacement
@@ -380,17 +382,18 @@ impl XmlParserCtxt<'_> {
         // terminate the literal.
         // In practice it means we stop the loop only when back at parsing
         // the initial entity and the quote is found
-        while xml_is_char(c as u32)
-            && (c as i32 != stop as i32 || self.input().unwrap().id != inputid)
-            && !matches!(self.instate, XmlParserInputState::XmlParserEOF)
-        {
-            buf.push(c);
-            self.advance_with_line_handling(c.len_utf8());
+        while let Some(nc) = c.filter(|&c| {
+            xml_is_char(c as u32)
+                && (c as i32 != stop as i32 || self.input().unwrap().id != inputid)
+                && !matches!(self.instate, XmlParserInputState::XmlParserEOF)
+        }) {
+            buf.push(nc);
+            self.advance_with_line_handling(nc.len_utf8());
             self.grow();
-            c = self.current_char(&mut l).unwrap_or('\0');
-            if c == '\0' {
+            c = self.current_char(&mut l);
+            if c.is_none() {
                 self.grow();
-                c = self.current_char(&mut l).unwrap_or('\0');
+                c = self.current_char(&mut l);
             }
 
             if buf.len() > max_length {
@@ -405,7 +408,7 @@ impl XmlParserCtxt<'_> {
         if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
             return (None, None);
         }
-        if c as i32 != stop as i32 {
+        if c.is_none_or(|c| c != stop as char) {
             xml_fatal_err(self, XmlParserErrors::XmlErrEntityNotFinished, None);
             return (None, None);
         }

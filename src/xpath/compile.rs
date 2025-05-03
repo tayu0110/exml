@@ -1509,7 +1509,10 @@ impl XmlXPathParserContext<'_> {
         {
             buf.push(c);
             self.next_char();
-            c = self.current_char().unwrap_or('\0');
+            let Some(next) = self.current_char() else {
+                break;
+            };
+            c = next;
         }
         (!buf.is_empty()).then_some(buf)
     }

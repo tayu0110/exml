@@ -2179,7 +2179,13 @@ unsafe fn err_parse_test(
             res = TEST_ERRORS
                 .with_borrow(|errors| compare_file_mem(err, &errors[..TEST_ERRORS_SIZE.get()]));
             if res != 0 {
-                eprintln!("Error for {filename} failed",);
+                eprintln!("Error for {filename} failed");
+                TEST_ERRORS.with_borrow(|errors| {
+                    eprintln!(
+                        "{}",
+                        std::str::from_utf8(&errors[..TEST_ERRORS_SIZE.get()]).unwrap()
+                    );
+                });
                 return -1;
             }
         } else if options & XmlParserOption::XmlParseDTDValid as i32 != 0

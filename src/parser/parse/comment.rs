@@ -69,10 +69,13 @@ impl XmlParserCtxt<'_> {
             return;
         }
         self.consume_char_if(|_, _| true);
-        let Some(mut cur) = self.current_char(&mut l) else {
+        let mut cur = self.current_char(&mut l);
+        if cur.is_none() {
             not_terminated!();
         };
-        while xml_is_char(cur as u32) && (cur != '>' || r != '-' || q != '-') {
+        while let Some(nc) =
+            cur.filter(|&cur| xml_is_char(cur as u32) && (cur != '>' || r != '-' || q != '-'))
+        {
             if r == '-' && q == '-' {
                 xml_fatal_err(self, XmlParserErrors::XmlErrHyphenInComment, None);
             }
@@ -87,42 +90,44 @@ impl XmlParserCtxt<'_> {
             }
 
             q = r;
-            r = cur;
+            r = nc;
 
             self.consume_char_if(|_, _| true);
-            cur = self.current_char(&mut l).unwrap_or('\0');
+            cur = self.current_char(&mut l);
         }
         if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
             return;
         }
-        if cur == '\0' {
+        if let Some(cur) = cur {
+            if !xml_is_char(cur as u32) {
+                xml_fatal_err_msg_int!(
+                    self,
+                    XmlParserErrors::XmlErrInvalidChar,
+                    format!("xmlParseComment: invalid xmlChar value {}\n", cur as i32).as_str(),
+                    cur as i32
+                );
+            } else {
+                if inputid != self.input().unwrap().id {
+                    xml_fatal_err_msg(
+                        self,
+                        XmlParserErrors::XmlErrEntityBoundary,
+                        "Comment doesn't start and stop in the same entity\n",
+                    );
+                }
+                self.skip_char();
+                if !self.disable_sax {
+                    if let Some(comment) = self.sax.as_deref_mut().and_then(|sax| sax.comment) {
+                        comment(self, buf);
+                    }
+                }
+            }
+        } else {
             xml_fatal_err_msg_str!(
                 self,
                 XmlParserErrors::XmlErrCommentNotFinished,
                 "Comment not terminated \n<!--{}\n",
                 buf
             );
-        } else if !xml_is_char(cur as u32) {
-            xml_fatal_err_msg_int!(
-                self,
-                XmlParserErrors::XmlErrInvalidChar,
-                format!("xmlParseComment: invalid xmlChar value {}\n", cur as i32).as_str(),
-                cur as i32
-            );
-        } else {
-            if inputid != self.input().unwrap().id {
-                xml_fatal_err_msg(
-                    self,
-                    XmlParserErrors::XmlErrEntityBoundary,
-                    "Comment doesn't start and stop in the same entity\n",
-                );
-            }
-            self.skip_char();
-            if !self.disable_sax {
-                if let Some(comment) = self.sax.as_deref_mut().and_then(|sax| sax.comment) {
-                    comment(self, buf);
-                }
-            }
         }
     }
 

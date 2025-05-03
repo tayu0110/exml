@@ -297,13 +297,14 @@ impl XmlParserCtxt<'_> {
         // allocate a translation buffer.
         let mut buf = String::with_capacity(100);
         // OK loop until we reach one of the ending c_char or a size limit.
-        let mut c = self.current_char(&mut l).unwrap_or('\0');
-        while self.current_byte() != limit
-            && xml_is_char(c as u32)
-            && c != '<'
-            && !matches!(self.instate, XmlParserInputState::XmlParserEOF)
-        {
-            if c == '&' {
+        let mut c = self.current_char(&mut l);
+        while let Some(nc) = c.filter(|&c| {
+            self.current_byte() != limit
+                && xml_is_char(c as u32)
+                && c != '<'
+                && !matches!(self.instate, XmlParserInputState::XmlParserEOF)
+        }) {
+            if nc == '&' {
                 in_space = 0;
                 if self.nth_byte(1) == b'#' {
                     let val = self.parse_char_ref();
@@ -410,7 +411,7 @@ impl XmlParserCtxt<'_> {
                     }
                 }
             } else {
-                if c == '\u{20}' || c == '\u{D}' || c == '\u{A}' || c == '\u{9}' {
+                if nc == '\u{20}' || nc == '\u{D}' || nc == '\u{A}' || nc == '\u{9}' {
                     if !buf.is_empty() || !normalize {
                         if !normalize || in_space == 0 {
                             buf.push('\x20');
@@ -419,12 +420,12 @@ impl XmlParserCtxt<'_> {
                     }
                 } else {
                     in_space = 0;
-                    buf.push(c);
+                    buf.push(nc);
                 }
                 self.advance_with_line_handling(l as usize);
             }
             self.grow();
-            c = self.current_char(&mut l).unwrap_or('\0');
+            c = self.current_char(&mut l);
             if buf.len() > max_length {
                 xml_fatal_err_msg(
                     self,
@@ -447,7 +448,7 @@ impl XmlParserCtxt<'_> {
         if self.current_byte() == b'<' {
             xml_fatal_err(self, XmlParserErrors::XmlErrLtInAttribute, None);
         } else if self.current_byte() != limit {
-            if c != '\0' && !xml_is_char(c as u32) {
+            if c.is_some_and(|c| !xml_is_char(c as u32)) {
                 xml_fatal_err_msg(
                     self,
                     XmlParserErrors::XmlErrInvalidChar,
