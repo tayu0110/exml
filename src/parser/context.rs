@@ -185,7 +185,7 @@ pub struct XmlParserCtxt<'a> {
     // unused
     nb_chars: i64,
     // used by progressive parsing lookup
-    pub(crate) check_index: i64,
+    pub(crate) check_index: usize,
     // ugly but ...
     pub(crate) keep_blanks: bool,
     // SAX callbacks are disabled

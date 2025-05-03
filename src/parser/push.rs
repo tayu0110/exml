@@ -116,14 +116,14 @@ impl XmlParserCtxt<'_> {
     /// Check whether the input buffer contains a character.
     #[doc(alias = "xmlParseLookupChar")]
     fn lookup_char(&mut self, c: u8) -> i32 {
-        let cur = &self.content_bytes()[self.check_index.max(1) as usize..];
+        let cur = &self.content_bytes()[self.check_index.max(1)..];
 
         if !cur.contains(&c) {
             if cur.len() > i64::MAX as usize {
                 self.check_index = 0;
                 1
             } else {
-                self.check_index = cur.len() as i64;
+                self.check_index = cur.len();
                 0
             }
         } else {
@@ -135,13 +135,13 @@ impl XmlParserCtxt<'_> {
     /// Check whether the input buffer contains terminated char data.
     #[doc(alias = "xmlParseLookupCharData")]
     fn lookup_char_data(&mut self) -> i32 {
-        let cur = &self.content_bytes()[self.check_index as usize..];
+        let cur = &self.content_bytes()[self.check_index..];
 
         if cur.contains(&b'<') || cur.contains(&b'&') || cur.len() > i64::MAX as usize {
             self.check_index = 0;
             1
         } else {
-            self.check_index = cur.len() as i64;
+            self.check_index = cur.len();
             0
         }
     }
@@ -150,34 +150,25 @@ impl XmlParserCtxt<'_> {
     ///
     /// If found, return buffer which start with `s` wrapped `Some`,
     /// otherwise return `None`.
+    ///
+    /// # Panics
+    /// - `s` must not be empty.
     #[doc(alias = "xmlParseLookupString")]
     fn lookup_string<'a>(&'a mut self, start_delta: usize, s: &str) -> Option<&'a [u8]> {
-        let cur = if self.check_index == 0 {
-            &self.content_bytes()[start_delta..]
-        } else {
-            &self.content_bytes()[self.check_index as usize..]
-        };
-        let len = cur.len();
+        assert!(!s.is_empty());
+        let content = self.input_tab.last().unwrap().current_contents();
+        let mut cur = &content[start_delta.max(self.check_index)..];
+        let s = s.as_bytes();
 
-        if let Some(term) = cur.windows(s.len()).position(|chunk| chunk == s.as_bytes()) {
-            self.check_index = 0;
-            let cur = self.content_bytes().windows(len).next_back().unwrap();
-            Some(&cur[term..])
-        } else {
-            // Rescan (strLen - 1) characters.
-            let end = if cur.len() < s.len() {
-                cur
-            } else {
-                cur.windows(s.len() - 1).next_back().unwrap()
-            };
-            let index = self.content_bytes().len() - end.len();
-            if index > i64::MAX as usize {
+        while let Some(pos) = cur.iter().position(|&b| b == s[0]) {
+            if cur[pos..].starts_with(s) {
                 self.check_index = 0;
-                return self.content_bytes().windows(s.len()).next_back();
+                return Some(&cur[pos..]);
             }
-            self.check_index = index as _;
-            None
+            cur = &cur[pos + 1..];
         }
+        self.check_index = content.len() - content.len().min(s.len() - 1);
+        None
     }
 
     /// Check whether there's enough data in the input buffer to finish parsing
@@ -187,7 +178,7 @@ impl XmlParserCtxt<'_> {
         let mut cur = if self.check_index == 0 {
             &self.content_bytes()[1..]
         } else {
-            &self.content_bytes()[self.check_index as usize..]
+            &self.content_bytes()[self.check_index..]
         };
 
         let mut state = self.end_check_state as u8;
@@ -212,7 +203,7 @@ impl XmlParserCtxt<'_> {
             self.end_check_state = 0;
             return 1;
         }
-        self.check_index = index as i64;
+        self.check_index = index;
         self.end_check_state = state as i32;
         0
     }
@@ -229,7 +220,7 @@ impl XmlParserCtxt<'_> {
         let mut cur = if self.check_index == 0 {
             &self.content_bytes()[1..]
         } else {
-            &self.content_bytes()[self.check_index as usize..]
+            &self.content_bytes()[self.check_index..]
         };
 
         let mut start = cur;
@@ -386,11 +377,7 @@ impl XmlParserCtxt<'_> {
                                 {
                                     set_document_locator(self, XmlSAXLocator::default());
                                 }
-                                xml_fatal_err(
-                                    &mut *self,
-                                    XmlParserErrors::XmlErrDocumentEmpty,
-                                    None,
-                                );
+                                xml_fatal_err(self, XmlParserErrors::XmlErrDocumentEmpty, None);
                                 self.halt();
                                 if let Some(end_document) =
                                     self.sax.as_deref_mut().and_then(|sax| sax.end_document)
@@ -651,7 +638,7 @@ impl XmlParserCtxt<'_> {
                                 }
                                 [b'<', ..] => {
                                     xml_fatal_err(
-                                        &mut *self,
+                                        self,
                                         XmlParserErrors::XmlErrInternalError,
                                         Some("detected an error in element content\n"),
                                     );
@@ -919,7 +906,7 @@ impl XmlParserCtxt<'_> {
                                 _ => {
                                     if self.instate == XmlParserInputState::XmlParserEpilog {
                                         xml_fatal_err(
-                                            &mut *self,
+                                            self,
                                             XmlParserErrors::XmlErrDocumentEnd,
                                             None,
                                         );

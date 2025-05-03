@@ -3583,7 +3583,7 @@ fn html_parse_lookup_comment_end(ctxt: &mut HtmlParserCtxt) -> i32 {
             ctxt.check_index = mark as _;
             return -1;
         }
-        ctxt.check_index = mark as i64 + 1;
+        ctxt.check_index = mark as usize + 1;
     }
     mark
 }

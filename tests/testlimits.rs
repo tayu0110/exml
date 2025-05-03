@@ -1239,7 +1239,7 @@ unsafe fn launch_crazy(test: u32, fail: i32) -> i32 {
     }
 }
 
-unsafe fn get_crazy_fail(test: i32) -> i32 {
+fn get_crazy_fail(test: i32) -> i32 {
     // adding 1000000 of character 'a' leads to parser failure mostly
     // everywhere except in those special spots. Need to be updated
     // each time crazy is updated
