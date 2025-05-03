@@ -21,9 +21,6 @@ impl XmlParserCtxt<'_> {
     /// ```
     #[doc(alias = "xmlParseCommentComplex")]
     fn parse_comment_complex(&mut self, buf: &mut String) {
-        let mut ql = 0;
-        let mut rl = 0;
-        let mut l = 0;
         let max_length = if self.options & XmlParserOption::XmlParseHuge as i32 != 0 {
             XML_MAX_HUGE_LENGTH
         } else {
@@ -43,7 +40,7 @@ impl XmlParserCtxt<'_> {
             };
         }
 
-        let Some(mut q) = self.current_char(&mut ql) else {
+        let Some(mut q) = self.current_char() else {
             not_terminated!();
         };
         if !xml_is_char(q as u32) {
@@ -56,7 +53,7 @@ impl XmlParserCtxt<'_> {
             return;
         }
         self.consume_char_if(|_, _| true);
-        let Some(mut r) = self.current_char(&mut rl) else {
+        let Some(mut r) = self.current_char() else {
             not_terminated!();
         };
         if !xml_is_char(r as u32) {
@@ -69,7 +66,7 @@ impl XmlParserCtxt<'_> {
             return;
         }
         self.consume_char_if(|_, _| true);
-        let mut cur = self.current_char(&mut l);
+        let mut cur = self.current_char();
         if cur.is_none() {
             not_terminated!();
         };
@@ -93,7 +90,7 @@ impl XmlParserCtxt<'_> {
             r = nc;
 
             self.consume_char_if(|_, _| true);
-            cur = self.current_char(&mut l);
+            cur = self.current_char();
         }
         if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
             return;

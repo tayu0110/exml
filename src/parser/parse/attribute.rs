@@ -278,7 +278,6 @@ impl XmlParserCtxt<'_> {
         } else {
             XML_MAX_TEXT_LENGTH
         };
-        let mut l: i32 = 0;
         let mut in_space: i32 = 0;
 
         let limit = if self.current_byte() == b'"' {
@@ -297,7 +296,7 @@ impl XmlParserCtxt<'_> {
         // allocate a translation buffer.
         let mut buf = String::with_capacity(100);
         // OK loop until we reach one of the ending c_char or a size limit.
-        let mut c = self.current_char(&mut l);
+        let mut c = self.current_char();
         while let Some(nc) = c.filter(|&c| {
             self.current_byte() != limit
                 && xml_is_char(c as u32)
@@ -422,10 +421,10 @@ impl XmlParserCtxt<'_> {
                     in_space = 0;
                     buf.push(nc);
                 }
-                self.advance_with_line_handling(l as usize);
+                self.advance_with_line_handling(nc.len_utf8());
             }
             self.grow();
-            c = self.current_char(&mut l);
+            c = self.current_char();
             if buf.len() > max_length {
                 xml_fatal_err_msg(
                     self,

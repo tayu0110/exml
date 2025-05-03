@@ -974,8 +974,7 @@ impl<'a> XmlParserCtxt<'a> {
             return;
         }
 
-        let mut len = 0;
-        let Some(c) = self.current_char(&mut len) else {
+        let Some(c) = self.current_char() else {
             return;
         };
         // 2.11 End-of-Line Handling
@@ -989,7 +988,7 @@ impl<'a> XmlParserCtxt<'a> {
         } else {
             input.col += 1;
         }
-        input.cur += len as usize;
+        input.cur += c.len_utf8();
     }
 
     /// skip all blanks character found at that point in the input streams.  
@@ -1110,7 +1109,7 @@ impl<'a> XmlParserCtxt<'a> {
     ///
     /// Returns the current char value and its length
     #[doc(alias = "xmlCurrentChar")]
-    pub(crate) fn current_char(&mut self, len: &mut i32) -> Option<char> {
+    pub(crate) fn current_char(&mut self) -> Option<char> {
         if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
             return None;
         }
@@ -1120,26 +1119,9 @@ impl<'a> XmlParserCtxt<'a> {
         }
 
         if (0x20..0x80).contains(&self.current_byte()) {
-            *len = 1;
             return Some(self.current_byte() as char);
         }
 
-        // if self.charset != XmlCharEncoding::UTF8 {
-        //     // Assume it's a fixed length encoding (1) with
-        //     // a compatible encoding for the ASCII set, since
-        //     // XML constructs only use < 128 chars
-        //     *len = 1;
-        //     if self.current_byte() == 0xD {
-        //         if self.nth_byte(1) == 0xA {
-        //             let input = self.input_mut()?;
-        //             input.cur += 1;
-        //         }
-        //         return Some('\u{A}');
-        //     }
-        //     return Some(self.current_byte() as char);
-        // }
-
-        *len = 0;
         let input = self.input_mut().unwrap();
         let c = if let Some(buf) = input.buf.as_ref() {
             if buf.encoder.is_some() {
@@ -1211,9 +1193,9 @@ impl<'a> XmlParserCtxt<'a> {
                                     .unwrap()
                                     .fallback_to_iso_8859_1();
                                 self.charset = XmlCharEncoding::ISO8859_1;
-                                self.current_char(len)
+                                self.current_char()
                             }
-                            None => Some('\0'),
+                            None => None,
                         };
                     }
                 }
@@ -1227,10 +1209,9 @@ impl<'a> XmlParserCtxt<'a> {
         } else {
             return None;
         };
-        *len = c.len_utf8() as i32;
 
-        if (*len > 1 && !xml_is_char(c as u32))
-            || (*len == 1 && c == '\0' && !self.content_bytes().is_empty())
+        if (c.len_utf8() > 1 && !xml_is_char(c as u32))
+            || (c.len_utf8() == 1 && c == '\0' && !self.content_bytes().is_empty())
         {
             xml_err_encoding_int!(
                 self,
@@ -1253,8 +1234,7 @@ impl<'a> XmlParserCtxt<'a> {
         &mut self,
         mut f: impl FnMut(&Self, char) -> bool,
     ) -> Option<char> {
-        let mut len = 0;
-        let c = self.current_char(&mut len)?;
+        let c = self.current_char()?;
         f(self, c).then(|| {
             let input = self.input_mut().unwrap();
             if c == '\n' {

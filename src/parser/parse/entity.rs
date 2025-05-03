@@ -207,8 +207,6 @@ impl XmlParserCtxt<'_> {
     /// Returns 0 in case of success and -1 in case of failure
     #[doc(alias = "xmlLoadEntityContent")]
     fn load_entity_content(&mut self, mut entity: XmlEntityPtr) -> i32 {
-        let mut l: i32 = 0;
-
         if !matches!(
             entity.etype,
             XmlEntityType::XmlExternalParameterEntity
@@ -245,7 +243,7 @@ impl XmlParserCtxt<'_> {
 
         self.grow();
         let mut buf = String::new();
-        let mut c = self.current_char(&mut l);
+        let mut c = self.current_char();
         while let Some(nc) = c.filter(|&c| {
             self.input().unwrap().id == input_id
                 && !self.content_bytes().is_empty()
@@ -253,7 +251,7 @@ impl XmlParserCtxt<'_> {
         }) {
             buf.push(nc);
             self.advance_with_line_handling(nc.len_utf8());
-            c = self.current_char(&mut l);
+            c = self.current_char();
         }
         if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
             return -1;
@@ -350,7 +348,6 @@ impl XmlParserCtxt<'_> {
     /// otherwise return `(None, None)`.
     #[doc(alias = "xmlParseEntityValue")]
     pub(crate) fn parse_entity_value(&mut self) -> (Option<String>, Option<String>) {
-        let mut l: i32 = 0;
         let max_length = if self.options & XmlParserOption::XmlParseHuge as i32 != 0 {
             XML_MAX_HUGE_LENGTH
         } else {
@@ -374,7 +371,7 @@ impl XmlParserCtxt<'_> {
             return (None, None);
         }
         self.skip_char();
-        let mut c = self.current_char(&mut l);
+        let mut c = self.current_char();
         // NOTE: 4.4.5 Included in Literal
         // When a parameter entity reference appears in a literal entity
         // value, ... a single or double quote character in the replacement
@@ -390,10 +387,10 @@ impl XmlParserCtxt<'_> {
             buf.push(nc);
             self.advance_with_line_handling(nc.len_utf8());
             self.grow();
-            c = self.current_char(&mut l);
+            c = self.current_char();
             if c.is_none() {
                 self.grow();
-                c = self.current_char(&mut l);
+                c = self.current_char();
             }
 
             if buf.len() > max_length {

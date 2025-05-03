@@ -188,8 +188,7 @@ impl XmlParserCtxt<'_> {
                 if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
                     return;
                 }
-                let mut l = 0;
-                if self.current_char(&mut l) != Some('?') {
+                if self.current_char() != Some('?') {
                     xml_fatal_err_msg_str!(
                         self,
                         XmlParserErrors::XmlErrPINotFinished,

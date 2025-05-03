@@ -86,10 +86,8 @@ impl XmlParserCtxt<'_> {
     /// of non-ASCII characters.
     #[doc(alias = "xmlParseCharDataComplex")]
     fn parse_char_data_complex(&mut self, partial: i32) {
-        let mut l: i32 = 0;
-
         let mut buf = String::with_capacity(XML_PARSER_BIG_BUFFER_SIZE + 5);
-        let mut cur = self.current_char(&mut l);
+        let mut cur = self.current_char();
         // test also done in xmlCurrentChar()
         while let Some(nc) = cur.filter(|&cur| cur != '<' && cur != '&' && xml_is_char(cur as u32))
         {
@@ -98,7 +96,7 @@ impl XmlParserCtxt<'_> {
             }
             buf.push(nc);
             // move current position before possible calling of (*self.sax).characters
-            self.advance_with_line_handling(l as usize);
+            self.advance_with_line_handling(nc.len_utf8());
             if buf.len() >= XML_PARSER_BIG_BUFFER_SIZE {
                 // OK the segment is to be consumed as chars.
                 if !self.disable_sax {
@@ -132,7 +130,7 @@ impl XmlParserCtxt<'_> {
                 }
                 self.shrink();
             }
-            cur = self.current_char(&mut l);
+            cur = self.current_char();
         }
         if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
             return;
@@ -187,14 +185,14 @@ impl XmlParserCtxt<'_> {
                 }
             } else if !matches!(cur, Some('<' | '&')) {
                 // Generate the error and skip the offending character
-                let cur = cur.unwrap_or('\0');
+                let c = cur.unwrap_or('\0');
                 xml_fatal_err_msg_int!(
                     self,
                     XmlParserErrors::XmlErrInvalidChar,
-                    format!("PCDATA invalid Char value {}\n", cur as i32).as_str(),
-                    cur as i32
+                    format!("PCDATA invalid Char value {}\n", c as i32).as_str(),
+                    c as i32
                 );
-                self.advance_with_line_handling(l as usize);
+                self.advance_with_line_handling(cur.map_or(0, |c| c.len_utf8()));
             }
         }
     }
@@ -444,9 +442,6 @@ impl XmlParserCtxt<'_> {
     /// ```
     #[doc(alias = "xmlParseCDSect")]
     pub(crate) fn parse_cdsect(&mut self) {
-        let mut rl: i32 = 0;
-        let mut sl: i32 = 0;
-        let mut l: i32 = 0;
         let max_length = if self.options & XmlParserOption::XmlParseHuge as i32 != 0 {
             XML_MAX_HUGE_LENGTH
         } else {
@@ -459,29 +454,23 @@ impl XmlParserCtxt<'_> {
         self.advance(9);
 
         self.instate = XmlParserInputState::XmlParserCDATASection;
-        let Some(mut r) = self
-            .current_char(&mut rl)
-            .filter(|&r| xml_is_char(r as u32))
-        else {
+        let Some(mut r) = self.current_char().filter(|&r| xml_is_char(r as u32)) else {
             xml_fatal_err(self, XmlParserErrors::XmlErrCDATANotFinished, None);
             if !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
                 self.instate = XmlParserInputState::XmlParserContent;
             }
             return;
         };
-        self.advance_with_line_handling(rl as usize);
-        let Some(mut s) = self
-            .current_char(&mut sl)
-            .filter(|&s| xml_is_char(s as u32))
-        else {
+        self.advance_with_line_handling(r.len_utf8());
+        let Some(mut s) = self.current_char().filter(|&s| xml_is_char(s as u32)) else {
             xml_fatal_err(self, XmlParserErrors::XmlErrCDATANotFinished, None);
             if !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
                 self.instate = XmlParserInputState::XmlParserContent;
             }
             return;
         };
-        self.advance_with_line_handling(sl as usize);
-        let mut cur = self.current_char(&mut l);
+        self.advance_with_line_handling(s.len_utf8());
+        let mut cur = self.current_char();
         let mut buf = String::new();
         while let Some(nc) =
             cur.filter(|&cur| xml_is_char(cur as u32) && (r != ']' || s != ']' || cur != '>'))
@@ -500,8 +489,8 @@ impl XmlParserCtxt<'_> {
             }
             r = s;
             s = nc;
-            self.advance_with_line_handling(l as usize);
-            cur = self.current_char(&mut l);
+            self.advance_with_line_handling(nc.len_utf8());
+            cur = self.current_char();
         }
         if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
             return;
@@ -519,7 +508,7 @@ impl XmlParserCtxt<'_> {
             }
             return;
         }
-        self.advance_with_line_handling(l as usize);
+        self.advance_with_line_handling(cur.map_or(0, |c| c.len_utf8()));
 
         // OK the buffer is to be consumed as cdata.
         if !self.disable_sax {
