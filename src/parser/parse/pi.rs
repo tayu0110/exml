@@ -170,6 +170,55 @@ impl XmlParserCtxt<'_> {
                         target
                     );
                 }
+                let input = self.input().unwrap();
+                let mut content = input.current_contents();
+                let mut line = input.line;
+                let mut col = input.col;
+                while content[0] < 0x80
+                    && xml_is_char(content[0] as u32)
+                    && !content.starts_with(b"?>")
+                {
+                    buf.push(content[0] as char);
+                    if content[0] == b'\n' {
+                        line += 1;
+                        col = 1;
+                    } else {
+                        col += 1;
+                    }
+                    content = &content[1..];
+                    if buf.len() > max_length {
+                        let len = content.len();
+                        let input = self.input_mut().unwrap();
+                        input.line = line;
+                        input.col = col;
+                        input.cur = input.base_contents().len() - len;
+                        xml_fatal_err_msg_str!(
+                            self,
+                            XmlParserErrors::XmlErrPINotFinished,
+                            "PI {} too big found",
+                            target
+                        );
+                        self.instate = state;
+                        return;
+                    }
+
+                    if content.len() < 2 {
+                        let input = self.input_mut().unwrap();
+                        input.line = line;
+                        input.col = col;
+                        input.cur = input.base_contents().len();
+                        self.grow();
+                        content = self.content_bytes();
+                        if content.len() < 2 {
+                            break;
+                        }
+                    }
+                }
+                let len = content.len();
+                let input = self.input_mut().unwrap();
+                input.line = line;
+                input.col = col;
+                input.cur = input.base_contents().len() - len;
                 while let Some(cur) = self.consume_char_if(|ctxt, c| {
                     xml_is_char(c as u32) && (c != '?' || ctxt.nth_byte(1) != b'>')
                 }) {
