@@ -1124,20 +1124,20 @@ impl<'a> XmlParserCtxt<'a> {
             return Some(self.current_byte() as char);
         }
 
-        if self.charset != XmlCharEncoding::UTF8 {
-            // Assume it's a fixed length encoding (1) with
-            // a compatible encoding for the ASCII set, since
-            // XML constructs only use < 128 chars
-            *len = 1;
-            if self.current_byte() == 0xD {
-                if self.nth_byte(1) == 0xA {
-                    let input = self.input_mut()?;
-                    input.cur += 1;
-                }
-                return Some('\u{A}');
-            }
-            return Some(self.current_byte() as char);
-        }
+        // if self.charset != XmlCharEncoding::UTF8 {
+        //     // Assume it's a fixed length encoding (1) with
+        //     // a compatible encoding for the ASCII set, since
+        //     // XML constructs only use < 128 chars
+        //     *len = 1;
+        //     if self.current_byte() == 0xD {
+        //         if self.nth_byte(1) == 0xA {
+        //             let input = self.input_mut()?;
+        //             input.cur += 1;
+        //         }
+        //         return Some('\u{A}');
+        //     }
+        //     return Some(self.current_byte() as char);
+        // }
 
         *len = 0;
         let input = self.input_mut().unwrap();
@@ -1204,9 +1204,14 @@ impl<'a> XmlParserCtxt<'a> {
                                         buffer
                                     );
                                 }
+                                self.input_mut()
+                                    .unwrap()
+                                    .buf
+                                    .as_mut()
+                                    .unwrap()
+                                    .fallback_to_iso_8859_1();
                                 self.charset = XmlCharEncoding::ISO8859_1;
-                                *len = 1;
-                                Some(self.current_byte() as char)
+                                self.current_char(len)
                             }
                             None => Some('\0'),
                         };

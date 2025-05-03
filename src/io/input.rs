@@ -18,6 +18,7 @@
 use std::{
     any::{type_name, type_name_of_val},
     io::{self, Cursor, Read},
+    mem::take,
     str::from_utf8_unchecked_mut,
     sync::{
         Mutex,
@@ -295,6 +296,22 @@ impl<'a> XmlParserInputBuffer<'a> {
                 })
             })
             .flatten()
+    }
+
+    /// Fallback UTF-8 buffers to ISO-8859-1.  
+    /// This method moves the contents of the buffer to `self.raw`
+    /// and decodes it again with a decoder for ISO-8859-1.
+    ///
+    /// # Panics
+    /// - `self.encoder` must be `None`.
+    /// - `self.raw` must be empty.
+    pub(crate) fn fallback_to_iso_8859_1(&mut self) {
+        assert!(self.encoder.is_none());
+        assert!(self.raw.is_empty());
+
+        let buf = take(&mut self.buffer);
+        self.encoder = get_encoding_handler(XmlCharEncoding::ISO8859_1);
+        self.push_bytes(&buf);
     }
 }
 
