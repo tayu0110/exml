@@ -974,67 +974,22 @@ impl<'a> XmlParserCtxt<'a> {
             return;
         }
 
+        let mut len = 0;
+        let Some(c) = self.current_char(&mut len) else {
+            return;
+        };
         // 2.11 End-of-Line Handling
         //   the literal two-character sequence "#xD#xA" or a standalone
         //   literal #xD, an XML processor must pass to the application
         //   the single character #xA.
         let input = self.input_mut().unwrap();
-        if input.base_contents()[input.cur] == b'\n' {
+        if c == '\n' {
             input.line += 1;
             input.col = 1;
         } else {
             input.col += 1;
         }
-
-        let bytes = self.content_bytes();
-        let len = 4.min(bytes.len());
-        match from_utf8(&bytes[..len]) {
-            Ok(s) => {
-                let c = s.chars().next().unwrap();
-                let input = self.input_mut().unwrap();
-                input.cur += c.len_utf8();
-                return;
-            }
-            Err(e) if e.valid_up_to() > 0 => {
-                let s = unsafe {
-                    // # Safety
-                    // Refer to the documents for `from_utf8_unchecked` and `Utf8Error`.
-                    from_utf8_unchecked(&bytes[..e.valid_up_to()])
-                };
-                let c = s.chars().next().unwrap();
-                let input = self.input_mut().unwrap();
-                input.cur += c.len_utf8();
-                return;
-            }
-            Err(_) => {}
-        }
-
-        // If we detect an UTF8 error that probably mean that the
-        // input encoding didn't get properly advertised in the declaration header.
-        // Report the error and switch the encoding
-        // to ISO-Latin-1 (if you don't like this policy, just declare the encoding !)
-        if self.input().is_none_or(|input| input.remainder_len() < 4) {
-            __xml_err_encoding!(
-                self,
-                XmlParserErrors::XmlErrInvalidChar,
-                "Input is not proper UTF-8, indicate encoding !\n"
-            );
-        } else {
-            let content = self.content_bytes();
-            let buffer = format!(
-                "Bytes: 0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}\n",
-                content[0], content[1], content[2], content[3],
-            );
-            __xml_err_encoding!(
-                self,
-                XmlParserErrors::XmlErrInvalidChar,
-                "Input is not proper UTF-8, indicate encoding !\n{}",
-                buffer
-            );
-        }
-        self.charset = XmlCharEncoding::ISO8859_1;
-        let input = self.input_mut().unwrap();
-        input.cur += 1;
+        input.cur += len as usize;
     }
 
     /// skip all blanks character found at that point in the input streams.  
