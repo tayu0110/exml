@@ -116,39 +116,40 @@ impl XmlParserCtxt<'_> {
     }
 
     #[doc(alias = "xmlParseNameComplex")]
-    fn parse_name_complex(&mut self) -> Option<String> {
+    fn parse_name_complex(&mut self, mut buf: String) -> Option<String> {
         let max_length = if self.options & XmlParserOption::XmlParseHuge as i32 != 0 {
             XML_MAX_TEXT_LENGTH
         } else {
             XML_MAX_NAME_LENGTH
         };
-        let mut buf = String::new();
 
         // Handler for more complex cases
         if self.options & XmlParserOption::XmlParseOld10 as i32 == 0 {
             // Use the new checks of production [4] [4a] amd [5] of the
             // Update 5 of XML-1.0
-            let c = self.consume_char_if(|_, c| {
-                c != ' '
-                    && c != '>'
-                    && c != '/'
-                    && (c.is_ascii_alphabetic()
-                        || c == '_'
-                        || c == ':'
-                        || ('\u{C0}'..='\u{D6}').contains(&c)
-                        || ('\u{D8}'..='\u{F6}').contains(&c)
-                        || ('\u{F8}'..='\u{2FF}').contains(&c)
-                        || ('\u{370}'..='\u{37D}').contains(&c)
-                        || ('\u{37F}'..='\u{1FFF}').contains(&c)
-                        || ('\u{200C}'..='\u{200D}').contains(&c)
-                        || ('\u{2070}'..='\u{218F}').contains(&c)
-                        || ('\u{2C00}'..='\u{2FEF}').contains(&c)
-                        || ('\u{3001}'..='\u{D7FF}').contains(&c)
-                        || ('\u{F900}'..='\u{FDCF}').contains(&c)
-                        || ('\u{FDF0}'..='\u{FFFD}').contains(&c)
-                        || ('\u{10000}'..='\u{EFFFF}').contains(&c))
-            })?;
-            buf.push(c);
+            if buf.is_empty() {
+                let c = self.consume_char_if(|_, c| {
+                    c != ' '
+                        && c != '>'
+                        && c != '/'
+                        && (c.is_ascii_alphabetic()
+                            || c == '_'
+                            || c == ':'
+                            || ('\u{C0}'..='\u{D6}').contains(&c)
+                            || ('\u{D8}'..='\u{F6}').contains(&c)
+                            || ('\u{F8}'..='\u{2FF}').contains(&c)
+                            || ('\u{370}'..='\u{37D}').contains(&c)
+                            || ('\u{37F}'..='\u{1FFF}').contains(&c)
+                            || ('\u{200C}'..='\u{200D}').contains(&c)
+                            || ('\u{2070}'..='\u{218F}').contains(&c)
+                            || ('\u{2C00}'..='\u{2FEF}').contains(&c)
+                            || ('\u{3001}'..='\u{D7FF}').contains(&c)
+                            || ('\u{F900}'..='\u{FDCF}').contains(&c)
+                            || ('\u{FDF0}'..='\u{FFFD}').contains(&c)
+                            || ('\u{10000}'..='\u{EFFFF}').contains(&c))
+                })?;
+                buf.push(c);
+            }
             while let Some(c) = self.consume_char_if(|_, c| {
                 c != ' '
                     && c != '>'
@@ -177,13 +178,15 @@ impl XmlParserCtxt<'_> {
                 buf.push(c);
             }
         } else {
-            let c = self.consume_char_if(|_, c| {
-                c != ' '
-                    && c != '>'
-                    && c != '/'
-                    && (xml_is_letter(c as u32) || c == '_' || c == ':')
-            })?;
-            buf.push(c);
+            if buf.is_empty() {
+                let c = self.consume_char_if(|_, c| {
+                    c != ' '
+                        && c != '>'
+                        && c != '/'
+                        && (xml_is_letter(c as u32) || c == '_' || c == ':')
+                })?;
+                buf.push(c);
+            }
 
             while let Some(c) = self.consume_char_if(|_, c| {
                 c != ' '
@@ -244,35 +247,49 @@ impl XmlParserCtxt<'_> {
             return None;
         }
 
+        let mut buf = String::new();
         // Accelerator for simple ASCII names
         let content = self.content_bytes();
         if !content.is_empty()
             && (content[0].is_ascii_alphabetic() || content[0] == b'_' || content[0] == b':')
         {
-            for (i, &b) in content.iter().enumerate().skip(1) {
+            buf.push(content[0] as char);
+            self.advance(1);
+            let mut cur = self.content_bytes();
+            let mut content = cur;
+            while !cur.is_empty() {
+                let b = cur[0];
                 if !b.is_ascii_alphanumeric() && b != b'_' && b != b'-' && b != b':' && b != b'.' {
+                    let diff = content.len() - cur.len();
+                    // `content[..diff]` contains no line delimiters,
+                    // so we need not use `self.advance_with_line_handling(i)`.
+                    self.advance(diff);
                     if !(1..0x80).contains(&b) {
                         break;
                     }
-                    if i > max_length {
-                        xml_fatal_err(self, XmlParserErrors::XmlErrNameTooLong, Some("Name"));
-                        return None;
+                    return Some(buf);
+                }
+                buf.push(b as char);
+                cur = &cur[1..];
+                if buf.len() > max_length {
+                    self.advance(content.len() - cur.len());
+                    xml_fatal_err(self, XmlParserErrors::XmlErrNameTooLong, Some("Name"));
+                    return None;
+                }
+                if cur.is_empty() {
+                    let len = content.len();
+                    self.advance(len);
+                    self.grow();
+                    content = self.content_bytes();
+                    cur = content;
+                    if cur.is_empty() {
+                        return Some(buf);
                     }
-                    let res = unsafe {
-                        // # Safety
-                        // `content[..i]` contains only ASCII characters.
-                        // Therefore, UTF-8 validation won't fail.
-                        String::from_utf8_unchecked(content[..i].to_vec())
-                    };
-                    // `content[..i]` contains no line delimiters,
-                    // so we need not use `self.advance_with_line_handling(i)`.
-                    self.advance(i);
-                    return Some(res);
                 }
             }
         }
         // accelerator for special cases
-        self.parse_name_complex()
+        self.parse_name_complex(buf)
     }
 
     /// Parse an XML name.
