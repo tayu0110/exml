@@ -89,7 +89,7 @@ impl XmlParserCtxt<'_> {
             q = r;
             r = nc;
 
-            self.skip_char();
+            self.advance_with_line_handling(nc.len_utf8());
             cur = self.current_char();
         }
         if matches!(self.instate, XmlParserInputState::XmlParserEOF) {

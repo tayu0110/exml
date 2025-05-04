@@ -119,13 +119,8 @@ impl XmlParserCtxt<'_> {
         let cur = &self.content_bytes()[self.check_index.max(1)..];
 
         if !cur.contains(&c) {
-            if cur.len() > i64::MAX as usize {
-                self.check_index = 0;
-                1
-            } else {
-                self.check_index = cur.len();
-                0
-            }
+            self.check_index = cur.len();
+            0
         } else {
             self.check_index = 0;
             1
@@ -137,7 +132,7 @@ impl XmlParserCtxt<'_> {
     fn lookup_char_data(&mut self) -> i32 {
         let cur = &self.content_bytes()[self.check_index..];
 
-        if cur.contains(&b'<') || cur.contains(&b'&') || cur.len() > i64::MAX as usize {
+        if cur.contains(&b'<') || cur.contains(&b'&') {
             self.check_index = 0;
             1
         } else {
@@ -161,7 +156,7 @@ impl XmlParserCtxt<'_> {
         let s = s.as_bytes();
 
         while let Some(pos) = cur.iter().position(|&b| b == s[0]) {
-            if cur[pos..].starts_with(s) {
+            if cur[pos + 1..].starts_with(&s[1..]) {
                 self.check_index = 0;
                 return Some(&cur[pos..]);
             }
@@ -175,35 +170,30 @@ impl XmlParserCtxt<'_> {
     /// a start tag. This has to take quotes into account.
     #[doc(alias = "xmlParseLookupGt")]
     fn lookup_gt(&mut self) -> i32 {
-        let mut cur = if self.check_index == 0 {
-            &self.content_bytes()[1..]
-        } else {
-            &self.content_bytes()[self.check_index..]
-        };
-
+        let content = self.input_tab.last().unwrap().current_contents();
+        let mut cur = &content[self.check_index.max(1)..];
         let mut state = self.end_check_state as u8;
         while !cur.is_empty() {
             if state != 0 {
-                if cur[0] == state {
+                if let Some(pos) = cur.iter().position(|&b| b == state) {
+                    cur = &cur[pos + 1..];
                     state = 0;
+                } else {
+                    break;
                 }
-            } else if matches!(cur[0], b'\'' | b'"') {
-                state = cur[0];
-            } else if cur[0] == b'>' {
-                self.check_index = 0;
-                self.end_check_state = 0;
-                return 1;
+            } else if let Some(pos) = cur.iter().position(|&b| matches!(b, b'\'' | b'"' | b'>')) {
+                if cur[pos] == b'>' {
+                    self.check_index = 0;
+                    self.end_check_state = 0;
+                    return 1;
+                }
+                state = cur[pos];
+                cur = &cur[pos + 1..];
+            } else {
+                break;
             }
-            cur = &cur[1..];
         }
-
-        let index = self.content_bytes().len() - cur.len();
-        if index > i64::MAX as usize {
-            self.check_index = 0;
-            self.end_check_state = 0;
-            return 1;
-        }
-        self.check_index = index;
+        self.check_index = content.len();
         self.end_check_state = state as i32;
         0
     }
@@ -680,7 +670,7 @@ impl XmlParserCtxt<'_> {
                                 // goto done;
                                 return ret;
                             }
-                            if terminate == 0 && self.lookup_char(b'>' as _) == 0 {
+                            if terminate == 0 && self.lookup_char(b'>') == 0 {
                                 // goto done;
                                 return ret;
                             }
@@ -708,11 +698,22 @@ impl XmlParserCtxt<'_> {
                             let term = if terminate != 0 {
                                 // Don't call xmlParseLookupString. If 'terminate'
                                 // is set, checkIndex is invalid.
-                                let target = b"]]>".as_slice();
-                                self.content_bytes()
-                                    .windows(target.len())
-                                    .position(|s| s == target)
-                                    .map(|pos| &self.content_bytes()[pos..])
+                                let mut res = None;
+                                let content = self.content_bytes();
+                                let mut cur = content;
+                                while let Some(pos) = cur
+                                    .iter()
+                                    .take(cur.len().saturating_sub(2))
+                                    .position(|&b| b == b']')
+                                {
+                                    if cur[pos + 1] == b']' && cur[pos + 2] == b'>' {
+                                        res = Some(&cur[pos..]);
+                                        break;
+                                    } else {
+                                        cur = &cur[pos + 1..];
+                                    }
+                                }
+                                res
                             } else {
                                 self.lookup_string(0, "]]>")
                             };

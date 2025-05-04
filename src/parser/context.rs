@@ -916,14 +916,25 @@ impl<'a> XmlParserCtxt<'a> {
             self.force_grow();
         }
         let input = self.input_mut().unwrap();
-        for i in input.cur..input.cur + nth {
-            if input.base_contents()[i] == b'\n' {
-                input.line += 1;
-                input.col = 1;
-            } else {
-                input.col += 1;
-            }
+        let content = &input.current_contents()[..nth];
+        let mut line = input.line;
+        let mut col = input.col;
+        let mut next = content.split(|b| b == &b'\n');
+        col += next.next().unwrap().len() as i32;
+        for cur in next {
+            line += 1;
+            col = cur.len() as i32 + 1;
         }
+        input.line = line;
+        input.col = col;
+        // for i in input.cur..input.cur + nth {
+        //     if input.base_contents()[i] == b'\n' {
+        //         input.line += 1;
+        //         input.col = 1;
+        //     } else {
+        //         input.col += 1;
+        //     }
+        // }
         input.cur += nth;
     }
 
