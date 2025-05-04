@@ -927,14 +927,6 @@ impl<'a> XmlParserCtxt<'a> {
         }
         input.line = line;
         input.col = col;
-        // for i in input.cur..input.cur + nth {
-        //     if input.base_contents()[i] == b'\n' {
-        //         input.line += 1;
-        //         input.col = 1;
-        //     } else {
-        //         input.col += 1;
-        //     }
-        // }
         input.cur += nth;
     }
 
@@ -1113,96 +1105,105 @@ impl<'a> XmlParserCtxt<'a> {
             return None;
         }
 
-        if (0x20..0x80).contains(&self.current_byte()) {
-            return Some(self.current_byte() as char);
+        let cur_byte = self.current_byte();
+        if (0x20..0x80).contains(&cur_byte) {
+            return Some(cur_byte as char);
         }
 
-        let input = self.input_mut().unwrap();
-        let c = if let Some(buf) = input.buf.as_ref() {
-            if buf.encoder.is_some() {
-                unsafe {
-                    // # Safety
-                    // If `buf.encoder` is `Some`, `buf.buffer` is decoded by `buf.encoder`.
-                    // Decoded buffer is already validated as UTF-8 byte sequence,
-                    // so this function works well.
-                    from_utf8_unchecked(&buf.buffer[input.cur..])
-                        .chars()
-                        .next()?
-                }
-            } else if input.cur < input.valid_up_to {
-                unsafe {
-                    // # Safety
-                    // `buf.buffer[input.cur..input.valid_up_to]` is kept valid
-                    // as a UTF-8 byte sequence.
-                    from_utf8_unchecked(&buf.buffer[input.cur..input.valid_up_to])
-                        .chars()
-                        .next()?
-                }
-            } else {
-                match from_utf8(&buf.buffer[input.cur..]) {
-                    Ok(s) => {
-                        input.valid_up_to = input.cur + s.len();
-                        s.chars().next()?
-                    }
-                    Err(e) if e.valid_up_to() > 0 => {
-                        input.valid_up_to = input.cur + e.valid_up_to();
-                        let s = unsafe {
-                            // # Safety
-                            // Refer to the documents for `from_utf8_unchecked` and `Utf8Error`.
-                            from_utf8_unchecked(&buf.buffer[input.cur..][..e.valid_up_to()])
-                        };
-                        s.chars().next().unwrap()
-                    }
-                    Err(e) => {
-                        return match e.error_len() {
-                            Some(_) => {
-                                // If we detect an UTF8 error that probably mean that the
-                                // input encoding didn't get properly advertised in the
-                                // declaration header. Report the error and switch the encoding
-                                // to ISO-Latin-1 (if you don't like this policy, just declare the encoding !)
-                                if input.remainder_len() < 4 {
-                                    __xml_err_encoding!(
-                                        self,
-                                        XmlParserErrors::XmlErrInvalidChar,
-                                        "Input is not proper UTF-8, indicate encoding !\n"
-                                    );
-                                } else {
-                                    let buffer = format!(
-                                        "Bytes: 0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}\n",
-                                        buf.buffer[input.cur],
-                                        buf.buffer[input.cur + 1],
-                                        buf.buffer[input.cur + 2],
-                                        buf.buffer[input.cur + 3],
-                                    );
-                                    __xml_err_encoding!(
-                                        self,
-                                        XmlParserErrors::XmlErrInvalidChar,
-                                        "Input is not proper UTF-8, indicate encoding !\n{}",
-                                        buffer
-                                    );
-                                }
-                                self.input_mut()
-                                    .unwrap()
-                                    .buf
-                                    .as_mut()
-                                    .unwrap()
-                                    .fallback_to_iso_8859_1();
-                                self.charset = XmlCharEncoding::ISO8859_1;
-                                self.current_char()
-                            }
-                            None => None,
-                        };
-                    }
-                }
-            }
-        } else if let Some(content) = input
-            .entity
-            .as_deref()
-            .and_then(|ent| ent.content.as_deref())
-        {
-            content[input.cur..].chars().next()?
-        } else {
+        if self.content_bytes().is_empty() {
             return None;
+        }
+
+        let c = if cur_byte >= 0x80 {
+            let input = self.input_mut().unwrap();
+            if let Some(buf) = input.buf.as_ref() {
+                if buf.encoder.is_some() {
+                    unsafe {
+                        // # Safety
+                        // If `buf.encoder` is `Some`, `buf.buffer` is decoded by `buf.encoder`.
+                        // Decoded buffer is already validated as UTF-8 byte sequence,
+                        // so this function works well.
+                        from_utf8_unchecked(&buf.buffer[input.cur..])
+                            .chars()
+                            .next()?
+                    }
+                } else if input.cur < input.valid_up_to {
+                    unsafe {
+                        // # Safety
+                        // `buf.buffer[input.cur..input.valid_up_to]` is kept valid
+                        // as a UTF-8 byte sequence.
+                        from_utf8_unchecked(&buf.buffer[input.cur..input.valid_up_to])
+                            .chars()
+                            .next()?
+                    }
+                } else {
+                    match from_utf8(&buf.buffer[input.cur..]) {
+                        Ok(s) => {
+                            input.valid_up_to = input.cur + s.len();
+                            s.chars().next()?
+                        }
+                        Err(e) if e.valid_up_to() > 0 => {
+                            input.valid_up_to = input.cur + e.valid_up_to();
+                            let s = unsafe {
+                                // # Safety
+                                // Refer to the documents for `from_utf8_unchecked` and `Utf8Error`.
+                                from_utf8_unchecked(&buf.buffer[input.cur..][..e.valid_up_to()])
+                            };
+                            s.chars().next().unwrap()
+                        }
+                        Err(e) => {
+                            return match e.error_len() {
+                                Some(_) => {
+                                    // If we detect an UTF8 error that probably mean that the
+                                    // input encoding didn't get properly advertised in the
+                                    // declaration header. Report the error and switch the encoding
+                                    // to ISO-Latin-1 (if you don't like this policy, just declare the encoding !)
+                                    if input.remainder_len() < 4 {
+                                        __xml_err_encoding!(
+                                            self,
+                                            XmlParserErrors::XmlErrInvalidChar,
+                                            "Input is not proper UTF-8, indicate encoding !\n"
+                                        );
+                                    } else {
+                                        let buffer = format!(
+                                            "Bytes: 0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}\n",
+                                            buf.buffer[input.cur],
+                                            buf.buffer[input.cur + 1],
+                                            buf.buffer[input.cur + 2],
+                                            buf.buffer[input.cur + 3],
+                                        );
+                                        __xml_err_encoding!(
+                                            self,
+                                            XmlParserErrors::XmlErrInvalidChar,
+                                            "Input is not proper UTF-8, indicate encoding !\n{}",
+                                            buffer
+                                        );
+                                    }
+                                    self.input_mut()
+                                        .unwrap()
+                                        .buf
+                                        .as_mut()
+                                        .unwrap()
+                                        .fallback_to_iso_8859_1();
+                                    self.charset = XmlCharEncoding::ISO8859_1;
+                                    self.current_char()
+                                }
+                                None => None,
+                            };
+                        }
+                    }
+                }
+            } else if let Some(content) = input
+                .entity
+                .as_deref()
+                .and_then(|ent| ent.content.as_deref())
+            {
+                content[input.cur..].chars().next()?
+            } else {
+                return None;
+            }
+        } else {
+            cur_byte as char
         };
 
         if (c.len_utf8() > 1 && !xml_is_char(c as u32)) || (c.len_utf8() == 1 && c == '\0') {

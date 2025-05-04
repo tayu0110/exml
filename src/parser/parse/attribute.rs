@@ -249,7 +249,6 @@ impl XmlParserCtxt<'_> {
         };
         col += 1;
         let len = start.len() - last.len();
-        #[allow(unused_unsafe)]
         let ret = unsafe {
             // # Safety
             // If we can reach here, UTF-8 validation will never fail
