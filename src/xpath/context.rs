@@ -32,9 +32,9 @@
 use std::{borrow::Cow, collections::HashMap, ffi::c_void, ptr::null_mut, rc::Rc};
 
 use crate::{
+    chvalid::XmlCharValid,
     error::XmlError,
     globals::{GenericErrorContext, StructuredError},
-    libxml::chvalid::XmlCharValid,
     tree::{XML_XML_NAMESPACE, XmlDocPtr, XmlGenericNodePtr, XmlNsPtr},
 };
 

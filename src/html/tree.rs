@@ -772,7 +772,7 @@ fn html_dtd_dump_output(buf: &mut XmlOutputBuffer, doc: XmlDocPtr, _encoding: Op
 #[doc(alias = "htmlAttrDumpOutput")]
 #[cfg(feature = "libxml_output")]
 fn html_attr_dump_output(buf: &mut XmlOutputBuffer, doc: Option<XmlDocPtr>, cur: &XmlAttr) {
-    use crate::{io::write_quoted, libxml::chvalid::XmlCharValid, uri::escape_url_except};
+    use crate::{chvalid::XmlCharValid, io::write_quoted, uri::escape_url_except};
 
     // The html output method should not escape a & character
     // occurring in an attribute value immediately followed by

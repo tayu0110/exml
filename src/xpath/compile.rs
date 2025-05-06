@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use crate::{
-    libxml::chvalid::XmlCharValid,
+    chvalid::XmlCharValid,
     parser::{XML_MAX_NAME_LENGTH, xml_is_letter},
     xpath::{
         XML_XPATH_CHECKNS, XPATH_MAX_RECURSION_DEPTH, XmlXPathAxisVal, XmlXPathError, XmlXPathOp,

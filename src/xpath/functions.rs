@@ -1,7 +1,7 @@
 use std::iter::repeat;
 
 use crate::{
-    libxml::chvalid::XmlCharValid,
+    chvalid::XmlCharValid,
     parser::build_qname,
     tree::{NodeCommon, XmlAttrPtr, XmlElementType, XmlNodePtr, XmlNsPtr},
     xpath::XmlXPathObjectType,

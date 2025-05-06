@@ -14,6 +14,7 @@
 
 #[cfg(all(feature = "c14n", feature = "libxml_output"))]
 pub mod c14n;
+mod chvalid;
 #[cfg(feature = "libxml_debug")]
 pub mod debug_xml;
 pub mod dict;

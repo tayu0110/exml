@@ -26,7 +26,7 @@ use std::{borrow::Cow, iter::once};
 
 use primitives::XmlSchemaValPrimitives;
 
-use crate::libxml::{chvalid::XmlCharValid, schemas_internals::XmlSchemaValType};
+use crate::{chvalid::XmlCharValid, libxml::schemas_internals::XmlSchemaValType};
 
 pub struct XmlSchemaVal {
     pub(crate) typ: XmlSchemaValType,

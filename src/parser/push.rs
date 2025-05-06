@@ -1,10 +1,10 @@
 use crate::{
+    chvalid::XmlCharValid,
     encoding::{XmlCharEncoding, detect_encoding},
     error::XmlParserErrors,
     generic_error,
     globals::GenericErrorContext,
     io::XmlParserInputBuffer,
-    libxml::chvalid::XmlCharValid,
     parser::{
         __xml_err_encoding, XML_MAX_LOOKUP_LIMIT, XML_PARSER_BIG_BUFFER_SIZE, XmlSAXHandler,
         xml_err_memory, xml_fatal_err_msg_str,

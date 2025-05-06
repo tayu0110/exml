@@ -37,13 +37,13 @@ use crate::libxml::xmlautomata::XmlAutomata;
 #[cfg(feature = "libxml_pattern")]
 use crate::pattern::{XmlPattern, XmlPatternFlags, XmlStreamCtxt, xml_pattern_compile};
 use crate::{
+    chvalid::XmlCharValid,
     encoding::XmlCharEncoding,
     error::{XmlErrorDomain, XmlParserErrors},
     generic_error,
     globals::{GLOBAL_STATE, GenericErrorContext},
     io::XmlParserInputBuffer,
     libxml::{
-        chvalid::XmlCharValid,
         dict::{XmlDictPtr, xml_dict_free, xml_dict_lookup, xml_dict_reference},
         globals::{xml_free, xml_malloc, xml_realloc},
         hash::{

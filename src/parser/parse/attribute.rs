@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 
 use crate::{
+    chvalid::XmlCharValid,
     error::XmlParserErrors,
-    libxml::chvalid::XmlCharValid,
     parser::{
         XML_MAX_HUGE_LENGTH, XML_MAX_TEXT_LENGTH, XML_SUBSTITUTE_REF, XmlParserCtxt,
         XmlParserInputState, XmlParserOption, check_language_id, xml_err_memory, xml_fatal_err,

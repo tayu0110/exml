@@ -27,10 +27,10 @@
 use std::{borrow::Cow, mem::take, os::raw::c_void, ptr::null_mut};
 
 use crate::{
+    chvalid::XmlCharValid,
     encoding::{XmlCharEncoding, get_encoding_handler},
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     io::xml_parser_get_directory,
-    libxml::chvalid::XmlCharValid,
     parser::{
         XML_DETECT_IDS, XmlParserCtxt, XmlParserOption, xml_init_parser, xml_load_external_entity,
     },

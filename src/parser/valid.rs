@@ -8,9 +8,10 @@
 use std::{borrow::Cow, cell::RefCell, collections::HashMap, ptr::null_mut, rc::Rc};
 
 use crate::{
+    chvalid::XmlCharValid,
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     hash::{XmlHashTable, XmlHashTableRef},
-    libxml::{chvalid::XmlCharValid, xmlregexp::XmlRegExecCtxt},
+    libxml::xmlregexp::XmlRegExecCtxt,
     list::XmlList,
     parser::build_qname,
     tree::{

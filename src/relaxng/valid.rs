@@ -4,9 +4,9 @@ use std::{
 };
 
 use crate::{
+    chvalid::XmlCharValid,
     globals::{GLOBAL_STATE, GenericError, GenericErrorContext, StructuredError},
     libxml::{
-        chvalid::XmlCharValid,
         globals::{xml_free, xml_malloc},
         relaxng::{
             XmlRelaxNGGrammarPtr, XmlRelaxNGPtr, XmlRelaxNGValidErr, XmlRelaxNGValidError,

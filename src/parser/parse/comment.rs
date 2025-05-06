@@ -1,8 +1,8 @@
 use std::str::from_utf8_unchecked;
 
 use crate::{
+    chvalid::XmlCharValid,
     error::XmlParserErrors,
-    libxml::chvalid::XmlCharValid,
     parser::{
         XML_MAX_HUGE_LENGTH, XML_MAX_TEXT_LENGTH, XmlParserCtxt, XmlParserInputState,
         XmlParserOption, xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_int,

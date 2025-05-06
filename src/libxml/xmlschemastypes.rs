@@ -31,6 +31,7 @@ use std::{
 use libc::{memcpy, memmove, memset, snprintf, sscanf};
 
 use crate::{
+    chvalid::XmlCharValid,
     error::{__xml_simple_oom_error, XmlErrorDomain, XmlParserErrors},
     libxml::{
         globals::{xml_free, xml_malloc, xml_malloc_atomic},
@@ -76,7 +77,7 @@ use crate::{
     xpath::{XML_XPATH_NAN, XML_XPATH_NINF, XML_XPATH_PINF, xml_xpath_is_nan},
 };
 
-use super::{chvalid::XmlCharValid, hash::CVoidWrapper, xmlregexp::XmlRegexp};
+use super::{hash::CVoidWrapper, xmlregexp::XmlRegexp};
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

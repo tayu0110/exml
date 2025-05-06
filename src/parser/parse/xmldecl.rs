@@ -1,7 +1,7 @@
 use crate::{
+    chvalid::XmlCharValid,
     encoding::find_encoding_handler,
     error::XmlParserErrors,
-    libxml::chvalid::XmlCharValid,
     parser::{
         XML_DEFAULT_VERSION, XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH, XmlParserCtxt,
         XmlParserInputState, XmlParserOption, xml_fatal_err, xml_fatal_err_msg,

@@ -11,7 +11,7 @@ pub use type_library::*;
 pub use valid::*;
 
 use crate::{
-    libxml::chvalid::XmlCharValid,
+    chvalid::XmlCharValid,
     tree::{NodeCommon, XmlElementType, XmlNodePtr},
 };
 

@@ -40,13 +40,13 @@
 use std::str::{from_utf8, from_utf8_mut};
 
 use crate::{
+    chvalid::XmlCharValid,
     encoding::{
         XmlCharEncoding, XmlCharEncodingHandler, find_encoding_handler, get_encoding_handler,
     },
     generic_error,
     globals::get_parser_debug_entities,
     io::{__xml_loader_err, XmlParserInputBuffer, xml_check_http_input, xml_parser_get_directory},
-    libxml::chvalid::XmlCharValid,
     parser::xml_err_internal,
     tree::{XmlEntityPtr, XmlEntityType},
     uri::canonic_path,

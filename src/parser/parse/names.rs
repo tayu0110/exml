@@ -1,6 +1,6 @@
 use crate::{
+    chvalid::XmlCharValid,
     error::XmlParserErrors,
-    libxml::chvalid::XmlCharValid,
     parser::{
         XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH, XmlParserCharValid, XmlParserCtxt,
         XmlParserInputState, XmlParserOption, build_qname, xml_fatal_err, xml_is_letter,

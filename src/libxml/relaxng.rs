@@ -36,6 +36,7 @@ use libc::{memcpy, memset, snprintf};
 #[cfg(feature = "libxml_regexp")]
 use crate::libxml::xmlregexp::{XmlRegExecCtxt, XmlRegExecCtxtPtr, XmlRegexp};
 use crate::{
+    chvalid::XmlCharValid,
     error::XmlParserErrors,
     globals::{GenericError, GenericErrorContext, StructuredError},
     hash::XmlHashTableRef,
@@ -68,7 +69,6 @@ use crate::{
 };
 
 use super::{
-    chvalid::XmlCharValid,
     xmlautomata::XmlAutomata,
     xmlstring::{xml_strncat, xml_strndup},
 };

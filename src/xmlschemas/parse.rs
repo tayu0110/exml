@@ -6,10 +6,10 @@ use std::{
 use libc::memset;
 
 use crate::{
+    chvalid::XmlCharValid,
     dict::xml_dict_lookup,
     error::XmlParserErrors,
     libxml::{
-        chvalid::XmlCharValid,
         globals::{xml_free, xml_malloc},
         schemas_internals::{
             XML_SCHEMAS_ANY_LAX, XML_SCHEMAS_ANY_SKIP, XML_SCHEMAS_ANY_STRICT,

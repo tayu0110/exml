@@ -35,6 +35,7 @@ use std::{
 use libc::size_t;
 
 use crate::{
+    chvalid::XmlCharValid,
     encoding::{EncodingError, XmlCharEncoding, detect_encoding, find_encoding_handler},
     error::{
         __xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors, parser_validity_error,
@@ -43,7 +44,6 @@ use crate::{
     globals::{GenericErrorContext, get_keep_blanks_default_value, get_line_numbers_default_value},
     io::XmlParserInputBuffer,
     libxml::{
-        chvalid::XmlCharValid,
         sax2::{xml_sax2_ignorable_whitespace, xml_sax2_init_html_default_sax_handler},
         xmlstring::XmlChar,
     },

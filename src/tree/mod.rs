@@ -45,9 +45,9 @@ use std::{
 };
 
 use crate::{
+    chvalid::XmlCharValid,
     error::{__xml_simple_error, __xml_simple_oom_error, XmlErrorDomain, XmlParserErrors},
     globals::{get_deregister_node_func, get_register_node_func},
-    libxml::chvalid::XmlCharValid,
     parser::{XML_STRING_COMMENT, XML_STRING_TEXT},
 };
 

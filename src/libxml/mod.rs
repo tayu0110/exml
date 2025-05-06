@@ -1,6 +1,5 @@
 #[cfg(feature = "catalog")]
 pub mod catalog;
-pub mod chvalid;
 pub mod dict;
 pub mod globals;
 pub mod hash;

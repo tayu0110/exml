@@ -1,11 +1,11 @@
 use std::{borrow::Cow, mem::take};
 
 use crate::{
+    chvalid::XmlCharValid,
     encoding::{XmlCharEncoding, detect_encoding},
     error::XmlParserErrors,
     generic_error,
     globals::{GenericErrorContext, get_parser_debug_entities},
-    libxml::chvalid::XmlCharValid,
     parser::{
         XML_ENT_FIXED_COST, XML_MAX_HUGE_LENGTH, XML_MAX_TEXT_LENGTH, XML_PARSER_ALLOWED_EXPANSION,
         XML_PARSER_NON_LINEAR, XML_SUBSTITUTE_PEREF, XML_SUBSTITUTE_REF, XmlParserCtxt,

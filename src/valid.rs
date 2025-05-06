@@ -29,10 +29,11 @@ use crate::libxml::{xmlautomata::XmlAutomata, xmlregexp::XmlRegExecCtxt};
 #[cfg(feature = "libxml_valid")]
 use crate::tree::{XmlElementPtr, XmlGenericNodePtr, XmlNsPtr};
 use crate::{
+    chvalid::XmlCharValid,
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     globals::{GenericError, GenericErrorContext, StructuredError},
     hash::XmlHashTableRef,
-    libxml::{chvalid::XmlCharValid, hash::XmlHashTable},
+    libxml::hash::XmlHashTable,
     list::XmlList,
     parser::{XML_VCTXT_USE_PCTXT, build_qname, split_qname2},
     tree::{
@@ -1529,7 +1530,7 @@ fn xml_is_doc_name_start_char(doc: Option<XmlDocPtr>, c: i32) -> i32 {
 
 #[cfg(feature = "libxml_valid")]
 fn xml_is_doc_name_char(doc: Option<XmlDocPtr>, c: i32) -> i32 {
-    use crate::{libxml::chvalid::XmlCharValid, parser::xml_is_letter};
+    use crate::parser::xml_is_letter;
 
     if doc.is_none_or(|doc| doc.properties & XmlDocProperties::XmlDocOld10 as i32 == 0) {
         // Use the new checks of production [4] [4a] amd [5] of the

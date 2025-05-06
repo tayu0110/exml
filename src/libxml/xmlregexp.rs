@@ -30,6 +30,7 @@
 use std::{borrow::Cow, fmt::Debug, mem::take, os::raw::c_void, ptr::null_mut, rc::Rc};
 
 use crate::{
+    chvalid::XmlCharValid,
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     libxml::{
         xmlautomata::{XmlAutomata, XmlAutomataState},
@@ -47,8 +48,6 @@ use crate::{
     },
     parser::xml_is_letter,
 };
-
-use super::chvalid::XmlCharValid;
 
 macro_rules! CUR {
     ( $ctxt:expr ) => {

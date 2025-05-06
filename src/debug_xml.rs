@@ -27,9 +27,9 @@ use std::{
 #[cfg(feature = "xpath")]
 use crate::xpath::XmlXPathObjectType;
 use crate::{
+    chvalid::XmlCharValid,
     error::{__xml_raise_error, XmlParserErrors},
     generic_error,
-    libxml::chvalid::XmlCharValid,
     parser::{
         XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC, xml_parse_in_node_context,
     },

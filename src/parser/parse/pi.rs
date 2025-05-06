@@ -1,8 +1,8 @@
 #[cfg(feature = "catalog")]
 use crate::libxml::catalog::{XML_CATALOG_PI, XmlCatalogAllow, xml_catalog_get_defaults};
 use crate::{
+    chvalid::XmlCharValid,
     error::XmlParserErrors,
-    libxml::chvalid::XmlCharValid,
     parser::{
         XML_MAX_HUGE_LENGTH, XML_MAX_TEXT_LENGTH, XmlParserCtxt, XmlParserInputState,
         XmlParserOption, xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_str, xml_ns_err,
@@ -67,7 +67,7 @@ impl XmlParserCtxt<'_> {
     #[doc(alias = "xmlParseCatalogPI")]
     #[cfg(feature = "catalog")]
     fn parse_catalog_pi(&mut self, catalog: &str) {
-        use crate::libxml::{catalog::XmlCatalogEntry, chvalid::XmlCharValid};
+        use crate::libxml::catalog::XmlCatalogEntry;
 
         macro_rules! syntax_error {
             () => {

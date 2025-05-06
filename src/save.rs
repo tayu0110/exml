@@ -29,11 +29,11 @@ use std::{
 };
 
 use crate::{
+    chvalid::XmlCharValid,
     encoding::{XmlCharEncoding, XmlCharEncodingHandler, find_encoding_handler},
     error::{__xml_simple_error, __xml_simple_oom_error, XmlErrorDomain, XmlParserErrors},
     globals::{GLOBAL_STATE, get_indent_tree_output},
     io::{XmlOutputBuffer, write_quoted},
-    libxml::chvalid::XmlCharValid,
     parser::{XML_STRING_TEXT_NOENC, xml_init_parser},
     tree::{
         NodeCommon, XML_LOCAL_NAMESPACE, XmlAttrPtr, XmlAttributePtr, XmlDocPtr, XmlDtdPtr,

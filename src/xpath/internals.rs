@@ -31,9 +31,9 @@ use std::ptr::null_mut;
 #[cfg(feature = "libxml_xptr_locs")]
 use crate::xpointer::XmlLocationSet;
 use crate::{
+    chvalid::XmlCharValid,
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     generic_error,
-    libxml::chvalid::XmlCharValid,
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlAttrPtr, XmlDocPtr, XmlDtdPtr, XmlElementType,
         XmlGenericNodePtr, XmlNodePtr, XmlNs, XmlNsPtr,

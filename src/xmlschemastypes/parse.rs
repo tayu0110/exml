@@ -1,6 +1,6 @@
 use std::{fmt::Debug, str::FromStr};
 
-use crate::libxml::{chvalid::XmlCharValid, schemas_internals::XmlSchemaValType};
+use crate::{chvalid::XmlCharValid, libxml::schemas_internals::XmlSchemaValType};
 
 use super::{
     XmlSchemaVal, XmlSchemaValPrimitives, is_wsp_blank_ch,

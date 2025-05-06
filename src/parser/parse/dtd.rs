@@ -5,15 +5,13 @@ use std::{
 };
 
 use crate::{
+    chvalid::XmlCharValid,
     encoding::{XmlCharEncoding, detect_encoding},
     error::XmlParserErrors,
     generic_error,
     globals::get_parser_debug_entities,
     hash::{XmlHashTable, XmlHashTableRef},
-    libxml::{
-        chvalid::XmlCharValid,
-        sax2::{xml_sax2_entity_decl, xml_sax2_get_entity},
-    },
+    libxml::sax2::{xml_sax2_entity_decl, xml_sax2_get_entity},
     parser::{
         XmlParserCtxt, XmlParserInput, XmlParserInputState, XmlParserOption, split_qname2,
         xml_err_memory, xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_int,

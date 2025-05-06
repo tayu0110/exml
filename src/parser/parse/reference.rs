@@ -1,9 +1,10 @@
 use std::{borrow::Cow, str::from_utf8_unchecked};
 
 use crate::{
+    chvalid::XmlCharValid,
     encoding::XmlCharEncoding,
     error::XmlParserErrors,
-    libxml::{chvalid::XmlCharValid, sax2::xml_sax2_get_entity},
+    libxml::sax2::xml_sax2_get_entity,
     parser::{
         XmlParserCtxt, XmlParserInputState, XmlParserMode, XmlParserOption,
         parse_external_entity_private, xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg,

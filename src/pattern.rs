@@ -26,10 +26,13 @@
 
 use std::{os::raw::c_void, ptr::null_mut, rc::Rc};
 
-use crate::libxml::chvalid::XmlCharValid;
-use crate::parser::xml_is_letter;
-use crate::tree::{NodeCommon, XmlAttrPtr};
-use crate::tree::{XML_XML_NAMESPACE, XmlElementType, XmlGenericNodePtr, XmlNodePtr};
+use crate::{
+    chvalid::XmlCharValid,
+    parser::xml_is_letter,
+    tree::{
+        NodeCommon, XML_XML_NAMESPACE, XmlAttrPtr, XmlElementType, XmlGenericNodePtr, XmlNodePtr,
+    },
+};
 
 const XML_STREAM_STEP_DESC: usize = 1;
 const XML_STREAM_STEP_FINAL: usize = 2;

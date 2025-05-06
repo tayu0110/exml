@@ -62,6 +62,7 @@ use std::{
 };
 
 use crate::{
+    chvalid::XmlCharValid,
     encoding::XmlCharEncoding,
     io::{
         XmlParserInputBuffer, cleanup_input_callbacks, cleanup_output_callbacks,
@@ -69,7 +70,6 @@ use crate::{
     },
     libxml::{
         catalog::xml_catalog_cleanup,
-        chvalid::XmlCharValid,
         threads::{
             __xml_global_init_mutex_lock, __xml_global_init_mutex_unlock,
             xml_cleanup_threads_internal, xml_init_threads_internal,

@@ -30,15 +30,13 @@ use std::{
 };
 
 use crate::{
+    chvalid::XmlCharValid,
     error::{
         __xml_raise_error, __xml_simple_error, __xml_simple_oom_error, XmlErrorDomain,
         XmlParserErrors,
     },
     hash::{CVoidWrapper, XmlHashTableRef},
-    libxml::{
-        chvalid::XmlCharValid,
-        hash::{XmlHashTable, xml_hash_create},
-    },
+    libxml::hash::{XmlHashTable, xml_hash_create},
     tree::{NodeCommon, XmlElementType, xml_free_node_list},
 };
 

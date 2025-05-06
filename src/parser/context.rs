@@ -12,6 +12,7 @@ use std::{
 };
 
 use crate::{
+    chvalid::XmlCharValid,
     encoding::{
         XmlCharEncoding, XmlCharEncodingHandler, detect_encoding, find_encoding_handler,
         get_encoding_handler,
@@ -28,7 +29,6 @@ use crate::{
     io::{XmlParserInputBuffer, xml_parser_get_directory},
     libxml::{
         catalog::XmlCatalogEntry,
-        chvalid::XmlCharValid,
         sax2::{
             xml_sax_version, xml_sax2_end_element, xml_sax2_ignorable_whitespace,
             xml_sax2_start_element,

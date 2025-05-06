@@ -27,7 +27,7 @@ use std::{
     sync::atomic::Ordering,
 };
 
-use crate::{libxml::chvalid::XmlCharValid, tree::xml_free_node_list, valid::xml_remove_id};
+use crate::{chvalid::XmlCharValid, tree::xml_free_node_list, valid::xml_remove_id};
 
 use super::{
     InvalidNodePointerCastError, NodeCommon, XML_CHECK_DTD, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,

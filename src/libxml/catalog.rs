@@ -54,6 +54,7 @@ use const_format::concatcp;
 use crate::tree::XmlNsPtr;
 use crate::{
     SYSCONFDIR,
+    chvalid::XmlCharValid,
     encoding::XmlCharEncoding,
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     generic_error,
@@ -65,8 +66,6 @@ use crate::{
     },
     uri::{build_uri, canonic_path},
 };
-
-use super::chvalid::XmlCharValid;
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlCatalogErrMemory")]

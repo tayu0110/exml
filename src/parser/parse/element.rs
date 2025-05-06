@@ -1,8 +1,8 @@
 use std::{borrow::Cow, cell::RefCell, mem::take, rc::Rc};
 
 use crate::{
+    chvalid::XmlCharValid,
     error::XmlParserErrors,
-    libxml::chvalid::XmlCharValid,
     parser::{
         XML_PARSER_MAX_DEPTH, XmlParserCtxt, XmlParserInputState, XmlParserNodeInfo,
         XmlParserOption, xml_err_attribute_dup, xml_fatal_err, xml_fatal_err_msg,
@@ -229,7 +229,7 @@ impl XmlParserCtxt<'_> {
     #[doc(alias = "xmlParseStartTag")]
     #[cfg(feature = "sax1")]
     pub(crate) fn parse_start_tag(&mut self) -> Option<String> {
-        use crate::{libxml::chvalid::XmlCharValid, parser::xml_err_attribute_dup};
+        use crate::parser::xml_err_attribute_dup;
 
         if self.current_byte() != b'<' {
             return None;
