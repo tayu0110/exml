@@ -42,14 +42,13 @@ use libc::{
     ENOEXEC, ENOLCK, ENOMEM, ENOSPC, ENOSYS, ENOTDIR, ENOTEMPTY, ENOTSOCK, ENOTSUP, ENOTTY, ENXIO,
     EPERM, EPIPE, ERANGE, EROFS, ESPIPE, ESRCH, ETIMEDOUT, EXDEV,
 };
-use url::Url;
 
 use crate::{
     encoding::find_encoding_handler,
     error::{__xml_simple_error, __xml_simple_oom_error, XmlErrorDomain, XmlParserErrors},
     nanohttp::XmlNanoHTTPCtxt,
     parser::{__xml_err_encoding, XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput},
-    uri::canonic_path,
+    uri::{canonic_path, unescape_url},
 };
 
 pub use input::*;
@@ -494,26 +493,32 @@ impl XmlInputCallback for DefaultFileIOCallbacks {
             return Ok(Box::new(stdin()));
         }
 
-        let filename = if let Ok(Ok(name)) = Url::parse(filename).map(|url| url.to_file_path()) {
-            Cow::Owned(name)
-        } else {
-            Cow::Borrowed(Path::new(filename))
-        };
+        #[cfg(target_os = "windows")]
+        let path = filename
+            .strip_prefix("file://localhost/")
+            .or_else(|| filename.strip_prefix("file:///"))
+            .or_else(|| filename.strip_prefix("file:/"))
+            .unwrap_or(filename);
+        #[cfg(not(target_os = "windows"))]
+        let path = filename
+            .starts_with("file://localhost/")
+            .then(|| &filename[16..])
+            .or_else(|| filename.starts_with("file:///").then(|| &filename[7..]))
+            .or_else(|| filename.starts_with("file:/").then(|| &filename[5..]))
+            .unwrap_or(filename);
 
-        if xml_check_filename(filename.as_ref()) == 0 {
-            return Err(io::Error::new(
-                ErrorKind::NotFound,
-                format!("{} is not found", filename.display()),
-            ));
+        if xml_check_filename(path) == 0 {
+            return match unescape_url(filename) {
+                Ok(unescaped) if filename != unescaped => XmlInputCallback::open(self, &unescaped),
+                _ => Err(io::Error::new(
+                    ErrorKind::NotFound,
+                    format!("{} is not found", path),
+                )),
+            };
         }
 
-        File::open(filename.as_ref())
-            .inspect_err(|_| {
-                xml_ioerr(
-                    XmlParserErrors::XmlErrOK,
-                    Some(filename.to_string_lossy().as_ref()),
-                )
-            })
+        File::open(path)
+            .inspect_err(|_| xml_ioerr(XmlParserErrors::XmlErrOK, Some(path)))
             .map(|file| Box::new(file) as Box<dyn Read>)
     }
 }

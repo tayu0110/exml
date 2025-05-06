@@ -767,7 +767,7 @@ impl XmlURI {
     /// ```
     ///
     /// Returns a newly built xmlURIPtr or NULL in case of error
-    #[doc(alias = "xmlParseURI")]
+    #[doc(alias = "xmlParseURI", alias = "xmlParseURIRaw")]
     pub fn parse(s: &str) -> Option<Self> {
         let mut uri = Self::new();
         uri.parse3986_uri_reference(s).ok()?;

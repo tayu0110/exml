@@ -21,7 +21,6 @@ use std::{
     ffi::c_void,
     fs::File,
     io::{self, Write, stdout},
-    path::Path,
     rc::Rc,
     str::from_utf8,
     sync::{
@@ -30,14 +29,12 @@ use std::{
     },
 };
 
-use url::Url;
-
 use crate::{
     encoding::{EncodingError, XmlCharEncodingHandler, floor_char_boundary, xml_encoding_err},
     error::XmlParserErrors,
     globals::GLOBAL_STATE,
     nanohttp::xml_nanohttp_method,
-    uri::unescape_url,
+    uri::{XmlURI, unescape_url},
 };
 
 use super::{
@@ -609,6 +606,7 @@ pub fn register_output_callbacks(callback: impl XmlOutputCallback + 'static) -> 
     Ok(callbacks.len())
 }
 
+#[doc(alias = "__xmlOutputBufferCreateFilename")]
 pub(crate) fn __xml_output_buffer_create_filename(
     uri: &str,
     encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
@@ -618,9 +616,8 @@ pub(crate) fn __xml_output_buffer_create_filename(
         register_default_output_callbacks();
     }
 
-    let unescaped = Url::parse(uri)
-        .ok()
-        .filter(|url| url.scheme() == "file")
+    let unescaped = XmlURI::parse(uri)
+        .filter(|url| url.scheme.as_deref() == Some("file"))
         .and_then(|_| unescape_url(uri).ok());
 
     let mut callbacks = XML_OUTPUT_CALLBACK_TABLE.lock().unwrap();
@@ -666,23 +663,26 @@ impl XmlOutputCallback for DefaultFileIOCallbacks {
             return Ok(Box::new(stdout()));
         }
 
-        let filename = if let Ok(Ok(name)) = Url::parse(filename).map(|url| url.to_file_path()) {
-            Cow::Owned(name)
-        } else {
-            Cow::Borrowed(Path::new(filename))
-        };
+        #[cfg(target_os = "windows")]
+        let path = filename
+            .strip_prefix("file://localhost/")
+            .or_else(|| filename.strip_prefix("file:///"))
+            .or_else(|| filename.strip_prefix("file:/"))
+            .unwrap_or(filename);
+        #[cfg(not(target_os = "windows"))]
+        let path = filename
+            .starts_with("file://localhost/")
+            .then(|| &filename[16..])
+            .or_else(|| filename.starts_with("file:///").then(|| &filename[7..]))
+            .or_else(|| filename.starts_with("file:/").then(|| &filename[5..]))
+            .unwrap_or(filename);
 
         File::options()
             .write(true)
             .truncate(true)
             .create(true)
-            .open(filename.as_ref())
-            .inspect_err(|_| {
-                xml_ioerr(
-                    XmlParserErrors::XmlErrOK,
-                    Some(filename.to_string_lossy().as_ref()),
-                )
-            })
+            .open(path)
+            .inspect_err(|_| xml_ioerr(XmlParserErrors::XmlErrOK, Some(path)))
             .map(|file| Box::new(file) as Box<dyn Write>)
     }
 }

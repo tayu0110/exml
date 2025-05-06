@@ -35,11 +35,10 @@ use std::{
     },
 };
 
-use url::Url;
-
 use crate::{
     error::{XmlErrorDomain, XmlParserErrors},
     io::__xml_ioerr,
+    uri::XmlURI,
 };
 
 const XML_NANO_HTTP_MAX_REDIR: usize = 10;
@@ -173,9 +172,8 @@ pub fn xml_nanohttp_scan_proxy(url: &str) {
     p.clear();
     PROXY_PORT.store(0, Ordering::Relaxed);
 
-    let Some(uri) = Url::parse(url)
-        .ok()
-        .filter(|uri| uri.scheme() == "http" && uri.host_str().is_some())
+    let Some(uri) = XmlURI::parse(url)
+        .filter(|uri| uri.scheme.as_deref() == Some("http") && uri.server.is_some())
     else {
         __xml_ioerr(
             XmlErrorDomain::XmlFromHTTP,
@@ -185,9 +183,9 @@ pub fn xml_nanohttp_scan_proxy(url: &str) {
         return;
     };
 
-    let host = uri.host_str().unwrap();
+    let host = uri.server.as_deref().unwrap();
     p.push_str(host);
-    if let Some(port) = uri.port() {
+    if let Some(port) = uri.port {
         PROXY_PORT.store(port as i32, Ordering::Release);
     }
 }
@@ -338,30 +336,33 @@ pub fn xml_nanohttp_method(
 /// the protocol host port and path it indicates.
 #[doc(alias = "xmlNanoHTTPScanURL")]
 fn xml_nanohttp_scan_url(ctxt: &mut XmlNanoHTTPCtxt, url: &str) {
-    /*
-     * Clear any existing data from the context
-     */
+    // Clear any existing data from the context
     ctxt.protocol = None;
     ctxt.hostname = None;
     ctxt.path = None;
     ctxt.query = None;
 
-    let Ok(uri) = Url::parse(url) else {
+    let Some(uri) = XmlURI::parse(url).filter(|uri| uri.scheme.is_some() && uri.server.is_some())
+    else {
         return;
     };
 
-    if uri.host().is_none() {
-        return;
-    };
-
-    ctxt.protocol = Some(uri.scheme().to_owned().into());
+    ctxt.protocol = uri.scheme.to_owned();
 
     /* special case of IPv6 addresses, the [] need to be removed */
-    let host = uri.host_str().unwrap();
-    ctxt.hostname = Some(host.to_owned().into());
-    ctxt.path = Some(uri.path().to_owned().into());
-    ctxt.query = uri.query().map(|q| q.to_owned().into());
-    if let Some(port) = uri.port() {
+    let host = uri.server.as_deref().unwrap();
+    if let Some(host) = host
+        .strip_prefix('[')
+        .and_then(|host| host.strip_suffix(']'))
+        .filter(|host| !host.is_empty())
+    {
+        ctxt.hostname = Some(host.to_owned().into());
+    } else {
+        ctxt.hostname = Some(host.to_owned().into());
+    }
+    ctxt.path = uri.path.to_owned();
+    ctxt.query = uri.query.to_owned();
+    if let Some(port) = uri.port {
         ctxt.port = port as i32;
     }
 }
