@@ -49,18 +49,6 @@ use crate::{
     parser::xml_is_letter,
 };
 
-macro_rules! CUR {
-    ( $ctxt:expr ) => {
-        *(*$ctxt).cur
-    };
-}
-
-macro_rules! NEXT {
-    ( $ctxt:expr ) => {
-        (*$ctxt).cur = (*$ctxt).cur.add(1);
-    };
-}
-
 macro_rules! ERROR {
     ( $ctxt:expr, $str:expr ) => {
         (*$ctxt).error = XmlParserErrors::XmlRegexpCompileError as _;
