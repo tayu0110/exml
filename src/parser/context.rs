@@ -1265,9 +1265,9 @@ impl<'a> XmlParserCtxt<'a> {
     ///
     /// Returns -1 in case of error, the index in the stack otherwise
     #[doc(alias = "inputPush")]
-    pub fn input_push(&mut self, value: XmlParserInput<'a>) -> i32 {
+    pub fn input_push(&mut self, value: XmlParserInput<'a>) -> usize {
         self.input_tab.push(value);
-        self.input_tab.len() as i32 - 1
+        self.input_tab.len() - 1
     }
 
     /// Pops the top parser input from the input stack
@@ -1431,7 +1431,7 @@ impl<'a> XmlParserCtxt<'a> {
     ///
     /// Returns -1 in case of error or the index in the input stack
     #[doc(alias = "xmlPushInput")]
-    pub fn push_input(&mut self, input: XmlParserInput<'a>) -> i32 {
+    pub fn push_input(&mut self, input: XmlParserInput<'a>) -> Result<usize, XmlParserErrors> {
         if get_parser_debug_entities() != 0 {
             if self.input().is_some() && self.input().unwrap().filename.is_some() {
                 generic_error!(
@@ -1453,11 +1453,7 @@ impl<'a> XmlParserCtxt<'a> {
                 }
                 _ => "(Failed to read buffer)",
             };
-            generic_error!(
-                "Pushing input {} : {}\n",
-                self.input_tab.len() + 1,
-                &cur[..cur.len().min(30)]
-            );
+            generic_error!("Pushing input {} : {}\n", self.input_tab.len() + 1, cur);
         }
         if (self.input_tab.len() > 40 && self.options & XmlParserOption::XmlParseHuge as i32 == 0)
             || self.input_tab.len() > 100
@@ -1466,14 +1462,14 @@ impl<'a> XmlParserCtxt<'a> {
             while self.input_tab.len() > 1 {
                 self.input_pop();
             }
-            return -1;
+            return Err(XmlParserErrors::XmlErrEntityLoop);
         }
-        let ret: i32 = self.input_push(input);
+        let ret = self.input_push(input);
         if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-            return -1;
+            return Err(XmlParserErrors::XmlErrInternalError);
         }
         self.grow();
-        ret
+        Ok(ret)
     }
 
     /// The current input pointed by self.input came to an end pop it and return the next c_char.

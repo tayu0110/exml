@@ -237,7 +237,7 @@ impl XmlParserCtxt<'_> {
 
         // Push the entity as the current input, read c_char by c_char
         // saving to the buffer until the end of the entity or an error
-        if self.push_input(input) < 0 {
+        if self.push_input(input).is_err() {
             return -1;
         }
 

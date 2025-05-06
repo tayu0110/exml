@@ -533,7 +533,7 @@ pub(crate) fn xml_sax_parse_dtd(
         })?;
 
     // plug some encoding conversion routines here.
-    if ctxt.push_input(input) < 0 {
+    if ctxt.push_input(input).is_err() {
         return None;
     }
     if ctxt.input().unwrap().remainder_len() >= 4 {

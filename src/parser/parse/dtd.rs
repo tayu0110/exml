@@ -1646,7 +1646,7 @@ impl XmlParserCtxt<'_> {
                     return;
                 };
                 input.parent_consumed = parent_consumed;
-                if self.push_input(input) < 0 {
+                if self.push_input(input).is_err() {
                     return;
                 }
 
@@ -2168,7 +2168,7 @@ pub fn xml_io_parse_dtd(
     let input_id = pinput.id;
 
     // plug some encoding conversion routines here.
-    if ctxt.push_input(pinput) < 0 {
+    if ctxt.push_input(pinput).is_err() {
         return None;
     }
     if !matches!(enc, XmlCharEncoding::None) {
