@@ -58,7 +58,6 @@ use crate::{
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     generic_error,
     io::{XmlParserInputBuffer, xml_parser_get_directory},
-    libxml::chvalid::xml_is_blank_char,
     parser::{XML_MAX_NAMELEN, XmlParserCtxt, XmlParserInput, xml_is_letter},
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlDocPtr, XmlGenericNodePtr, XmlNodePtr, xml_free_doc,
@@ -67,7 +66,7 @@ use crate::{
     uri::{build_uri, canonic_path},
 };
 
-use super::chvalid::xml_is_pubid_char;
+use super::chvalid::XmlCharValid;
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlCatalogErrMemory")]
@@ -301,7 +300,8 @@ impl XmlCatalog {
                 cur = rem;
                 if cur
                     .first()
-                    .filter(|&&b| xml_is_blank_char(b as u32))
+                    .copied()
+                    .filter(XmlCharValid::is_xml_blank_char)
                     .is_none()
                 {
                     return -1;
@@ -354,7 +354,8 @@ impl XmlCatalog {
                         cur = rem;
                         if cur
                             .first()
-                            .filter(|&&b| xml_is_blank_char(b as u32))
+                            .copied()
+                            .filter(XmlCharValid::is_xml_blank_char)
                             .is_none()
                         {
                             return -1;
@@ -385,7 +386,8 @@ impl XmlCatalog {
                         }
                         if cur
                             .first()
-                            .filter(|&&b| xml_is_blank_char(b as u32))
+                            .copied()
+                            .filter(XmlCharValid::is_xml_blank_char)
                             .is_none()
                         {
                             return -1;
@@ -2024,7 +2026,7 @@ fn xml_load_file_content(filename: impl AsRef<Path>) -> Option<Vec<u8>> {
 
 /// Trim blank chars at the head of `cur`.
 fn skip_blanks(mut cur: &[u8]) -> &[u8] {
-    while !cur.is_empty() && xml_is_blank_char(cur[0] as u32) {
+    while !cur.is_empty() && cur[0].is_xml_blank_char() {
         cur = &cur[1..];
     }
     cur
@@ -2093,14 +2095,11 @@ fn xml_parse_sgml_catalog_pubid(mut cur: &[u8]) -> Option<(&[u8], &[u8])> {
     };
     let mut len = 0;
     let orig = cur;
-    while let Some(&now) = cur
-        .first()
-        .filter(|&&b| xml_is_pubid_char(b as u32) || b == b'?')
-    {
+    while let Some(&now) = cur.first().filter(|&&b| b.is_xml_pubid_char() || b == b'?') {
         if now == stop && stop != b' ' {
             break;
         }
-        if stop == b' ' && xml_is_blank_char(now as u32) {
+        if stop == b' ' && now.is_xml_blank_char() {
             break;
         }
         len += 1;
@@ -2108,7 +2107,9 @@ fn xml_parse_sgml_catalog_pubid(mut cur: &[u8]) -> Option<(&[u8], &[u8])> {
     }
     let id = &orig[..len];
     if stop == b' ' {
-        cur.first().filter(|&&b| xml_is_blank_char(b as u32))?;
+        cur.first()
+            .copied()
+            .filter(XmlCharValid::is_xml_blank_char)?;
     } else {
         if cur.first() != Some(&stop) {
             return None;
@@ -2131,7 +2132,7 @@ fn normalize_public(pub_id: &[u8]) -> Option<Vec<u8>> {
     let mut white = true;
     let mut p = pub_id;
     while !p.is_empty() && ok {
-        if !xml_is_blank_char(p[0] as u32) {
+        if !p[0].is_xml_blank_char() {
             white = false;
         } else if p[0] == 0x20 && !white {
             white = true;
@@ -2149,7 +2150,7 @@ fn normalize_public(pub_id: &[u8]) -> Option<Vec<u8>> {
     let mut white = false;
     let mut p = pub_id;
     while !p.is_empty() {
-        if xml_is_blank_char(p[0] as u32) {
+        if p[0].is_xml_blank_char() {
             if !ret.is_empty() {
                 white = true;
             }
@@ -2815,7 +2816,7 @@ pub fn xml_initialize_catalog() {
         );
         let mut next = None::<XmlCatalogEntry>;
         // the XML_CATALOG_FILES envvar is allowed to contain a space-separated list of entries.
-        for path in catalogs.split(|b: char| xml_is_blank_char(b as u32)) {
+        for path in catalogs.split(|b: char| b.is_xml_blank_char()) {
             if !path.is_empty() {
                 let path = PathBuf::from(path);
                 let new = xml_new_catalog_entry(

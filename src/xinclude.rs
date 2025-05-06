@@ -30,7 +30,7 @@ use crate::{
     encoding::{XmlCharEncoding, get_encoding_handler},
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     io::xml_parser_get_directory,
-    libxml::chvalid::xml_is_char,
+    libxml::chvalid::XmlCharValid,
     parser::{
         XML_DETECT_IDS, XmlParserCtxt, XmlParserOption, xml_init_parser, xml_load_external_entity,
     },
@@ -1569,7 +1569,7 @@ impl XmlXIncludeCtxt {
 
             let content = buf.buffer.as_ref();
             match std::str::from_utf8(content) {
-                Ok(content) if content.chars().all(|c| xml_is_char(c as u32)) => {
+                Ok(content) if content.chars().all(|c| c.is_xml_char()) => {
                     node.add_content(content);
                 }
                 _ => {

@@ -2,7 +2,7 @@ use std::{borrow::Cow, cell::RefCell, mem::take, rc::Rc};
 
 use crate::{
     error::XmlParserErrors,
-    libxml::chvalid::{xml_is_blank_char, xml_is_char},
+    libxml::chvalid::XmlCharValid,
     parser::{
         XML_PARSER_MAX_DEPTH, XmlParserCtxt, XmlParserInputState, XmlParserNodeInfo,
         XmlParserOption, xml_err_attribute_dup, xml_fatal_err, xml_fatal_err_msg,
@@ -229,7 +229,7 @@ impl XmlParserCtxt<'_> {
     #[doc(alias = "xmlParseStartTag")]
     #[cfg(feature = "sax1")]
     pub(crate) fn parse_start_tag(&mut self) -> Option<String> {
-        use crate::parser::xml_err_attribute_dup;
+        use crate::{libxml::chvalid::XmlCharValid, parser::xml_err_attribute_dup};
 
         if self.current_byte() != b'<' {
             return None;
@@ -254,7 +254,7 @@ impl XmlParserCtxt<'_> {
         let mut atts: Vec<(String, Option<String>)> = vec![];
         while self.current_byte() != b'>'
             && !self.content_bytes().starts_with(b"/>")
-            && xml_is_char(self.current_byte() as u32)
+            && self.current_byte().is_xml_char()
             && !matches!(self.instate, XmlParserInputState::XmlParserEOF)
         {
             let (Some(attname), attvalue) = self.parse_attribute() else {
@@ -362,7 +362,7 @@ impl XmlParserCtxt<'_> {
 
         while self.current_byte() != b'>'
             && (self.current_byte() != b'/' || self.nth_byte(1) != b'>')
-            && xml_is_char(self.current_byte() as u32)
+            && self.current_byte().is_xml_char()
             && !matches!(self.instate, XmlParserInputState::XmlParserEOF)
         {
             let Some((aprefix, attname, attvalue)) =
@@ -754,7 +754,7 @@ impl XmlParserCtxt<'_> {
         if count == self.name.as_deref().unwrap().len()
             && input
                 .get(count)
-                .is_some_and(|&b| b == b'>' || xml_is_blank_char(b as u32))
+                .is_some_and(|&b| b == b'>' || b.is_xml_blank_char())
         {
             // success
             self.advance(count);
@@ -785,7 +785,7 @@ impl XmlParserCtxt<'_> {
             .and_then(|input| input.strip_prefix(b":"))
             .and_then(|input| input.strip_prefix(self.name.as_deref().unwrap().as_bytes()))
             .and_then(|input| input.first())
-            .is_some_and(|&b| b == b'>' || xml_is_blank_char(b as u32))
+            .is_some_and(|&b| b == b'>' || b.is_xml_blank_char())
         {
             // success
             let len = prefix.len() + 1 + self.name.as_deref().unwrap().len();
@@ -830,7 +830,7 @@ impl XmlParserCtxt<'_> {
         // We should definitely be at the ending "S? '>'" part
         self.grow();
         self.skip_blanks();
-        if !xml_is_char(self.current_byte() as u32) || self.current_byte() != b'>' {
+        if !self.current_byte().is_xml_char() || self.current_byte() != b'>' {
             xml_fatal_err(self, XmlParserErrors::XmlErrGtRequired, None);
         } else {
             self.advance(1);
@@ -891,7 +891,7 @@ impl XmlParserCtxt<'_> {
             return;
         }
         self.skip_blanks();
-        if !xml_is_char(self.current_byte() as u32) || self.current_byte() != b'>' {
+        if !self.current_byte().is_xml_char() || self.current_byte() != b'>' {
             xml_fatal_err(self, XmlParserErrors::XmlErrGtRequired, None);
         } else {
             self.advance(1);

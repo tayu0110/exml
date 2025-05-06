@@ -1,7 +1,7 @@
 use std::iter::repeat;
 
 use crate::{
-    libxml::chvalid::xml_is_blank_char,
+    libxml::chvalid::XmlCharValid,
     parser::build_qname,
     tree::{NodeCommon, XmlAttrPtr, XmlElementType, XmlNodePtr, XmlNsPtr},
     xpath::XmlXPathObjectType,
@@ -616,7 +616,7 @@ pub fn xml_xpath_normalize_function(ctxt: &mut XmlXPathParserContext, mut nargs:
     };
     let oldlen = source.len();
     // Skip leading whitespaces
-    let Some(start) = source.find(|c| !xml_is_blank_char(c as u32)) else {
+    let Some(start) = source.find(|c: char| !c.is_xml_blank_char()) else {
         ctxt.value_mut()
             .unwrap()
             .stringval
@@ -632,7 +632,7 @@ pub fn xml_xpath_normalize_function(ctxt: &mut XmlXPathParserContext, mut nargs:
     let mut blank = false;
     for i in start..oldlen {
         let c = target[i];
-        if xml_is_blank_char(c as u32) {
+        if c.is_xml_blank_char() {
             blank = true;
         } else {
             if blank {

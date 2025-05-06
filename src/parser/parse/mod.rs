@@ -65,7 +65,7 @@ use crate::{
     encoding::{XmlCharEncoding, detect_encoding, find_encoding_handler},
     error::XmlParserErrors,
     globals::GenericErrorContext,
-    libxml::chvalid::xml_is_blank_char,
+    libxml::chvalid::XmlCharValid,
     parser::XmlParserOption,
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlDocProperties, XmlDocPtr, XmlElementType,
@@ -130,9 +130,7 @@ impl XmlParserCtxt<'_> {
             }
 
             self.grow();
-            if self.content_bytes().starts_with(b"<?xml")
-                && xml_is_blank_char(self.nth_byte(5) as u32)
-            {
+            if self.content_bytes().starts_with(b"<?xml") && self.nth_byte(5).is_xml_blank_char() {
                 // Note that we will switch encoding on the fly.
                 self.parse_xmldecl();
                 if self.err_no == XmlParserErrors::XmlErrUnsupportedEncoding as i32

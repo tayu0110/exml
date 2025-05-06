@@ -36,7 +36,7 @@ use crate::{
     },
     hash::{CVoidWrapper, XmlHashTableRef},
     libxml::{
-        chvalid::xml_is_char,
+        chvalid::XmlCharValid,
         hash::{XmlHashTable, xml_hash_create},
     },
     tree::{NodeCommon, XmlElementType, xml_free_node_list},
@@ -918,7 +918,7 @@ fn xml_encode_entities_internal(doc: Option<XmlDocPtr>, input: &str, attr: i32) 
                 continue;
             } else {
                 let val = cur.chars().next().unwrap();
-                if !xml_is_char(val as u32) {
+                if !val.is_xml_char() {
                     xml_entities_err(
                         XmlParserErrors::XmlErrInvalidChar,
                         "xmlEncodeEntities: char out of range\n",
@@ -935,7 +935,7 @@ fn xml_encode_entities_internal(doc: Option<XmlDocPtr>, input: &str, attr: i32) 
                 cur = &cur[val.len_utf8()..];
                 continue;
             }
-        } else if xml_is_char(cur.as_bytes()[0] as u32) {
+        } else if cur.as_bytes()[0].is_xml_char() {
             out.push_str(format!("&#{};", cur.as_bytes()[0]).as_str());
         }
         cur = &cur[1..];

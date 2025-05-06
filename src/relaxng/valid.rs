@@ -6,7 +6,7 @@ use std::{
 use crate::{
     globals::{GLOBAL_STATE, GenericError, GenericErrorContext, StructuredError},
     libxml::{
-        chvalid::xml_is_blank_char,
+        chvalid::XmlCharValid,
         globals::{xml_free, xml_malloc},
         relaxng::{
             XmlRelaxNGGrammarPtr, XmlRelaxNGPtr, XmlRelaxNGValidErr, XmlRelaxNGValidError,
@@ -462,15 +462,15 @@ pub(crate) unsafe fn xml_relaxng_free_valid_state(
 /// Otherwise, return normalized string wrapped `Cow::Owned`.
 #[doc(alias = "xmlRelaxNGNormalize")]
 pub(crate) fn relaxng_normalize(mut s: &str) -> Cow<'_, str> {
-    s = s.trim_start_matches(|c| xml_is_blank_char(c as u32));
-    s = s.trim_end_matches(|c| xml_is_blank_char(c as u32));
+    s = s.trim_start_matches(|c: char| c.is_xml_blank_char());
+    s = s.trim_end_matches(|c: char| c.is_xml_blank_char());
     let mut chars = s.chars().peekable();
     let mut pending = 0;
     let mut buf = None::<String>;
     while let Some(c) = chars.next() {
-        if xml_is_blank_char(c as u32) {
-            if chars.next_if(|c| xml_is_blank_char(*c as u32)).is_some() {
-                while chars.next_if(|c| xml_is_blank_char(*c as u32)).is_some() {}
+        if c.is_xml_blank_char() {
+            if chars.next_if(|c| c.is_xml_blank_char()).is_some() {
+                while chars.next_if(|c| c.is_xml_blank_char()).is_some() {}
                 let buf = buf.get_or_insert_with(String::new);
                 if pending > 0 {
                     buf.push_str(&s[..pending]);

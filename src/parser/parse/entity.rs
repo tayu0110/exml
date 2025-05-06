@@ -5,7 +5,7 @@ use crate::{
     error::XmlParserErrors,
     generic_error,
     globals::{GenericErrorContext, get_parser_debug_entities},
-    libxml::chvalid::{xml_is_blank_char, xml_is_char},
+    libxml::chvalid::XmlCharValid,
     parser::{
         XML_ENT_FIXED_COST, XML_MAX_HUGE_LENGTH, XML_MAX_TEXT_LENGTH, XML_PARSER_ALLOWED_EXPANSION,
         XML_PARSER_NON_LINEAR, XML_SUBSTITUTE_PEREF, XML_SUBSTITUTE_REF, XmlParserCtxt,
@@ -247,7 +247,7 @@ impl XmlParserCtxt<'_> {
         while let Some(nc) = c.filter(|&c| {
             self.input().unwrap().id == input_id
                 && !self.content_bytes().is_empty()
-                && xml_is_char(c as u32)
+                && c.is_xml_char()
         }) {
             buf.push(nc);
             self.advance_with_line_handling(nc.len_utf8());
@@ -265,7 +265,7 @@ impl XmlParserCtxt<'_> {
                 .sizeentities
                 .saturating_add(self.input().unwrap().consumed);
             self.pop_input();
-        } else if c.is_none_or(|c| !xml_is_char(c as u32)) {
+        } else if c.is_none_or(|c| !c.is_xml_char()) {
             let c = c.unwrap_or('\0');
             xml_fatal_err_msg_int!(
                 self,
@@ -380,7 +380,7 @@ impl XmlParserCtxt<'_> {
         // In practice it means we stop the loop only when back at parsing
         // the initial entity and the quote is found
         while let Some(nc) = c.filter(|&c| {
-            xml_is_char(c as u32)
+            c.is_xml_char()
                 && (c as i32 != stop as i32 || self.input().unwrap().id != inputid)
                 && !matches!(self.instate, XmlParserInputState::XmlParserEOF)
         }) {
@@ -547,8 +547,7 @@ impl XmlParserCtxt<'_> {
 
         // Check for the XMLDecl in the Prolog.
         self.grow();
-        if self.content_bytes().starts_with(b"<?xml") && xml_is_blank_char(self.nth_byte(5) as u32)
-        {
+        if self.content_bytes().starts_with(b"<?xml") && self.nth_byte(5).is_xml_blank_char() {
             // Note that we will switch encoding on the fly.
             self.parse_xmldecl();
             if self.err_no == XmlParserErrors::XmlErrUnsupportedEncoding as i32 {
@@ -690,8 +689,7 @@ pub(crate) fn parse_external_entity_private(
         }
 
         // Parse a possible text declaration first
-        if ctxt.content_bytes().starts_with(b"<?xml") && xml_is_blank_char(ctxt.nth_byte(5) as u32)
-        {
+        if ctxt.content_bytes().starts_with(b"<?xml") && ctxt.nth_byte(5).is_xml_blank_char() {
             ctxt.parse_text_decl();
             // An XML-1.0 document can't reference an entity not XML-1.0
             if oldctxt.version.as_deref() == Some("1.0")

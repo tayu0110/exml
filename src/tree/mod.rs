@@ -47,7 +47,7 @@ use std::{
 use crate::{
     error::{__xml_simple_error, __xml_simple_oom_error, XmlErrorDomain, XmlParserErrors},
     globals::{get_deregister_node_func, get_register_node_func},
-    libxml::chvalid::xml_is_blank_char,
+    libxml::chvalid::XmlCharValid,
     parser::{XML_STRING_COMMENT, XML_STRING_TEXT},
 };
 
@@ -250,23 +250,20 @@ impl Display for InvalidNodePointerCastError {
     feature = "libxml_writer",
 ))]
 pub fn validate_ncname<const ALLOW_SPACE: bool>(value: &str) -> Result<(), &'static str> {
-    use crate::{
-        libxml::chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
-        parser::xml_is_letter,
-    };
+    use crate::parser::xml_is_letter;
 
     let mut cur = value;
 
     // First quick algorithm for ASCII range
     if ALLOW_SPACE {
-        cur = cur.trim_start_matches(|c| xml_is_blank_char(c as u32));
+        cur = cur.trim_start_matches(|c: char| c.is_xml_blank_char());
     }
     if cur.starts_with(|c: char| c.is_ascii_alphabetic() || c == '_') {
         cur = cur[1..].trim_start_matches(|c: char| {
             c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '.'
         });
         if ALLOW_SPACE {
-            cur = cur.trim_start_matches(|c| xml_is_blank_char(c as u32));
+            cur = cur.trim_start_matches(|c: char| c.is_xml_blank_char());
         }
 
         if cur.is_empty() {
@@ -278,22 +275,22 @@ pub fn validate_ncname<const ALLOW_SPACE: bool>(value: &str) -> Result<(), &'sta
     // Second check for chars outside the ASCII range
     let mut cur = value;
     if ALLOW_SPACE {
-        cur = cur.trim_start_matches(|c: char| xml_is_blank_char(c as u32));
+        cur = cur.trim_start_matches(|c: char| c.is_xml_blank_char());
     }
     let Some(mut cur) = cur.strip_prefix(|c: char| xml_is_letter(c as u32) || c == '_') else {
         return Err("Invalid NCName");
     };
     cur = cur.trim_start_matches(|c: char| {
         xml_is_letter(c as u32)
-            || xml_is_digit(c as u32)
+            || c.is_xml_digit()
             || c == '.'
             || c == '-'
             || c == '_'
-            || xml_is_combining(c as u32)
-            || xml_is_extender(c as u32)
+            || c.is_xml_combining()
+            || c.is_xml_extender()
     });
     if ALLOW_SPACE {
-        cur = cur.trim_start_matches(|c: char| xml_is_blank_char(c as u32));
+        cur = cur.trim_start_matches(|c: char| c.is_xml_blank_char());
     }
 
     if cur.is_empty() {
@@ -309,16 +306,13 @@ pub fn validate_ncname<const ALLOW_SPACE: bool>(value: &str) -> Result<(), &'sta
 #[doc(alias = "xmlValidateQName")]
 #[cfg(any(feature = "libxml_tree", feature = "schema"))]
 pub fn validate_qname<const ALLOW_SPACE: bool>(value: &str) -> Result<(), &'static str> {
-    use crate::{
-        libxml::chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
-        parser::xml_is_letter,
-    };
+    use crate::parser::xml_is_letter;
 
     let mut cur = value;
 
     // First quick algorithm for ASCII range
     if ALLOW_SPACE {
-        cur = cur.trim_start_matches(|c: char| xml_is_blank_char(c as u32));
+        cur = cur.trim_start_matches(|c: char| c.is_xml_blank_char());
     }
 
     if cur.starts_with(|c: char| c.is_ascii_alphabetic() || c == '_') {
@@ -337,7 +331,7 @@ pub fn validate_qname<const ALLOW_SPACE: bool>(value: &str) -> Result<(), &'stat
                 });
             }
             if ALLOW_SPACE {
-                cur = cur.trim_start_matches(|c: char| xml_is_blank_char(c as u32));
+                cur = cur.trim_start_matches(|c: char| c.is_xml_blank_char());
             }
             if cur.is_empty() {
                 return Ok(());
@@ -349,19 +343,19 @@ pub fn validate_qname<const ALLOW_SPACE: bool>(value: &str) -> Result<(), &'stat
     // Second check for chars outside the ASCII range
     let mut cur = value;
     if ALLOW_SPACE {
-        cur = cur.trim_start_matches(|c: char| xml_is_blank_char(c as u32));
+        cur = cur.trim_start_matches(|c: char| c.is_xml_blank_char());
     }
     let Some(mut cur) = cur.strip_prefix(|c: char| xml_is_letter(c as u32) || c == '_') else {
         return Err("Invalid QName");
     };
     cur = cur.trim_start_matches(|c: char| {
         xml_is_letter(c as u32)
-            || xml_is_digit(c as u32)
+            || c.is_xml_digit()
             || c == '.'
             || c == '-'
             || c == '_'
-            || xml_is_combining(c as u32)
-            || xml_is_extender(c as u32)
+            || c.is_xml_combining()
+            || c.is_xml_extender()
     });
     if let Some(local) = cur.strip_prefix(':') {
         let Some(rem) = local.strip_prefix(|c: char| xml_is_letter(c as u32) || c == '_') else {
@@ -369,16 +363,16 @@ pub fn validate_qname<const ALLOW_SPACE: bool>(value: &str) -> Result<(), &'stat
         };
         cur = rem.trim_start_matches(|c: char| {
             xml_is_letter(c as u32)
-                || xml_is_digit(c as u32)
+                || c.is_xml_digit()
                 || c == '.'
                 || c == '-'
                 || c == '_'
-                || xml_is_combining(c as u32)
-                || xml_is_extender(c as u32)
+                || c.is_xml_combining()
+                || c.is_xml_extender()
         });
     }
     if ALLOW_SPACE {
-        cur = cur.trim_start_matches(|c: char| xml_is_blank_char(c as u32));
+        cur = cur.trim_start_matches(|c: char| c.is_xml_blank_char());
     }
     if cur.is_empty() {
         Ok(())
@@ -393,23 +387,20 @@ pub fn validate_qname<const ALLOW_SPACE: bool>(value: &str) -> Result<(), &'stat
 #[doc(alias = "xmlValidateName")]
 #[cfg(any(feature = "libxml_tree", feature = "schema"))]
 pub fn validate_name<const ALLOW_SPACE: bool>(value: &str) -> Result<(), &'static str> {
-    use crate::{
-        libxml::chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
-        parser::xml_is_letter,
-    };
+    use crate::parser::xml_is_letter;
 
     let mut cur = value;
 
     // First quick algorithm for ASCII range
     if ALLOW_SPACE {
-        cur = cur.trim_start_matches(|c: char| xml_is_blank_char(c as u32));
+        cur = cur.trim_start_matches(|c: char| c.is_xml_blank_char());
     }
     if cur.starts_with(|c: char| c.is_ascii_alphabetic() || c == '_' || c == ':') {
         cur = cur[1..].trim_start_matches(|c: char| {
             c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '.' || c == ':'
         });
         if ALLOW_SPACE {
-            cur = cur.trim_start_matches(|c: char| xml_is_blank_char(c as u32));
+            cur = cur.trim_start_matches(|c: char| c.is_xml_blank_char());
         }
         if cur.is_empty() {
             return Ok(());
@@ -420,7 +411,7 @@ pub fn validate_name<const ALLOW_SPACE: bool>(value: &str) -> Result<(), &'stati
     // Second check for chars outside the ASCII range
     let mut cur = value;
     if ALLOW_SPACE {
-        cur = cur.trim_start_matches(|c: char| xml_is_blank_char(c as u32));
+        cur = cur.trim_start_matches(|c: char| c.is_xml_blank_char());
     }
     let Some(mut cur) = cur.strip_prefix(|c: char| xml_is_letter(c as u32) || c == '_' || c == ':')
     else {
@@ -428,16 +419,16 @@ pub fn validate_name<const ALLOW_SPACE: bool>(value: &str) -> Result<(), &'stati
     };
     cur = cur.trim_start_matches(|c: char| {
         xml_is_letter(c as u32)
-            || xml_is_digit(c as u32)
+            || c.is_xml_digit()
             || c == '.'
             || c == ':'
             || c == '-'
             || c == '_'
-            || xml_is_combining(c as u32)
-            || xml_is_extender(c as u32)
+            || c.is_xml_combining()
+            || c.is_xml_extender()
     });
     if ALLOW_SPACE {
-        cur = cur.trim_start_matches(|c: char| xml_is_blank_char(c as u32));
+        cur = cur.trim_start_matches(|c: char| c.is_xml_blank_char());
     }
     if cur.is_empty() {
         Ok(())
@@ -452,16 +443,13 @@ pub fn validate_name<const ALLOW_SPACE: bool>(value: &str) -> Result<(), &'stati
 #[doc(alias = "xmlValidateNMToken")]
 #[cfg(any(feature = "libxml_tree", feature = "schema"))]
 pub fn validate_nmtoken<const ALLOW_SPACE: bool>(value: &str) -> Result<(), &'static str> {
-    use crate::{
-        libxml::chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
-        parser::xml_is_letter,
-    };
+    use crate::parser::xml_is_letter;
 
     let mut cur = value;
 
     // First quick algorithm for ASCII range
     if ALLOW_SPACE {
-        cur = cur.trim_start_matches(|c: char| xml_is_blank_char(c as u32));
+        cur = cur.trim_start_matches(|c: char| c.is_xml_blank_char());
     }
     if cur.starts_with(|c: char| {
         c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '.' || c == ':'
@@ -470,7 +458,7 @@ pub fn validate_nmtoken<const ALLOW_SPACE: bool>(value: &str) -> Result<(), &'st
             c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '.' || c == ':'
         });
         if ALLOW_SPACE {
-            cur = cur.trim_start_matches(|c: char| xml_is_blank_char(c as u32));
+            cur = cur.trim_start_matches(|c: char| c.is_xml_blank_char());
         }
         if cur.is_empty() {
             return Ok(());
@@ -481,32 +469,32 @@ pub fn validate_nmtoken<const ALLOW_SPACE: bool>(value: &str) -> Result<(), &'st
     // Second check for chars outside the ASCII range
     let mut cur = value;
     if ALLOW_SPACE {
-        cur = cur.trim_start_matches(|c: char| xml_is_blank_char(c as u32));
+        cur = cur.trim_start_matches(|c: char| c.is_xml_blank_char());
     }
     let Some(mut cur) = cur.strip_prefix(|c: char| {
         xml_is_letter(c as u32)
-            || xml_is_digit(c as u32)
+            || c.is_xml_digit()
             || c == '.'
             || c == ':'
             || c == '-'
             || c == '_'
-            || xml_is_combining(c as u32)
-            || xml_is_extender(c as u32)
+            || c.is_xml_combining()
+            || c.is_xml_extender()
     }) else {
         return Err("Invalid NMToken");
     };
     cur = cur.trim_start_matches(|c: char| {
         xml_is_letter(c as u32)
-            || xml_is_digit(c as u32)
+            || c.is_xml_digit()
             || c == '.'
             || c == ':'
             || c == '-'
             || c == '_'
-            || xml_is_combining(c as u32)
-            || xml_is_extender(c as u32)
+            || c.is_xml_combining()
+            || c.is_xml_extender()
     });
     if ALLOW_SPACE {
-        cur = cur.trim_start_matches(|c: char| xml_is_blank_char(c as u32));
+        cur = cur.trim_start_matches(|c: char| c.is_xml_blank_char());
     }
     if cur.is_empty() {
         Ok(())

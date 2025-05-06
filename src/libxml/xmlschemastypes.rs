@@ -76,7 +76,7 @@ use crate::{
     xpath::{XML_XPATH_NAN, XML_XPATH_NINF, XML_XPATH_PINF, xml_xpath_is_nan},
 };
 
-use super::{chvalid::xml_is_blank_char, hash::CVoidWrapper, xmlregexp::XmlRegexp};
+use super::{chvalid::XmlCharValid, hash::CVoidWrapper, xmlregexp::XmlRegexp};
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -103,7 +103,7 @@ macro_rules! IS_WSP_SPACE_CH {
 
 macro_rules! IS_WSP_BLANK_CH {
     ($c:expr) => {
-        $crate::libxml::chvalid::xml_is_blank_char($c as u32)
+        $c.is_xml_blank_char()
     };
 }
 
@@ -1083,22 +1083,22 @@ unsafe fn xml_schema_val_atomic_list_node(
         }
         cur = val;
         // Split the list
-        while xml_is_blank_char(*cur as u32) {
+        while (*cur).is_xml_blank_char() {
             *cur = 0;
             cur = cur.add(1);
         }
         while *cur != 0 {
-            if xml_is_blank_char(*cur as u32) {
+            if (*cur).is_xml_blank_char() {
                 *cur = 0;
                 cur = cur.add(1);
-                while xml_is_blank_char(*cur as u32) {
+                while (*cur).is_xml_blank_char() {
                     *cur = 0;
                     cur = cur.add(1);
                 }
             } else {
                 nb_values += 1;
                 cur = cur.add(1);
-                while *cur != 0 && !xml_is_blank_char(*cur as u32) {
+                while *cur != 0 && !(*cur).is_xml_blank_char() {
                     cur = cur.add(1);
                 }
             }
@@ -1148,7 +1148,7 @@ unsafe fn xml_schema_strip(value: *const XmlChar) -> *mut XmlChar {
         if value.is_null() {
             return null_mut();
         }
-        while *start != 0 && xml_is_blank_char(*start as u32) {
+        while *start != 0 && (*start).is_xml_blank_char() {
             start = start.add(1);
         }
         end = start;
@@ -1157,7 +1157,7 @@ unsafe fn xml_schema_strip(value: *const XmlChar) -> *mut XmlChar {
         }
         let f: *const XmlChar = end;
         end = end.sub(1);
-        while end > start && xml_is_blank_char(*end as u32) {
+        while end > start && (*end).is_xml_blank_char() {
             end = end.sub(1);
         }
         end = end.add(1);
@@ -1942,11 +1942,11 @@ unsafe fn xml_schema_val_atomic_type(
                                         if !v.is_null() {
                                             let mut start: *const XmlChar = value;
                                             let mut end: *const XmlChar;
-                                            while xml_is_blank_char(*start as u32) {
+                                            while (*start).is_xml_blank_char() {
                                                 start = start.add(1);
                                             }
                                             end = start;
-                                            while *end != 0 && !xml_is_blank_char(*end as u32) {
+                                            while *end != 0 && !(*end).is_xml_blank_char() {
                                                 end = end.add(1);
                                             }
                                             (*v).value.str =
@@ -4055,22 +4055,22 @@ unsafe fn xml_schema_compare_norm_strings(mut x: *const XmlChar, mut y: *const X
     unsafe {
         let mut tmp: i32;
 
-        while xml_is_blank_char(*x as u32) {
+        while (*x).is_xml_blank_char() {
             x = x.add(1);
         }
-        while xml_is_blank_char(*y as u32) {
+        while (*y).is_xml_blank_char() {
             y = y.add(1);
         }
         while *x != 0 && *y != 0 {
-            if xml_is_blank_char(*x as u32) {
-                if !xml_is_blank_char(*y as u32) {
+            if (*x).is_xml_blank_char() {
+                if !(*y).is_xml_blank_char() {
                     tmp = *x as i32 - *y as i32;
                     return tmp;
                 }
-                while xml_is_blank_char(*x as u32) {
+                while (*x).is_xml_blank_char() {
                     x = x.add(1);
                 }
-                while xml_is_blank_char(*y as u32) {
+                while (*y).is_xml_blank_char() {
                     y = y.add(1);
                 }
             } else {
@@ -4086,7 +4086,7 @@ unsafe fn xml_schema_compare_norm_strings(mut x: *const XmlChar, mut y: *const X
             }
         }
         if *x != 0 {
-            while xml_is_blank_char(*x as u32) {
+            while (*x).is_xml_blank_char() {
                 x = x.add(1);
             }
             if *x != 0 {
@@ -4094,7 +4094,7 @@ unsafe fn xml_schema_compare_norm_strings(mut x: *const XmlChar, mut y: *const X
             }
         }
         if *y != 0 {
-            while xml_is_blank_char(*y as u32) {
+            while (*y).is_xml_blank_char() {
                 y = y.add(1);
             }
             if *y != 0 {
@@ -4499,7 +4499,7 @@ unsafe fn xml_schema_norm_len(value: *const XmlChar) -> i32 {
             return -1;
         }
         utf = value;
-        while xml_is_blank_char(*utf as u32) {
+        while (*utf).is_xml_blank_char() {
             utf = utf.add(1);
         }
         while *utf != 0 {
@@ -4522,8 +4522,8 @@ unsafe fn xml_schema_norm_len(value: *const XmlChar) -> i32 {
                 } else {
                     utf = utf.add(2);
                 }
-            } else if xml_is_blank_char(*utf as u32) {
-                while xml_is_blank_char(*utf as u32) {
+            } else if (*utf).is_xml_blank_char() {
+                while (*utf).is_xml_blank_char() {
                     utf = utf.add(1);
                 }
                 if *utf == 0 {

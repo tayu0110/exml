@@ -29,7 +29,7 @@ use crate::xpath::XmlXPathObjectType;
 use crate::{
     error::{__xml_raise_error, XmlParserErrors},
     generic_error,
-    libxml::chvalid::xml_is_blank_char,
+    libxml::chvalid::XmlCharValid,
     parser::{
         XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC, xml_parse_in_node_context,
     },
@@ -112,7 +112,7 @@ impl XmlDebugCtxt<'_> {
         };
 
         for c in s.bytes().take(40) {
-            if xml_is_blank_char(c as u32) {
+            if c.is_xml_blank_char() {
                 write!(self.output, " ").ok();
             } else if c >= 0x80 {
                 write!(self.output, "#{:0X}", c as i32).ok();
@@ -1349,7 +1349,7 @@ pub fn xml_debug_dump_string<'a>(mut output: Option<&mut (impl Write + 'a)>, s: 
         return;
     };
     for c in s.bytes().take(40) {
-        if xml_is_blank_char(c as u32) {
+        if c.is_xml_blank_char() {
             write!(output, " ").ok();
         } else if c >= 0x80 {
             write!(output, "#{:X}", c as i32).ok();

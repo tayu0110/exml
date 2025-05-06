@@ -1,6 +1,6 @@
 use std::{fmt::Debug, str::FromStr};
 
-use crate::libxml::{chvalid::xml_is_blank_char, schemas_internals::XmlSchemaValType};
+use crate::libxml::{chvalid::XmlCharValid, schemas_internals::XmlSchemaValType};
 
 use super::{
     XmlSchemaVal, XmlSchemaValPrimitives, is_wsp_blank_ch,
@@ -661,7 +661,7 @@ pub(crate) fn check_language_type(value: &str) -> bool {
 /// Returns the stripped string or `None` if no change was required.
 #[doc(alias = "xmlSchemaStrip")]
 fn xml_schema_strip(value: &str) -> Option<&str> {
-    let stripped = value.trim_matches(|c: char| xml_is_blank_char(c as u32));
+    let stripped = value.trim_matches(|c: char| c.is_xml_blank_char());
     (value.len() != stripped.len()).then_some(stripped)
 }
 

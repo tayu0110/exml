@@ -2,10 +2,11 @@
 use crate::libxml::catalog::{XML_CATALOG_PI, XmlCatalogAllow, xml_catalog_get_defaults};
 use crate::{
     error::XmlParserErrors,
+    libxml::chvalid::XmlCharValid,
     parser::{
         XML_MAX_HUGE_LENGTH, XML_MAX_TEXT_LENGTH, XmlParserCtxt, XmlParserInputState,
-        XmlParserOption, xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_str, xml_is_char,
-        xml_ns_err, xml_warning_msg,
+        XmlParserOption, xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_str, xml_ns_err,
+        xml_warning_msg,
     },
 };
 
@@ -66,7 +67,7 @@ impl XmlParserCtxt<'_> {
     #[doc(alias = "xmlParseCatalogPI")]
     #[cfg(feature = "catalog")]
     fn parse_catalog_pi(&mut self, catalog: &str) {
-        use crate::libxml::{catalog::XmlCatalogEntry, chvalid::xml_is_blank_char};
+        use crate::libxml::{catalog::XmlCatalogEntry, chvalid::XmlCharValid};
 
         macro_rules! syntax_error {
             () => {
@@ -80,17 +81,17 @@ impl XmlParserCtxt<'_> {
         }
 
         let mut tmp = catalog;
-        tmp = tmp.trim_start_matches(|c| xml_is_blank_char(c as u32));
+        tmp = tmp.trim_start_matches(|c: char| c.is_xml_blank_char());
         let Some(rem) = tmp.strip_prefix("catalog") else {
             syntax_error!();
             return;
         };
-        tmp = rem.trim_start_matches(|c| xml_is_blank_char(c as u32));
+        tmp = rem.trim_start_matches(|c: char| c.is_xml_blank_char());
         let Some(rem) = tmp.strip_prefix('=') else {
             syntax_error!();
             return;
         };
-        tmp = rem.trim_start_matches(|c| xml_is_blank_char(c as u32));
+        tmp = rem.trim_start_matches(|c: char| c.is_xml_blank_char());
         let Some(quoto) = tmp.chars().next().filter(|&c| c == '\'' || c == '"') else {
             syntax_error!();
             return;
@@ -100,7 +101,7 @@ impl XmlParserCtxt<'_> {
             syntax_error!();
             return;
         };
-        tmp = rem.trim_start_matches(|c| xml_is_blank_char(c as u32));
+        tmp = rem.trim_start_matches(|c: char| c.is_xml_blank_char());
         if !tmp.is_empty() {
             syntax_error!();
             return;
@@ -174,10 +175,7 @@ impl XmlParserCtxt<'_> {
                 let mut content = input.current_contents();
                 let mut line = input.line;
                 let mut col = input.col;
-                while content[0] < 0x80
-                    && xml_is_char(content[0] as u32)
-                    && !content.starts_with(b"?>")
-                {
+                while content[0] < 0x80 && content[0].is_xml_char() && !content.starts_with(b"?>") {
                     buf.push(content[0] as char);
                     if content[0] == b'\n' {
                         line += 1;
@@ -220,7 +218,7 @@ impl XmlParserCtxt<'_> {
                 input.col = col;
                 input.cur = input.base_contents().len() - len;
                 while let Some(cur) = self.consume_char_if(|ctxt, c| {
-                    xml_is_char(c as u32) && (c != '?' || ctxt.nth_byte(1) != b'>')
+                    c.is_xml_char() && (c != '?' || ctxt.nth_byte(1) != b'>')
                 }) {
                     buf.push(cur);
                     if buf.len() > max_length {

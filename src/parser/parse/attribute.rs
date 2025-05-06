@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use crate::{
     error::XmlParserErrors,
-    libxml::chvalid::xml_is_char,
+    libxml::chvalid::XmlCharValid,
     parser::{
         XML_MAX_HUGE_LENGTH, XML_MAX_TEXT_LENGTH, XML_SUBSTITUTE_REF, XmlParserCtxt,
         XmlParserInputState, XmlParserOption, check_language_id, xml_err_memory, xml_fatal_err,
@@ -298,7 +298,7 @@ impl XmlParserCtxt<'_> {
         let mut c = self.current_char();
         while let Some(nc) = c.filter(|&c| {
             self.current_byte() != limit
-                && xml_is_char(c as u32)
+                && c.is_xml_char()
                 && c != '<'
                 && !matches!(self.instate, XmlParserInputState::XmlParserEOF)
         }) {
@@ -446,7 +446,7 @@ impl XmlParserCtxt<'_> {
         if self.current_byte() == b'<' {
             xml_fatal_err(self, XmlParserErrors::XmlErrLtInAttribute, None);
         } else if self.current_byte() != limit {
-            if c.is_some_and(|c| !xml_is_char(c as u32)) {
+            if c.is_some_and(|c| !c.is_xml_char()) {
                 xml_fatal_err_msg(
                     self,
                     XmlParserErrors::XmlErrInvalidChar,

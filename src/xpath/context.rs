@@ -34,7 +34,7 @@ use std::{borrow::Cow, collections::HashMap, ffi::c_void, ptr::null_mut, rc::Rc}
 use crate::{
     error::XmlError,
     globals::{GenericErrorContext, StructuredError},
-    libxml::chvalid::xml_is_blank_char,
+    libxml::chvalid::XmlCharValid,
     tree::{XML_XML_NAMESPACE, XmlDocPtr, XmlGenericNodePtr, XmlNsPtr},
 };
 
@@ -140,7 +140,7 @@ impl<'a> XmlXPathParserContext<'a> {
     pub(crate) fn skip_blanks(&mut self) {
         let rem = self
             .current_str()
-            .trim_start_matches(|c: char| xml_is_blank_char(c as u32));
+            .trim_start_matches(|c: char| c.is_xml_blank_char());
         let diff = self.current_str().len() - rem.len();
         self.cur += diff;
     }

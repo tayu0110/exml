@@ -772,7 +772,7 @@ fn html_dtd_dump_output(buf: &mut XmlOutputBuffer, doc: XmlDocPtr, _encoding: Op
 #[doc(alias = "htmlAttrDumpOutput")]
 #[cfg(feature = "libxml_output")]
 fn html_attr_dump_output(buf: &mut XmlOutputBuffer, doc: Option<XmlDocPtr>, cur: &XmlAttr) {
-    use crate::{io::write_quoted, libxml::chvalid::xml_is_blank_char, uri::escape_url_except};
+    use crate::{io::write_quoted, libxml::chvalid::XmlCharValid, uri::escape_url_except};
 
     // The html output method should not escape a & character
     // occurring in an attribute value immediately followed by
@@ -806,7 +806,7 @@ fn html_attr_dump_output(buf: &mut XmlOutputBuffer, doc: Option<XmlDocPtr>, cur:
                     })
                     .is_some()
             {
-                let tmp = value.trim_start_matches(|c| xml_is_blank_char(c as u32));
+                let tmp = value.trim_start_matches(|c: char| c.is_xml_blank_char());
 
                 // Angle brackets are technically illegal in URIs, but they're
                 // used in server side includes, for example. Curly brackets

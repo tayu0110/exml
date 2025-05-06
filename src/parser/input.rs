@@ -46,7 +46,7 @@ use crate::{
     generic_error,
     globals::get_parser_debug_entities,
     io::{__xml_loader_err, XmlParserInputBuffer, xml_check_http_input, xml_parser_get_directory},
-    libxml::chvalid::xml_is_blank_char,
+    libxml::chvalid::XmlCharValid,
     parser::xml_err_internal,
     tree::{XmlEntityPtr, XmlEntityType},
     uri::canonic_path,
@@ -404,14 +404,14 @@ impl<'a> XmlParserInput<'a> {
                 let mut cur: u8;
 
                 i += 8;
-                while xml_is_blank_char(out[i] as u32) {
+                while out[i].is_xml_blank_char() {
                     i += 1;
                 }
                 i += 1;
                 if out[i - 1] != b'=' {
                     break;
                 }
-                while xml_is_blank_char(out[i] as u32) {
+                while out[i].is_xml_blank_char() {
                     i += 1;
                 }
                 let quote: u8 = out[i];

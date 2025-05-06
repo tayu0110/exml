@@ -11,7 +11,7 @@ use crate::{
     globals::get_parser_debug_entities,
     hash::{XmlHashTable, XmlHashTableRef},
     libxml::{
-        chvalid::xml_is_blank_char,
+        chvalid::XmlCharValid,
         sax2::{xml_sax2_entity_decl, xml_sax2_get_entity},
     },
     parser::{
@@ -1674,7 +1674,7 @@ impl XmlParserCtxt<'_> {
                     }
 
                     if self.content_bytes().starts_with(b"<?xml")
-                        && xml_is_blank_char(self.nth_byte(5) as u32)
+                        && self.nth_byte(5).is_xml_blank_char()
                     {
                         self.parse_text_decl();
                     }

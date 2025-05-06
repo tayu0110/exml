@@ -2,7 +2,7 @@ use std::{ptr::fn_addr_eq, str::from_utf8_unchecked};
 
 use crate::{
     error::XmlParserErrors,
-    libxml::chvalid::{xml_is_blank_char, xml_is_char},
+    libxml::chvalid::XmlCharValid,
     parser::{
         XML_MAX_HUGE_LENGTH, XML_MAX_TEXT_LENGTH, XML_PARSER_BIG_BUFFER_SIZE, XmlParserCtxt,
         XmlParserInputState, XmlParserOption, xml_fatal_err, xml_fatal_err_msg,
@@ -35,7 +35,7 @@ impl XmlParserCtxt<'_> {
         }
 
         // Check that the string is made of blanks
-        if !blank_chars && s.chars().any(|c| !xml_is_blank_char(c as u32)) {
+        if !blank_chars && s.chars().any(|c| !c.is_xml_blank_char()) {
             return false;
         }
 
@@ -89,8 +89,7 @@ impl XmlParserCtxt<'_> {
         let mut buf = String::with_capacity(XML_PARSER_BIG_BUFFER_SIZE + 5);
         let mut cur = self.current_char();
         // test also done in xmlCurrentChar()
-        while let Some(nc) = cur.filter(|&cur| cur != '<' && cur != '&' && xml_is_char(cur as u32))
-        {
+        while let Some(nc) = cur.filter(|&cur| cur != '<' && cur != '&' && cur.is_xml_char()) {
             if nc == ']' && self.nth_byte(1) == b']' && self.nth_byte(2) == b'>' {
                 xml_fatal_err(self, XmlParserErrors::XmlErrMisplacedCDATAEnd, None);
             }
@@ -454,7 +453,7 @@ impl XmlParserCtxt<'_> {
         self.advance(9);
 
         self.instate = XmlParserInputState::XmlParserCDATASection;
-        let Some(mut r) = self.current_char().filter(|&r| xml_is_char(r as u32)) else {
+        let Some(mut r) = self.current_char().filter(|&r| r.is_xml_char()) else {
             xml_fatal_err(self, XmlParserErrors::XmlErrCDATANotFinished, None);
             if !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
                 self.instate = XmlParserInputState::XmlParserContent;
@@ -462,7 +461,7 @@ impl XmlParserCtxt<'_> {
             return;
         };
         self.advance_with_line_handling(r.len_utf8());
-        let Some(mut s) = self.current_char().filter(|&s| xml_is_char(s as u32)) else {
+        let Some(mut s) = self.current_char().filter(|&s| s.is_xml_char()) else {
             xml_fatal_err(self, XmlParserErrors::XmlErrCDATANotFinished, None);
             if !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
                 self.instate = XmlParserInputState::XmlParserContent;
@@ -473,7 +472,7 @@ impl XmlParserCtxt<'_> {
         let mut cur = self.current_char();
         let mut buf = String::new();
         while let Some(nc) =
-            cur.filter(|&cur| xml_is_char(cur as u32) && (r != ']' || s != ']' || cur != '>'))
+            cur.filter(|&cur| cur.is_xml_char() && (r != ']' || s != ']' || cur != '>'))
         {
             buf.push(r);
             if buf.len() > max_length {

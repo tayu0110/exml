@@ -69,10 +69,7 @@ use crate::{
     },
     libxml::{
         catalog::xml_catalog_cleanup,
-        chvalid::{
-            xml_is_base_char, xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender,
-            xml_is_ideographic,
-        },
+        chvalid::XmlCharValid,
         threads::{
             __xml_global_init_mutex_lock, __xml_global_init_mutex_unlock,
             xml_cleanup_threads_internal, xml_init_threads_internal,
@@ -223,13 +220,13 @@ impl XmlParserCharValid for u8 {
                     || (0xF8..=0xFF).contains(&c))
         } else {
             xml_is_letter(c as u32)
-                || xml_is_digit(c as u32)
+                || c.is_xml_digit()
                 || c == b'.'
                 || c == b'-'
                 || c == b'_'
                 || c == b':'
-                || xml_is_combining(c as u32)
-                || xml_is_extender(c as u32)
+                || c.is_xml_combining()
+                || c.is_xml_extender()
         }
     }
 
@@ -287,13 +284,13 @@ impl XmlParserCharValid for u32 {
                     || (0x10000..=0xEFFFF).contains(&c))
         } else {
             xml_is_letter(c)
-                || xml_is_digit(c)
+                || c.is_xml_digit()
                 || c == b'.' as u32
                 || c == b'-' as u32
                 || c == b'_' as u32
                 || c == b':' as u32
-                || xml_is_combining(c)
-                || xml_is_extender(c)
+                || c.is_xml_combining()
+                || c.is_xml_extender()
         }
     }
 
@@ -344,7 +341,7 @@ impl XmlParserCharValid for char {
 /// ```
 #[doc(alias = "xmlIsLetter")]
 pub fn xml_is_letter(c: u32) -> bool {
-    xml_is_base_char(c) || xml_is_ideographic(c)
+    c.is_xml_base_char() || c.is_xml_ideographic()
 }
 
 /// Checks that the value conforms to the LanguageID production:

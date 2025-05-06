@@ -26,7 +26,7 @@ use std::{borrow::Cow, iter::once};
 
 use primitives::XmlSchemaValPrimitives;
 
-use crate::libxml::{chvalid::xml_is_blank_char, schemas_internals::XmlSchemaValType};
+use crate::libxml::{chvalid::XmlCharValid, schemas_internals::XmlSchemaValType};
 
 pub struct XmlSchemaVal {
     pub(crate) typ: XmlSchemaValType,
@@ -46,7 +46,7 @@ fn is_wsp_space_ch(c: char) -> bool {
 
 #[doc(alias = "IS_WSP_BLANK_CH")]
 fn is_wsp_blank_ch(c: char) -> bool {
-    xml_is_blank_char(c as u32)
+    c.is_xml_blank_char()
 }
 
 /// Removes and normalize white spaces in the string
@@ -54,21 +54,21 @@ fn is_wsp_blank_ch(c: char) -> bool {
 /// Returns the new string or `None` if no change was required.
 #[doc(alias = "xmlSchemaCollapseString")]
 pub fn xml_schema_collapse_string(value: &str) -> Option<Cow<'_, str>> {
-    let start = value.trim_start_matches(|c| xml_is_blank_char(c as u32));
+    let start = value.trim_start_matches(|c: char| c.is_xml_blank_char());
     let Some(col) = start
         .chars()
         .zip(start.chars().skip(1).chain(once('\0')))
         .position(|(f, s)| {
-            (f == ' ' && xml_is_blank_char(s as u32)) || f == '\x0A' || f == '\x09' || f == '\x0D'
+            (f == ' ' && s.is_xml_blank_char()) || f == '\x0A' || f == '\x09' || f == '\x0D'
         })
     else {
-        let res = start.trim_end_matches(|c| xml_is_blank_char(c as u32));
+        let res = start.trim_end_matches(|c: char| c.is_xml_blank_char());
         return (res.len() != value.len()).then_some(Cow::Borrowed(res));
     };
     let mut buf = String::with_capacity(start.len());
     buf.push_str(&start[..col]);
     let res = start[col..]
-        .split(|c| xml_is_blank_char(c as u32))
+        .split(|c: char| c.is_xml_blank_char())
         .filter(|s| !s.is_empty())
         .fold(buf, |mut buf, s| {
             buf.push(' ');

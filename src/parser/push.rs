@@ -4,7 +4,7 @@ use crate::{
     generic_error,
     globals::GenericErrorContext,
     io::XmlParserInputBuffer,
-    libxml::chvalid::{xml_is_blank_char, xml_is_char},
+    libxml::chvalid::XmlCharValid,
     parser::{
         __xml_err_encoding, XML_MAX_LOOKUP_LIMIT, XML_PARSER_BIG_BUFFER_SIZE, XmlSAXHandler,
         xml_err_memory, xml_fatal_err_msg_str,
@@ -41,7 +41,7 @@ pub(crate) fn check_cdata_push(utf: &[u8], complete: bool) -> Result<usize, usiz
             // If `e.error_len().is_some()` is `true`,
             // it is still invalid because it contains an invalid byte sequence.
             if complete || e.error_len().is_some() {
-                return Err(s.find(|c: char| !xml_is_char(c as u32)).unwrap_or(s.len()));
+                return Err(s.find(|c: char| !c.is_xml_char()).unwrap_or(s.len()));
             }
             s
         }
@@ -49,8 +49,7 @@ pub(crate) fn check_cdata_push(utf: &[u8], complete: bool) -> Result<usize, usiz
 
     // Even a valid UTF-8 sequence may contain characters
     // that do not conform to the XML specification.
-    s.find(|c: char| !xml_is_char(c as u32))
-        .map_or(Ok(s.len()), Err)
+    s.find(|c: char| !c.is_xml_char()).map_or(Ok(s.len()), Err)
 }
 
 impl XmlParserCtxt<'_> {
@@ -229,7 +228,7 @@ impl XmlParserCtxt<'_> {
                     self.end_check_state = 0;
                     return 1;
                 }
-                if xml_is_blank_char(cur[0] as u32) {
+                if cur[0].is_xml_blank_char() {
                     state = b' ';
                 } else if cur[0] != b']' {
                     state = 0;
@@ -242,7 +241,7 @@ impl XmlParserCtxt<'_> {
                     self.end_check_state = 0;
                     return 1;
                 }
-                if !xml_is_blank_char(cur[0] as u32) {
+                if !cur[0].is_xml_blank_char() {
                     state = 0;
                     start = cur;
                     continue;
@@ -395,7 +394,7 @@ impl XmlParserCtxt<'_> {
                                     set_document_locator(self, XmlSAXLocator::default());
                                 }
                                 if self.content_bytes()[2..].starts_with(b"xml")
-                                    && xml_is_blank_char(self.nth_byte(5) as u32)
+                                    && self.nth_byte(5).is_xml_blank_char()
                                 {
                                     ret += 5;
                                     self.parse_xmldecl();

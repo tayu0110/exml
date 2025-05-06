@@ -28,7 +28,7 @@ use crate::{
     io::{XmlParserInputBuffer, xml_parser_get_directory},
     libxml::{
         catalog::XmlCatalogEntry,
-        chvalid::{xml_is_blank_char, xml_is_char},
+        chvalid::XmlCharValid,
         sax2::{
             xml_sax_version, xml_sax2_end_element, xml_sax2_ignorable_whitespace,
             xml_sax2_start_element,
@@ -996,10 +996,7 @@ impl<'a> XmlParserCtxt<'a> {
             let mut col = input.col;
             self.force_grow();
             let mut content = self.content_bytes();
-            while content
-                .first()
-                .is_some_and(|&b| xml_is_blank_char(b as u32))
-            {
+            while content.first().is_some_and(XmlCharValid::is_xml_blank_char) {
                 if content[0] == b'\n' {
                     line += 1;
                     col = 1;
@@ -1030,15 +1027,12 @@ impl<'a> XmlParserCtxt<'a> {
             let expand_pe = self.external != 0 || self.input_tab.len() != 1;
 
             while !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                if xml_is_blank_char(self.current_byte() as u32) {
+                if self.current_byte().is_xml_blank_char() {
                     // CHECKED tstblanks.xml
                     self.skip_char();
                 } else if self.current_byte() == b'%' {
                     // Need to handle support of entities branching here
-                    if !expand_pe
-                        || xml_is_blank_char(self.nth_byte(1) as u32)
-                        || self.nth_byte(1) == 0
-                    {
+                    if !expand_pe || self.nth_byte(1).is_xml_blank_char() || self.nth_byte(1) == 0 {
                         break;
                     }
                     self.parse_pe_reference();
@@ -1206,7 +1200,7 @@ impl<'a> XmlParserCtxt<'a> {
             cur_byte as char
         };
 
-        if (c.len_utf8() > 1 && !xml_is_char(c as u32)) || (c.len_utf8() == 1 && c == '\0') {
+        if (c.len_utf8() > 1 && !c.is_xml_char()) || (c.len_utf8() == 1 && c == '\0') {
             xml_err_encoding_int!(
                 self,
                 XmlParserErrors::XmlErrInvalidChar,

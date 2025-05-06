@@ -43,7 +43,7 @@ use crate::{
     globals::{GLOBAL_STATE, GenericErrorContext},
     io::XmlParserInputBuffer,
     libxml::{
-        chvalid::xml_is_blank_char,
+        chvalid::XmlCharValid,
         dict::{XmlDictPtr, xml_dict_free, xml_dict_lookup, xml_dict_reference},
         globals::{xml_free, xml_malloc, xml_realloc},
         hash::{
@@ -2057,11 +2057,11 @@ pub(crate) unsafe fn xml_schema_vcheck_cvc_simple_type(
                 let item_type: XmlSchemaTypePtr = (*typ).subtypes;
                 cur = value;
                 loop {
-                    while xml_is_blank_char(*cur as u32) {
+                    while (*cur).is_xml_blank_char() {
                         cur = cur.add(1);
                     }
                     end = cur;
-                    while *end != 0 && !xml_is_blank_char(*end as u32) {
+                    while *end != 0 && !(*end).is_xml_blank_char() {
                         end = end.add(1);
                     }
                     if end == cur {
@@ -2549,14 +2549,14 @@ fn is_blank_node(node: XmlNodePtr) -> bool {
         && node
             .content
             .as_deref()
-            .is_some_and(|content| content.chars().all(|c| xml_is_blank_char(c as u32)))
+            .is_some_and(|content| content.chars().all(|c| c.is_xml_blank_char()))
 }
 
 /// Check if a string is ignorable
 ///
 /// Returns 1 if the string is NULL or made of blanks chars, 0 otherwise
 fn xml_schema_is_blank(s: Option<&str>) -> bool {
-    s.is_none_or(|s| s.chars().all(|c| xml_is_blank_char(c as u32)))
+    s.is_none_or(|s| s.chars().all(|c| c.is_xml_blank_char()))
 }
 
 /// Removes unwanted nodes in a schemas document tree
@@ -3696,11 +3696,11 @@ pub(crate) unsafe fn xml_schema_pval_attr_block_final(
             let mut item: *mut XmlChar;
 
             loop {
-                while xml_is_blank_char(*cur as u32) {
+                while (*cur).is_xml_blank_char() {
                     cur = cur.add(1);
                 }
                 end = cur;
-                while *end != 0 && !xml_is_blank_char(*end as u32) {
+                while *end != 0 && !(*end).is_xml_blank_char() {
                     end = end.add(1);
                 }
                 if end == cur {
@@ -4243,7 +4243,7 @@ pub(crate) unsafe fn xml_get_min_occurs(
         };
         let val = (*ctxt).get_node_content(Some(attr.into()));
         let mut cur = val.as_str();
-        cur = cur.trim_start_matches(|c| xml_is_blank_char(c as u32));
+        cur = cur.trim_start_matches(|c: char| c.is_xml_blank_char());
         if cur.is_empty() {
             // XML_SCHEMAP_INVALID_MINOCCURS,
             xml_schema_psimple_type_err(
@@ -4260,7 +4260,7 @@ pub(crate) unsafe fn xml_get_min_occurs(
             );
             return def;
         }
-        cur = cur.trim_end_matches(|c| xml_is_blank_char(c as u32));
+        cur = cur.trim_end_matches(|c: char| c.is_xml_blank_char());
         if cur.bytes().all(|b| b.is_ascii_digit()) {
             // TODO: Restrict the maximal value to Integer.
             if let Some(ret) = cur
@@ -4329,7 +4329,7 @@ pub(crate) unsafe fn xml_get_max_occurs(
         }
 
         let mut cur = val.as_str();
-        cur = cur.trim_start_matches(|c| xml_is_blank_char(c as u32));
+        cur = cur.trim_start_matches(|c: char| c.is_xml_blank_char());
         if cur.is_empty() {
             // XML_SCHEMAP_INVALID_MINOCCURS,
             xml_schema_psimple_type_err(
@@ -4346,7 +4346,7 @@ pub(crate) unsafe fn xml_get_max_occurs(
             );
             return def;
         }
-        cur = cur.trim_end_matches(|c| xml_is_blank_char(c as u32));
+        cur = cur.trim_end_matches(|c: char| c.is_xml_blank_char());
         if cur.bytes().all(|b| b.is_ascii_digit()) {
             // TODO: Restrict the maximal value to Integer.
             if let Some(ret) = cur
@@ -14125,11 +14125,11 @@ unsafe fn xml_schema_assemble_by_xsi(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
             // TODO: Move the string parsing mechanism away from here.
             if (*iattr).meta_type == XML_SCHEMA_ATTR_INFO_META_XSI_SCHEMA_LOC {
                 // Get the namespace name.
-                while xml_is_blank_char(*cur as u32) {
+                while (*cur).is_xml_blank_char() {
                     cur = cur.add(1);
                 }
                 end = cur;
-                while *end != 0 && !xml_is_blank_char(*end as u32) {
+                while *end != 0 && !(*end).is_xml_blank_char() {
                     end = end.add(1);
                 }
                 if end == cur {
@@ -14140,11 +14140,11 @@ unsafe fn xml_schema_assemble_by_xsi(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                 cur = end;
             }
             // Get the URI.
-            while xml_is_blank_char(*cur as u32) {
+            while (*cur).is_xml_blank_char() {
                 cur = cur.add(1);
             }
             end = cur;
-            while *end != 0 && !xml_is_blank_char(*end as u32) {
+            while *end != 0 && !(*end).is_xml_blank_char() {
                 end = end.add(1);
             }
             if end == cur {

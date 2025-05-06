@@ -68,7 +68,7 @@ use crate::{
 };
 
 use super::{
-    chvalid::xml_is_blank_char,
+    chvalid::XmlCharValid,
     xmlautomata::XmlAutomata,
     xmlstring::{xml_strncat, xml_strndup},
 };
@@ -1121,7 +1121,7 @@ fn xml_relaxng_compute_interleaves(def: XmlRelaxNGDefinePtr, ctxt: XmlRelaxNGPar
 /// Returns 1 if the string is NULL or made of blanks chars, 0 otherwise
 #[doc(alias = "xmlRelaxNGIsBlank")]
 fn xml_relaxng_is_blank(s: Option<&str>) -> bool {
-    s.is_none_or(|s| s.chars().all(|c| xml_is_blank_char(c as u32)))
+    s.is_none_or(|s| s.chars().all(|c| c.is_xml_blank_char()))
 }
 
 /// Check all the attributes on the given node
@@ -6786,7 +6786,7 @@ unsafe fn xml_relaxng_validate_value(
                 if !value.is_null() && *value.add(0) != 0 {
                     let mut idx: i32 = 0;
 
-                    while xml_is_blank_char(*value.add(idx as usize) as u32) {
+                    while (*value.add(idx as usize)).is_xml_blank_char() {
                         idx += 1;
                     }
                     if *value.add(idx as usize) != 0 {
@@ -6898,10 +6898,10 @@ unsafe fn xml_relaxng_validate_value(
                 }
                 cur = val;
                 while *cur != 0 {
-                    if xml_is_blank_char(*cur as u32) {
+                    if (*cur).is_xml_blank_char() {
                         *cur = 0;
                         cur = cur.add(1);
-                        while xml_is_blank_char(*cur as u32) {
+                        while (*cur).is_xml_blank_char() {
                             *cur = 0;
                             cur = cur.add(1);
                         }
@@ -9244,7 +9244,7 @@ pub unsafe fn xml_relaxng_validate_push_cdata(ctxt: XmlRelaxNGValidCtxtPtr, mut 
             return -1;
         }
 
-        data = data.trim_start_matches(|c: char| xml_is_blank_char(c as u32));
+        data = data.trim_start_matches(|c: char| c.is_xml_blank_char());
         if data.is_empty() {
             return 1;
         }

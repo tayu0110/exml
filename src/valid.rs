@@ -32,7 +32,7 @@ use crate::{
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     globals::{GenericError, GenericErrorContext, StructuredError},
     hash::XmlHashTableRef,
-    libxml::{chvalid::xml_is_blank_char, hash::XmlHashTable},
+    libxml::{chvalid::XmlCharValid, hash::XmlHashTable},
     list::XmlList,
     parser::{XML_VCTXT_USE_PCTXT, build_qname, split_qname2},
     tree::{
@@ -711,7 +711,7 @@ impl XmlValidCtxt {
                     XmlElementTypeVal::XmlElementTypeAny => {}
                     XmlElementTypeVal::XmlElementTypeMixed => {}
                     XmlElementTypeVal::XmlElementTypeElement => {
-                        if data.contains(|c: char| !xml_is_blank_char(c as u32)) {
+                        if data.contains(|c: char| !c.is_xml_blank_char()) {
                             let name = state.node.name().unwrap().into_owned();
                             let node = state.node.into();
                             xml_err_valid_node(
@@ -1529,10 +1529,7 @@ fn xml_is_doc_name_start_char(doc: Option<XmlDocPtr>, c: i32) -> i32 {
 
 #[cfg(feature = "libxml_valid")]
 fn xml_is_doc_name_char(doc: Option<XmlDocPtr>, c: i32) -> i32 {
-    use crate::{
-        libxml::chvalid::{xml_is_combining, xml_is_digit, xml_is_extender},
-        parser::xml_is_letter,
-    };
+    use crate::{libxml::chvalid::XmlCharValid, parser::xml_is_letter};
 
     if doc.is_none_or(|doc| doc.properties & XmlDocProperties::XmlDocOld10 as i32 == 0) {
         // Use the new checks of production [4] [4a] amd [5] of the
@@ -1563,13 +1560,13 @@ fn xml_is_doc_name_char(doc: Option<XmlDocPtr>, c: i32) -> i32 {
             return 1;
         }
     } else if xml_is_letter(c as u32)
-        || xml_is_digit(c as u32)
+        || (c as u32).is_xml_digit()
         || c == b'.' as i32
         || c == b'-' as i32
         || c == b'_' as i32
         || c == b':' as i32
-        || xml_is_combining(c as u32)
-        || xml_is_extender(c as u32)
+        || (c as u32).is_xml_combining()
+        || (c as u32).is_xml_extender()
     {
         return 1;
     }
@@ -1626,9 +1623,7 @@ fn xml_validate_name_value_internal(doc: Option<XmlDocPtr>, value: &str) -> i32 
 #[doc(alias = "xmlValidateNmtokensValueInternal")]
 #[cfg(feature = "libxml_valid")]
 fn xml_validate_nmtokens_value_internal(doc: Option<XmlDocPtr>, mut value: &str) -> i32 {
-    use crate::libxml::chvalid::xml_is_blank_char;
-
-    value = value.trim_matches(|c: char| xml_is_blank_char(c as u32));
+    value = value.trim_matches(|c: char| c.is_xml_blank_char());
     if value
         .chars()
         .next()
@@ -2832,7 +2827,7 @@ fn xml_validate_attribute_value2(
         }
         XmlAttributeType::XmlAttributeEntities => {
             for nam in value
-                .split(|c: char| xml_is_blank_char(c as u32))
+                .split(|c: char| c.is_xml_blank_char())
                 .filter(|nam| !nam.is_empty())
             {
                 if let Some(ent) = xml_get_doc_entity(Some(doc), nam) {
@@ -3919,8 +3914,7 @@ pub fn xml_validate_one_element(
                         if matches!(cur_node.element_type(), XmlElementType::XmlTextNode) {
                             let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
                             let mut content = cur_node.content.as_deref().unwrap();
-                            content =
-                                content.trim_start_matches(|c: char| xml_is_blank_char(c as u32));
+                            content = content.trim_start_matches(|c: char| c.is_xml_blank_char());
                             if content.is_empty() {
                                 let name = elem.name().unwrap();
                                 xml_err_valid_node(
@@ -4827,7 +4821,7 @@ fn xml_validate_ref(refe: &XmlRef, ctxt: &mut XmlValidCtxt, name: &str) {
             }
         } else if matches!(attr.atype, Some(XmlAttributeType::XmlAttributeIDREFS)) {
             for s in name
-                .split(|c: char| xml_is_blank_char(c as u32))
+                .split(|c: char| c.is_xml_blank_char())
                 .filter(|s| !s.is_empty())
             {
                 if xml_get_id(ctxt.doc.unwrap(), s).is_none() {
@@ -4851,7 +4845,7 @@ fn xml_validate_ref(refe: &XmlRef, ctxt: &mut XmlValidCtxt, name: &str) {
         }
     } else {
         for s in name
-            .split(|c: char| xml_is_blank_char(c as u32))
+            .split(|c: char| c.is_xml_blank_char())
             .filter(|s| !s.is_empty())
         {
             if xml_get_id(ctxt.doc.unwrap(), s).is_none() {

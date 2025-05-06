@@ -1,9 +1,10 @@
 use crate::{
     error::XmlParserErrors,
+    libxml::chvalid::XmlCharValid,
     parser::{
         XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH, XmlParserCharValid, XmlParserCtxt,
-        XmlParserInputState, XmlParserOption, build_qname, xml_fatal_err, xml_is_combining,
-        xml_is_digit, xml_is_extender, xml_is_letter, xml_ns_err,
+        XmlParserInputState, XmlParserOption, build_qname, xml_fatal_err, xml_is_letter,
+        xml_ns_err,
     },
 };
 
@@ -193,13 +194,13 @@ impl XmlParserCtxt<'_> {
                     && c != '>'
                     && c != '/'
                     && (xml_is_letter(c as u32)
-                        || xml_is_digit(c as u32)
+                        || c.is_xml_digit()
                         || c == '.'
                         || c == '-'
                         || c == '_'
                         || c == ':'
-                        || xml_is_combining(c as u32)
-                        || xml_is_extender(c as u32))
+                        || c.is_xml_combining()
+                        || c.is_xml_extender())
             }) {
                 buf.push(c);
             }

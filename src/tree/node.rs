@@ -27,13 +27,13 @@ use std::{
     sync::atomic::Ordering,
 };
 
-use crate::{tree::xml_free_node_list, valid::xml_remove_id};
+use crate::{libxml::chvalid::XmlCharValid, tree::xml_free_node_list, valid::xml_remove_id};
 
 use super::{
     InvalidNodePointerCastError, NodeCommon, XML_CHECK_DTD, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
     XmlAttrPtr, XmlAttributePtr, XmlAttributeType, XmlDocPtr, XmlElementType, XmlGenericNodePtr,
     XmlNs, XmlNsPtr, xml_encode_attribute_entities, xml_encode_entities_reentrant, xml_free_node,
-    xml_free_prop, xml_get_doc_entity, xml_is_blank_char, xml_ns_in_scope, xml_tree_err_memory,
+    xml_free_prop, xml_get_doc_entity, xml_ns_in_scope, xml_tree_err_memory,
 };
 
 fn verify_xml_node(node: &XmlNode) -> bool {
@@ -88,7 +88,7 @@ impl XmlNode {
         let Some(content) = self.content.as_deref() else {
             return true;
         };
-        content.chars().all(|c| xml_is_blank_char(c as u32))
+        content.chars().all(|c| c.is_xml_blank_char())
     }
 
     /// Get line number of `self`.

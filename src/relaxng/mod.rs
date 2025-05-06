@@ -11,7 +11,7 @@ pub use type_library::*;
 pub use valid::*;
 
 use crate::{
-    libxml::chvalid::xml_is_blank_char,
+    libxml::chvalid::XmlCharValid,
     tree::{NodeCommon, XmlElementType, XmlNodePtr},
 };
 
@@ -30,6 +30,6 @@ pub(crate) fn is_relaxng(node: XmlNodePtr, typ: &str) -> bool {
 #[doc(alias = "xmlRelaxNGNormExtSpace")]
 pub(crate) fn normalize_external_space(value: &str) -> &str {
     value
-        .trim_start_matches(|c| xml_is_blank_char(c as u32))
-        .trim_end_matches(|c| xml_is_blank_char(c as u32))
+        .trim_start_matches(|c: char| c.is_xml_blank_char())
+        .trim_end_matches(|c: char| c.is_xml_blank_char())
 }

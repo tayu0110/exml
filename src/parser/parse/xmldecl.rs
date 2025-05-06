@@ -1,7 +1,7 @@
 use crate::{
     encoding::find_encoding_handler,
     error::XmlParserErrors,
-    libxml::chvalid::xml_is_blank_char,
+    libxml::chvalid::XmlCharValid,
     parser::{
         XML_DEFAULT_VERSION, XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH, XmlParserCtxt,
         XmlParserInputState, XmlParserOption, xml_fatal_err, xml_fatal_err_msg,
@@ -265,7 +265,7 @@ impl XmlParserCtxt<'_> {
         assert!(self.content_bytes().starts_with(b"<?xml"));
         self.advance(5);
 
-        if !xml_is_blank_char(self.current_byte() as u32) {
+        if !self.current_byte().is_xml_blank_char() {
             xml_fatal_err_msg(
                 self,
                 XmlParserErrors::XmlErrSpaceRequired,
@@ -307,7 +307,7 @@ impl XmlParserCtxt<'_> {
         }
 
         // We may have the encoding declaration
-        if !xml_is_blank_char(self.current_byte() as u32) {
+        if !self.current_byte().is_xml_blank_char() {
             if self.current_byte() == b'?' && self.nth_byte(1) == b'>' {
                 self.advance(2);
                 return;
@@ -327,9 +327,7 @@ impl XmlParserCtxt<'_> {
         }
 
         // We may have the standalone status.
-        if self.input().unwrap().encoding.is_some()
-            && !xml_is_blank_char(self.current_byte() as u32)
-        {
+        if self.input().unwrap().encoding.is_some() && !self.current_byte().is_xml_blank_char() {
             if self.content_bytes().starts_with(b"?>") {
                 self.advance(2);
                 return;
@@ -379,9 +377,7 @@ impl XmlParserCtxt<'_> {
     #[doc(alias = "xmlParseTextDecl")]
     pub(crate) fn parse_text_decl(&mut self) {
         // We know that '<?xml' is here.
-        if !self.content_bytes().starts_with(b"<?xml")
-            || !xml_is_blank_char(self.nth_byte(5) as u32)
-        {
+        if !self.content_bytes().starts_with(b"<?xml") || !self.nth_byte(5).is_xml_blank_char() {
             xml_fatal_err(self, XmlParserErrors::XmlErrXMLDeclNotStarted, None);
             return;
         }

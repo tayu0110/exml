@@ -43,10 +43,7 @@ use crate::{
     globals::{GenericErrorContext, get_keep_blanks_default_value, get_line_numbers_default_value},
     io::XmlParserInputBuffer,
     libxml::{
-        chvalid::{
-            xml_is_blank_char, xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender,
-            xml_is_pubid_char,
-        },
+        chvalid::XmlCharValid,
         sax2::{xml_sax2_ignorable_whitespace, xml_sax2_init_html_default_sax_handler},
         xmlstring::XmlChar,
     },
@@ -170,7 +167,7 @@ fn html_skip_blank_chars(ctxt: &mut XmlParserCtxt) -> i32 {
     ctxt.force_grow();
     let mut buffer = ctxt.content_bytes();
     let mut res = 0;
-    while !buffer.is_empty() && xml_is_blank_char(buffer[0] as u32) {
+    while !buffer.is_empty() && buffer[0].is_xml_blank_char() {
         if buffer[0] == b'\n' {
             line += 1;
             col = 1;
@@ -479,7 +476,7 @@ fn html_current_char(ctxt: &mut XmlParserCtxt, len: &mut i32) -> i32 {
         }
     };
 
-    if (*len > 1 && !xml_is_char(c as u32))
+    if (*len > 1 && !c.is_xml_char())
         || (*len == 1 && c == '\0' && !ctxt.content_bytes().is_empty())
     {
         html_parse_err_int!(
@@ -519,13 +516,13 @@ fn html_parse_name_complex(ctxt: &mut XmlParserCtxt) -> Option<String> {
         && c != b'>' as i32
         && c != b'/' as i32
         && (xml_is_letter(c as u32)
-            || xml_is_digit(c as u32)
+            || (c as u32).is_xml_digit()
             || c == b'.' as i32
             || c == b'-' as i32
             || c == b'_' as i32
             || c == b':' as i32
-            || xml_is_combining(c as u32)
-            || xml_is_extender(c as u32))
+            || (c as u32).is_xml_combining()
+            || (c as u32).is_xml_extender())
     {
         ret.push(char::from_u32(c as u32).unwrap());
         if ret.len() > max_length {
@@ -733,7 +730,7 @@ pub(crate) fn html_parse_char_ref(ctxt: &mut HtmlParserCtxt) -> i32 {
         );
     }
     // Check the value IS_CHAR ...
-    if xml_is_char(val as u32) {
+    if (val as u32).is_xml_char() {
         return val;
     } else if val >= 0x110000 {
         html_parse_err(
@@ -1040,7 +1037,7 @@ fn html_parse_html_attribute(ctxt: &mut HtmlParserCtxt, stop: u8) -> Option<Stri
         if stop == 0 && ctxt.current_byte() == b'>' {
             break;
         }
-        if stop == 0 && xml_is_blank_char(ctxt.current_byte() as u32) {
+        if stop == 0 && ctxt.current_byte().is_xml_blank_char() {
             break;
         }
         if ctxt.current_byte() == b'&' {
@@ -1289,7 +1286,7 @@ fn html_check_encoding(ctxt: &mut HtmlParserCtxt, attvalue: &str) {
         return;
     };
     encoding = &encoding[pos + 7..];
-    encoding = encoding.trim_start_matches(|c| xml_is_blank_char(c as u32));
+    encoding = encoding.trim_start_matches(|c: char| c.is_xml_blank_char());
     if let Some(encoding) = encoding.strip_prefix('=') {
         html_check_encoding_direct(ctxt, Some(encoding));
     }
@@ -1456,7 +1453,7 @@ fn html_parse_start_tag(ctxt: &mut HtmlParserCtxt) -> i32 {
         } else {
             // Dump the bogus attribute string up to the next blank or the end of the tag.
             while ctxt.current_byte() != 0
-                && !xml_is_blank_char(ctxt.current_byte() as u32)
+                && !ctxt.current_byte().is_xml_blank_char()
                 && ctxt.current_byte() != b'>'
                 && !ctxt.content_bytes().starts_with(b"/>")
                 && !matches!(ctxt.instate, XmlParserInputState::XmlParserEOF)
@@ -1741,7 +1738,7 @@ fn html_parse_script(ctxt: &mut HtmlParserCtxt) {
                 break;
             }
         }
-        if xml_is_char(cur as u32) {
+        if (cur as u32).is_xml_char() {
             let c = char::from_u32(cur as u32).unwrap();
             let s = c.encode_utf8(&mut buf[nbchar as usize..]);
             nbchar += s.len() as i32;
@@ -1819,7 +1816,7 @@ fn html_parse_system_literal(ctxt: &mut HtmlParserCtxt) -> Option<String> {
 
     while ctxt.current_byte() != 0 && ctxt.current_byte() as i32 != quote {
         // TODO: Handle UTF-8
-        if !xml_is_char(ctxt.current_byte() as u32) {
+        if !ctxt.current_byte().is_xml_char() {
             html_parse_err_int!(
                 &mut *ctxt,
                 XmlParserErrors::XmlErrInvalidChar,
@@ -1882,7 +1879,7 @@ fn html_parse_pubid_literal(ctxt: &mut HtmlParserCtxt) -> Option<String> {
     let start_position = ctxt.input().unwrap().offset_from_base();
 
     while ctxt.current_byte() != 0 && ctxt.current_byte() as i32 != quote {
-        if !xml_is_pubid_char(ctxt.current_byte() as u32) {
+        if !ctxt.current_byte().is_xml_pubid_char() {
             html_parse_err_int!(
                 &mut *ctxt,
                 XmlParserErrors::XmlErrInvalidChar,
@@ -1934,7 +1931,7 @@ fn html_parse_external_id(ctxt: &mut HtmlParserCtxt) -> (Option<String>, Option<
     if ctxt.content_bytes().len() >= 6 && ctxt.content_bytes()[..6].eq_ignore_ascii_case(b"SYSTEM")
     {
         ctxt.advance(6);
-        if !xml_is_blank_char(ctxt.current_byte() as u32) {
+        if !ctxt.current_byte().is_xml_blank_char() {
             html_parse_err(
                 Some(ctxt),
                 XmlParserErrors::XmlErrSpaceRequired,
@@ -1959,7 +1956,7 @@ fn html_parse_external_id(ctxt: &mut HtmlParserCtxt) -> (Option<String>, Option<
         && ctxt.content_bytes()[..6].eq_ignore_ascii_case(b"PUBLIC")
     {
         ctxt.advance(6);
-        if !xml_is_blank_char(ctxt.current_byte() as u32) {
+        if !ctxt.current_byte().is_xml_blank_char() {
             html_parse_err(
                 Some(ctxt),
                 XmlParserErrors::XmlErrSpaceRequired,
@@ -2148,7 +2145,7 @@ fn html_parse_comment(ctxt: &mut HtmlParserCtxt) {
                         break;
                     }
 
-                    if xml_is_char(q as u32) {
+                    if (q as u32).is_xml_char() {
                         buf.push(char::from_u32(q as u32).unwrap());
                     } else {
                         html_parse_err_int!(
@@ -2265,7 +2262,7 @@ fn html_parse_pi(ctxt: &mut HtmlParserCtxt) {
             }
             let mut buf = String::new();
             cur = ctxt.current_byte() as _;
-            if !xml_is_blank_char(cur as u32) {
+            if !(cur as u32).is_xml_blank_char() {
                 html_parse_err(
                     Some(ctxt),
                     XmlParserErrors::XmlErrSpaceRequired,
@@ -2277,7 +2274,7 @@ fn html_parse_pi(ctxt: &mut HtmlParserCtxt) {
             html_skip_blank_chars(ctxt);
             cur = html_current_char(ctxt, &mut l);
             while cur != 0 && cur != b'>' as i32 {
-                if xml_is_char(cur as u32) {
+                if (cur as u32).is_xml_char() {
                     buf.push(char::from_u32(cur as u32).unwrap());
                 } else {
                     html_parse_err_int!(
@@ -2488,7 +2485,7 @@ fn html_parse_reference(ctxt: &mut HtmlParserCtxt) {
 /// Returns 1 if ignorable 0 otherwise.
 #[doc(alias = "areBlanks")]
 fn are_blanks(ctxt: &mut HtmlParserCtxt, s: &str) -> i32 {
-    if s.chars().any(|c| !xml_is_blank_char(c as u32)) {
+    if s.chars().any(|c| !c.is_xml_blank_char()) {
         return 0;
     }
 
@@ -2584,7 +2581,7 @@ fn html_parse_char_data_internal(ctxt: &mut HtmlParserCtxt, readahead: i32) {
         && (cur != b'&' as i32 || ctxt.token == b'&' as i32)
         && cur != 0
     {
-        if !xml_is_char(cur as u32) {
+        if !(cur as u32).is_xml_char() {
             html_parse_err_int!(
                 ctxt,
                 XmlParserErrors::XmlErrInvalidChar,
@@ -3638,7 +3635,7 @@ fn html_parse_try_or_finish(ctxt: &mut HtmlParserCtxt, terminate: i32) -> i32 {
             XmlParserInputState::XmlParserStart => {
                 // Very first chars read from the document flow.
                 let cur = ctxt.current_byte();
-                if xml_is_blank_char(cur as u32) {
+                if cur.is_xml_blank_char() {
                     html_skip_blank_chars(ctxt);
                     avail = ctxt.input().unwrap().remainder_len();
                 }
@@ -3749,7 +3746,7 @@ fn html_parse_try_or_finish(ctxt: &mut HtmlParserCtxt, terminate: i32) -> i32 {
                     // goto done;
                     break 'done;
                 }
-                if xml_is_blank_char(ctxt.current_byte() as u32) {
+                if ctxt.current_byte().is_xml_blank_char() {
                     html_parse_char_data(ctxt);
                     // goto done;
                     break 'done;
@@ -3916,7 +3913,7 @@ fn html_parse_try_or_finish(ctxt: &mut HtmlParserCtxt, terminate: i32) -> i32 {
                         if let Some(sax) = ctxt.sax.as_deref_mut() {
                             chr[0] = cur;
                             let s = from_utf8(&chr[..1]).expect("Internal Error");
-                            if xml_is_blank_char(cur as u32) {
+                            if cur.is_xml_blank_char() {
                                 if ctxt.keep_blanks {
                                     if let Some(characters) = sax.characters {
                                         characters(ctxt, s);

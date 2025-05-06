@@ -26,12 +26,10 @@
 
 use std::{os::raw::c_void, ptr::null_mut, rc::Rc};
 
+use crate::libxml::chvalid::XmlCharValid;
 use crate::parser::xml_is_letter;
 use crate::tree::{NodeCommon, XmlAttrPtr};
-use crate::{
-    libxml::chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
-    tree::{XML_XML_NAMESPACE, XmlElementType, XmlGenericNodePtr, XmlNodePtr},
-};
+use crate::tree::{XML_XML_NAMESPACE, XmlElementType, XmlGenericNodePtr, XmlNodePtr};
 
 const XML_STREAM_STEP_DESC: usize = 1;
 const XML_STREAM_STEP_FINAL: usize = 2;
@@ -785,7 +783,7 @@ impl XmlPatParserContext {
 
     fn skip_blanks(&mut self) {
         let pat = self.current_str();
-        let trimmed = pat.trim_start_matches(|c: char| xml_is_blank_char(c as u32));
+        let trimmed = pat.trim_start_matches(|c: char| c.is_xml_blank_char());
         let diff = pat.len() - trimmed.len();
         self.cur += diff;
     }
@@ -830,10 +828,7 @@ impl XmlPatParserContext {
             self.next();
             self.skip_blanks();
             if self.current_byte() == Some(b'/') {
-                if self
-                    .peek_prev(1)
-                    .is_some_and(|c| xml_is_blank_char(c as u32))
-                {
+                if self.peek_prev(1).is_some_and(|c| c.is_xml_blank_char()) {
                     // Disallow "./ /"
                     self.error = 1;
                     return;
@@ -1026,10 +1021,7 @@ impl XmlPatParserContext {
             }
             return;
         };
-        if self
-            .current_byte()
-            .is_some_and(|b| xml_is_blank_char(b as u32))
-        {
+        if self.current_byte().is_some_and(|b| b.is_xml_blank_char()) {
             has_blanks = 1;
             self.skip_blanks();
         }
@@ -1038,11 +1030,7 @@ impl XmlPatParserContext {
             if self.current_byte() != Some(b':') {
                 let prefix = name;
 
-                if has_blanks != 0
-                    || self
-                        .current_byte()
-                        .is_some_and(|b| xml_is_blank_char(b as u32))
-                {
+                if has_blanks != 0 || self.current_byte().is_some_and(|b| b.is_xml_blank_char()) {
                     self.error = 1;
                     return;
                 }
@@ -1089,10 +1077,7 @@ impl XmlPatParserContext {
                         let prefix = name;
 
                         self.next();
-                        if self
-                            .current_byte()
-                            .is_some_and(|b| xml_is_blank_char(b as u32))
-                        {
+                        if self.current_byte().is_some_and(|b| b.is_xml_blank_char()) {
                             self.error = 1;
                             return;
                         }
@@ -1163,10 +1148,7 @@ impl XmlPatParserContext {
 
             self.next();
 
-            if self
-                .current_byte()
-                .is_some_and(|b| xml_is_blank_char(b as u32))
-            {
+            if self.current_byte().is_some_and(|b| b.is_xml_blank_char()) {
                 self.error = 1;
                 return;
             }
@@ -1221,12 +1203,12 @@ impl XmlPatParserContext {
         }
         let trimmed = cur.trim_start_matches(|c: char| {
             xml_is_letter(c as u32)
-                || xml_is_digit(c as u32)
+                || c.is_xml_digit()
                 || c == '.'
                 || c == '-'
                 || c == '_'
-                || xml_is_combining(c as u32)
-                || xml_is_extender(c as u32)
+                || c.is_xml_combining()
+                || c.is_xml_extender()
         });
         let diff = cur.len() - trimmed.len();
         let ret = cur[..diff].to_owned();
@@ -1247,12 +1229,12 @@ impl XmlPatParserContext {
         }
         let trimmed = cur.trim_start_matches(|c: char| {
             xml_is_letter(c as u32)
-                || xml_is_digit(c as u32)
+                || c.is_xml_digit()
                 || c == '.'
                 || c == '-'
                 || c == '_'
-                || xml_is_combining(c as u32)
-                || xml_is_extender(c as u32)
+                || c.is_xml_combining()
+                || c.is_xml_extender()
         });
         let diff = cur.len() - trimmed.len();
         let ret = cur[..diff].to_owned();

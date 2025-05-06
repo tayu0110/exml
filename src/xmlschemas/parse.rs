@@ -9,7 +9,7 @@ use crate::{
     dict::xml_dict_lookup,
     error::XmlParserErrors,
     libxml::{
-        chvalid::xml_is_blank_char,
+        chvalid::XmlCharValid,
         globals::{xml_free, xml_malloc},
         schemas_internals::{
             XML_SCHEMAS_ANY_LAX, XML_SCHEMAS_ANY_SKIP, XML_SCHEMAS_ANY_STRICT,
@@ -5353,8 +5353,8 @@ impl XmlSchemaParserCtxt<'_> {
                 (*typ).base = xml_dict_lookup(self.dict, cur.as_ptr(), cur.len() as i32);
                 let mut cur = cur.as_str();
                 while !cur.is_empty() {
-                    cur = cur.trim_start_matches(|c| xml_is_blank_char(c as u32));
-                    let end = cur.trim_start_matches(|c| !xml_is_blank_char(c as u32));
+                    cur = cur.trim_start_matches(|c: char| c.is_xml_blank_char());
+                    let end = cur.trim_start_matches(|c: char| !c.is_xml_blank_char());
                     if end.len() == cur.len() {
                         break;
                     }
@@ -5812,8 +5812,8 @@ impl XmlSchemaParserCtxt<'_> {
                 } else {
                     let mut cur = ns.as_str();
                     while !cur.is_empty() {
-                        cur = cur.trim_start_matches(|c| xml_is_blank_char(c as u32));
-                        let end = cur.trim_start_matches(|c| !xml_is_blank_char(c as u32));
+                        cur = cur.trim_start_matches(|c: char| c.is_xml_blank_char());
+                        let end = cur.trim_start_matches(|c: char| !c.is_xml_blank_char());
                         if end.len() == cur.len() {
                             break;
                         }

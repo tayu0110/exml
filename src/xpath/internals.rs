@@ -33,7 +33,7 @@ use crate::xpointer::XmlLocationSet;
 use crate::{
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     generic_error,
-    libxml::chvalid::xml_is_blank_char,
+    libxml::chvalid::XmlCharValid,
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlAttrPtr, XmlDocPtr, XmlDtdPtr, XmlElementType,
         XmlGenericNodePtr, XmlNodePtr, XmlNs, XmlNsPtr,
@@ -759,7 +759,7 @@ pub fn xml_xpath_string_eval_number(s: Option<&str>) -> f64 {
     let mut ok = false;
     let mut isneg = false;
     let mut exponent = 0;
-    let mut cur = s.trim_matches(|c: char| xml_is_blank_char(c as u32));
+    let mut cur = s.trim_matches(|c: char| c.is_xml_blank_char());
     if let Some(rem) = cur.strip_prefix('-') {
         isneg = true;
         cur = rem;
@@ -2562,7 +2562,7 @@ pub(super) fn xml_xpath_get_elements_by_ids(
     let mut ret = xml_xpath_node_set_create(None)?;
 
     for id in ids
-        .split(|c: char| xml_is_blank_char(c as u32))
+        .split(|c: char| c.is_xml_blank_char())
         .filter(|s| !s.is_empty())
     {
         // We used to check the fact that the value passed

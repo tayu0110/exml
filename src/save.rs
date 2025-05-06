@@ -33,7 +33,7 @@ use crate::{
     error::{__xml_simple_error, __xml_simple_oom_error, XmlErrorDomain, XmlParserErrors},
     globals::{GLOBAL_STATE, get_indent_tree_output},
     io::{XmlOutputBuffer, write_quoted},
-    libxml::chvalid::xml_is_char,
+    libxml::chvalid::XmlCharValid,
     parser::{XML_STRING_TEXT_NOENC, xml_init_parser},
     tree::{
         NodeCommon, XML_LOCAL_NAMESPACE, XmlAttrPtr, XmlAttributePtr, XmlDocPtr, XmlDtdPtr,
@@ -1654,7 +1654,7 @@ pub(crate) fn attr_serialize_text_content<'a>(
                 continue;
             }
             let val = cur.chars().next().unwrap();
-            if val.len_utf8() == 1 || !xml_is_char(val as u32) {
+            if val.len_utf8() == 1 || !val.is_xml_char() {
                 xml_save_err(
                     XmlParserErrors::XmlSaveCharInvalid as _,
                     attr.map(|attr| attr.into()),

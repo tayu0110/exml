@@ -2,10 +2,11 @@ use std::str::from_utf8_unchecked;
 
 use crate::{
     error::XmlParserErrors,
+    libxml::chvalid::XmlCharValid,
     parser::{
         XML_MAX_HUGE_LENGTH, XML_MAX_TEXT_LENGTH, XmlParserCtxt, XmlParserInputState,
         XmlParserOption, xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_int,
-        xml_fatal_err_msg_str, xml_is_char,
+        xml_fatal_err_msg_str,
     },
 };
 
@@ -43,7 +44,7 @@ impl XmlParserCtxt<'_> {
         let Some(mut q) = self.current_char() else {
             not_terminated!();
         };
-        if !xml_is_char(q as u32) {
+        if !q.is_xml_char() {
             xml_fatal_err_msg_int!(
                 self,
                 XmlParserErrors::XmlErrInvalidChar,
@@ -56,7 +57,7 @@ impl XmlParserCtxt<'_> {
         let Some(mut r) = self.current_char() else {
             not_terminated!();
         };
-        if !xml_is_char(r as u32) {
+        if !r.is_xml_char() {
             xml_fatal_err_msg_int!(
                 self,
                 XmlParserErrors::XmlErrInvalidChar,
@@ -71,7 +72,7 @@ impl XmlParserCtxt<'_> {
             not_terminated!();
         };
         while let Some(nc) =
-            cur.filter(|&cur| xml_is_char(cur as u32) && (cur != '>' || r != '-' || q != '-'))
+            cur.filter(|&cur| cur.is_xml_char() && (cur != '>' || r != '-' || q != '-'))
         {
             if r == '-' && q == '-' {
                 xml_fatal_err(self, XmlParserErrors::XmlErrHyphenInComment, None);
@@ -96,7 +97,7 @@ impl XmlParserCtxt<'_> {
             return;
         }
         if let Some(cur) = cur {
-            if !xml_is_char(cur as u32) {
+            if !cur.is_xml_char() {
                 xml_fatal_err_msg_int!(
                     self,
                     XmlParserErrors::XmlErrInvalidChar,

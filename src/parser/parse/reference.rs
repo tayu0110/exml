@@ -3,12 +3,12 @@ use std::{borrow::Cow, str::from_utf8_unchecked};
 use crate::{
     encoding::XmlCharEncoding,
     error::XmlParserErrors,
-    libxml::sax2::xml_sax2_get_entity,
+    libxml::{chvalid::XmlCharValid, sax2::xml_sax2_get_entity},
     parser::{
         XmlParserCtxt, XmlParserInputState, XmlParserMode, XmlParserOption,
         parse_external_entity_private, xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg,
-        xml_fatal_err_msg_int, xml_fatal_err_msg_str, xml_is_char,
-        xml_parse_balanced_chunk_memory_internal, xml_warning_msg,
+        xml_fatal_err_msg_int, xml_fatal_err_msg_str, xml_parse_balanced_chunk_memory_internal,
+        xml_warning_msg,
     },
     tree::{
         NodeCommon, XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
@@ -117,7 +117,7 @@ impl XmlParserCtxt<'_> {
                 "xmlParseCharRef: character reference out of bounds\n",
                 val as i32
             );
-        } else if xml_is_char(val) {
+        } else if val.is_xml_char() {
             return char::from_u32(val);
         } else {
             xml_fatal_err_msg_int!(
@@ -184,7 +184,7 @@ impl XmlParserCtxt<'_> {
                 "xmlParseStringCharRef: character reference out of bounds\n",
                 val as i32
             );
-        } else if xml_is_char(val) {
+        } else if val.is_xml_char() {
             return (Some(char::from_u32(val).expect("Internal Error")), ptr);
         } else {
             xml_fatal_err_msg_int!(

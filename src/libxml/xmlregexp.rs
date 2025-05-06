@@ -48,7 +48,7 @@ use crate::{
     parser::xml_is_letter,
 };
 
-use super::chvalid::{xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender};
+use super::chvalid::XmlCharValid;
 
 macro_rules! CUR {
     ( $ctxt:expr ) => {
@@ -310,7 +310,7 @@ impl XmlRegAtom {
     fn check_character(&self, codepoint: i32) -> i32 {
         let mut ret: i32;
 
-        if !xml_is_char(codepoint as u32) {
+        if !(codepoint as u32).is_xml_char() {
             return -1;
         }
 
@@ -3609,23 +3609,23 @@ fn xml_reg_check_character_range(
         XmlRegAtomType::XmlRegexpNotNameChar => {
             neg = (neg == 0) as i32;
             xml_is_letter(codepoint as u32)
-                || xml_is_digit(codepoint as u32)
+                || (codepoint as u32).is_xml_digit()
                 || codepoint == '.' as i32
                 || codepoint == '-' as i32
                 || codepoint == '_' as i32
                 || codepoint == ':' as i32
-                || xml_is_combining(codepoint as u32)
-                || xml_is_extender(codepoint as u32)
+                || (codepoint as u32).is_xml_combining()
+                || (codepoint as u32).is_xml_extender()
         }
         XmlRegAtomType::XmlRegexpNameChar => {
             xml_is_letter(codepoint as u32)
-                || xml_is_digit(codepoint as u32)
+                || (codepoint as u32).is_xml_digit()
                 || codepoint == '.' as i32
                 || codepoint == '-' as i32
                 || codepoint == '_' as i32
                 || codepoint == ':' as i32
-                || xml_is_combining(codepoint as u32)
-                || xml_is_extender(codepoint as u32)
+                || (codepoint as u32).is_xml_combining()
+                || (codepoint as u32).is_xml_extender()
         }
         XmlRegAtomType::XmlRegexpNotDecimal => {
             neg = (neg == 0) as i32;

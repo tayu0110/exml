@@ -1,6 +1,6 @@
 use crate::{
     error::XmlParserErrors,
-    libxml::chvalid::{xml_is_char, xml_is_pubid_char},
+    libxml::chvalid::XmlCharValid,
     parser::{
         XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH, XmlParserCtxt, XmlParserInputState,
         XmlParserOption, xml_fatal_err, xml_fatal_err_msg,
@@ -34,7 +34,7 @@ impl XmlParserCtxt<'_> {
         let mut buf = String::new();
         self.instate = XmlParserInputState::XmlParserSystemLiteral;
         let mut cur = self.current_char();
-        while let Some(nc) = cur.filter(|&cur| xml_is_char(cur as u32) && cur != stop as char) {
+        while let Some(nc) = cur.filter(|&cur| cur.is_xml_char() && cur != stop as char) {
             buf.push(nc);
             if buf.len() > max_length {
                 xml_fatal_err(
@@ -52,7 +52,7 @@ impl XmlParserCtxt<'_> {
             return None;
         }
         self.instate = state;
-        if cur.is_none_or(|cur| !xml_is_char(cur as u32)) {
+        if cur.is_none_or(|cur| !cur.is_xml_char()) {
             xml_fatal_err(self, XmlParserErrors::XmlErrLiteralNotFinished, None);
         } else {
             self.skip_char();
@@ -87,7 +87,7 @@ impl XmlParserCtxt<'_> {
         let mut buf = String::new();
         self.instate = XmlParserInputState::XmlParserPublicLiteral;
         let mut cur = self.current_byte();
-        while xml_is_pubid_char(cur as u32) && cur != stop {
+        while cur.is_xml_pubid_char() && cur != stop {
             // Since PubidChar is a subset of ASCII,
             // there is no problem with casting to `char`.
             buf.push(cur as char);

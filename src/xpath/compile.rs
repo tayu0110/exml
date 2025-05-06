@@ -1,9 +1,7 @@
 use std::rc::Rc;
 
 use crate::{
-    libxml::chvalid::{
-        xml_is_blank_char, xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender,
-    },
+    libxml::chvalid::XmlCharValid,
     parser::{XML_MAX_NAME_LENGTH, xml_is_letter},
     xpath::{
         XML_XPATH_CHECKNS, XPATH_MAX_RECURSION_DEPTH, XmlXPathAxisVal, XmlXPathError, XmlXPathOp,
@@ -488,10 +486,7 @@ impl XmlXPathParserContext<'_> {
                             // element name
                             lc = 1;
                             break;
-                        } else if self
-                            .nth_byte(len)
-                            .is_some_and(|c| xml_is_blank_char(c as u32))
-                        {
+                        } else if self.nth_byte(len).is_some_and(|c| c.is_xml_blank_char()) {
                             // ignore blanks
                         } else if self.nth_byte(len) == Some(b':') {
                             lc = 1;
@@ -923,9 +918,7 @@ impl XmlXPathParserContext<'_> {
             return None;
         };
 
-        let blanks: i32 = self
-            .current_char()
-            .is_some_and(|c| xml_is_blank_char(c as u32)) as i32;
+        let blanks: i32 = self.current_char().is_some_and(|c| c.is_xml_blank_char()) as i32;
         self.skip_blanks();
         if self.current_char() == Some('(') {
             self.next_char();
@@ -1174,11 +1167,11 @@ impl XmlXPathParserContext<'_> {
             let q = self.cur;
             while self
                 .current_char()
-                .is_some_and(|c| xml_is_char(c as u32) && c != '"')
+                .is_some_and(|c| c.is_xml_char() && c != '"')
             {
                 self.next_char();
             }
-            if self.current_char().is_none_or(|c| !xml_is_char(c as u32)) {
+            if self.current_char().is_none_or(|c| !c.is_xml_char()) {
                 xml_xpath_err(
                     Some(self),
                     XmlXPathError::XPathUnfinishedLiteralError as i32,
@@ -1193,11 +1186,11 @@ impl XmlXPathParserContext<'_> {
             let q = self.cur;
             while self
                 .current_char()
-                .is_some_and(|c| xml_is_char(c as u32) && c != '\'')
+                .is_some_and(|c| c.is_xml_char() && c != '\'')
             {
                 self.next_char();
             }
-            if self.current_char().is_none_or(|c| !xml_is_char(c as u32)) {
+            if self.current_char().is_none_or(|c| !c.is_xml_char()) {
                 xml_xpath_err(
                     Some(self),
                     XmlXPathError::XPathUnfinishedLiteralError as i32,
@@ -1432,13 +1425,13 @@ impl XmlXPathParserContext<'_> {
                 || c == '>'
                 || c == '/'
                 || (!xml_is_letter(c as u32)
-                    && !xml_is_digit(c as u32)
+                    && !c.is_xml_digit()
                     && c != '.'
                     && c != '-'
                     && c != '_'
                     && c != ':'
-                    && !xml_is_combining(c as u32)
-                    && !xml_is_extender(c as u32))
+                    && !c.is_xml_combining()
+                    && !c.is_xml_extender())
         })
         .map(|pair| pair.0)
         .or(Some(expr))
@@ -1499,13 +1492,13 @@ impl XmlXPathParserContext<'_> {
             && c != '>'
             && c != '/'
             && (xml_is_letter(c as u32)
-                || xml_is_digit(c as u32)
+                || c.is_xml_digit()
                 || c == '.'
                 || c == '-'
                 || c == '_'
                 || (qualified && c == ':')
-                || xml_is_combining(c as u32)
-                || xml_is_extender(c as u32))
+                || c.is_xml_combining()
+                || c.is_xml_extender())
         {
             buf.push(c);
             self.next_char();
@@ -1593,7 +1586,7 @@ impl XmlXPathParserContext<'_> {
             xml_xpath_err(Some(self), XmlXPathError::XPathStartLiteralError as i32);
             return None;
         };
-        let Some((lit, _)) = expr.split_once(|c: char| !xml_is_char(c as u32) || c == sep) else {
+        let Some((lit, _)) = expr.split_once(|c: char| !c.is_xml_char() || c == sep) else {
             xml_xpath_err(
                 Some(self),
                 XmlXPathError::XPathUnfinishedLiteralError as i32,

@@ -10,7 +10,7 @@ use std::{borrow::Cow, cell::RefCell, collections::HashMap, ptr::null_mut, rc::R
 use crate::{
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     hash::{XmlHashTable, XmlHashTableRef},
-    libxml::{chvalid::xml_is_blank_char, xmlregexp::XmlRegExecCtxt},
+    libxml::{chvalid::XmlCharValid, xmlregexp::XmlRegExecCtxt},
     list::XmlList,
     parser::build_qname,
     tree::{
@@ -925,7 +925,7 @@ impl XmlParserCtxt<'_> {
                     XmlElementTypeVal::XmlElementTypeAny => {}
                     XmlElementTypeVal::XmlElementTypeMixed => {}
                     XmlElementTypeVal::XmlElementTypeElement => {
-                        if data.contains(|c: char| !xml_is_blank_char(c as u32)) {
+                        if data.contains(|c: char| !c.is_xml_blank_char()) {
                             let name = state.node.name().unwrap().into_owned();
                             let node = state.node.into();
                             xml_err_valid_node(
@@ -1468,8 +1468,6 @@ impl XmlParserCtxt<'_> {
     #[doc(alias = "xmlValidateOneElement")]
     #[cfg(feature = "libxml_valid")]
     pub fn validate_one_element(&mut self, doc: XmlDocPtr, elem: Option<XmlGenericNodePtr>) -> i32 {
-        use crate::libxml::chvalid::xml_is_blank_char;
-
         let mut ret: i32 = 1;
         let tmp: i32;
         let mut extsubset: i32 = 0;
@@ -1808,8 +1806,8 @@ impl XmlParserCtxt<'_> {
                             if matches!(cur_node.element_type(), XmlElementType::XmlTextNode) {
                                 let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
                                 let mut content = cur_node.content.as_deref().unwrap();
-                                content = content
-                                    .trim_start_matches(|c: char| xml_is_blank_char(c as u32));
+                                content =
+                                    content.trim_start_matches(|c: char| c.is_xml_blank_char());
                                 if content.is_empty() {
                                     let name = elem.name().unwrap();
                                     xml_err_valid_node(
@@ -2471,7 +2469,7 @@ impl XmlParserCtxt<'_> {
             }
             XmlAttributeType::XmlAttributeEntities => {
                 for nam in value
-                    .split(|c: char| xml_is_blank_char(c as u32))
+                    .split(|c: char| c.is_xml_blank_char())
                     .filter(|nam| !nam.is_empty())
                 {
                     if let Some(ent) = xml_get_doc_entity(Some(doc), nam) {
