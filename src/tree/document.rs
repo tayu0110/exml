@@ -75,7 +75,7 @@ pub struct XmlDoc {
     // Hash table for ID attributes if any
     pub(crate) ids: HashMap<String, XmlID>,
     // Hash table for IDREFs attributes if any
-    pub(crate) refs: Option<HashMap<String, XmlList<Box<XmlRef>>>>,
+    pub(crate) refs: HashMap<String, XmlList<Box<XmlRef>>>,
     // The URI for that document
     pub(crate) url: Option<String>,
     // Internal flag for charset handling, actually an xmlCharEncoding
@@ -352,7 +352,7 @@ impl Default for XmlDoc {
             version: None,
             encoding: None,
             ids: HashMap::new(),
-            refs: None,
+            refs: HashMap::new(),
             url: None,
             charset: XmlCharEncoding::None,
             psvi: null_mut(),
@@ -783,7 +783,6 @@ pub unsafe fn xml_free_doc(mut cur: XmlDocPtr) {
         }
 
         // Do this before freeing the children list to avoid ID lookups
-        cur.refs.take();
         let mut ext_subset = cur.ext_subset.take();
         let int_subset = cur.int_subset.take();
         if int_subset == ext_subset {

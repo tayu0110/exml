@@ -21,11 +21,7 @@
 #[cfg(feature = "libxml_output")]
 use std::io::Write;
 use std::{
-    borrow::Cow,
-    cell::RefCell,
-    collections::{HashMap, hash_map::Entry},
-    os::raw::c_void,
-    ptr::null_mut,
+    borrow::Cow, cell::RefCell, collections::hash_map::Entry, os::raw::c_void, ptr::null_mut,
     rc::Rc,
 };
 
@@ -2009,8 +2005,6 @@ pub(crate) fn xml_add_ref(
     value: &str,
     attr: XmlAttrPtr,
 ) -> Option<()> {
-    // Create the Ref table if needed.
-    let table = doc.refs.get_or_insert_with(HashMap::new);
     let mut ret = XmlRef {
         value: value.to_owned(),
         ..Default::default()
@@ -2025,7 +2019,8 @@ pub(crate) fn xml_add_ref(
     // Add the owning node to the NodeList
     // Return the ref
 
-    let ref_list = table
+    let ref_list = doc
+        .refs
         .entry(value.to_owned())
         .or_insert_with(|| XmlList::new(None, Rc::new(|_, _| std::cmp::Ordering::Equal)));
     ref_list.insert_upper_bound(Box::new(ret));
@@ -2742,7 +2737,7 @@ pub fn xml_validate_dtd(ctxt: &mut XmlValidCtxt, mut doc: XmlDocPtr, dtd: XmlDtd
         return ret;
     }
     doc.ids.clear();
-    doc.refs.take();
+    doc.refs.clear();
     let root = doc.get_root_element();
     ret = xml_validate_element(ctxt, doc, root.map(|root| root.into()));
     ret &= xml_validate_document_final(ctxt, doc);
@@ -3116,7 +3111,7 @@ pub fn xml_validate_document(ctxt: &mut XmlValidCtxt, mut doc: XmlDocPtr) -> i32
     }
 
     doc.ids.clear();
-    doc.refs.take();
+    doc.refs.clear();
     ret = xml_validate_dtd_final(ctxt, doc);
     if xml_validate_root(Some(ctxt), doc) == 0 {
         return 0;
@@ -4885,13 +4880,11 @@ pub fn xml_validate_document_final(ctxt: &mut XmlValidCtxt, doc: XmlDocPtr) -> i
     // Check all the IDREF/IDREFS attributes definition for validity
     ctxt.doc = Some(doc);
     ctxt.valid = 1;
-    if let Some(table) = doc.refs.as_ref() {
-        for (name, ref_list) in table.iter() {
-            ref_list.walk(|data| {
-                xml_validate_ref(data.as_ref(), ctxt, name.as_str());
-                true
-            });
-        }
+    for (name, ref_list) in doc.refs.iter() {
+        ref_list.walk(|data| {
+            xml_validate_ref(data.as_ref(), ctxt, name.as_str());
+            true
+        });
     }
 
     ctxt.flags = save;

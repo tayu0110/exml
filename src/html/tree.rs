@@ -83,7 +83,6 @@ pub fn html_new_doc_no_dtd(uri: Option<&str>, external_id: Option<&str>) -> Opti
         old_ns: None,
         encoding: None,
         standalone: 1,
-        refs: None,
         _private: null_mut(),
         charset: XmlCharEncoding::UTF8,
         properties: XmlDocProperties::XmlDocHTML as i32 | XmlDocProperties::XmlDocUserbuilt as i32,

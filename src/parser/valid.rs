@@ -5,13 +5,7 @@
 //! As a workaround, I decided to implement it as a method of `XmlParserCtxt`
 //! so that `XmlValidCtxt` does not own a pointer to the parent.
 
-use std::{
-    borrow::Cow,
-    cell::RefCell,
-    collections::{HashMap, hash_map::Entry},
-    ptr::null_mut,
-    rc::Rc,
-};
+use std::{borrow::Cow, cell::RefCell, collections::hash_map::Entry, ptr::null_mut, rc::Rc};
 
 use crate::{
     chvalid::XmlCharValid,
@@ -66,7 +60,6 @@ impl XmlParserCtxt<'_> {
         }
         ret.lineno = attr.parent.map_or(-1, |p| p.get_line_no() as i32);
 
-        // Create the ID table if needed.
         let entry = doc.ids.entry(value.to_owned());
         match entry {
             Entry::Occupied(_) => {
@@ -105,8 +98,6 @@ impl XmlParserCtxt<'_> {
         value: &str,
         attr: XmlAttrPtr,
     ) -> Option<()> {
-        // Create the Ref table if needed.
-        let table = doc.refs.get_or_insert_with(HashMap::new);
         let mut ret = XmlRef {
             value: value.to_owned(),
             ..Default::default()
@@ -128,7 +119,8 @@ impl XmlParserCtxt<'_> {
         // Add the owning node to the NodeList
         // Return the ref
 
-        let ref_list = table
+        let ref_list = doc
+            .refs
             .entry(value.to_owned())
             .or_insert_with(|| XmlList::new(None, Rc::new(|_, _| std::cmp::Ordering::Equal)));
         ref_list.insert_upper_bound(Box::new(ret));
