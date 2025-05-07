@@ -1,5 +1,6 @@
+use std::collections::HashSet;
+
 use crate::{
-    hash::XmlHashTable,
     tree::{
         NodeCommon, XmlElementType, XmlGenericNodePtr, XmlNodePtr, XmlNsPtr, xml_free_node_list,
     },
@@ -18,8 +19,7 @@ use super::{
 // with more than 10 millions nodes.
 const XPATH_MAX_NODESET_LENGTH: usize = 10000000;
 
-// A node-set (an unordered collection of nodes without duplicates).
-pub type XmlNodeSetPtr = *mut XmlNodeSet;
+/// A node-set (an unordered collection of nodes without duplicates).
 #[repr(C)]
 #[derive(Clone, PartialEq, Default)]
 pub struct XmlNodeSet {
@@ -416,19 +416,13 @@ pub fn xml_xpath_distinct_sorted(nodes: Option<&XmlNodeSet>) -> Option<Box<XmlNo
     }
 
     let l = nodes.len();
-    let mut hash = XmlHashTable::with_capacity(l);
+    let mut hash = HashSet::new();
     for i in 0..l {
         let cur = nodes.get(i).unwrap();
         let strval = xml_xpath_cast_node_to_string(Some(cur));
-        if hash.lookup(&strval).is_none() {
-            if hash.add_entry(&strval, ()).is_err() {
-                xml_xpath_free_node_set(Some(ret));
-                return None;
-            }
-            if ret.as_mut().add_unique(cur) < 0 {
-                xml_xpath_free_node_set(Some(ret));
-                return None;
-            }
+        if hash.insert(strval) && ret.as_mut().add_unique(cur) < 0 {
+            xml_xpath_free_node_set(Some(ret));
+            return None;
         }
     }
     Some(ret)
