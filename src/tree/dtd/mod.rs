@@ -26,6 +26,7 @@ mod notation;
 use std::{
     any::type_name,
     borrow::Cow,
+    collections::HashMap,
     ops::{Deref, DerefMut},
     os::raw::c_void,
     ptr::{NonNull, null_mut},
@@ -61,7 +62,7 @@ pub struct XmlDtd {
     pub(crate) doc: Option<XmlDocPtr>,              /* the containing document */
 
     // End of common part
-    pub(crate) notations: Option<Box<XmlHashTable<'static, XmlNotation>>>, /* Hash table for notations if any */
+    pub(crate) notations: HashMap<String, XmlNotation>, /* Hash table for notations if any */
     pub(crate) elements: Option<XmlHashTable<'static, XmlElementPtr>>, /* Hash table for elements if any */
     pub(crate) attributes: Option<XmlHashTableRef<'static, XmlAttributePtr>>, /* Hash table for attributes if any */
     pub(crate) entities: Option<XmlHashTableRef<'static, XmlEntityPtr>>, /* Hash table for entities if any */
@@ -143,7 +144,7 @@ impl Default for XmlDtd {
             next: None,
             prev: None,
             doc: None,
-            notations: None,
+            notations: HashMap::new(),
             elements: None,
             attributes: None,
             entities: None,

@@ -1578,7 +1578,7 @@ pub fn xml_sax2_start_element(
         if ctxt.validate
             && my_doc.ext_subset.is_none()
             && my_doc.int_subset.is_none_or(|int_subset| {
-                int_subset.notations.is_none()
+                int_subset.notations.is_empty()
                     && int_subset.elements.is_none()
                     && int_subset.attributes.is_none()
                     && int_subset.entities.is_none()
@@ -1747,7 +1747,7 @@ pub fn xml_sax2_start_element_ns(
         if ctxt.validate
             && my_doc.ext_subset.is_none()
             && my_doc.int_subset.is_none_or(|int_subset| {
-                int_subset.notations.is_none()
+                int_subset.notations.is_empty()
                     && int_subset.elements.is_none()
                     && int_subset.attributes.is_none()
                     && int_subset.entities.is_none()

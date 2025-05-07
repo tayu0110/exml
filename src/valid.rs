@@ -18,12 +18,12 @@
 //
 // daniel@veillard.com
 
-#[cfg(feature = "libxml_output")]
-use std::io::Write;
 use std::{
     borrow::Cow, cell::RefCell, collections::hash_map::Entry, os::raw::c_void, ptr::null_mut,
     rc::Rc,
 };
+#[cfg(feature = "libxml_output")]
+use std::{collections::HashMap, io::Write};
 
 #[cfg(feature = "libxml_regexp")]
 use crate::libxml::{xmlautomata::XmlAutomata, xmlregexp::XmlRegExecCtxt};
@@ -828,39 +828,26 @@ pub fn xml_add_notation_decl<'a>(
         return None;
     }
 
-    // Create the Notation table if needed.
-    let table = dtd?
-        .notations
-        .get_or_insert_with(|| Box::new(XmlHashTable::with_capacity(0)));
-
+    let dtd = dtd?;
     let ret = XmlNotation::new(name, public_id, system_id);
 
     // Validity Check:
     // Check the DTD for previous declarations of the ATTLIST
-    if table.add_entry(name, ret).is_err() {
-        #[cfg(feature = "libxml_valid")]
-        {
-            xml_err_valid!(
-                None::<&mut XmlValidCtxt>,
-                XmlParserErrors::XmlDTDNotationRedefined,
-                "xmlAddNotationDecl: {} already defined\n",
-                name
-            );
+    match dtd.notations.entry(name.to_owned()) {
+        Entry::Occupied(_) => {
+            #[cfg(feature = "libxml_valid")]
+            {
+                xml_err_valid!(
+                    None::<&mut XmlValidCtxt>,
+                    XmlParserErrors::XmlDTDNotationRedefined,
+                    "xmlAddNotationDecl: {} already defined\n",
+                    name
+                );
+            }
+            None
         }
-        return None;
+        Entry::Vacant(entry) => Some(entry.insert(ret)),
     }
-    table.lookup(name)
-}
-
-/// Build a copy of a notation table.
-///
-/// Returns the new xmlNotationTablePtr or null_mut() in case of error.
-#[doc(alias = "xmlCopyNotationTable")]
-#[cfg(feature = "libxml_tree")]
-pub fn xml_copy_notation_table<'a>(
-    table: &XmlHashTable<'a, XmlNotation>,
-) -> XmlHashTable<'a, XmlNotation> {
-    table.clone_with(|data, _| data.clone())
 }
 
 /// This will dump the content of the notation table as an XML DTD definition
@@ -868,13 +855,13 @@ pub fn xml_copy_notation_table<'a>(
 #[cfg(feature = "libxml_output")]
 pub fn xml_dump_notation_table<'a>(
     out: &mut (impl Write + 'a),
-    table: &XmlHashTable<'_, XmlNotation>,
+    table: &HashMap<String, XmlNotation>,
 ) {
     use crate::tree::xml_dump_notation_decl;
 
-    table.scan(|notation, _, _, _| {
+    for notation in table.values() {
         xml_dump_notation_decl(out, notation);
-    });
+    }
 }
 
 /// Allocate an element content structure.
@@ -4962,8 +4949,7 @@ pub fn xml_get_dtd_notation_desc<'a>(
     dtd: Option<&'a XmlDtd>,
     name: &str,
 ) -> Option<&'a XmlNotation> {
-    dtd.and_then(|dtd| dtd.notations.as_deref())
-        .and_then(|notations| notations.lookup(name))
+    dtd.and_then(|dtd| dtd.notations.get(name))
 }
 
 /// Search the DTD for the description of this element

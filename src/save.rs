@@ -21,6 +21,7 @@
 use std::{
     borrow::Cow,
     cell::RefCell,
+    collections::HashMap,
     io::Write,
     os::raw::c_void,
     ptr::{fn_addr_eq, null_mut},
@@ -49,8 +50,6 @@ use crate::{
     },
     tree::{XmlNode, is_xhtml},
 };
-
-use super::hash::XmlHashTable;
 
 const MAX_INDENT: usize = 60;
 
@@ -651,7 +650,7 @@ fn xml_ns_dump_output(
 #[doc(alias = "xmlBufDumpNotationTable")]
 unsafe fn xml_buf_dump_notation_table<'a>(
     buf: &mut (impl Write + 'a),
-    table: &XmlHashTable<'_, XmlNotation>,
+    table: &HashMap<String, XmlNotation>,
 ) {
     xml_dump_notation_table(buf, table);
 }
@@ -1037,7 +1036,7 @@ unsafe fn xml_dtd_dump_output(ctxt: &mut XmlSaveCtxt, dtd: XmlDtdPtr) {
         if dtd.entities.is_none()
             && dtd.elements.is_none()
             && dtd.attributes.is_none()
-            && dtd.notations.is_none()
+            && dtd.notations.is_empty()
             && dtd.pentities.is_none()
         {
             ctxt.buf.write_bytes(b">").ok();
@@ -1047,9 +1046,7 @@ unsafe fn xml_dtd_dump_output(ctxt: &mut XmlSaveCtxt, dtd: XmlDtdPtr) {
         // Dump the notations first they are not in the DTD children list
         // Do this only on a standalone DTD or on the internal subset though.
         if dtd.doc.is_none_or(|doc| doc.int_subset == Some(dtd)) {
-            if let Some(table) = dtd.notations.as_deref() {
-                xml_buf_dump_notation_table(&mut ctxt.buf, table);
-            }
+            xml_buf_dump_notation_table(&mut ctxt.buf, &dtd.notations);
         }
         let format: i32 = ctxt.format;
         let level: i32 = ctxt.level;
