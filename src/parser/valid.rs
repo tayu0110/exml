@@ -207,30 +207,28 @@ impl XmlParserCtxt<'_> {
         if let Some(mut dtd) = dtd.doc.and_then(|doc| doc.int_subset) {
             let ret = dtd
                 .elements
-                .as_ref()
-                .and_then(|table| table.lookup2(name, ns))
+                .get(&(Cow::Borrowed(name), ns.map(Cow::Borrowed)))
                 .cloned();
             if let Some(mut ret) =
                 ret.filter(|ret| ret.etype == XmlElementTypeVal::XmlElementTypeUndefined)
             {
                 old_attributes = ret.attributes.take();
-                dtd.elements
-                    .as_mut()
-                    .unwrap()
-                    .remove_entry2(name, ns, |_, _| {})
-                    .ok();
+                dtd.elements.remove(&(
+                    Cow::Owned(name.to_owned()),
+                    ns.map(|ns| Cow::Owned(ns.to_owned())),
+                ));
                 unsafe {
                     xml_free_element(Some(ret));
                 }
             }
         }
 
-        // Create the Element table if needed.
-        let table = dtd
-            .elements
-            .get_or_insert_with(|| XmlHashTable::with_capacity(0));
         // The element may already be present if one of its attribute was registered first
-        let mut ret = if let Some(ret) = table.lookup2(name, ns).cloned() {
+        let mut ret = if let Some(ret) = dtd
+            .elements
+            .get(&(Cow::Borrowed(name), ns.map(Cow::Borrowed)))
+            .cloned()
+        {
             if !matches!(ret.etype, XmlElementTypeVal::XmlElementTypeUndefined) {
                 #[cfg(feature = "libxml_valid")]
                 {
@@ -261,24 +259,32 @@ impl XmlParserCtxt<'_> {
 
             // Validity Check:
             // Insertion must not fail
-            if table.add_entry2(name, ns, ret).is_err() {
-                #[cfg(feature = "libxml_valid")]
-                {
-                    // The element is already defined in this DTD.
-                    xml_err_valid_node(
-                        Some(self),
-                        Some(dtd.into()),
-                        XmlParserErrors::XmlDTDElemRedefined,
-                        format!("Redefinition of element {name}\n").as_str(),
-                        Some(name),
-                        None,
-                        None,
-                    );
+            match dtd.elements.entry((
+                Cow::Owned(name.to_owned()),
+                ns.map(|ns| Cow::Owned(ns.to_owned())),
+            )) {
+                Entry::Occupied(_) => {
+                    #[cfg(feature = "libxml_valid")]
+                    {
+                        // The element is already defined in this DTD.
+                        xml_err_valid_node(
+                            Some(self),
+                            Some(dtd.into()),
+                            XmlParserErrors::XmlDTDElemRedefined,
+                            format!("Redefinition of element {name}\n").as_str(),
+                            Some(name),
+                            None,
+                            None,
+                        );
+                    }
+                    unsafe {
+                        ret.free();
+                    }
+                    return None;
                 }
-                unsafe {
-                    ret.free();
+                Entry::Vacant(entry) => {
+                    entry.insert(ret);
                 }
-                return None;
             }
             // For new element, may have attributes from earlier
             // definition in internal subset
@@ -549,18 +555,18 @@ impl XmlParserCtxt<'_> {
         mut name: &str,
         create: i32,
     ) -> Option<XmlElementPtr> {
-        if dtd.elements.is_none() && create == 0 {
+        if create == 0 {
             return None;
         }
-        let table = dtd
-            .elements
-            .get_or_insert_with(|| XmlHashTable::with_capacity(0));
         let mut prefix = None;
         if let Some((pref, local)) = split_qname2(name) {
             name = local;
             prefix = Some(pref);
         }
-        let mut cur = table.lookup2(name, prefix).cloned();
+        let mut cur = dtd
+            .elements
+            .get(&(Cow::Borrowed(name), prefix.map(Cow::Borrowed)))
+            .cloned();
         if cur.is_none() && create != 0 {
             let Some(res) = XmlElementPtr::new(XmlElement {
                 typ: XmlElementType::XmlElementDecl,
@@ -573,12 +579,19 @@ impl XmlParserCtxt<'_> {
                 return None;
             };
             cur = Some(res);
-            if table.add_entry2(name, prefix, res).is_err() {
-                xml_verr_memory(Some(self), Some("adding entry failed"));
-                unsafe {
-                    xml_free_element(cur);
+            let name = Cow::Owned(name.to_owned());
+            let prefix = prefix.map(|pre| Cow::Owned(pre.to_owned()));
+            match dtd.elements.entry((name, prefix)) {
+                Entry::Occupied(_) => {
+                    xml_verr_memory(Some(self), Some("adding entry failed"));
+                    unsafe {
+                        xml_free_element(cur);
+                    }
+                    cur = None;
                 }
-                cur = None;
+                Entry::Vacant(entry) => {
+                    entry.insert(res);
+                }
             }
         }
         cur

@@ -1034,7 +1034,7 @@ unsafe fn xml_dtd_dump_output(ctxt: &mut XmlSaveCtxt, dtd: XmlDtdPtr) {
             write_quoted(&mut ctxt.buf.buffer, system_id).ok();
         }
         if dtd.entities.is_none()
-            && dtd.elements.is_none()
+            && dtd.elements.is_empty()
             && dtd.attributes.is_none()
             && dtd.notations.is_empty()
             && dtd.pentities.is_none()

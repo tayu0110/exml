@@ -34,7 +34,7 @@ use std::{
 
 use crate::{
     globals::{get_deregister_node_func, get_register_node_func},
-    hash::{XmlHashTable, XmlHashTableRef},
+    hash::XmlHashTableRef,
     parser::split_qname2,
     valid::xml_free_attribute_table,
 };
@@ -63,7 +63,7 @@ pub struct XmlDtd {
 
     // End of common part
     pub(crate) notations: HashMap<String, XmlNotation>, /* Hash table for notations if any */
-    pub(crate) elements: Option<XmlHashTable<'static, XmlElementPtr>>, /* Hash table for elements if any */
+    pub(crate) elements: HashMap<(Cow<'static, str>, Option<Cow<'static, str>>), XmlElementPtr>, /* Hash table for elements if any */
     pub(crate) attributes: Option<XmlHashTableRef<'static, XmlAttributePtr>>, /* Hash table for attributes if any */
     pub(crate) entities: Option<XmlHashTableRef<'static, XmlEntityPtr>>, /* Hash table for entities if any */
     pub(crate) external_id: Option<String>, /* External identifier for PUBLIC DTD */
@@ -145,7 +145,7 @@ impl Default for XmlDtd {
             prev: None,
             doc: None,
             notations: HashMap::new(),
-            elements: None,
+            elements: HashMap::new(),
             attributes: None,
             entities: None,
             external_id: None,
@@ -498,10 +498,8 @@ pub unsafe fn xml_free_dtd(mut cur: XmlDtdPtr) {
         }
         cur.system_id = None;
         cur.external_id = None;
-        // TODO !!!
-
-        if let Some(table) = cur.elements.take() {
-            table.scan(|data, _, _, _| xml_free_element(Some(*data)));
+        for (_, element) in cur.elements.drain() {
+            xml_free_element(Some(element));
         }
         if let Some(table) = cur.attributes.take().map(|t| t.into_inner()) {
             xml_free_attribute_table(table);

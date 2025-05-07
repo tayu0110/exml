@@ -860,12 +860,11 @@ pub unsafe fn xml_copy_dtd(dtd: XmlDtdPtr) -> Option<XmlDtdPtr> {
             ret.entities = xml_copy_entities_table(entities);
         }
         ret.notations = dtd.notations.clone();
-        if let Some(table) = dtd.elements.as_ref() {
-            ret.elements =
-                Some(table.clone_with(|data, _| {
-                    xml_copy_element(*data).expect("Failed to copy element")
-                }));
-        }
+        ret.elements = dtd
+            .elements
+            .iter()
+            .map(|(k, v)| (k.clone(), xml_copy_element(*v).unwrap()))
+            .collect();
         if let Some(table) = dtd.attributes {
             ret.attributes = xml_copy_attribute_table(table);
         }
