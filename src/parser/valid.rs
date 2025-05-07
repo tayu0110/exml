@@ -5,7 +5,13 @@
 //! As a workaround, I decided to implement it as a method of `XmlParserCtxt`
 //! so that `XmlValidCtxt` does not own a pointer to the parent.
 
-use std::{borrow::Cow, cell::RefCell, collections::HashMap, ptr::null_mut, rc::Rc};
+use std::{
+    borrow::Cow,
+    cell::RefCell,
+    collections::{HashMap, hash_map::Entry},
+    ptr::null_mut,
+    rc::Rc,
+};
 
 use crate::{
     chvalid::XmlCharValid,
@@ -61,25 +67,26 @@ impl XmlParserCtxt<'_> {
         ret.lineno = attr.parent.map_or(-1, |p| p.get_line_no() as i32);
 
         // Create the ID table if needed.
-        doc.ids
-            .get_or_insert(Box::new(XmlHashTable::with_capacity(0)));
-        let table = doc.ids.as_deref_mut().unwrap();
-        if table.add_entry(value, ret).is_err() {
-            // The id is already defined in this DTD.
-            #[cfg(feature = "libxml_valid")]
-            {
-                xml_err_valid_node(
-                    Some(self),
-                    attr.parent.map(|par| par.into()),
-                    XmlParserErrors::XmlDTDIDRedefined,
-                    format!("ID {value} already defined\n").as_str(),
-                    Some(value),
-                    None,
-                    None,
-                );
+        let entry = doc.ids.entry(value.to_owned());
+        match entry {
+            Entry::Occupied(_) => {
+                // The id is already defined in this DTD.
+                #[cfg(feature = "libxml_valid")]
+                {
+                    xml_err_valid_node(
+                        Some(self),
+                        attr.parent.map(|par| par.into()),
+                        XmlParserErrors::XmlDTDIDRedefined,
+                        format!("ID {value} already defined\n").as_str(),
+                        Some(value),
+                        None,
+                        None,
+                    );
+                }
+                return None;
             }
-            return None;
-        }
+            Entry::Vacant(entry) => entry.insert(ret),
+        };
         attr.atype = Some(XmlAttributeType::XmlAttributeID);
         Some(())
     }

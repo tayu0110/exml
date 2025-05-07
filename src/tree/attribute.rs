@@ -673,7 +673,7 @@ pub(super) unsafe fn xml_copy_prop_internal(
         }
         // Try to handle IDs
         if let Some(target_doc) = target.and_then(|target| target.doc).filter(|_| {
-            cur.doc.is_some_and(|doc| doc.ids.is_some())
+            cur.doc.is_some()
                 && cur
                     .parent
                     .filter(|&p| xml_is_id(cur.doc, Some(p), Some(cur)) != 0)

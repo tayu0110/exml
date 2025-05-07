@@ -31,7 +31,6 @@ use crate::{
     encoding::XmlCharEncoding,
     error::XmlParserErrors,
     globals::{get_deregister_node_func, get_register_node_func},
-    hash::XmlHashTable,
     list::XmlList,
 };
 
@@ -74,7 +73,7 @@ pub struct XmlDoc {
     // external initial encoding, if any
     pub(crate) encoding: Option<String>,
     // Hash table for ID attributes if any
-    pub(crate) ids: Option<Box<XmlHashTable<'static, XmlID>>>,
+    pub(crate) ids: HashMap<String, XmlID>,
     // Hash table for IDREFs attributes if any
     pub(crate) refs: Option<HashMap<String, XmlList<Box<XmlRef>>>>,
     // The URI for that document
@@ -352,7 +351,7 @@ impl Default for XmlDoc {
             old_ns: None,
             version: None,
             encoding: None,
-            ids: None,
+            ids: HashMap::new(),
             refs: None,
             url: None,
             charset: XmlCharEncoding::None,
@@ -784,7 +783,6 @@ pub unsafe fn xml_free_doc(mut cur: XmlDocPtr) {
         }
 
         // Do this before freeing the children list to avoid ID lookups
-        cur.ids.take();
         cur.refs.take();
         let mut ext_subset = cur.ext_subset.take();
         let int_subset = cur.int_subset.take();

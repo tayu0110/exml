@@ -21,7 +21,12 @@
 #[cfg(feature = "libxml_output")]
 use std::io::Write;
 use std::{
-    borrow::Cow, cell::RefCell, collections::HashMap, os::raw::c_void, ptr::null_mut, rc::Rc,
+    borrow::Cow,
+    cell::RefCell,
+    collections::{HashMap, hash_map::Entry},
+    os::raw::c_void,
+    ptr::null_mut,
+    rc::Rc,
 };
 
 #[cfg(feature = "libxml_regexp")]
@@ -1842,25 +1847,26 @@ pub fn xml_add_id(
     ret.lineno = attr.parent().map_or(-1, |p| p.get_line_no() as i32);
 
     // Create the ID table if needed.
-    doc.ids
-        .get_or_insert(Box::new(XmlHashTable::with_capacity(0)));
-    let table = doc.ids.as_deref_mut().unwrap();
-    if table.add_entry(value, ret).is_err() {
-        // The id is already defined in this DTD.
-        #[cfg(feature = "libxml_valid")]
-        if let Some(ctxt) = ctxt {
-            xml_err_valid_node(
-                Some(ctxt),
-                attr.parent(),
-                XmlParserErrors::XmlDTDIDRedefined,
-                format!("ID {value} already defined\n").as_str(),
-                Some(value),
-                None,
-                None,
-            );
+    let entry = doc.ids.entry(value.to_owned());
+    match entry {
+        Entry::Occupied(_) => {
+            // The id is already defined in this DTD.
+            #[cfg(feature = "libxml_valid")]
+            if let Some(ctxt) = ctxt {
+                xml_err_valid_node(
+                    Some(ctxt),
+                    attr.parent(),
+                    XmlParserErrors::XmlDTDIDRedefined,
+                    format!("ID {value} already defined\n").as_str(),
+                    Some(value),
+                    None,
+                    None,
+                );
+            }
+            return None;
         }
-        return None;
-    }
+        Entry::Vacant(entry) => entry.insert(ret),
+    };
     attr.atype = Some(XmlAttributeType::XmlAttributeID);
     Some(())
 }
@@ -1871,9 +1877,7 @@ pub fn xml_add_id(
 /// otherwise the xmlAttrPtr defining the ID or XmlDocPtr as `*mut dyn NodeCommon`.
 #[doc(alias = "xmlGetID")]
 pub fn xml_get_id(doc: XmlDocPtr, id: &str) -> Option<Result<XmlAttrPtr, XmlDocPtr>> {
-    let table = doc.ids.as_deref()?;
-    let id_ptr = table.lookup(id)?;
-    match id_ptr.attr {
+    match doc.ids.get(id)?.attr {
         Some(attr) => Some(Ok(attr)),
         None => {
             // We are operating on a stream, return a well known reference
@@ -1974,23 +1978,19 @@ pub(crate) fn xml_valid_normalize_string(s: &str) -> Cow<'_, str> {
 /// Returns -1 if the lookup failed and 0 otherwise
 #[doc(alias = "xmlRemoveID")]
 pub fn xml_remove_id(mut doc: XmlDocPtr, mut attr: XmlAttrPtr) -> i32 {
-    if doc.ids.is_none() {
-        return -1;
-    }
     let Some(id) = attr.children().and_then(|c| c.get_string(Some(doc), 1)) else {
         return -1;
     };
     let id = xml_valid_normalize_string(&id);
 
-    let table = doc.ids.as_deref_mut().unwrap();
-    let Some(id_ptr) = table.lookup(&id) else {
+    let Some(id_ptr) = doc.ids.get(id.as_ref()) else {
         return -1;
     };
     if id_ptr.attr != Some(attr) {
         return -1;
     }
 
-    table.remove_entry(&id, |_, _| {}).ok();
+    doc.ids.remove(id.as_ref());
     attr.atype = None;
     0
 }
@@ -2741,7 +2741,7 @@ pub fn xml_validate_dtd(ctxt: &mut XmlValidCtxt, mut doc: XmlDocPtr, dtd: XmlDtd
         doc.int_subset = old_int;
         return ret;
     }
-    doc.ids.take();
+    doc.ids.clear();
     doc.refs.take();
     let root = doc.get_root_element();
     ret = xml_validate_element(ctxt, doc, root.map(|root| root.into()));
@@ -3115,7 +3115,7 @@ pub fn xml_validate_document(ctxt: &mut XmlValidCtxt, mut doc: XmlDocPtr) -> i32
         }
     }
 
-    doc.ids.take();
+    doc.ids.clear();
     doc.refs.take();
     ret = xml_validate_dtd_final(ctxt, doc);
     if xml_validate_root(Some(ctxt), doc) == 0 {

@@ -4212,8 +4212,6 @@ unsafe fn xml_text_reader_free_doc(reader: &mut XmlTextReader, mut cur: XmlDocPt
         }
 
         // Do this before freeing the children list to avoid ID lookups
-        cur.ids.take();
-        cur.refs.take();
         let mut ext_subset = cur.ext_subset.take();
         let int_subset = cur.int_subset.take();
         if int_subset == ext_subset {

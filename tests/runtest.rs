@@ -2702,6 +2702,8 @@ unsafe fn xmlid_doc_test(
     err: Option<String>,
     options: i32,
 ) -> i32 {
+    use std::fs::read_to_string;
+
     unsafe {
         let mut res: i32 = 0;
         let mut ret: i32;
@@ -2745,6 +2747,7 @@ unsafe fn xmlid_doc_test(
             ret = compare_files(temp.as_str(), result.as_str());
             if ret != 0 {
                 eprintln!("Result for {filename} failed in {}", result);
+                eprintln!("{}", read_to_string(temp.as_str()).unwrap());
                 res = 1;
             }
         }
@@ -2759,6 +2762,9 @@ unsafe fn xmlid_doc_test(
                 .with_borrow(|errors| compare_file_mem(err, &errors[..TEST_ERRORS_SIZE.get()]));
             if ret != 0 {
                 eprintln!("Error for {filename} failed",);
+                TEST_ERRORS.with_borrow(|errors| {
+                    eprintln!("{}", from_utf8(&errors[..TEST_ERRORS_SIZE.get()]).unwrap());
+                });
                 res = 1;
             }
         }
