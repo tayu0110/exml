@@ -35,8 +35,8 @@ use crate::{
         __xml_raise_error, __xml_simple_error, __xml_simple_oom_error, XmlErrorDomain,
         XmlParserErrors,
     },
-    hash::{CVoidWrapper, XmlHashTableRef},
-    libxml::hash::{XmlHashTable, xml_hash_create},
+    hash::XmlHashTableRef,
+    libxml::hash::XmlHashTable,
     tree::{NodeCommon, XmlElementType, xml_free_node_list},
 };
 
@@ -345,11 +345,6 @@ impl From<XmlEntityPtr> for *mut XmlEntity {
         value.0.as_ptr()
     }
 }
-
-/// All entities are stored in an hash table.
-/// There is 2 separate hash tables for global and parameter entities.
-pub type XmlEntitiesTable = XmlHashTable<'static, CVoidWrapper>;
-pub type XmlEntitiesTablePtr = *mut XmlEntitiesTable;
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlEntitiesErrMemory")]
@@ -979,15 +974,6 @@ pub fn xml_encode_special_chars(_doc: Option<XmlDocPtr>, input: &str) -> String 
     out
 }
 
-/// create and initialize an empty entities hash table.
-/// This really doesn't make sense and should be deprecated
-///
-/// Returns the xmlEntitiesTablePtr just created or NULL in case of error.
-#[doc(alias = "xmlCreateEntitiesTable")]
-pub fn xml_create_entities_table() -> XmlEntitiesTablePtr {
-    xml_hash_create(0) as XmlEntitiesTablePtr
-}
-
 /// Build a copy of an entity
 ///
 /// Returns the new xmlEntitiesPtr or NULL in case of error.
@@ -1028,25 +1014,6 @@ pub unsafe fn xml_free_entities_table(table: XmlHashTableRef<'static, XmlEntityP
         let mut table = table.into_inner();
         table.clear_with(|payload, _| {
             xml_free_entity(payload);
-        });
-    }
-}
-
-/// This will dump the content of the entity table as an XML DTD definition
-#[doc(alias = "xmlDumpEntitiesTable")]
-#[cfg(feature = "libxml_output")]
-pub unsafe fn xml_dump_entities_table<'a>(buf: &mut (impl Write + 'a), table: XmlEntitiesTablePtr) {
-    unsafe {
-        let Some(table) = XmlHashTableRef::from_raw(table) else {
-            return;
-        };
-        table.scan(|data, _, _, _| {
-            xml_dump_entity_decl(
-                buf,
-                XmlEntityPtr::from_raw(data.0 as *mut XmlEntity)
-                    .unwrap()
-                    .unwrap(),
-            )
         });
     }
 }
