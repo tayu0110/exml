@@ -720,22 +720,17 @@ impl XmlXIncludeCtxt {
 
             let source = from.int_subset;
             if let Some(source) = source {
-                if let Some(entities) = source.entities {
-                    entities.scan(|payload, _, _, _| {
-                        self.merge_entity(*payload, doc);
-                    });
+                for &entity in source.entities.values() {
+                    self.merge_entity(entity, doc);
                 }
             }
             let source = from.ext_subset;
             if let Some(source) = source {
-                if let Some(entities) = source.entities {
-                    // don't duplicate existing stuff when external subsets are the same
-                    if target.external_id != source.external_id
-                        && target.system_id != source.system_id
-                    {
-                        entities.scan(|payload, _, _, _| {
-                            self.merge_entity(*payload, doc);
-                        });
+                // don't duplicate existing stuff when external subsets are the same
+                if target.external_id != source.external_id && target.system_id != source.system_id
+                {
+                    for &entity in source.entities.values() {
+                        self.merge_entity(entity, doc);
                     }
                 }
             }

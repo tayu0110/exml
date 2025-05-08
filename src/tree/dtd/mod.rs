@@ -34,13 +34,12 @@ use std::{
 
 use crate::{
     globals::{get_deregister_node_func, get_register_node_func},
-    hash::XmlHashTableRef,
     parser::split_qname2,
 };
 
 use super::{
     InvalidNodePointerCastError, NodeCommon, XmlDocPtr, XmlElementType, XmlEntityPtr,
-    XmlGenericNodePtr, xml_free_entities_table, xml_free_node, xml_tree_err_memory,
+    XmlGenericNodePtr, xml_free_entity, xml_free_node, xml_tree_err_memory,
 };
 
 pub use attribute::*;
@@ -72,10 +71,10 @@ pub struct XmlDtd {
         ),
         XmlAttributePtr,
     >, /* Hash table for attributes if any */
-    pub(crate) entities: Option<XmlHashTableRef<'static, XmlEntityPtr>>, /* Hash table for entities if any */
-    pub(crate) external_id: Option<String>, /* External identifier for PUBLIC DTD */
-    pub(crate) system_id: Option<String>,   /* URI for a SYSTEM or PUBLIC DTD */
-    pub(crate) pentities: Option<XmlHashTableRef<'static, XmlEntityPtr>>, /* Hash table for param entities if any */
+    pub(crate) entities: HashMap<String, XmlEntityPtr>, /* Hash table for entities if any */
+    pub(crate) external_id: Option<String>,             /* External identifier for PUBLIC DTD */
+    pub(crate) system_id: Option<String>,               /* URI for a SYSTEM or PUBLIC DTD */
+    pub(crate) pentities: HashMap<String, XmlEntityPtr>, /* Hash table for param entities if any */
 }
 
 impl XmlDtd {
@@ -86,7 +85,7 @@ impl XmlDtd {
     #[doc(alias = "xmlGetEntityFromDtd")]
     #[cfg(feature = "libxml_tree")]
     pub(super) fn get_entity(&self, name: &str) -> Option<XmlEntityPtr> {
-        self.entities.as_deref()?.lookup(name).copied()
+        self.entities.get(name).copied()
     }
 
     /// Do an entity lookup in the DTD parameter entity hash table and
@@ -96,7 +95,7 @@ impl XmlDtd {
     #[doc(alias = "xmlGetParameterEntityFromDtd")]
     #[cfg(feature = "libxml_tree")]
     pub(super) fn get_parameter_entity(&self, name: &str) -> Option<XmlEntityPtr> {
-        self.pentities.as_deref()?.lookup(name).copied()
+        self.pentities.get(name).copied()
     }
 
     /// Search the DTD for the description of this attribute on this element.
@@ -167,10 +166,10 @@ impl Default for XmlDtd {
             notations: HashMap::new(),
             elements: HashMap::new(),
             attributes: HashMap::new(),
-            entities: None,
+            entities: HashMap::new(),
             external_id: None,
             system_id: None,
-            pentities: None,
+            pentities: HashMap::new(),
         }
     }
 }
@@ -524,11 +523,11 @@ pub unsafe fn xml_free_dtd(mut cur: XmlDtdPtr) {
         for (_, attr) in cur.attributes.drain() {
             xml_free_attribute(attr);
         }
-        if let Some(entities) = cur.entities.take() {
-            xml_free_entities_table(entities);
+        for (_, entity) in cur.entities.drain() {
+            xml_free_entity(entity);
         }
-        if let Some(pentities) = cur.pentities.take() {
-            xml_free_entities_table(pentities);
+        for (_, entity) in cur.pentities.drain() {
+            xml_free_entity(entity);
         }
 
         cur.free();

@@ -3007,10 +3007,8 @@ impl XmlParserCtxt<'_> {
             for &attr in dtd.attributes.values() {
                 self.validate_attribute_callback(attr);
             }
-            if let Some(entities) = dtd.entities {
-                entities.scan(|payload, _, _, _| {
-                    self.validate_notation_callback(*payload);
-                });
+            for &entity in dtd.entities.values() {
+                self.validate_notation_callback(entity);
             }
         }
         let dtd = doc.ext_subset;
@@ -3018,10 +3016,8 @@ impl XmlParserCtxt<'_> {
             for &attr in dtd.attributes.values() {
                 self.validate_attribute_callback(attr);
             }
-            if let Some(entities) = dtd.entities {
-                entities.scan(|entity, _, _, _| {
-                    self.validate_notation_callback(*entity);
-                });
+            for &entity in dtd.entities.values() {
+                self.validate_notation_callback(entity);
             }
         }
         self.vctxt.valid

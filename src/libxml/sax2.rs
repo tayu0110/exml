@@ -1581,7 +1581,7 @@ pub fn xml_sax2_start_element(
                 int_subset.notations.is_empty()
                     && int_subset.elements.is_empty()
                     && int_subset.attributes.is_empty()
-                    && int_subset.entities.is_none()
+                    && int_subset.entities.is_empty()
             })
         {
             xml_err_valid!(
@@ -1750,7 +1750,7 @@ pub fn xml_sax2_start_element_ns(
                 int_subset.notations.is_empty()
                     && int_subset.elements.is_empty()
                     && int_subset.attributes.is_empty()
-                    && int_subset.entities.is_none()
+                    && int_subset.entities.is_empty()
             })
         {
             xml_err_valid!(

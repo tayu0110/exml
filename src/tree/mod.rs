@@ -856,9 +856,11 @@ pub unsafe fn xml_copy_dtd(dtd: XmlDtdPtr) -> Option<XmlDtdPtr> {
             dtd.external_id.as_deref(),
             dtd.system_id.as_deref(),
         )?;
-        if let Some(entities) = dtd.entities {
-            ret.entities = xml_copy_entities_table(entities);
-        }
+        ret.entities = dtd
+            .entities
+            .iter()
+            .map(|(k, v)| (k.clone(), xml_copy_entity(*v).unwrap()))
+            .collect();
         ret.notations = dtd.notations.clone();
         ret.elements = dtd
             .elements
@@ -886,9 +888,11 @@ pub unsafe fn xml_copy_dtd(dtd: XmlDtdPtr) -> Option<XmlDtdPtr> {
                 )
             })
             .collect();
-        if let Some(pentities) = dtd.pentities {
-            ret.pentities = xml_copy_entities_table(pentities);
-        }
+        ret.pentities = dtd
+            .pentities
+            .iter()
+            .map(|(k, v)| (k.clone(), xml_copy_entity(*v).unwrap()))
+            .collect();
 
         let mut cur = dtd.children;
         let mut p: Option<XmlGenericNodePtr> = None;

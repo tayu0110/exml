@@ -2996,10 +2996,8 @@ pub fn xml_validate_dtd_final(ctxt: &mut XmlValidCtxt, doc: XmlDocPtr) -> i32 {
         for &attr in dtd.attributes.values() {
             xml_validate_attribute_callback(attr, ctxt);
         }
-        if let Some(entities) = dtd.entities {
-            entities.scan(|payload, _, _, _| {
-                xml_validate_notation_callback(*payload, ctxt);
-            });
+        for &entity in dtd.entities.values() {
+            xml_validate_notation_callback(entity, ctxt);
         }
     }
     let dtd = doc.ext_subset;
@@ -3007,10 +3005,8 @@ pub fn xml_validate_dtd_final(ctxt: &mut XmlValidCtxt, doc: XmlDocPtr) -> i32 {
         for &attr in dtd.attributes.values() {
             xml_validate_attribute_callback(attr, ctxt);
         }
-        if let Some(entities) = dtd.entities {
-            entities.scan(|entity, _, _, _| {
-                xml_validate_notation_callback(*entity, ctxt);
-            });
+        for &entity in dtd.entities.values() {
+            xml_validate_notation_callback(entity, ctxt);
         }
     }
     ctxt.valid

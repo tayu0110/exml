@@ -1033,11 +1033,11 @@ unsafe fn xml_dtd_dump_output(ctxt: &mut XmlSaveCtxt, dtd: XmlDtdPtr) {
             ctxt.buf.write_bytes(b" SYSTEM ").ok();
             write_quoted(&mut ctxt.buf.buffer, system_id).ok();
         }
-        if dtd.entities.is_none()
+        if dtd.entities.is_empty()
             && dtd.elements.is_empty()
             && dtd.attributes.is_empty()
             && dtd.notations.is_empty()
-            && dtd.pentities.is_none()
+            && dtd.pentities.is_empty()
         {
             ctxt.buf.write_bytes(b">").ok();
             return;

@@ -1291,27 +1291,25 @@ impl XmlDebugCtxt<'_> {
         if let Some(doc) = doc {
             self.dump_doc_head(doc);
             if let Some(int_subset) = doc.int_subset {
-                if let Some(table) = int_subset.entities {
+                if !int_subset.entities.is_empty() {
                     if self.check == 0 {
                         writeln!(self.output, "Entities in internal subset").ok();
                     }
-                    table.scan(|payload, _, _, _| {
-                        let entity = *payload;
+                    for &entity in int_subset.entities.values() {
                         self.dump_entities_callback(Some(&*entity));
-                    });
+                    }
                 }
             } else {
                 writeln!(self.output, "No entities in internal subset").ok();
             }
             if let Some(ext_subset) = doc.ext_subset {
-                if let Some(table) = ext_subset.entities {
+                if !ext_subset.entities.is_empty() {
                     if self.check == 0 {
                         writeln!(self.output, "Entities in external subset").ok();
                     }
-                    table.scan(|payload, _, _, _| {
-                        let entity = *payload;
+                    for &entity in ext_subset.entities.values() {
                         self.dump_entities_callback(Some(&*entity));
-                    });
+                    }
                 }
             } else if self.check == 0 {
                 writeln!(self.output, "No entities in external subset").ok();

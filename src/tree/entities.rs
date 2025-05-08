@@ -24,6 +24,7 @@ use std::io::Write;
 use std::{
     any::type_name,
     borrow::Cow,
+    collections::hash_map::Entry,
     ops::{Deref, DerefMut},
     os::raw::c_void,
     ptr::{NonNull, null_mut},
@@ -36,7 +37,6 @@ use crate::{
         XmlParserErrors,
     },
     hash::XmlHashTableRef,
-    libxml::hash::XmlHashTable,
     tree::{NodeCommon, XmlElementType, xml_free_node_list},
 };
 
@@ -153,28 +153,20 @@ impl NodeCommon for XmlEntity {
                 // In addition, this pointer is not leaked to the out of this function.
                 XmlEntityPtr::from_raw(self).unwrap()
             };
-            if let Some(int_subset) = doc.int_subset {
-                if let Some(mut table) = int_subset.entities {
-                    if table.lookup(&self.name).copied() == entity {
-                        table.remove_entry(&self.name, |_, _| {}).ok();
-                    }
+            if let Some(mut int_subset) = doc.int_subset {
+                if int_subset.entities.get(self.name.as_ref()).copied() == entity {
+                    int_subset.entities.remove(self.name.as_ref());
                 }
-                if let Some(mut table) = int_subset.pentities {
-                    if table.lookup(&self.name).copied() == entity {
-                        table.remove_entry(&self.name, |_, _| {}).ok();
-                    }
+                if int_subset.pentities.get(self.name.as_ref()).copied() == entity {
+                    int_subset.pentities.remove(self.name.as_ref());
                 }
             }
-            if let Some(ext_subset) = doc.ext_subset {
-                if let Some(mut table) = ext_subset.entities {
-                    if table.lookup(&self.name).copied() == entity {
-                        table.remove_entry(&self.name, |_, _| {}).ok();
-                    }
+            if let Some(mut ext_subset) = doc.ext_subset {
+                if ext_subset.entities.get(self.name.as_ref()).copied() == entity {
+                    ext_subset.entities.remove_entry(self.name.as_ref());
                 }
-                if let Some(mut table) = ext_subset.pentities {
-                    if table.lookup(&self.name).copied() == entity {
-                        table.remove_entry(&self.name, |_, _| {}).ok();
-                    }
+                if ext_subset.pentities.get(self.name.as_ref()).copied() == entity {
+                    ext_subset.pentities.remove(self.name.as_ref());
                 }
             }
         }
@@ -459,7 +451,7 @@ macro_rules! xml_entities_warn {
 
 /// clean-up an entity record.
 #[doc(alias = "xmlFreeEntity")]
-unsafe fn xml_free_entity(mut entity: XmlEntityPtr) {
+pub unsafe fn xml_free_entity(mut entity: XmlEntityPtr) {
     unsafe {
         if entity.owner == 1 {
             if let Some(children) = entity
@@ -525,33 +517,27 @@ unsafe fn xml_add_entity(
                         return None;
                     }
                 }
-                if dtd.entities.is_none() {
-                    let table = XmlHashTable::with_capacity(0);
-                    dtd.entities = XmlHashTableRef::from_table(table);
-                }
-                dtd.entities
+                &mut dtd.entities
             }
             XmlEntityType::XmlInternalParameterEntity
-            | XmlEntityType::XmlExternalParameterEntity => {
-                if dtd.pentities.is_none() {
-                    let table = XmlHashTable::with_capacity(0);
-                    dtd.pentities = XmlHashTableRef::from_table(table);
-                }
-                dtd.pentities
-            }
+            | XmlEntityType::XmlExternalParameterEntity => &mut dtd.pentities,
             XmlEntityType::XmlInternalPredefinedEntity => {
                 return None;
             }
         };
-        let mut table = table?;
         let mut ret = xml_create_entity(name, typ, external_id, system_id, content)?;
-        ret.doc = dtd.doc;
 
-        if table.add_entry(name, ret).is_err() {
-            // entity was already defined at another level.
-            xml_free_entity(ret);
-            return None;
+        match table.entry(name.to_owned()) {
+            Entry::Occupied(_) => {
+                // entity was already defined at another level.
+                xml_free_entity(ret);
+                return None;
+            }
+            Entry::Vacant(entry) => {
+                entry.insert(ret);
+            }
         }
+        ret.doc = dtd.doc;
         Some(ret)
     }
 }
@@ -770,18 +756,6 @@ pub fn xml_get_predefined_entity(name: &str) -> Option<XmlEntityPtr> {
     }
 }
 
-/// Do an entity lookup in the table.
-/// returns the corresponding parameter entity, if found.
-///
-/// Returns A pointer to the entity structure or NULL if not found.
-#[doc(alias = "xmlGetEntityFromTable")]
-fn xml_get_entity_from_table(
-    table: XmlHashTableRef<'static, XmlEntityPtr>,
-    name: &str,
-) -> Option<XmlEntityPtr> {
-    table.lookup(name).copied()
-}
-
 /// Do an entity lookup in the document entity hash table and
 /// returns the corresponding entity, otherwise a lookup is done
 /// in the predefined entities too.
@@ -791,20 +765,16 @@ fn xml_get_entity_from_table(
 pub fn xml_get_doc_entity(doc: Option<XmlDocPtr>, name: &str) -> Option<XmlEntityPtr> {
     if let Some(doc) = doc {
         if let Some(int_subset) = doc.int_subset {
-            if let Some(table) = int_subset.entities {
-                let cur = xml_get_entity_from_table(table, name);
-                if cur.is_some() {
-                    return cur;
-                }
+            let cur = int_subset.entities.get(name).copied();
+            if cur.is_some() {
+                return cur;
             }
         }
         if doc.standalone != 1 {
             if let Some(ext_subset) = doc.ext_subset {
-                if let Some(table) = ext_subset.entities {
-                    let cur = xml_get_entity_from_table(table, name);
-                    if cur.is_some() {
-                        return cur;
-                    }
+                let cur = ext_subset.entities.get(name).copied();
+                if cur.is_some() {
+                    return cur;
                 }
             }
         }
@@ -819,12 +789,8 @@ pub fn xml_get_doc_entity(doc: Option<XmlDocPtr>, name: &str) -> Option<XmlEntit
 /// Returns A pointer to the entity structure or NULL if not found.
 #[doc(alias = "xmlGetDtdEntity")]
 pub fn xml_get_dtd_entity(doc: XmlDocPtr, name: &str) -> Option<XmlEntityPtr> {
-    if let Some(ext_subset) = doc.ext_subset {
-        if let Some(table) = ext_subset.entities {
-            return xml_get_entity_from_table(table, name);
-        }
-    }
-    None
+    doc.ext_subset
+        .and_then(|ext| ext.entities.get(name).copied())
 }
 
 /// Do an entity lookup in the internal and external subsets and
@@ -834,19 +800,13 @@ pub fn xml_get_dtd_entity(doc: XmlDocPtr, name: &str) -> Option<XmlEntityPtr> {
 #[doc(alias = "xmlGetParameterEntity")]
 pub fn xml_get_parameter_entity(doc: XmlDocPtr, name: &str) -> Option<XmlEntityPtr> {
     if let Some(int_subset) = doc.int_subset {
-        if let Some(table) = int_subset.pentities {
-            let ret = xml_get_entity_from_table(table, name);
-            if ret.is_some() {
-                return ret;
-            }
+        let ret = int_subset.pentities.get(name).copied();
+        if ret.is_some() {
+            return ret;
         }
     }
-    if let Some(ext_subset) = doc.ext_subset {
-        if let Some(table) = ext_subset.pentities {
-            return xml_get_entity_from_table(table, name);
-        }
-    }
-    None
+    doc.ext_subset
+        .and_then(|ext| ext.pentities.get(name).copied())
 }
 
 /// Do a global encoding of a string, replacing the predefined entities
@@ -979,7 +939,7 @@ pub fn xml_encode_special_chars(_doc: Option<XmlDocPtr>, input: &str) -> String 
 /// Returns the new xmlEntitiesPtr or NULL in case of error.
 #[doc(alias = "xmlCopyEntity")]
 #[cfg(feature = "libxml_tree")]
-fn xml_copy_entity(ent: XmlEntityPtr) -> Option<XmlEntityPtr> {
+pub fn xml_copy_entity(ent: XmlEntityPtr) -> Option<XmlEntityPtr> {
     let mut cur = XmlEntityPtr::new(XmlEntity {
         typ: XmlElementType::XmlEntityDecl,
         etype: ent.etype,
