@@ -10,7 +10,6 @@ use std::{borrow::Cow, cell::RefCell, collections::hash_map::Entry, ptr::null_mu
 use crate::{
     chvalid::XmlCharValid,
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
-    hash::{XmlHashTable, XmlHashTableRef},
     libxml::xmlregexp::XmlRegExecCtxt,
     list::XmlList,
     parser::build_qname,
@@ -354,30 +353,19 @@ impl XmlParserCtxt<'_> {
         // already defined in the internal subset
         if let Some(doc) = dtd.doc.filter(|doc| doc.ext_subset == Some(dtd)) {
             if let Some(int_subset) = doc.int_subset {
-                if let Some(attributes) = int_subset.attributes {
-                    let ret = attributes.lookup3(name, ns, Some(elem)).copied();
-                    if ret.is_some() {
-                        return None;
-                    }
+                let ret = int_subset
+                    .attributes
+                    .get(&(
+                        Cow::Borrowed(name),
+                        ns.map(Cow::Borrowed),
+                        Some(Cow::Borrowed(elem)),
+                    ))
+                    .copied();
+                if ret.is_some() {
+                    return None;
                 }
             }
         }
-
-        // Create the Attribute table if needed.
-        let mut table = if let Some(table) = dtd.attributes {
-            table
-        } else {
-            let table = XmlHashTable::with_capacity(0);
-            let Some(table) = XmlHashTableRef::from_table(table) else {
-                xml_verr_memory(
-                    Some(self),
-                    Some("xmlAddAttributeDecl: Table creation failed!\n"),
-                );
-                return None;
-            };
-            dtd.attributes = Some(table);
-            table
-        };
 
         let Some(mut ret) = XmlAttributePtr::new(XmlAttribute {
             typ: XmlElementType::XmlAttributeDecl,
@@ -399,32 +387,42 @@ impl XmlParserCtxt<'_> {
 
         // Validity Check:
         // Search the DTD for previous declarations of the ATTLIST
-        if table
-            .add_entry3(
-                ret.name.as_deref().unwrap(),
-                ret.prefix.as_deref(),
-                ret.elem.as_deref(),
-                ret as _,
-            )
-            .is_err()
         {
-            #[cfg(feature = "libxml_valid")]
-            {
-                // The attribute is already defined in this DTD.
-                xml_err_valid_warning(
-                    Some(self),
-                    Some(dtd.into()),
-                    XmlParserErrors::XmlDTDAttributeRedefined,
-                    format!("Attribute {} of element {}: already defined\n", name, elem).as_str(),
-                    Some(name),
-                    Some(elem),
-                    None,
-                );
+            let attr = ret
+                .name
+                .as_deref()
+                .map(|name| Cow::Owned(name.to_owned()))
+                .unwrap();
+            let prefix = ret
+                .prefix
+                .as_deref()
+                .map(|prefix| Cow::Owned(prefix.to_owned()));
+            let val = ret.elem.as_deref().map(|elem| Cow::Owned(elem.to_owned()));
+            match dtd.attributes.entry((attr, prefix, val)) {
+                Entry::Occupied(_) => {
+                    #[cfg(feature = "libxml_valid")]
+                    {
+                        // The attribute is already defined in this DTD.
+                        xml_err_valid_warning(
+                            Some(self),
+                            Some(dtd.into()),
+                            XmlParserErrors::XmlDTDAttributeRedefined,
+                            format!("Attribute {} of element {}: already defined\n", name, elem)
+                                .as_str(),
+                            Some(name),
+                            Some(elem),
+                            None,
+                        );
+                    }
+                    unsafe {
+                        xml_free_attribute(ret);
+                    }
+                    return None;
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert(ret);
+                }
             }
-            unsafe {
-                xml_free_attribute(ret);
-            }
-            return None;
         }
 
         // Validity Check:
@@ -3006,10 +3004,8 @@ impl XmlParserCtxt<'_> {
         self.vctxt.valid = 1;
         let dtd = doc.int_subset;
         if let Some(dtd) = dtd {
-            if let Some(table) = dtd.attributes {
-                table.scan(|&payload, _, _, _| {
-                    self.validate_attribute_callback(payload);
-                });
+            for &attr in dtd.attributes.values() {
+                self.validate_attribute_callback(attr);
             }
             if let Some(entities) = dtd.entities {
                 entities.scan(|payload, _, _, _| {
@@ -3019,10 +3015,8 @@ impl XmlParserCtxt<'_> {
         }
         let dtd = doc.ext_subset;
         if let Some(dtd) = dtd {
-            if let Some(table) = dtd.attributes {
-                table.scan(|payload, _, _, _| {
-                    self.validate_attribute_callback(*payload);
-                });
+            for &attr in dtd.attributes.values() {
+                self.validate_attribute_callback(attr);
             }
             if let Some(entities) = dtd.entities {
                 entities.scan(|entity, _, _, _| {
@@ -3407,14 +3401,12 @@ impl XmlParserCtxt<'_> {
                 // element in the external subset.
                 nb_id = 0;
                 if let Some(int_subset) = doc.int_subset {
-                    if let Some(table) = int_subset.attributes {
-                        table.scan(|&payload, _, _, name3| {
-                            if matches!(payload.atype, XmlAttributeType::XmlAttributeID)
-                                && name3.map(|n| n.as_ref()) == attr_elem
-                            {
-                                nb_id += 1;
-                            }
-                        });
+                    for ((_, _, value), attr) in &int_subset.attributes {
+                        if matches!(attr.atype, XmlAttributeType::XmlAttributeID)
+                            && value.as_deref() == attr_elem
+                        {
+                            nb_id += 1;
+                        }
                     }
                 }
             }

@@ -36,7 +36,6 @@ use crate::{
     globals::{get_deregister_node_func, get_register_node_func},
     hash::XmlHashTableRef,
     parser::split_qname2,
-    valid::xml_free_attribute_table,
 };
 
 use super::{
@@ -64,7 +63,15 @@ pub struct XmlDtd {
     // End of common part
     pub(crate) notations: HashMap<String, XmlNotation>, /* Hash table for notations if any */
     pub(crate) elements: HashMap<(Cow<'static, str>, Option<Cow<'static, str>>), XmlElementPtr>, /* Hash table for elements if any */
-    pub(crate) attributes: Option<XmlHashTableRef<'static, XmlAttributePtr>>, /* Hash table for attributes if any */
+    #[allow(clippy::type_complexity)]
+    pub(crate) attributes: HashMap<
+        (
+            Cow<'static, str>,
+            Option<Cow<'static, str>>,
+            Option<Cow<'static, str>>,
+        ),
+        XmlAttributePtr,
+    >, /* Hash table for attributes if any */
     pub(crate) entities: Option<XmlHashTableRef<'static, XmlEntityPtr>>, /* Hash table for entities if any */
     pub(crate) external_id: Option<String>, /* External identifier for PUBLIC DTD */
     pub(crate) system_id: Option<String>,   /* URI for a SYSTEM or PUBLIC DTD */
@@ -97,11 +104,18 @@ impl XmlDtd {
     /// returns the xmlAttributePtr if found or null_mut()
     #[doc(alias = "xmlGetDtdAttrDesc")]
     pub fn get_attr_desc(&self, elem: &str, name: &str) -> Option<XmlAttributePtr> {
-        let table = self.attributes?;
         if let Some((prefix, local)) = split_qname2(name) {
-            table.lookup3(local, Some(prefix), Some(elem)).copied()
+            self.attributes
+                .get(&(
+                    Cow::Borrowed(local),
+                    Some(Cow::Borrowed(prefix)),
+                    Some(Cow::Borrowed(elem)),
+                ))
+                .copied()
         } else {
-            table.lookup3(name, None, Some(elem)).copied()
+            self.attributes
+                .get(&(Cow::Borrowed(name), None, Some(Cow::Borrowed(elem))))
+                .copied()
         }
     }
 
@@ -115,7 +129,13 @@ impl XmlDtd {
         name: &str,
         prefix: Option<&str>,
     ) -> Option<XmlAttributePtr> {
-        self.attributes?.lookup3(name, prefix, Some(elem)).copied()
+        self.attributes
+            .get(&(
+                Cow::Borrowed(name),
+                prefix.map(Cow::Borrowed),
+                Some(Cow::Borrowed(elem)),
+            ))
+            .copied()
     }
 
     /// update all nodes under the tree to point to the right document
@@ -146,7 +166,7 @@ impl Default for XmlDtd {
             doc: None,
             notations: HashMap::new(),
             elements: HashMap::new(),
-            attributes: None,
+            attributes: HashMap::new(),
             entities: None,
             external_id: None,
             system_id: None,
@@ -501,8 +521,8 @@ pub unsafe fn xml_free_dtd(mut cur: XmlDtdPtr) {
         for (_, element) in cur.elements.drain() {
             xml_free_element(Some(element));
         }
-        if let Some(table) = cur.attributes.take().map(|t| t.into_inner()) {
-            xml_free_attribute_table(table);
+        for (_, attr) in cur.attributes.drain() {
+            xml_free_attribute(attr);
         }
         if let Some(entities) = cur.entities.take() {
             xml_free_entities_table(entities);

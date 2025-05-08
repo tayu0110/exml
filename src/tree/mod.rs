@@ -848,7 +848,7 @@ pub(crate) unsafe fn xml_static_copy_node_list(
 #[cfg(feature = "libxml_tree")]
 pub unsafe fn xml_copy_dtd(dtd: XmlDtdPtr) -> Option<XmlDtdPtr> {
     unsafe {
-        use crate::valid::{xml_copy_attribute_table, xml_get_dtd_qelement_desc};
+        use crate::valid::xml_get_dtd_qelement_desc;
 
         let mut ret = xml_new_dtd(
             None,
@@ -865,9 +865,27 @@ pub unsafe fn xml_copy_dtd(dtd: XmlDtdPtr) -> Option<XmlDtdPtr> {
             .iter()
             .map(|(k, v)| (k.clone(), xml_copy_element(*v).unwrap()))
             .collect();
-        if let Some(table) = dtd.attributes {
-            ret.attributes = xml_copy_attribute_table(table);
-        }
+        ret.attributes = dtd
+            .attributes
+            .iter()
+            .map(|(k, v)| {
+                (
+                    k.clone(),
+                    XmlAttributePtr::new(XmlAttribute {
+                        typ: XmlElementType::XmlAttributeDecl,
+                        name: v.name.clone(),
+                        atype: v.atype,
+                        def: v.def,
+                        default_value: v.default_value.clone(),
+                        tree: v.tree.clone(),
+                        prefix: v.prefix.clone(),
+                        elem: v.elem.clone(),
+                        ..Default::default()
+                    })
+                    .unwrap(),
+                )
+            })
+            .collect();
         if let Some(pentities) = dtd.pentities {
             ret.pentities = xml_copy_entities_table(pentities);
         }
