@@ -36,7 +36,6 @@ use crate::{
         __xml_raise_error, __xml_simple_error, __xml_simple_oom_error, XmlErrorDomain,
         XmlParserErrors,
     },
-    hash::XmlHashTableRef,
     tree::{NodeCommon, XmlElementType, xml_free_node_list},
 };
 
@@ -953,29 +952,6 @@ pub fn xml_copy_entity(ent: XmlEntityPtr) -> Option<XmlEntityPtr> {
     cur.orig = ent.orig.clone();
     cur.uri = ent.uri.clone();
     Some(cur)
-}
-
-/// Build a copy of an entity table.
-///
-/// Returns the new xmlEntitiesTablePtr or NULL in case of error.
-#[doc(alias = "xmlCopyEntitiesTable")]
-#[cfg(feature = "libxml_tree")]
-pub fn xml_copy_entities_table(
-    table: XmlHashTableRef<'static, XmlEntityPtr>,
-) -> Option<XmlHashTableRef<'static, XmlEntityPtr>> {
-    let new = table.clone_with(|&ent, _| xml_copy_entity(ent).unwrap());
-    XmlHashTableRef::from_table(new)
-}
-
-/// Deallocate the memory used by an entities hash table.
-#[doc(alias = "xmlFreeEntitiesTable")]
-pub unsafe fn xml_free_entities_table(table: XmlHashTableRef<'static, XmlEntityPtr>) {
-    unsafe {
-        let mut table = table.into_inner();
-        table.clear_with(|payload, _| {
-            xml_free_entity(payload);
-        });
-    }
 }
 
 /// This will dump the quoted string value, taking care of the special

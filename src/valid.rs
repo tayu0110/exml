@@ -33,8 +33,6 @@ use crate::{
     chvalid::XmlCharValid,
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     globals::{GenericError, GenericErrorContext, StructuredError},
-    hash::XmlHashTableRef,
-    libxml::hash::XmlHashTable,
     list::XmlList,
     parser::{XML_VCTXT_USE_PCTXT, build_qname, split_qname2},
     tree::{
@@ -1332,16 +1330,6 @@ pub unsafe fn xml_add_element_decl(
     }
 }
 
-/// This will dump the content of the element table as an XML DTD definition
-#[doc(alias = "xmlDumpElementTable")]
-#[cfg(feature = "libxml_output")]
-pub fn xml_dump_element_table<'a>(
-    buf: &mut (impl Write + 'a),
-    table: &XmlHashTable<'static, XmlElementPtr>,
-) {
-    table.scan(|data, _, _, _| xml_dump_element_decl(buf, *data));
-}
-
 /// Dump the occurrence operator of an element.
 #[doc(alias = "xmlDumpElementOccur")]
 #[cfg(feature = "libxml_output")]
@@ -1723,26 +1711,6 @@ pub(crate) fn xml_scan_id_attribute_decl(
         cur = now.nexth;
     }
     ret
-}
-
-/// Deallocate the memory used by an entities hash table.
-#[doc(alias = "xmlFreeAttributeTable")]
-pub unsafe fn xml_free_attribute_table(mut table: XmlHashTable<'static, XmlAttributePtr>) {
-    unsafe {
-        table.clear_with(|payload, _| {
-            xml_free_attribute(payload);
-        });
-    }
-}
-
-/// This will dump the content of the attribute table as an XML DTD definition
-#[doc(alias = "xmlDumpAttributeTable")]
-#[cfg(feature = "libxml_output")]
-pub fn xml_dump_attribute_table<'a>(
-    buf: &mut (impl Write + 'a),
-    table: XmlHashTableRef<'static, XmlAttributePtr>,
-) {
-    table.scan(|data, _, _, _| xml_dump_attribute_decl(buf, *data));
 }
 
 /// This will dump the content of the attribute declaration as an XML DTD definition
