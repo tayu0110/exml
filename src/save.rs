@@ -1028,7 +1028,7 @@ unsafe fn xml_dtd_dump_output(ctxt: &mut XmlSaveCtxt, dtd: XmlDtdPtr) {
             ctxt.buf.write_bytes(b" PUBLIC ").ok();
             write_quoted(&mut ctxt.buf.buffer, external_id).ok();
             ctxt.buf.write_bytes(b" ").ok();
-            write_quoted(&mut ctxt.buf.buffer, dtd.system_id.as_deref().unwrap());
+            write_quoted(&mut ctxt.buf.buffer, dtd.system_id.as_deref().unwrap()).ok();
         } else if let Some(system_id) = dtd.system_id.as_deref() {
             ctxt.buf.write_bytes(b" SYSTEM ").ok();
             write_quoted(&mut ctxt.buf.buffer, system_id).ok();

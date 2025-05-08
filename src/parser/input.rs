@@ -352,12 +352,6 @@ impl<'a> XmlParserInput<'a> {
         0
     }
 
-    /// Returns the distance between the base and the top of the buffer.
-    #[doc(alias = "xmlBufGetInputBase")]
-    pub(crate) fn get_base(&self) -> usize {
-        self.base
-    }
-
     /// Reduce buffer capacity.  
     /// The `base` and `cur` are automatically aligned according to the number of bytes removed.
     ///

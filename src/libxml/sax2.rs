@@ -238,7 +238,7 @@ pub fn xml_sax2_external_subset(
         let oldencoding = ctxt.encoding.take();
         let oldprogressive = ctxt.progressive;
         ctxt.progressive = false;
-        ctxt.push_input(input);
+        ctxt.push_input(input).ok();
 
         // On the fly encoding conversion if needed
         if ctxt.input().unwrap().length >= 4 {

@@ -3513,17 +3513,6 @@ impl Default for XmlRegExecCtxt {
     }
 }
 
-#[repr(C)]
-enum XmlExpNodeInfo {
-    XmlExpNilable = 1 << 0,
-}
-
-macro_rules! IS_NILLABLE {
-    ( $node:expr ) => {
-        (*$node).info & XmlExpNodeInfo::XmlExpNilable as u8
-    };
-}
-
 /// Handle a compilation failure
 #[doc(alias = "xmlRegexpErrCompile")]
 fn xml_regexp_err_compile(ctxt: &mut XmlRegParserCtxt, extra: &str) {

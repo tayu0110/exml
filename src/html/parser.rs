@@ -1003,20 +1003,6 @@ fn html_check_implied(ctxt: &mut HtmlParserCtxt, newtag: &str) {
     }
 }
 
-// Macro used to grow the current buffer.
-macro_rules! grow_buffer {
-    ($ctxt:expr, $buffer:expr, $buffer_size:expr) => {
-        $buffer_size *= 2;
-        let tmp: *mut XmlChar = xml_realloc($buffer as _, $buffer_size as usize) as _;
-        if tmp.is_null() {
-            html_err_memory($ctxt, Some("growing buffer\n"));
-            xml_free($buffer as _);
-            return null_mut();
-        }
-        $buffer = tmp;
-    };
-}
-
 /// Parse an HTML attribute value till the stop (quote),
 /// if stop is 0 then it stops at the first space
 ///

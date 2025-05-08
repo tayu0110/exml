@@ -45,7 +45,7 @@ use libc::{
 
 use crate::{
     encoding::find_encoding_handler,
-    error::{__xml_simple_error, __xml_simple_oom_error, XmlErrorDomain, XmlParserErrors},
+    error::{__xml_simple_error, XmlErrorDomain, XmlParserErrors},
     nanohttp::XmlNanoHTTPCtxt,
     parser::{__xml_err_encoding, XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput},
     uri::{canonic_path, unescape_url},
@@ -54,12 +54,6 @@ use crate::{
 pub use input::*;
 #[cfg(feature = "libxml_output")]
 pub use output::*;
-
-///  Handle an out of memory condition
-#[doc(alias = "xmlIOErrMemory")]
-pub(crate) fn xml_ioerr_memory(extra: &str) {
-    __xml_simple_oom_error(XmlErrorDomain::XmlFromIO, None, Some(extra));
-}
 
 const IOERR: &[&str] = &[
     "Unknown IO error",                    /* UNKNOWN */

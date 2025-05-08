@@ -181,8 +181,6 @@ pub struct XmlParserCtxt<'a> {
     // array of nodes
     pub(crate) name_tab: Vec<Rc<str>>,
 
-    // unused
-    nb_chars: i64,
     // used by progressive parsing lookup
     pub(crate) check_index: usize,
     // ugly but ...
@@ -268,8 +266,6 @@ pub struct XmlParserCtxt<'a> {
     pub last_error: XmlError,
     // the parser mode
     pub(crate) parse_mode: XmlParserMode,
-    // unused
-    pub(crate) nbentities: u64,
     // size of parsed entities
     pub sizeentities: u64,
 
@@ -1939,7 +1935,6 @@ impl Default for XmlParserCtxt<'_> {
             directory: None,
             name: None,
             name_tab: vec![],
-            nb_chars: 0,
             check_index: 0,
             keep_blanks: get_keep_blanks_default_value(),
             disable_sax: false,
@@ -1975,7 +1970,6 @@ impl Default for XmlParserCtxt<'_> {
             free_attrs: None,
             last_error: XmlError::default(),
             parse_mode: XmlParserMode::default(),
-            nbentities: 0,
             sizeentities: 0,
             node_info_tab: vec![],
             input_id: 0,
