@@ -721,7 +721,7 @@ pub(crate) fn parse_external_entity_private(
         ctxt.str_xmlns = Some(Cow::Borrowed("xmlns"));
         ctxt.str_xml_ns = Some(Cow::Borrowed(XML_XML_NAMESPACE));
         ctxt.atts_default = take(&mut oldctxt.atts_default);
-        ctxt.atts_special = oldctxt.atts_special;
+        ctxt.atts_special = take(&mut oldctxt.atts_special);
         ctxt.linenumbers = oldctxt.linenumbers;
         ctxt.record_info = oldctxt.record_info;
         ctxt.node_seq = take(&mut oldctxt.node_seq);
@@ -769,7 +769,7 @@ pub(crate) fn parse_external_entity_private(
         }
 
         ctxt.atts_default.clear();
-        ctxt.atts_special = None;
+        ctxt.atts_special.clear();
         oldctxt.nb_errors = ctxt.nb_errors;
         oldctxt.nb_warnings = ctxt.nb_warnings;
         oldctxt.validate = ctxt.validate;

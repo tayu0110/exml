@@ -25,7 +25,6 @@ use crate::{
         get_line_numbers_default_value, get_load_ext_dtd_default_value, get_parser_debug_entities,
         get_pedantic_parser_default_value, get_substitute_entities_default_value,
     },
-    hash::XmlHashTableRef,
     io::{XmlParserInputBuffer, xml_parser_get_directory},
     libxml::{
         catalog::XmlCatalogEntry,
@@ -249,7 +248,7 @@ pub struct XmlParserCtxt<'a> {
         Vec<(String, Option<String>, String, Option<&'static str>)>,
     >,
     // non-CDATA attributes if any
-    pub(crate) atts_special: Option<XmlHashTableRef<'static, XmlAttributeType>>,
+    pub(crate) atts_special: HashMap<(Cow<'static, str>, Cow<'static, str>), XmlAttributeType>,
     // is the document XML Namespace okay
     pub(crate) ns_well_formed: bool,
     // Extra options
@@ -814,7 +813,7 @@ impl<'a> XmlParserCtxt<'a> {
         self.sizeentcopy = 0;
         self.node_seq.clear();
         self.atts_default.clear();
-        let _ = self.atts_special.take().map(|t| t.into_inner());
+        self.atts_special.clear();
 
         #[cfg(feature = "catalog")]
         {
@@ -1967,7 +1966,7 @@ impl Default for XmlParserCtxt<'_> {
             ns_tab: vec![],
             push_tab: vec![],
             atts_default: HashMap::new(),
-            atts_special: None,
+            atts_special: HashMap::new(),
             ns_well_formed: true,
             options: 0,
             free_elems_nr: 0,
@@ -1994,7 +1993,6 @@ impl Drop for XmlParserCtxt<'_> {
     #[doc(alias = "xmlFreeParserCtxt")]
     fn drop(&mut self) {
         unsafe {
-            let _ = self.atts_special.take().map(|t| t.into_inner());
             let mut cur = self.free_elems;
             while let Some(now) = cur {
                 let next = now.next.map(|node| XmlNodePtr::try_from(node).unwrap());

@@ -2068,7 +2068,7 @@ unsafe fn xml_sax2_attribute_ns(
                         // apply an extra layer of normalization.
                         // It need to be done twice ... it's an extra burden related
                         // to the ability to keep references in attributes
-                        if ctxt.atts_special.is_some() {
+                        if !ctxt.atts_special.is_empty() {
                             let fullname = build_qname(localname, prefix);
                             ctxt.vctxt.valid = 1;
                             let nvalnorm = ctxt.normalize_attribute_value(

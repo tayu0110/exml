@@ -4349,8 +4349,7 @@ pub fn html_ctxt_reset(ctxt: &mut HtmlParserCtxt) {
     }
     ctxt.node_seq.clear();
     ctxt.atts_default.clear();
-
-    let _ = ctxt.atts_special.take().map(|t| t.into_inner());
+    ctxt.atts_special.clear();
 
     ctxt.nb_errors = 0;
     ctxt.nb_warnings = 0;

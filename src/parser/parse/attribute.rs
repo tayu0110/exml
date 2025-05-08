@@ -607,13 +607,16 @@ impl XmlParserCtxt<'_> {
         };
 
         // get the type if needed
-        if let Some(atts) = self.atts_special {
-            if atts
-                .qlookup2(pref, elem, prefix.as_deref(), Some(&name))
-                .is_some()
-            {
-                normalize = true;
-            }
+        if !self.atts_special.is_empty() {
+            let fullname = pref.map_or(Cow::Borrowed(elem), |pref| {
+                Cow::Owned(format!("{pref}:{elem}"))
+            });
+            let fullattr = prefix
+                .as_deref()
+                .map_or(Cow::Borrowed(name.as_str()), |pref| {
+                    Cow::Owned(format!("{pref}:{name}"))
+                });
+            normalize = self.atts_special.contains_key(&(fullname, fullattr));
         }
 
         // read the value

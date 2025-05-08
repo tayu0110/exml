@@ -573,7 +573,7 @@ pub(crate) fn xml_parse_balanced_chunk_memory_internal(
             ctxt.loadsubset |= XML_SKIP_IDS as i32;
         }
         ctxt.atts_default = take(&mut oldctxt.atts_default);
-        ctxt.atts_special = oldctxt.atts_special;
+        ctxt.atts_special = take(&mut oldctxt.atts_special);
 
         ctxt.parse_content();
         if ctxt.content_bytes().starts_with(b"</") {
@@ -637,7 +637,7 @@ pub(crate) fn xml_parse_balanced_chunk_memory_internal(
         oldctxt.sax = ctxt.sax.take();
         ctxt.sax = oldsax;
         ctxt.atts_default.clear();
-        ctxt.atts_special = None;
+        ctxt.atts_special.clear();
         if let Some(new_doc) = new_doc {
             xml_free_doc(new_doc);
         }

@@ -1,6 +1,7 @@
 use std::{
     borrow::Cow,
     cell::RefCell,
+    collections::hash_map::Entry,
     rc::{Rc, Weak},
 };
 
@@ -10,7 +11,6 @@ use crate::{
     error::XmlParserErrors,
     generic_error,
     globals::get_parser_debug_entities,
-    hash::{XmlHashTable, XmlHashTableRef},
     libxml::sax2::{xml_sax2_entity_decl, xml_sax2_get_entity},
     parser::{
         XmlParserCtxt, XmlParserInput, XmlParserInputState, XmlParserOption, split_qname2,
@@ -38,8 +38,7 @@ impl XmlParserCtxt<'_> {
         // Allows to detect attribute redefinitions
         if self
             .atts_special
-            .filter(|t| t.lookup2(fullname, Some(fullattr)).is_some())
-            .is_some()
+            .contains_key(&(Cow::Borrowed(fullname), Cow::Borrowed(fullattr)))
         {
             return;
         }
@@ -80,23 +79,12 @@ impl XmlParserCtxt<'_> {
     /// Register this attribute type
     #[doc(alias = "xmlAddSpecialAttr")]
     fn add_special_attr(&mut self, fullname: &str, fullattr: &str, typ: XmlAttributeType) {
-        let mut atts_special = if let Some(table) = self.atts_special {
-            table
-        } else {
-            let table = XmlHashTable::with_capacity(10);
-            let Some(table) = XmlHashTableRef::from_table(table) else {
-                xml_err_memory(Some(self), None);
-                return;
-            };
-            self.atts_special = Some(table);
-            table
-        };
-
-        if atts_special.lookup2(fullname, Some(fullattr)).is_some() {
-            return;
+        if let Entry::Vacant(entry) = self.atts_special.entry((
+            Cow::Owned(fullname.to_owned()),
+            Cow::Owned(fullattr.to_owned()),
+        )) {
+            entry.insert(typ);
         }
-
-        atts_special.add_entry2(fullname, Some(fullattr), typ).ok();
     }
 
     /// Trim the list of attributes defined to remove all those of type
@@ -104,18 +92,9 @@ impl XmlParserCtxt<'_> {
     /// to parse the DTD and before starting to parse the document root.
     #[doc(alias = "xmlCleanSpecialAttr")]
     pub(crate) fn clean_special_attr(&mut self) {
-        let Some(mut atts) = self.atts_special else {
-            return;
-        };
-
-        atts.remove_if(
-            |data, _, _, _| *data == XmlAttributeType::XmlAttributeCDATA,
-            |_, _| {},
-        );
-        if atts.is_empty() {
-            atts.free();
-            self.atts_special = None;
-        }
+        self.atts_special
+            .retain(|_, v| *v != XmlAttributeType::XmlAttributeCDATA);
+        self.atts_special.shrink_to_fit();
     }
 
     /// Parse a DOCTYPE declaration
