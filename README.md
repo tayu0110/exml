@@ -37,24 +37,6 @@ Since the implementation is still insufficient, it may not be possible to build 
 | libxml_writer      | Corresponds to `XML_WITH_WRITER`                                          |
 | libxml_xptr_locs   | Corresponds to the behavior when `LIBXML_XPTR_LOCS_ENABLED` is enabled.   |
 
-## Unsupported features
-Some features will be substituted or not supported.
-
-| feature            | description                                                               |
-|:-------------------|:--------------------------------------------------------------------------|
-| XML_WITH_THREAD    | It is not provided as a separate feature.                                 |
-| XML_WITH_FTP       | Not planed. Please use other crates.                                      |
-| XML_WITH_LEGACY    | Not planed.                                                               |
-| XML_WITH_ICONV     | Only the encodings provided by `encoding_rs` are supported by default.    |
-| XML_WITH_MODULES   | Not planed. Please use other crates.                                      |
-| XML_WITH_DEBUG_MEM | Not planed.                                                               |
-| XML_WITH_DEBUG_RUN | Not planed.                                                               |
-| XML_WITH_ZLIB      | Not planed. Please use other crates.                                      |
-| XML_WITH_LZMA      | Not planed. Please use other crates.                                      |
-| XML_WITH_ICU       | Only the encodings provided by `encoding_rs` are supported by default.    |
-| XML_WITH_EXPR      | Removed.                                                                  |
-
-
 # Tests
 
 All tests under the `tests/` directory are also based on original libxml2.\
