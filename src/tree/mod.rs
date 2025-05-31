@@ -39,7 +39,6 @@ use std::{
     borrow::Cow,
     cell::RefCell,
     fmt::Display,
-    ptr::null_mut,
     rc::{Rc, Weak},
     sync::atomic::{AtomicBool, AtomicI32, Ordering},
 };

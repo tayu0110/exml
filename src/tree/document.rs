@@ -135,7 +135,7 @@ impl XmlDoc {
                     let cur = cur_node.ns;
                     if let Some(cur) = cur.filter(|cur| {
                         cur.href.as_deref().is_some_and(|h| h == href)
-                            && (*cur).prefix().is_some()
+                            && cur.prefix().is_some()
                             && xml_ns_in_scope(doc, Some(orig), node, cur.prefix.as_deref()) == 1
                     }) {
                         return Some(cur);

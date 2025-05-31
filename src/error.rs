@@ -1778,7 +1778,7 @@ macro_rules! __xml_simple_error {
             None,
             None,
             None,
-            null_mut(),
+            std::ptr::null_mut(),
             $node as _,
             $domain,
             $code,

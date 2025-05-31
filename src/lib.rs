@@ -1,6 +1,7 @@
 #![allow(clippy::missing_safety_doc)]
 #![allow(clippy::blocks_in_conditions)]
 #![allow(clippy::needless_range_loop)]
+#![allow(clippy::type_complexity)]
 #![allow(unused_assignments)]
 #![allow(deprecated)]
 #![allow(unused)]
@@ -18,6 +19,7 @@ mod chvalid;
 #[cfg(feature = "libxml_debug")]
 pub mod debug_xml;
 pub mod dict;
+pub mod dom;
 pub mod encoding;
 pub mod error;
 pub mod globals;

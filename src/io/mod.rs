@@ -32,7 +32,6 @@ use std::{
     fs::{File, metadata},
     io::{self, ErrorKind, Read, stdin},
     path::{Path, PathBuf},
-    ptr::null_mut,
 };
 
 use libc::{
