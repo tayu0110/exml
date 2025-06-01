@@ -657,6 +657,10 @@ impl NodeConnection for TextRef {
         replace(&mut self.0.borrow_mut().next_sibling, new_sibling)
     }
 
+    fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
+        replace(&mut self.0.borrow_mut().owner_document, new_doc.downgrade()).upgrade()
+    }
+
     fn adopted_to(&mut self, new_doc: DocumentRef) {
         self.0.borrow_mut().adopted_to(new_doc);
     }
@@ -836,6 +840,10 @@ impl NodeConnection for CommentRef {
         replace(&mut self.0.borrow_mut().next_sibling, new_sibling)
     }
 
+    fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
+        replace(&mut self.0.borrow_mut().owner_document, new_doc.downgrade()).upgrade()
+    }
+
     fn adopted_to(&mut self, new_doc: DocumentRef) {
         self.0.borrow_mut().adopted_to(new_doc);
     }
@@ -1007,6 +1015,10 @@ impl NodeConnection for CDATASectionRef {
 
     fn set_next_sibling(&mut self, new_sibling: Option<NodeRef>) -> Option<NodeRef> {
         replace(&mut self.0.borrow_mut().next_sibling, new_sibling)
+    }
+
+    fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
+        replace(&mut self.0.borrow_mut().owner_document, new_doc.downgrade()).upgrade()
     }
 
     fn adopted_to(&mut self, new_doc: DocumentRef) {

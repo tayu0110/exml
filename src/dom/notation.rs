@@ -1,5 +1,6 @@
 use std::{
     cell::RefCell,
+    mem::replace,
     rc::{Rc, Weak},
 };
 
@@ -118,6 +119,10 @@ impl NodeConnection for NotationRef {
 
     fn set_next_sibling(&mut self, _: Option<NodeRef>) -> Option<NodeRef> {
         None
+    }
+
+    fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
+        replace(&mut self.0.borrow_mut().owner_document, new_doc.downgrade()).upgrade()
     }
 
     fn adopted_to(&mut self, _new_doc: DocumentRef) {

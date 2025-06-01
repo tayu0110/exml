@@ -1132,6 +1132,10 @@ impl NodeConnection for ElementRef {
         replace(&mut self.0.borrow_mut().next_sibling, new_sibling)
     }
 
+    fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
+        replace(&mut self.0.borrow_mut().owner_document, new_doc.downgrade()).upgrade()
+    }
+
     fn adopted_to(&mut self, new_doc: DocumentRef) {
         self.0.borrow_mut().adopted_to(new_doc);
     }

@@ -77,6 +77,19 @@ impl EntityReference {
 pub struct EntityReferenceRef(Rc<RefCell<EntityReference>>);
 
 impl EntityReferenceRef {
+    /// Create new [`EntityReferenceRef`] whose ownerDocument is `doc`.
+    pub(super) fn from_doc(doc: DocumentRef, name: Rc<str>) -> Self {
+        Self(Rc::new(RefCell::new(EntityReference {
+            parent_node: None,
+            first_child: None,
+            last_child: None,
+            previous_sibling: None,
+            next_sibling: None,
+            owner_document: doc.downgrade(),
+            name,
+        })))
+    }
+
     pub(crate) fn get_entity_ref_value(&self) -> Option<String> {
         self.0.borrow().get_entity_ref_value()
     }
@@ -189,6 +202,10 @@ impl NodeConnection for EntityReferenceRef {
         replace(&mut self.0.borrow_mut().next_sibling, new_sibling)
     }
 
+    fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
+        replace(&mut self.0.borrow_mut().owner_document, new_doc.downgrade()).upgrade()
+    }
+
     /// # Specification
     /// ```text
     /// ENTITY_REFERENCE_NODE
@@ -209,7 +226,7 @@ impl NodeConnection for EntityReferenceRef {
 
         // If new entity reference can be created successfully,
         // move its children to `self`.
-        if let Ok(entref) = new_doc.create_entity_reference(&self.node_name()) {
+        if let Ok(entref) = new_doc.create_entity_reference(self.node_name()) {
             self.set_first_child(entref.first_child());
             self.set_last_child(entref.last_child());
             let mut children = entref.first_child();

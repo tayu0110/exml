@@ -1249,6 +1249,9 @@ pub(super) trait NodeConnection: Clone + Into<NodeRef> {
     /// Set new next sibling node.  
     /// Return old next sibling node if exists.
     fn set_next_sibling(&mut self, new_sibling: Option<NodeRef>) -> Option<NodeRef>;
+    /// Set new owner Document node.  
+    /// Return old owner Document node if exists.
+    fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef>;
 
     /// Replace ownerDocument of self and all elements of the subtree.
     ///
@@ -1490,6 +1493,7 @@ impl_node_connection_to_noderef! {
     set_last_child(new_child: Option<NodeRef>) -> Option<NodeRef>,
     set_previous_sibling(new_sibling: Option<NodeRef>) -> Option<NodeRef>,
     set_next_sibling(new_sibling: Option<NodeRef>) -> Option<NodeRef>,
+    set_owner_document(new_doc: DocumentRef) -> Option<DocumentRef>,
     adopted_to(new_doc: DocumentRef) -> (),
     connect_as_previous_sibling(next: NodeRef) -> (),
     connect_as_next_sibling(prev: NodeRef) -> (),

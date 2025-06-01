@@ -156,6 +156,10 @@ impl NodeConnection for EntityRef {
         None
     }
 
+    fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
+        replace(&mut self.0.borrow_mut().owner_document, new_doc.downgrade()).upgrade()
+    }
+
     fn adopted_to(&mut self, _new_doc: DocumentRef) {
         // Entity nodes cannot be adopted.
     }

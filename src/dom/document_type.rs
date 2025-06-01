@@ -4,6 +4,8 @@ use std::{
     rc::{Rc, Weak},
 };
 
+use crate::tree::validate_name;
+
 use super::{
     DOMException, NodeType,
     character_data::CommentRef,
@@ -299,6 +301,10 @@ impl NodeConnection for DocumentTypeRef {
         replace(&mut self.0.borrow_mut().next_sibling, new_sibling)
     }
 
+    fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
+        replace(&mut self.0.borrow_mut().owner_document, new_doc.downgrade()).upgrade()
+    }
+
     fn adopted_to(&mut self, _new_doc: DocumentRef) {
         // `DocumentType` nodes cannot be adopted.
     }
@@ -372,20 +378,96 @@ impl<const EXT: bool> DtdSubset<EXT> {
         self.notations.contains(notation)
     }
 
+    fn append_markup_decl(&mut self, data: MarkupDecl) {
+        if let Some(last) = self.last_child.clone() {
+            let entry = Rc::new(RefCell::new(MarkupDeclListEntry {
+                previous: Some(Rc::downgrade(&last)),
+                next: None,
+                data,
+            }));
+            last.borrow_mut().next = Some(entry.clone());
+            self.last_child = Some(entry);
+        } else {
+            let entry = Rc::new(RefCell::new(MarkupDeclListEntry {
+                previous: None,
+                next: None,
+                data,
+            }));
+            self.first_child = Some(entry.clone());
+            self.last_child = Some(entry);
+        }
+    }
+
+    /// Add an entity `entity` to this subset.
+    ///
+    /// If this subset already has an entity with the same name as the name of the `entity`,
+    /// `entity` is not added and this method returns [`Err`].  
+    /// The name of the entity is also verified.
+    pub fn add_entity(&mut self, entity: EntityRef) -> Result<(), DOMException> {
+        let name = entity.node_name();
+        if validate_name::<false>(&name).is_err() {
+            return Err(DOMException::InvalidCharacterErr);
+        }
+        if self.entities.get_named_item(name.clone()).is_some() {
+            // Is this correct ??
+            return Err(DOMException::NoDataAllowedErr);
+        }
+
+        self.entities.set_named_item(entity.clone())?;
+        let decl = MarkupDecl::EntityDecl(entity);
+        self.append_markup_decl(decl);
+        Ok(())
+    }
+
+    /// Add an notation `notation` to this subset.
+    ///
+    /// If this subset already has an notation with the same name as the name of the `notation`,
+    /// `notation` is not added and this method returns [`Err`].  
+    /// The name of the notation is also verified.
+    pub fn add_notation(&mut self, notation: NotationRef) -> Result<(), DOMException> {
+        let name = notation.node_name();
+        if validate_name::<false>(&name).is_err() {
+            return Err(DOMException::InvalidCharacterErr);
+        }
+        if self.notations.get_named_item(name.clone()).is_some() {
+            // Is this correct ??
+            return Err(DOMException::NoDataAllowedErr);
+        }
+
+        self.notations.set_named_item(notation.clone())?;
+        let decl = MarkupDecl::NotationDecl(notation);
+        self.append_markup_decl(decl);
+        Ok(())
+    }
+
     pub fn clone_node(&self, deep: bool) -> Self {
         let mut subset = Self {
             first_child: None,
             last_child: None,
             owner_document: self.owner_document.clone(),
             name: self.name.clone(),
-            entities: todo!(),
-            notations: todo!(),
+            entities: NamedNodeMap::new(self.entities.owner_document().unwrap().downgrade()),
+            notations: NamedNodeMap::new(self.notations.owner_document().unwrap().downgrade()),
             public_id: self.public_id.clone(),
             system_id: self.system_id.clone(),
         };
 
         if deep {
-            todo!("add all children to the new subset")
+            for i in 0..self.entities.len() {
+                let ent = self.entities.item(i).unwrap();
+                let NodeRef::Entity(ent) = ent.clone_node(true) else {
+                    unreachable!()
+                };
+                subset.add_entity(ent);
+            }
+
+            for i in 0..self.notations.len() {
+                let not = self.notations.item(i).unwrap();
+                let NodeRef::Notation(not) = not.clone_node(true) else {
+                    unreachable!()
+                };
+                subset.add_notation(not);
+            }
         }
 
         subset

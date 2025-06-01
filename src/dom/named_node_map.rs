@@ -367,6 +367,11 @@ impl<N: Node + Clone> NamedNodeMap<N> {
         Ok(res)
     }
 
+    /// Get the owner Document.
+    pub(super) fn owner_document(&self) -> Option<DocumentRef> {
+        self.owner_document.upgrade()
+    }
+
     /// Replace ownerDocument of this map.
     ///
     /// All data in this map won't modified.  

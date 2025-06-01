@@ -393,9 +393,25 @@ impl DocumentRef {
     /// ```
     pub fn create_entity_reference(
         &mut self,
-        name: &str,
+        name: impl Into<Rc<str>>,
     ) -> Result<EntityReferenceRef, DOMException> {
-        todo!()
+        if self.is_html() {
+            return Err(DOMException::NotSupportedErr);
+        }
+        let name: Rc<str> = name.into();
+        if validate_name::<false>(&name).is_err() {
+            return Err(DOMException::InvalidCharacterErr);
+        }
+        let mut entref = EntityReferenceRef::from_doc(self.clone(), name);
+
+        if let Some(entity) = self.get_entity(entref.node_name()) {
+            let mut children = entity.first_child();
+            while let Some(child) = children {
+                children = child.next_sibling();
+                entref.append_child(child.clone_node(true));
+            }
+        }
+        Ok(entref)
     }
 
     /// Implementation of [`getElementsByTagName`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-A6C9094) method.
@@ -478,8 +494,7 @@ impl DocumentRef {
     ///         that cannot have any children, and on Attr, and EntityReference nodes.
     ///
     /// Return Value
-    /// Node
-    /// The imported node that belongs to this Document.
+    ///     Node The imported node that belongs to this Document.
     ///
     /// Exceptions
     ///     DOMException
@@ -495,7 +510,108 @@ impl DocumentRef {
         imported_node: NodeRef,
         deep: bool,
     ) -> Result<NodeRef, DOMException> {
-        todo!()
+        match &imported_node {
+            NodeRef::Attribute(attr) => {
+                let NodeRef::Attribute(mut attr) = attr.clone_node(deep) else {
+                    unreachable!()
+                };
+                let mut children = attr.first_child();
+                while let Some(child) = children {
+                    children = child.next_sibling();
+                    attr.replace_child(self.import_node(child.clone(), true)?, child)?;
+                }
+                Ok(attr.into())
+            }
+            NodeRef::DocumentFragment(frag) => {
+                let mut new = self.create_document_fragment();
+                if deep {
+                    let mut children = frag.first_child();
+                    while let Some(child) = children {
+                        children = child.next_sibling();
+                        new.append_child(self.import_node(child, true)?)?;
+                    }
+                }
+                Ok(new.into())
+            }
+            NodeRef::Document(_) | NodeRef::DocumentType(_) => Err(DOMException::NotSupportedErr),
+            NodeRef::Element(elem) => {
+                let mut new = if elem.local_name().is_some() {
+                    self.create_element_ns(
+                        elem.namespace_uri().as_deref(),
+                        elem.node_name().as_ref(),
+                    )
+                } else {
+                    self.create_element(self.node_name())
+                }?;
+
+                let attrs = elem.attributes();
+                for i in 0..attrs.len() {
+                    let attr = attrs.item(i).unwrap();
+                    if attr.specified() {
+                        let NodeRef::Attribute(attr) = self.import_node(attr.into(), deep)? else {
+                            unreachable!()
+                        };
+                        new.set_attribute_node_ns(attr.clone())
+                            .or_else(|_| new.set_attribute_node(attr))?;
+                    }
+                }
+
+                if deep {
+                    let mut children = elem.first_child();
+                    while let Some(child) = children {
+                        children = child.next_sibling();
+                        new.append_child(self.import_node(child, true)?);
+                    }
+                }
+                Ok(new.into())
+            }
+            NodeRef::EntityReference(entref) => Ok(self
+                .create_entity_reference(entref.node_name().as_ref())?
+                .into()),
+            node @ (NodeRef::Notation(_)
+            | NodeRef::CDATASection(_)
+            | NodeRef::Comment(_)
+            | NodeRef::ProcessingInstruction(_)
+            | NodeRef::Text(_)
+            | NodeRef::Entity(_)) => {
+                let mut new = node.clone_node(deep);
+                new.set_owner_document(self.clone());
+
+                let mut children = new.first_child();
+                while let Some(mut child) = children {
+                    child.set_owner_document(self.clone());
+                    if let Some(attrs) = child.attributes() {
+                        for i in 0..attrs.len() {
+                            let mut attr = attrs.item(i).unwrap();
+                            attr.set_owner_document(self.clone());
+                            let mut children = attr.first_child();
+                            while let Some(child) = children {
+                                children = child.next_sibling();
+                                attr.replace_child(self.import_node(child.clone(), true)?, child)?;
+                            }
+                        }
+                    }
+
+                    if let Some(ch) = child.first_child() {
+                        children = Some(ch);
+                    } else if let Some(sib) = child.next_sibling() {
+                        children = Some(sib);
+                    } else {
+                        children = None;
+                        while let Some(par) =
+                            child.parent_node().filter(|par| !new.is_same_node(par))
+                        {
+                            if let Some(sib) = par.next_sibling() {
+                                children = Some(sib);
+                                break;
+                            }
+                            child = par;
+                        }
+                    }
+                }
+                Ok(new)
+            }
+        }
     }
 
     /// Implementation of [`createElementNS`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-DocCrElNS) method.
@@ -1135,6 +1251,10 @@ impl NodeConnection for DocumentRef {
     }
 
     fn set_next_sibling(&mut self, _: Option<NodeRef>) -> Option<NodeRef> {
+        None
+    }
+
+    fn set_owner_document(&mut self, _: DocumentRef) -> Option<DocumentRef> {
         None
     }
 
