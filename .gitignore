@@ -7,11 +7,18 @@
 /result
 # Test data in xmlconf
 /xmlconf
+/resources/DOM-Test-Suite
 
 libxml2-*
 callgrind.out.*
 *.xml
+*.xhtml
 *.html
+*.xsl
+*.dtd
 *.tar.gz
 *.out
 *.log
+*.svg
+*.cvsignore
+*.zip
