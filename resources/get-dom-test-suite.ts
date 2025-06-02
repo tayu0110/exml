@@ -90,10 +90,22 @@ await Deno.writeFile(
     await junit.bytes(),
 );
 
-// If you cannot install old JDK, you can comment out the following lines.
-// const build_xml = new TextDecoder().decode(
-//     await Deno.readFile(`${TEST_SUITE_ROOT}/build.xml`),
-// )
-//     .replaceAll('source="1.2"', 'source="8"')
-//     .replaceAll('target="1.1"', 'target="8"');
-// await Deno.writeTextFile(`${TEST_SUITE_ROOT}/build.xml`, build_xml);
+const build_xml = new TextDecoder().decode(
+    await Deno.readFile(`${TEST_SUITE_ROOT}/build.xml`),
+)
+    // .replaceAll('source="1.2"', 'source="8"')
+    // .replaceAll('target="1.1"', 'target="8"')
+    .replaceAll(
+        "http://www.w3.org/2002/08/xmlspec-v22-dom.dtd",
+        "https://www.w3.org/XML/1998/06/xmlspec-v21.dtd",
+    )
+    .replaceAll("xmlspec-v22-dom.dtd", "xmlspec-v21-dom.dtd")
+    .replaceAll(
+        "2000/REC-DOM-Level-2",
+        "2000/PR-DOM-Level-2",
+    )
+    .replaceAll(
+        "20001113",
+        "20000927",
+    );
+await Deno.writeTextFile(`${TEST_SUITE_ROOT}/build.xml`, build_xml);
