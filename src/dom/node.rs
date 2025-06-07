@@ -29,15 +29,45 @@ use super::{
 /// Implementation of [Node](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-1950641247)
 /// interface on [1.4 Fundamental Interfaces: Core Module](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-BBACDC08)
 ///
-/// Actual node representations are implemented as `NodeRef` and `NodeWeakRef`.
+/// Actual node representations are implemented as [`NodeRef`].
 #[allow(private_bounds)]
 pub trait Node: NodeConnection {
     /// Implementation of `nodeName` attribute.
+    ///
+    /// # Specification
+    /// ```text
+    /// The name of this node, depending on its type; see the table above.
+    /// ```
     fn node_name(&self) -> Rc<str>;
     /// Implementation of `nodeValue` attribute.
+    ///
+    /// # Specification
+    /// ```text
+    /// The value of this node, depending on its type; see the table above. When it is defined to be null, setting it has no effect, including if the node is read-only.
+    ///
+    /// Exceptions on retrieval
+    ///     DOMException
+    ///     DOMSTRING_SIZE_ERR: Raised when it would return more characters than fit in a DOMString variable on the implementation platform.
+    /// ```
     fn node_value(&self) -> Option<Rc<str>>;
+    /// Implementation of `nodeValue` attribute.
+    ///
+    /// # Specification
+    /// ```text
+    /// The value of this node, depending on its type; see the table above. When it is defined to be null, setting it has no effect, including if the node is read-only.
+    ///
+    /// Exceptions on setting
+    ///     DOMException
+    ///     NO_MODIFICATION_ALLOWED_ERR: Raised when the node is readonly and if it is not defined to be null.
+    /// ```
+    fn set_node_value(&mut self, value: impl Into<String>) -> Result<(), DOMException>;
 
     /// Implementation of `nodeType` attribute.
+    ///
+    /// # Specification
+    /// ```text
+    /// A code representing the type of the underlying object, as defined above.
+    /// ```
     fn node_type(&self) -> NodeType;
     /// Implementation of `parentNode` attribute.
     fn parent_node(&self) -> Option<NodeRef> {
@@ -1420,6 +1450,7 @@ macro_rules! impl_node_trait_to_noderef {
 impl_node_trait_to_noderef! {
     fn node_name() -> Rc<str>,
     fn node_value() -> Option<Rc<str>>,
+    fn(mut) set_node_value(value: impl Into<String>) -> Result<(), DOMException>,
     fn node_type() -> NodeType,
     fn parent_node() -> Option<NodeRef>,
     fn child_nodes() -> Vec<NodeRef>,

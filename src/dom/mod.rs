@@ -548,7 +548,18 @@ mod dom_test_suite {
             }
             // ./resources/DOM-Test-Suite/tests/level1/core/attrcreatetextnode2.xml
             #[test]
-            fn test_attrcreatetextnode2() {}
+            fn test_attrcreatetextnode2() {
+                let doc = staff_xml(STAFF_XML).unwrap();
+                let address_list = doc.get_elements_by_tag_name("address");
+                let test_node = address_list[3].clone();
+                let attributes = test_node.attributes();
+                let mut street_attr = attributes.get_named_item("street".into()).unwrap();
+                street_attr.set_node_value("Y&ent1;").unwrap();
+                let value = street_attr.get_value();
+                assert_eq!(value, "Y&ent1;");
+                let value = street_attr.node_value().unwrap();
+                assert_eq!(value, "Y&ent1;".into());
+            }
             // ./resources/DOM-Test-Suite/tests/level1/core/attrcreatetextnode.xml
             #[test]
             fn test_attrcreatetextnode() {

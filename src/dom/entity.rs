@@ -90,6 +90,10 @@ impl Node for EntityRef {
         None
     }
 
+    fn set_node_value(&mut self, _: impl Into<String>) -> Result<(), super::DOMException> {
+        Ok(())
+    }
+
     fn node_type(&self) -> NodeType {
         NodeType::Entity
     }

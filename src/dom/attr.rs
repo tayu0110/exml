@@ -272,6 +272,11 @@ impl Node for AttrRef {
         Some(self.0.borrow().get_value().into())
     }
 
+    fn set_node_value(&mut self, value: impl Into<String>) -> Result<(), DOMException> {
+        self.set_value(value)?;
+        Ok(())
+    }
+
     fn node_type(&self) -> NodeType {
         NodeType::Attribute
     }

@@ -561,6 +561,11 @@ impl Node for TextRef {
         Some(self.0.borrow().data.as_str().into())
     }
 
+    fn set_node_value(&mut self, value: impl Into<String>) -> Result<(), DOMException> {
+        self.set_data(value)?;
+        Ok(())
+    }
+
     fn node_type(&self) -> NodeType {
         NodeType::Text
     }
@@ -755,6 +760,11 @@ impl Node for CommentRef {
         Some(self.0.borrow().data.as_str().into())
     }
 
+    fn set_node_value(&mut self, value: impl Into<String>) -> Result<(), DOMException> {
+        self.set_data(value)?;
+        Ok(())
+    }
+
     fn node_type(&self) -> NodeType {
         NodeType::Comment
     }
@@ -930,6 +940,11 @@ impl Node for CDATASectionRef {
 
     fn node_value(&self) -> Option<Rc<str>> {
         Some(self.0.borrow().data.as_str().into())
+    }
+
+    fn set_node_value(&mut self, value: impl Into<String>) -> Result<(), DOMException> {
+        self.set_data(value)?;
+        Ok(())
     }
 
     fn node_type(&self) -> NodeType {

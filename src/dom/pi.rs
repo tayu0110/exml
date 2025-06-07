@@ -4,6 +4,8 @@ use std::{
     rc::{Rc, Weak},
 };
 
+use crate::dom::DOMException;
+
 use super::{
     NodeType,
     document::{DocumentRef, DocumentWeakRef},
@@ -65,6 +67,33 @@ impl ProcessingInstructionRef {
             data,
         })))
     }
+
+    /// Implementation of `data` attribute.
+    ///
+    /// # Specification
+    /// ```text
+    /// The content of this processing instruction. This is from the first non white space
+    /// character after the target to the character immediately preceding the ?>.
+    /// ```
+    pub fn data(&self) -> Option<Rc<str>> {
+        self.0.borrow().data.clone()
+    }
+
+    /// Implementation of `data` attribute.
+    ///
+    /// # Specification
+    /// ```text
+    /// The content of this processing instruction. This is from the first non white space
+    /// character after the target to the character immediately preceding the ?>.
+    ///
+    /// Exceptions on setting
+    ///     DOMException
+    ///     NO_MODIFICATION_ALLOWED_ERR: Raised when the node is readonly.
+    /// ```
+    pub fn set_data(&mut self, value: impl Into<Rc<str>>) -> Result<(), DOMException> {
+        self.0.borrow_mut().data = Some(value.into());
+        Ok(())
+    }
 }
 
 impl Node for ProcessingInstructionRef {
@@ -74,6 +103,11 @@ impl Node for ProcessingInstructionRef {
 
     fn node_value(&self) -> Option<Rc<str>> {
         self.0.borrow().data.clone()
+    }
+
+    fn set_node_value(&mut self, value: impl Into<String>) -> Result<(), DOMException> {
+        self.set_data(value.into())?;
+        Ok(())
     }
 
     fn node_type(&self) -> NodeType {

@@ -313,6 +313,10 @@ impl Node for DocumentTypeRef {
         None
     }
 
+    fn set_node_value(&mut self, _: impl Into<String>) -> Result<(), DOMException> {
+        Ok(())
+    }
+
     fn node_type(&self) -> super::NodeType {
         NodeType::DocumentType
     }
