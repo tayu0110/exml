@@ -125,22 +125,16 @@ pub trait Node: NodeConnection {
             return Err(DOMException::HierarchyRequestErr);
         }
         // NOT_FOUND_ERR: Raised if refChild is not a child of this node.
-        if ref_child
-            .as_ref()
-            .and_then(|ref_child| ref_child.parent_node())
-            .is_none_or(|par| !self.is_same_node(&par))
-        {
+        if ref_child.as_ref().is_some_and(|ref_child| {
+            ref_child
+                .parent_node()
+                .is_none_or(|par| !self.is_same_node(&par))
+        }) {
             return Err(DOMException::NotFoundErr);
         }
-        let rdoc = self.owner_document();
-        let ndoc = new_child.owner_document();
         // WRONG_DOCUMENT_ERR: Raised if newChild was created from a different document
         // than the one that created this node.
-        if rdoc.is_some() != ndoc.is_some()
-            || rdoc
-                .zip(ndoc)
-                .is_some_and(|(rd, nd)| !rd.is_same_node(&NodeRef::Document(nd)))
-        {
+        if !check_owner_document_sameness(self, &new_child) {
             return Err(DOMException::WrongDocumentErr);
         }
 

@@ -401,7 +401,7 @@ impl TextRef {
         let parent = self.parent_node();
         if content.is_empty() {
             if let Some(mut parent) = parent {
-                parent.remove_child(self.clone().into());
+                parent.remove_child(self.clone().into())?;
             }
             return Ok(None);
         }
@@ -411,7 +411,7 @@ impl TextRef {
         }
 
         // TODO: handle read-only node
-        self.set_data(content);
+        self.set_data(content)?;
         let mut prev = self.previous_sibling();
         while let Some(mut pre) = prev {
             match pre.node_type() {

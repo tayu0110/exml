@@ -24,7 +24,7 @@ pub struct Notation {
     // /// - no sibling
     // previous_sibling: Option<NodeWeakRef>,
     // next_sibling: Option<NodeRef>,
-    owner_document: DocumentWeakRef,
+    owner_document: Option<DocumentWeakRef>,
     /// Notation name. as same as `nodeName` for `Node`.
     name: Rc<str>,
 
@@ -39,6 +39,15 @@ pub struct Notation {
 pub struct NotationRef(Rc<RefCell<Notation>>);
 
 impl NotationRef {
+    pub(crate) fn new(doc: Option<DocumentRef>, name: Rc<str>) -> Self {
+        Self(Rc::new(RefCell::new(Notation {
+            owner_document: doc.map(|doc| doc.downgrade()),
+            name,
+            public_id: None,
+            system_id: None,
+        })))
+    }
+
     /// Generate [`NotationWeakRef`] from `self`.
     pub fn downgrade(&self) -> NotationWeakRef {
         NotationWeakRef(Rc::downgrade(&self.0))
@@ -59,7 +68,11 @@ impl Node for NotationRef {
     }
 
     fn owner_document(&self) -> Option<DocumentRef> {
-        self.0.borrow().owner_document.upgrade()
+        self.0
+            .borrow()
+            .owner_document
+            .as_ref()
+            .and_then(|doc| doc.upgrade())
     }
 
     fn clone_node(&self, _deep: bool) -> NodeRef {
@@ -122,7 +135,11 @@ impl NodeConnection for NotationRef {
     }
 
     fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
-        replace(&mut self.0.borrow_mut().owner_document, new_doc.downgrade()).upgrade()
+        replace(
+            &mut self.0.borrow_mut().owner_document,
+            Some(new_doc.downgrade()),
+        )
+        .and_then(|doc| doc.upgrade())
     }
 
     fn adopted_to(&mut self, _new_doc: DocumentRef) {

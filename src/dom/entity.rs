@@ -37,7 +37,7 @@ pub struct Entity {
     // /// - no sibling
     // previous_sibling: Option<NodeWeakRef>,
     // next_sibling: Option<NodeRef>,
-    owner_document: DocumentWeakRef,
+    owner_document: Option<DocumentWeakRef>,
 
     /// Entity name. as same as `nodeName` for `Node`.
     name: Rc<str>,
@@ -60,6 +60,21 @@ pub struct Entity {
 pub struct EntityRef(Rc<RefCell<Entity>>);
 
 impl EntityRef {
+    pub(crate) fn new(doc: Option<DocumentRef>, name: Rc<str>) -> Self {
+        Self(Rc::new(RefCell::new(Entity {
+            first_child: None,
+            last_child: None,
+            owner_document: doc.map(|doc| doc.downgrade()),
+            name,
+            public_id: None,
+            system_id: None,
+            notation_name: None,
+            input_encoding: None,
+            xml_encoding: None,
+            xml_version: None,
+        })))
+    }
+
     /// Generate [`EntityWeakRef`] from `self`.
     pub fn downgrade(&self) -> EntityWeakRef {
         EntityWeakRef(Rc::downgrade(&self.0))
@@ -88,7 +103,11 @@ impl Node for EntityRef {
     }
 
     fn owner_document(&self) -> Option<DocumentRef> {
-        self.0.borrow().owner_document.upgrade()
+        self.0
+            .borrow()
+            .owner_document
+            .as_ref()
+            .and_then(|doc| doc.upgrade())
     }
 
     fn clone_node(&self, deep: bool) -> NodeRef {
@@ -109,7 +128,9 @@ impl Node for EntityRef {
             let mut children = self.first_child();
             while let Some(child) = children {
                 children = child.next_sibling();
-                entity.append_child(child.clone_node(true));
+                entity
+                    .append_child(child.clone_node(true))
+                    .expect("Internal Error");
             }
         }
         entity.into()
@@ -157,7 +178,11 @@ impl NodeConnection for EntityRef {
     }
 
     fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
-        replace(&mut self.0.borrow_mut().owner_document, new_doc.downgrade()).upgrade()
+        replace(
+            &mut self.0.borrow_mut().owner_document,
+            Some(new_doc.downgrade()),
+        )
+        .and_then(|doc| doc.upgrade())
     }
 
     fn adopted_to(&mut self, _new_doc: DocumentRef) {

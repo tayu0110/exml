@@ -99,7 +99,8 @@ impl Node for DocumentFragmentRef {
             let mut children = self.first_child();
             while let Some(child) = children {
                 children = child.next_sibling();
-                frag.append_child(child.clone_node(true));
+                frag.append_child(child.clone_node(true))
+                    .expect("Internal Error");
             }
         }
         frag.into()

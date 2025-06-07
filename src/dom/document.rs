@@ -45,12 +45,7 @@ pub struct Document {
     /// Implementation of `doctype` attribute.  
     pub(super) doctype: Option<DocumentTypeRef>,
     /// Implementation of `documentElement` attribute.
-    ///
-    /// This is created at the same time the `Document` is created
-    /// for the purpose of holding a Weak pointer to the `Document`.  
-    /// To check the validity constraint that exactly one document element is present,
-    /// the child elements must be scanning.
-    document_element: ElementRef,
+    document_element: Option<ElementRef>,
     /// Implementation of `documentURI` attribute.
     document_uri: Option<Rc<str>>,
     /// Implementation of `inputEncoding` attribute.
@@ -171,6 +166,117 @@ impl Document {
 pub struct DocumentRef(Rc<RefCell<Document>>);
 
 impl DocumentRef {
+    /// Implementation of [`createDocument`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-Level-2-Core-DOM-createDocument) method.
+    ///
+    /// In the specification, this is implemented in [`DOMImplementation`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-102161490).
+    ///
+    /// ```text
+    /// Creates a DOM Document object of the specified type with its document element.
+    /// Note that based on the DocumentType given to create the document, the implementation
+    /// may instantiate specialized Document objects that support additional features than
+    /// the "Core", such as "HTML" [DOM Level 2 HTML]. On the other hand, setting the
+    /// DocumentType after the document was created makes this very unlikely to happen.
+    /// Alternatively, specialized Document creation methods, such as createHTMLDocument
+    /// [DOM Level 2 HTML], can be used to obtain specific types of Document objects.
+    ///
+    /// Parameters
+    ///     namespaceURI of type DOMString
+    ///         The namespace URI of the document element to create or null.
+    ///     qualifiedName of type DOMString
+    ///         The qualified name of the document element to be created or null.
+    ///     doctype of type DocumentType
+    ///         The type of document to be created or null.
+    ///         When doctype is not null, its Node.ownerDocument attribute is set to the
+    ///         document being created.
+    ///
+    /// Return Value
+    ///     Document A new Document object with its document element. If the NamespaceURI,
+    ///              qualifiedName, and doctype are null, the returned Document is empty with
+    ///              no document element.
+    ///
+    /// Exceptions
+    ///     DOMException
+    ///     INVALID_CHARACTER_ERR: Raised if the specified qualified name is not an XML name
+    ///                            according to [XML 1.0].
+    ///     NAMESPACE_ERR:         Raised if the qualifiedName is malformed, if the
+    ///                            qualifiedName has a prefix and the namespaceURI is null,
+    ///                            or if the qualifiedName is null and the namespaceURI is
+    ///                            different from null, or if the qualifiedName has a prefix
+    ///                            that is "xml" and the namespaceURI is different from
+    ///                            "http://www.w3.org/XML/1998/namespace" [XML Namespaces],
+    ///                            or if the DOM implementation does not support the "XML"
+    ///                            feature but a non-null namespace URI was provided, since
+    ///                            namespaces were defined by XML.
+    ///     WRONG_DOCUMENT_ERR:    Raised if doctype has already been used with a different
+    ///                            document or was created from a different implementation.
+    ///     NOT_SUPPORTED_ERR:     May be raised if the implementation does not support the
+    ///                            feature "XML" and the language exposed through the Document
+    ///                            does not support XML Namespaces (such as [HTML 4.01]).
+    /// ```
+    pub fn new(
+        ns_uri: Option<&str>,
+        qname: Option<&str>,
+        doctype: Option<DocumentTypeRef>,
+    ) -> Result<Self, DOMException> {
+        if doctype
+            .as_ref()
+            .is_some_and(|doctype| doctype.owner_document().is_some())
+        {
+            return Err(DOMException::WrongDocumentErr);
+        }
+
+        let mut new = DocumentRef(Rc::new(RefCell::new(Document {
+            first_child: None,
+            last_child: None,
+            doctype: None,
+            document_element: None,
+            document_uri: None,
+            input_encoding: None,
+            xml_encoding: None,
+            xml_standalone: 0,
+            xml_version: None,
+            html: false,
+        })));
+        // TODO: check if the DTD specifies this document is HTML or not.
+        if let Some(mut doctype) = doctype {
+            doctype.set_owner_document(new.clone());
+            new.0.borrow_mut().doctype = Some(doctype.clone());
+            new.append_child(doctype.into())?;
+        }
+
+        if let Some(qname) = qname {
+            if validate_qname::<false>(qname).is_err() {
+                return Err(DOMException::InvalidCharacterErr);
+            }
+
+            let elem = if let Some((prefix, _)) = split_qname2(qname) {
+                let Some(ns_uri) = ns_uri else {
+                    // ... if the qualifiedName has a prefix and the namespaceURI is null,
+                    return Err(DOMException::NamespaceErr);
+                };
+
+                // ... or if the qualifiedName has a prefix that is "xml" and the namespaceURI
+                // is different from "http://www.w3.org/XML/1998/namespace" [XML Namespaces],
+                if prefix == "xml" && ns_uri != "http://www.w3.org/XML/1998/namespace" {
+                    return Err(DOMException::NamespaceErr);
+                }
+                ElementRef::with_namespace(new.clone(), qname.into(), ns_uri.into())
+            } else {
+                ElementRef::new(new.clone(), qname.into())
+            };
+
+            new.0.borrow_mut().document_element = Some(elem.clone());
+            new.append_child(elem.into())?;
+        } else {
+            // ... or if the qualifiedName is null and the namespaceURI is different from null
+            if ns_uri.is_some() {
+                return Err(DOMException::NamespaceErr);
+            }
+        }
+
+        Ok(new)
+    }
+
     /// Implementation of [`createElement`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-2141741547) method.
     ///
     /// # Specification
@@ -360,7 +466,7 @@ impl DocumentRef {
         Ok(AttrRef::new(self.clone(), name))
     }
 
-    /// Implementation of `createEntityReference` method.
+    /// Implementation of [`createEntityReference`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-392B75AE) method.
     ///
     /// # Specification
     /// ```text
@@ -408,7 +514,7 @@ impl DocumentRef {
             let mut children = entity.first_child();
             while let Some(child) = children {
                 children = child.next_sibling();
-                entref.append_child(child.clone_node(true));
+                entref.append_child(child.clone_node(true))?;
             }
         }
         Ok(entref)
@@ -560,7 +666,7 @@ impl DocumentRef {
                     let mut children = elem.first_child();
                     while let Some(child) = children {
                         children = child.next_sibling();
-                        new.append_child(self.import_node(child, true)?);
+                        new.append_child(self.import_node(child, true)?)?;
                     }
                 }
                 Ok(new.into())
@@ -957,7 +1063,7 @@ impl DocumentRef {
         }
 
         if let Some(mut parent) = source.parent_node() {
-            parent.remove_child(source.clone());
+            parent.remove_child(source.clone())?;
         }
 
         if !check_owner_document_sameness(self, &source) {
@@ -1079,7 +1185,7 @@ impl DocumentRef {
             NodeRef::Attribute(attr) => {
                 let mut keep = None;
                 if let Some(mut elem) = attr.owner_element() {
-                    elem.remove_attribute_node(attr.clone());
+                    elem.remove_attribute_node(attr.clone())?;
                     keep = Some(elem);
                 }
 
@@ -1105,7 +1211,7 @@ impl DocumentRef {
 
                 attr.rename(qname, ns_uri);
                 if let Some(mut elem) = keep {
-                    elem.set_attribute_node(attr.clone());
+                    elem.set_attribute_node(attr.clone())?;
                 }
                 Ok(n)
             }
@@ -1118,7 +1224,7 @@ impl DocumentRef {
         self.0.borrow().doctype.clone()
     }
 
-    pub fn document_element(&self) -> ElementRef {
+    pub fn document_element(&self) -> Option<ElementRef> {
         self.0.borrow().document_element.clone()
     }
 
@@ -1177,9 +1283,12 @@ impl Node for DocumentRef {
             };
             doctype
         });
-        let NodeRef::Element(document_element) = self.document_element().clone_node(deep) else {
-            unreachable!()
-        };
+        let document_element = self.document_element().map(|elem| {
+            let NodeRef::Element(elem) = elem.clone_node(deep) else {
+                unreachable!()
+            };
+            elem
+        });
         let mut doc = DocumentRef(Rc::new(RefCell::new(Document {
             first_child: None,
             last_child: None,
@@ -1198,7 +1307,7 @@ impl Node for DocumentRef {
             while let Some(child) = children {
                 children = child.next_sibling();
                 let new = doc.import_node(child, deep).expect("Internal Error");
-                doc.append_child(new);
+                doc.append_child(new).expect("Internal Error");
             }
         }
 
@@ -1221,15 +1330,19 @@ impl Node for DocumentRef {
     }
 
     fn lookup_prefix(&self, ns_uri: &str) -> Option<Rc<str>> {
-        self.document_element().lookup_prefix(ns_uri)
+        self.document_element()
+            .and_then(|elem| elem.lookup_prefix(ns_uri))
     }
 
     fn is_default_namespace(&self, ns_uri: &str) -> bool {
-        self.document_element().is_default_namespace(ns_uri)
+        self.document_element()
+            .map(|elem| elem.is_default_namespace(ns_uri))
+            .unwrap_or(false)
     }
 
     fn lookup_namespace_uri(&self, prefix: &str) -> Option<Rc<str>> {
-        self.document_element().lookup_namespace_uri(prefix)
+        self.document_element()
+            .and_then(|elem| elem.lookup_namespace_uri(prefix))
     }
 }
 

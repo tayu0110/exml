@@ -1,10 +1,10 @@
 use std::{
-    cell::RefCell,
+    cell::{LazyCell, RefCell},
     mem::replace,
     rc::{Rc, Weak},
 };
 
-use crate::tree::validate_name;
+use crate::tree::{validate_name, validate_qname};
 
 use super::{
     DOMException, NodeType,
@@ -34,7 +34,7 @@ pub struct DocumentType {
     /// - `Comment`
     previous_sibling: Option<NodeWeakRef>,
     next_sibling: Option<NodeRef>,
-    owner_document: DocumentWeakRef,
+    owner_document: Option<DocumentWeakRef>,
 
     /// Implementation of `name` for `DocumentType`.
     /// as same as `nodeName` for `Node`.
@@ -60,6 +60,75 @@ impl DocumentType {
                     .and_then(|ext| ext.get_entity(name))
             })
     }
+
+    /// Add an entity.
+    ///
+    /// If `EXT` is true, `entity` is added to the external subset,
+    /// otherwise, added to the internal subset.
+    pub fn add_entity<const EXT: bool>(&mut self, entity: EntityRef) -> Result<(), DOMException> {
+        if EXT {
+            let subset = self.external_subset.get_or_insert_with(|| {
+                DtdSubset::new(
+                    self.owner_document.as_ref().and_then(|doc| doc.upgrade()),
+                    self.name.clone(),
+                    self.public_id.clone(),
+                    self.system_id.clone(),
+                )
+            });
+            subset.add_entity(entity)
+        } else {
+            let subset = self.internal_subset.get_or_insert_with(|| {
+                DtdSubset::new(
+                    self.owner_document.as_ref().and_then(|doc| doc.upgrade()),
+                    self.name.clone(),
+                    self.public_id.clone(),
+                    self.system_id.clone(),
+                )
+            });
+            subset.add_entity(entity)
+        }
+    }
+
+    /// Add a notation.
+    ///
+    /// If `EXT` is true, `entity` is added to the external subset,
+    /// otherwise, added to the internal subset.
+    pub fn add_notation<const EXT: bool>(
+        &mut self,
+        notation: NotationRef,
+    ) -> Result<(), DOMException> {
+        if EXT {
+            let subset = self.external_subset.get_or_insert_with(|| {
+                DtdSubset::new(
+                    self.owner_document.as_ref().and_then(|doc| doc.upgrade()),
+                    self.name.clone(),
+                    self.public_id.clone(),
+                    self.system_id.clone(),
+                )
+            });
+            subset.add_notation(notation)
+        } else {
+            let subset = self.internal_subset.get_or_insert_with(|| {
+                DtdSubset::new(
+                    self.owner_document.as_ref().and_then(|doc| doc.upgrade()),
+                    self.name.clone(),
+                    self.public_id.clone(),
+                    self.system_id.clone(),
+                )
+            });
+            subset.add_notation(notation)
+        }
+    }
+
+    fn set_owner_document(&mut self, doc: DocumentRef) -> Option<DocumentRef> {
+        if let Some(sub) = self.internal_subset.as_mut() {
+            sub.set_owner_document(doc.clone());
+        }
+        if let Some(sub) = self.external_subset.as_mut() {
+            sub.set_owner_document(doc.clone());
+        }
+        replace(&mut self.owner_document, Some(doc.downgrade())).and_then(|doc| doc.upgrade())
+    }
 }
 
 /// Wrapper of `Rc<RefCell<DocumentType>>`.
@@ -67,6 +136,56 @@ impl DocumentType {
 pub struct DocumentTypeRef(Rc<RefCell<DocumentType>>);
 
 impl DocumentTypeRef {
+    /// Implementation of [`createDocumentType`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-Level-2-Core-DOM-createDocType)
+    ///
+    /// In the specification, this is implemented in [`DOMImplementation`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-102161490).
+    ///
+    /// ```text
+    /// Creates an empty DocumentType node. Entity declarations and notations are not made
+    /// available. Entity reference expansions and default attribute additions do not occur.
+    ///
+    /// Parameters
+    ///     qualifiedName of type DOMString
+    ///         The qualified name of the document type to be created.
+    ///     publicId of type DOMString
+    ///         The external subset public identifier.
+    ///     systemId of type DOMString
+    ///         The external subset system identifier.
+    ///
+    /// Return Value
+    ///     DocumentType A new DocumentType node with Node.ownerDocument set to null.
+    ///
+    /// Exceptions
+    ///     DOMException
+    ///     INVALID_CHARACTER_ERR: Raised if the specified qualified name is not an XML name
+    ///                            according to [XML 1.0].
+    ///     NAMESPACE_ERR:         Raised if the qualifiedName is malformed.
+    ///     NOT_SUPPORTED_ERR:     May be raised if the implementation does not support the
+    ///                            feature "XML" and the language exposed through the Document
+    ///                            does not support XML Namespaces (such as [HTML 4.01]).
+    /// ```
+    pub fn new(
+        qname: &str,
+        public_id: Option<&str>,
+        system_id: Option<&str>,
+    ) -> Result<Self, DOMException> {
+        if validate_qname::<false>(qname).is_err() {
+            return Err(DOMException::InvalidCharacterErr);
+        }
+
+        Ok(DocumentTypeRef(Rc::new(RefCell::new(DocumentType {
+            parent_node: None,
+            previous_sibling: None,
+            next_sibling: None,
+            owner_document: None,
+            name: qname.into(),
+            public_id: public_id.map(|pubid| pubid.into()),
+            system_id: system_id.map(|systemid| systemid.into()),
+            internal_subset: None,
+            external_subset: None,
+        }))))
+    }
+
     /// Implementation of `publicId` attribute.
     pub fn public_id(&self) -> Option<Rc<str>> {
         self.0.borrow().public_id.clone()
@@ -82,9 +201,56 @@ impl DocumentTypeRef {
         DocumentTypeWeakRef(Rc::downgrade(&self.0))
     }
 
+    /// Create a new [`EntityRef`] that has `name` as the entity name.
+    ///
+    /// This is not a required method by the DOM specification.
+    ///
+    /// # Errors
+    /// - If `name` is not a valid XML Name, return `Err(DOMException::InvalidCharacterErr)`
+    pub fn create_entity(&self, name: impl Into<Rc<str>>) -> Result<EntityRef, DOMException> {
+        let name: Rc<str> = name.into();
+        if validate_name::<false>(&name).is_err() {
+            return Err(DOMException::InvalidCharacterErr);
+        }
+        Ok(EntityRef::new(self.owner_document(), name))
+    }
+
+    /// Create a new [`NotationRef`] that has `name` as the notation name.
+    ///
+    /// This is not a required method by the DOM specification.
+    ///
+    /// # Errors
+    /// - If `name` is not a valid XML Name, return `Err(DOMException::InvalidCharacterErr)`
+    pub fn create_notation(&self, name: impl Into<Rc<str>>) -> Result<NotationRef, DOMException> {
+        let name: Rc<str> = name.into();
+        if validate_name::<false>(&name).is_err() {
+            return Err(DOMException::InvalidCharacterErr);
+        }
+        Ok(NotationRef::new(self.owner_document(), name))
+    }
+
     /// Return an entity that is specified by `name` if exists.
     pub fn get_entity(&self, name: Rc<str>) -> Option<EntityRef> {
         self.0.borrow().get_entity(name)
+    }
+
+    /// Add an entity.
+    ///
+    /// If `EXT` is true, `entity` is added to the external subset,
+    /// otherwise, added to the internal subset.
+    pub fn add_entity<const EXT: bool>(&mut self, entity: EntityRef) -> Result<(), DOMException> {
+        self.0.borrow_mut().add_entity::<EXT>(entity)
+    }
+
+    /// Add a notation.
+    ///
+    /// If `EXT` is true, `entity` is added to the external subset,
+    /// otherwise, added to the internal subset.
+    pub fn add_notation<const EXT: bool>(
+        &mut self,
+        notation: NotationRef,
+    ) -> Result<(), DOMException> {
+        self.0.borrow_mut().add_notation::<EXT>(notation)
     }
 
     /// Compare positions of `l` and `r`.
@@ -172,7 +338,11 @@ impl Node for DocumentTypeRef {
     }
 
     fn owner_document(&self) -> Option<DocumentRef> {
-        self.0.borrow().owner_document.upgrade()
+        self.0
+            .borrow()
+            .owner_document
+            .as_ref()
+            .and_then(|doc| doc.upgrade())
     }
 
     fn clone_node(&self, deep: bool) -> NodeRef {
@@ -302,7 +472,7 @@ impl NodeConnection for DocumentTypeRef {
     }
 
     fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
-        replace(&mut self.0.borrow_mut().owner_document, new_doc.downgrade()).upgrade()
+        self.0.borrow_mut().set_owner_document(new_doc)
     }
 
     fn adopted_to(&mut self, _new_doc: DocumentRef) {
@@ -357,7 +527,33 @@ pub struct DtdSubset<const EXT: bool> {
 pub type InternalSubset = DtdSubset<false>;
 pub type ExternalSubset = DtdSubset<true>;
 
+thread_local! {
+    static DUMMY_DOCUMENT: LazyCell<DocumentRef> = LazyCell::new(|| DocumentRef::new(None, None, None).unwrap());
+}
+
 impl<const EXT: bool> DtdSubset<EXT> {
+    fn new(
+        doc: Option<DocumentRef>,
+        name: impl Into<Rc<str>>,
+        public_id: Option<impl Into<Rc<str>>>,
+        system_id: Option<impl Into<Rc<str>>>,
+    ) -> Self {
+        let ddoc = doc
+            .clone()
+            .unwrap_or(DUMMY_DOCUMENT.with(|doc| (**doc).clone()))
+            .downgrade();
+        Self {
+            first_child: None,
+            last_child: None,
+            owner_document: doc.map(|doc| doc.downgrade()),
+            name: name.into(),
+            entities: NamedNodeMap::new(ddoc.clone()),
+            notations: NamedNodeMap::new(ddoc),
+            public_id: public_id.map(|id| id.into()),
+            system_id: system_id.map(|id| id.into()),
+        }
+    }
+
     /// Return an entity that is specified by `name` if exists.
     pub fn get_entity(&self, name: Rc<str>) -> Option<EntityRef> {
         self.entities.get_named_item(name)
@@ -440,14 +636,47 @@ impl<const EXT: bool> DtdSubset<EXT> {
         Ok(())
     }
 
+    fn set_owner_document(&mut self, doc: DocumentRef) -> Option<DocumentRef> {
+        self.entities.set_owner_document(doc.clone());
+        self.notations.set_owner_document(doc.clone());
+        let mut children = self.first_child.clone();
+        while let Some(child) = children {
+            children = child.borrow().next.clone();
+            match &mut child.borrow_mut().data {
+                MarkupDecl::AttlistDecl => {
+                    todo!()
+                }
+                MarkupDecl::Comment(comment) => comment.set_owner_document(doc.clone()),
+                MarkupDecl::ElementDecl => {
+                    todo!()
+                }
+                MarkupDecl::EntityDecl(entity) => entity.set_owner_document(doc.clone()),
+                MarkupDecl::NotationDecl(notation) => notation.set_owner_document(doc.clone()),
+                MarkupDecl::PEReference(entref) => entref.set_owner_document(doc.clone()),
+                MarkupDecl::ProcessingInstruction(pi) => pi.set_owner_document(doc.clone()),
+            };
+        }
+        replace(&mut self.owner_document, Some(doc.downgrade())).and_then(|doc| doc.upgrade())
+    }
+
     pub fn clone_node(&self, deep: bool) -> Self {
         let mut subset = Self {
             first_child: None,
             last_child: None,
             owner_document: self.owner_document.clone(),
             name: self.name.clone(),
-            entities: NamedNodeMap::new(self.entities.owner_document().unwrap().downgrade()),
-            notations: NamedNodeMap::new(self.notations.owner_document().unwrap().downgrade()),
+            entities: NamedNodeMap::new(
+                self.entities
+                    .owner_document()
+                    .unwrap_or(DUMMY_DOCUMENT.with(|doc| (**doc).clone()))
+                    .downgrade(),
+            ),
+            notations: NamedNodeMap::new(
+                self.notations
+                    .owner_document()
+                    .unwrap_or(DUMMY_DOCUMENT.with(|doc| (**doc).clone()))
+                    .downgrade(),
+            ),
             public_id: self.public_id.clone(),
             system_id: self.system_id.clone(),
         };
@@ -458,7 +687,7 @@ impl<const EXT: bool> DtdSubset<EXT> {
                 let NodeRef::Entity(ent) = ent.clone_node(true) else {
                     unreachable!()
                 };
-                subset.add_entity(ent);
+                subset.add_entity(ent).expect("Internal Error");
             }
 
             for i in 0..self.notations.len() {
@@ -466,7 +695,7 @@ impl<const EXT: bool> DtdSubset<EXT> {
                 let NodeRef::Notation(not) = not.clone_node(true) else {
                     unreachable!()
                 };
-                subset.add_notation(not);
+                subset.add_notation(not).expect("Internal Error");
             }
         }
 

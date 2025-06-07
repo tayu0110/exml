@@ -216,9 +216,10 @@ impl ElementRef {
     /// ```
     pub fn set_attribute(
         &mut self,
-        name: Rc<str>,
+        name: impl Into<Rc<str>>,
         value: impl Into<String>,
     ) -> Result<(), DOMException> {
+        let name: Rc<str> = name.into();
         if validate_name::<false>(&name).is_err() {
             return Err(DOMException::InvalidCharacterErr);
         }
@@ -279,8 +280,8 @@ impl ElementRef {
     ///
     /// No Exceptions
     /// ```
-    pub fn get_attribute_node(&self, name: Rc<str>) -> Option<AttrRef> {
-        self.attributes().get_named_item(name)
+    pub fn get_attribute_node(&self, name: impl Into<Rc<str>>) -> Option<AttrRef> {
+        self.attributes().get_named_item(name.into())
     }
     /// Implementation of [`setAttributeNode`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-887236154) method.
     ///
@@ -1013,7 +1014,7 @@ impl Node for ElementRef {
                 unreachable!()
             };
             if elem.set_attribute_node_ns(attr.clone()).is_err() {
-                elem.set_attribute_node(attr);
+                elem.set_attribute_node(attr).expect("Internal Error");
             }
         }
 
@@ -1021,7 +1022,8 @@ impl Node for ElementRef {
             let mut children = self.first_child();
             while let Some(child) = children {
                 children = child.next_sibling();
-                elem.append_child(child.clone_node(true));
+                elem.append_child(child.clone_node(true))
+                    .expect("Internal Error");
             }
         }
 

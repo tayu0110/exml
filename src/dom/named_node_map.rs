@@ -99,7 +99,7 @@ impl<N: Node + Clone> NamedNodeMap<N> {
                 remain.push(i);
             }
         }
-        replace(&mut *self.data.borrow_mut(), new);
+        *self.data.borrow_mut() = new;
         self.index.borrow_mut().retain(|_, index| {
             if let Ok(new) = remain.binary_search(&*index) {
                 *index = new;

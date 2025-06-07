@@ -4,7 +4,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use crate::parser::split_qname2;
+use crate::{dom::DOMException, parser::split_qname2};
 
 use super::{
     NodeType,
@@ -186,9 +186,59 @@ impl AttrRef {
         self.0.borrow_mut().owner_element = elem.map(|elem| elem.downgrade());
     }
 
+    /// Implementation of `name` attribute of `Attr`.
+    pub fn name(&self) -> Rc<str> {
+        self.0.borrow().name.clone()
+    }
+
     /// Implementation of `specified` attribute of `Attr`.
     pub fn specified(&self) -> bool {
         self.0.borrow().specified
+    }
+
+    /// Implementation of `value` attribute.
+    ///
+    /// # Specification
+    /// ```text
+    /// On retrieval, the value of the attribute is returned as a string. Character and
+    /// general entity references are replaced with their values. See also the method
+    /// getAttribute on the Element interface.
+    /// Some specialized implementations, such as some [SVG 1.1] implementations, may do
+    /// normalization automatically, even after mutation; in such case, the value on
+    /// retrieval may differ from the value on setting.
+    /// ```
+    pub fn get_value(&self) -> String {
+        self.0.borrow().get_value()
+    }
+
+    /// Implementation of `value` attribute.
+    ///
+    /// # Specification
+    /// ```text
+    /// On setting, this creates a Text node with the unparsed contents of the string,
+    /// i.e. any characters that an XML processor would recognize as markup are instead
+    /// treated as literal text. See also the method Element.setAttribute().
+    /// Some specialized implementations, such as some [SVG 1.1] implementations, may do
+    /// normalization automatically, even after mutation; in such case, the value on
+    /// retrieval may differ from the value on setting.
+    ///
+    /// Exceptions on setting
+    ///     DOMException
+    ///     NO_MODIFICATION_ALLOWED_ERR: Raised when the node is readonly.
+    /// ```
+    pub fn set_value(&mut self, value: impl Into<String>) -> Result<(), DOMException> {
+        let mut children = self.first_child();
+        while let Some(mut child) = children {
+            children = child.next_sibling();
+            child.disconnect_parent_and_sibling();
+        }
+        self.append_child(
+            self.owner_document()
+                .ok_or(DOMException::WrongDocumentErr)?
+                .create_text_node(value)
+                .into(),
+        )?;
+        Ok(())
     }
 
     /// Implementation of `isId` attribute of `Attr`.
@@ -258,7 +308,8 @@ impl Node for AttrRef {
         let mut children = self.first_child();
         while let Some(child) = children {
             children = child.next_sibling();
-            attr.append_child(child.clone_node(true));
+            attr.append_child(child.clone_node(true))
+                .expect("Internal Error");
         }
         attr.into()
     }

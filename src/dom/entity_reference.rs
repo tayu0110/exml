@@ -159,7 +159,7 @@ impl Node for EntityReferenceRef {
         let mut children = self.first_child();
         while let Some(child) = children {
             children = child.next_sibling();
-            entref.append_child(child.clone_node(true));
+            entref.append_child(child.clone_node(true)).unwrap();
         }
 
         entref.into()
