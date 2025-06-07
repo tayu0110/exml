@@ -236,10 +236,7 @@ fn check_owner_document_sameness(l: &impl Node, r: &impl Node) -> bool {
 #[cfg(test)]
 mod dom_test_suite {
     use crate::dom::{
-        DOMException,
-        document::DocumentRef,
-        document_type::DocumentTypeRef,
-        node::{Node, NodeRef},
+        DOMException, document::DocumentRef, document_type::DocumentTypeRef, node::Node,
     };
 
     const STAFF_XML: &str =
@@ -319,14 +316,13 @@ mod dom_test_suite {
             .unwrap();
         let mut address = employee
             .append_child(doc.create_element("address").unwrap().into())
+            .unwrap()
+            .as_element()
             .unwrap();
         address.append_child(
             doc.create_text_node("1230 North Ave. Dallas, Texas 98551")
                 .into(),
         )?;
-        let NodeRef::Element(mut address) = address else {
-            unreachable!()
-        };
         address.set_attribute("domestic", "Yes").unwrap();
 
         let mut employee = root
@@ -375,6 +371,8 @@ mod dom_test_suite {
             .unwrap();
         let mut address = employee
             .append_child(doc.create_element("address").unwrap().into())
+            .unwrap()
+            .as_element()
             .unwrap();
         address
             .append_child(doc.create_entity_reference("ent2").unwrap().into())
@@ -388,9 +386,6 @@ mod dom_test_suite {
         address
             .append_child(doc.create_text_node("\n 98554").into())
             .unwrap();
-        let NodeRef::Element(mut address) = address else {
-            unreachable!()
-        };
         address.set_attribute("domestic", "Yes").unwrap();
         address.set_attribute("street", "Yes").unwrap();
 
@@ -428,13 +423,12 @@ mod dom_test_suite {
             .unwrap();
         let mut address = employee
             .append_child(doc.create_element("address").unwrap().into())
+            .unwrap()
+            .as_element()
             .unwrap();
         address
             .append_child(doc.create_text_node("PO Box 27 Irving, texas 98553").into())
             .unwrap();
-        let NodeRef::Element(mut address) = address else {
-            unreachable!()
-        };
         address.set_attribute("domestic", "Yes").unwrap();
         address.set_attribute("street", "No").unwrap();
 
@@ -472,13 +466,12 @@ mod dom_test_suite {
             .unwrap();
         let mut address = employee
             .append_child(doc.create_element("address").unwrap().into())
+            .unwrap()
+            .as_element()
             .unwrap();
         address
             .append_child(doc.create_text_node("PO Box 27 Irving, texas 98553").into())
             .unwrap();
-        let NodeRef::Element(mut address) = address else {
-            unreachable!()
-        };
         address.set_attribute("domestic", "Yes")?;
         address.set_attribute("street", "Y")?;
         let mut street = address.get_attribute_node("street").unwrap();
@@ -520,14 +513,13 @@ mod dom_test_suite {
             .unwrap();
         let mut address = employee
             .append_child(doc.create_element("address").unwrap().into())
+            .unwrap()
+            .as_element()
             .unwrap();
         address.append_child(
             doc.create_text_node("1821 Nordic. Road, Irving Texas 98558")
                 .into(),
         )?;
-        let NodeRef::Element(mut address) = address else {
-            unreachable!()
-        };
         address.set_attribute("street", "Yyes").unwrap();
 
         Ok(doc)

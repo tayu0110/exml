@@ -772,9 +772,7 @@ pub trait Node: NodeConnection {
                 };
             }
             NodeType::Attribute => {
-                let NodeRef::Attribute(attr) = &this_ancestor else {
-                    unreachable!()
-                };
+                let attr = this_ancestor.as_attribute().unwrap();
                 let Some(elem) = attr.owner_element() else {
                     let mut ancestor = other.parent_node();
                     while let Some(par) = ancestor {
@@ -793,7 +791,7 @@ pub trait Node: NodeConnection {
                     };
                     if oelem.is_same_node(&NodeRef::Element(elem.clone())) {
                         let attrs = elem.attributes();
-                        return if attrs.index_of(attr) < attrs.index_of(oattr) {
+                        return if attrs.index_of(&attr) < attrs.index_of(oattr) {
                             DocumentPosition::new().set_flag(DOCUMENT_POSITION_FOLLOWING)
                         } else {
                             DocumentPosition::new().set_flag(DOCUMENT_POSITION_PRECEDING)
@@ -1492,6 +1490,35 @@ impl_node_connection_to_noderef! {
     connect_as_previous_sibling(next: NodeRef) -> (),
     connect_as_next_sibling(prev: NodeRef) -> (),
     disconnect_parent_and_sibling() -> Option<NodeRef>
+}
+
+macro_rules! impl_node_conversion {
+    ( $( ( $fn:ident, $var:ident, $t:ty ) ),* ) => {
+        impl NodeRef {
+            $(
+                pub fn $fn (&self) -> Option<$t> {
+                    match self {
+                        NodeRef:: $var (node) => Some(node.clone()),
+                        _ => None
+                    }
+                }
+            )*
+        }
+    };
+}
+
+impl_node_conversion! {
+    ( as_element, Element, ElementRef ),
+    ( as_attribute, Attribute, AttrRef ),
+    ( as_text_node, Text, TextRef ),
+    ( as_cdata_section, CDATASection, CDATASectionRef ),
+    ( as_entity_reference, EntityReference, EntityReferenceRef ),
+    ( as_processing_instruction, ProcessingInstruction, ProcessingInstructionRef ),
+    ( as_comment, Comment, CommentRef ),
+    ( as_document, Document, DocumentRef ),
+    ( as_document_type, DocumentType, DocumentTypeRef ),
+    ( as_document_fragment, DocumentFragment, DocumentFragmentRef ),
+    ( as_notation, Notation, NotationRef )
 }
 
 /// Implementation of [Node](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-1950641247)
