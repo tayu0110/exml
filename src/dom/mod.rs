@@ -13,12 +13,14 @@
 
 use node::{Node, NodeRef};
 
+pub mod attlistdecl;
 pub mod attr;
 pub mod character_data;
 pub mod document;
 pub mod document_fragment;
 pub mod document_type;
 pub mod element;
+pub mod elementdecl;
 pub mod entity;
 pub mod entity_reference;
 pub mod name_list;
@@ -236,7 +238,12 @@ fn check_owner_document_sameness(l: &impl Node, r: &impl Node) -> bool {
 #[cfg(test)]
 mod dom_test_suite {
     use crate::dom::{
-        DOMException, document::DocumentRef, document_type::DocumentTypeRef, node::Node,
+        DOMException,
+        attlistdecl::{AttType, DefaultDecl},
+        document::DocumentRef,
+        document_type::DocumentTypeRef,
+        elementdecl::{ContentSpec, ElementContent, ElementContentOccur},
+        node::Node,
     };
 
     const STAFF_XML: &str =
@@ -275,6 +282,180 @@ mod dom_test_suite {
             .unwrap();
 
         // TODO: add external subset
+        doctype
+            .add_element_decl::<true>(
+                doctype
+                    .create_element_decl(
+                        "employeeId",
+                        ContentSpec::Mixed(ElementContent::new_pcdata(ElementContentOccur::Once)),
+                    )
+                    .unwrap(),
+            )
+            .unwrap();
+        doctype
+            .add_element_decl::<true>(
+                doctype
+                    .create_element_decl(
+                        "name",
+                        ContentSpec::Mixed(ElementContent::new_pcdata(ElementContentOccur::Once)),
+                    )
+                    .unwrap(),
+            )
+            .unwrap();
+        doctype
+            .add_element_decl::<true>(
+                doctype
+                    .create_element_decl(
+                        "position",
+                        ContentSpec::Mixed(ElementContent::new_pcdata(ElementContentOccur::Once)),
+                    )
+                    .unwrap(),
+            )
+            .unwrap();
+        doctype
+            .add_element_decl::<true>(
+                doctype
+                    .create_element_decl(
+                        "salary",
+                        ContentSpec::Mixed(ElementContent::new_pcdata(ElementContentOccur::Once)),
+                    )
+                    .unwrap(),
+            )
+            .unwrap();
+        doctype
+            .add_element_decl::<true>(
+                doctype
+                    .create_element_decl(
+                        "address",
+                        ContentSpec::Mixed(ElementContent::new_pcdata(ElementContentOccur::Once)),
+                    )
+                    .unwrap(),
+            )
+            .unwrap();
+        doctype
+            .add_element_decl::<true>(
+                doctype
+                    .create_element_decl(
+                        "entElement",
+                        ContentSpec::Mixed(ElementContent::new_pcdata(ElementContentOccur::Once)),
+                    )
+                    .unwrap(),
+            )
+            .unwrap();
+        let or = ElementContent::new_or(ElementContentOccur::Mult);
+        or.set_first_child(ElementContent::new_pcdata(ElementContentOccur::Once));
+        or.set_second_child(ElementContent::new_element(
+            ElementContentOccur::Once,
+            "entElement",
+        ));
+        doctype
+            .add_element_decl::<true>(
+                doctype
+                    .create_element_decl("gender", ContentSpec::Mixed(or))
+                    .unwrap(),
+            )
+            .unwrap();
+        let seq1 = ElementContent::new_seq(ElementContentOccur::Once);
+        seq1.set_first_child(ElementContent::new_element(
+            ElementContentOccur::Once,
+            "employeeId",
+        ));
+        let seq2 = ElementContent::new_seq(ElementContentOccur::Once);
+        seq2.set_first_child(ElementContent::new_element(
+            ElementContentOccur::Once,
+            "name",
+        ));
+        let seq3 = ElementContent::new_seq(ElementContentOccur::Once);
+        seq3.set_first_child(ElementContent::new_element(
+            ElementContentOccur::Once,
+            "position",
+        ));
+        let seq4 = ElementContent::new_seq(ElementContentOccur::Once);
+        seq4.set_first_child(ElementContent::new_element(
+            ElementContentOccur::Once,
+            "salary",
+        ));
+        let seq5 = ElementContent::new_seq(ElementContentOccur::Once);
+        seq5.set_first_child(ElementContent::new_element(
+            ElementContentOccur::Once,
+            "gender",
+        ));
+        seq5.set_second_child(ElementContent::new_element(
+            ElementContentOccur::Once,
+            "address",
+        ));
+        seq4.set_second_child(seq5);
+        seq3.set_second_child(seq4);
+        seq2.set_second_child(seq3);
+        seq1.set_second_child(seq2);
+        doctype
+            .add_element_decl::<true>(
+                doctype
+                    .create_element_decl("employee", ContentSpec::Children(seq1))
+                    .unwrap(),
+            )
+            .unwrap();
+        doctype
+            .add_element_decl::<true>(
+                doctype
+                    .create_element_decl(
+                        "staff",
+                        ContentSpec::Children(ElementContent::new_element(
+                            ElementContentOccur::Plus,
+                            "employee",
+                        )),
+                    )
+                    .unwrap(),
+            )
+            .unwrap();
+        doctype
+            .add_attlist_decl::<true>(
+                doctype
+                    .create_attlist_decl(
+                        "entElement",
+                        "attr1",
+                        AttType::CDATA,
+                        DefaultDecl::None("Attr".into()),
+                    )
+                    .unwrap(),
+            )
+            .unwrap();
+        doctype
+            .add_attlist_decl::<true>(
+                doctype
+                    .create_attlist_decl(
+                        "address",
+                        "domestic",
+                        AttType::CDATA,
+                        DefaultDecl::Implied,
+                    )
+                    .unwrap(),
+            )
+            .unwrap();
+        doctype
+            .add_attlist_decl::<true>(
+                doctype
+                    .create_attlist_decl(
+                        "address",
+                        "street",
+                        AttType::CDATA,
+                        DefaultDecl::None("Yes".into()),
+                    )
+                    .unwrap(),
+            )
+            .unwrap();
+        doctype
+            .add_attlist_decl::<true>(
+                doctype
+                    .create_attlist_decl(
+                        "entElement",
+                        "domestic",
+                        AttType::CDATA,
+                        DefaultDecl::None("MALE".into()),
+                    )
+                    .unwrap(),
+            )
+            .unwrap();
 
         let mut root = doc.document_element().unwrap();
         assert!(root.parent_node().is_some());
@@ -576,7 +757,15 @@ mod dom_test_suite {
             }
             // ./resources/DOM-Test-Suite/tests/level1/core/attrdefaultvalue.xml
             #[test]
-            fn test_attrdefaultvalue() {}
+            fn test_attrdefaultvalue() {
+                let doc = staff_xml(STAFF_XML).unwrap();
+                let address_list = doc.get_elements_by_tag_name("address");
+                let test_node = address_list[0].clone();
+                let attributes = test_node.attributes();
+                let stree_attr = attributes.get_named_item("street".into()).unwrap();
+                let value = stree_attr.node_value().unwrap();
+                assert_eq!(value, "Yes".into());
+            }
             // ./resources/DOM-Test-Suite/tests/level1/core/attreffectivevalue.xml
             #[test]
             fn test_attreffectivevalue() {}

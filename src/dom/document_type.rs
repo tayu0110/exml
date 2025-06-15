@@ -1,10 +1,17 @@
 use std::{
     cell::{LazyCell, RefCell},
+    collections::HashMap,
     mem::replace,
     rc::{Rc, Weak},
 };
 
-use crate::tree::{validate_name, validate_qname};
+use crate::{
+    dom::{
+        attlistdecl::{AttType, AttlistDeclRef, DefaultDecl},
+        elementdecl::{ContentSpec, ElementDeclRef},
+    },
+    tree::{validate_name, validate_qname},
+};
 
 use super::{
     DOMException, NodeType,
@@ -66,26 +73,18 @@ impl DocumentType {
     /// If `EXT` is true, `entity` is added to the external subset,
     /// otherwise, added to the internal subset.
     pub fn add_entity<const EXT: bool>(&mut self, entity: EntityRef) -> Result<(), DOMException> {
+        let doc = self.owner_document();
+        let name = self.name.clone();
+        let public_id = self.public_id.clone();
+        let system_id = self.system_id.clone();
         if EXT {
-            let subset = self.external_subset.get_or_insert_with(|| {
-                DtdSubset::new(
-                    self.owner_document.as_ref().and_then(|doc| doc.upgrade()),
-                    self.name.clone(),
-                    self.public_id.clone(),
-                    self.system_id.clone(),
-                )
-            });
-            subset.add_entity(entity)
+            self.external_subset
+                .get_or_insert_with(|| DtdSubset::new(doc, name, public_id, system_id))
+                .add_entity(entity)
         } else {
-            let subset = self.internal_subset.get_or_insert_with(|| {
-                DtdSubset::new(
-                    self.owner_document.as_ref().and_then(|doc| doc.upgrade()),
-                    self.name.clone(),
-                    self.public_id.clone(),
-                    self.system_id.clone(),
-                )
-            });
-            subset.add_entity(entity)
+            self.internal_subset
+                .get_or_insert_with(|| DtdSubset::new(doc, name, public_id, system_id))
+                .add_entity(entity)
         }
     }
 
@@ -97,27 +96,69 @@ impl DocumentType {
         &mut self,
         notation: NotationRef,
     ) -> Result<(), DOMException> {
+        let doc = self.owner_document();
+        let name = self.name.clone();
+        let public_id = self.public_id.clone();
+        let system_id = self.system_id.clone();
         if EXT {
-            let subset = self.external_subset.get_or_insert_with(|| {
-                DtdSubset::new(
-                    self.owner_document.as_ref().and_then(|doc| doc.upgrade()),
-                    self.name.clone(),
-                    self.public_id.clone(),
-                    self.system_id.clone(),
-                )
-            });
-            subset.add_notation(notation)
+            self.external_subset
+                .get_or_insert_with(|| DtdSubset::new(doc, name, public_id, system_id))
+                .add_notation(notation)
         } else {
-            let subset = self.internal_subset.get_or_insert_with(|| {
-                DtdSubset::new(
-                    self.owner_document.as_ref().and_then(|doc| doc.upgrade()),
-                    self.name.clone(),
-                    self.public_id.clone(),
-                    self.system_id.clone(),
-                )
-            });
-            subset.add_notation(notation)
+            self.internal_subset
+                .get_or_insert_with(|| DtdSubset::new(doc, name, public_id, system_id))
+                .add_notation(notation)
         }
+    }
+
+    /// Add a elementdecl.
+    ///
+    /// If `EXT` is true, `element_decl` is added to the external subset,
+    /// otherwise, added to the internal subset.
+    pub fn add_element_decl<const EXT: bool>(
+        &mut self,
+        element_decl: ElementDeclRef,
+    ) -> Result<(), DOMException> {
+        let doc = self.owner_document();
+        let name = self.name.clone();
+        let public_id = self.public_id.clone();
+        let system_id = self.system_id.clone();
+        if EXT {
+            self.external_subset
+                .get_or_insert_with(|| DtdSubset::new(doc, name, public_id, system_id))
+                .add_element_decl(element_decl)
+        } else {
+            self.internal_subset
+                .get_or_insert_with(|| DtdSubset::new(doc, name, public_id, system_id))
+                .add_element_decl(element_decl)
+        }
+    }
+
+    /// Add a attlistdecl.
+    ///
+    /// If `EXT` is true, `attlist_decl` is added to the external subset,
+    /// otherwise, added to the internal subset.
+    pub fn add_attlist_decl<const EXT: bool>(
+        &mut self,
+        attlist_decl: AttlistDeclRef,
+    ) -> Result<(), DOMException> {
+        let doc = self.owner_document();
+        let name = self.name.clone();
+        let public_id = self.public_id.clone();
+        let system_id = self.system_id.clone();
+        if EXT {
+            self.external_subset
+                .get_or_insert_with(|| DtdSubset::new(doc, name, public_id, system_id))
+                .add_attlist_decl(attlist_decl)
+        } else {
+            self.internal_subset
+                .get_or_insert_with(|| DtdSubset::new(doc, name, public_id, system_id))
+                .add_attlist_decl(attlist_decl)
+        }
+    }
+
+    fn owner_document(&self) -> Option<DocumentRef> {
+        self.owner_document.as_ref().and_then(|doc| doc.upgrade())
     }
 
     fn set_owner_document(&mut self, doc: DocumentRef) -> Option<DocumentRef> {
@@ -229,6 +270,58 @@ impl DocumentTypeRef {
         Ok(NotationRef::new(self.owner_document(), name))
     }
 
+    /// Create a new [`ElementDeclRef`] that has `name` as the element name.
+    ///
+    /// This is not a required method by the DOM specification.
+    ///
+    /// # Errors
+    /// - If `name` is not a valid XML Name, return `Err(DOMException::InvalidCharacterErr)`
+    pub fn create_element_decl(
+        &self,
+        name: impl Into<Rc<str>>,
+        contentspec: ContentSpec,
+    ) -> Result<ElementDeclRef, DOMException> {
+        let name: Rc<str> = name.into();
+        if validate_name::<false>(&name).is_err() {
+            return Err(DOMException::InvalidCharacterErr);
+        }
+        Ok(ElementDeclRef::new(
+            self.owner_document(),
+            name,
+            contentspec,
+        ))
+    }
+
+    /// Create a new [`AttlistDeclRef`] that has `elem_name` as the element name
+    /// and `att_name` as the attribute name.
+    ///
+    /// This is not a required method by the DOM specification.
+    ///
+    /// # Errors
+    /// - If either `elem_name` or `att_name` is not a valid XML Name,
+    ///   return `Err(DOMException::InvalidCharacterErr)`
+    pub fn create_attlist_decl(
+        &self,
+        elem_name: impl Into<Rc<str>>,
+        att_name: impl Into<Rc<str>>,
+        att_type: AttType,
+        default_decl: DefaultDecl,
+    ) -> Result<AttlistDeclRef, DOMException> {
+        let elem_name: Rc<str> = elem_name.into();
+        let att_name: Rc<str> = att_name.into();
+        if validate_name::<false>(&elem_name).is_err() || validate_name::<false>(&att_name).is_err()
+        {
+            return Err(DOMException::InvalidCharacterErr);
+        }
+        Ok(AttlistDeclRef::new(
+            self.owner_document(),
+            att_name,
+            att_type,
+            default_decl,
+            elem_name,
+        ))
+    }
+
     /// Return an entity that is specified by `name` if exists.
     pub fn get_entity(&self, name: Rc<str>) -> Option<EntityRef> {
         self.0.borrow().get_entity(name)
@@ -251,6 +344,28 @@ impl DocumentTypeRef {
         notation: NotationRef,
     ) -> Result<(), DOMException> {
         self.0.borrow_mut().add_notation::<EXT>(notation)
+    }
+
+    /// Add a elementdecl.
+    ///
+    /// If `EXT` is true, `element_decl` is added to the external subset,
+    /// otherwise, added to the internal subset.
+    pub fn add_element_decl<const EXT: bool>(
+        &mut self,
+        element_decl: ElementDeclRef,
+    ) -> Result<(), DOMException> {
+        self.0.borrow_mut().add_element_decl::<EXT>(element_decl)
+    }
+
+    /// Add a attlistdecl.
+    ///
+    /// If `EXT` is true, `attlist_decl` is added to the external subset,
+    /// otherwise, added to the internal subset.
+    pub fn add_attlist_decl<const EXT: bool>(
+        &mut self,
+        attlist_decl: AttlistDeclRef,
+    ) -> Result<(), DOMException> {
+        self.0.borrow_mut().add_attlist_decl::<EXT>(attlist_decl)
     }
 
     /// Compare positions of `l` and `r`.
@@ -526,6 +641,8 @@ pub struct DtdSubset<const EXT: bool> {
     public_id: Option<Rc<str>>,
     /// Implementation of `systemId` for `DocumentType`.
     system_id: Option<Rc<str>>,
+
+    elements: HashMap<String, ElementDeclRef>,
 }
 
 pub type InternalSubset = DtdSubset<false>;
@@ -555,6 +672,7 @@ impl<const EXT: bool> DtdSubset<EXT> {
             notations: NamedNodeMap::new(ddoc),
             public_id: public_id.map(|id| id.into()),
             system_id: system_id.map(|id| id.into()),
+            elements: HashMap::new(),
         }
     }
 
@@ -640,6 +758,51 @@ impl<const EXT: bool> DtdSubset<EXT> {
         Ok(())
     }
 
+    /// Add an elementdecl `element_decl` to this subset.
+    ///
+    /// If this subset already has an elementdecl with the same name as the name of the
+    /// `element_decl`, `element_decl` is not added and this method returns [`Err`].  
+    /// The name of the elementdecl is also verified.
+    pub fn add_element_decl(&mut self, element_decl: ElementDeclRef) -> Result<(), DOMException> {
+        let name = element_decl.name();
+        if validate_name::<false>(&name).is_err() {
+            return Err(DOMException::InvalidCharacterErr);
+        }
+        if self.elements.contains_key(name.as_ref()) {
+            // Is this correct ??
+            return Err(DOMException::NoDataAllowedErr);
+        }
+
+        self.elements.insert(name.to_string(), element_decl.clone());
+        let decl = MarkupDecl::ElementDecl(element_decl);
+        self.append_markup_decl(decl);
+        Ok(())
+    }
+
+    /// Add an attlistdecl `attlist_decl` to this subset.
+    ///
+    /// If the owner element of the `attlist_decl` is not found, this method returns [`Err`].  
+    /// If this subset already has an attlistdecl with the same name as the name of the
+    /// `attlist_decl`, `attlist_decl` is not added and this method returns [`Err`].  
+    /// The name of the attlistdecl is also verified.
+    pub fn add_attlist_decl(&mut self, attlist_decl: AttlistDeclRef) -> Result<(), DOMException> {
+        let name = attlist_decl.name();
+        if validate_name::<false>(&name).is_err() {
+            return Err(DOMException::InvalidCharacterErr);
+        }
+
+        let elem_name = attlist_decl.element_name();
+        let mut elem = self
+            .elements
+            .get(elem_name.as_ref())
+            .ok_or(DOMException::NotFoundErr)?
+            .clone();
+        elem.add_attlist_decl(attlist_decl.clone())?;
+        let decl = MarkupDecl::AttlistDecl(attlist_decl);
+        self.append_markup_decl(decl);
+        Ok(())
+    }
+
     fn set_owner_document(&mut self, doc: DocumentRef) -> Option<DocumentRef> {
         self.entities.set_owner_document(doc.clone());
         self.notations.set_owner_document(doc.clone());
@@ -647,13 +810,9 @@ impl<const EXT: bool> DtdSubset<EXT> {
         while let Some(child) = children {
             children = child.borrow().next.clone();
             match &mut child.borrow_mut().data {
-                MarkupDecl::AttlistDecl => {
-                    todo!()
-                }
+                MarkupDecl::AttlistDecl(attlist) => attlist.set_owner_document(doc.clone()),
                 MarkupDecl::Comment(comment) => comment.set_owner_document(doc.clone()),
-                MarkupDecl::ElementDecl => {
-                    todo!()
-                }
+                MarkupDecl::ElementDecl(element) => element.set_owner_document(doc.clone()),
                 MarkupDecl::EntityDecl(entity) => entity.set_owner_document(doc.clone()),
                 MarkupDecl::NotationDecl(notation) => notation.set_owner_document(doc.clone()),
                 MarkupDecl::PEReference(entref) => entref.set_owner_document(doc.clone()),
@@ -683,6 +842,7 @@ impl<const EXT: bool> DtdSubset<EXT> {
             ),
             public_id: self.public_id.clone(),
             system_id: self.system_id.clone(),
+            elements: HashMap::new(),
         };
 
         if deep {
@@ -691,7 +851,7 @@ impl<const EXT: bool> DtdSubset<EXT> {
                 let NodeRef::Entity(ent) = ent.clone_node(true) else {
                     unreachable!()
                 };
-                subset.add_entity(ent).expect("Internal Error");
+                subset.add_entity(ent).unwrap();
             }
 
             for i in 0..self.notations.len() {
@@ -699,7 +859,12 @@ impl<const EXT: bool> DtdSubset<EXT> {
                 let NodeRef::Notation(not) = not.clone_node(true) else {
                     unreachable!()
                 };
-                subset.add_notation(not).expect("Internal Error");
+                subset.add_notation(not).unwrap();
+            }
+
+            for element_decl in self.elements.values() {
+                let element_decl = element_decl.clone_node(true);
+                subset.add_element_decl(element_decl).unwrap();
             }
         }
 
@@ -732,7 +897,7 @@ impl<const EXT: bool> DtdSubset<EXT> {
             children = child.borrow().next.clone();
 
             match &child.borrow().data {
-                MarkupDecl::AttlistDecl => {
+                MarkupDecl::AttlistDecl(_attlist) => {
                     todo!()
                 }
                 MarkupDecl::Comment(comment) => {
@@ -743,7 +908,7 @@ impl<const EXT: bool> DtdSubset<EXT> {
                         ri.get_or_insert(cur);
                     }
                 }
-                MarkupDecl::ElementDecl => {
+                MarkupDecl::ElementDecl(_element) => {
                     todo!()
                 }
                 MarkupDecl::EntityDecl(entity) => {
@@ -842,9 +1007,9 @@ impl<const EXT: bool> DtdSubset<EXT> {
 /// ```
 pub(crate) enum MarkupDecl {
     // TODO: implement ElementDecl
-    ElementDecl,
+    ElementDecl(ElementDeclRef),
     // TODO: implement AttlistDecl
-    AttlistDecl,
+    AttlistDecl(AttlistDeclRef),
     EntityDecl(EntityRef),
     NotationDecl(NotationRef),
     ProcessingInstruction(ProcessingInstructionRef),
