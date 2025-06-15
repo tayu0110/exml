@@ -121,36 +121,67 @@ pub struct ElementRef(Rc<RefCell<Element>>);
 impl ElementRef {
     /// Create new [`ElementRef`].
     pub(super) fn new(doc: DocumentRef, tag_name: Rc<str>) -> Self {
-        // TODO: add default attributes
-
-        let doc = doc.downgrade();
-        Self(Rc::new(RefCell::new(Element {
+        let ddoc = doc.downgrade();
+        let mut new = Self(Rc::new(RefCell::new(Element {
             parent_node: None,
             first_child: None,
             last_child: None,
             previous_sibling: None,
             next_sibling: None,
-            attributes: NamedNodeMap::new(doc.clone()),
-            owner_document: doc,
-            tag_name,
+            attributes: NamedNodeMap::new(ddoc.clone()),
+            owner_document: ddoc,
+            tag_name: tag_name.clone(),
             namespace_uri: None,
             prefix: None,
             local_name: None,
-        })))
+        })));
+
+        if let Some(def) = doc.get_default_attributes(&tag_name) {
+            for attr in def {
+                new.set_attribute_node(attr).ok();
+            }
+        }
+        new
     }
 
     /// Create new [`ElementRef`] with namespace whose URI is `ns_uri`.
     pub(super) fn with_namespace(doc: DocumentRef, tag_name: Rc<str>, ns_uri: Rc<str>) -> Self {
-        let new = Self::new(doc, tag_name.clone());
-        let mut elem = new.0.borrow_mut();
-        elem.namespace_uri = Some(ns_uri);
-        if let Some((prefix, local_name)) = split_qname2(&tag_name) {
-            elem.prefix = Some(prefix.into());
-            elem.local_name = Some(local_name.into());
+        let ddoc = doc.downgrade();
+        let mut new = if let Some((prefix, local_name)) = split_qname2(&tag_name) {
+            Self(Rc::new(RefCell::new(Element {
+                parent_node: None,
+                first_child: None,
+                last_child: None,
+                previous_sibling: None,
+                next_sibling: None,
+                attributes: NamedNodeMap::new(ddoc.clone()),
+                owner_document: ddoc,
+                tag_name: tag_name.clone(),
+                namespace_uri: Some(ns_uri),
+                prefix: Some(prefix.into()),
+                local_name: Some(local_name.into()),
+            })))
         } else {
-            elem.local_name = Some(tag_name);
+            Self(Rc::new(RefCell::new(Element {
+                parent_node: None,
+                first_child: None,
+                last_child: None,
+                previous_sibling: None,
+                next_sibling: None,
+                attributes: NamedNodeMap::new(ddoc.clone()),
+                owner_document: ddoc,
+                tag_name: tag_name.clone(),
+                namespace_uri: Some(ns_uri),
+                prefix: None,
+                local_name: Some(tag_name.clone()),
+            })))
+        };
+
+        if let Some(def) = doc.get_default_attributes_ns(&tag_name) {
+            for attr in def {
+                new.set_attribute_node_ns(attr).ok();
+            }
         }
-        drop(elem);
         new
     }
 

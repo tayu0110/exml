@@ -85,6 +85,14 @@ impl AttlistDeclRef {
         self.0.borrow().elem_name.clone()
     }
 
+    pub fn att_type(&self) -> AttType {
+        self.0.borrow().att_type.clone()
+    }
+
+    pub fn default_decl(&self) -> DefaultDecl {
+        self.0.borrow().default_decl.clone()
+    }
+
     pub fn set_owner_document(&mut self, doc: DocumentRef) -> Option<DocumentRef> {
         replace(
             &mut self.0.borrow_mut().owner_document,

@@ -68,6 +68,10 @@ impl Attr {
         self.is_id
     }
 
+    pub(super) fn set_specified(&mut self, is_specified: bool) -> bool {
+        replace(&mut self.specified, is_specified)
+    }
+
     /// Set `isId` attribute.\
     /// Return an old flag.
     pub(super) fn set_is_id(&mut self, is_id: bool) -> bool {
@@ -244,6 +248,10 @@ impl AttrRef {
     /// Implementation of `isId` attribute of `Attr`.
     pub fn is_id(&self) -> bool {
         self.0.borrow().is_id
+    }
+
+    pub(super) fn set_specified(&mut self, is_specified: bool) -> bool {
+        self.0.borrow_mut().set_specified(is_specified)
     }
 
     pub(super) fn set_is_id(&mut self, is_id: bool) -> bool {

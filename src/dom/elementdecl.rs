@@ -236,6 +236,14 @@ impl ElementDeclRef {
         Rc::ptr_eq(&self.0, &other.0)
     }
 
+    pub(crate) fn get_attribute_decl(&self, name: &str) -> Option<AttlistDeclRef> {
+        self.0.borrow().attrdecl.get(name).cloned()
+    }
+
+    pub(crate) fn get_attribute_decls(&self) -> Vec<AttlistDeclRef> {
+        self.0.borrow().attrdecl.values().cloned().collect()
+    }
+
     pub(crate) fn add_attlist_decl(&mut self, decl: AttlistDeclRef) -> Result<(), DOMException> {
         let name = decl.name();
         if validate_name::<false>(&name).is_err() {

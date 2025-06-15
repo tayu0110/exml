@@ -37,7 +37,7 @@ pub const XML_NS_NAMESPACE: &str = "http://www.w3.org/2000/xmlns/";
 /// Implementation of [DOMException](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-17189187)
 /// interface on [1.4 Fundamental Interfaces: Core Module](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-BBACDC08)
 ///
-/// Although named “Exception,”
+/// Although named “Exception”,
 /// it merely inherits its name from the specification and is in fact just an error code.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DOMException {

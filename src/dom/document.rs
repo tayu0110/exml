@@ -6,6 +6,7 @@ use std::{
 
 use crate::{
     chvalid::XmlCharValid,
+    dom::attlistdecl::DefaultDecl,
     error::XmlParserErrors,
     parser::split_qname2,
     tree::{validate_name, validate_qname},
@@ -457,7 +458,7 @@ impl DocumentRef {
     ///                            according to the XML version in use specified in
     ///                            the Document.xmlVersion attribute.
     /// ```
-    pub fn create_attribute(&mut self, name: impl Into<Rc<str>>) -> Result<AttrRef, DOMException> {
+    pub fn create_attribute(&self, name: impl Into<Rc<str>>) -> Result<AttrRef, DOMException> {
         let name: Rc<str> = name.into();
         if validate_name::<false>(&name).is_err() {
             return Err(DOMException::InvalidCharacterErr);
@@ -845,7 +846,7 @@ impl DocumentRef {
     ///                            "XML" feature, since namespaces were defined by XML.
     /// ```
     pub fn create_attribute_ns(
-        &mut self,
+        &self,
         ns_uri: Option<&str>,
         qname: &str,
     ) -> Result<AttrRef, DOMException> {
@@ -1242,6 +1243,66 @@ impl DocumentRef {
     #[doc(alias = "xmlGetDocEntity")]
     pub fn get_entity(&self, name: Rc<str>) -> Option<EntityRef> {
         self.0.borrow().get_entity(name)
+    }
+
+    pub(super) fn get_default_attributes(&self, elem_name: &str) -> Option<Vec<AttrRef>> {
+        let elemdecl = self.doctype()?.get_element_decl(elem_name)?;
+        let mut res = vec![];
+        for decl in elemdecl.get_attribute_decls() {
+            match decl.default_decl() {
+                DefaultDecl::None(def) | DefaultDecl::Fixed(def) => {
+                    let mut attr = self.create_attribute(decl.name()).ok()?;
+                    attr.set_value(def.as_ref()).ok()?;
+                    attr.set_specified(false);
+
+                    // Due to the requirements of the XML specification, attributes
+                    // with default values are not ID attributes, so it is not necessary
+                    // to check whether they should be set as ID attributes.
+                    //
+                    // 3.3.1 Attribute Types
+                    // [Validity constraint: ID Attribute Default]
+                    // An ID attribute MUST have a declared default of #IMPLIED or #REQUIRED.
+
+                    res.push(attr);
+                }
+                _ => {}
+            }
+        }
+        Some(res)
+    }
+
+    pub(super) fn get_default_attributes_ns(&self, elem_name: &str) -> Option<Vec<AttrRef>> {
+        let elemdecl = self.doctype()?.get_element_decl(elem_name)?;
+        let mut res = vec![];
+        for decl in elemdecl.get_attribute_decls() {
+            match decl.default_decl() {
+                DefaultDecl::None(def) | DefaultDecl::Fixed(def) => {
+                    let mut attr = if let Some((pre, _)) = split_qname2(&decl.name()) {
+                        self.create_attribute_ns(
+                            self.lookup_namespace_uri(pre).as_deref(),
+                            &decl.name(),
+                        )
+                        .ok()?
+                    } else {
+                        self.create_attribute(decl.name()).ok()?
+                    };
+                    attr.set_value(def.as_ref()).ok()?;
+                    attr.set_specified(false);
+
+                    // Due to the requirements of the XML specification, attributes
+                    // with default values are not ID attributes, so it is not necessary
+                    // to check whether they should be set as ID attributes.
+                    //
+                    // 3.3.1 Attribute Types
+                    // [Validity constraint: ID Attribute Default]
+                    // An ID attribute MUST have a declared default of #IMPLIED or #REQUIRED.
+
+                    res.push(attr);
+                }
+                _ => {}
+            }
+        }
+        Some(res)
     }
 
     /// Check if this is HTML document.

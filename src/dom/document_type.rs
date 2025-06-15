@@ -68,6 +68,18 @@ impl DocumentType {
             })
     }
 
+    /// Return an elementdecl that is specified by `name` if exists.
+    pub fn get_element_decl(&self, name: &str) -> Option<ElementDeclRef> {
+        self.internal_subset
+            .as_ref()
+            .and_then(|int| int.get_element_decl(name))
+            .or_else(|| {
+                self.external_subset
+                    .as_ref()
+                    .and_then(|ext| ext.get_element_decl(name))
+            })
+    }
+
     /// Add an entity.
     ///
     /// If `EXT` is true, `entity` is added to the external subset,
@@ -325,6 +337,11 @@ impl DocumentTypeRef {
     /// Return an entity that is specified by `name` if exists.
     pub fn get_entity(&self, name: Rc<str>) -> Option<EntityRef> {
         self.0.borrow().get_entity(name)
+    }
+
+    /// Return an elementdecl that is specified by `name` if exists.
+    pub fn get_element_decl(&self, name: &str) -> Option<ElementDeclRef> {
+        self.0.borrow().get_element_decl(name)
     }
 
     /// Add an entity.
@@ -684,6 +701,11 @@ impl<const EXT: bool> DtdSubset<EXT> {
     /// Return a notation that is specified by `name` if exists.
     pub fn get_notation(&self, name: Rc<str>) -> Option<NotationRef> {
         self.notations.get_named_item(name)
+    }
+
+    /// Return a elementdecl that is specified by `name` if exists.
+    pub fn get_element_decl(&self, name: &str) -> Option<ElementDeclRef> {
+        self.elements.get(name).cloned()
     }
 
     /// Check if this subset has `entity` or not.
