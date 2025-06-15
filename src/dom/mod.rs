@@ -746,7 +746,7 @@ mod dom_test_suite {
             // ./resources/DOM-Test-Suite/tests/level1/core/attrcreatedocumentfragment.xml
             #[test]
             fn test_attrcreatedocumentfragment() {
-                let mut doc = staff_xml(STAFF_XML).unwrap();
+                let doc = staff_xml(STAFF_XML).unwrap();
                 let mut doc_fragment = doc.create_document_fragment();
                 let mut new_one = doc.create_element("newElement").unwrap();
                 new_one.set_attribute("newdomestic", "Yes").unwrap();
@@ -820,37 +820,139 @@ mod dom_test_suite {
             }
             // ./resources/DOM-Test-Suite/tests/level1/core/attrname.xml
             #[test]
-            fn test_attrname() {}
+            fn test_attrname() {
+                let doc = staff_xml(STAFF_XML).unwrap();
+                let address_list = doc.get_elements_by_tag_name("address");
+                let test_node = address_list[1].clone();
+                let attributes = test_node.attributes();
+                let street_attr = attributes.get_named_item("street".into()).unwrap();
+                let name = street_attr.node_name();
+                assert_eq!(name.as_ref(), "street");
+                let name = street_attr.name();
+                assert_eq!(name.as_ref(), "street");
+            }
             // ./resources/DOM-Test-Suite/tests/level1/core/attrnextsiblingnull.xml
             #[test]
-            fn test_attrnextsiblingnull() {}
+            fn test_attrnextsiblingnull() {
+                let doc = staff_xml(STAFF_XML).unwrap();
+                let address_list = doc.get_elements_by_tag_name("address");
+                let test_node = address_list[0].clone();
+                let attributes = test_node.attributes();
+                let domestic_attr = attributes.get_named_item("domestic".into()).unwrap();
+                let s = domestic_attr.next_sibling();
+                assert!(s.is_none());
+            }
             // ./resources/DOM-Test-Suite/tests/level1/core/attrnotspecifiedvalue.xml
             #[test]
-            fn test_attrnotspecifiedvalue() {}
+            fn test_attrnotspecifiedvalue() {
+                let doc = staff_xml(STAFF_XML).unwrap();
+                let address_list = doc.get_elements_by_tag_name("address");
+                let test_node = address_list[0].clone();
+                let attributes = test_node.attributes();
+                let street_attr = attributes.get_named_item("street".into()).unwrap();
+                let state = street_attr.specified();
+                assert!(!state);
+            }
             // ./resources/DOM-Test-Suite/tests/level1/core/attrparentnodenull.xml
             #[test]
-            fn test_attrparentnodenull() {}
+            fn test_attrparentnodenull() {
+                let doc = staff_xml(STAFF_XML).unwrap();
+                let address_list = doc.get_elements_by_tag_name("address");
+                let test_node = address_list[0].clone();
+                let attributes = test_node.attributes();
+                let domestic_attr = attributes.get_named_item("domestic".into()).unwrap();
+                let s = domestic_attr.parent_node();
+                assert!(s.is_none());
+            }
             // ./resources/DOM-Test-Suite/tests/level1/core/attrprevioussiblingnull.xml
             #[test]
-            fn test_attrprevioussiblingnull() {}
+            fn test_attrprevioussiblingnull() {
+                let doc = staff_xml(STAFF_XML).unwrap();
+                let address_list = doc.get_elements_by_tag_name("address");
+                let test_node = address_list[0].clone();
+                let attributes = test_node.attributes();
+                let domestic_attr = attributes.get_named_item("domestic".into()).unwrap();
+                let s = domestic_attr.previous_sibling();
+                assert!(s.is_none());
+            }
             // ./resources/DOM-Test-Suite/tests/level1/core/attrremovechild1.xml
             #[test]
-            fn test_attrremovechild1() {}
+            fn test_attrremovechild1() {
+                let doc = staff_xml(STAFF_XML).unwrap();
+                let ent_ref = doc.create_entity_reference("ent4").unwrap();
+                let ent_element = ent_ref.first_child().unwrap().as_element().unwrap();
+                let mut attr_node = ent_element.get_attribute_node("domestic").unwrap();
+                let text_node = attr_node.first_child().unwrap();
+                assert!(attr_node.remove_child(text_node).is_err());
+            }
             // ./resources/DOM-Test-Suite/tests/level1/core/attrreplacechild1.xml
             #[test]
-            fn test_attrreplacechild1() {}
+            fn test_attrreplacechild1() {
+                let doc = staff_xml(STAFF_XML).unwrap();
+                let ent_ref = doc.create_entity_reference("ent4").unwrap();
+                let ent_element = ent_ref.first_child().unwrap().as_element().unwrap();
+                let mut attr_node = ent_element.get_attribute_node("domestic").unwrap();
+                let text_node = attr_node.first_child().unwrap();
+                let new_child = doc.create_text_node("Yesterday");
+                assert!(
+                    attr_node
+                        .replace_child(new_child.into(), text_node)
+                        .is_err()
+                );
+            }
             // ./resources/DOM-Test-Suite/tests/level1/core/attrsetvaluenomodificationallowederrEE.xml
             #[test]
-            fn test_attrsetvaluenomodificationallowederr_ee() {}
+            fn test_attrsetvaluenomodificationallowederr_ee() {
+                let doc = staff_xml(STAFF_XML).unwrap();
+                let gender_list = doc.get_elements_by_tag_name("gender");
+                let mut gender = gender_list[2].clone();
+                let ent_ref = doc.create_entity_reference("ent4").unwrap();
+                gender.append_child(ent_ref.clone().into()).unwrap();
+                let ent_element = ent_ref.first_child().unwrap();
+                let attr_list = ent_element.attributes().unwrap();
+                let mut attr_node = attr_list.get_named_item("domestic".into()).unwrap();
+                assert!(attr_node.set_value("newvalue").is_err());
+                assert!(attr_node.set_node_value("newvalue2").is_err());
+            }
             // ./resources/DOM-Test-Suite/tests/level1/core/attrsetvaluenomodificationallowederr.xml
             #[test]
-            fn test_attrsetvaluenomodificationallowederr() {}
+            fn test_attrsetvaluenomodificationallowederr() {
+                let doc = staff_xml(STAFF_XML).unwrap();
+                let gender_list = doc.get_elements_by_tag_name("gender");
+                let gender = gender_list[2].clone();
+                let gen_list = gender.child_nodes();
+                let r#gen = gen_list[0].clone();
+                let g_list = r#gen.child_nodes();
+                let g = g_list[0].clone();
+                let attr_list = g.attributes().unwrap();
+                let mut attr_node = attr_list.get_named_item("domestic".into()).unwrap();
+                assert!(attr_node.set_value("newvalue").is_err());
+                assert!(attr_node.set_node_value("newvalue2").is_err());
+            }
             // ./resources/DOM-Test-Suite/tests/level1/core/attrspecifiedvaluechanged.xml
             #[test]
-            fn test_attrspecifiedvaluechanged() {}
+            fn test_attrspecifiedvaluechanged() {
+                let doc = staff_xml(STAFF_XML).unwrap();
+                let address_list = doc.get_elements_by_tag_name("address");
+                let mut test_node = address_list[2].clone();
+                test_node.set_attribute("street", "Yes");
+                let attributes = test_node.attributes();
+                let street_attr = attributes.get_named_item("street".into()).unwrap();
+                let state = street_attr.specified();
+                assert!(state);
+            }
             // ./resources/DOM-Test-Suite/tests/level1/core/attrspecifiedvalueremove.xml
             #[test]
-            fn test_attrspecifiedvalueremove() {}
+            fn test_attrspecifiedvalueremove() {
+                let doc = staff_xml(STAFF_XML).unwrap();
+                let address_list = doc.get_elements_by_tag_name("address");
+                let mut test_node = address_list[2].clone();
+                test_node.remove_attribute("street".into()).unwrap();
+                let attributes = test_node.attributes();
+                let street_attr = attributes.get_named_item("street".into()).unwrap();
+                let state = street_attr.specified();
+                assert!(!state);
+            }
             // ./resources/DOM-Test-Suite/tests/level1/core/attrspecifiedvalue.xml
             #[test]
             fn test_attrspecifiedvalue() {}

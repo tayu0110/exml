@@ -299,10 +299,7 @@ impl DocumentRef {
     ///     Element A new Element object with the nodeName attribute set to tagName,
     ///             and localName, prefix, and namespaceURI set to null.
     /// ```
-    pub fn create_element(
-        &mut self,
-        tag_name: impl Into<Rc<str>>,
-    ) -> Result<ElementRef, DOMException> {
+    pub fn create_element(&self, tag_name: impl Into<Rc<str>>) -> Result<ElementRef, DOMException> {
         let tag_name: Rc<str> = tag_name.into();
         if validate_name::<false>(&tag_name).is_err() {
             return Err(DOMException::InvalidCharacterErr);
@@ -320,7 +317,7 @@ impl DocumentRef {
     /// Return Value
     ///     DocumentFragment A new DocumentFragment.
     /// ```
-    pub fn create_document_fragment(&mut self) -> DocumentFragmentRef {
+    pub fn create_document_fragment(&self) -> DocumentFragmentRef {
         DocumentFragmentRef::from_doc(self.clone())
     }
 
@@ -337,7 +334,7 @@ impl DocumentRef {
     /// Return Value
     ///     Text The new Text object.
     /// ```
-    pub fn create_text_node(&mut self, data: impl Into<String>) -> TextRef {
+    pub fn create_text_node(&self, data: impl Into<String>) -> TextRef {
         TextRef::from_doc(self.clone(), data.into())
     }
 
@@ -354,7 +351,7 @@ impl DocumentRef {
     /// Return Value
     ///     Comment The new Comment object.
     /// ```
-    pub fn create_comment(&mut self, data: impl Into<String>) -> CommentRef {
+    pub fn create_comment(&self, data: impl Into<String>) -> CommentRef {
         CommentRef::from_doc(self.clone(), data.into())
     }
 
@@ -374,7 +371,7 @@ impl DocumentRef {
     ///     CDATASection The new CDATASection object.
     /// ```
     pub fn create_cdata_section(
-        &mut self,
+        &self,
         data: impl Into<String>,
     ) -> Result<CDATASectionRef, DOMException> {
         if self.is_html() {
@@ -412,7 +409,7 @@ impl DocumentRef {
     ///     NOT_SUPPORTED_ERR:     Raised if this document is an HTML document.
     /// ```
     pub fn create_processing_instruction(
-        &mut self,
+        &self,
         target: impl Into<Rc<str>>,
         data: Option<impl Into<Rc<str>>>,
     ) -> Result<ProcessingInstructionRef, DOMException> {
@@ -499,7 +496,7 @@ impl DocumentRef {
     ///     NOT_SUPPORTED_ERR:     Raised if this document is an HTML document.
     /// ```
     pub fn create_entity_reference(
-        &mut self,
+        &self,
         name: impl Into<Rc<str>>,
     ) -> Result<EntityReferenceRef, DOMException> {
         if self.is_html() {
@@ -1243,6 +1240,24 @@ impl DocumentRef {
     #[doc(alias = "xmlGetDocEntity")]
     pub fn get_entity(&self, name: Rc<str>) -> Option<EntityRef> {
         self.0.borrow().get_entity(name)
+    }
+
+    pub(super) fn get_default_attribute(
+        &self,
+        elem_name: &str,
+        attr_name: &str,
+    ) -> Option<AttrRef> {
+        let elemdecl = self.doctype()?.get_element_decl(elem_name)?;
+        let attlistdecl = elemdecl.get_attribute_decl(attr_name)?;
+        match attlistdecl.default_decl() {
+            DefaultDecl::None(def) | DefaultDecl::Fixed(def) => {
+                let mut attr = self.create_attribute(attr_name).ok()?;
+                attr.set_value(def.as_ref()).ok()?;
+                attr.set_specified(false);
+                Some(attr)
+            }
+            _ => None,
+        }
     }
 
     pub(super) fn get_default_attributes(&self, elem_name: &str) -> Option<Vec<AttrRef>> {

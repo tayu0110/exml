@@ -58,6 +58,10 @@ pub struct Element {
     prefix: Option<Rc<str>>,
     /// Implementation of `localName` for `Node`.
     local_name: Option<Rc<str>>,
+
+    // 0: read-only ?
+    // 1 - 15: unused
+    flag: u16,
 }
 
 impl Element {
@@ -134,6 +138,7 @@ impl ElementRef {
             namespace_uri: None,
             prefix: None,
             local_name: None,
+            flag: 0,
         })));
 
         if let Some(def) = doc.get_default_attributes(&tag_name) {
@@ -160,6 +165,7 @@ impl ElementRef {
                 namespace_uri: Some(ns_uri),
                 prefix: Some(prefix.into()),
                 local_name: Some(local_name.into()),
+                flag: 0,
             })))
         } else {
             Self(Rc::new(RefCell::new(Element {
@@ -174,6 +180,7 @@ impl ElementRef {
                 namespace_uri: Some(ns_uri),
                 prefix: None,
                 local_name: Some(tag_name.clone()),
+                flag: 0,
             })))
         };
 
@@ -255,7 +262,7 @@ impl ElementRef {
             return Err(DOMException::InvalidCharacterErr);
         }
 
-        let mut doc = self.owner_document().expect("Internal Error");
+        let doc = self.owner_document().expect("Internal Error");
         let mut new = doc.create_attribute(name)?;
         let text = doc.create_text_node(value);
         new.append_child(text.into())?;
@@ -287,9 +294,18 @@ impl ElementRef {
     /// ```
     pub fn remove_attribute(&mut self, name: Rc<str>) -> Result<(), DOMException> {
         let mut attrs = self.attributes();
-        let mut attr = attrs.remove_named_item(name)?;
+        let mut attr = attrs.remove_named_item(name.clone())?;
         attr.set_owner_element(None);
-        // TODO: restore the default attribute if exists in DTD.
+
+        // If the owner Document has a default attribute,
+        // insert it to this element.
+        if let Some(def) = self
+            .owner_document()
+            .and_then(|doc| doc.get_default_attribute(&self.node_name(), &name))
+        {
+            self.set_attribute_node(def)?;
+        }
+
         Ok(())
     }
 
@@ -384,8 +400,18 @@ impl ElementRef {
         if !check_owner_document_sameness(self, &old_attr) {
             return Err(DOMException::NotFoundErr);
         }
-        let mut attr = self.attributes().remove_named_item(old_attr.node_name())?;
+        let attr_name = old_attr.node_name();
+        let mut attr = self.attributes().remove_named_item(attr_name.clone())?;
         attr.set_owner_element(None);
+
+        // If the owner Document has a default attribute,
+        // insert it to this element.
+        if let Some(def) = self
+            .owner_document()
+            .and_then(|doc| doc.get_default_attribute(&self.node_name(), &attr_name))
+        {
+            self.set_attribute_node(def)?;
+        }
         Ok(attr)
     }
 
@@ -536,7 +562,7 @@ impl ElementRef {
         qname: Rc<str>,
         value: impl Into<String>,
     ) -> Result<(), DOMException> {
-        let mut doc = self.owner_document().expect("Internal Error");
+        let doc = self.owner_document().expect("Internal Error");
         if doc.is_html() {
             return Err(DOMException::NotSupportedErr);
         }
@@ -1041,6 +1067,7 @@ impl Node for ElementRef {
             namespace_uri: self.0.borrow().namespace_uri.clone(),
             prefix: self.0.borrow().prefix.clone(),
             local_name: self.0.borrow().local_name.clone(),
+            flag: 0,
         })));
 
         let attrs = self.attributes();

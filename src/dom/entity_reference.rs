@@ -219,7 +219,7 @@ impl NodeConnection for EntityReferenceRef {
     ///     If the document being imported into provides a definition for this entity
     ///     name, its value is assigned.
     /// ```
-    fn adopted_to(&mut self, mut new_doc: DocumentRef) {
+    fn adopted_to(&mut self, new_doc: DocumentRef) {
         let mut children = self.set_first_child(None);
         while let Some(mut child) = children {
             child.set_parent_node(None);

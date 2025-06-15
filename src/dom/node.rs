@@ -43,22 +43,26 @@ pub trait Node: NodeConnection {
     ///
     /// # Specification
     /// ```text
-    /// The value of this node, depending on its type; see the table above. When it is defined to be null, setting it has no effect, including if the node is read-only.
+    /// The value of this node, depending on its type; see the table above. When it is defined
+    /// to be null, setting it has no effect, including if the node is read-only.
     ///
     /// Exceptions on retrieval
     ///     DOMException
-    ///     DOMSTRING_SIZE_ERR: Raised when it would return more characters than fit in a DOMString variable on the implementation platform.
+    ///     DOMSTRING_SIZE_ERR: Raised when it would return more characters than fit in a
+    ///                         DOMString variable on the implementation platform.
     /// ```
     fn node_value(&self) -> Option<Rc<str>>;
     /// Implementation of `nodeValue` attribute.
     ///
     /// # Specification
     /// ```text
-    /// The value of this node, depending on its type; see the table above. When it is defined to be null, setting it has no effect, including if the node is read-only.
+    /// The value of this node, depending on its type; see the table above. When it is defined
+    /// to be null, setting it has no effect, including if the node is read-only.
     ///
     /// Exceptions on setting
     ///     DOMException
-    ///     NO_MODIFICATION_ALLOWED_ERR: Raised when the node is readonly and if it is not defined to be null.
+    ///     NO_MODIFICATION_ALLOWED_ERR: Raised when the node is readonly and if it is not
+    ///                                  defined to be null.
     /// ```
     fn set_node_value(&mut self, value: impl Into<String>) -> Result<(), DOMException>;
 
@@ -134,6 +138,24 @@ pub trait Node: NodeConnection {
     ///
     /// Return Value
     ///     Node The node being inserted.
+    ///
+    /// Exceptions
+    ///     DOMException
+    ///     HIERARCHY_REQUEST_ERR:       Raised if this node is of a type that does not allow
+    ///                                  children of the type of the newChild node, or if the
+    ///                                  node to insert is one of this node's ancestors or
+    ///                                  this node itself, or if this node is of type Document
+    ///                                  and the DOM application attempts to insert a second
+    ///                                  DocumentType or Element node.
+    ///     WRONG_DOCUMENT_ERR:          Raised if newChild was created from a different
+    ///                                  document than the one that created this node.
+    ///     NO_MODIFICATION_ALLOWED_ERR: Raised if this node is readonly or if the parent of
+    ///                                  the node being inserted is readonly.
+    ///     NOT_FOUND_ERR:               Raised if refChild is not a child of this node.
+    ///     NOT_SUPPORTED_ERR:           if this node is of type Document, this exception
+    ///                                  might be raised if the DOM implementation doesn't
+    ///                                  support the insertion of a DocumentType or Element
+    ///                                  node.
     /// ```
     fn insert_before(
         &mut self,
@@ -259,6 +281,24 @@ pub trait Node: NodeConnection {
     ///
     /// Return Value
     ///     Node The node replaced.
+    ///
+    /// Exceptions
+    ///     DOMException
+    ///     HIERARCHY_REQUEST_ERR:       Raised if this node is of a type that does not allow
+    ///                                  children of the type of the newChild node, or if the
+    ///                                  node to put in is one of this node's ancestors or
+    ///                                  this node itself, or if this node is of type Document
+    ///                                  and the result of the replacement operation would add
+    ///                                  a second DocumentType or Element on the Document node.
+    ///     WRONG_DOCUMENT_ERR:          Raised if newChild was created from a different
+    ///                                  document than the one that created this node.
+    ///     NO_MODIFICATION_ALLOWED_ERR: Raised if this node or the parent of the new node is
+    ///                                  readonly.
+    ///     NOT_FOUND_ERR:               Raised if oldChild is not a child of this node.
+    ///     NOT_SUPPORTED_ERR:           if this node is of type Document, this exception
+    ///                                  might be raised if the DOM implementation doesn't
+    ///                                  support the replacement of the DocumentType child or
+    ///                                  Element child.
     /// ```
     fn replace_child(
         &mut self,
@@ -371,6 +411,15 @@ pub trait Node: NodeConnection {
     ///
     /// Return Value
     ///     Node The node removed.
+    ///
+    /// Exceptions
+    ///     DOMException
+    ///     NO_MODIFICATION_ALLOWED_ERR: Raised if this node is readonly.
+    ///     NOT_FOUND_ERR:               Raised if oldChild is not a child of this node.
+    ///     NOT_SUPPORTED_ERR:           if this node is of type Document, this exception
+    ///                                  might be raised if the DOM implementation doesn't
+    ///                                  support the removal of the DocumentType child or the
+    ///                                  Element child.
     /// ```
     fn remove_child(&mut self, mut old_child: NodeRef) -> Result<NodeRef, DOMException> {
         // NOT_FOUND_ERR: Raised if oldChild is not a child of this node.
@@ -400,6 +449,23 @@ pub trait Node: NodeConnection {
     ///
     /// Return Value
     ///     Node The node added.
+    ///
+    /// Exceptions
+    ///     DOMException
+    ///     HIERARCHY_REQUEST_ERR:       Raised if this node is of a type that does not allow
+    ///                                  children of the type of the newChild node, or if the
+    ///                                  node to append is one of this node's ancestors or
+    ///                                  this node itself, or if this node is of type Document
+    ///                                  and the DOM application attempts to append a second
+    ///                                  DocumentType or Element node.
+    ///     WRONG_DOCUMENT_ERR:          Raised if newChild was created from a different
+    ///                                  document than the one that created this node.
+    ///     NO_MODIFICATION_ALLOWED_ERR: Raised if this node is readonly or if the previous
+    ///                                  parent of the node being inserted is readonly.
+    ///     NOT_SUPPORTED_ERR:           if the newChild node is a child of the Document node,
+    ///                                  this exception might be raised if the DOM
+    ///                                  implementation doesn't support the removal of the
+    ///                                  DocumentType child or Element child.
     /// ```
     fn append_child(&mut self, new_child: NodeRef) -> Result<NodeRef, DOMException> {
         self.insert_before(new_child, None)
@@ -963,8 +1029,8 @@ pub trait Node: NodeConnection {
     /// contain the white spaces in element content (see the attribute
     /// Text.isElementContentWhitespace). Similarly, on setting, no parsing is performed
     /// either, the input string is taken as pure textual content.
-    /// The string returned is made of the text content of this node depending on its type, as
-    /// defined below:
+    /// The string returned is made of the text content of this node depending on its type,
+    /// as defined below:
     ///
     /// <omitted>
     ///
@@ -1006,8 +1072,8 @@ pub trait Node: NodeConnection {
     /// contain the white spaces in element content (see the attribute
     /// Text.isElementContentWhitespace). Similarly, on setting, no parsing is performed
     /// either, the input string is taken as pure textual content.
-    /// The string returned is made of the text content of this node depending on its type, as
-    /// defined below:
+    /// The string returned is made of the text content of this node depending on its type,
+    /// as defined below:
     ///
     /// <omitted>
     ///
@@ -1022,7 +1088,7 @@ pub trait Node: NodeConnection {
             self.remove_child(child).ok();
         }
 
-        let mut doc = self.owner_document().expect("Internal Error");
+        let doc = self.owner_document().expect("Internal Error");
         let text = doc.create_text_node(text);
         self.append_child(text.into()).ok();
         Ok(())
