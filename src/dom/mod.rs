@@ -243,6 +243,7 @@ mod dom_test_suite {
         document::DocumentRef,
         document_type::DocumentTypeRef,
         elementdecl::{ContentSpec, ElementContent, ElementContentOccur},
+        entity::EntityType,
         node::Node,
     };
 
@@ -254,24 +255,53 @@ mod dom_test_suite {
         let mut doc = DocumentRef::new(None, Some("staff"), Some(doctype)).unwrap();
 
         let mut doctype = doc.doctype().unwrap();
-        doctype
-            .add_entity::<false>(doctype.create_entity("ent1").unwrap())
+        let mut ent = doctype
+            .create_entity("ent1", EntityType::InternalGeneralEntity)
             .unwrap();
-        doctype
-            .add_entity::<false>(doctype.create_entity("ent2").unwrap())
+        ent.append_child(doc.create_text_node("es").into()).unwrap();
+        doctype.add_entity::<false>(ent).unwrap();
+        let mut ent = doctype
+            .create_entity("ent2", EntityType::InternalGeneralEntity)
             .unwrap();
-        doctype
-            .add_entity::<false>(doctype.create_entity("ent3").unwrap())
+        ent.append_child(doc.create_text_node("1900 Dallas Road").into())
             .unwrap();
-        doctype
-            .add_entity::<false>(doctype.create_entity("ent4").unwrap())
+        doctype.add_entity::<false>(ent).unwrap();
+        let mut ent = doctype
+            .create_entity("ent3", EntityType::InternalGeneralEntity)
             .unwrap();
-        doctype
-            .add_entity::<false>(doctype.create_entity("ent5").unwrap())
+        ent.append_child(doc.create_text_node("Texas").into())
             .unwrap();
+        doctype.add_entity::<false>(ent).unwrap();
+        let mut ent = doctype
+            .create_entity("ent4", EntityType::InternalGeneralEntity)
+            .unwrap();
+        let mut ent_element = doc.create_element("entElement").unwrap();
+        ent_element.set_attribute("domestic", "Yes").unwrap();
+        ent_element
+            .append_child(doc.create_text_node("Element data").into())
+            .unwrap();
+        ent.append_child(ent_element.into()).unwrap();
+        ent.append_child(
+            doc.create_processing_instruction("PItarget", Some("PIdata"))
+                .unwrap()
+                .into(),
+        )
+        .unwrap();
+        doctype.add_entity::<false>(ent).unwrap();
+        let mut ent = doctype
+            .create_entity("ent5", EntityType::ExternalGeneralUnparsedEntity)
+            .unwrap();
+        ent.set_public_id(Some("entityURI"));
+        ent.set_system_id(Some("entityFile"));
+        ent.set_notation_name(Some("notation1"));
+        doctype.add_entity::<false>(ent).unwrap();
         assert!(
             doctype
-                .add_entity::<false>(doctype.create_entity("ent1").unwrap())
+                .add_entity::<false>(
+                    doctype
+                        .create_entity("ent1", EntityType::InternalGeneralEntity)
+                        .unwrap()
+                )
                 .is_err()
         );
         doctype
@@ -768,10 +798,26 @@ mod dom_test_suite {
             }
             // ./resources/DOM-Test-Suite/tests/level1/core/attreffectivevalue.xml
             #[test]
-            fn test_attreffectivevalue() {}
+            fn test_attreffectivevalue() {
+                let doc = staff_xml(STAFF_XML).unwrap();
+                let address_list = doc.get_elements_by_tag_name("address");
+                let test_node = address_list[0].clone();
+                let attributes = test_node.attributes();
+                let domestic_attr = attributes.get_named_item("domestic".into()).unwrap();
+                let value = domestic_attr.node_value().unwrap();
+                assert_eq!(value, "Yes".into());
+            }
             // ./resources/DOM-Test-Suite/tests/level1/core/attrentityreplacement.xml
             #[test]
-            fn test_attrentityreplacement() {}
+            fn test_attrentityreplacement() {
+                let doc = staff_xml(STAFF_XML).unwrap();
+                let address_list = doc.get_elements_by_tag_name("address");
+                let test_node = address_list[3].clone();
+                let attributes = test_node.attributes();
+                let street_attr = attributes.get_named_item("street".into()).unwrap();
+                let value = street_attr.get_value();
+                assert_eq!(value, "Yes");
+            }
             // ./resources/DOM-Test-Suite/tests/level1/core/attrname.xml
             #[test]
             fn test_attrname() {}

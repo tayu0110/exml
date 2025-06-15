@@ -9,6 +9,7 @@ use crate::{
     dom::{
         attlistdecl::{AttType, AttlistDeclRef, DefaultDecl},
         elementdecl::{ContentSpec, ElementDeclRef},
+        entity::EntityType,
     },
     tree::{validate_name, validate_qname},
 };
@@ -260,12 +261,16 @@ impl DocumentTypeRef {
     ///
     /// # Errors
     /// - If `name` is not a valid XML Name, return `Err(DOMException::InvalidCharacterErr)`
-    pub fn create_entity(&self, name: impl Into<Rc<str>>) -> Result<EntityRef, DOMException> {
+    pub fn create_entity(
+        &self,
+        name: impl Into<Rc<str>>,
+        etype: EntityType,
+    ) -> Result<EntityRef, DOMException> {
         let name: Rc<str> = name.into();
         if validate_name::<false>(&name).is_err() {
             return Err(DOMException::InvalidCharacterErr);
         }
-        Ok(EntityRef::new(self.owner_document(), name))
+        Ok(EntityRef::new(self.owner_document(), name, etype))
     }
 
     /// Create a new [`NotationRef`] that has `name` as the notation name.

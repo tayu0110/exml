@@ -18,6 +18,18 @@ pub(super) fn xml_entities_err(code: XmlParserErrors, msg: &str) {
     __xml_simple_error!(XmlErrorDomain::XmlFromTree, code, None, msg);
 }
 
+/// The different valid entity types.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum EntityType {
+    #[default]
+    InternalGeneralEntity,
+    InternalParameterEntity,
+    InternalPredefinedEntity,
+    ExternalGeneralParsedEntity,
+    ExternalGeneralUnparsedEntity,
+    ExternalParameterEntity,
+}
+
 /// Implementation of [Entity](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-527DCFF2)
 /// interface on [1.5 Extended Interfaces: XML Module](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-E067D597)
 pub struct Entity {
@@ -53,6 +65,8 @@ pub struct Entity {
     xml_encoding: Option<Rc<str>>,
     /// Implementation of `xmlVersion` attribute.
     xml_version: Option<Rc<str>>,
+
+    etype: EntityType,
 }
 
 /// Wrapper of `Rc<RefCell<Entity>>`.
@@ -60,7 +74,7 @@ pub struct Entity {
 pub struct EntityRef(Rc<RefCell<Entity>>);
 
 impl EntityRef {
-    pub(crate) fn new(doc: Option<DocumentRef>, name: Rc<str>) -> Self {
+    pub(crate) fn new(doc: Option<DocumentRef>, name: Rc<str>, etype: EntityType) -> Self {
         Self(Rc::new(RefCell::new(Entity {
             first_child: None,
             last_child: None,
@@ -72,12 +86,37 @@ impl EntityRef {
             input_encoding: None,
             xml_encoding: None,
             xml_version: None,
+            etype,
         })))
     }
 
     /// Generate [`EntityWeakRef`] from `self`.
     pub fn downgrade(&self) -> EntityWeakRef {
         EntityWeakRef(Rc::downgrade(&self.0))
+    }
+
+    pub fn set_public_id(&mut self, public_id: Option<impl Into<Rc<str>>>) -> Option<Rc<str>> {
+        replace(
+            &mut self.0.borrow_mut().public_id,
+            public_id.map(|id| id.into()),
+        )
+    }
+
+    pub fn set_system_id(&mut self, system_id: Option<impl Into<Rc<str>>>) -> Option<Rc<str>> {
+        replace(
+            &mut self.0.borrow_mut().system_id,
+            system_id.map(|id| id.into()),
+        )
+    }
+
+    pub fn set_notation_name(
+        &mut self,
+        notation_name: Option<impl Into<Rc<str>>>,
+    ) -> Option<Rc<str>> {
+        replace(
+            &mut self.0.borrow_mut().notation_name,
+            notation_name.map(|name| name.into()),
+        )
     }
 }
 
@@ -126,6 +165,7 @@ impl Node for EntityRef {
             input_encoding: self.0.borrow().input_encoding.clone(),
             xml_encoding: self.0.borrow().xml_encoding.clone(),
             xml_version: self.0.borrow().xml_version.clone(),
+            etype: self.0.borrow().etype,
         })));
 
         if deep {
