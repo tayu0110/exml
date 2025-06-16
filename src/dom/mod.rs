@@ -555,6 +555,8 @@ mod dom_test_suite {
                 .unwrap()
                 .into(),
         )?;
+        name.append_child(doc.create_text_node("\n").into())
+            .unwrap();
         name.append_child(
             doc.create_cdata_section(
                 "This is an adjacent CDATASection with a reference to a tab &tab;",
@@ -739,6 +741,8 @@ mod dom_test_suite {
     mod level1 {
         mod core {
             use crate::dom::{
+                DOMException, NodeType,
+                character_data::CharacterData,
                 dom_test_suite::{STAFF_XML, staff_xml},
                 node::Node,
             };
@@ -764,7 +768,7 @@ mod dom_test_suite {
                 let address_list = doc.get_elements_by_tag_name("address");
                 let test_node = address_list[3].clone();
                 let attributes = test_node.attributes();
-                let mut street_attr = attributes.get_named_item("street".into()).unwrap();
+                let mut street_attr = attributes.get_named_item("street").unwrap();
                 street_attr.set_node_value("Y&ent1;").unwrap();
                 let value = street_attr.get_value();
                 assert_eq!(value, "Y&ent1;");
@@ -778,7 +782,7 @@ mod dom_test_suite {
                 let address_list = doc.get_elements_by_tag_name("address");
                 let test_node = address_list[3].clone();
                 let attributes = test_node.attributes();
-                let mut street_attr = attributes.get_named_item("street".into()).unwrap();
+                let mut street_attr = attributes.get_named_item("street").unwrap();
                 street_attr.set_value("Y&ent1;").unwrap();
                 let value = street_attr.get_value();
                 assert_eq!(value, "Y&ent1;");
@@ -792,7 +796,7 @@ mod dom_test_suite {
                 let address_list = doc.get_elements_by_tag_name("address");
                 let test_node = address_list[0].clone();
                 let attributes = test_node.attributes();
-                let stree_attr = attributes.get_named_item("street".into()).unwrap();
+                let stree_attr = attributes.get_named_item("street").unwrap();
                 let value = stree_attr.node_value().unwrap();
                 assert_eq!(value, "Yes".into());
             }
@@ -803,7 +807,7 @@ mod dom_test_suite {
                 let address_list = doc.get_elements_by_tag_name("address");
                 let test_node = address_list[0].clone();
                 let attributes = test_node.attributes();
-                let domestic_attr = attributes.get_named_item("domestic".into()).unwrap();
+                let domestic_attr = attributes.get_named_item("domestic").unwrap();
                 let value = domestic_attr.node_value().unwrap();
                 assert_eq!(value, "Yes".into());
             }
@@ -814,7 +818,7 @@ mod dom_test_suite {
                 let address_list = doc.get_elements_by_tag_name("address");
                 let test_node = address_list[3].clone();
                 let attributes = test_node.attributes();
-                let street_attr = attributes.get_named_item("street".into()).unwrap();
+                let street_attr = attributes.get_named_item("street").unwrap();
                 let value = street_attr.get_value();
                 assert_eq!(value, "Yes");
             }
@@ -825,7 +829,7 @@ mod dom_test_suite {
                 let address_list = doc.get_elements_by_tag_name("address");
                 let test_node = address_list[1].clone();
                 let attributes = test_node.attributes();
-                let street_attr = attributes.get_named_item("street".into()).unwrap();
+                let street_attr = attributes.get_named_item("street").unwrap();
                 let name = street_attr.node_name();
                 assert_eq!(name.as_ref(), "street");
                 let name = street_attr.name();
@@ -838,7 +842,7 @@ mod dom_test_suite {
                 let address_list = doc.get_elements_by_tag_name("address");
                 let test_node = address_list[0].clone();
                 let attributes = test_node.attributes();
-                let domestic_attr = attributes.get_named_item("domestic".into()).unwrap();
+                let domestic_attr = attributes.get_named_item("domestic").unwrap();
                 let s = domestic_attr.next_sibling();
                 assert!(s.is_none());
             }
@@ -849,7 +853,7 @@ mod dom_test_suite {
                 let address_list = doc.get_elements_by_tag_name("address");
                 let test_node = address_list[0].clone();
                 let attributes = test_node.attributes();
-                let street_attr = attributes.get_named_item("street".into()).unwrap();
+                let street_attr = attributes.get_named_item("street").unwrap();
                 let state = street_attr.specified();
                 assert!(!state);
             }
@@ -860,7 +864,7 @@ mod dom_test_suite {
                 let address_list = doc.get_elements_by_tag_name("address");
                 let test_node = address_list[0].clone();
                 let attributes = test_node.attributes();
-                let domestic_attr = attributes.get_named_item("domestic".into()).unwrap();
+                let domestic_attr = attributes.get_named_item("domestic").unwrap();
                 let s = domestic_attr.parent_node();
                 assert!(s.is_none());
             }
@@ -871,7 +875,7 @@ mod dom_test_suite {
                 let address_list = doc.get_elements_by_tag_name("address");
                 let test_node = address_list[0].clone();
                 let attributes = test_node.attributes();
-                let domestic_attr = attributes.get_named_item("domestic".into()).unwrap();
+                let domestic_attr = attributes.get_named_item("domestic").unwrap();
                 let s = domestic_attr.previous_sibling();
                 assert!(s.is_none());
             }
@@ -910,9 +914,15 @@ mod dom_test_suite {
                 gender.append_child(ent_ref.clone().into()).unwrap();
                 let ent_element = ent_ref.first_child().unwrap();
                 let attr_list = ent_element.attributes().unwrap();
-                let mut attr_node = attr_list.get_named_item("domestic".into()).unwrap();
-                assert!(attr_node.set_value("newvalue").is_err());
-                assert!(attr_node.set_node_value("newvalue2").is_err());
+                let mut attr_node = attr_list.get_named_item("domestic").unwrap();
+                assert_eq!(
+                    attr_node.set_value("newvalue"),
+                    Err(DOMException::NoModificationAllowedErr)
+                );
+                assert_eq!(
+                    attr_node.set_node_value("newvalue2"),
+                    Err(DOMException::NoModificationAllowedErr)
+                );
             }
             // ./resources/DOM-Test-Suite/tests/level1/core/attrsetvaluenomodificationallowederr.xml
             #[test]
@@ -925,9 +935,15 @@ mod dom_test_suite {
                 let g_list = r#gen.child_nodes();
                 let g = g_list[0].clone();
                 let attr_list = g.attributes().unwrap();
-                let mut attr_node = attr_list.get_named_item("domestic".into()).unwrap();
-                assert!(attr_node.set_value("newvalue").is_err());
-                assert!(attr_node.set_node_value("newvalue2").is_err());
+                let mut attr_node = attr_list.get_named_item("domestic").unwrap();
+                assert_eq!(
+                    attr_node.set_value("newvalue"),
+                    Err(DOMException::NoModificationAllowedErr)
+                );
+                assert_eq!(
+                    attr_node.set_node_value("newvalue2"),
+                    Err(DOMException::NoModificationAllowedErr)
+                );
             }
             // ./resources/DOM-Test-Suite/tests/level1/core/attrspecifiedvaluechanged.xml
             #[test]
@@ -937,7 +953,7 @@ mod dom_test_suite {
                 let mut test_node = address_list[2].clone();
                 test_node.set_attribute("street", "Yes");
                 let attributes = test_node.attributes();
-                let street_attr = attributes.get_named_item("street".into()).unwrap();
+                let street_attr = attributes.get_named_item("street").unwrap();
                 let state = street_attr.specified();
                 assert!(state);
             }
@@ -949,40 +965,148 @@ mod dom_test_suite {
                 let mut test_node = address_list[2].clone();
                 test_node.remove_attribute("street".into()).unwrap();
                 let attributes = test_node.attributes();
-                let street_attr = attributes.get_named_item("street".into()).unwrap();
+                let street_attr = attributes.get_named_item("street").unwrap();
                 let state = street_attr.specified();
                 assert!(!state);
             }
             // ./resources/DOM-Test-Suite/tests/level1/core/attrspecifiedvalue.xml
             #[test]
-            fn test_attrspecifiedvalue() {}
+            fn test_attrspecifiedvalue() {
+                let doc = staff_xml(STAFF_XML).unwrap();
+                let address_list = doc.get_elements_by_tag_name("address");
+                let test_node = address_list[0].clone();
+                let attributes = test_node.attributes();
+                let domestic_attr = attributes.get_named_item("domestic").unwrap();
+                let state = domestic_attr.specified();
+                assert!(state);
+            }
             // ./resources/DOM-Test-Suite/tests/level1/core/cdatasectiongetdata.xml
             #[test]
-            fn test_cdatasectiongetdata() {}
+            fn test_cdatasectiongetdata() {
+                let doc = staff_xml(STAFF_XML).unwrap();
+                let name_list = doc.get_elements_by_tag_name("name");
+                let child = name_list[1].clone();
+                let last_child = child.last_child().unwrap();
+                let node_type = last_child.node_type();
+                assert_eq!(node_type, NodeType::CDATASection);
+                let data = last_child.as_cdata_section().unwrap().data();
+                assert_eq!(
+                    data,
+                    "This is an adjacent CDATASection with a reference to a tab &tab;"
+                )
+            }
             // ./resources/DOM-Test-Suite/tests/level1/core/cdatasectionnormalize.xml
             #[test]
-            fn test_cdatasectionnormalize() {}
+            fn test_cdatasectionnormalize() {
+                let doc = staff_xml(STAFF_XML).unwrap();
+                let name_list = doc.get_elements_by_tag_name("name");
+                let mut l_child = name_list[1].clone();
+                l_child.normalize();
+                let child_nodes = l_child.child_nodes();
+                let cdata_n = child_nodes[1].clone().as_cdata_section().unwrap();
+                let data = cdata_n.data();
+                assert_eq!(
+                    data,
+                    "This is a CDATASection with EntityReference number 2 &ent2;"
+                );
+                let cdata_n = child_nodes[3].clone().as_cdata_section().unwrap();
+                let data = cdata_n.data();
+                assert_eq!(
+                    data,
+                    "This is an adjacent CDATASection with a reference to a tab &tab;"
+                );
+            }
             // ./resources/DOM-Test-Suite/tests/level1/core/characterdataappenddatagetdata.xml
             #[test]
-            fn test_characterdataappenddatagetdata() {}
+            fn test_characterdataappenddatagetdata() {
+                let doc = staff_xml(STAFF_XML).unwrap();
+                let element_list = doc.get_elements_by_tag_name("name");
+                let name_node = element_list[0].clone();
+                let mut child = name_node.first_child().unwrap().as_text_node().unwrap();
+                child.append_data(", Esquire").unwrap();
+                let child_data = child.data();
+                assert_eq!(child_data, "Margaret Martin, Esquire");
+            }
             // ./resources/DOM-Test-Suite/tests/level1/core/characterdataappenddatanomodificationallowederrEE.xml
             #[test]
-            fn test_characterdataappenddatanomodificationallowederr_ee() {}
+            fn test_characterdataappenddatanomodificationallowederr_ee() {
+                let doc = staff_xml(STAFF_XML).unwrap();
+                let gender_list = doc.get_elements_by_tag_name("gender");
+                let mut gender_node = gender_list[2].clone();
+                let ent_reference = doc.create_entity_reference("ent3").unwrap();
+                gender_node
+                    .append_child(ent_reference.clone().into())
+                    .unwrap();
+                let mut ent_text = ent_reference.first_child().unwrap().as_text_node().unwrap();
+                assert_eq!(
+                    ent_text.append_data("newString"),
+                    Err(DOMException::NoModificationAllowedErr)
+                );
+            }
             // ./resources/DOM-Test-Suite/tests/level1/core/characterdataappenddatanomodificationallowederr.xml
             #[test]
-            fn test_characterdataappenddatanomodificationallowederr() {}
+            fn test_characterdataappenddatanomodificationallowederr() {
+                let doc = staff_xml(STAFF_XML).unwrap();
+                let gender_list = doc.get_elements_by_tag_name("gender");
+                let gender_node = gender_list[2].clone();
+                let mut ent_reference = gender_node.first_child().unwrap();
+                let node_type = ent_reference.node_type();
+                if node_type == NodeType::Element {
+                    ent_reference = doc.create_entity_reference("ent4").unwrap().into();
+                }
+                let ent_element = ent_reference.first_child().unwrap();
+                let mut ent_element_content =
+                    ent_element.first_child().unwrap().as_text_node().unwrap();
+                assert_eq!(
+                    ent_element_content.append_data("newString"),
+                    Err(DOMException::NoModificationAllowedErr)
+                );
+            }
             // ./resources/DOM-Test-Suite/tests/level1/core/characterdataappenddata.xml
             #[test]
-            fn test_characterdataappenddata() {}
+            fn test_characterdataappenddata() {
+                let doc = staff_xml(STAFF_XML).unwrap();
+                let element_list = doc.get_elements_by_tag_name("name");
+                let name_node = element_list[0].clone();
+                let mut child = name_node.first_child().unwrap().as_text_node().unwrap();
+                child.append_data(", Esquire").unwrap();
+                let child_value = child.data();
+                let child_length = child_value.len();
+                assert_eq!(child_length, 24);
+            }
             // ./resources/DOM-Test-Suite/tests/level1/core/characterdatadeletedatabegining.xml
             #[test]
-            fn test_characterdatadeletedatabegining() {}
+            fn test_characterdatadeletedatabegining() {
+                let doc = staff_xml(STAFF_XML).unwrap();
+                let element_list = doc.get_elements_by_tag_name("address");
+                let name_node = element_list[0].clone();
+                let mut child = name_node.first_child().unwrap().as_text_node().unwrap();
+                child.delete_data(0, 16).unwrap();
+                let child_data = child.data();
+                assert_eq!(child_data, "Dallas, Texas 98551");
+            }
             // ./resources/DOM-Test-Suite/tests/level1/core/characterdatadeletedataend.xml
             #[test]
-            fn test_characterdatadeletedataend() {}
+            fn test_characterdatadeletedataend() {
+                let doc = staff_xml(STAFF_XML).unwrap();
+                let element_list = doc.get_elements_by_tag_name("address");
+                let name_node = element_list[0].clone();
+                let mut child = name_node.first_child().unwrap().as_text_node().unwrap();
+                child.delete_data(30, 5).unwrap();
+                let child_data = child.data();
+                assert_eq!(child_data, "1230 North Ave. Dallas, Texas ");
+            }
             // ./resources/DOM-Test-Suite/tests/level1/core/characterdatadeletedataexceedslength.xml
             #[test]
-            fn test_characterdatadeletedataexceedslength() {}
+            fn test_characterdatadeletedataexceedslength() {
+                let doc = staff_xml(STAFF_XML).unwrap();
+                let element_list = doc.get_elements_by_tag_name("address");
+                let name_node = element_list[0].clone();
+                let mut child = name_node.first_child().unwrap().as_text_node().unwrap();
+                child.delete_data(4, 50).unwrap();
+                let child_data = child.data();
+                assert_eq!(child_data, "1230");
+            }
             // ./resources/DOM-Test-Suite/tests/level1/core/characterdatadeletedatagetlengthanddata.xml
             #[test]
             fn test_characterdatadeletedatagetlengthanddata() {}

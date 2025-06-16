@@ -130,10 +130,11 @@ pub trait CharacterData {
     /// ```
     fn delete_data(&mut self, offset: usize, count: usize) -> Result<(), DOMException> {
         let mut data = self.data();
-        if !data.is_char_boundary(offset) || !data.is_char_boundary(offset + count) {
+        let end = data.len().min(offset + count);
+        if !data.is_char_boundary(offset) || !data.is_char_boundary(end) {
             return Err(DOMException::IndexSizeErr);
         }
-        data.drain(offset..offset + count);
+        data.drain(offset..end);
         self.set_data(data)
     }
     /// Implementation of [`replaceData`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-E5CBA7FB) method.

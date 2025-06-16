@@ -124,8 +124,8 @@ impl<N: Node + Clone> NamedNodeMap<N> {
     }
 
     /// Implementation of `getNamedItem` method.
-    pub fn get_named_item(&self, name: Rc<str>) -> Option<N> {
-        let &index = self.index.borrow().get(&(name, None))?;
+    pub fn get_named_item(&self, name: impl Into<Rc<str>>) -> Option<N> {
+        let &index = self.index.borrow().get(&(name.into(), None))?;
         self.item(index)
     }
 
