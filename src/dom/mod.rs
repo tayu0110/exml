@@ -1109,22 +1109,84 @@ mod dom_test_suite {
             }
             // ./resources/DOM-Test-Suite/tests/level1/core/characterdatadeletedatagetlengthanddata.xml
             #[test]
-            fn test_characterdatadeletedatagetlengthanddata() {}
+            fn test_characterdatadeletedatagetlengthanddata() {
+                let doc = staff_xml(STAFF_XML).unwrap();
+                let element_list = doc.get_elements_by_tag_name("address");
+                let name_node = element_list[0].clone();
+                let mut child = name_node.first_child().unwrap().as_text_node().unwrap();
+                child.delete_data(30, 5).unwrap();
+                let child_data = child.data();
+                assert_eq!(child_data, "1230 North Ave. Dallas, Texas ");
+                let child_length = child_data.len();
+                assert_eq!(child_length, 30);
+            }
             // ./resources/DOM-Test-Suite/tests/level1/core/characterdatadeletedatamiddle.xml
             #[test]
-            fn test_characterdatadeletedatamiddle() {}
+            fn test_characterdatadeletedatamiddle() {
+                let doc = staff_xml(STAFF_XML).unwrap();
+                let element_list = doc.get_elements_by_tag_name("address");
+                let name_node = element_list[0].clone();
+                let mut child = name_node.first_child().unwrap().as_text_node().unwrap();
+                child.delete_data(16, 8).unwrap();
+                let child_data = child.data();
+                assert_eq!(child_data, "1230 North Ave. Texas 98551");
+            }
             // ./resources/DOM-Test-Suite/tests/level1/core/characterdatadeletedatanomodificationallowederrEE.xml
             #[test]
-            fn test_characterdatadeletedatanomodificationallowederr_ee() {}
+            fn test_characterdatadeletedatanomodificationallowederr_ee() {
+                let doc = staff_xml(STAFF_XML).unwrap();
+                let gender_list = doc.get_elements_by_tag_name("gender");
+                let mut gender_node = gender_list[2].clone();
+                let ent_reference = doc.create_entity_reference("ent3").unwrap();
+                gender_node
+                    .append_child(ent_reference.clone().into())
+                    .unwrap();
+                let mut ent_text = ent_reference.first_child().unwrap().as_text_node().unwrap();
+                assert_eq!(
+                    ent_text.delete_data(1, 3),
+                    Err(DOMException::NoModificationAllowedErr)
+                );
+            }
             // ./resources/DOM-Test-Suite/tests/level1/core/characterdatadeletedatanomodificationallowederr.xml
             #[test]
-            fn test_characterdatadeletedatanomodificationallowederr() {}
+            fn test_characterdatadeletedatanomodificationallowederr() {
+                let doc = staff_xml(STAFF_XML).unwrap();
+                let gender_list = doc.get_elements_by_tag_name("gender");
+                let gender_node = gender_list[2].clone();
+                let mut ent_reference = gender_node.first_child().unwrap();
+                let node_type = ent_reference.node_type();
+                if node_type == NodeType::Text {
+                    ent_reference = doc.create_entity_reference("ent4").unwrap().into();
+                }
+                let ent_element = ent_reference.first_child().unwrap();
+                let mut ent_element_content =
+                    ent_element.first_child().unwrap().as_text_node().unwrap();
+                assert_eq!(
+                    ent_element_content.delete_data(1, 3),
+                    Err(DOMException::NoModificationAllowedErr)
+                );
+            }
             // ./resources/DOM-Test-Suite/tests/level1/core/characterdatagetdata.xml
             #[test]
-            fn test_characterdatagetdata() {}
+            fn test_characterdatagetdata() {
+                let doc = staff_xml(STAFF_XML).unwrap();
+                let element_list = doc.get_elements_by_tag_name("name");
+                let name_node = element_list[0].clone();
+                let child = name_node.first_child().unwrap().as_text_node().unwrap();
+                let child_data = child.data();
+                assert_eq!(child_data, "Margaret Martin");
+            }
             // ./resources/DOM-Test-Suite/tests/level1/core/characterdatagetlength.xml
             #[test]
-            fn test_characterdatagetlength() {}
+            fn test_characterdatagetlength() {
+                let doc = staff_xml(STAFF_XML).unwrap();
+                let element_list = doc.get_elements_by_tag_name("name");
+                let name_node = element_list[0].clone();
+                let child = name_node.first_child().unwrap().as_text_node().unwrap();
+                let child_value = child.data();
+                let child_length = child_value.len();
+                assert_eq!(child_length, 15);
+            }
             // ./resources/DOM-Test-Suite/tests/level1/core/characterdataindexsizeerrdeletedatacountnegative.xml
             #[test]
             fn test_characterdataindexsizeerrdeletedatacountnegative() {}
