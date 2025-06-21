@@ -124,6 +124,12 @@ impl DocumentPosition {
     }
 }
 
+impl From<DocumentPosition> for u16 {
+    fn from(value: DocumentPosition) -> Self {
+        value.0
+    }
+}
+
 /// Constants `NodeType` in [Interface Node](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-1950641247).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum NodeType {
@@ -770,7 +776,7 @@ mod dom_test_suite {
                 let attributes = test_node.attributes();
                 let mut street_attr = attributes.get_named_item("street").unwrap();
                 street_attr.set_node_value("Y&ent1;").unwrap();
-                let value = street_attr.get_value();
+                let value = street_attr.value();
                 assert_eq!(value, "Y&ent1;");
                 let value = street_attr.node_value().unwrap();
                 assert_eq!(value, "Y&ent1;".into());
@@ -784,7 +790,7 @@ mod dom_test_suite {
                 let attributes = test_node.attributes();
                 let mut street_attr = attributes.get_named_item("street").unwrap();
                 street_attr.set_value("Y&ent1;").unwrap();
-                let value = street_attr.get_value();
+                let value = street_attr.value();
                 assert_eq!(value, "Y&ent1;");
                 let value = street_attr.node_value().unwrap();
                 assert_eq!(value, "Y&ent1;".into());
@@ -819,7 +825,7 @@ mod dom_test_suite {
                 let test_node = address_list[3].clone();
                 let attributes = test_node.attributes();
                 let street_attr = attributes.get_named_item("street").unwrap();
-                let value = street_attr.get_value();
+                let value = street_attr.value();
                 assert_eq!(value, "Yes");
             }
             // ./resources/DOM-Test-Suite/tests/level1/core/attrname.xml

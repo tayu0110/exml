@@ -44,13 +44,13 @@ pub struct Document {
     // previous_sibling: Option<NodeWeakRef>,
     // next_sibling: Option<NodeRef>,
     /// Implementation of `doctype` attribute.  
-    pub(super) doctype: Option<DocumentTypeRef>,
+    doctype: Option<DocumentTypeRef>,
     /// Implementation of `documentElement` attribute.
     document_element: Option<ElementRef>,
     /// Implementation of `documentURI` attribute.
     document_uri: Option<Rc<str>>,
     /// Implementation of `inputEncoding` attribute.
-    pub(super) input_encoding: Option<Rc<str>>,
+    input_encoding: Option<Rc<str>>,
     /// Implementation of `xmlEncoding` attribute.
     xml_encoding: Option<Rc<str>>,
     /// Implementation of `xmlStandalone` attribute.  
@@ -67,7 +67,10 @@ pub struct Document {
     xml_version: Option<Rc<str>>,
 
     /// HTML document or not
-    pub(super) html: bool,
+    html: bool,
+    // 0: enable modification check for Entity if set
+    // 1: enable modification check for EntityReference if set
+    flag: u32,
 }
 
 impl Document {
@@ -237,6 +240,7 @@ impl DocumentRef {
             xml_standalone: 0,
             xml_version: None,
             html: false,
+            flag: 0,
         })));
         // TODO: check if the DTD specifies this document is HTML or not.
         if let Some(mut doctype) = doctype {
@@ -1380,6 +1384,7 @@ impl Node for DocumentRef {
             xml_standalone: self.0.borrow().xml_standalone,
             xml_version: self.0.borrow().xml_version.clone(),
             html: self.0.borrow().html,
+            flag: self.0.borrow().flag,
         })));
 
         if deep {

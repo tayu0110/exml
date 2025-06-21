@@ -48,6 +48,21 @@ impl NotationRef {
         })))
     }
 
+    /// Get `name` attribute of this notation.
+    pub fn name(&self) -> Rc<str> {
+        self.0.borrow().name.clone()
+    }
+
+    /// Get `publicId` attribute of this notation.
+    pub fn public_id(&self) -> Option<Rc<str>> {
+        self.0.borrow().public_id.clone()
+    }
+
+    /// Get `systemId` attribute of this notation.
+    pub fn system_id(&self) -> Option<Rc<str>> {
+        self.0.borrow().system_id.clone()
+    }
+
     /// Generate [`NotationWeakRef`] from `self`.
     pub fn downgrade(&self) -> NotationWeakRef {
         NotationWeakRef(Rc::downgrade(&self.0))

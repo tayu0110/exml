@@ -72,9 +72,21 @@ impl ProcessingInstructionRef {
     ///
     /// # Specification
     /// ```text
-    /// The content of this processing instruction. This is from the first non white space
-    /// character after the target to the character immediately preceding the ?>.
+    /// target of type DOMString, readonly
+    ///     The target of this processing instruction. XML defines this as being the first
+    ///     token following the markup that begins the processing instruction.
     /// ```
+    pub fn target(&self) -> Rc<str> {
+        self.0.borrow().target.clone()
+    }
+
+    /// Implementation of `data` attribute.
+    ///
+    /// # Specification
+    /// ```text
+    /// data of type DOMString
+    ///     The content of this processing instruction. This is from the first non white
+    ///     space character after the target to the character immediately preceding the ?>.
     pub fn data(&self) -> Option<Rc<str>> {
         self.0.borrow().data.clone()
     }

@@ -192,6 +192,11 @@ impl ElementRef {
         new
     }
 
+    /// Get `tagName` attribute of this element.
+    pub fn tag_name(&self) -> Rc<str> {
+        self.0.borrow().tag_name.clone()
+    }
+
     /// Get `attributes` attribute of this element.
     pub fn attributes(&self) -> NamedNodeMap<AttrRef> {
         self.0.borrow().attributes()

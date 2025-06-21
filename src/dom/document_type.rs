@@ -240,6 +240,11 @@ impl DocumentTypeRef {
         }))))
     }
 
+    /// Implementation of `name` attribute.
+    pub fn name(&self) -> Rc<str> {
+        self.0.borrow().name.clone()
+    }
+
     /// Implementation of `publicId` attribute.
     pub fn public_id(&self) -> Option<Rc<str>> {
         self.0.borrow().public_id.clone()

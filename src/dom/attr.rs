@@ -87,7 +87,7 @@ impl Attr {
     /// Character and general entity references are replaced with their values.
     /// See also the method getAttribute on the Element interface.
     /// ```
-    pub fn get_value(&self) -> String {
+    pub fn value(&self) -> String {
         let mut buf = String::new();
         let mut children = self.first_child.clone();
         while let Some(child) = children {
@@ -211,8 +211,8 @@ impl AttrRef {
     /// normalization automatically, even after mutation; in such case, the value on
     /// retrieval may differ from the value on setting.
     /// ```
-    pub fn get_value(&self) -> String {
-        self.0.borrow().get_value()
+    pub fn value(&self) -> String {
+        self.0.borrow().value()
     }
 
     /// Implementation of `value` attribute.
@@ -277,7 +277,7 @@ impl Node for AttrRef {
     }
 
     fn node_value(&self) -> Option<Rc<str>> {
-        Some(self.0.borrow().get_value().into())
+        Some(self.0.borrow().value().into())
     }
 
     fn set_node_value(&mut self, value: impl Into<String>) -> Result<(), DOMException> {

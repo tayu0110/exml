@@ -174,7 +174,10 @@ impl<N: Node + Clone> NamedNodeMap<N> {
     ///
     /// # Specification
     /// ```text
-    /// Removes a node specified by name. When this map contains the attributes attached to an element, if the removed attribute is known to have a default value, an attribute immediately appears containing the default value as well as the corresponding namespace URI, local name, and prefix when applicable.
+    /// Removes a node specified by name. When this map contains the attributes attached to
+    /// an element, if the removed attribute is known to have a default value, an attribute
+    /// immediately appears containing the default value as well as the corresponding
+    /// namespace URI, local name, and prefix when applicable.
     ///
     /// Parameters
     ///     name of type DOMString

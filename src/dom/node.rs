@@ -1609,6 +1609,7 @@ impl_node_conversion! {
     ( as_attribute, Attribute, AttrRef ),
     ( as_text_node, Text, TextRef ),
     ( as_cdata_section, CDATASection, CDATASectionRef ),
+    ( as_entity, Entity, EntityRef ),
     ( as_entity_reference, EntityReference, EntityReferenceRef ),
     ( as_processing_instruction, ProcessingInstruction, ProcessingInstructionRef ),
     ( as_comment, Comment, CommentRef ),

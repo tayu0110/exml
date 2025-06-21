@@ -95,6 +95,26 @@ impl EntityRef {
         EntityWeakRef(Rc::downgrade(&self.0))
     }
 
+    /// Get `name` attribute of this entity.
+    pub fn name(&self) -> Rc<str> {
+        self.0.borrow().name.clone()
+    }
+
+    /// Get `publicId` attribute of this entity.
+    pub fn public_id(&self) -> Option<Rc<str>> {
+        self.0.borrow().public_id.clone()
+    }
+
+    /// Get `systemId` attribute of this entity.
+    pub fn system_id(&self) -> Option<Rc<str>> {
+        self.0.borrow().system_id.clone()
+    }
+
+    /// Get `notationName` attribute of this entity.
+    pub fn notation_name(&self) -> Option<Rc<str>> {
+        self.0.borrow().notation_name.clone()
+    }
+
     pub fn set_public_id(&mut self, public_id: Option<impl Into<Rc<str>>>) -> Option<Rc<str>> {
         replace(
             &mut self.0.borrow_mut().public_id,
