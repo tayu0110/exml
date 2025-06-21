@@ -6,7 +6,7 @@ use std::{
 
 use crate::{
     chvalid::XmlCharValid,
-    dom::attlistdecl::DefaultDecl,
+    dom::{attlistdecl::DefaultDecl, entity::EntityType},
     error::XmlParserErrors,
     parser::split_qname2,
     tree::{validate_name, validate_qname},
@@ -71,6 +71,14 @@ pub struct Document {
     // 0: enable modification check for Entity if set
     // 1: enable modification check for EntityReference if set
     flag: u32,
+
+    // Predefined entities.
+    //  0: lt
+    //  1: gt
+    //  2: amp
+    //  3: apos
+    //  4: quot
+    predefined_entities: [EntityRef; 5],
 }
 
 impl Document {
@@ -85,11 +93,19 @@ impl Document {
         if let Some(ent) = self
             .doctype
             .as_ref()
-            .and_then(|doctype| doctype.get_entity(name))
+            .and_then(|doctype| doctype.get_entity(name.clone()))
         {
             return Some(ent);
         }
-        todo!("predefined entity");
+
+        match name.as_ref() {
+            "lt" => Some(self.predefined_entities[0].clone()),
+            "gt" => Some(self.predefined_entities[1].clone()),
+            "amp" => Some(self.predefined_entities[2].clone()),
+            "apos" => Some(self.predefined_entities[3].clone()),
+            "quot" => Some(self.predefined_entities[4].clone()),
+            _ => None,
+        }
     }
 
     /// Do a global encoding of a string, replacing the predefined entities
@@ -241,7 +257,15 @@ impl DocumentRef {
             xml_version: None,
             html: false,
             flag: 0,
+            predefined_entities: [
+                EntityRef::new(None, "lt".into(), EntityType::InternalPredefinedEntity),
+                EntityRef::new(None, "gt".into(), EntityType::InternalPredefinedEntity),
+                EntityRef::new(None, "amp".into(), EntityType::InternalPredefinedEntity),
+                EntityRef::new(None, "apos".into(), EntityType::InternalPredefinedEntity),
+                EntityRef::new(None, "quot".into(), EntityType::InternalPredefinedEntity),
+            ],
         })));
+
         // TODO: check if the DTD specifies this document is HTML or not.
         if let Some(mut doctype) = doctype {
             doctype.set_owner_document(new.clone());
@@ -278,6 +302,21 @@ impl DocumentRef {
                 return Err(DOMException::NamespaceErr);
             }
         }
+
+        // Setup predefined entities
+        for mut ent in new.0.borrow_mut().predefined_entities.iter().cloned() {
+            ent.set_owner_document(new.clone());
+        }
+        let lt = new.create_text_node("<");
+        new.0.borrow_mut().predefined_entities[0].append_child(lt.into())?;
+        let gt = new.create_text_node(">");
+        new.0.borrow_mut().predefined_entities[1].append_child(gt.into())?;
+        let amp = new.create_text_node("&");
+        new.0.borrow_mut().predefined_entities[2].append_child(amp.into())?;
+        let apos = new.create_text_node("'");
+        new.0.borrow_mut().predefined_entities[3].append_child(apos.into())?;
+        let quot = new.create_text_node("\"");
+        new.0.borrow_mut().predefined_entities[4].append_child(quot.into())?;
 
         Ok(new)
     }
@@ -1385,7 +1424,19 @@ impl Node for DocumentRef {
             xml_version: self.0.borrow().xml_version.clone(),
             html: self.0.borrow().html,
             flag: self.0.borrow().flag,
+            predefined_entities: self.0.borrow().predefined_entities.clone(),
         })));
+        for (i, ent) in self
+            .0
+            .borrow()
+            .predefined_entities
+            .iter()
+            .cloned()
+            .enumerate()
+        {
+            let new = doc.import_node(ent.into(), true).expect("Internal Error");
+            doc.0.borrow_mut().predefined_entities[i] = new.as_entity().unwrap();
+        }
 
         if deep {
             let mut children = self.first_child();
