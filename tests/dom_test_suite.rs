@@ -1059,27 +1059,32 @@ mod dom_test_suite {
                     .unwrap();
                 em.append_child(doc.create_text_node("EMP0001").into())
                     .unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
                 let mut strong = p
                     .append_child(doc.create_element("strong").unwrap().into())
                     .unwrap();
                 strong
                     .append_child(doc.create_text_node("Margaret Martin").into())
                     .unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
                 let mut code = p
                     .append_child(doc.create_element("code").unwrap().into())
                     .unwrap();
                 code.append_child(doc.create_text_node("Accountant").into())
                     .unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
                 let mut sup = p
                     .append_child(doc.create_element("sup").unwrap().into())
                     .unwrap();
                 sup.append_child(doc.create_text_node("56,000").into())
                     .unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
                 let mut var = p
                     .append_child(doc.create_element("var").unwrap().into())
                     .unwrap();
                 var.append_child(doc.create_text_node("Female").into())
                     .unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
                 let mut acronym = p
                     .append_child(doc.create_element("acronym").unwrap().into())
                     .unwrap()
@@ -1090,6 +1095,7 @@ mod dom_test_suite {
                         .into(),
                 )?;
                 acronym.set_attribute("title", "Yes").unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
 
                 let mut p = body
                     .append_child(doc.create_element("p").unwrap().into())
@@ -1099,27 +1105,32 @@ mod dom_test_suite {
                     .unwrap();
                 em.append_child(doc.create_text_node("EMP0002").into())
                     .unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
                 let mut strong = p
                     .append_child(doc.create_element("strong").unwrap().into())
                     .unwrap();
                 strong
                     .append_child(doc.create_text_node("Martha RaynoldsThis is a CDATASection with EntityReference number 2 &ent2;\nThis is an adjacent CDATASection with a reference to a tab &tab;").into())
                     .unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
                 let mut code = p
                     .append_child(doc.create_element("code").unwrap().into())
                     .unwrap();
                 code.append_child(doc.create_text_node("Secretary").into())
                     .unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
                 let mut sup = p
                     .append_child(doc.create_element("sup").unwrap().into())
                     .unwrap();
                 sup.append_child(doc.create_text_node("35,000").into())
                     .unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
                 let mut var = p
                     .append_child(doc.create_element("var").unwrap().into())
                     .unwrap();
                 var.append_child(doc.create_text_node("Female").into())
                     .unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
                 let mut acronym = p
                     .append_child(doc.create_element("acronym").unwrap().into())
                     .unwrap()
@@ -1139,6 +1150,7 @@ mod dom_test_suite {
                     .unwrap();
                 acronym.set_attribute("title", "Yes").unwrap();
                 acronym.set_attribute("class", "Yes").unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
 
                 let mut p = body
                     .append_child(doc.create_element("p").unwrap().into())
@@ -1148,27 +1160,32 @@ mod dom_test_suite {
                     .unwrap();
                 em.append_child(doc.create_text_node("EMP0003").into())
                     .unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
                 let mut strong = p
                     .append_child(doc.create_element("strong").unwrap().into())
                     .unwrap();
                 strong
                     .append_child(doc.create_text_node("Roger\n Jones").into())
                     .unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
                 let mut code = p
                     .append_child(doc.create_element("code").unwrap().into())
                     .unwrap();
                 code.append_child(doc.create_text_node("Department Manager").into())
                     .unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
                 let mut sup = p
                     .append_child(doc.create_element("sup").unwrap().into())
                     .unwrap();
                 sup.append_child(doc.create_text_node("100,000").into())
                     .unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
                 let mut var = p
                     .append_child(doc.create_element("var").unwrap().into())
                     .unwrap();
                 var.append_child(doc.create_entity_reference("delta").unwrap().into())
                     .unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
                 let mut acronym = p
                     .append_child(doc.create_element("acronym").unwrap().into())
                     .unwrap()
@@ -1179,6 +1196,7 @@ mod dom_test_suite {
                     .unwrap();
                 acronym.set_attribute("title", "Yes").unwrap();
                 acronym.set_attribute("class", "No").unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
 
                 let mut p = body
                     .append_child(doc.create_element("p").unwrap().into())
@@ -1188,27 +1206,32 @@ mod dom_test_suite {
                     .unwrap();
                 em.append_child(doc.create_text_node("EMP0004").into())
                     .unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
                 let mut strong = p
                     .append_child(doc.create_element("strong").unwrap().into())
                     .unwrap();
                 strong
                     .append_child(doc.create_text_node("Jeny Oconnor").into())
                     .unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
                 let mut code = p
                     .append_child(doc.create_element("code").unwrap().into())
                     .unwrap();
                 code.append_child(doc.create_text_node("Personnel Director").into())
                     .unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
                 let mut sup = p
                     .append_child(doc.create_element("sup").unwrap().into())
                     .unwrap();
                 sup.append_child(doc.create_text_node("95,000").into())
                     .unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
                 let mut var = p
                     .append_child(doc.create_element("var").unwrap().into())
                     .unwrap();
                 var.append_child(doc.create_text_node("Female").into())
                     .unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
                 let mut acronym = p
                     .append_child(doc.create_element("acronym").unwrap().into())
                     .unwrap()
@@ -1219,6 +1242,7 @@ mod dom_test_suite {
                     .unwrap();
                 acronym.set_attribute("title", "Yes")?;
                 acronym.set_attribute("class", "Y")?;
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
                 let mut class = acronym.get_attribute_node("class").unwrap();
                 class
                     .append_child(doc.create_entity_reference("alpha").unwrap().into())
@@ -1232,27 +1256,32 @@ mod dom_test_suite {
                     .unwrap();
                 em.append_child(doc.create_text_node("EMP0005").into())
                     .unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
                 let mut strong = p
                     .append_child(doc.create_element("strong").unwrap().into())
                     .unwrap();
                 strong
                     .append_child(doc.create_text_node("Robert Myers").into())
                     .unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
                 let mut code = p
                     .append_child(doc.create_element("code").unwrap().into())
                     .unwrap();
                 code.append_child(doc.create_text_node("Computer Specialist").into())
                     .unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
                 let mut sup = p
                     .append_child(doc.create_element("sup").unwrap().into())
                     .unwrap();
                 sup.append_child(doc.create_text_node("90,000").into())
                     .unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
                 let mut var = p
                     .append_child(doc.create_element("var").unwrap().into())
                     .unwrap();
                 var.append_child(doc.create_text_node("male").into())
                     .unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
                 let mut acronym = p
                     .append_child(doc.create_element("acronym").unwrap().into())
                     .unwrap()
@@ -1263,6 +1292,7 @@ mod dom_test_suite {
                         .into(),
                 )?;
                 acronym.set_attribute("title", "Yes").unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
 
                 Ok(doc)
             }
