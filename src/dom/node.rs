@@ -173,7 +173,15 @@ pub trait Node: NodeConnection {
 
         // HIERARCHY_REQUEST_ERR: Raised if this node is of a type that does not allow children
         // of the type of the newChild node (..snip)
-        if !check_vertical_hierarchy(self.node_type(), new_child.node_type()) {
+        if new_child.node_type() == NodeType::DocumentFragment {
+            let mut children = new_child.first_child();
+            while let Some(child) = children {
+                children = child.next_sibling();
+                if !check_vertical_hierarchy(self.node_type(), child.node_type()) {
+                    return Err(DOMException::HierarchyRequestErr);
+                }
+            }
+        } else if !check_vertical_hierarchy(self.node_type(), new_child.node_type()) {
             return Err(DOMException::HierarchyRequestErr);
         }
         // NOT_FOUND_ERR: Raised if refChild is not a child of this node.
@@ -313,7 +321,15 @@ pub trait Node: NodeConnection {
 
         // HIERARCHY_REQUEST_ERR: Raised if this node is of a type that does not allow children
         // of the type of the newChild node (..snip)
-        if !check_vertical_hierarchy(self.node_type(), new_child.node_type()) {
+        if new_child.node_type() == NodeType::DocumentFragment {
+            let mut children = new_child.first_child();
+            while let Some(child) = children {
+                children = child.next_sibling();
+                if !check_vertical_hierarchy(self.node_type(), child.node_type()) {
+                    return Err(DOMException::HierarchyRequestErr);
+                }
+            }
+        } else if !check_vertical_hierarchy(self.node_type(), new_child.node_type()) {
             return Err(DOMException::HierarchyRequestErr);
         }
         // NOT_FOUND_ERR: Raised if oldChild is not a child of this node.

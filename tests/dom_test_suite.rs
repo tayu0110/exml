@@ -13,805 +13,1257 @@ mod dom_test_suite {
     mod level1 {
         use super::*;
 
-        const STAFF_XML: &str =
-            include_str!("../resources/DOM-Test-Suite/tests/level1/core/files/staff.xml");
-        const HC_STAFF_XML: &str =
-            include_str!("../resources/DOM-Test-Suite/tests/level1/core/files/hc_staff.xml");
+        mod core {
+            use super::*;
 
-        fn staff_xml(_doc: &str) -> Result<DocumentRef, DOMException> {
-            let doctype = DocumentTypeRef::new("staff", None, Some("staff.dtd")).unwrap();
-            let mut doc = DocumentRef::new(None, Some("staff"), Some(doctype)).unwrap();
+            const STAFF_XML: &str =
+                include_str!("../resources/DOM-Test-Suite/tests/level1/core/files/staff.xml");
+            const HC_STAFF_XML: &str =
+                include_str!("../resources/DOM-Test-Suite/tests/level1/core/files/hc_staff.xml");
 
-            let mut doctype = doc.doctype().unwrap();
-            let mut ent = doctype
-                .create_entity("ent1", EntityType::InternalGeneralEntity)
-                .unwrap();
-            ent.append_child(doc.create_text_node("es").into()).unwrap();
-            doctype.add_entity::<false>(ent).unwrap();
-            let mut ent = doctype
-                .create_entity("ent2", EntityType::InternalGeneralEntity)
-                .unwrap();
-            ent.append_child(doc.create_text_node("1900 Dallas Road").into())
-                .unwrap();
-            doctype.add_entity::<false>(ent).unwrap();
-            let mut ent = doctype
-                .create_entity("ent3", EntityType::InternalGeneralEntity)
-                .unwrap();
-            ent.append_child(doc.create_text_node("Texas").into())
-                .unwrap();
-            doctype.add_entity::<false>(ent).unwrap();
-            let mut ent = doctype
-                .create_entity("ent4", EntityType::InternalGeneralEntity)
-                .unwrap();
-            let mut ent_element = doc.create_element("entElement").unwrap();
-            ent_element.set_attribute("domestic", "Yes").unwrap();
-            ent_element
-                .append_child(doc.create_text_node("Element data").into())
-                .unwrap();
-            ent.append_child(ent_element.into()).unwrap();
-            ent.append_child(
-                doc.create_processing_instruction("PItarget", Some("PIdata"))
-                    .unwrap()
-                    .into(),
-            )
-            .unwrap();
-            doctype.add_entity::<false>(ent).unwrap();
-            let mut ent = doctype
-                .create_entity("ent5", EntityType::ExternalGeneralUnparsedEntity)
-                .unwrap();
-            ent.set_public_id(Some("entityURI"));
-            ent.set_system_id(Some("entityFile"));
-            ent.set_notation_name(Some("notation1"));
-            doctype.add_entity::<false>(ent).unwrap();
-            assert!(
-                doctype
-                    .add_entity::<false>(
-                        doctype
-                            .create_entity("ent1", EntityType::InternalGeneralEntity)
-                            .unwrap()
-                    )
-                    .is_err()
-            );
-            doctype
-                .add_notation::<false>(doctype.create_notation("notation1").unwrap())
-                .unwrap();
-            doctype
-                .add_notation::<false>(doctype.create_notation("notation2").unwrap())
-                .unwrap();
+            fn staff_xml(_doc: &str) -> Result<DocumentRef, DOMException> {
+                let doctype = DocumentTypeRef::new("staff", None, Some("staff.dtd")).unwrap();
+                let mut doc = DocumentRef::new(None, Some("staff"), Some(doctype)).unwrap();
 
-            // TODO: add external subset
-            doctype
-                .add_element_decl::<true>(
-                    doctype
-                        .create_element_decl(
-                            "employeeId",
-                            ContentSpec::Mixed(ElementContent::new_pcdata(
-                                ElementContentOccur::Once,
-                            )),
-                        )
-                        .unwrap(),
-                )
-                .unwrap();
-            doctype
-                .add_element_decl::<true>(
-                    doctype
-                        .create_element_decl(
-                            "name",
-                            ContentSpec::Mixed(ElementContent::new_pcdata(
-                                ElementContentOccur::Once,
-                            )),
-                        )
-                        .unwrap(),
-                )
-                .unwrap();
-            doctype
-                .add_element_decl::<true>(
-                    doctype
-                        .create_element_decl(
-                            "position",
-                            ContentSpec::Mixed(ElementContent::new_pcdata(
-                                ElementContentOccur::Once,
-                            )),
-                        )
-                        .unwrap(),
-                )
-                .unwrap();
-            doctype
-                .add_element_decl::<true>(
-                    doctype
-                        .create_element_decl(
-                            "salary",
-                            ContentSpec::Mixed(ElementContent::new_pcdata(
-                                ElementContentOccur::Once,
-                            )),
-                        )
-                        .unwrap(),
-                )
-                .unwrap();
-            doctype
-                .add_element_decl::<true>(
-                    doctype
-                        .create_element_decl(
-                            "address",
-                            ContentSpec::Mixed(ElementContent::new_pcdata(
-                                ElementContentOccur::Once,
-                            )),
-                        )
-                        .unwrap(),
-                )
-                .unwrap();
-            doctype
-                .add_element_decl::<true>(
-                    doctype
-                        .create_element_decl(
-                            "entElement",
-                            ContentSpec::Mixed(ElementContent::new_pcdata(
-                                ElementContentOccur::Once,
-                            )),
-                        )
-                        .unwrap(),
-                )
-                .unwrap();
-            let or = ElementContent::new_or(ElementContentOccur::Mult);
-            or.set_first_child(ElementContent::new_pcdata(ElementContentOccur::Once));
-            or.set_second_child(ElementContent::new_element(
-                ElementContentOccur::Once,
-                "entElement",
-            ));
-            doctype
-                .add_element_decl::<true>(
-                    doctype
-                        .create_element_decl("gender", ContentSpec::Mixed(or))
-                        .unwrap(),
-                )
-                .unwrap();
-            let seq1 = ElementContent::new_seq(ElementContentOccur::Once);
-            seq1.set_first_child(ElementContent::new_element(
-                ElementContentOccur::Once,
-                "employeeId",
-            ));
-            let seq2 = ElementContent::new_seq(ElementContentOccur::Once);
-            seq2.set_first_child(ElementContent::new_element(
-                ElementContentOccur::Once,
-                "name",
-            ));
-            let seq3 = ElementContent::new_seq(ElementContentOccur::Once);
-            seq3.set_first_child(ElementContent::new_element(
-                ElementContentOccur::Once,
-                "position",
-            ));
-            let seq4 = ElementContent::new_seq(ElementContentOccur::Once);
-            seq4.set_first_child(ElementContent::new_element(
-                ElementContentOccur::Once,
-                "salary",
-            ));
-            let seq5 = ElementContent::new_seq(ElementContentOccur::Once);
-            seq5.set_first_child(ElementContent::new_element(
-                ElementContentOccur::Once,
-                "gender",
-            ));
-            seq5.set_second_child(ElementContent::new_element(
-                ElementContentOccur::Once,
-                "address",
-            ));
-            seq4.set_second_child(seq5);
-            seq3.set_second_child(seq4);
-            seq2.set_second_child(seq3);
-            seq1.set_second_child(seq2);
-            doctype
-                .add_element_decl::<true>(
-                    doctype
-                        .create_element_decl("employee", ContentSpec::Children(seq1))
-                        .unwrap(),
-                )
-                .unwrap();
-            doctype
-                .add_element_decl::<true>(
-                    doctype
-                        .create_element_decl(
-                            "staff",
-                            ContentSpec::Children(ElementContent::new_element(
-                                ElementContentOccur::Plus,
-                                "employee",
-                            )),
-                        )
-                        .unwrap(),
-                )
-                .unwrap();
-            doctype
-                .add_attlist_decl::<true>(
-                    doctype
-                        .create_attlist_decl(
-                            "entElement",
-                            "attr1",
-                            AttType::CDATA,
-                            DefaultDecl::None("Attr".into()),
-                        )
-                        .unwrap(),
-                )
-                .unwrap();
-            doctype
-                .add_attlist_decl::<true>(
-                    doctype
-                        .create_attlist_decl(
-                            "address",
-                            "domestic",
-                            AttType::CDATA,
-                            DefaultDecl::Implied,
-                        )
-                        .unwrap(),
-                )
-                .unwrap();
-            doctype
-                .add_attlist_decl::<true>(
-                    doctype
-                        .create_attlist_decl(
-                            "address",
-                            "street",
-                            AttType::CDATA,
-                            DefaultDecl::None("Yes".into()),
-                        )
-                        .unwrap(),
-                )
-                .unwrap();
-            doctype
-                .add_attlist_decl::<true>(
-                    doctype
-                        .create_attlist_decl(
-                            "entElement",
-                            "domestic",
-                            AttType::CDATA,
-                            DefaultDecl::None("MALE".into()),
-                        )
-                        .unwrap(),
-                )
-                .unwrap();
-
-            doc.insert_before(
-                doc.create_processing_instruction("TEST-STYLE", Some("PIDATA"))
-                    .unwrap()
-                    .into(),
-                Some(doctype.into()),
-            )
-            .unwrap();
-
-            let mut root = doc.document_element().unwrap();
-            assert!(root.parent_node().is_some());
-            let comment = doc.create_comment(" This is comment number 1.").into();
-            doc.insert_before(comment, Some(root.clone().into()))
-                .unwrap();
-
-            let mut employee = root
-                .append_child(doc.create_element("employee").unwrap().into())
-                .unwrap();
-            let mut employee_id = employee
-                .append_child(doc.create_element("employeeId").unwrap().into())
-                .unwrap();
-            employee_id
-                .append_child(doc.create_text_node("EMP0001").into())
-                .unwrap();
-            let mut name = employee
-                .append_child(doc.create_element("name").unwrap().into())
-                .unwrap();
-            name.append_child(doc.create_text_node("Margaret Martin").into())
-                .unwrap();
-            let mut position = employee
-                .append_child(doc.create_element("position").unwrap().into())
-                .unwrap();
-            position
-                .append_child(doc.create_text_node("Accountant").into())
-                .unwrap();
-            let mut salary = employee
-                .append_child(doc.create_element("salary").unwrap().into())
-                .unwrap();
-            salary
-                .append_child(doc.create_text_node("56,000").into())
-                .unwrap();
-            let mut gender = employee
-                .append_child(doc.create_element("gender").unwrap().into())
-                .unwrap();
-            gender
-                .append_child(doc.create_text_node("Female").into())
-                .unwrap();
-            let mut address = employee
-                .append_child(doc.create_element("address").unwrap().into())
-                .unwrap()
-                .as_element()
-                .unwrap();
-            address.append_child(
-                doc.create_text_node("1230 North Ave. Dallas, Texas 98551")
-                    .into(),
-            )?;
-            address.set_attribute("domestic", "Yes").unwrap();
-
-            let mut employee = root
-                .append_child(doc.create_element("employee").unwrap().into())
-                .unwrap();
-            let mut employee_id = employee
-                .append_child(doc.create_element("employeeId").unwrap().into())
-                .unwrap();
-            employee_id
-                .append_child(doc.create_text_node("EMP0002").into())
-                .unwrap();
-            let mut name = employee
-                .append_child(doc.create_element("name").unwrap().into())
-                .unwrap();
-            name.append_child(doc.create_text_node("Martha Raynolds").into())
-                .unwrap();
-            name.append_child(
-                doc.create_cdata_section(
-                    "This is a CDATASection with EntityReference number 2 &ent2;",
-                )
-                .unwrap()
-                .into(),
-            )?;
-            name.append_child(doc.create_text_node("\n").into())
-                .unwrap();
-            name.append_child(
-                doc.create_cdata_section(
-                    "This is an adjacent CDATASection with a reference to a tab &tab;",
-                )
-                .unwrap()
-                .into(),
-            )?;
-            let mut position = employee
-                .append_child(doc.create_element("position").unwrap().into())
-                .unwrap();
-            position
-                .append_child(doc.create_text_node("Secretary").into())
-                .unwrap();
-            let mut salary = employee
-                .append_child(doc.create_element("salary").unwrap().into())
-                .unwrap();
-            salary
-                .append_child(doc.create_text_node("35,000").into())
-                .unwrap();
-            let mut gender = employee
-                .append_child(doc.create_element("gender").unwrap().into())
-                .unwrap();
-            gender
-                .append_child(doc.create_text_node("Female").into())
-                .unwrap();
-            let mut address = employee
-                .append_child(doc.create_element("address").unwrap().into())
-                .unwrap()
-                .as_element()
-                .unwrap();
-            address
-                .append_child(doc.create_entity_reference("ent2").unwrap().into())
-                .unwrap();
-            address
-                .append_child(doc.create_text_node(" Dallas, ").into())
-                .unwrap();
-            address
-                .append_child(doc.create_entity_reference("ent3").unwrap().into())
-                .unwrap();
-            address
-                .append_child(doc.create_text_node("\n 98554").into())
-                .unwrap();
-            address.set_attribute("domestic", "Yes").unwrap();
-            address.set_attribute("street", "Yes").unwrap();
-
-            let mut employee = root
-                .append_child(doc.create_element("employee").unwrap().into())
-                .unwrap();
-            let mut employee_id = employee
-                .append_child(doc.create_element("employeeId").unwrap().into())
-                .unwrap();
-            employee_id
-                .append_child(doc.create_text_node("EMP0003").into())
-                .unwrap();
-            let mut name = employee
-                .append_child(doc.create_element("name").unwrap().into())
-                .unwrap();
-            name.append_child(doc.create_text_node("Roger\n Jones").into())
-                .unwrap();
-            let mut position = employee
-                .append_child(doc.create_element("position").unwrap().into())
-                .unwrap();
-            position
-                .append_child(doc.create_text_node("Department Manager").into())
-                .unwrap();
-            let mut salary = employee
-                .append_child(doc.create_element("salary").unwrap().into())
-                .unwrap();
-            salary
-                .append_child(doc.create_text_node("100,000").into())
-                .unwrap();
-            let mut gender = employee
-                .append_child(doc.create_element("gender").unwrap().into())
-                .unwrap();
-            gender
-                .append_child(doc.create_entity_reference("ent4").unwrap().into())
-                .unwrap();
-            let mut address = employee
-                .append_child(doc.create_element("address").unwrap().into())
-                .unwrap()
-                .as_element()
-                .unwrap();
-            address
-                .append_child(doc.create_text_node("PO Box 27 Irving, texas 98553").into())
-                .unwrap();
-            address.set_attribute("domestic", "Yes").unwrap();
-            address.set_attribute("street", "No").unwrap();
-
-            let mut employee = root
-                .append_child(doc.create_element("employee").unwrap().into())
-                .unwrap();
-            let mut employee_id = employee
-                .append_child(doc.create_element("employeeId").unwrap().into())
-                .unwrap();
-            employee_id
-                .append_child(doc.create_text_node("EMP0004").into())
-                .unwrap();
-            let mut name = employee
-                .append_child(doc.create_element("name").unwrap().into())
-                .unwrap();
-            name.append_child(doc.create_text_node("Jeny Oconnor").into())
-                .unwrap();
-            let mut position = employee
-                .append_child(doc.create_element("position").unwrap().into())
-                .unwrap();
-            position
-                .append_child(doc.create_text_node("Personnel Director").into())
-                .unwrap();
-            let mut salary = employee
-                .append_child(doc.create_element("salary").unwrap().into())
-                .unwrap();
-            salary
-                .append_child(doc.create_text_node("95,000").into())
-                .unwrap();
-            let mut gender = employee
-                .append_child(doc.create_element("gender").unwrap().into())
-                .unwrap();
-            gender
-                .append_child(doc.create_text_node("Female").into())
-                .unwrap();
-            let mut address = employee
-                .append_child(doc.create_element("address").unwrap().into())
-                .unwrap()
-                .as_element()
-                .unwrap();
-            address
-                .append_child(doc.create_text_node("PO Box 27 Irving, texas 98553").into())
-                .unwrap();
-            address.set_attribute("domestic", "Yes")?;
-            address.set_attribute("street", "Y")?;
-            let mut street = address.get_attribute_node("street").unwrap();
-            street
-                .append_child(doc.create_entity_reference("ent1").unwrap().into())
-                .unwrap();
-
-            let mut employee = root
-                .append_child(doc.create_element("employee").unwrap().into())
-                .unwrap();
-            let mut employee_id = employee
-                .append_child(doc.create_element("employeeId").unwrap().into())
-                .unwrap();
-            employee_id
-                .append_child(doc.create_text_node("EMP0005").into())
-                .unwrap();
-            let mut name = employee
-                .append_child(doc.create_element("name").unwrap().into())
-                .unwrap();
-            name.append_child(doc.create_text_node("Robert Myers").into())
-                .unwrap();
-            let mut position = employee
-                .append_child(doc.create_element("position").unwrap().into())
-                .unwrap();
-            position
-                .append_child(doc.create_text_node("Computer Specialist").into())
-                .unwrap();
-            let mut salary = employee
-                .append_child(doc.create_element("salary").unwrap().into())
-                .unwrap();
-            salary
-                .append_child(doc.create_text_node("90,000").into())
-                .unwrap();
-            let mut gender = employee
-                .append_child(doc.create_element("gender").unwrap().into())
-                .unwrap();
-            gender
-                .append_child(doc.create_text_node("male").into())
-                .unwrap();
-            let mut address = employee
-                .append_child(doc.create_element("address").unwrap().into())
-                .unwrap()
-                .as_element()
-                .unwrap();
-            address.append_child(
-                doc.create_text_node("1821 Nordic. Road, Irving Texas 98558")
-                    .into(),
-            )?;
-            address.set_attribute("street", "Yes").unwrap();
-
-            Ok(doc)
-        }
-        fn hc_staff_xml(_doc: &str) -> Result<DocumentRef, DOMException> {
-            let doctype = DocumentTypeRef::new(
-                "html",
-                Some("-//W3C//DTD HTML 4.01//EN"),
-                Some("http://www.w3.org/TR/html4/strict.dtd"),
-            )
-            .unwrap();
-            let mut doc = DocumentRef::new(None, Some("html"), Some(doctype)).unwrap();
-
-            let mut root = doc.document_element().unwrap();
-            assert!(root.parent_node().is_some());
-            let comment = doc.create_comment(" This is comment number 1.").into();
-            doc.insert_before(comment, Some(root.clone().into()))
-                .unwrap();
-
-            let mut head = root
-                .append_child(doc.create_element("head").unwrap().into())
-                .unwrap();
-            let mut meta = head
-                .append_child(doc.create_element("meta").unwrap().into())
-                .unwrap()
-                .as_element()
-                .unwrap();
-            meta.set_attribute("http-equiv", "Content-Type").unwrap();
-            meta.set_attribute("content", "text/html; charset=UTF-8")
-                .unwrap();
-            let mut title = head
-                .append_child(doc.create_element("title").unwrap().into())
-                .unwrap();
-            title
-                .append_child(doc.create_text_node("hc_staff").into())
-                .unwrap();
-            let mut script = head
-                .append_child(doc.create_element("script").unwrap().into())
-                .unwrap()
-                .as_element()
-                .unwrap();
-            script.set_attribute("type", "text/javascript").unwrap();
-            script.set_attribute("src", "svgunit.js").unwrap();
-            let mut script = head
-                .append_child(doc.create_element("script").unwrap().into())
-                .unwrap()
-                .as_element()
-                .unwrap();
-            script.set_attribute("charset", "UTF-8").unwrap();
-            script.set_attribute("type", "text/javascript").unwrap();
-            script.set_attribute("src", "svgtest.js").unwrap();
-            let mut script = head
-                .append_child(doc.create_element("script").unwrap().into())
-                .unwrap()
-                .as_element()
-                .unwrap();
-            script.set_attribute("type", "text/javascript").unwrap();
-            script
-                .append_child(
-                    doc.create_text_node("function loadComplete() { startTest(); }")
+                let mut doctype = doc.doctype().unwrap();
+                let mut ent = doctype
+                    .create_entity("ent1", EntityType::InternalGeneralEntity)
+                    .unwrap();
+                ent.append_child(doc.create_text_node("es").into()).unwrap();
+                doctype.add_entity::<false>(ent).unwrap();
+                let mut ent = doctype
+                    .create_entity("ent2", EntityType::InternalGeneralEntity)
+                    .unwrap();
+                ent.append_child(doc.create_text_node("1900 Dallas Road").into())
+                    .unwrap();
+                doctype.add_entity::<false>(ent).unwrap();
+                let mut ent = doctype
+                    .create_entity("ent3", EntityType::InternalGeneralEntity)
+                    .unwrap();
+                ent.append_child(doc.create_text_node("Texas").into())
+                    .unwrap();
+                doctype.add_entity::<false>(ent).unwrap();
+                let mut ent = doctype
+                    .create_entity("ent4", EntityType::InternalGeneralEntity)
+                    .unwrap();
+                let mut ent_element = doc.create_element("entElement").unwrap();
+                ent_element.set_attribute("domestic", "Yes").unwrap();
+                ent_element
+                    .append_child(doc.create_text_node("Element data").into())
+                    .unwrap();
+                ent.append_child(ent_element.into()).unwrap();
+                ent.append_child(
+                    doc.create_processing_instruction("PItarget", Some("PIdata"))
+                        .unwrap()
                         .into(),
                 )
                 .unwrap();
+                doctype.add_entity::<false>(ent).unwrap();
+                let mut ent = doctype
+                    .create_entity("ent5", EntityType::ExternalGeneralUnparsedEntity)
+                    .unwrap();
+                ent.set_public_id(Some("entityURI"));
+                ent.set_system_id(Some("entityFile"));
+                ent.set_notation_name(Some("notation1"));
+                doctype.add_entity::<false>(ent).unwrap();
+                assert!(
+                    doctype
+                        .add_entity::<false>(
+                            doctype
+                                .create_entity("ent1", EntityType::InternalGeneralEntity)
+                                .unwrap()
+                        )
+                        .is_err()
+                );
+                doctype
+                    .add_notation::<false>(doctype.create_notation("notation1").unwrap())
+                    .unwrap();
+                doctype
+                    .add_notation::<false>(doctype.create_notation("notation2").unwrap())
+                    .unwrap();
 
-            let mut body = root
-                .append_child(doc.create_element("body").unwrap().into())
-                .unwrap()
-                .as_element()
-                .unwrap();
-            body.set_attribute("onload", "parent.loadComplete()")
+                // TODO: add external subset
+                doctype
+                    .add_element_decl::<true>(
+                        doctype
+                            .create_element_decl(
+                                "employeeId",
+                                ContentSpec::Mixed(ElementContent::new_pcdata(
+                                    ElementContentOccur::Once,
+                                )),
+                            )
+                            .unwrap(),
+                    )
+                    .unwrap();
+                doctype
+                    .add_element_decl::<true>(
+                        doctype
+                            .create_element_decl(
+                                "name",
+                                ContentSpec::Mixed(ElementContent::new_pcdata(
+                                    ElementContentOccur::Once,
+                                )),
+                            )
+                            .unwrap(),
+                    )
+                    .unwrap();
+                doctype
+                    .add_element_decl::<true>(
+                        doctype
+                            .create_element_decl(
+                                "position",
+                                ContentSpec::Mixed(ElementContent::new_pcdata(
+                                    ElementContentOccur::Once,
+                                )),
+                            )
+                            .unwrap(),
+                    )
+                    .unwrap();
+                doctype
+                    .add_element_decl::<true>(
+                        doctype
+                            .create_element_decl(
+                                "salary",
+                                ContentSpec::Mixed(ElementContent::new_pcdata(
+                                    ElementContentOccur::Once,
+                                )),
+                            )
+                            .unwrap(),
+                    )
+                    .unwrap();
+                doctype
+                    .add_element_decl::<true>(
+                        doctype
+                            .create_element_decl(
+                                "address",
+                                ContentSpec::Mixed(ElementContent::new_pcdata(
+                                    ElementContentOccur::Once,
+                                )),
+                            )
+                            .unwrap(),
+                    )
+                    .unwrap();
+                doctype
+                    .add_element_decl::<true>(
+                        doctype
+                            .create_element_decl(
+                                "entElement",
+                                ContentSpec::Mixed(ElementContent::new_pcdata(
+                                    ElementContentOccur::Once,
+                                )),
+                            )
+                            .unwrap(),
+                    )
+                    .unwrap();
+                let or = ElementContent::new_or(ElementContentOccur::Mult);
+                or.set_first_child(ElementContent::new_pcdata(ElementContentOccur::Once));
+                or.set_second_child(ElementContent::new_element(
+                    ElementContentOccur::Once,
+                    "entElement",
+                ));
+                doctype
+                    .add_element_decl::<true>(
+                        doctype
+                            .create_element_decl("gender", ContentSpec::Mixed(or))
+                            .unwrap(),
+                    )
+                    .unwrap();
+                let seq1 = ElementContent::new_seq(ElementContentOccur::Once);
+                seq1.set_first_child(ElementContent::new_element(
+                    ElementContentOccur::Once,
+                    "employeeId",
+                ));
+                let seq2 = ElementContent::new_seq(ElementContentOccur::Once);
+                seq2.set_first_child(ElementContent::new_element(
+                    ElementContentOccur::Once,
+                    "name",
+                ));
+                let seq3 = ElementContent::new_seq(ElementContentOccur::Once);
+                seq3.set_first_child(ElementContent::new_element(
+                    ElementContentOccur::Once,
+                    "position",
+                ));
+                let seq4 = ElementContent::new_seq(ElementContentOccur::Once);
+                seq4.set_first_child(ElementContent::new_element(
+                    ElementContentOccur::Once,
+                    "salary",
+                ));
+                let seq5 = ElementContent::new_seq(ElementContentOccur::Once);
+                seq5.set_first_child(ElementContent::new_element(
+                    ElementContentOccur::Once,
+                    "gender",
+                ));
+                seq5.set_second_child(ElementContent::new_element(
+                    ElementContentOccur::Once,
+                    "address",
+                ));
+                seq4.set_second_child(seq5);
+                seq3.set_second_child(seq4);
+                seq2.set_second_child(seq3);
+                seq1.set_second_child(seq2);
+                doctype
+                    .add_element_decl::<true>(
+                        doctype
+                            .create_element_decl("employee", ContentSpec::Children(seq1))
+                            .unwrap(),
+                    )
+                    .unwrap();
+                doctype
+                    .add_element_decl::<true>(
+                        doctype
+                            .create_element_decl(
+                                "staff",
+                                ContentSpec::Children(ElementContent::new_element(
+                                    ElementContentOccur::Plus,
+                                    "employee",
+                                )),
+                            )
+                            .unwrap(),
+                    )
+                    .unwrap();
+                doctype
+                    .add_attlist_decl::<true>(
+                        doctype
+                            .create_attlist_decl(
+                                "entElement",
+                                "attr1",
+                                AttType::CDATA,
+                                DefaultDecl::None("Attr".into()),
+                            )
+                            .unwrap(),
+                    )
+                    .unwrap();
+                doctype
+                    .add_attlist_decl::<true>(
+                        doctype
+                            .create_attlist_decl(
+                                "address",
+                                "domestic",
+                                AttType::CDATA,
+                                DefaultDecl::Implied,
+                            )
+                            .unwrap(),
+                    )
+                    .unwrap();
+                doctype
+                    .add_attlist_decl::<true>(
+                        doctype
+                            .create_attlist_decl(
+                                "address",
+                                "street",
+                                AttType::CDATA,
+                                DefaultDecl::None("Yes".into()),
+                            )
+                            .unwrap(),
+                    )
+                    .unwrap();
+                doctype
+                    .add_attlist_decl::<true>(
+                        doctype
+                            .create_attlist_decl(
+                                "entElement",
+                                "domestic",
+                                AttType::CDATA,
+                                DefaultDecl::None("MALE".into()),
+                            )
+                            .unwrap(),
+                    )
+                    .unwrap();
+
+                doc.insert_before(
+                    doc.create_processing_instruction("TEST-STYLE", Some("PIDATA"))
+                        .unwrap()
+                        .into(),
+                    Some(doctype.into()),
+                )
                 .unwrap();
 
-            let mut p = body
-                .append_child(doc.create_element("p").unwrap().into())
-                .unwrap();
-            let mut em = p
-                .append_child(doc.create_element("em").unwrap().into())
-                .unwrap();
-            em.append_child(doc.create_text_node("EMP0001").into())
-                .unwrap();
-            let mut strong = p
-                .append_child(doc.create_element("strong").unwrap().into())
-                .unwrap();
-            strong
-                .append_child(doc.create_text_node("Margaret Martin").into())
-                .unwrap();
-            let mut code = p
-                .append_child(doc.create_element("code").unwrap().into())
-                .unwrap();
-            code.append_child(doc.create_text_node("Accountant").into())
-                .unwrap();
-            let mut sup = p
-                .append_child(doc.create_element("sup").unwrap().into())
-                .unwrap();
-            sup.append_child(doc.create_text_node("56,000").into())
-                .unwrap();
-            let mut var = p
-                .append_child(doc.create_element("var").unwrap().into())
-                .unwrap();
-            var.append_child(doc.create_text_node("Female").into())
-                .unwrap();
-            let mut acronym = p
-                .append_child(doc.create_element("acronym").unwrap().into())
-                .unwrap()
-                .as_element()
-                .unwrap();
-            acronym.append_child(
-                doc.create_text_node("1230 North Ave. Dallas, Texas 98551")
+                let mut root = doc.document_element().unwrap();
+                assert!(root.parent_node().is_some());
+                let comment = doc.create_comment(" This is comment number 1.").into();
+                doc.insert_before(comment, Some(root.clone().into()))
+                    .unwrap();
+
+                let mut employee = root
+                    .append_child(doc.create_element("employee").unwrap().into())
+                    .unwrap();
+                let mut employee_id = employee
+                    .append_child(doc.create_element("employeeId").unwrap().into())
+                    .unwrap();
+                employee_id
+                    .append_child(doc.create_text_node("EMP0001").into())
+                    .unwrap();
+                let mut name = employee
+                    .append_child(doc.create_element("name").unwrap().into())
+                    .unwrap();
+                name.append_child(doc.create_text_node("Margaret Martin").into())
+                    .unwrap();
+                let mut position = employee
+                    .append_child(doc.create_element("position").unwrap().into())
+                    .unwrap();
+                position
+                    .append_child(doc.create_text_node("Accountant").into())
+                    .unwrap();
+                let mut salary = employee
+                    .append_child(doc.create_element("salary").unwrap().into())
+                    .unwrap();
+                salary
+                    .append_child(doc.create_text_node("56,000").into())
+                    .unwrap();
+                let mut gender = employee
+                    .append_child(doc.create_element("gender").unwrap().into())
+                    .unwrap();
+                gender
+                    .append_child(doc.create_text_node("Female").into())
+                    .unwrap();
+                let mut address = employee
+                    .append_child(doc.create_element("address").unwrap().into())
+                    .unwrap()
+                    .as_element()
+                    .unwrap();
+                address.append_child(
+                    doc.create_text_node("1230 North Ave. Dallas, Texas 98551")
+                        .into(),
+                )?;
+                address.set_attribute("domestic", "Yes").unwrap();
+
+                let mut employee = root
+                    .append_child(doc.create_element("employee").unwrap().into())
+                    .unwrap();
+                let mut employee_id = employee
+                    .append_child(doc.create_element("employeeId").unwrap().into())
+                    .unwrap();
+                employee_id
+                    .append_child(doc.create_text_node("EMP0002").into())
+                    .unwrap();
+                let mut name = employee
+                    .append_child(doc.create_element("name").unwrap().into())
+                    .unwrap();
+                name.append_child(doc.create_text_node("Martha Raynolds").into())
+                    .unwrap();
+                name.append_child(
+                    doc.create_cdata_section(
+                        "This is a CDATASection with EntityReference number 2 &ent2;",
+                    )
+                    .unwrap()
                     .into(),
-            )?;
-            acronym.set_attribute("title", "Yes").unwrap();
-
-            let mut p = body
-                .append_child(doc.create_element("p").unwrap().into())
-                .unwrap();
-            let mut em = p
-                .append_child(doc.create_element("em").unwrap().into())
-                .unwrap();
-            em.append_child(doc.create_text_node("EMP0002").into())
-                .unwrap();
-            let mut strong = p
-                .append_child(doc.create_element("strong").unwrap().into())
-                .unwrap();
-            strong
-                .append_child(doc.create_text_node("Martha RaynoldsThis is a CDATASection with EntityReference number 2 &ent2;\nThis is an adjacent CDATASection with a reference to a tab &tab;").into())
-                .unwrap();
-            let mut code = p
-                .append_child(doc.create_element("code").unwrap().into())
-                .unwrap();
-            code.append_child(doc.create_text_node("Secretary").into())
-                .unwrap();
-            let mut sup = p
-                .append_child(doc.create_element("sup").unwrap().into())
-                .unwrap();
-            sup.append_child(doc.create_text_node("35,000").into())
-                .unwrap();
-            let mut var = p
-                .append_child(doc.create_element("var").unwrap().into())
-                .unwrap();
-            var.append_child(doc.create_text_node("Female").into())
-                .unwrap();
-            let mut acronym = p
-                .append_child(doc.create_element("acronym").unwrap().into())
-                .unwrap()
-                .as_element()
-                .unwrap();
-            acronym
-                .append_child(doc.create_entity_reference("beta").unwrap().into())
-                .unwrap();
-            acronym
-                .append_child(doc.create_text_node(" Dallas, ").into())
-                .unwrap();
-            acronym
-                .append_child(doc.create_entity_reference("gamma").unwrap().into())
-                .unwrap();
-            acronym
-                .append_child(doc.create_text_node("\n 98554").into())
-                .unwrap();
-            acronym.set_attribute("title", "Yes").unwrap();
-            acronym.set_attribute("class", "Yes").unwrap();
-
-            let mut p = body
-                .append_child(doc.create_element("p").unwrap().into())
-                .unwrap();
-            let mut em = p
-                .append_child(doc.create_element("em").unwrap().into())
-                .unwrap();
-            em.append_child(doc.create_text_node("EMP0003").into())
-                .unwrap();
-            let mut strong = p
-                .append_child(doc.create_element("strong").unwrap().into())
-                .unwrap();
-            strong
-                .append_child(doc.create_text_node("Roger\n Jones").into())
-                .unwrap();
-            let mut code = p
-                .append_child(doc.create_element("code").unwrap().into())
-                .unwrap();
-            code.append_child(doc.create_text_node("Department Manager").into())
-                .unwrap();
-            let mut sup = p
-                .append_child(doc.create_element("sup").unwrap().into())
-                .unwrap();
-            sup.append_child(doc.create_text_node("100,000").into())
-                .unwrap();
-            let mut var = p
-                .append_child(doc.create_element("var").unwrap().into())
-                .unwrap();
-            var.append_child(doc.create_entity_reference("delta").unwrap().into())
-                .unwrap();
-            let mut acronym = p
-                .append_child(doc.create_element("acronym").unwrap().into())
-                .unwrap()
-                .as_element()
-                .unwrap();
-            acronym
-                .append_child(doc.create_text_node("PO Box 27 Irving, texas 98553").into())
-                .unwrap();
-            acronym.set_attribute("title", "Yes").unwrap();
-            acronym.set_attribute("class", "No").unwrap();
-
-            let mut p = body
-                .append_child(doc.create_element("p").unwrap().into())
-                .unwrap();
-            let mut em = p
-                .append_child(doc.create_element("em").unwrap().into())
-                .unwrap();
-            em.append_child(doc.create_text_node("EMP0004").into())
-                .unwrap();
-            let mut strong = p
-                .append_child(doc.create_element("strong").unwrap().into())
-                .unwrap();
-            strong
-                .append_child(doc.create_text_node("Jeny Oconnor").into())
-                .unwrap();
-            let mut code = p
-                .append_child(doc.create_element("code").unwrap().into())
-                .unwrap();
-            code.append_child(doc.create_text_node("Personnel Director").into())
-                .unwrap();
-            let mut sup = p
-                .append_child(doc.create_element("sup").unwrap().into())
-                .unwrap();
-            sup.append_child(doc.create_text_node("95,000").into())
-                .unwrap();
-            let mut var = p
-                .append_child(doc.create_element("var").unwrap().into())
-                .unwrap();
-            var.append_child(doc.create_text_node("Female").into())
-                .unwrap();
-            let mut acronym = p
-                .append_child(doc.create_element("acronym").unwrap().into())
-                .unwrap()
-                .as_element()
-                .unwrap();
-            acronym
-                .append_child(doc.create_text_node("PO Box 27 Irving, texas 98553").into())
-                .unwrap();
-            acronym.set_attribute("title", "Yes")?;
-            acronym.set_attribute("class", "Y")?;
-            let mut class = acronym.get_attribute_node("class").unwrap();
-            class
-                .append_child(doc.create_entity_reference("alpha").unwrap().into())
-                .unwrap();
-
-            let mut p = body
-                .append_child(doc.create_element("p").unwrap().into())
-                .unwrap();
-            let mut em = p
-                .append_child(doc.create_element("em").unwrap().into())
-                .unwrap();
-            em.append_child(doc.create_text_node("EMP0005").into())
-                .unwrap();
-            let mut strong = p
-                .append_child(doc.create_element("strong").unwrap().into())
-                .unwrap();
-            strong
-                .append_child(doc.create_text_node("Robert Myers").into())
-                .unwrap();
-            let mut code = p
-                .append_child(doc.create_element("code").unwrap().into())
-                .unwrap();
-            code.append_child(doc.create_text_node("Computer Specialist").into())
-                .unwrap();
-            let mut sup = p
-                .append_child(doc.create_element("sup").unwrap().into())
-                .unwrap();
-            sup.append_child(doc.create_text_node("90,000").into())
-                .unwrap();
-            let mut var = p
-                .append_child(doc.create_element("var").unwrap().into())
-                .unwrap();
-            var.append_child(doc.create_text_node("male").into())
-                .unwrap();
-            let mut acronym = p
-                .append_child(doc.create_element("acronym").unwrap().into())
-                .unwrap()
-                .as_element()
-                .unwrap();
-            acronym.append_child(
-                doc.create_text_node("1821 Nordic. Road, Irving Texas 98558")
+                )?;
+                name.append_child(doc.create_text_node("\n").into())
+                    .unwrap();
+                name.append_child(
+                    doc.create_cdata_section(
+                        "This is an adjacent CDATASection with a reference to a tab &tab;",
+                    )
+                    .unwrap()
                     .into(),
-            )?;
-            acronym.set_attribute("title", "Yes").unwrap();
+                )?;
+                let mut position = employee
+                    .append_child(doc.create_element("position").unwrap().into())
+                    .unwrap();
+                position
+                    .append_child(doc.create_text_node("Secretary").into())
+                    .unwrap();
+                let mut salary = employee
+                    .append_child(doc.create_element("salary").unwrap().into())
+                    .unwrap();
+                salary
+                    .append_child(doc.create_text_node("35,000").into())
+                    .unwrap();
+                let mut gender = employee
+                    .append_child(doc.create_element("gender").unwrap().into())
+                    .unwrap();
+                gender
+                    .append_child(doc.create_text_node("Female").into())
+                    .unwrap();
+                let mut address = employee
+                    .append_child(doc.create_element("address").unwrap().into())
+                    .unwrap()
+                    .as_element()
+                    .unwrap();
+                address
+                    .append_child(doc.create_entity_reference("ent2").unwrap().into())
+                    .unwrap();
+                address
+                    .append_child(doc.create_text_node(" Dallas, ").into())
+                    .unwrap();
+                address
+                    .append_child(doc.create_entity_reference("ent3").unwrap().into())
+                    .unwrap();
+                address
+                    .append_child(doc.create_text_node("\n 98554").into())
+                    .unwrap();
+                address.set_attribute("domestic", "Yes").unwrap();
+                address.set_attribute("street", "Yes").unwrap();
 
-            Ok(doc)
-        }
-        mod core {
-            use super::*;
+                let mut employee = root
+                    .append_child(doc.create_element("employee").unwrap().into())
+                    .unwrap();
+                let mut employee_id = employee
+                    .append_child(doc.create_element("employeeId").unwrap().into())
+                    .unwrap();
+                employee_id
+                    .append_child(doc.create_text_node("EMP0003").into())
+                    .unwrap();
+                let mut name = employee
+                    .append_child(doc.create_element("name").unwrap().into())
+                    .unwrap();
+                name.append_child(doc.create_text_node("Roger\n Jones").into())
+                    .unwrap();
+                let mut position = employee
+                    .append_child(doc.create_element("position").unwrap().into())
+                    .unwrap();
+                position
+                    .append_child(doc.create_text_node("Department Manager").into())
+                    .unwrap();
+                let mut salary = employee
+                    .append_child(doc.create_element("salary").unwrap().into())
+                    .unwrap();
+                salary
+                    .append_child(doc.create_text_node("100,000").into())
+                    .unwrap();
+                let mut gender = employee
+                    .append_child(doc.create_element("gender").unwrap().into())
+                    .unwrap();
+                gender
+                    .append_child(doc.create_entity_reference("ent4").unwrap().into())
+                    .unwrap();
+                let mut address = employee
+                    .append_child(doc.create_element("address").unwrap().into())
+                    .unwrap()
+                    .as_element()
+                    .unwrap();
+                address
+                    .append_child(doc.create_text_node("PO Box 27 Irving, texas 98553").into())
+                    .unwrap();
+                address.set_attribute("domestic", "Yes").unwrap();
+                address.set_attribute("street", "No").unwrap();
+
+                let mut employee = root
+                    .append_child(doc.create_element("employee").unwrap().into())
+                    .unwrap();
+                let mut employee_id = employee
+                    .append_child(doc.create_element("employeeId").unwrap().into())
+                    .unwrap();
+                employee_id
+                    .append_child(doc.create_text_node("EMP0004").into())
+                    .unwrap();
+                let mut name = employee
+                    .append_child(doc.create_element("name").unwrap().into())
+                    .unwrap();
+                name.append_child(doc.create_text_node("Jeny Oconnor").into())
+                    .unwrap();
+                let mut position = employee
+                    .append_child(doc.create_element("position").unwrap().into())
+                    .unwrap();
+                position
+                    .append_child(doc.create_text_node("Personnel Director").into())
+                    .unwrap();
+                let mut salary = employee
+                    .append_child(doc.create_element("salary").unwrap().into())
+                    .unwrap();
+                salary
+                    .append_child(doc.create_text_node("95,000").into())
+                    .unwrap();
+                let mut gender = employee
+                    .append_child(doc.create_element("gender").unwrap().into())
+                    .unwrap();
+                gender
+                    .append_child(doc.create_text_node("Female").into())
+                    .unwrap();
+                let mut address = employee
+                    .append_child(doc.create_element("address").unwrap().into())
+                    .unwrap()
+                    .as_element()
+                    .unwrap();
+                address
+                    .append_child(doc.create_text_node("PO Box 27 Irving, texas 98553").into())
+                    .unwrap();
+                address.set_attribute("domestic", "Yes")?;
+                address.set_attribute("street", "Y")?;
+                let mut street = address.get_attribute_node("street").unwrap();
+                street
+                    .append_child(doc.create_entity_reference("ent1").unwrap().into())
+                    .unwrap();
+
+                let mut employee = root
+                    .append_child(doc.create_element("employee").unwrap().into())
+                    .unwrap();
+                let mut employee_id = employee
+                    .append_child(doc.create_element("employeeId").unwrap().into())
+                    .unwrap();
+                employee_id
+                    .append_child(doc.create_text_node("EMP0005").into())
+                    .unwrap();
+                let mut name = employee
+                    .append_child(doc.create_element("name").unwrap().into())
+                    .unwrap();
+                name.append_child(doc.create_text_node("Robert Myers").into())
+                    .unwrap();
+                let mut position = employee
+                    .append_child(doc.create_element("position").unwrap().into())
+                    .unwrap();
+                position
+                    .append_child(doc.create_text_node("Computer Specialist").into())
+                    .unwrap();
+                let mut salary = employee
+                    .append_child(doc.create_element("salary").unwrap().into())
+                    .unwrap();
+                salary
+                    .append_child(doc.create_text_node("90,000").into())
+                    .unwrap();
+                let mut gender = employee
+                    .append_child(doc.create_element("gender").unwrap().into())
+                    .unwrap();
+                gender
+                    .append_child(doc.create_text_node("male").into())
+                    .unwrap();
+                let mut address = employee
+                    .append_child(doc.create_element("address").unwrap().into())
+                    .unwrap()
+                    .as_element()
+                    .unwrap();
+                address.append_child(
+                    doc.create_text_node("1821 Nordic. Road, Irving Texas 98558")
+                        .into(),
+                )?;
+                address.set_attribute("street", "Yes").unwrap();
+
+                Ok(doc)
+            }
+            fn hc_staff_xml(_doc: &str) -> Result<DocumentRef, DOMException> {
+                let doctype = DocumentTypeRef::new(
+                    "html",
+                    Some("-//W3C//DTD HTML 4.01//EN"),
+                    Some("http://www.w3.org/TR/html4/strict.dtd"),
+                )
+                .unwrap();
+                let mut doc = DocumentRef::new(None, Some("html"), Some(doctype)).unwrap();
+                let mut doctype = doc.doctype().unwrap();
+
+                let mut ent = doctype
+                    .create_entity("alpha", EntityType::InternalGeneralEntity)
+                    .unwrap();
+                ent.append_child(doc.create_text_node("\u{3B1}").into())
+                    .unwrap();
+                doctype.add_entity::<false>(ent).unwrap();
+                let mut ent = doctype
+                    .create_entity("beta", EntityType::InternalGeneralEntity)
+                    .unwrap();
+                ent.append_child(doc.create_text_node("\u{3B2}").into())
+                    .unwrap();
+                doctype.add_entity::<false>(ent).unwrap();
+                let mut ent = doctype
+                    .create_entity("gamma", EntityType::InternalGeneralEntity)
+                    .unwrap();
+                ent.append_child(doc.create_text_node("\u{3B3}").into())
+                    .unwrap();
+                doctype.add_entity::<false>(ent).unwrap();
+                let mut ent = doctype
+                    .create_entity("delta", EntityType::InternalGeneralEntity)
+                    .unwrap();
+                ent.append_child(doc.create_text_node("\u{3B4}").into())
+                    .unwrap();
+                doctype.add_entity::<false>(ent).unwrap();
+                let mut ent = doctype
+                    .create_entity("epsilon", EntityType::InternalGeneralEntity)
+                    .unwrap();
+                ent.append_child(doc.create_text_node("\u{3B5}").into())
+                    .unwrap();
+                doctype.add_entity::<false>(ent).unwrap();
+                let mut ent = doctype
+                    .create_entity("alpha", EntityType::InternalGeneralEntity)
+                    .unwrap();
+                ent.append_child(doc.create_text_node("\u{3B6}").into())
+                    .unwrap();
+                assert!(doctype.add_entity::<false>(ent).is_err());
+                doctype
+                    .add_notation::<false>(doctype.create_notation("notation1").unwrap())
+                    .unwrap();
+                doctype
+                    .add_notation::<false>(doctype.create_notation("notation2").unwrap())
+                    .unwrap();
+
+                // TODO: add external subset
+                let mut seq = ElementContent::new_seq(ElementContentOccur::Once);
+                seq.set_first_child(ElementContent::new_element(
+                    ElementContentOccur::Once,
+                    "head",
+                ));
+                seq.set_second_child(ElementContent::new_element(
+                    ElementContentOccur::Once,
+                    "body",
+                ));
+                doctype
+                    .add_element_decl::<true>(
+                        doctype
+                            .create_element_decl("html", ContentSpec::Children(seq))
+                            .unwrap(),
+                    )
+                    .unwrap();
+                doctype
+                    .add_attlist_decl::<true>(
+                        doctype
+                            .create_attlist_decl(
+                                "html",
+                                "xmlns",
+                                AttType::CDATA,
+                                DefaultDecl::Implied,
+                            )
+                            .unwrap(),
+                    )
+                    .unwrap();
+                let mut seq = ElementContent::new_seq(ElementContentOccur::Once);
+                seq.set_first_child(ElementContent::new_element(
+                    ElementContentOccur::Once,
+                    "meta",
+                ));
+                let mut seq2 = ElementContent::new_seq(ElementContentOccur::Once);
+                seq.set_first_child(ElementContent::new_element(
+                    ElementContentOccur::Once,
+                    "title",
+                ));
+                seq.set_second_child(ElementContent::new_element(
+                    ElementContentOccur::Mult,
+                    "script",
+                ));
+                seq.set_second_child(seq2);
+                doctype
+                    .add_element_decl::<true>(
+                        doctype
+                            .create_element_decl("head", ContentSpec::Children(seq))
+                            .unwrap(),
+                    )
+                    .unwrap();
+                doctype
+                    .add_element_decl::<true>(
+                        doctype
+                            .create_element_decl("meta", ContentSpec::Empty)
+                            .unwrap(),
+                    )
+                    .unwrap();
+                doctype
+                    .create_attlist_decl("meta", "http-equiv", AttType::CDATA, DefaultDecl::Implied)
+                    .unwrap();
+                doctype
+                    .create_attlist_decl("meta", "content", AttType::CDATA, DefaultDecl::Implied)
+                    .unwrap();
+                doctype
+                    .add_element_decl::<true>(
+                        doctype
+                            .create_element_decl(
+                                "title",
+                                ContentSpec::Mixed(ElementContent::new_pcdata(
+                                    ElementContentOccur::Once,
+                                )),
+                            )
+                            .unwrap(),
+                    )
+                    .unwrap();
+                doctype
+                    .add_element_decl::<true>(
+                        doctype
+                            .create_element_decl(
+                                "body",
+                                ContentSpec::Children(ElementContent::new_element(
+                                    ElementContentOccur::Mult,
+                                    "p",
+                                )),
+                            )
+                            .unwrap(),
+                    )
+                    .unwrap();
+                doctype
+                    .add_attlist_decl::<true>(
+                        doctype
+                            .create_attlist_decl(
+                                "body",
+                                "onload",
+                                AttType::CDATA,
+                                DefaultDecl::Implied,
+                            )
+                            .unwrap(),
+                    )
+                    .unwrap();
+                let mut or = ElementContent::new_or(ElementContentOccur::Mult);
+                or.set_first_child(ElementContent::new_pcdata(ElementContentOccur::Once));
+                let mut or2 = ElementContent::new_or(ElementContentOccur::Once);
+                or2.set_first_child(ElementContent::new_element(ElementContentOccur::Once, "em"));
+                let mut or3 = ElementContent::new_or(ElementContentOccur::Once);
+                or3.set_first_child(ElementContent::new_element(
+                    ElementContentOccur::Once,
+                    "strong",
+                ));
+                let mut or4 = ElementContent::new_or(ElementContentOccur::Once);
+                or4.set_first_child(ElementContent::new_element(
+                    ElementContentOccur::Once,
+                    "code",
+                ));
+                let mut or5 = ElementContent::new_or(ElementContentOccur::Once);
+                or5.set_first_child(ElementContent::new_element(
+                    ElementContentOccur::Once,
+                    "sup",
+                ));
+                let mut or6 = ElementContent::new_or(ElementContentOccur::Once);
+                or6.set_first_child(ElementContent::new_element(
+                    ElementContentOccur::Once,
+                    "var",
+                ));
+                let mut or7 = ElementContent::new_or(ElementContentOccur::Once);
+                or7.set_first_child(ElementContent::new_element(
+                    ElementContentOccur::Once,
+                    "acronym",
+                ));
+                or7.set_second_child(ElementContent::new_element(
+                    ElementContentOccur::Once,
+                    "abbr",
+                ));
+                or6.set_second_child(or7);
+                or5.set_second_child(or6);
+                or4.set_second_child(or5);
+                or3.set_second_child(or4);
+                or2.set_second_child(or3);
+                or.set_second_child(or2);
+                doctype
+                    .add_element_decl::<true>(
+                        doctype
+                            .create_element_decl("p", ContentSpec::Mixed(or))
+                            .unwrap(),
+                    )
+                    .unwrap();
+                doctype
+                    .add_attlist_decl::<true>(
+                        doctype
+                            .create_attlist_decl(
+                                "p",
+                                "xmlns:dmstc",
+                                AttType::CDATA,
+                                DefaultDecl::Implied,
+                            )
+                            .unwrap(),
+                    )
+                    .unwrap();
+                doctype
+                    .add_attlist_decl::<true>(
+                        doctype
+                            .create_attlist_decl(
+                                "p",
+                                "xmlns:nm",
+                                AttType::CDATA,
+                                DefaultDecl::Implied,
+                            )
+                            .unwrap(),
+                    )
+                    .unwrap();
+                doctype
+                    .add_attlist_decl::<true>(
+                        doctype
+                            .create_attlist_decl(
+                                "p",
+                                "xmlns:emp2",
+                                AttType::CDATA,
+                                DefaultDecl::Implied,
+                            )
+                            .unwrap(),
+                    )
+                    .unwrap();
+                doctype
+                    .add_attlist_decl::<true>(
+                        doctype
+                            .create_attlist_decl("p", "id", AttType::ID, DefaultDecl::Implied)
+                            .unwrap(),
+                    )
+                    .unwrap();
+
+                doctype
+                    .add_element_decl::<true>(
+                        doctype
+                            .create_element_decl(
+                                "em",
+                                ContentSpec::Mixed(ElementContent::new_pcdata(
+                                    ElementContentOccur::Once,
+                                )),
+                            )
+                            .unwrap(),
+                    )
+                    .unwrap();
+                doctype
+                    .add_element_decl::<true>(
+                        doctype
+                            .create_element_decl(
+                                "span",
+                                ContentSpec::Mixed(ElementContent::new_pcdata(
+                                    ElementContentOccur::Once,
+                                )),
+                            )
+                            .unwrap(),
+                    )
+                    .unwrap();
+                doctype
+                    .add_element_decl::<true>(
+                        doctype
+                            .create_element_decl(
+                                "strong",
+                                ContentSpec::Mixed(ElementContent::new_pcdata(
+                                    ElementContentOccur::Once,
+                                )),
+                            )
+                            .unwrap(),
+                    )
+                    .unwrap();
+                doctype
+                    .add_element_decl::<true>(
+                        doctype
+                            .create_element_decl(
+                                "code",
+                                ContentSpec::Mixed(ElementContent::new_pcdata(
+                                    ElementContentOccur::Once,
+                                )),
+                            )
+                            .unwrap(),
+                    )
+                    .unwrap();
+                doctype
+                    .add_element_decl::<true>(
+                        doctype
+                            .create_element_decl(
+                                "sup",
+                                ContentSpec::Mixed(ElementContent::new_pcdata(
+                                    ElementContentOccur::Once,
+                                )),
+                            )
+                            .unwrap(),
+                    )
+                    .unwrap();
+                let mut or = ElementContent::new_or(ElementContentOccur::Mult);
+                or.set_first_child(ElementContent::new_pcdata(ElementContentOccur::Once));
+                or.set_second_child(ElementContent::new_element(
+                    ElementContentOccur::Once,
+                    "span",
+                ));
+                doctype
+                    .add_element_decl::<true>(
+                        doctype
+                            .create_element_decl("var", ContentSpec::Mixed(or))
+                            .unwrap(),
+                    )
+                    .unwrap();
+                doctype
+                    .add_element_decl::<true>(
+                        doctype
+                            .create_element_decl(
+                                "acronym",
+                                ContentSpec::Mixed(ElementContent::new_pcdata(
+                                    ElementContentOccur::Once,
+                                )),
+                            )
+                            .unwrap(),
+                    )
+                    .unwrap();
+                doctype
+                    .add_attlist_decl::<true>(
+                        doctype
+                            .create_attlist_decl(
+                                "acronym",
+                                "title",
+                                AttType::CDATA,
+                                DefaultDecl::Implied,
+                            )
+                            .unwrap(),
+                    )
+                    .unwrap();
+                doctype
+                    .add_attlist_decl::<true>(
+                        doctype
+                            .create_attlist_decl(
+                                "acronym",
+                                "class",
+                                AttType::CDATA,
+                                DefaultDecl::Implied,
+                            )
+                            .unwrap(),
+                    )
+                    .unwrap();
+                doctype
+                    .add_attlist_decl::<true>(
+                        doctype
+                            .create_attlist_decl("acronym", "id", AttType::ID, DefaultDecl::Implied)
+                            .unwrap(),
+                    )
+                    .unwrap();
+                doctype
+                    .add_element_decl::<true>(
+                        doctype
+                            .create_element_decl(
+                                "abbr",
+                                ContentSpec::Mixed(ElementContent::new_pcdata(
+                                    ElementContentOccur::Once,
+                                )),
+                            )
+                            .unwrap(),
+                    )
+                    .unwrap();
+                doctype
+                    .add_attlist_decl::<true>(
+                        doctype
+                            .create_attlist_decl(
+                                "abbr",
+                                "title",
+                                AttType::CDATA,
+                                DefaultDecl::Implied,
+                            )
+                            .unwrap(),
+                    )
+                    .unwrap();
+                doctype
+                    .add_attlist_decl::<true>(
+                        doctype
+                            .create_attlist_decl(
+                                "abbr",
+                                "class",
+                                AttType::CDATA,
+                                DefaultDecl::Implied,
+                            )
+                            .unwrap(),
+                    )
+                    .unwrap();
+                doctype
+                    .add_attlist_decl::<true>(
+                        doctype
+                            .create_attlist_decl("abbr", "id", AttType::ID, DefaultDecl::Implied)
+                            .unwrap(),
+                    )
+                    .unwrap();
+                doctype
+                    .add_element_decl::<true>(
+                        doctype
+                            .create_element_decl(
+                                "script",
+                                ContentSpec::Mixed(ElementContent::new_pcdata(
+                                    ElementContentOccur::Once,
+                                )),
+                            )
+                            .unwrap(),
+                    )
+                    .unwrap();
+                doctype
+                    .add_attlist_decl::<true>(
+                        doctype
+                            .create_attlist_decl(
+                                "script",
+                                "type",
+                                AttType::CDATA,
+                                DefaultDecl::Implied,
+                            )
+                            .unwrap(),
+                    )
+                    .unwrap();
+                doctype
+                    .add_attlist_decl::<true>(
+                        doctype
+                            .create_attlist_decl(
+                                "script",
+                                "src",
+                                AttType::CDATA,
+                                DefaultDecl::Implied,
+                            )
+                            .unwrap(),
+                    )
+                    .unwrap();
+                doctype
+                    .add_attlist_decl::<true>(
+                        doctype
+                            .create_attlist_decl(
+                                "script",
+                                "charset",
+                                AttType::CDATA,
+                                DefaultDecl::Implied,
+                            )
+                            .unwrap(),
+                    )
+                    .unwrap();
+
+                doc.insert_before(
+                    doc.create_processing_instruction("TEST-STYLE", Some("PIDATA"))
+                        .unwrap()
+                        .into(),
+                    Some(doctype.into()),
+                )
+                .unwrap();
+
+                let mut root = doc.document_element().unwrap();
+                assert!(root.parent_node().is_some());
+                let comment = doc.create_comment(" This is comment number 1.").into();
+                doc.insert_before(comment, Some(root.clone().into()))
+                    .unwrap();
+
+                let mut head = root
+                    .append_child(doc.create_element("head").unwrap().into())
+                    .unwrap();
+                let mut meta = head
+                    .append_child(doc.create_element("meta").unwrap().into())
+                    .unwrap()
+                    .as_element()
+                    .unwrap();
+                meta.set_attribute("http-equiv", "Content-Type").unwrap();
+                meta.set_attribute("content", "text/html; charset=UTF-8")
+                    .unwrap();
+                let mut title = head
+                    .append_child(doc.create_element("title").unwrap().into())
+                    .unwrap();
+                title
+                    .append_child(doc.create_text_node("hc_staff").into())
+                    .unwrap();
+                let mut script = head
+                    .append_child(doc.create_element("script").unwrap().into())
+                    .unwrap()
+                    .as_element()
+                    .unwrap();
+                script.set_attribute("type", "text/javascript").unwrap();
+                script.set_attribute("src", "svgunit.js").unwrap();
+                let mut script = head
+                    .append_child(doc.create_element("script").unwrap().into())
+                    .unwrap()
+                    .as_element()
+                    .unwrap();
+                script.set_attribute("charset", "UTF-8").unwrap();
+                script.set_attribute("type", "text/javascript").unwrap();
+                script.set_attribute("src", "svgtest.js").unwrap();
+                let mut script = head
+                    .append_child(doc.create_element("script").unwrap().into())
+                    .unwrap()
+                    .as_element()
+                    .unwrap();
+                script.set_attribute("type", "text/javascript").unwrap();
+                script
+                    .append_child(
+                        doc.create_text_node("function loadComplete() { startTest(); }")
+                            .into(),
+                    )
+                    .unwrap();
+
+                let mut body = root
+                    .append_child(doc.create_element("body").unwrap().into())
+                    .unwrap()
+                    .as_element()
+                    .unwrap();
+                body.set_attribute("onload", "parent.loadComplete()")
+                    .unwrap();
+
+                let mut p = body
+                    .append_child(doc.create_element("p").unwrap().into())
+                    .unwrap();
+                let mut em = p
+                    .append_child(doc.create_element("em").unwrap().into())
+                    .unwrap();
+                em.append_child(doc.create_text_node("EMP0001").into())
+                    .unwrap();
+                let mut strong = p
+                    .append_child(doc.create_element("strong").unwrap().into())
+                    .unwrap();
+                strong
+                    .append_child(doc.create_text_node("Margaret Martin").into())
+                    .unwrap();
+                let mut code = p
+                    .append_child(doc.create_element("code").unwrap().into())
+                    .unwrap();
+                code.append_child(doc.create_text_node("Accountant").into())
+                    .unwrap();
+                let mut sup = p
+                    .append_child(doc.create_element("sup").unwrap().into())
+                    .unwrap();
+                sup.append_child(doc.create_text_node("56,000").into())
+                    .unwrap();
+                let mut var = p
+                    .append_child(doc.create_element("var").unwrap().into())
+                    .unwrap();
+                var.append_child(doc.create_text_node("Female").into())
+                    .unwrap();
+                let mut acronym = p
+                    .append_child(doc.create_element("acronym").unwrap().into())
+                    .unwrap()
+                    .as_element()
+                    .unwrap();
+                acronym.append_child(
+                    doc.create_text_node("1230 North Ave. Dallas, Texas 98551")
+                        .into(),
+                )?;
+                acronym.set_attribute("title", "Yes").unwrap();
+
+                let mut p = body
+                    .append_child(doc.create_element("p").unwrap().into())
+                    .unwrap();
+                let mut em = p
+                    .append_child(doc.create_element("em").unwrap().into())
+                    .unwrap();
+                em.append_child(doc.create_text_node("EMP0002").into())
+                    .unwrap();
+                let mut strong = p
+                    .append_child(doc.create_element("strong").unwrap().into())
+                    .unwrap();
+                strong
+                    .append_child(doc.create_text_node("Martha RaynoldsThis is a CDATASection with EntityReference number 2 &ent2;\nThis is an adjacent CDATASection with a reference to a tab &tab;").into())
+                    .unwrap();
+                let mut code = p
+                    .append_child(doc.create_element("code").unwrap().into())
+                    .unwrap();
+                code.append_child(doc.create_text_node("Secretary").into())
+                    .unwrap();
+                let mut sup = p
+                    .append_child(doc.create_element("sup").unwrap().into())
+                    .unwrap();
+                sup.append_child(doc.create_text_node("35,000").into())
+                    .unwrap();
+                let mut var = p
+                    .append_child(doc.create_element("var").unwrap().into())
+                    .unwrap();
+                var.append_child(doc.create_text_node("Female").into())
+                    .unwrap();
+                let mut acronym = p
+                    .append_child(doc.create_element("acronym").unwrap().into())
+                    .unwrap()
+                    .as_element()
+                    .unwrap();
+                acronym
+                    .append_child(doc.create_entity_reference("beta").unwrap().into())
+                    .unwrap();
+                acronym
+                    .append_child(doc.create_text_node(" Dallas, ").into())
+                    .unwrap();
+                acronym
+                    .append_child(doc.create_entity_reference("gamma").unwrap().into())
+                    .unwrap();
+                acronym
+                    .append_child(doc.create_text_node("\n 98554").into())
+                    .unwrap();
+                acronym.set_attribute("title", "Yes").unwrap();
+                acronym.set_attribute("class", "Yes").unwrap();
+
+                let mut p = body
+                    .append_child(doc.create_element("p").unwrap().into())
+                    .unwrap();
+                let mut em = p
+                    .append_child(doc.create_element("em").unwrap().into())
+                    .unwrap();
+                em.append_child(doc.create_text_node("EMP0003").into())
+                    .unwrap();
+                let mut strong = p
+                    .append_child(doc.create_element("strong").unwrap().into())
+                    .unwrap();
+                strong
+                    .append_child(doc.create_text_node("Roger\n Jones").into())
+                    .unwrap();
+                let mut code = p
+                    .append_child(doc.create_element("code").unwrap().into())
+                    .unwrap();
+                code.append_child(doc.create_text_node("Department Manager").into())
+                    .unwrap();
+                let mut sup = p
+                    .append_child(doc.create_element("sup").unwrap().into())
+                    .unwrap();
+                sup.append_child(doc.create_text_node("100,000").into())
+                    .unwrap();
+                let mut var = p
+                    .append_child(doc.create_element("var").unwrap().into())
+                    .unwrap();
+                var.append_child(doc.create_entity_reference("delta").unwrap().into())
+                    .unwrap();
+                let mut acronym = p
+                    .append_child(doc.create_element("acronym").unwrap().into())
+                    .unwrap()
+                    .as_element()
+                    .unwrap();
+                acronym
+                    .append_child(doc.create_text_node("PO Box 27 Irving, texas 98553").into())
+                    .unwrap();
+                acronym.set_attribute("title", "Yes").unwrap();
+                acronym.set_attribute("class", "No").unwrap();
+
+                let mut p = body
+                    .append_child(doc.create_element("p").unwrap().into())
+                    .unwrap();
+                let mut em = p
+                    .append_child(doc.create_element("em").unwrap().into())
+                    .unwrap();
+                em.append_child(doc.create_text_node("EMP0004").into())
+                    .unwrap();
+                let mut strong = p
+                    .append_child(doc.create_element("strong").unwrap().into())
+                    .unwrap();
+                strong
+                    .append_child(doc.create_text_node("Jeny Oconnor").into())
+                    .unwrap();
+                let mut code = p
+                    .append_child(doc.create_element("code").unwrap().into())
+                    .unwrap();
+                code.append_child(doc.create_text_node("Personnel Director").into())
+                    .unwrap();
+                let mut sup = p
+                    .append_child(doc.create_element("sup").unwrap().into())
+                    .unwrap();
+                sup.append_child(doc.create_text_node("95,000").into())
+                    .unwrap();
+                let mut var = p
+                    .append_child(doc.create_element("var").unwrap().into())
+                    .unwrap();
+                var.append_child(doc.create_text_node("Female").into())
+                    .unwrap();
+                let mut acronym = p
+                    .append_child(doc.create_element("acronym").unwrap().into())
+                    .unwrap()
+                    .as_element()
+                    .unwrap();
+                acronym
+                    .append_child(doc.create_text_node("PO Box 27 Irving, texas 98553").into())
+                    .unwrap();
+                acronym.set_attribute("title", "Yes")?;
+                acronym.set_attribute("class", "Y")?;
+                let mut class = acronym.get_attribute_node("class").unwrap();
+                class
+                    .append_child(doc.create_entity_reference("alpha").unwrap().into())
+                    .unwrap();
+
+                let mut p = body
+                    .append_child(doc.create_element("p").unwrap().into())
+                    .unwrap();
+                let mut em = p
+                    .append_child(doc.create_element("em").unwrap().into())
+                    .unwrap();
+                em.append_child(doc.create_text_node("EMP0005").into())
+                    .unwrap();
+                let mut strong = p
+                    .append_child(doc.create_element("strong").unwrap().into())
+                    .unwrap();
+                strong
+                    .append_child(doc.create_text_node("Robert Myers").into())
+                    .unwrap();
+                let mut code = p
+                    .append_child(doc.create_element("code").unwrap().into())
+                    .unwrap();
+                code.append_child(doc.create_text_node("Computer Specialist").into())
+                    .unwrap();
+                let mut sup = p
+                    .append_child(doc.create_element("sup").unwrap().into())
+                    .unwrap();
+                sup.append_child(doc.create_text_node("90,000").into())
+                    .unwrap();
+                let mut var = p
+                    .append_child(doc.create_element("var").unwrap().into())
+                    .unwrap();
+                var.append_child(doc.create_text_node("male").into())
+                    .unwrap();
+                let mut acronym = p
+                    .append_child(doc.create_element("acronym").unwrap().into())
+                    .unwrap()
+                    .as_element()
+                    .unwrap();
+                acronym.append_child(
+                    doc.create_text_node("1821 Nordic. Road, Irving Texas 98558")
+                        .into(),
+                )?;
+                acronym.set_attribute("title", "Yes").unwrap();
+
+                Ok(doc)
+            }
             // hc_elementretrieveattrvalue.xml
             #[test]
             fn test_hc_elementretrieveattrvalue() {
@@ -8330,7 +8782,7 @@ mod dom_test_suite {
                 r#doc = staff_xml(STAFF_XML).unwrap(); // staff.xml // <load var="doc" href="staff" willBeModified="false"/>
                 r#name_list = r#doc.get_elements_by_tag_name("name"); // <getElementsByTagName interface="Document" obj="doc" var="nameList" tagname="&quot;name&quot;"/>
                 r#child = r#name_list[1].clone(); // <item interface="NodeList" obj="nameList" var="child" index="1"/>
-                r#last_child = r#child.last_child().unwrap().as_text_node().unwrap(); // <lastChild interface="Node" obj="child" var="lastChild"/>
+                r#last_child = r#child.last_child().unwrap().as_cdata_section().unwrap(); // <lastChild interface="Node" obj="child" var="lastChild"/>
                 r#node_type = r#last_child.node_type(); // <nodeType var="nodeType" obj="lastChild"/>
                 assert_eq!(r#node_type as i32, 4); // <assertEquals actual="nodeType" expected="4" id="isCDATA" ignoreCase="false"/>
                 r#data = r#last_child.data().to_string(); // <data interface="CharacterData" obj="lastChild" var="data"/>
