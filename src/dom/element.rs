@@ -375,7 +375,11 @@ impl ElementRef {
         if !check_owner_document_sameness(self, &new_attr) {
             return Err(DOMException::WrongDocumentErr);
         }
-        if new_attr.owner_element().is_some() {
+        if let Some(owner) = new_attr.owner_element() {
+            // Replacing an attribute node by itself has no effect.
+            if self.is_same_node(&owner.into()) {
+                return Ok(Some(new_attr));
+            }
             return Err(DOMException::InuseAttributeErr);
         }
 
@@ -707,7 +711,11 @@ impl ElementRef {
         if !check_owner_document_sameness(self, &new_attr) {
             return Err(DOMException::WrongDocumentErr);
         }
-        if new_attr.owner_element().is_some() {
+        if let Some(owner) = new_attr.owner_element() {
+            // Replacing an attribute node by itself has no effect.
+            if self.is_same_node(&owner.into()) {
+                return Ok(Some(new_attr));
+            }
             return Err(DOMException::InuseAttributeErr);
         }
 

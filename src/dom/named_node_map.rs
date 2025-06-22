@@ -753,8 +753,9 @@ impl NamedNodeMap for AttributeMap {
             return Err(DOMException::WrongDocumentErr);
         }
 
-        // TODO: handle `DOMError::InuseAttributeErr`.
-        // TODO: handle `DOMError::HierarchyRequestErr`.
+        if node.owner_element().is_some() {
+            return Err(DOMException::InuseAttributeErr);
+        }
 
         let name = node.node_name();
         match self
@@ -819,11 +820,8 @@ impl NamedNodeMap for AttributeMap {
             return Err(DOMException::NotSupportedErr);
         }
 
-        let noderef: NodeRef = node.clone().into();
-        if let NodeRef::Attribute(attr) = noderef {
-            if attr.owner_element().is_some() {
-                return Err(DOMException::InuseAttributeErr);
-            }
+        if node.owner_element().is_some() {
+            return Err(DOMException::InuseAttributeErr);
         }
 
         let ns_uri = node.namespace_uri();
