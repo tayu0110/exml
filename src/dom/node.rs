@@ -2,7 +2,9 @@ use std::rc::Rc;
 
 use crate::{
     dom::{
-        DOCUMENT_POSITION_DISCONNECTED, check_owner_document_sameness, node_list::ChildNodesList,
+        DOCUMENT_POSITION_DISCONNECTED, check_owner_document_sameness,
+        named_node_map::{AttributeMap, NamedNodeMap},
+        node_list::ChildNodesList,
     },
     tree::XML_XML_NAMESPACE,
     uri::{XmlURI, build_uri},
@@ -23,7 +25,6 @@ use super::{
     element::{ElementRef, ElementWeakRef},
     entity::{EntityRef, EntityWeakRef},
     entity_reference::{EntityReferenceRef, EntityReferenceWeakRef},
-    named_node_map::NamedNodeMap,
     notation::{NotationRef, NotationWeakRef},
     pi::{ProcessingInstructionRef, ProcessingInstructionWeakRef},
 };
@@ -107,7 +108,7 @@ pub trait Node: NodeConnection {
         None
     }
     /// Implementation of `attributes` attribute.
-    fn attributes(&self) -> Option<NamedNodeMap<AttrRef>> {
+    fn attributes(&self) -> Option<AttributeMap> {
         None
     }
     /// Implementation of `ownerDocument` attribute.
@@ -683,7 +684,7 @@ pub trait Node: NodeConnection {
                         children = elem.first_child();
                         continue;
                     } else if name.eq_ignore_ascii_case("base") {
-                        return elem.get_attribute("href".into());
+                        return elem.get_attribute("href");
                     }
                 }
             }
@@ -695,7 +696,7 @@ pub trait Node: NodeConnection {
             .attributes()
             .and_then(|attrs| {
                 attrs
-                    .get_named_item_ns(Some(XML_XML_NAMESPACE.into()), "base".into())
+                    .get_named_item_ns(Some(XML_XML_NAMESPACE), "base")
                     .ok()
                     .flatten()
             })
@@ -712,9 +713,7 @@ pub trait Node: NodeConnection {
             parents = parent.parent_node();
 
             if let NodeRef::Element(elem) = parent {
-                if let Ok(Some(attr)) =
-                    elem.get_attribute_ns(Some(XML_XML_NAMESPACE.into()), "base".into())
-                {
+                if let Ok(Some(attr)) = elem.get_attribute_ns(Some(XML_XML_NAMESPACE), "base") {
                     if XmlURI::parse(&attr).is_some_and(|base| base.scheme.is_some()) {
                         return bases
                             .into_iter()
@@ -1543,7 +1542,7 @@ impl_node_trait_to_noderef! {
     fn last_child() -> Option<NodeRef>,
     fn previous_sibling() -> Option<NodeRef>,
     fn next_sibling() -> Option<NodeRef>,
-    fn attributes() -> Option<NamedNodeMap<AttrRef>>,
+    fn attributes() -> Option<AttributeMap>,
     fn owner_document() -> Option<DocumentRef>,
     fn(mut) insert_before(new_child: NodeRef, ref_child: Option<NodeRef>) -> Result<NodeRef, DOMException>,
     fn(mut) replace_child(new_child: NodeRef, old_child: NodeRef) -> Result<NodeRef, DOMException>,

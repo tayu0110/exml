@@ -14,7 +14,7 @@ mod dom_test_suite {
         use super::*;
 
         mod core {
-            use exml::dom::node_list::NodeList;
+            use exml::dom::{named_node_map::NamedNodeMap, node_list::NodeList};
 
             use super::*;
 
@@ -1276,7 +1276,7 @@ mod dom_test_suite {
                 r#doc = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="false"/>
                 r#element_list = r#doc.get_elements_by_tag_name("acronym"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;acronym&quot;" var="elementList"/>
                 r#test_address = r#element_list[2].clone(); // <item interface="NodeList" obj="elementList" index="2" var="testAddress"/>
-                r#attr_value = r#test_address.get_attribute("class".into()).unwrap(); // <getAttribute obj="testAddress" var="attrValue" name="&quot;class&quot;"/>
+                r#attr_value = r#test_address.get_attribute("class").unwrap(); // <getAttribute obj="testAddress" var="attrValue" name="&quot;class&quot;"/>
                 assert_eq!(r#attr_value, "No"); // <assertEquals actual="attrValue" expected="&quot;No&quot;" id="attrValue" ignoreCase="false"/>
             }
             // hc_nodevalue07.xml
@@ -1794,7 +1794,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("acronym"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;acronym&quot;" var="elementList"/>
                 r#test_employee = r#element_list[3].clone(); // <item interface="NodeList" obj="elementList" index="3" var="testEmployee"/>
                 r#domestic_attr = r#test_employee.set_attribute_node(r#new_attribute).unwrap(); // <setAttributeNode obj="testEmployee" var="domesticAttr" newAttr="newAttribute"/>
-                r#attr_value = r#test_employee.get_attribute("lang".into()).unwrap(); // <getAttribute obj="testEmployee" var="attrValue" name="&quot;lang&quot;"/>
+                r#attr_value = r#test_employee.get_attribute("lang").unwrap(); // <getAttribute obj="testEmployee" var="attrValue" name="&quot;lang&quot;"/>
                 assert_eq!(r#attr_value, ""); // <assertEquals actual="attrValue" expected="&quot;&quot;" id="elementGetElementEmptyAssert" ignoreCase="false"/>
             }
             // characterdatagetdata.xml
@@ -3156,8 +3156,8 @@ mod dom_test_suite {
                 r#new_element2 = r#doc.create_element("acronym".to_string()).unwrap(); // <createElement obj="doc" var="newElement2" tagName="&quot;acronym&quot;"/>
                 r#new_element1.set_attribute("lang", "EN").unwrap(); // <setAttribute obj="newElement1" name="&quot;lang&quot;" value="&quot;EN&quot;"/>
                 r#new_element2.set_attribute("title", "Dallas").unwrap(); // <setAttribute obj="newElement2" name="&quot;title&quot;" value="&quot;Dallas&quot;"/>
-                r#attribute1 = r#new_element1.get_attribute("lang".into()).unwrap(); // <getAttribute obj="newElement1" var="attribute1" name="&quot;lang&quot;"/>
-                r#attribute2 = r#new_element2.get_attribute("title".into()).unwrap(); // <getAttribute obj="newElement2" var="attribute2" name="&quot;title&quot;"/>
+                r#attribute1 = r#new_element1.get_attribute("lang").unwrap(); // <getAttribute obj="newElement1" var="attribute1" name="&quot;lang&quot;"/>
+                r#attribute2 = r#new_element2.get_attribute("title").unwrap(); // <getAttribute obj="newElement2" var="attribute2" name="&quot;title&quot;"/>
                 assert_eq!(r#attribute1, "EN"); // <assertEquals actual="attribute1" expected="&quot;EN&quot;" ignoreCase="false" id="attrib1"/>
                 assert_eq!(r#attribute2, "Dallas"); // <assertEquals actual="attribute2" expected="&quot;Dallas&quot;" ignoreCase="false" id="attrib2"/>
                 r#node_name1 = r#new_element1.node_name().to_string(); // <nodeName var="nodeName1" obj="newElement1"/>
@@ -4065,8 +4065,8 @@ mod dom_test_suite {
                     .set_attribute("district", "Fort Worth")
                     .unwrap(); // <setAttribute obj="newElement1" name="&quot;district&quot;" value="&quot;Fort Worth&quot;"/>
                 r#new_element2.set_attribute("county", "Dallas").unwrap(); // <setAttribute obj="newElement2" name="&quot;county&quot;" value="&quot;Dallas&quot;"/>
-                r#attribute1 = r#new_element1.get_attribute("district".into()).unwrap(); // <getAttribute obj="newElement1" var="attribute1" name="&quot;district&quot;"/>
-                r#attribute2 = r#new_element2.get_attribute("county".into()).unwrap(); // <getAttribute obj="newElement2" var="attribute2" name="&quot;county&quot;"/>
+                r#attribute1 = r#new_element1.get_attribute("district").unwrap(); // <getAttribute obj="newElement1" var="attribute1" name="&quot;district&quot;"/>
+                r#attribute2 = r#new_element2.get_attribute("county").unwrap(); // <getAttribute obj="newElement2" var="attribute2" name="&quot;county&quot;"/>
                 assert_eq!(r#attribute1, "Fort Worth"); // <assertEquals actual="attribute1" expected="&quot;Fort Worth&quot;" ignoreCase="false" id="attrib1"/>
                 assert_eq!(r#attribute2, "Dallas"); // <assertEquals actual="attribute2" expected="&quot;Dallas&quot;" ignoreCase="false" id="attrib2"/>
             }
@@ -4205,7 +4205,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("address"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;address&quot;" var="elementList"/>
                 r#test_employee = r#element_list[4].clone(); // <item interface="NodeList" obj="elementList" index="4" var="testEmployee"/>
                 r#test_employee.set_attribute("district", "dallas").unwrap(); // <setAttribute obj="testEmployee" name="&quot;district&quot;" value="&quot;dallas&quot;"/>
-                r#attr_value = r#test_employee.get_attribute("district".into()).unwrap(); // <getAttribute obj="testEmployee" var="attrValue" name="&quot;district&quot;"/>
+                r#attr_value = r#test_employee.get_attribute("district").unwrap(); // <getAttribute obj="testEmployee" var="attrValue" name="&quot;district&quot;"/>
                 assert_eq!(r#attr_value, "dallas"); // <assertEquals actual="attrValue" expected="&quot;dallas&quot;" id="elementAddNewAttributeAssert" ignoreCase="false"/>
             }
             // hc_attrspecifiedvaluechanged.xml
@@ -4642,7 +4642,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("address"); // <getElementsByTagName interface="Document" obj="doc" var="elementList" tagname="&quot;address&quot;"/>
                 r#test_address = r#element_list[2].clone(); // <item interface="NodeList" obj="elementList" var="testAddress" index="2"/>
                 r#attributes = r#test_address.attributes(); // <attributes obj="testAddress" var="attributes"/>
-                r#removed_node = r#attributes.remove_named_item("street".into()).unwrap(); // <removeNamedItem interface="NamedNodeMap" obj="attributes" var="removedNode" name="&quot;street&quot;"/>
+                r#removed_node = r#attributes.remove_named_item("street").unwrap(); // <removeNamedItem interface="NamedNodeMap" obj="attributes" var="removedNode" name="&quot;street&quot;"/>
                 r#value = r#removed_node.node_value().unwrap().to_string(); // <nodeValue obj="removedNode" var="value"/>
                 assert_eq!(r#value, "No"); // <assertEquals actual="value" expected="&quot;No&quot;" id="namednodemapRemoveNamedItemReturnNodeValueAssert" ignoreCase="false"/>
             }
@@ -4816,7 +4816,7 @@ mod dom_test_suite {
                 r#attributes = r#test_address.attributes(); // <attributes obj="testAddress" var="attributes"/>
 
                 // unimplemented: // <assertNotNull actual="attributes" id="attributesNotNull"/>
-                r#removed_node = r#attributes.remove_named_item("street".into()).unwrap(); // <removeNamedItem var="removedNode" interface="NamedNodeMap" obj="attributes" name="&quot;street&quot;"/>
+                r#removed_node = r#attributes.remove_named_item("street").unwrap(); // <removeNamedItem var="removedNode" interface="NamedNodeMap" obj="attributes" name="&quot;street&quot;"/>
                 r#street_attr = r#attributes.get_named_item("street").unwrap(); // <getNamedItem obj="attributes" var="streetAttr" name="&quot;street&quot;"/>
 
                 // unimplemented: // <assertNotNull actual="streetAttr" id="streetAttrNotNull"/>
@@ -4987,7 +4987,7 @@ mod dom_test_suite {
                 r#removed_attr = r#test_employee
                     .remove_attribute_node(r#street_attr)
                     .unwrap(); // <removeAttributeNode var="removedAttr" obj="testEmployee" oldAttr="streetAttr"/>
-                r#attribute = r#test_employee.get_attribute("street".into()).unwrap(); // <getAttribute obj="testEmployee" var="attribute" name="&quot;street&quot;"/>
+                r#attribute = r#test_employee.get_attribute("street").unwrap(); // <getAttribute obj="testEmployee" var="attribute" name="&quot;street&quot;"/>
                 assert_eq!(r#attribute, "Yes"); // <assertEquals actual="attribute" expected="&quot;Yes&quot;" id="streetYes" ignoreCase="false"/>
             }
             // attrcreatetextnode.xml
@@ -5049,7 +5049,7 @@ mod dom_test_suite {
                 r#doc = staff_xml(STAFF_XML).unwrap(); // staff.xml // <load var="doc" href="staff" willBeModified="false"/>
                 r#element_list = r#doc.get_elements_by_tag_name("address"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;address&quot;" var="elementList"/>
                 r#test_address = r#element_list[2].clone(); // <item interface="NodeList" obj="elementList" index="2" var="testAddress"/>
-                r#attr_value = r#test_address.get_attribute("street".into()).unwrap(); // <getAttribute obj="testAddress" var="attrValue" name="&quot;street&quot;"/>
+                r#attr_value = r#test_address.get_attribute("street").unwrap(); // <getAttribute obj="testAddress" var="attrValue" name="&quot;street&quot;"/>
                 assert_eq!(r#attr_value, "No"); // <assertEquals actual="attrValue" expected="&quot;No&quot;" id="attrValue" ignoreCase="false"/>
             }
             // hc_elementremoveattribute.xml
@@ -5063,7 +5063,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("acronym"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;acronym&quot;" var="elementList"/>
                 r#test_employee = r#element_list[3].clone(); // <item interface="NodeList" obj="elementList" index="3" var="testEmployee"/>
                 r#test_employee.remove_attribute("class".into()).unwrap(); // <removeAttribute obj="testEmployee" name="&quot;class&quot;"/>
-                r#attr_value = r#test_employee.get_attribute("class".into()).unwrap(); // <getAttribute obj="testEmployee" var="attrValue" name="&quot;class&quot;"/>
+                r#attr_value = r#test_employee.get_attribute("class").unwrap(); // <getAttribute obj="testEmployee" var="attrValue" name="&quot;class&quot;"/>
                 assert_eq!(r#attr_value, ""); // <assertEquals actual="attrValue" expected="&quot;&quot;" id="attrValue" ignoreCase="false"/>
             }
             // hc_attrappendchild1.xml
@@ -5329,7 +5329,7 @@ mod dom_test_suite {
                     .set_attribute_node(r#new_attribute)
                     .unwrap()
                     .unwrap(); // <setAttributeNode var="setAttr" obj="testEmployee" newAttr="newAttribute"/>
-                r#strong = r#test_employee.get_attribute("class".into()).unwrap(); // <getAttribute obj="testEmployee" var="strong" name="&quot;class&quot;"/>
+                r#strong = r#test_employee.get_attribute("class").unwrap(); // <getAttribute obj="testEmployee" var="strong" name="&quot;class&quot;"/>
                 assert_eq!(r#strong, ""); // <assertEquals actual="strong" expected="&quot;&quot;" id="replacedValue" ignoreCase="false"/>
             }
             // hc_namednodemapsetnameditemwithnewvalue.xml
@@ -6344,7 +6344,7 @@ mod dom_test_suite {
                     .set_attribute_node(r#new_attribute)
                     .unwrap()
                     .unwrap(); // <setAttributeNode var="setAttr" obj="testEmployee" newAttr="newAttribute"/>
-                r#name = r#test_employee.get_attribute("street".into()).unwrap(); // <getAttribute obj="testEmployee" var="name" name="&quot;street&quot;"/>
+                r#name = r#test_employee.get_attribute("street").unwrap(); // <getAttribute obj="testEmployee" var="name" name="&quot;street&quot;"/>
                 assert_eq!(r#name, ""); // <assertEquals actual="name" expected="&quot;&quot;" id="elementReplaceExistingAttributeAssert" ignoreCase="false"/>
             }
             // hc_elementcreatenewattribute.xml
@@ -6365,7 +6365,7 @@ mod dom_test_suite {
                 r#district_attr = r#test_address.get_attribute_node("lang").unwrap(); // <getAttributeNode obj="testAddress" var="districtAttr" name="&quot;lang&quot;"/>
 
                 // unimplemented: // <assertNotNull actual="districtAttr" id="new_district_accessible"/>
-                r#attr_val = r#test_address.get_attribute("lang".into()).unwrap(); // <getAttribute var="attrVal" obj="testAddress" name="&quot;lang&quot;"/>
+                r#attr_val = r#test_address.get_attribute("lang").unwrap(); // <getAttribute var="attrVal" obj="testAddress" name="&quot;lang&quot;"/>
                 assert_eq!(r#attr_val, ""); // <assertEquals actual="attrVal" expected="&quot;&quot;" id="attr_value" ignoreCase="false"/>
             }
             // namednodemapremovenameditemgetvalue.xml
@@ -6385,7 +6385,7 @@ mod dom_test_suite {
                 r#attributes = r#test_employee.attributes(); // <attributes obj="testEmployee" var="attributes"/>
 
                 // unimplemented: // <assertNotNull actual="attributes" id="attributesNotNull"/>
-                r#removed_node = r#attributes.remove_named_item("street".into()).unwrap(); // <removeNamedItem var="removedNode" obj="attributes" name="&quot;street&quot;"/>
+                r#removed_node = r#attributes.remove_named_item("street").unwrap(); // <removeNamedItem var="removedNode" obj="attributes" name="&quot;street&quot;"/>
                 r#street_attr = r#attributes.get_named_item("street").unwrap(); // <getNamedItem obj="attributes" var="streetAttr" name="&quot;street&quot;"/>
 
                 // unimplemented: // <assertNotNull actual="streetAttr" id="streetAttrNotNull"/>
@@ -7586,7 +7586,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("address"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;address&quot;" var="elementList"/>
                 r#test_employee = r#element_list[3].clone(); // <item interface="NodeList" obj="elementList" index="3" var="testEmployee"/>
                 r#domestic_attr = r#test_employee.set_attribute_node(r#new_attribute).unwrap(); // <setAttributeNode obj="testEmployee" var="domesticAttr" newAttr="newAttribute"/>
-                r#attr_value = r#test_employee.get_attribute("district".into()).unwrap(); // <getAttribute obj="testEmployee" var="attrValue" name="&quot;district&quot;"/>
+                r#attr_value = r#test_employee.get_attribute("district").unwrap(); // <getAttribute obj="testEmployee" var="attrValue" name="&quot;district&quot;"/>
                 assert_eq!(r#attr_value, ""); // <assertEquals actual="attrValue" expected="&quot;&quot;" id="elementGetElementEmptyAssert" ignoreCase="false"/>
             }
             // elementchangeattributevalue.xml
@@ -7600,7 +7600,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("address"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;address&quot;" var="elementList"/>
                 r#test_employee = r#element_list[3].clone(); // <item interface="NodeList" obj="elementList" index="3" var="testEmployee"/>
                 r#test_employee.set_attribute("street", "Neither").unwrap(); // <setAttribute obj="testEmployee" name="&quot;street&quot;" value="&quot;Neither&quot;"/>
-                r#attr_value = r#test_employee.get_attribute("street".into()).unwrap(); // <getAttribute obj="testEmployee" var="attrValue" name="&quot;street&quot;"/>
+                r#attr_value = r#test_employee.get_attribute("street").unwrap(); // <getAttribute obj="testEmployee" var="attrValue" name="&quot;street&quot;"/>
                 assert_eq!(r#attr_value, "Neither"); // <assertEquals actual="attrValue" expected="&quot;Neither&quot;" id="elementChangeAttributeValueAssert" ignoreCase="false"/>
             }
             // hc_nodedocumentnodevalue.xml
@@ -8327,7 +8327,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("acronym"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;acronym&quot;" var="elementList"/>
                 r#test_employee = r#element_list[3].clone(); // <item interface="NodeList" obj="elementList" index="3" var="testEmployee"/>
                 r#test_employee.set_attribute("class", "Neither").unwrap(); // <setAttribute obj="testEmployee" name="&quot;class&quot;" value="&quot;Neither&quot;"/>
-                r#attr_value = r#test_employee.get_attribute("class".into()).unwrap(); // <getAttribute obj="testEmployee" var="attrValue" name="&quot;class&quot;"/>
+                r#attr_value = r#test_employee.get_attribute("class").unwrap(); // <getAttribute obj="testEmployee" var="attrValue" name="&quot;class&quot;"/>
                 assert_eq!(r#attr_value, "Neither"); // <assertEquals actual="attrValue" expected="&quot;Neither&quot;" id="elementChangeAttributeValueAssert" ignoreCase="false"/>
             }
             // hc_attrappendchild2.xml
@@ -9059,7 +9059,7 @@ mod dom_test_suite {
                 r#district_attr = r#test_address.get_attribute_node("district").unwrap(); // <getAttributeNode obj="testAddress" var="districtAttr" name="&quot;district&quot;"/>
 
                 // unimplemented: // <assertNotNull actual="districtAttr" id="new_district_accessible"/>
-                r#attr_val = r#test_address.get_attribute("district".into()).unwrap(); // <getAttribute var="attrVal" obj="testAddress" name="&quot;district&quot;"/>
+                r#attr_val = r#test_address.get_attribute("district").unwrap(); // <getAttribute var="attrVal" obj="testAddress" name="&quot;district&quot;"/>
                 assert_eq!(r#attr_val, ""); // <assertEquals actual="attrVal" expected="&quot;&quot;" id="attr_value" ignoreCase="false"/>
             }
             // nodedocumenttypenodename.xml
@@ -9087,7 +9087,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("acronym"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;acronym&quot;" var="elementList"/>
                 r#test_employee = r#element_list[4].clone(); // <item interface="NodeList" obj="elementList" index="4" var="testEmployee"/>
                 r#test_employee.set_attribute("lang", "EN-us").unwrap(); // <setAttribute obj="testEmployee" name="&quot;lang&quot;" value="&quot;EN-us&quot;"/>
-                r#attr_value = r#test_employee.get_attribute("lang".into()).unwrap(); // <getAttribute obj="testEmployee" var="attrValue" name="&quot;lang&quot;"/>
+                r#attr_value = r#test_employee.get_attribute("lang").unwrap(); // <getAttribute obj="testEmployee" var="attrValue" name="&quot;lang&quot;"/>
                 assert_eq!(r#attr_value, "EN-us"); // <assertEquals actual="attrValue" expected="&quot;EN-us&quot;" id="attrValue" ignoreCase="false"/>
             }
             // hc_elementinvalidcharacterexception.xml
@@ -11004,7 +11004,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("address"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;address&quot;" var="elementList"/>
                 r#test_employee = r#element_list[3].clone(); // <item interface="NodeList" obj="elementList" index="3" var="testEmployee"/>
                 r#test_employee.remove_attribute("street".into()).unwrap(); // <removeAttribute obj="testEmployee" name="&quot;street&quot;"/>
-                r#attr_value = r#test_employee.get_attribute("street".into()).unwrap(); // <getAttribute obj="testEmployee" var="attrValue" name="&quot;street&quot;"/>
+                r#attr_value = r#test_employee.get_attribute("street").unwrap(); // <getAttribute obj="testEmployee" var="attrValue" name="&quot;street&quot;"/>
                 assert_eq!(r#attr_value, "Yes"); // <assertEquals actual="attrValue" expected="&quot;Yes&quot;" id="streetYes" ignoreCase="false"/>
             }
             // nodedocumentfragmentnodename.xml
@@ -11040,7 +11040,7 @@ mod dom_test_suite {
     mod level2 {
         use super::*;
         mod core {
-            use exml::dom::node_list::NodeList;
+            use exml::dom::{named_node_map::NamedNodeMap, node_list::NodeList};
 
             use super::*;
             // namednodemapsetnameditemns08.xml
@@ -11207,7 +11207,7 @@ mod dom_test_suite {
                 r#element = r#element_list[1].clone(); // <item var="element" obj="elementList" index="1" interface="NodeList"/>
                 r#attributes = r#element.attributes(); // <attributes var="attributes" obj="element"/>
                 r#attribute = r#attributes
-                    .get_named_item_ns(Some("*".into()), "street".into())
+                    .get_named_item_ns(Some("*"), "street")
                     .unwrap()
                     .unwrap(); // <getNamedItemNS var="attribute" obj="attributes" namespaceURI="&quot;*&quot;" localName="&quot;street&quot;"/>
 
@@ -11223,7 +11223,7 @@ mod dom_test_suite {
                 r#doc = todo!(); // staff.xml // <load var="doc" href="staff" willBeModified="false"/>
                 r#element_list = r#doc.get_elements_by_tag_name("address"); // <getElementsByTagName interface="Document" obj="doc" var="elementList" tagname="&quot;address&quot;"/>
                 r#test_node = r#element_list[0].clone(); // <item interface="NodeList" obj="elementList" var="testNode" index="0"/>
-                r#state = r#test_node.has_attribute("nomatch".into()); // <hasAttribute obj="testNode" var="state" name="&quot;nomatch&quot;"/>
+                r#state = r#test_node.has_attribute("nomatch"); // <hasAttribute obj="testNode" var="state" name="&quot;nomatch&quot;"/>
                 assert!(!r#state); // <assertFalse actual="state" id="throw_False"/>
             }
             // createDocument06.xml
@@ -11272,16 +11272,16 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("emp:address"); // <getElementsByTagName interface="Document" obj="doc" var="elementList" tagname="&quot;emp:address&quot;"/>
                 r#test_addr = r#element_list[0].clone(); // <item interface="NodeList" obj="elementList" var="testAddr" index="0"/>
                 r#test_addr
-                    .remove_attribute_ns(Some("http://www.nist.gov".into()), "local1".into())
+                    .remove_attribute_ns(Some("http://www.nist.gov"), "local1")
                     .unwrap(); // <removeAttributeNS obj="testAddr" namespaceURI="&quot;http://www.nist.gov&quot;" localName="&quot;local1&quot;"/>
                 r#element_list = r#doc.get_elements_by_tag_name("emp:address"); // <getElementsByTagName interface="Document" obj="doc" var="elementList" tagname="&quot;emp:address&quot;"/>
                 r#test_addr = r#element_list[0].clone(); // <item interface="NodeList" obj="elementList" var="testAddr" index="0"/>
                 r#addr_attr = r#test_addr
-                    .get_attribute_node_ns(Some("http://www.nist.gov".into()), "local1".into())
+                    .get_attribute_node_ns(Some("http://www.nist.gov"), "local1")
                     .unwrap()
                     .unwrap(); // <getAttributeNodeNS obj="testAddr" var="addrAttr" namespaceURI="&quot;http://www.nist.gov&quot;" localName="&quot;local1&quot;"/>
                 r#attr = r#test_addr
-                    .get_attribute_ns(Some("http://www.nist.gov".into()), "local1".into())
+                    .get_attribute_ns(Some("http://www.nist.gov"), "local1")
                     .unwrap()
                     .unwrap(); // <getAttributeNS obj="testAddr" var="attr" namespaceURI="&quot;http://www.nist.gov&quot;" localName="&quot;local1&quot;"/>
                 r#namespace_uri = r#addr_attr.namespace_uri().unwrap().to_string(); // <namespaceURI obj="addrAttr" var="namespaceURI"/>
@@ -11680,11 +11680,11 @@ mod dom_test_suite {
                     )
                     .unwrap(); // <setAttributeNS obj="testAddr" namespaceURI="&quot;http://www.nist.gov&quot;" qualifiedName="&quot;newprefix:zone&quot;" value="&quot;newValue&quot;"/>
                 r#addr_attr = r#test_addr
-                    .get_attribute_node_ns(Some("http://www.nist.gov".into()), "zone".into())
+                    .get_attribute_node_ns(Some("http://www.nist.gov"), "zone")
                     .unwrap()
                     .unwrap(); // <getAttributeNodeNS obj="testAddr" var="addrAttr" namespaceURI="&quot;http://www.nist.gov&quot;" localName="&quot;zone&quot;"/>
                 r#result_attr = r#test_addr
-                    .get_attribute_ns(Some("http://www.nist.gov".into()), "zone".into())
+                    .get_attribute_ns(Some("http://www.nist.gov"), "zone")
                     .unwrap()
                     .unwrap(); // <getAttributeNS obj="testAddr" var="resultAttr" namespaceURI="&quot;http://www.nist.gov&quot;" localName="&quot;zone&quot;"/>
                 assert_eq!(r#result_attr, "newValue"); // <assertEquals actual="resultAttr" expected="&quot;newValue&quot;" id="attrValue" ignoreCase="false"/>
@@ -11848,11 +11848,11 @@ mod dom_test_suite {
                     .set_attribute_ns(Some(r#namespace_uri), r#qualified_name, "newValue")
                     .unwrap(); // <setAttributeNS obj="testAddr" namespaceURI="namespaceURI" qualifiedName="qualifiedName" value="&quot;newValue&quot;"/>
                 r#addr_attr = r#test_addr
-                    .get_attribute_node_ns(Some(r#namespace_uri), r#local_name)
+                    .get_attribute_node_ns(Some(&r#namespace_uri), r#local_name)
                     .unwrap()
                     .unwrap(); // <getAttributeNodeNS obj="testAddr" var="addrAttr" namespaceURI="namespaceURI" localName="localName"/>
                 r#result_attr = r#test_addr
-                    .get_attribute_ns(Some(r#namespace_uri), r#local_name)
+                    .get_attribute_ns(Some(&r#namespace_uri), r#local_name)
                     .unwrap()
                     .unwrap(); // <getAttributeNS obj="testAddr" var="resultAttr" namespaceURI="namespaceURI" localName="localName"/>
                 assert_eq!(r#result_attr, "newValue"); // <assertEquals actual="resultAttr" expected="&quot;newValue&quot;" id="attrValue" ignoreCase="false"/>
@@ -12097,7 +12097,7 @@ mod dom_test_suite {
                 r#element = r#doc.create_element("address".to_string()).unwrap(); // <createElement var="element" obj="doc" tagName="&quot;address&quot;"/>
                 r#attribute = r#doc.create_attribute("domestic".to_string()).unwrap(); // <createAttribute var="attribute" obj="doc" name="&quot;domestic&quot;"/>
                 r#new_attribute = r#element.set_attribute_node(r#attribute).unwrap().unwrap(); // <setAttributeNode var="newAttribute" obj="element" newAttr="attribute"/>
-                r#state = r#element.has_attribute("domestic".into()); // <hasAttribute var="state" obj="element" name="&quot;domestic&quot;"/>
+                r#state = r#element.has_attribute("domestic"); // <hasAttribute var="state" obj="element" name="&quot;domestic&quot;"/>
                 assert!(r#state); // <assertTrue actual="state" id="elementhasattribute04"/>
             }
             // getNamedItemNS01.xml
@@ -12115,7 +12115,7 @@ mod dom_test_suite {
                 r#test_employee = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" var="testEmployee" index="1"/>
                 r#attributes = r#test_employee.attributes(); // <attributes obj="testEmployee" var="attributes"/>
                 r#domestic_attr = r#attributes
-                    .get_named_item_ns(Some("http://www.usa.com".into()), "domestic".into())
+                    .get_named_item_ns(Some("http://www.usa.com"), "domestic")
                     .unwrap()
                     .unwrap(); // <getNamedItemNS obj="attributes" var="domesticAttr" namespaceURI="&quot;http://www.usa.com&quot;" localName="&quot;domestic&quot;"/>
                 r#attr_name = r#domestic_attr.node_name().to_string(); // <nodeName obj="domesticAttr" var="attrName"/>
@@ -12147,7 +12147,7 @@ mod dom_test_suite {
                 r#doc = todo!(); // staff.xml // <load var="doc" href="staff" willBeModified="false"/>
                 r#element_list = r#doc.get_elements_by_tag_name("address"); // <getElementsByTagName interface="Document" obj="doc" var="elementList" tagname="&quot;address&quot;"/>
                 r#test_node = r#element_list[0].clone(); // <item interface="NodeList" obj="elementList" var="testNode" index="0"/>
-                r#state = r#test_node.has_attribute("street".into()); // <hasAttribute obj="testNode" var="state" name="&quot;street&quot;"/>
+                r#state = r#test_node.has_attribute("street"); // <hasAttribute obj="testNode" var="state" name="&quot;street&quot;"/>
                 assert!(r#state); // <assertTrue actual="state" id="throw_True"/>
             }
             // getAttributeNS05.xml
@@ -12164,7 +12164,7 @@ mod dom_test_suite {
 
                 // unimplemented: // <assertNotNull actual="testAddr" id="empAddrNotNull"/>
                 r#attr_value = r#test_addr
-                    .get_attribute_ns(Some("http://www.nist.gov".into()), "domestic".into())
+                    .get_attribute_ns(Some("http://www.nist.gov"), "domestic")
                     .unwrap()
                     .unwrap(); // <getAttributeNS obj="testAddr" var="attrValue" namespaceURI="&quot;http://www.nist.gov&quot;" localName="&quot;domestic&quot;"/>
                 assert_eq!(r#attr_value, "Yes"); // <assertEquals actual="attrValue" expected="&quot;Yes&quot;" id="attrValue" ignoreCase="false"/>
@@ -12210,10 +12210,7 @@ mod dom_test_suite {
                     .unwrap()
                     .unwrap(); // <setAttributeNodeNS var="newAttribute1" obj="element" newAttr="attribute"/>
                 r#attribute = r#element
-                    .get_attribute_node_ns(
-                        Some("http://www.w3.org/DOM/Level2".into()),
-                        "att".into(),
-                    )
+                    .get_attribute_node_ns(Some("http://www.w3.org/DOM/Level2"), "att")
                     .unwrap()
                     .unwrap(); // <getAttributeNodeNS var="attribute" obj="element" namespaceURI="&quot;http://www.w3.org/DOM/Level2&quot;" localName="&quot;att&quot;"/>
                 r#attr_value = r#attribute.node_value().unwrap().to_string(); // <nodeValue var="attrValue" obj="attribute"/>
@@ -12398,7 +12395,7 @@ mod dom_test_suite {
                     .create_attribute_ns(None, "domestic".as_ref())
                     .unwrap(); // <createAttributeNS var="attribute" obj="doc" namespaceURI="nullNS" qualifiedName="&quot;domestic&quot;"/>
                 r#new_attribute = r#element.set_attribute_node(r#attribute).unwrap().unwrap(); // <setAttributeNode var="newAttribute" obj="element" newAttr="attribute"/>
-                r#state = r#element.has_attribute_ns(None, "domestic".into()).unwrap(); // <hasAttributeNS var="state" obj="element" namespaceURI="nullNS" localName="&quot;domestic&quot;"/>
+                r#state = r#element.has_attribute_ns(None, "domestic").unwrap(); // <hasAttributeNS var="state" obj="element" namespaceURI="nullNS" localName="&quot;domestic&quot;"/>
                 assert!(r#state); // <assertTrue actual="state" id="elementhasattributens03"/>
             }
             // namednodemapremovenameditemns04.xml
@@ -12416,25 +12413,19 @@ mod dom_test_suite {
                 r#element = r#element_list[0].clone(); // <item var="element" obj="elementList" index="0" interface="NodeList"/>
                 r#attributes = r#element.attributes(); // <attributes var="attributes" obj="element"/>
                 r#attribute_removed = r#attributes
-                    .remove_named_item_ns(
-                        Some("http://www.w3.org/2000/xmlns/".into()),
-                        "xmlns".into(),
-                    )
+                    .remove_named_item_ns(Some("http://www.w3.org/2000/xmlns/"), "xmlns")
                     .unwrap(); // <removeNamedItemNS var="attributeRemoved" obj="attributes" namespaceURI="&quot;http://www.w3.org/2000/xmlns/&quot;" localName="&quot;xmlns&quot;"/>
                 r#attribute = r#attributes
-                    .get_named_item_ns(Some("http://www.w3.org/2000/xmlns/".into()), "xmlns".into())
+                    .get_named_item_ns(Some("http://www.w3.org/2000/xmlns/"), "xmlns")
                     .unwrap()
                     .unwrap(); // <getNamedItemNS var="attribute" obj="attributes" namespaceURI="&quot;http://www.w3.org/2000/xmlns/&quot;" localName="&quot;xmlns&quot;"/>
 
                 // unimplemented: // <assertNull actual="attribute" id="namednodemapremovenameditemns04_1"/>
                 r#attribute_removed = r#attributes
-                    .remove_named_item_ns(
-                        Some("http://www.w3.org/2000/xmlns/".into()),
-                        "dmstc".into(),
-                    )
+                    .remove_named_item_ns(Some("http://www.w3.org/2000/xmlns/"), "dmstc")
                     .unwrap(); // <removeNamedItemNS var="attributeRemoved" obj="attributes" namespaceURI="&quot;http://www.w3.org/2000/xmlns/&quot;" localName="&quot;dmstc&quot;"/>
                 r#attribute = r#attributes
-                    .get_named_item_ns(Some("http://www.w3.org/2000/xmlns/".into()), "dmstc".into())
+                    .get_named_item_ns(Some("http://www.w3.org/2000/xmlns/"), "dmstc")
                     .unwrap()
                     .unwrap(); // <getNamedItemNS var="attribute" obj="attributes" namespaceURI="&quot;http://www.w3.org/2000/xmlns/&quot;" localName="&quot;dmstc&quot;"/>
 
@@ -12632,7 +12623,7 @@ mod dom_test_suite {
                     .unwrap(); // <setAttributeNodeNS var="newAttribute" obj="element" newAttr="newAttr2"/>
                 r#attributes = r#element.attributes(); // <attributes var="attributes" obj="element"/>
                 r#attribute = r#attributes
-                    .get_named_item_ns(Some("http://www.w3.org/DOM/L2".into()), "att".into())
+                    .get_named_item_ns(Some("http://www.w3.org/DOM/L2"), "att")
                     .unwrap()
                     .unwrap(); // <getNamedItemNS var="attribute" obj="attributes" namespaceURI="&quot;http://www.w3.org/DOM/L2&quot;" localName="&quot;att&quot;"/>
                 r#attr_name = r#attribute.node_name().to_string(); // <nodeName var="attrName" obj="attribute"/>
@@ -12895,15 +12886,12 @@ mod dom_test_suite {
                     .unwrap(); // <setAttributeNodeNS var="newAttribute" obj="element" newAttr="attribute"/>
                 r#element
                     .remove_attribute_ns(
-                        Some("http://www.w3.org/DOM/Test/createAttributeNS".into()),
-                        "attr".into(),
+                        Some("http://www.w3.org/DOM/Test/createAttributeNS"),
+                        "attr",
                     )
                     .unwrap(); // <removeAttributeNS obj="element" namespaceURI="&quot;http://www.w3.org/DOM/Test/createAttributeNS&quot;" localName="&quot;attr&quot;"/>
                 r#state = r#element
-                    .has_attribute_ns(
-                        Some("http://www.w3.org/DOM/Test/createAttributeNS".into()),
-                        "attr".into(),
-                    )
+                    .has_attribute_ns(Some("http://www.w3.org/DOM/Test/createAttributeNS"), "attr")
                     .unwrap(); // <hasAttributeNS var="state" obj="element" namespaceURI="&quot;http://www.w3.org/DOM/Test/createAttributeNS&quot;" localName="&quot;attr&quot;"/>
                 assert!(!r#state); // <assertFalse actual="state" id="elementremoveattributens01"/>
             }
@@ -12955,10 +12943,7 @@ mod dom_test_suite {
                     .unwrap()
                     .unwrap(); // <setAttributeNodeNS var="newAttribute2" obj="element" newAttr="attribute2"/>
                 r#attribute = r#element
-                    .get_attribute_node_ns(
-                        Some("http://www.w3.org/DOM/Level2".into()),
-                        "att".into(),
-                    )
+                    .get_attribute_node_ns(Some("http://www.w3.org/DOM/Level2"), "att")
                     .unwrap()
                     .unwrap(); // <getAttributeNodeNS var="attribute" obj="element" namespaceURI="&quot;http://www.w3.org/DOM/Level2&quot;" localName="&quot;att&quot;"/>
                 r#attr_value = r#attribute.node_value().unwrap().to_string(); // <nodeValue var="attrValue" obj="attribute"/>
@@ -13112,7 +13097,7 @@ mod dom_test_suite {
                     .unwrap()
                     .unwrap(); // <setAttributeNodeNS var="newAttribute" obj="element" newAttr="newAttr1"/>
                 r#attribute = r#attributes
-                    .get_named_item_ns(Some("http://www.w3.org/DOM/L1".into()), "streets".into())
+                    .get_named_item_ns(Some("http://www.w3.org/DOM/L1"), "streets")
                     .unwrap()
                     .unwrap(); // <getNamedItemNS var="attribute" obj="attributes" namespaceURI="&quot;http://www.w3.org/DOM/L1&quot;" localName="&quot;streets&quot;"/>
                 r#attr_name = r#attribute.node_name().to_string(); // <nodeName var="attrName" obj="attribute"/>
@@ -13183,7 +13168,7 @@ mod dom_test_suite {
                 r#doc = todo!(); // staff.xml // <load var="doc" href="staff" willBeModified="false"/>
                 r#element_list = r#doc.get_elements_by_tag_name("address"); // <getElementsByTagName interface="Document" obj="doc" var="elementList" tagname="&quot;address&quot;"/>
                 r#test_node = r#element_list[4].clone(); // <item interface="NodeList" obj="elementList" var="testNode" index="4"/>
-                r#state = r#test_node.has_attribute("domestic".into()); // <hasAttribute obj="testNode" var="state" name="&quot;domestic&quot;"/>
+                r#state = r#test_node.has_attribute("domestic"); // <hasAttribute obj="testNode" var="state" name="&quot;domestic&quot;"/>
                 assert!(!r#state); // <assertFalse actual="state" id="throw_False"/>
             }
             // attrgetownerelement01.xml
@@ -13206,7 +13191,7 @@ mod dom_test_suite {
                 r#element = r#element_list[1].clone(); // <item var="element" obj="elementList" index="1" interface="NodeList"/>
                 r#attributes = r#element.attributes(); // <attributes var="attributes" obj="element"/>
                 r#attr = r#attributes
-                    .get_named_item_ns(Some(r#null_ns), "defaultAttr".into())
+                    .get_named_item_ns(Some(r#null_ns), "defaultAttr")
                     .unwrap()
                     .unwrap(); // <getNamedItemNS var="attr" obj="attributes" namespaceURI="nullNS" localName="&quot;defaultAttr&quot;"/>
                 r#owner_element = r#attr.owner_element().unwrap(); // <ownerElement var="ownerElement" obj="attr"/>
@@ -13316,10 +13301,10 @@ mod dom_test_suite {
                     .unwrap(); // <setAttributeNodeNS var="newAttribute" obj="element" newAttr="attribute2"/>
                 r#attributes = r#element.attributes(); // <attributes var="attributes" obj="element"/>
                 r#attribute = r#attributes
-                    .remove_named_item_ns(Some("http://www.w3.org/DOM/L1".into()), "att".into())
+                    .remove_named_item_ns(Some("http://www.w3.org/DOM/L1"), "att")
                     .unwrap(); // <removeNamedItemNS var="attribute" obj="attributes" namespaceURI="&quot;http://www.w3.org/DOM/L1&quot;" localName="&quot;att&quot;"/>
                 r#attribute = r#attributes
-                    .get_named_item_ns(Some("http://www.w3.org/DOM/L2".into()), "att".into())
+                    .get_named_item_ns(Some("http://www.w3.org/DOM/L2"), "att")
                     .unwrap()
                     .unwrap(); // <getNamedItemNS var="attribute" obj="attributes" namespaceURI="&quot;http://www.w3.org/DOM/L2&quot;" localName="&quot;att&quot;"/>
                 r#node_name = r#attribute.node_name().to_string(); // <nodeName var="nodeName" obj="attribute"/>
@@ -13469,10 +13454,10 @@ mod dom_test_suite {
                 r#element = r#element_list[1].clone(); // <item var="element" obj="elementList" index="1" interface="NodeList"/>
                 r#attributes = r#element.attributes(); // <attributes var="attributes" obj="element"/>
                 r#attribute = r#attributes
-                    .remove_named_item_ns(Some("http://www.nist.gov".into()), "domestic".into())
+                    .remove_named_item_ns(Some("http://www.nist.gov"), "domestic")
                     .unwrap(); // <removeNamedItemNS var="attribute" obj="attributes" namespaceURI="&quot;http://www.nist.gov&quot;" localName="&quot;domestic&quot;"/>
                 r#attribute = r#attributes
-                    .get_named_item_ns(Some("http://www.nist.gov".into()), "domestic".into())
+                    .get_named_item_ns(Some("http://www.nist.gov"), "domestic")
                     .unwrap()
                     .unwrap(); // <getNamedItemNS var="attribute" obj="attributes" namespaceURI="&quot;http://www.nist.gov&quot;" localName="&quot;domestic&quot;"/>
 
@@ -13600,7 +13585,7 @@ mod dom_test_suite {
 
                 // unimplemented: // <assertNotNull actual="element" id="empAddressNotNull"/>
                 r#attr = r#element
-                    .get_attribute_node_ns(Some("http://www.nist.gov".into()), "zone".into())
+                    .get_attribute_node_ns(Some("http://www.nist.gov"), "zone")
                     .unwrap()
                     .unwrap(); // <getAttributeNodeNS var="attr" obj="element" namespaceURI="&quot;http://www.nist.gov&quot;" localName="&quot;zone&quot;"/>
                 r#attr_imp = r#doc_imp
@@ -13639,7 +13624,7 @@ mod dom_test_suite {
                     .unwrap(); // <setAttributeNodeNS var="newAttribute" obj="element" newAttr="newAttr1"/>
                 r#attributes = r#element.attributes(); // <attributes var="attributes" obj="element"/>
                 r#attribute = r#attributes
-                    .get_named_item_ns(Some("http://www.w3.org/DOM/L1".into()), "street".into())
+                    .get_named_item_ns(Some("http://www.w3.org/DOM/L1"), "street")
                     .unwrap()
                     .unwrap(); // <getNamedItemNS var="attribute" obj="attributes" namespaceURI="&quot;http://www.w3.org/DOM/L1&quot;" localName="&quot;street&quot;"/>
                 r#attr_name = r#attribute.node_name().to_string(); // <nodeName var="attrName" obj="attribute"/>
@@ -13685,8 +13670,8 @@ mod dom_test_suite {
                     .unwrap(); // <setAttributeNS obj="element" namespaceURI="&quot;http://www.w3.org/DOM/Test/setAttributeNS&quot;" qualifiedName="&quot;this:street&quot;" value="&quot;Silver Street&quot;"/>
                 r#attribute = r#element
                     .get_attribute_node_ns(
-                        Some("http://www.w3.org/DOM/Test/setAttributeNS".into()),
-                        "street".into(),
+                        Some("http://www.w3.org/DOM/Test/setAttributeNS"),
+                        "street",
                     )
                     .unwrap()
                     .unwrap(); // <getAttributeNodeNS var="attribute" obj="element" namespaceURI="&quot;http://www.w3.org/DOM/Test/setAttributeNS&quot;" localName="&quot;street&quot;"/>
@@ -13708,7 +13693,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("address"); // <getElementsByTagName interface="Document" obj="doc" var="elementList" tagname="&quot;address&quot;"/>
                 r#test_node = r#element_list[0].clone(); // <item interface="NodeList" obj="elementList" var="testNode" index="0"/>
                 r#state = r#test_node
-                    .has_attribute_ns(Some(r#namespace_uri.into()), r#local_name.into())
+                    .has_attribute_ns(Some(r#namespace_uri), r#local_name)
                     .unwrap(); // <hasAttributeNS obj="testNode" var="state" namespaceURI="namespaceURI" localName="localName"/>
                 assert!(!r#state); // <assertFalse actual="state" id="throw_False"/>
             }
@@ -13789,11 +13774,11 @@ mod dom_test_suite {
                 r#element_alt = r#element_list_alt[1].clone(); // <item var="elementAlt" obj="elementListAlt" index="1" interface="NodeList"/>
                 r#attributes_alt = r#element_alt.attributes(); // <attributes var="attributesAlt" obj="elementAlt"/>
                 r#attr = r#attributes_alt
-                    .get_named_item_ns(Some(r#null_ns), "street".into())
+                    .get_named_item_ns(Some(r#null_ns), "street")
                     .unwrap()
                     .unwrap(); // <getNamedItemNS var="attr" obj="attributesAlt" namespaceURI="nullNS" localName="&quot;street&quot;"/>
                 r#new_node = r#attributes_alt
-                    .remove_named_item_ns(Some(r#null_ns), "street".into())
+                    .remove_named_item_ns(Some(r#null_ns), "street")
                     .unwrap(); // <removeNamedItemNS var="newNode" obj="attributesAlt" namespaceURI="nullNS" localName="&quot;street&quot;"/>
 
                 // unimplemented: // <assertDOMException id="throw_WRONG_DOCUMENT_ERR"><WRONG_DOCUMENT_ERR><setNamedItemNS var="newNode" obj="attributes" arg="attr"/></WRONG_DOCUMENT_ERR></assertDOMException>
@@ -13819,7 +13804,7 @@ mod dom_test_suite {
                 r#node_map = r#element.attributes(); // <attributes var="nodeMap" obj="element"/>
                 r#removed_child = r#parent_element.remove_child(element.into()).unwrap(); // <removeChild var="removedChild" obj="parentElement" oldChild="element"/>
                 r#attr = r#node_map
-                    .get_named_item_ns(Some(r#null_ns), "street".into())
+                    .get_named_item_ns(Some(r#null_ns), "street")
                     .unwrap()
                     .unwrap(); // <getNamedItemNS var="attr" obj="nodeMap" namespaceURI="nullNS" localName="&quot;street&quot;"/>
                 r#owner_element = r#attr.owner_element().unwrap(); // <ownerElement var="ownerElement" obj="attr"/>
@@ -14006,7 +13991,7 @@ mod dom_test_suite {
                     r#doc.get_elements_by_tag_name_ns(Some("http://www.nist.gov"), "address"); // <getElementsByTagNameNS var="elementList" obj="doc" namespaceURI="&quot;http://www.nist.gov&quot;" localName="&quot;address&quot;" interface="Document"/>
                 r#element = r#element_list[1].clone(); // <item var="element" obj="elementList" index="1" interface="NodeList"/>
                 r#attribute = r#element
-                    .get_attribute_node_ns(Some(r#null_ns), "street".into())
+                    .get_attribute_node_ns(Some(r#null_ns), "street")
                     .unwrap()
                     .unwrap(); // <getAttributeNodeNS var="attribute" obj="element" namespaceURI="nullNS" localName="&quot;street&quot;"/>
                 r#attribute_cloned = r#attribute.clone_node(true); // <cloneNode var="attributeCloned" obj="attribute" deep="true"/>
@@ -14151,7 +14136,7 @@ mod dom_test_suite {
                 r#attributes = r#test_address.attributes(); // <attributes obj="testAddress" var="attributes"/>
                 r#set_node = r#attributes.set_named_item_ns(r#arg).unwrap().unwrap(); // <setNamedItemNS var="setNode" interface="NamedNodeMap" obj="attributes" arg="arg"/>
                 r#retnode = r#attributes
-                    .get_named_item_ns(Some(r#namespace_uri.into()), "newAttr".into())
+                    .get_named_item_ns(Some(r#namespace_uri), "newAttr")
                     .unwrap()
                     .unwrap(); // <getNamedItemNS obj="attributes" var="retnode" namespaceURI="namespaceURI" localName="&quot;newAttr&quot;"/>
                 r#value = r#retnode.node_value().unwrap().to_string(); // <nodeValue obj="retnode" var="value"/>
@@ -14371,7 +14356,7 @@ mod dom_test_suite {
                     r#doc.get_elements_by_tag_name_ns(Some("http://www.nist.gov"), "address"); // <getElementsByTagNameNS var="addresses" obj="doc" interface="Document" namespaceURI="&quot;http://www.nist.gov&quot;" localName="&quot;address&quot;"/>
                 r#element = r#addresses[1].clone(); // <item var="element" obj="addresses" interface="NodeList" index="1"/>
                 r#attr = r#element
-                    .get_attribute_node_ns(Some("http://www.nist.gov".into()), "zone".into())
+                    .get_attribute_node_ns(Some("http://www.nist.gov"), "zone")
                     .unwrap()
                     .unwrap(); // <getAttributeNodeNS var="attr" obj="element" namespaceURI="&quot;http://www.nist.gov&quot;" localName="&quot;zone&quot;"/>
                 r#imported_attr = r#doc_imported.import_node(r#attr.into(), false).unwrap(); // <importNode var="importedAttr" obj="docImported" importedNode="attr" deep="false"/>
@@ -14645,7 +14630,7 @@ mod dom_test_suite {
 
                 // unimplemented: // <assertNotNull actual="testAddr" id="empAddrNotNull"/>
                 r#attribute = r#test_addr
-                    .get_attribute_node_ns(Some("http://www.nist.gov".into()), "domestic".into())
+                    .get_attribute_node_ns(Some("http://www.nist.gov"), "domestic")
                     .unwrap()
                     .unwrap(); // <getAttributeNodeNS obj="testAddr" var="attribute" namespaceURI="&quot;http://www.nist.gov&quot;" localName="&quot;domestic&quot;"/>
                 r#attr_name = r#attribute.node_name().to_string(); // <nodeName obj="attribute" var="attrName"/>
@@ -14809,7 +14794,7 @@ mod dom_test_suite {
                 r#element = r#element_list[1].clone(); // <item var="element" obj="elementList" index="1" interface="NodeList"/>
                 r#attributes = r#element.attributes(); // <attributes var="attributes" obj="element"/>
                 r#attribute = r#attributes
-                    .get_named_item_ns(Some("http://www.nist.gov".into()), "domestic".into())
+                    .get_named_item_ns(Some("http://www.nist.gov"), "domestic")
                     .unwrap()
                     .unwrap(); // <getNamedItemNS var="attribute" obj="attributes" namespaceURI="&quot;http://www.nist.gov&quot;" localName="&quot;domestic&quot;"/>
                 r#attr_name = r#attribute.node_name().to_string(); // <nodeName var="attrName" obj="attribute"/>
@@ -15017,7 +15002,7 @@ mod dom_test_suite {
 
                 // unimplemented: // <assertNotNull actual="testAddr" id="empAddressNotNull"/>
                 r#addr_attr = r#test_addr
-                    .get_attribute_node_ns(Some("http://www.nist.gov".into()), "domestic".into())
+                    .get_attribute_node_ns(Some("http://www.nist.gov"), "domestic")
                     .unwrap()
                     .unwrap(); // <getAttributeNodeNS obj="testAddr" localName="&quot;domestic&quot;" namespaceURI="&quot;http://www.nist.gov&quot;" var="addrAttr"/>
                 r#attr_namespace_uri = r#addr_attr.namespace_uri().unwrap().to_string(); // <namespaceURI obj="addrAttr" var="attrNamespaceURI"/>
@@ -15032,7 +15017,7 @@ mod dom_test_suite {
                 let mut r#state; // type: boolean // <var name="state" type="boolean"/>
                 r#doc = todo!(); // staff.xml // <load var="doc" href="staff" willBeModified="false"/>
                 r#element = r#doc.document_element().unwrap(); // <documentElement var="element" obj="doc"/>
-                r#state = r#element.has_attribute("".into()); // <hasAttribute var="state" obj="element" name="&quot;&quot;"/>
+                r#state = r#element.has_attribute(""); // <hasAttribute var="state" obj="element" name="&quot;&quot;"/>
                 assert!(!r#state); // <assertFalse actual="state" id="elementhasattribute01"/>
             }
             // getElementsByTagNameNS10.xml
@@ -15159,7 +15144,7 @@ mod dom_test_suite {
                     .unwrap()
                     .unwrap(); // <setNamedItemNS var="newNode" obj="attributes" arg="attribute1"/>
                 r#attribute = r#attributes
-                    .get_named_item_ns(Some("http://www.w3.org/DOM/L1".into()), "att".into())
+                    .get_named_item_ns(Some("http://www.w3.org/DOM/L1"), "att")
                     .unwrap()
                     .unwrap(); // <getNamedItemNS var="attribute" obj="attributes" namespaceURI="&quot;http://www.w3.org/DOM/L1&quot;" localName="&quot;att&quot;"/>
                 r#attr_name = r#attribute.node_name().to_string(); // <nodeName var="attrName" obj="attribute"/>
@@ -15189,10 +15174,10 @@ mod dom_test_suite {
                 r#doc = todo!(); // staff.xml // <load var="doc" href="staff" willBeModified="false"/>
                 r#element = r#doc.create_element("address".to_string()).unwrap(); // <createElement var="element" obj="doc" tagName="&quot;address&quot;"/>
                 r#attribute = r#doc.create_attribute("domestic".to_string()).unwrap(); // <createAttribute var="attribute" obj="doc" name="&quot;domestic&quot;"/>
-                r#state = r#element.has_attribute("domestic".into()); // <hasAttribute var="state" obj="element" name="&quot;domestic&quot;"/>
+                r#state = r#element.has_attribute("domestic"); // <hasAttribute var="state" obj="element" name="&quot;domestic&quot;"/>
                 assert!(!r#state); // <assertFalse actual="state" id="elementhasattribute03_False"/>
                 r#new_attribute = r#element.set_attribute_node(r#attribute).unwrap().unwrap(); // <setAttributeNode var="newAttribute" obj="element" newAttr="attribute"/>
-                r#state = r#element.has_attribute("domestic".into()); // <hasAttribute var="state" obj="element" name="&quot;domestic&quot;"/>
+                r#state = r#element.has_attribute("domestic"); // <hasAttribute var="state" obj="element" name="&quot;domestic&quot;"/>
                 assert!(r#state); // <assertTrue actual="state" id="elementhasattribute03_True"/>
             }
             // prefix03.xml
@@ -15272,7 +15257,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name_ns(Some("*"), "employee"); // <getElementsByTagNameNS var="elementList" obj="doc" namespaceURI="&quot;*&quot;" localName="&quot;employee&quot;" interface="Document"/>
                 r#element = r#element_list[0].clone(); // <item var="element" obj="elementList" index="0" interface="NodeList"/>
                 r#state = r#element
-                    .has_attribute_ns(Some("http://www.w3.org/2000/xmlns/".into()), "xmlns".into())
+                    .has_attribute_ns(Some("http://www.w3.org/2000/xmlns/"), "xmlns")
                     .unwrap(); // <hasAttributeNS var="state" obj="element" namespaceURI="&quot;http://www.w3.org/2000/xmlns/&quot;" localName="&quot;xmlns&quot;"/>
                 assert!(r#state); // <assertTrue actual="state" id="elementhasattributens01"/>
             }
@@ -15515,7 +15500,7 @@ mod dom_test_suite {
                 r#doc = todo!(); // staffNS.xml // <load var="doc" href="staffNS" willBeModified="false"/>
                 r#element_list = r#doc.get_elements_by_tag_name("address"); // <getElementsByTagName interface="Document" obj="doc" var="elementList" tagname="&quot;address&quot;"/>
                 r#test_node = r#element_list[0].clone(); // <item interface="NodeList" obj="elementList" var="testNode" index="0"/>
-                r#state = r#test_node.has_attribute("dmstc:domestic".into()); // <hasAttribute obj="testNode" var="state" name="&quot;dmstc:domestic&quot;"/>
+                r#state = r#test_node.has_attribute("dmstc:domestic"); // <hasAttribute obj="testNode" var="state" name="&quot;dmstc:domestic&quot;"/>
                 assert!(r#state); // <assertTrue actual="state" id="hasDomesticAttr"/>
             }
             // removeNamedItemNS01.xml
@@ -15533,7 +15518,7 @@ mod dom_test_suite {
                 r#test_address = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" var="testAddress" index="1"/>
                 r#attributes = r#test_address.attributes(); // <attributes obj="testAddress" var="attributes"/>
                 r#removed_node = r#attributes
-                    .remove_named_item_ns(Some("http://www.usa.com".into()), "domestic".into())
+                    .remove_named_item_ns(Some("http://www.usa.com"), "domestic")
                     .unwrap(); // <removeNamedItemNS var="removedNode" interface="NamedNodeMap" obj="attributes" namespaceURI="&quot;http://www.usa.com&quot;" localName="&quot;domestic&quot;"/>
 
                 // unimplemented: // <assertNotNull actual="removedNode" id="retval"/>
@@ -15598,7 +15583,7 @@ mod dom_test_suite {
                     .unwrap(); // <createAttributeNS var="attribute" obj="doc" namespaceURI="&quot;http://www.w3.org/DOM&quot;" qualifiedName="&quot;domestic&quot;"/>
                 r#new_attribute = r#element.set_attribute_node(r#attribute).unwrap().unwrap(); // <setAttributeNode var="newAttribute" obj="element" newAttr="attribute"/>
                 r#state = r#element
-                    .has_attribute_ns(Some("http://www.w3.org/DOM".into()), "domestic".into())
+                    .has_attribute_ns(Some("http://www.w3.org/DOM"), "domestic")
                     .unwrap(); // <hasAttributeNS var="state" obj="element" namespaceURI="&quot;http://www.w3.org/DOM&quot;" localName="&quot;domestic&quot;"/>
                 assert!(r#state); // <assertTrue actual="state" id="hasDomesticAttr"/>
             }
@@ -15615,7 +15600,7 @@ mod dom_test_suite {
                 r#element = r#element_list[0].clone(); // <item var="element" obj="elementList" index="0" interface="NodeList"/>
 
                 // unimplemented: // <assertNotNull actual="element" id="empEmployeeNotNull"/>
-                r#state = r#element.has_attribute("defaultAttr".into()); // <hasAttribute var="state" obj="element" name="&quot;defaultAttr&quot;"/>
+                r#state = r#element.has_attribute("defaultAttr"); // <hasAttribute var="state" obj="element" name="&quot;defaultAttr&quot;"/>
                 assert!(r#state); // <assertTrue actual="state" id="elementhasattribute02"/>
             }
             // namednodemapremovenameditemns09.xml
@@ -15634,11 +15619,11 @@ mod dom_test_suite {
                 r#element = r#element_list[1].clone(); // <item var="element" obj="elementList" index="1" interface="NodeList"/>
                 r#attributes = r#element.attributes(); // <attributes var="attributes" obj="element"/>
                 r#attribute = r#attributes
-                    .remove_named_item_ns(Some("http://www.nist.gov".into()), "domestic".into())
+                    .remove_named_item_ns(Some("http://www.nist.gov"), "domestic")
                     .unwrap(); // <removeNamedItemNS var="attribute" obj="attributes" namespaceURI="&quot;http://www.nist.gov&quot;" localName="&quot;domestic&quot;"/>
                 r#new_attributes = r#element.attributes(); // <attributes var="newAttributes" obj="element"/>
                 r#attribute = r#new_attributes
-                    .get_named_item_ns(Some("http://www.nist.gov".into()), "domestic".into())
+                    .get_named_item_ns(Some("http://www.nist.gov"), "domestic")
                     .unwrap()
                     .unwrap(); // <getNamedItemNS var="attribute" obj="newAttributes" namespaceURI="&quot;http://www.nist.gov&quot;" localName="&quot;domestic&quot;"/>
 
@@ -15693,8 +15678,8 @@ mod dom_test_suite {
                     .unwrap(); // <setAttributeNS obj="element" namespaceURI="&quot;http://www.w3.org/DOM/Test/setAttributeNS&quot;" qualifiedName="&quot;attr&quot;" value="&quot;value&quot;"/>
                 r#attribute = r#element
                     .get_attribute_node_ns(
-                        Some("http://www.w3.org/DOM/Test/setAttributeNS".into()),
-                        "attr".into(),
+                        Some("http://www.w3.org/DOM/Test/setAttributeNS"),
+                        "attr",
                     )
                     .unwrap()
                     .unwrap(); // <getAttributeNodeNS var="attribute" obj="element" namespaceURI="&quot;http://www.w3.org/DOM/Test/setAttributeNS&quot;" localName="&quot;attr&quot;"/>
@@ -15805,7 +15790,7 @@ mod dom_test_suite {
                     r#doc.get_elements_by_tag_name_ns(Some("http://www.nist.gov"), "employee"); // <getElementsByTagNameNS var="childList" obj="doc" localName="&quot;employee&quot;" namespaceURI="&quot;http://www.nist.gov&quot;" interface="Document"/>
                 r#element = r#child_list[1].clone(); // <item var="element" obj="childList" index="1" interface="NodeList"/>
                 r#attribute = r#element
-                    .get_attribute_node_ns(Some(r#null_ns), "defaultAttr".into())
+                    .get_attribute_node_ns(Some(r#null_ns), "defaultAttr")
                     .unwrap()
                     .unwrap(); // <getAttributeNodeNS var="attribute" obj="element" localName="&quot;defaultAttr&quot;" namespaceURI="nullNS"/>
                 r#attr_value = r#attribute.node_value().unwrap().to_string(); // <nodeValue var="attrValue" obj="attribute"/>
@@ -15837,13 +15822,13 @@ mod dom_test_suite {
                     .unwrap()
                     .unwrap(); // <setAttributeNodeNS var="newAttribute" obj="element" newAttr="newAttr1"/>
                 r#attribute = r#attributes_map1
-                    .get_named_item_ns(Some("http://www.w3.org/DOM/L1".into()), "street".into())
+                    .get_named_item_ns(Some("http://www.w3.org/DOM/L1"), "street")
                     .unwrap()
                     .unwrap(); // <getNamedItemNS var="attribute" obj="attributesMap1" namespaceURI="&quot;http://www.w3.org/DOM/L1&quot;" localName="&quot;street&quot;"/>
                 r#attr_name = r#attribute.node_name().to_string(); // <nodeName var="attrName" obj="attribute"/>
                 assert_eq!(r#attr_name, "street"); // <assertEquals actual="attrName" expected="&quot;street&quot;" id="namednodemapgetnameditemnsMap106" ignoreCase="false"/>
                 r#attribute = r#attributes_map2
-                    .get_named_item_ns(Some("http://www.w3.org/DOM/L1".into()), "street".into())
+                    .get_named_item_ns(Some("http://www.w3.org/DOM/L1"), "street")
                     .unwrap()
                     .unwrap(); // <getNamedItemNS var="attribute" obj="attributesMap2" namespaceURI="&quot;http://www.w3.org/DOM/L1&quot;" localName="&quot;street&quot;"/>
                 r#attr_name = r#attribute.node_name().to_string(); // <nodeName var="attrName" obj="attribute"/>
@@ -16158,10 +16143,10 @@ mod dom_test_suite {
                 r#element = r#element_list[1].clone(); // <item var="element" obj="elementList" index="1" interface="NodeList"/>
                 r#attributes = r#element.attributes(); // <attributes var="attributes" obj="element"/>
                 r#attribute = r#attributes
-                    .remove_named_item_ns(Some(r#null_ns), "defaultAttr".into())
+                    .remove_named_item_ns(Some(r#null_ns), "defaultAttr")
                     .unwrap(); // <removeNamedItemNS var="attribute" obj="attributes" namespaceURI="nullNS" localName="&quot;defaultAttr&quot;"/>
                 r#attribute = r#attributes
-                    .get_named_item_ns(Some(r#null_ns), "defaultAttr".into())
+                    .get_named_item_ns(Some(r#null_ns), "defaultAttr")
                     .unwrap()
                     .unwrap(); // <getNamedItemNS var="attribute" obj="attributes" namespaceURI="nullNS" localName="&quot;defaultAttr&quot;"/>
                 r#attr_value = r#attribute.node_value().unwrap().to_string(); // <nodeValue var="attrValue" obj="attribute"/>
@@ -16415,7 +16400,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("emp:address"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;emp:address&quot;" var="elementList"/>
                 r#test_addr = r#element_list[0].clone(); // <item interface="NodeList" obj="elementList" index="0" var="testAddr"/>
                 r#addr_attr = r#test_addr
-                    .get_attribute_node_ns(Some("http://www.nist.gov".into()), "district".into())
+                    .get_attribute_node_ns(Some("http://www.nist.gov"), "district")
                     .unwrap()
                     .unwrap(); // <getAttributeNodeNS obj="testAddr" namespaceURI="&quot;http://www.nist.gov&quot;" localName="&quot;district&quot;" var="addrAttr"/>
                 r#attr_namespace_uri = r#addr_attr.namespace_uri().unwrap().to_string(); // <namespaceURI obj="addrAttr" var="attrNamespaceURI"/>
@@ -16504,7 +16489,7 @@ mod dom_test_suite {
                     r#doc.get_elements_by_tag_name_ns(Some("http://www.nist.gov"), "employee"); // <getElementsByTagNameNS var="childList" obj="doc" localName="&quot;employee&quot;" namespaceURI="&quot;http://www.nist.gov&quot;" interface="Document"/>
                 r#element = r#child_list[1].clone(); // <item var="element" obj="childList" index="1" interface="NodeList"/>
                 r#attr_value = r#element
-                    .get_attribute_ns(Some(r#null_ns), "defaultAttr".into())
+                    .get_attribute_ns(Some(r#null_ns), "defaultAttr")
                     .unwrap()
                     .unwrap(); // <getAttributeNS var="attrValue" obj="element" localName="&quot;defaultAttr&quot;" namespaceURI="nullNS"/>
                 assert_eq!(r#attr_value, "defaultVal"); // <assertEquals actual="attrValue" expected="&quot;defaultVal&quot;" id="elementgetattributens02" ignoreCase="false"/>
@@ -16589,10 +16574,7 @@ mod dom_test_suite {
                     )
                     .unwrap(); // <setAttributeNS obj="element" namespaceURI="&quot;http://www.w3.org/DOM/Test/2&quot;" qualifiedName="&quot;defaultAttr&quot;" value="&quot;default2&quot;"/>
                 r#attribute = r#element
-                    .get_attribute_node_ns(
-                        Some("http://www.w3.org/DOM/Test/1".into()),
-                        "defaultAttr".into(),
-                    )
+                    .get_attribute_node_ns(Some("http://www.w3.org/DOM/Test/1"), "defaultAttr")
                     .unwrap()
                     .unwrap(); // <getAttributeNodeNS var="attribute" obj="element" namespaceURI="&quot;http://www.w3.org/DOM/Test/1&quot;" localName="&quot;defaultAttr&quot;"/>
                 r#attr_name = r#attribute.node_name().to_string(); // <nodeName var="attrName" obj="attribute"/>
@@ -17078,7 +17060,7 @@ mod dom_test_suite {
 
                 // unimplemented: // <assertNotNull actual="element" id="empEmployeeNotNull"/>
                 r#attribute = r#element
-                    .get_attribute_node_ns(Some(r#null_ns), "defaultAttr".into())
+                    .get_attribute_node_ns(Some(r#null_ns), "defaultAttr")
                     .unwrap()
                     .unwrap(); // <getAttributeNodeNS var="attribute" obj="element" namespaceURI="nullNS" localName="&quot;defaultAttr&quot;"/>
 
@@ -17171,6 +17153,8 @@ mod dom_test_suite {
     mod level3 {
         use super::*;
         mod core {
+            use exml::dom::named_node_map::NamedNodeMap;
+
             use super::*;
             // documentadoptnode05.xml
             #[test]
@@ -18112,11 +18096,7 @@ mod dom_test_suite {
                     )
                     .unwrap(); // <setAttributeNS obj="employeeIdElem" qualifiedName="&quot;xmlns:newAttr&quot;" namespaceURI="&quot;http://www.w3.org/2000/xmlns/&quot;" value="&quot;newValue&quot;"/>
                 r#employee_id_elem
-                    .set_id_attribute_ns(
-                        Some("http://www.w3.org/2000/xmlns/".into()),
-                        "newAttr".into(),
-                        true,
-                    )
+                    .set_id_attribute_ns(Some("http://www.w3.org/2000/xmlns/"), "newAttr", true)
                     .unwrap(); // <setIdAttributeNS obj="employeeIdElem" localName="&quot;newAttr&quot;" namespaceURI="&quot;http://www.w3.org/2000/xmlns/&quot;" isId="true"/>
                 r#attributes_map = r#employee_id_elem.attributes(); // <attributes var="attributesMap" obj="employeeIdElem"/>
                 r#attr = r#attributes_map.get_named_item("xmlns:newAttr").unwrap(); // <getNamedItem var="attr" obj="attributesMap" name="&quot;xmlns:newAttr&quot;"/>
@@ -18126,11 +18106,7 @@ mod dom_test_suite {
                 r#elem_name = r#elem.tag_name().to_string(); // <tagName obj="elem" var="elemName"/>
                 assert_eq!(r#elem_name, "em"); // <assertEquals actual="elemName" expected="&quot;em&quot;" id="elementsetidattributensGetElementById03" ignoreCase="false"/>
                 r#employee_id_elem
-                    .set_id_attribute_ns(
-                        Some("http://www.w3.org/2000/xmlns/".into()),
-                        "newAttr".into(),
-                        false,
-                    )
+                    .set_id_attribute_ns(Some("http://www.w3.org/2000/xmlns/"), "newAttr", false)
                     .unwrap(); // <setIdAttributeNS obj="employeeIdElem" localName="&quot;newAttr&quot;" namespaceURI="&quot;http://www.w3.org/2000/xmlns/&quot;" isId="false"/>
                 r#id = r#attr.is_id(); // <isId var="id" obj="attr"/>
                 assert!(!r#id); // <assertFalse actual="id" id="elementsetidattributensIsIdFalse03"/>
@@ -18619,9 +18595,7 @@ mod dom_test_suite {
                 r#elem_list = r#doc.get_elements_by_tag_name("acronym"); // <getElementsByTagName var="elemList" obj="doc" tagname="&quot;acronym&quot;" interface="Document"/>
                 r#acronym_elem = r#elem_list[2].clone(); // <item var="acronymElem" obj="elemList" index="2" interface="NodeList"/>
                 r#acronym_elem.set_attribute("class", "Maybe").unwrap(); // <setAttribute obj="acronymElem" name="&quot;class&quot;" value="&quot;Maybe&quot;"/>
-                r#acronym_elem
-                    .set_id_attribute("class".into(), true)
-                    .unwrap(); // <setIdAttribute obj="acronymElem" name="&quot;class&quot;" isId="true"/>
+                r#acronym_elem.set_id_attribute("class", true).unwrap(); // <setIdAttribute obj="acronymElem" name="&quot;class&quot;" isId="true"/>
                 r#attributes_map = r#acronym_elem.attributes(); // <attributes var="attributesMap" obj="acronymElem"/>
                 r#attr = r#attributes_map.get_named_item("class").unwrap(); // <getNamedItem var="attr" obj="attributesMap" name="&quot;class&quot;"/>
                 r#id = r#attr.is_id(); // <isId var="id" obj="attr"/>
@@ -18629,9 +18603,7 @@ mod dom_test_suite {
                 r#elem = r#doc.get_element_by_id("Maybe".as_ref()).unwrap(); // <getElementById obj="doc" var="elem" elementId="&quot;Maybe&quot;"/>
                 r#elem_name = r#elem.tag_name().to_string(); // <tagName obj="elem" var="elemName"/>
                 assert_eq!(r#elem_name, "acronym"); // <assertEquals actual="elemName" expected="&quot;acronym&quot;" id="elementsetidattributeGetElementById03" ignoreCase="false"/>
-                r#acronym_elem
-                    .set_id_attribute("class".into(), false)
-                    .unwrap(); // <setIdAttribute obj="acronymElem" name="&quot;class&quot;" isId="false"/>
+                r#acronym_elem.set_id_attribute("class", false).unwrap(); // <setIdAttribute obj="acronymElem" name="&quot;class&quot;" isId="false"/>
                 r#id = r#attr.is_id(); // <isId var="id" obj="attr"/>
                 assert!(!r#id); // <assertFalse actual="id" id="elementsetidattributeIsIdFalse03"/>
             }
@@ -19225,22 +19197,22 @@ mod dom_test_suite {
                     .unwrap(); // <setAttributeNS obj="acronymElem1" qualifiedName="&quot;xsi:noNamespaceSchemaLocation&quot;" namespaceURI="&quot;http://www.w3.org/2001/XMLSchema-instance&quot;" value="&quot;No&quot;"/>
                 r#acronym_elem1
                     .set_id_attribute_ns(
-                        Some("http://www.w3.org/2001/XMLSchema-instance".into()),
-                        "noNamespaceSchemaLocation".into(),
+                        Some("http://www.w3.org/2001/XMLSchema-instance"),
+                        "noNamespaceSchemaLocation",
                         true,
                     )
                     .unwrap(); // <setIdAttributeNS obj="acronymElem1" localName="&quot;noNamespaceSchemaLocation&quot;" namespaceURI="&quot;http://www.w3.org/2001/XMLSchema-instance&quot;" isId="true"/>
                 r#acronym_elem2
                     .set_id_attribute_ns(
-                        Some("http://www.w3.org/2001/XMLSchema-instance".into()),
-                        "noNamespaceSchemaLocation".into(),
+                        Some("http://www.w3.org/2001/XMLSchema-instance"),
+                        "noNamespaceSchemaLocation",
                         true,
                     )
                     .unwrap(); // <setIdAttributeNS obj="acronymElem2" localName="&quot;noNamespaceSchemaLocation&quot;" namespaceURI="&quot;http://www.w3.org/2001/XMLSchema-instance&quot;" isId="true"/>
                 r#acronym_elem3
                     .set_id_attribute_ns(
-                        Some("http://www.w3.org/2001/XMLSchema-instance".into()),
-                        "noNamespaceSchemaLocation".into(),
+                        Some("http://www.w3.org/2001/XMLSchema-instance"),
+                        "noNamespaceSchemaLocation",
                         true,
                     )
                     .unwrap(); // <setIdAttributeNS obj="acronymElem3" localName="&quot;noNamespaceSchemaLocation&quot;" namespaceURI="&quot;http://www.w3.org/2001/XMLSchema-instance&quot;" isId="true"/>
@@ -20432,9 +20404,7 @@ mod dom_test_suite {
                 r#doc = todo!(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
                 r#elem_list = r#doc.get_elements_by_tag_name("acronym"); // <getElementsByTagName var="elemList" obj="doc" tagname="&quot;acronym&quot;" interface="Document"/>
                 r#acronym_elem = r#elem_list[3].clone(); // <item var="acronymElem" obj="elemList" index="3" interface="NodeList"/>
-                r#acronym_elem
-                    .set_id_attribute("class".into(), true)
-                    .unwrap(); // <setIdAttribute obj="acronymElem" name="&quot;class&quot;" isId="true"/>
+                r#acronym_elem.set_id_attribute("class", true).unwrap(); // <setIdAttribute obj="acronymElem" name="&quot;class&quot;" isId="true"/>
                 r#attributes_map = r#acronym_elem.attributes(); // <attributes var="attributesMap" obj="acronymElem"/>
                 r#attr = r#attributes_map.get_named_item("class").unwrap(); // <getNamedItem var="attr" obj="attributesMap" name="&quot;class&quot;"/>
                 r#id = r#attr.is_id(); // <isId var="id" obj="attr"/>
@@ -20444,9 +20414,7 @@ mod dom_test_suite {
                 // unimplemented: // <assertNotNull actual="elem" id="elemByIDNotNull"/>
                 r#elem_name = r#elem.tag_name().to_string(); // <tagName obj="elem" var="elemName"/>
                 assert_eq!(r#elem_name, "acronym"); // <assertEquals actual="elemName" expected="&quot;acronym&quot;" id="elementsetidattributeGetElementById11" ignoreCase="false"/>
-                r#acronym_elem
-                    .set_id_attribute("class".into(), false)
-                    .unwrap(); // <setIdAttribute obj="acronymElem" name="&quot;class&quot;" isId="false"/>
+                r#acronym_elem.set_id_attribute("class", false).unwrap(); // <setIdAttribute obj="acronymElem" name="&quot;class&quot;" isId="false"/>
                 r#id = r#attr.is_id(); // <isId var="id" obj="attr"/>
                 assert!(!r#id); // <assertFalse actual="id" id="elementsetidattributeIsIdFalse11"/>
             }
@@ -20826,9 +20794,7 @@ mod dom_test_suite {
                 r#doc = todo!(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
                 r#elem_list = r#doc.get_elements_by_tag_name("acronym"); // <getElementsByTagName var="elemList" obj="doc" tagname="&quot;acronym&quot;" interface="Document"/>
                 r#acronym_elem = r#elem_list[2].clone(); // <item var="acronymElem" obj="elemList" index="2" interface="NodeList"/>
-                r#acronym_elem
-                    .set_id_attribute("class".into(), true)
-                    .unwrap(); // <setIdAttribute obj="acronymElem" name="&quot;class&quot;" isId="true"/>
+                r#acronym_elem.set_id_attribute("class", true).unwrap(); // <setIdAttribute obj="acronymElem" name="&quot;class&quot;" isId="true"/>
                 r#attributes_map = r#acronym_elem.attributes(); // <attributes var="attributesMap" obj="acronymElem"/>
                 r#attr = r#attributes_map.get_named_item("class").unwrap(); // <getNamedItem var="attr" obj="attributesMap" name="&quot;class&quot;"/>
                 r#id = r#attr.is_id(); // <isId var="id" obj="attr"/>
@@ -20836,9 +20802,7 @@ mod dom_test_suite {
                 r#elem = r#doc.get_element_by_id("No".as_ref()).unwrap(); // <getElementById obj="doc" var="elem" elementId="&quot;No&quot;"/>
                 r#elem_name = r#elem.tag_name().to_string(); // <tagName obj="elem" var="elemName"/>
                 assert_eq!(r#elem_name, "acronym"); // <assertEquals actual="elemName" expected="&quot;acronym&quot;" id="elementsetidattributeGetElementById01" ignoreCase="false"/>
-                r#acronym_elem
-                    .set_id_attribute("class".into(), false)
-                    .unwrap(); // <setIdAttribute obj="acronymElem" name="&quot;class&quot;" isId="false"/>
+                r#acronym_elem.set_id_attribute("class", false).unwrap(); // <setIdAttribute obj="acronymElem" name="&quot;class&quot;" isId="false"/>
                 r#id = r#attr.is_id(); // <isId var="id" obj="attr"/>
                 assert!(!r#id); // <assertFalse actual="id" id="elementsetidattributeIsIdFalse01"/>
             }
@@ -21950,15 +21914,9 @@ mod dom_test_suite {
                 r#acronym_elem1 = r#elem_list[1].clone(); // <item var="acronymElem1" obj="elemList" index="1" interface="NodeList"/>
                 r#acronym_elem2 = r#elem_list[2].clone(); // <item var="acronymElem2" obj="elemList" index="2" interface="NodeList"/>
                 r#acronym_elem3 = r#elem_list[4].clone(); // <item var="acronymElem3" obj="elemList" index="4" interface="NodeList"/>
-                r#acronym_elem1
-                    .set_id_attribute("class".into(), true)
-                    .unwrap(); // <setIdAttribute obj="acronymElem1" name="&quot;class&quot;" isId="true"/>
-                r#acronym_elem2
-                    .set_id_attribute("class".into(), true)
-                    .unwrap(); // <setIdAttribute obj="acronymElem2" name="&quot;class&quot;" isId="true"/>
-                r#acronym_elem3
-                    .set_id_attribute("class".into(), true)
-                    .unwrap(); // <setIdAttribute obj="acronymElem3" name="&quot;class&quot;" isId="true"/>
+                r#acronym_elem1.set_id_attribute("class", true).unwrap(); // <setIdAttribute obj="acronymElem1" name="&quot;class&quot;" isId="true"/>
+                r#acronym_elem2.set_id_attribute("class", true).unwrap(); // <setIdAttribute obj="acronymElem2" name="&quot;class&quot;" isId="true"/>
+                r#acronym_elem3.set_id_attribute("class", true).unwrap(); // <setIdAttribute obj="acronymElem3" name="&quot;class&quot;" isId="true"/>
                 r#attributes_map = r#acronym_elem1.attributes(); // <attributes var="attributesMap" obj="acronymElem1"/>
                 r#attr = r#attributes_map.get_named_item("class").unwrap(); // <getNamedItem var="attr" obj="attributesMap" name="&quot;class&quot;"/>
                 r#id = r#attr.is_id(); // <isId var="id" obj="attr"/>
@@ -23392,14 +23350,10 @@ mod dom_test_suite {
                     )
                     .unwrap(); // <setAttributeNS obj="acronymElem" namespaceURI="&quot;http://www.w3.org/DOM&quot;" qualifiedName="&quot;dom3:newAttr&quot;" value="&quot;null&quot;"/>
                 r#acronym_elem
-                    .set_id_attribute_ns(
-                        Some("http://www.w3.org/DOM".into()),
-                        "newAttr".into(),
-                        true,
-                    )
+                    .set_id_attribute_ns(Some("http://www.w3.org/DOM"), "newAttr", true)
                     .unwrap(); // <setIdAttributeNS obj="acronymElem" localName="&quot;newAttr&quot;" namespaceURI="&quot;http://www.w3.org/DOM&quot;" isId="true"/>
                 r#attr = r#acronym_elem
-                    .get_attribute_node_ns(Some("http://www.w3.org/DOM".into()), "newAttr".into())
+                    .get_attribute_node_ns(Some("http://www.w3.org/DOM"), "newAttr")
                     .unwrap()
                     .unwrap(); // <getAttributeNodeNS var="attr" obj="acronymElem" namespaceURI="&quot;http://www.w3.org/DOM&quot;" localName="&quot;newAttr&quot;"/>
                 r#id = r#attr.is_id(); // <isId var="id" obj="attr"/>
@@ -23530,18 +23484,10 @@ mod dom_test_suite {
                 r#p_elem1 = r#elem_list[2].clone(); // <item var="pElem1" obj="elemList" index="2" interface="NodeList"/>
                 r#p_elem2 = r#elem_list[3].clone(); // <item var="pElem2" obj="elemList" index="3" interface="NodeList"/>
                 r#p_elem1
-                    .set_id_attribute_ns(
-                        Some("http://www.w3.org/2000/xmlns/".into()),
-                        "dmstc".into(),
-                        true,
-                    )
+                    .set_id_attribute_ns(Some("http://www.w3.org/2000/xmlns/"), "dmstc", true)
                     .unwrap(); // <setIdAttributeNS obj="pElem1" localName="&quot;dmstc&quot;" namespaceURI="&quot;http://www.w3.org/2000/xmlns/&quot;" isId="true"/>
                 r#p_elem2
-                    .set_id_attribute_ns(
-                        Some("http://www.w3.org/2000/xmlns/".into()),
-                        "nm".into(),
-                        true,
-                    )
+                    .set_id_attribute_ns(Some("http://www.w3.org/2000/xmlns/"), "nm", true)
                     .unwrap(); // <setIdAttributeNS obj="pElem2" localName="&quot;nm&quot;" namespaceURI="&quot;http://www.w3.org/2000/xmlns/&quot;" isId="true"/>
                 r#attributes_map = r#p_elem1.attributes(); // <attributes var="attributesMap" obj="pElem1"/>
                 r#attr = r#attributes_map.get_named_item("xmlns:dmstc").unwrap(); // <getNamedItem var="attr" obj="attributesMap" name="&quot;xmlns:dmstc&quot;"/>
@@ -25505,13 +25451,13 @@ mod dom_test_suite {
                     .set_attribute("hasMiddleName", "Antoine")
                     .unwrap(); // <setAttribute obj="nameElem1" name="&quot;hasMiddleName&quot;" value="&quot;Antoine&quot;"/>
                 r#name_elem1
-                    .set_id_attribute("hasMiddleName".into(), true)
+                    .set_id_attribute("hasMiddleName", true)
                     .unwrap(); // <setIdAttribute obj="nameElem1" name="&quot;hasMiddleName&quot;" isId="true"/>
                 r#name_elem2
                     .set_attribute("hasMiddleName", "Neeya")
                     .unwrap(); // <setAttribute obj="nameElem2" name="&quot;hasMiddleName&quot;" value="&quot;Neeya&quot;"/>
                 r#name_elem2
-                    .set_id_attribute("hasMiddleName".into(), true)
+                    .set_id_attribute("hasMiddleName", true)
                     .unwrap(); // <setIdAttribute obj="nameElem2" name="&quot;hasMiddleName&quot;" isId="true"/>
                 r#attributes_map = r#name_elem1.attributes(); // <attributes var="attributesMap" obj="nameElem1"/>
                 r#attr = r#attributes_map.get_named_item("hasMiddleName").unwrap(); // <getNamedItem var="attr" obj="attributesMap" name="&quot;hasMiddleName&quot;"/>
@@ -25766,11 +25712,7 @@ mod dom_test_suite {
                     )
                     .unwrap(); // <setAttributeNS obj="nameElem" qualifiedName="&quot;xmlns:newAttr&quot;" namespaceURI="&quot;http://www.w3.org/2000/xmlns/&quot;" value="&quot;newValue&quot;"/>
                 r#name_elem
-                    .set_id_attribute_ns(
-                        Some("http://www.w3.org/2000/xmlns/".into()),
-                        "newAttr".into(),
-                        true,
-                    )
+                    .set_id_attribute_ns(Some("http://www.w3.org/2000/xmlns/"), "newAttr", true)
                     .unwrap(); // <setIdAttributeNS obj="nameElem" localName="&quot;newAttr&quot;" namespaceURI="&quot;http://www.w3.org/2000/xmlns/&quot;" isId="true"/>
                 r#attributes_map = r#name_elem.attributes(); // <attributes var="attributesMap" obj="nameElem"/>
                 r#attr = r#attributes_map.get_named_item("xmlns:newAttr").unwrap(); // <getNamedItem var="attr" obj="attributesMap" name="&quot;xmlns:newAttr&quot;"/>
@@ -26360,10 +26302,7 @@ mod dom_test_suite {
                     )
                     .unwrap(); // <setAttributeNS obj="elem" namespaceURI="&quot;http://www.w3.org/XML/1998/namespace&quot;" qualifiedName="&quot;xml:lang&quot;" value="&quot;en-US&quot;"/>
                 r#attr = r#elem
-                    .get_attribute_node_ns(
-                        Some("http://www.w3.org/XML/1998/namespace".into()),
-                        "lang".into(),
-                    )
+                    .get_attribute_node_ns(Some("http://www.w3.org/XML/1998/namespace"), "lang")
                     .unwrap()
                     .unwrap(); // <getAttributeNodeNS var="attr" obj="elem" namespaceURI="&quot;http://www.w3.org/XML/1998/namespace&quot;" localName="&quot;lang&quot;"/>
                 r#text_content = r#attr.text_content().unwrap(); // <textContent var="textContent" obj="attr"/>
@@ -26723,18 +26662,10 @@ mod dom_test_suite {
                 r#p_elem1 = r#elem_list[1].clone(); // <item var="pElem1" obj="elemList" index="1" interface="NodeList"/>
                 r#p_elem2 = r#elem_list[2].clone(); // <item var="pElem2" obj="elemList" index="2" interface="NodeList"/>
                 r#p_elem1
-                    .set_id_attribute_ns(
-                        Some("http://www.w3.org/2000/xmlns/".into()),
-                        "dmstc".into(),
-                        true,
-                    )
+                    .set_id_attribute_ns(Some("http://www.w3.org/2000/xmlns/"), "dmstc", true)
                     .unwrap(); // <setIdAttributeNS obj="pElem1" localName="&quot;dmstc&quot;" namespaceURI="&quot;http://www.w3.org/2000/xmlns/&quot;" isId="true"/>
                 r#p_elem2
-                    .set_id_attribute_ns(
-                        Some("http://www.w3.org/2000/xmlns/".into()),
-                        "dmstc".into(),
-                        true,
-                    )
+                    .set_id_attribute_ns(Some("http://www.w3.org/2000/xmlns/"), "dmstc", true)
                     .unwrap(); // <setIdAttributeNS obj="pElem2" localName="&quot;dmstc&quot;" namespaceURI="&quot;http://www.w3.org/2000/xmlns/&quot;" isId="true"/>
                 r#attributes_map = r#p_elem1.attributes(); // <attributes var="attributesMap" obj="pElem1"/>
                 r#attr = r#attributes_map.get_named_item("xmlns:dmstc").unwrap(); // <getNamedItem var="attr" obj="attributesMap" name="&quot;xmlns:dmstc&quot;"/>
@@ -27067,16 +26998,12 @@ mod dom_test_suite {
                 r#elem_list = r#doc.get_elements_by_tag_name_ns(Some("*"), "acronym"); // <getElementsByTagNameNS var="elemList" obj="doc" localName="&quot;acronym&quot;" namespaceURI="&quot;*&quot;" interface="Document"/>
                 r#acronym_elem = r#elem_list[2].clone(); // <item var="acronymElem" obj="elemList" index="2" interface="NodeList"/>
                 r#p_elem
-                    .set_id_attribute_ns(
-                        Some("http://www.w3.org/2000/xmlns/".into()),
-                        "dmstc".into(),
-                        true,
-                    )
+                    .set_id_attribute_ns(Some("http://www.w3.org/2000/xmlns/"), "dmstc", true)
                     .unwrap(); // <setIdAttributeNS obj="pElem" localName="&quot;dmstc&quot;" namespaceURI="&quot;http://www.w3.org/2000/xmlns/&quot;" isId="true"/>
                 r#acronym_elem
                     .set_id_attribute_ns(
-                        Some("http://www.w3.org/2001/XMLSchema-instance".into()),
-                        "noNamespaceSchemaLocation".into(),
+                        Some("http://www.w3.org/2001/XMLSchema-instance"),
+                        "noNamespaceSchemaLocation",
                         true,
                     )
                     .unwrap(); // <setIdAttributeNS obj="acronymElem" localName="&quot;noNamespaceSchemaLocation&quot;" namespaceURI="&quot;http://www.w3.org/2001/XMLSchema-instance&quot;" isId="true"/>
@@ -29980,12 +29907,8 @@ mod dom_test_suite {
                     .set_attribute("hasMiddleName", "Antoine")
                     .unwrap(); // <setAttribute obj="nameElem" name="&quot;hasMiddleName&quot;" value="&quot;Antoine&quot;"/>
                 r#salary_elem.set_attribute("annual", "2002").unwrap(); // <setAttribute obj="salaryElem" name="&quot;annual&quot;" value="&quot;2002&quot;"/>
-                r#name_elem
-                    .set_id_attribute("hasMiddleName".into(), true)
-                    .unwrap(); // <setIdAttribute obj="nameElem" name="&quot;hasMiddleName&quot;" isId="true"/>
-                r#salary_elem
-                    .set_id_attribute("annual".into(), true)
-                    .unwrap(); // <setIdAttribute obj="salaryElem" name="&quot;annual&quot;" isId="true"/>
+                r#name_elem.set_id_attribute("hasMiddleName", true).unwrap(); // <setIdAttribute obj="nameElem" name="&quot;hasMiddleName&quot;" isId="true"/>
+                r#salary_elem.set_id_attribute("annual", true).unwrap(); // <setIdAttribute obj="salaryElem" name="&quot;annual&quot;" isId="true"/>
                 r#attributes_map = r#name_elem.attributes(); // <attributes var="attributesMap" obj="nameElem"/>
                 r#attr = r#attributes_map.get_named_item("hasMiddleName").unwrap(); // <getNamedItem var="attr" obj="attributesMap" name="&quot;hasMiddleName&quot;"/>
                 r#id = r#attr.is_id(); // <isId var="id" obj="attr"/>
@@ -30585,10 +30508,7 @@ mod dom_test_suite {
                     .unwrap(); // <createAttributeNS var="att" obj="doc" namespaceURI="&quot;http://www.w3.org/XML/1998/namespace&quot;" qualifiedName="&quot;xml:lang&quot;"/>
                 r#replaced_attr = r#elem.set_attribute_node_ns(r#att).unwrap().unwrap(); // <setAttributeNodeNS obj="elem" var="replacedAttr" newAttr="att"/>
                 r#attr = r#elem
-                    .get_attribute_node_ns(
-                        Some("http://www.w3.org/XML/1998/namespace".into()),
-                        "lang".into(),
-                    )
+                    .get_attribute_node_ns(Some("http://www.w3.org/XML/1998/namespace"), "lang")
                     .unwrap()
                     .unwrap(); // <getAttributeNodeNS var="attr" obj="elem" namespaceURI="&quot;http://www.w3.org/XML/1998/namespace&quot;" localName="&quot;lang&quot;"/>
                 r#text_content = r#attr.text_content().unwrap(); // <textContent var="textContent" obj="attr"/>
@@ -31956,11 +31876,7 @@ mod dom_test_suite {
                     )
                     .unwrap(); // <setAttributeNS obj="strongElem" qualifiedName="&quot;dmstc:newAttr&quot;" namespaceURI="&quot;http://www.netzero.com&quot;" value="&quot;newValue&quot;"/>
                 r#strong_elem
-                    .set_id_attribute_ns(
-                        Some("http://www.netzero.com".into()),
-                        "newAttr".into(),
-                        true,
-                    )
+                    .set_id_attribute_ns(Some("http://www.netzero.com"), "newAttr", true)
                     .unwrap(); // <setIdAttributeNS obj="strongElem" localName="&quot;newAttr&quot;" namespaceURI="&quot;http://www.netzero.com&quot;" isId="true"/>
                 r#attributes_map = r#strong_elem.attributes(); // <attributes var="attributesMap" obj="strongElem"/>
                 r#attr = r#attributes_map.get_named_item("dmstc:newAttr").unwrap(); // <getNamedItem var="attr" obj="attributesMap" name="&quot;dmstc:newAttr&quot;"/>
@@ -31970,11 +31886,7 @@ mod dom_test_suite {
                 r#elem_name = r#elem.tag_name().to_string(); // <tagName obj="elem" var="elemName"/>
                 assert_eq!(r#elem_name, "strong"); // <assertEquals actual="elemName" expected="&quot;strong&quot;" id="elementsetidattributensGetElementById04" ignoreCase="false"/>
                 r#strong_elem
-                    .set_id_attribute_ns(
-                        Some("http://www.netzero.com".into()),
-                        "newAttr".into(),
-                        false,
-                    )
+                    .set_id_attribute_ns(Some("http://www.netzero.com"), "newAttr", false)
                     .unwrap(); // <setIdAttributeNS obj="strongElem" localName="&quot;newAttr&quot;" namespaceURI="&quot;http://www.netzero.com&quot;" isId="false"/>
                 r#id = r#attr.is_id(); // <isId var="id" obj="attr"/>
                 assert!(!r#id); // <assertFalse actual="id" id="elementsetidattributensIsIdFalse04"/>
@@ -33538,11 +33450,7 @@ mod dom_test_suite {
                 r#elem_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName var="elemList" obj="doc" tagname="&quot;p&quot;" interface="Document"/>
                 r#employee_elem = r#elem_list[2].clone(); // <item var="employeeElem" obj="elemList" index="2" interface="NodeList"/>
                 r#employee_elem
-                    .set_id_attribute_ns(
-                        Some("http://www.w3.org/2000/xmlns/".into()),
-                        "dmstc".into(),
-                        true,
-                    )
+                    .set_id_attribute_ns(Some("http://www.w3.org/2000/xmlns/"), "dmstc", true)
                     .unwrap(); // <setIdAttributeNS obj="employeeElem" localName="&quot;dmstc&quot;" namespaceURI="&quot;http://www.w3.org/2000/xmlns/&quot;" isId="true"/>
                 r#attributes_map = r#employee_elem.attributes(); // <attributes var="attributesMap" obj="employeeElem"/>
                 r#attr = r#attributes_map.get_named_item("xmlns:dmstc").unwrap(); // <getNamedItem var="attr" obj="attributesMap" name="&quot;xmlns:dmstc&quot;"/>
@@ -33554,11 +33462,7 @@ mod dom_test_suite {
                 r#elem_name = r#elem.tag_name().to_string(); // <tagName obj="elem" var="elemName"/>
                 assert_eq!(r#elem_name, "p"); // <assertEquals actual="elemName" expected="&quot;p&quot;" id="elementsetidattributensGetElementById01" ignoreCase="false"/>
                 r#employee_elem
-                    .set_id_attribute_ns(
-                        Some("http://www.w3.org/2000/xmlns/".into()),
-                        "dmstc".into(),
-                        false,
-                    )
+                    .set_id_attribute_ns(Some("http://www.w3.org/2000/xmlns/"), "dmstc", false)
                     .unwrap(); // <setIdAttributeNS obj="employeeElem" localName="&quot;dmstc&quot;" namespaceURI="&quot;http://www.w3.org/2000/xmlns/&quot;" isId="false"/>
                 r#id = r#attr.is_id(); // <isId var="id" obj="attr"/>
                 assert!(!r#id); // <assertFalse actual="id" id="elementsetidattributensIsIdFalse01"/>
@@ -33702,7 +33606,7 @@ mod dom_test_suite {
                 r#elem_list = r#doc.get_elements_by_tag_name_ns(Some("*"), "acronym"); // <getElementsByTagNameNS var="elemList" obj="doc" localName="&quot;acronym&quot;" namespaceURI="&quot;*&quot;" interface="Document"/>
                 r#address_elem = r#elem_list[2].clone(); // <item var="addressElem" obj="elemList" index="2" interface="NodeList"/>
                 r#address_elem
-                    .set_id_attribute_ns(Some(r#xsi_ns), "noNamespaceSchemaLocation".into(), true)
+                    .set_id_attribute_ns(Some(r#xsi_ns), "noNamespaceSchemaLocation", true)
                     .unwrap(); // <setIdAttributeNS obj="addressElem" localName="&quot;noNamespaceSchemaLocation&quot;" namespaceURI="xsiNS" isId="true"/>
                 r#attributes_map = r#address_elem.attributes(); // <attributes var="attributesMap" obj="addressElem"/>
                 r#attr = r#attributes_map
@@ -33716,7 +33620,7 @@ mod dom_test_suite {
                 r#elem_name = r#elem.tag_name().to_string(); // <tagName obj="elem" var="elemName"/>
                 assert_eq!(r#elem_name, "acronym"); // <assertEquals actual="elemName" expected="&quot;acronym&quot;" id="elementsetidattributensGetElementById01" ignoreCase="false"/>
                 r#address_elem
-                    .set_id_attribute_ns(Some(r#xsi_ns), "noNamespaceSchemaLocation".into(), false)
+                    .set_id_attribute_ns(Some(r#xsi_ns), "noNamespaceSchemaLocation", false)
                     .unwrap(); // <setIdAttributeNS obj="addressElem" localName="&quot;noNamespaceSchemaLocation&quot;" namespaceURI="xsiNS" isId="false"/>
                 r#id = r#attr.is_id(); // <isId var="id" obj="attr"/>
                 assert!(!r#id); // <assertFalse actual="id" id="elementsetidattributensIsIdFalse02"/>
@@ -34247,9 +34151,7 @@ mod dom_test_suite {
                 r#name_elem
                     .set_attribute("hasMiddleName", "Antoine")
                     .unwrap(); // <setAttribute obj="nameElem" name="&quot;hasMiddleName&quot;" value="&quot;Antoine&quot;"/>
-                r#name_elem
-                    .set_id_attribute("hasMiddleName".into(), true)
-                    .unwrap(); // <setIdAttribute obj="nameElem" name="&quot;hasMiddleName&quot;" isId="true"/>
+                r#name_elem.set_id_attribute("hasMiddleName", true).unwrap(); // <setIdAttribute obj="nameElem" name="&quot;hasMiddleName&quot;" isId="true"/>
                 r#attributes_map = r#name_elem.attributes(); // <attributes var="attributesMap" obj="nameElem"/>
                 r#attr = r#attributes_map.get_named_item("hasMiddleName").unwrap(); // <getNamedItem var="attr" obj="attributesMap" name="&quot;hasMiddleName&quot;"/>
                 r#id = r#attr.is_id(); // <isId var="id" obj="attr"/>
@@ -34258,7 +34160,7 @@ mod dom_test_suite {
                 r#elem_name = r#elem.tag_name().to_string(); // <tagName obj="elem" var="elemName"/>
                 assert_eq!(r#elem_name, "strong"); // <assertEquals actual="elemName" expected="&quot;strong&quot;" id="elementsetidattributeGetElementById03" ignoreCase="false"/>
                 r#name_elem
-                    .set_id_attribute("hasMiddleName".into(), false)
+                    .set_id_attribute("hasMiddleName", false)
                     .unwrap(); // <setIdAttribute obj="nameElem" name="&quot;hasMiddleName&quot;" isId="false"/>
                 r#id = r#attr.is_id(); // <isId var="id" obj="attr"/>
                 assert!(!r#id); // <assertFalse actual="id" id="elementsetidattributeIsIdFalse03"/>
@@ -34385,10 +34287,10 @@ mod dom_test_suite {
                     .set_attribute_ns(Some(r#xml_ns), "xml:lang".into(), "FR-fr")
                     .unwrap(); // <setAttributeNS obj="acronymElem" namespaceURI="xmlNS" qualifiedName="&quot;xml:lang&quot;" value="&quot;FR-fr&quot;"/>
                 r#acronym_elem
-                    .set_id_attribute_ns(Some(r#xml_ns), "lang".into(), false)
+                    .set_id_attribute_ns(Some(&r#xml_ns), "lang", false)
                     .unwrap(); // <setIdAttributeNS obj="acronymElem" localName="&quot;lang&quot;" namespaceURI="xmlNS" isId="false"/>
                 r#attr = r#acronym_elem
-                    .get_attribute_node_ns(Some(r#xml_ns), "lang".into())
+                    .get_attribute_node_ns(Some(&r#xml_ns), "lang")
                     .unwrap()
                     .unwrap(); // <getAttributeNodeNS var="attr" obj="acronymElem" namespaceURI="xmlNS" localName="&quot;lang&quot;"/>
                 r#id = r#attr.is_id(); // <isId var="id" obj="attr"/>
@@ -34735,7 +34637,7 @@ mod dom_test_suite {
                     .set_attribute_ns(Some("*".into()), "title".into(), "newValue")
                     .unwrap(); // <setAttributeNS obj="acronymElem" qualifiedName="&quot;title&quot;" namespaceURI="&quot;*&quot;" value="&quot;newValue&quot;"/>
                 r#acronym_elem
-                    .set_id_attribute_ns(Some("*".into()), "title".into(), true)
+                    .set_id_attribute_ns(Some("*"), "title", true)
                     .unwrap(); // <setIdAttributeNS obj="acronymElem" localName="&quot;title&quot;" namespaceURI="&quot;*&quot;" isId="true"/>
                 r#attributes_map = r#acronym_elem.attributes(); // <attributes var="attributesMap" obj="acronymElem"/>
                 r#attr = r#attributes_map.get_named_item("title").unwrap(); // <getNamedItem var="attr" obj="attributesMap" name="&quot;title&quot;"/>
@@ -34745,7 +34647,7 @@ mod dom_test_suite {
                 r#elem_name = r#elem.tag_name().to_string(); // <tagName obj="elem" var="elemName"/>
                 assert_eq!(r#elem_name, "acronym"); // <assertEquals actual="elemName" expected="&quot;acronym&quot;" id="elementsetidattributensGetElementById05" ignoreCase="false"/>
                 r#acronym_elem
-                    .set_id_attribute_ns(Some("*".into()), "title".into(), false)
+                    .set_id_attribute_ns(Some("*"), "title", false)
                     .unwrap(); // <setIdAttributeNS obj="acronymElem" localName="&quot;title&quot;" namespaceURI="&quot;*&quot;" isId="false"/>
                 r#id = r#attr.is_id(); // <isId var="id" obj="attr"/>
                 assert!(!r#id); // <assertFalse actual="id" id="elementsetidattributensIsIdFalse05"/>
@@ -34874,7 +34776,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName var="elementList" obj="doc" tagname="&quot;p&quot;" interface="Document"/>
                 r#addr_element = r#element_list[3].clone(); // <item var="addrElement" obj="elementList" index="3" interface="NodeList"/>
                 r#attr1 = r#addr_element
-                    .get_attribute_node_ns(Some(r#null_nsuri), "dir".into())
+                    .get_attribute_node_ns(Some(r#null_nsuri), "dir")
                     .unwrap()
                     .unwrap(); // <getAttributeNodeNS obj="addrElement" var="attr1" namespaceURI="nullNSURI" localName="&quot;dir&quot;"/>
                 r#attr2 = r#attr1.clone_node(true); // <cloneNode var="attr2" obj="attr1" deep="true"/>

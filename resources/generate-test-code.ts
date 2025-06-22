@@ -82,17 +82,10 @@ for (const [d1, d] of TEST_SUITE) {
                                 const vr = elem.getAttribute("var");
                                 const obj = elem.getAttribute("obj");
                                 const index = elem.getAttribute("index");
-                                const iface = elem.getAttribute("interface");
                                 if (vr && obj) {
-                                    if (iface === "NamedNodeMap") {
-                                        buffer += `r#${snakeCase(vr)} = r#${
-                                            snakeCase(obj)
-                                        }.item(${index}).unwrap();`;
-                                    } else {
-                                        buffer += `r#${snakeCase(vr)} = r#${
-                                            snakeCase(obj)
-                                        }[${index}].clone();`;
-                                    }
+                                    buffer += `r#${snakeCase(vr)} = r#${
+                                        snakeCase(obj)
+                                    }.item(${index}).unwrap();`;
                                 }
                             } else if (child.nodeName === "assertEquals") {
                                 const actual = elem.getAttribute("actual");

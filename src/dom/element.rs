@@ -4,13 +4,19 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use crate::{dom::check_owner_document_sameness, parser::split_qname2, tree::validate_name};
+use crate::{
+    dom::{
+        check_owner_document_sameness,
+        named_node_map::{AttributeMap, NamedNodeMap},
+    },
+    parser::split_qname2,
+    tree::validate_name,
+};
 
 use super::{
     DOMException, NodeType,
     attr::AttrRef,
     document::{DocumentRef, DocumentWeakRef},
-    named_node_map::NamedNodeMap,
     node::{Node, NodeConnection, NodeRef, NodeWeakRef},
 };
 
@@ -44,7 +50,7 @@ pub struct Element {
     previous_sibling: Option<NodeWeakRef>,
     next_sibling: Option<NodeRef>,
     /// Implementation of `attributes` attribute.
-    attributes: NamedNodeMap<AttrRef>,
+    attributes: AttributeMap,
     pub(super) owner_document: DocumentWeakRef,
 
     /// Implementation of `tagName` for `Element`.
@@ -66,7 +72,7 @@ pub struct Element {
 
 impl Element {
     /// Get `attributes` attribute of this element.
-    pub fn attributes(&self) -> NamedNodeMap<AttrRef> {
+    pub fn attributes(&self) -> AttributeMap {
         self.attributes.clone()
     }
 
@@ -132,7 +138,7 @@ impl ElementRef {
             last_child: None,
             previous_sibling: None,
             next_sibling: None,
-            attributes: NamedNodeMap::new(ddoc.clone()),
+            attributes: AttributeMap::new(ddoc.clone()),
             owner_document: ddoc,
             tag_name: tag_name.clone(),
             namespace_uri: None,
@@ -159,7 +165,7 @@ impl ElementRef {
                 last_child: None,
                 previous_sibling: None,
                 next_sibling: None,
-                attributes: NamedNodeMap::new(ddoc.clone()),
+                attributes: AttributeMap::new(ddoc.clone()),
                 owner_document: ddoc,
                 tag_name: tag_name.clone(),
                 namespace_uri: Some(ns_uri),
@@ -174,7 +180,7 @@ impl ElementRef {
                 last_child: None,
                 previous_sibling: None,
                 next_sibling: None,
-                attributes: NamedNodeMap::new(ddoc.clone()),
+                attributes: AttributeMap::new(ddoc.clone()),
                 owner_document: ddoc,
                 tag_name: tag_name.clone(),
                 namespace_uri: Some(ns_uri),
@@ -198,7 +204,7 @@ impl ElementRef {
     }
 
     /// Get `attributes` attribute of this element.
-    pub fn attributes(&self) -> NamedNodeMap<AttrRef> {
+    pub fn attributes(&self) -> AttributeMap {
         self.0.borrow().attributes()
     }
 
@@ -223,7 +229,7 @@ impl ElementRef {
     ///
     /// No Exceptions
     /// ```
-    pub fn get_attribute(&self, name: Rc<str>) -> Option<String> {
+    pub fn get_attribute(&self, name: &str) -> Option<String> {
         self.get_attribute_node(name)?.text_content()
     }
     /// Implementation of [`setAttribute`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-F68F082) method.
@@ -299,7 +305,7 @@ impl ElementRef {
     /// ```
     pub fn remove_attribute(&mut self, name: Rc<str>) -> Result<(), DOMException> {
         let mut attrs = self.attributes();
-        let mut attr = attrs.remove_named_item(name.clone())?;
+        let mut attr = attrs.remove_named_item(name.as_ref())?;
         attr.set_owner_element(None);
 
         // If the owner Document has a default attribute,
@@ -332,8 +338,8 @@ impl ElementRef {
     ///
     /// No Exceptions
     /// ```
-    pub fn get_attribute_node(&self, name: impl Into<Rc<str>>) -> Option<AttrRef> {
-        self.attributes().get_named_item(name.into())
+    pub fn get_attribute_node(&self, name: &str) -> Option<AttrRef> {
+        self.attributes().get_named_item(name)
     }
     /// Implementation of [`setAttributeNode`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-887236154) method.
     ///
@@ -406,7 +412,7 @@ impl ElementRef {
             return Err(DOMException::NotFoundErr);
         }
         let attr_name = old_attr.node_name();
-        let mut attr = self.attributes().remove_named_item(attr_name.clone())?;
+        let mut attr = self.attributes().remove_named_item(attr_name.as_ref())?;
         attr.set_owner_element(None);
 
         // If the owner Document has a default attribute,
@@ -499,8 +505,8 @@ impl ElementRef {
     /// ```
     pub fn get_attribute_ns(
         &self,
-        ns_uri: Option<Rc<str>>,
-        local_name: Rc<str>,
+        ns_uri: Option<&str>,
+        local_name: &str,
     ) -> Result<Option<String>, DOMException> {
         if self.owner_document().is_some_and(|doc| doc.is_html()) {
             return Err(DOMException::NotSupportedErr);
@@ -615,8 +621,8 @@ impl ElementRef {
     /// ```
     pub fn remove_attribute_ns(
         &mut self,
-        ns_uri: Option<Rc<str>>,
-        local_name: Rc<str>,
+        ns_uri: Option<&str>,
+        local_name: &str,
     ) -> Result<(), DOMException> {
         if self.owner_document().is_some_and(|doc| doc.is_html()) {
             return Err(DOMException::NotSupportedErr);
@@ -654,8 +660,8 @@ impl ElementRef {
     /// ```
     pub fn get_attribute_node_ns(
         &self,
-        ns_uri: Option<Rc<str>>,
-        local_name: Rc<str>,
+        ns_uri: Option<&str>,
+        local_name: &str,
     ) -> Result<Option<AttrRef>, DOMException> {
         if self.owner_document().is_some_and(|doc| doc.is_html()) {
             return Err(DOMException::NotSupportedErr);
@@ -808,7 +814,7 @@ impl ElementRef {
     ///
     /// No Exceptions
     /// ```
-    pub fn has_attribute(&self, name: Rc<str>) -> bool {
+    pub fn has_attribute(&self, name: &str) -> bool {
         self.attributes().get_named_item(name).is_some()
     }
     /// Implementation of [`hasAttributeNS`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-ElHasAttrNS) method.
@@ -838,8 +844,8 @@ impl ElementRef {
     /// ```
     pub fn has_attribute_ns(
         &self,
-        ns_uri: Option<Rc<str>>,
-        local_name: Rc<str>,
+        ns_uri: Option<&str>,
+        local_name: &str,
     ) -> Result<bool, DOMException> {
         self.attributes()
             .get_named_item_ns(ns_uri, local_name)
@@ -872,7 +878,7 @@ impl ElementRef {
     ///
     /// No Return Value
     /// ```
-    pub fn set_id_attribute(&mut self, name: Rc<str>, is_id: bool) -> Result<(), DOMException> {
+    pub fn set_id_attribute(&mut self, name: &str, is_id: bool) -> Result<(), DOMException> {
         let mut attr = self
             .get_attribute_node(name)
             .ok_or(DOMException::NotFoundErr)?;
@@ -908,8 +914,8 @@ impl ElementRef {
     /// ```
     pub fn set_id_attribute_ns(
         &mut self,
-        ns_uri: Option<Rc<str>>,
-        local_name: Rc<str>,
+        ns_uri: Option<&str>,
+        local_name: &str,
         is_id: bool,
     ) -> Result<(), DOMException> {
         let mut attr = self
@@ -1051,7 +1057,7 @@ impl Node for ElementRef {
         self.0.borrow().next_sibling.clone()
     }
 
-    fn attributes(&self) -> Option<NamedNodeMap<AttrRef>> {
+    fn attributes(&self) -> Option<AttributeMap> {
         Some(self.0.borrow().attributes.clone())
     }
 
@@ -1066,7 +1072,7 @@ impl Node for ElementRef {
             last_child: None,
             previous_sibling: None,
             next_sibling: None,
-            attributes: NamedNodeMap::new(self.0.borrow().owner_document.clone()),
+            attributes: AttributeMap::new(self.0.borrow().owner_document.clone()),
             owner_document: self.0.borrow().owner_document.clone(),
             tag_name: self.0.borrow().tag_name.clone(),
             namespace_uri: self.0.borrow().namespace_uri.clone(),
@@ -1128,8 +1134,8 @@ impl Node for ElementRef {
         };
 
         if let Some(attr) = self
-            .get_attribute("xmlns".into())
-            .or_else(|| self.get_attribute_ns(None, "xmlns".into()).ok().flatten())
+            .get_attribute("xmlns")
+            .or_else(|| self.get_attribute_ns(None, "xmlns").ok().flatten())
         {
             return attr == ns_uri;
         }

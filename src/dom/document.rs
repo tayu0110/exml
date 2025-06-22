@@ -6,7 +6,7 @@ use std::{
 
 use crate::{
     chvalid::XmlCharValid,
-    dom::{attlistdecl::DefaultDecl, entity::EntityType},
+    dom::{attlistdecl::DefaultDecl, entity::EntityType, named_node_map::NamedNodeMap},
     error::XmlParserErrors,
     parser::split_qname2,
     tree::{validate_name, validate_qname},
@@ -1034,7 +1034,7 @@ impl DocumentRef {
         while let Some(child) = children {
             if let NodeRef::Element(elem) = &child {
                 if elem
-                    .get_attribute_node(element_id.clone())
+                    .get_attribute_node(element_id.as_ref())
                     .is_some_and(|attr| attr.is_id())
                 {
                     return Some(elem.clone());

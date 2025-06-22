@@ -751,6 +751,7 @@ mod dom_test_suite {
                 DOMException, NodeType,
                 character_data::CharacterData,
                 dom_test_suite::{STAFF_XML, staff_xml},
+                named_node_map::NamedNodeMap,
                 node::Node,
                 node_list::NodeList,
             };

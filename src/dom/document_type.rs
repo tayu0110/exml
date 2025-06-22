@@ -20,7 +20,7 @@ use super::{
     document::{DocumentRef, DocumentWeakRef},
     entity::EntityRef,
     entity_reference::EntityReferenceRef,
-    named_node_map::NamedNodeMap,
+    named_node_map::_NamedNodeMap,
     node::{Node, NodeConnection, NodeRef, NodeWeakRef},
     notation::NotationRef,
     pi::ProcessingInstructionRef,
@@ -661,9 +661,9 @@ pub struct DtdSubset<const EXT: bool> {
     /// as same as `nodeName` for `Node`.
     name: Rc<str>,
     /// Implementation of `entities` for `DocumentType`.
-    entities: NamedNodeMap<EntityRef>,
+    entities: _NamedNodeMap<EntityRef>,
     /// Implementation of `notations` for `DocumentType`.
-    notations: NamedNodeMap<NotationRef>,
+    notations: _NamedNodeMap<NotationRef>,
     /// Implementation of `publicId` for `DocumentType`.
     public_id: Option<Rc<str>>,
     /// Implementation of `systemId` for `DocumentType`.
@@ -695,8 +695,8 @@ impl<const EXT: bool> DtdSubset<EXT> {
             last_child: None,
             owner_document: doc.map(|doc| doc.downgrade()),
             name: name.into(),
-            entities: NamedNodeMap::new(ddoc.clone()),
-            notations: NamedNodeMap::new(ddoc),
+            entities: _NamedNodeMap::new(ddoc.clone()),
+            notations: _NamedNodeMap::new(ddoc),
             public_id: public_id.map(|id| id.into()),
             system_id: system_id.map(|id| id.into()),
             elements: HashMap::new(),
@@ -860,13 +860,13 @@ impl<const EXT: bool> DtdSubset<EXT> {
             last_child: None,
             owner_document: self.owner_document.clone(),
             name: self.name.clone(),
-            entities: NamedNodeMap::new(
+            entities: _NamedNodeMap::new(
                 self.entities
                     .owner_document()
                     .unwrap_or(DUMMY_DOCUMENT.with(|doc| (**doc).clone()))
                     .downgrade(),
             ),
-            notations: NamedNodeMap::new(
+            notations: _NamedNodeMap::new(
                 self.notations
                     .owner_document()
                     .unwrap_or(DUMMY_DOCUMENT.with(|doc| (**doc).clone()))
