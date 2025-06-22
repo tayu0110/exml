@@ -606,6 +606,7 @@ pub trait NamedNodeMap {
 #[derive(Clone)]
 pub struct AttributeMap {
     owner_document: DocumentWeakRef,
+    owner_tagname: Rc<str>,
     // (LocalPart, namespaceURI) : if inserted by Level 2 method
     // (Name, None)              : if inserted by Level 1 method
     index: Rc<RefCell<HashMap<(Cow<'static, str>, Option<Cow<'static, str>>), usize>>>,
@@ -614,9 +615,10 @@ pub struct AttributeMap {
 
 impl AttributeMap {
     /// Create new empty [`AttributeMap`]
-    pub(super) fn new(doc: DocumentWeakRef) -> Self {
+    pub(super) fn new(doc: DocumentWeakRef, tagname: Rc<str>) -> Self {
         Self {
             owner_document: doc,
+            owner_tagname: tagname,
             index: Rc::new(RefCell::new(HashMap::new())),
             data: Rc::new(RefCell::new(vec![])),
         }
@@ -781,12 +783,19 @@ impl NamedNodeMap for AttributeMap {
             .borrow()
             .get(&(Cow::Borrowed(name), None))
             .ok_or(DOMException::NotFoundErr)?;
-        let res = self.data.borrow_mut().remove(index);
-        self.index
-            .borrow_mut()
-            .values_mut()
-            .filter(|i| **i > index)
-            .for_each(|i| *i -= 1);
+        let res = if let Some(def) = self
+            .owner_document()
+            .and_then(|doc| doc.get_default_attribute(&self.owner_tagname, name))
+        {
+            replace(&mut self.data.borrow_mut()[index], def)
+        } else {
+            self.index
+                .borrow_mut()
+                .values_mut()
+                .filter(|i| **i > index)
+                .for_each(|i| *i -= 1);
+            self.data.borrow_mut().remove(index)
+        };
         Ok(res)
     }
     fn item(&self, index: usize) -> Option<Self::Item> {
@@ -864,12 +873,20 @@ impl NamedNodeMap for AttributeMap {
             .borrow()
             .get(&(Cow::Borrowed(local_name), ns_uri.map(Cow::Borrowed)))
             .ok_or(DOMException::NotFoundErr)?;
-        let res = self.data.borrow_mut().remove(index);
-        self.index
-            .borrow_mut()
-            .values_mut()
-            .filter(|i| **i > index)
-            .for_each(|i| *i -= 1);
+        let attr_name = self.data.borrow()[index].node_name();
+        let res = if let Some(def) = self
+            .owner_document()
+            .and_then(|doc| doc.get_default_attribute(&self.owner_tagname, &attr_name))
+        {
+            replace(&mut self.data.borrow_mut()[index], def)
+        } else {
+            self.index
+                .borrow_mut()
+                .values_mut()
+                .filter(|i| **i > index)
+                .for_each(|i| *i -= 1);
+            self.data.borrow_mut().remove(index)
+        };
         Ok(res)
     }
 }
