@@ -166,10 +166,11 @@ pub trait CharacterData {
     /// ```
     fn replace_data(&mut self, offset: usize, count: usize, arg: &str) -> Result<(), DOMException> {
         let mut data = self.data();
-        if !data.is_char_boundary(offset) || !data.is_char_boundary(offset + count) {
+        let end = data.len().min(offset + count);
+        if !data.is_char_boundary(offset) || !data.is_char_boundary(end) {
             return Err(DOMException::IndexSizeErr);
         }
-        data.replace_range(offset..offset + count, arg);
+        data.replace_range(offset..end, arg);
         self.set_data(data)
     }
 }
