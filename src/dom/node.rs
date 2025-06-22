@@ -684,7 +684,9 @@ pub trait Node: NodeConnection {
                         children = elem.first_child();
                         continue;
                     } else if name.eq_ignore_ascii_case("base") {
-                        return elem.get_attribute("href");
+                        return elem
+                            .get_attribute_node("href")
+                            .and_then(|attr| attr.text_content());
                     }
                 }
             }

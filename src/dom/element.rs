@@ -215,6 +215,12 @@ impl ElementRef {
 
     /// Implementation of [`getAttribute`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-666EE0F9) method.
     ///
+    /// # Note
+    /// As the DOM specification describes, this method returns an empty string if the attribute
+    /// is not found. Therefore, the return value is not [`Option`].\
+    /// You can use [`get_attribute_node`](crate::dom::element::ElementRef::get_attribute_node)
+    /// to determine the existence of an attribute.
+    ///
     /// # Specification
     /// ```text
     /// Retrieves an attribute value by name.
@@ -229,8 +235,10 @@ impl ElementRef {
     ///
     /// No Exceptions
     /// ```
-    pub fn get_attribute(&self, name: &str) -> Option<String> {
-        self.get_attribute_node(name)?.text_content()
+    pub fn get_attribute(&self, name: &str) -> String {
+        self.get_attribute_node(name)
+            .and_then(|attr| attr.text_content())
+            .unwrap_or_default()
     }
     /// Implementation of [`setAttribute`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-F68F082) method.
     ///
@@ -1145,10 +1153,10 @@ impl Node for ElementRef {
         };
 
         if let Some(attr) = self
-            .get_attribute("xmlns")
-            .or_else(|| self.get_attribute_ns(None, "xmlns").ok().flatten())
+            .get_attribute_node("xmlns")
+            .or_else(|| self.get_attribute_node_ns(None, "xmlns").ok().flatten())
         {
-            return attr == ns_uri;
+            return attr.text_content().is_some_and(|attr| attr == ns_uri);
         }
 
         let mut ancestor = self.parent_node();

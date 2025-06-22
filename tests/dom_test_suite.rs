@@ -1276,7 +1276,7 @@ mod dom_test_suite {
                 r#doc = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="false"/>
                 r#element_list = r#doc.get_elements_by_tag_name("acronym"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;acronym&quot;" var="elementList"/>
                 r#test_address = r#element_list[2].clone(); // <item interface="NodeList" obj="elementList" index="2" var="testAddress"/>
-                r#attr_value = r#test_address.get_attribute("class").unwrap(); // <getAttribute obj="testAddress" var="attrValue" name="&quot;class&quot;"/>
+                r#attr_value = r#test_address.get_attribute("class"); // <getAttribute obj="testAddress" var="attrValue" name="&quot;class&quot;"/>
                 assert_eq!(r#attr_value, "No"); // <assertEquals actual="attrValue" expected="&quot;No&quot;" id="attrValue" ignoreCase="false"/>
             }
             // hc_nodevalue07.xml
@@ -1794,7 +1794,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("acronym"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;acronym&quot;" var="elementList"/>
                 r#test_employee = r#element_list[3].clone(); // <item interface="NodeList" obj="elementList" index="3" var="testEmployee"/>
                 r#domestic_attr = r#test_employee.set_attribute_node(r#new_attribute).unwrap(); // <setAttributeNode obj="testEmployee" var="domesticAttr" newAttr="newAttribute"/>
-                r#attr_value = r#test_employee.get_attribute("lang").unwrap(); // <getAttribute obj="testEmployee" var="attrValue" name="&quot;lang&quot;"/>
+                r#attr_value = r#test_employee.get_attribute("lang"); // <getAttribute obj="testEmployee" var="attrValue" name="&quot;lang&quot;"/>
                 assert_eq!(r#attr_value, ""); // <assertEquals actual="attrValue" expected="&quot;&quot;" id="elementGetElementEmptyAssert" ignoreCase="false"/>
             }
             // characterdatagetdata.xml
@@ -3156,8 +3156,8 @@ mod dom_test_suite {
                 r#new_element2 = r#doc.create_element("acronym".to_string()).unwrap(); // <createElement obj="doc" var="newElement2" tagName="&quot;acronym&quot;"/>
                 r#new_element1.set_attribute("lang", "EN").unwrap(); // <setAttribute obj="newElement1" name="&quot;lang&quot;" value="&quot;EN&quot;"/>
                 r#new_element2.set_attribute("title", "Dallas").unwrap(); // <setAttribute obj="newElement2" name="&quot;title&quot;" value="&quot;Dallas&quot;"/>
-                r#attribute1 = r#new_element1.get_attribute("lang").unwrap(); // <getAttribute obj="newElement1" var="attribute1" name="&quot;lang&quot;"/>
-                r#attribute2 = r#new_element2.get_attribute("title").unwrap(); // <getAttribute obj="newElement2" var="attribute2" name="&quot;title&quot;"/>
+                r#attribute1 = r#new_element1.get_attribute("lang"); // <getAttribute obj="newElement1" var="attribute1" name="&quot;lang&quot;"/>
+                r#attribute2 = r#new_element2.get_attribute("title"); // <getAttribute obj="newElement2" var="attribute2" name="&quot;title&quot;"/>
                 assert_eq!(r#attribute1, "EN"); // <assertEquals actual="attribute1" expected="&quot;EN&quot;" ignoreCase="false" id="attrib1"/>
                 assert_eq!(r#attribute2, "Dallas"); // <assertEquals actual="attribute2" expected="&quot;Dallas&quot;" ignoreCase="false" id="attrib2"/>
                 r#node_name1 = r#new_element1.node_name().to_string(); // <nodeName var="nodeName1" obj="newElement1"/>
@@ -4065,8 +4065,8 @@ mod dom_test_suite {
                     .set_attribute("district", "Fort Worth")
                     .unwrap(); // <setAttribute obj="newElement1" name="&quot;district&quot;" value="&quot;Fort Worth&quot;"/>
                 r#new_element2.set_attribute("county", "Dallas").unwrap(); // <setAttribute obj="newElement2" name="&quot;county&quot;" value="&quot;Dallas&quot;"/>
-                r#attribute1 = r#new_element1.get_attribute("district").unwrap(); // <getAttribute obj="newElement1" var="attribute1" name="&quot;district&quot;"/>
-                r#attribute2 = r#new_element2.get_attribute("county").unwrap(); // <getAttribute obj="newElement2" var="attribute2" name="&quot;county&quot;"/>
+                r#attribute1 = r#new_element1.get_attribute("district"); // <getAttribute obj="newElement1" var="attribute1" name="&quot;district&quot;"/>
+                r#attribute2 = r#new_element2.get_attribute("county"); // <getAttribute obj="newElement2" var="attribute2" name="&quot;county&quot;"/>
                 assert_eq!(r#attribute1, "Fort Worth"); // <assertEquals actual="attribute1" expected="&quot;Fort Worth&quot;" ignoreCase="false" id="attrib1"/>
                 assert_eq!(r#attribute2, "Dallas"); // <assertEquals actual="attribute2" expected="&quot;Dallas&quot;" ignoreCase="false" id="attrib2"/>
             }
@@ -4205,7 +4205,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("address"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;address&quot;" var="elementList"/>
                 r#test_employee = r#element_list[4].clone(); // <item interface="NodeList" obj="elementList" index="4" var="testEmployee"/>
                 r#test_employee.set_attribute("district", "dallas").unwrap(); // <setAttribute obj="testEmployee" name="&quot;district&quot;" value="&quot;dallas&quot;"/>
-                r#attr_value = r#test_employee.get_attribute("district").unwrap(); // <getAttribute obj="testEmployee" var="attrValue" name="&quot;district&quot;"/>
+                r#attr_value = r#test_employee.get_attribute("district"); // <getAttribute obj="testEmployee" var="attrValue" name="&quot;district&quot;"/>
                 assert_eq!(r#attr_value, "dallas"); // <assertEquals actual="attrValue" expected="&quot;dallas&quot;" id="elementAddNewAttributeAssert" ignoreCase="false"/>
             }
             // hc_attrspecifiedvaluechanged.xml
@@ -4987,7 +4987,7 @@ mod dom_test_suite {
                 r#removed_attr = r#test_employee
                     .remove_attribute_node(r#street_attr)
                     .unwrap(); // <removeAttributeNode var="removedAttr" obj="testEmployee" oldAttr="streetAttr"/>
-                r#attribute = r#test_employee.get_attribute("street").unwrap(); // <getAttribute obj="testEmployee" var="attribute" name="&quot;street&quot;"/>
+                r#attribute = r#test_employee.get_attribute("street"); // <getAttribute obj="testEmployee" var="attribute" name="&quot;street&quot;"/>
                 assert_eq!(r#attribute, "Yes"); // <assertEquals actual="attribute" expected="&quot;Yes&quot;" id="streetYes" ignoreCase="false"/>
             }
             // attrcreatetextnode.xml
@@ -5049,7 +5049,7 @@ mod dom_test_suite {
                 r#doc = staff_xml(STAFF_XML).unwrap(); // staff.xml // <load var="doc" href="staff" willBeModified="false"/>
                 r#element_list = r#doc.get_elements_by_tag_name("address"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;address&quot;" var="elementList"/>
                 r#test_address = r#element_list[2].clone(); // <item interface="NodeList" obj="elementList" index="2" var="testAddress"/>
-                r#attr_value = r#test_address.get_attribute("street").unwrap(); // <getAttribute obj="testAddress" var="attrValue" name="&quot;street&quot;"/>
+                r#attr_value = r#test_address.get_attribute("street"); // <getAttribute obj="testAddress" var="attrValue" name="&quot;street&quot;"/>
                 assert_eq!(r#attr_value, "No"); // <assertEquals actual="attrValue" expected="&quot;No&quot;" id="attrValue" ignoreCase="false"/>
             }
             // hc_elementremoveattribute.xml
@@ -5063,7 +5063,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("acronym"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;acronym&quot;" var="elementList"/>
                 r#test_employee = r#element_list[3].clone(); // <item interface="NodeList" obj="elementList" index="3" var="testEmployee"/>
                 r#test_employee.remove_attribute("class".into()).unwrap(); // <removeAttribute obj="testEmployee" name="&quot;class&quot;"/>
-                r#attr_value = r#test_employee.get_attribute("class").unwrap(); // <getAttribute obj="testEmployee" var="attrValue" name="&quot;class&quot;"/>
+                r#attr_value = r#test_employee.get_attribute("class"); // <getAttribute obj="testEmployee" var="attrValue" name="&quot;class&quot;"/>
                 assert_eq!(r#attr_value, ""); // <assertEquals actual="attrValue" expected="&quot;&quot;" id="attrValue" ignoreCase="false"/>
             }
             // hc_attrappendchild1.xml
@@ -5329,7 +5329,7 @@ mod dom_test_suite {
                     .set_attribute_node(r#new_attribute)
                     .unwrap()
                     .unwrap(); // <setAttributeNode var="setAttr" obj="testEmployee" newAttr="newAttribute"/>
-                r#strong = r#test_employee.get_attribute("class").unwrap(); // <getAttribute obj="testEmployee" var="strong" name="&quot;class&quot;"/>
+                r#strong = r#test_employee.get_attribute("class"); // <getAttribute obj="testEmployee" var="strong" name="&quot;class&quot;"/>
                 assert_eq!(r#strong, ""); // <assertEquals actual="strong" expected="&quot;&quot;" id="replacedValue" ignoreCase="false"/>
             }
             // hc_namednodemapsetnameditemwithnewvalue.xml
@@ -6344,7 +6344,7 @@ mod dom_test_suite {
                     .set_attribute_node(r#new_attribute)
                     .unwrap()
                     .unwrap(); // <setAttributeNode var="setAttr" obj="testEmployee" newAttr="newAttribute"/>
-                r#name = r#test_employee.get_attribute("street").unwrap(); // <getAttribute obj="testEmployee" var="name" name="&quot;street&quot;"/>
+                r#name = r#test_employee.get_attribute("street"); // <getAttribute obj="testEmployee" var="name" name="&quot;street&quot;"/>
                 assert_eq!(r#name, ""); // <assertEquals actual="name" expected="&quot;&quot;" id="elementReplaceExistingAttributeAssert" ignoreCase="false"/>
             }
             // hc_elementcreatenewattribute.xml
@@ -6365,7 +6365,7 @@ mod dom_test_suite {
                 r#district_attr = r#test_address.get_attribute_node("lang").unwrap(); // <getAttributeNode obj="testAddress" var="districtAttr" name="&quot;lang&quot;"/>
 
                 // unimplemented: // <assertNotNull actual="districtAttr" id="new_district_accessible"/>
-                r#attr_val = r#test_address.get_attribute("lang").unwrap(); // <getAttribute var="attrVal" obj="testAddress" name="&quot;lang&quot;"/>
+                r#attr_val = r#test_address.get_attribute("lang"); // <getAttribute var="attrVal" obj="testAddress" name="&quot;lang&quot;"/>
                 assert_eq!(r#attr_val, ""); // <assertEquals actual="attrVal" expected="&quot;&quot;" id="attr_value" ignoreCase="false"/>
             }
             // namednodemapremovenameditemgetvalue.xml
@@ -7586,7 +7586,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("address"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;address&quot;" var="elementList"/>
                 r#test_employee = r#element_list[3].clone(); // <item interface="NodeList" obj="elementList" index="3" var="testEmployee"/>
                 r#domestic_attr = r#test_employee.set_attribute_node(r#new_attribute).unwrap(); // <setAttributeNode obj="testEmployee" var="domesticAttr" newAttr="newAttribute"/>
-                r#attr_value = r#test_employee.get_attribute("district").unwrap(); // <getAttribute obj="testEmployee" var="attrValue" name="&quot;district&quot;"/>
+                r#attr_value = r#test_employee.get_attribute("district"); // <getAttribute obj="testEmployee" var="attrValue" name="&quot;district&quot;"/>
                 assert_eq!(r#attr_value, ""); // <assertEquals actual="attrValue" expected="&quot;&quot;" id="elementGetElementEmptyAssert" ignoreCase="false"/>
             }
             // elementchangeattributevalue.xml
@@ -7600,7 +7600,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("address"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;address&quot;" var="elementList"/>
                 r#test_employee = r#element_list[3].clone(); // <item interface="NodeList" obj="elementList" index="3" var="testEmployee"/>
                 r#test_employee.set_attribute("street", "Neither").unwrap(); // <setAttribute obj="testEmployee" name="&quot;street&quot;" value="&quot;Neither&quot;"/>
-                r#attr_value = r#test_employee.get_attribute("street").unwrap(); // <getAttribute obj="testEmployee" var="attrValue" name="&quot;street&quot;"/>
+                r#attr_value = r#test_employee.get_attribute("street"); // <getAttribute obj="testEmployee" var="attrValue" name="&quot;street&quot;"/>
                 assert_eq!(r#attr_value, "Neither"); // <assertEquals actual="attrValue" expected="&quot;Neither&quot;" id="elementChangeAttributeValueAssert" ignoreCase="false"/>
             }
             // hc_nodedocumentnodevalue.xml
@@ -8327,7 +8327,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("acronym"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;acronym&quot;" var="elementList"/>
                 r#test_employee = r#element_list[3].clone(); // <item interface="NodeList" obj="elementList" index="3" var="testEmployee"/>
                 r#test_employee.set_attribute("class", "Neither").unwrap(); // <setAttribute obj="testEmployee" name="&quot;class&quot;" value="&quot;Neither&quot;"/>
-                r#attr_value = r#test_employee.get_attribute("class").unwrap(); // <getAttribute obj="testEmployee" var="attrValue" name="&quot;class&quot;"/>
+                r#attr_value = r#test_employee.get_attribute("class"); // <getAttribute obj="testEmployee" var="attrValue" name="&quot;class&quot;"/>
                 assert_eq!(r#attr_value, "Neither"); // <assertEquals actual="attrValue" expected="&quot;Neither&quot;" id="elementChangeAttributeValueAssert" ignoreCase="false"/>
             }
             // hc_attrappendchild2.xml
@@ -9059,7 +9059,7 @@ mod dom_test_suite {
                 r#district_attr = r#test_address.get_attribute_node("district").unwrap(); // <getAttributeNode obj="testAddress" var="districtAttr" name="&quot;district&quot;"/>
 
                 // unimplemented: // <assertNotNull actual="districtAttr" id="new_district_accessible"/>
-                r#attr_val = r#test_address.get_attribute("district").unwrap(); // <getAttribute var="attrVal" obj="testAddress" name="&quot;district&quot;"/>
+                r#attr_val = r#test_address.get_attribute("district"); // <getAttribute var="attrVal" obj="testAddress" name="&quot;district&quot;"/>
                 assert_eq!(r#attr_val, ""); // <assertEquals actual="attrVal" expected="&quot;&quot;" id="attr_value" ignoreCase="false"/>
             }
             // nodedocumenttypenodename.xml
@@ -9087,7 +9087,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("acronym"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;acronym&quot;" var="elementList"/>
                 r#test_employee = r#element_list[4].clone(); // <item interface="NodeList" obj="elementList" index="4" var="testEmployee"/>
                 r#test_employee.set_attribute("lang", "EN-us").unwrap(); // <setAttribute obj="testEmployee" name="&quot;lang&quot;" value="&quot;EN-us&quot;"/>
-                r#attr_value = r#test_employee.get_attribute("lang").unwrap(); // <getAttribute obj="testEmployee" var="attrValue" name="&quot;lang&quot;"/>
+                r#attr_value = r#test_employee.get_attribute("lang"); // <getAttribute obj="testEmployee" var="attrValue" name="&quot;lang&quot;"/>
                 assert_eq!(r#attr_value, "EN-us"); // <assertEquals actual="attrValue" expected="&quot;EN-us&quot;" id="attrValue" ignoreCase="false"/>
             }
             // hc_elementinvalidcharacterexception.xml
@@ -11004,7 +11004,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("address"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;address&quot;" var="elementList"/>
                 r#test_employee = r#element_list[3].clone(); // <item interface="NodeList" obj="elementList" index="3" var="testEmployee"/>
                 r#test_employee.remove_attribute("street".into()).unwrap(); // <removeAttribute obj="testEmployee" name="&quot;street&quot;"/>
-                r#attr_value = r#test_employee.get_attribute("street").unwrap(); // <getAttribute obj="testEmployee" var="attrValue" name="&quot;street&quot;"/>
+                r#attr_value = r#test_employee.get_attribute("street"); // <getAttribute obj="testEmployee" var="attrValue" name="&quot;street&quot;"/>
                 assert_eq!(r#attr_value, "Yes"); // <assertEquals actual="attrValue" expected="&quot;Yes&quot;" id="streetYes" ignoreCase="false"/>
             }
             // nodedocumentfragmentnodename.xml
