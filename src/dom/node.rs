@@ -567,7 +567,7 @@ pub trait Node: NodeConnection {
                                 children = text.next_sibling();
                             }
                             next => {
-                                children = next.next_sibling();
+                                children = Some(next);
                                 break;
                             }
                         }
