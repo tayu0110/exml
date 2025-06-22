@@ -95,6 +95,10 @@ name = "testrecurse"
 name = "test_threads"
 required-features = ["catalog"]
 
+[[test]]
+name = "dom_test_suite"
+path = "./tests/dom_test_suite.rs"
+
 [[bin]]
 name = "exmllint"
 path = "src/bin/exmllint.rs"
