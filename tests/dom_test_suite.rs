@@ -14,6 +14,8 @@ mod dom_test_suite {
         use super::*;
 
         mod core {
+            use exml::dom::node_list::NodeList;
+
             use super::*;
 
             const STAFF_XML: &str =
@@ -1694,7 +1696,7 @@ mod dom_test_suite {
                 // r#element_list = r#doc.get_elements_by_tag_name("employee"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;employee&quot;" var="elementList"/>
                 // r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
                 // r#child_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="childList"/>
-                // r#old_child = r#child_list[0].clone(); // <item interface="NodeList" obj="childList" index="0" var="oldChild"/>
+                // r#old_child = r#child_list.item(0).unwrap().clone(); // <item interface="NodeList" obj="childList" index="0" var="oldChild"/>
 
                 // // unimplemented: // <assertDOMException id="throw_HIERARCHY_REQUEST_ERR"><HIERARCHY_REQUEST_ERR><replaceChild var="replacedNode" obj="employeeNode" newChild="newChild" oldChild="oldChild"/></HIERARCHY_REQUEST_ERR></assertDOMException>
             }
@@ -1718,8 +1720,8 @@ mod dom_test_suite {
                 // r#element_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;p&quot;" var="elementList"/>
                 // r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
                 // r#child_list = r#employee_node.get_elements_by_tag_name("*"); // <getElementsByTagName interface="Element" obj="employeeNode" var="childList" tagname="&quot;*&quot;"/>
-                // r#new_child = r#child_list[0].clone(); // <item interface="NodeList" obj="childList" index="0" var="newChild"/>
-                // r#old_child = r#child_list[5].clone(); // <item interface="NodeList" obj="childList" index="5" var="oldChild"/>
+                // r#new_child = r#child_list.item(0).unwrap().clone(); // <item interface="NodeList" obj="childList" index="0" var="newChild"/>
+                // r#old_child = r#child_list.item(5).unwrap().clone(); // <item interface="NodeList" obj="childList" index="5" var="oldChild"/>
                 // r#replaced_child = r#employee_node
                 //     .replace_child(new_child.into(), old_child)
                 //     .unwrap(); // <replaceChild var="replacedChild" obj="employeeNode" newChild="newChild" oldChild="oldChild"/>
@@ -1759,7 +1761,7 @@ mod dom_test_suite {
                 // r#element_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;p&quot;" var="elementList"/>
                 // r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
                 // r#child_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="childList"/>
-                // r#old_child = r#child_list[0].clone(); // <item interface="NodeList" obj="childList" index="0" var="oldChild"/>
+                // r#old_child = r#child_list.item(0).unwrap().clone(); // <item interface="NodeList" obj="childList" index="0" var="oldChild"/>
 
                 // // unimplemented: // <assertDOMException id="throw_HIERARCHY_REQUEST_ERR"><HIERARCHY_REQUEST_ERR><replaceChild var="replacedNode" obj="employeeNode" newChild="newChild" oldChild="oldChild"/></HIERARCHY_REQUEST_ERR></assertDOMException>
             }
@@ -1914,7 +1916,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("employee"); // <getElementsByTagName interface="Document" obj="doc" var="elementList" tagname="&quot;employee&quot;"/>
                 r#employee_node = r#element_list[2].clone(); // <item interface="NodeList" obj="elementList" var="employeeNode" index="2"/>
                 r#employee_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="employeeList"/>
-                r#child_node = r#employee_list[1].clone(); // <item interface="NodeList" obj="employeeList" var="childNode" index="1"/>
+                r#child_node = r#employee_list.item(1).unwrap().clone(); // <item interface="NodeList" obj="employeeList" var="childNode" index="1"/>
                 r#text_node = r#child_node.first_child().unwrap(); // <firstChild interface="Node" obj="childNode" var="textNode"/>
                 r#text_list = r#text_node.child_nodes(); // <childNodes obj="textNode" var="textList"/>
 
@@ -2010,7 +2012,12 @@ mod dom_test_suite {
                 let mut r#node_type; // type: int // <var name="nodeType" type="int"/>
                 r#doc = staff_xml(STAFF_XML).unwrap(); // staff.xml // <load var="doc" href="staff" willBeModified="false"/>
                 r#test_list = r#doc.child_nodes(); // <childNodes obj="doc" var="testList"/>
-                r#pi_node = r#test_list[0].clone().as_processing_instruction().unwrap(); // <item interface="NodeList" obj="testList" var="piNode" index="0"/>
+                r#pi_node = r#test_list
+                    .item(0)
+                    .unwrap()
+                    .clone()
+                    .as_processing_instruction()
+                    .unwrap(); // <item interface="NodeList" obj="testList" var="piNode" index="0"/>
                 r#node_type = r#pi_node.node_type(); // <nodeType obj="piNode" var="nodeType"/>
                 assert_eq!(r#node_type as i32, 7); // <assertEquals actual="nodeType" expected="7" id="nodeProcessingInstructionNodeTypeAssert1" ignoreCase="false"/>
             }
@@ -2565,7 +2572,7 @@ mod dom_test_suite {
                 r#doc = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
                 r#root_node = r#doc.document_element().unwrap(); // <documentElement obj="doc" var="rootNode"/>
                 r#child_list = r#root_node.child_nodes(); // <childNodes obj="rootNode" var="childList"/>
-                r#child_to_remove = r#child_list[1].clone(); // <item interface="NodeList" obj="childList" index="1" var="childToRemove"/>
+                r#child_to_remove = r#child_list.item(1).unwrap().clone(); // <item interface="NodeList" obj="childList" index="1" var="childToRemove"/>
                 r#removed_child = r#root_node.remove_child(child_to_remove).unwrap(); // <removeChild obj="rootNode" var="removedChild" oldChild="childToRemove"/>
                 let r#parent_node = r#removed_child.parent_node(); // <parentNode interface="Node" obj="removedChild" var="parentNode"/>
                 assert!(parent_node.is_none()); // <assertNull actual="parentNode" id="parentNodeNull"/>
@@ -2699,12 +2706,12 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("employee"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;employee&quot;" var="elementList"/>
                 r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
                 r#child_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="childList"/>
-                r#old_child = r#child_list[0].clone(); // <item interface="NodeList" obj="childList" index="0" var="oldChild"/>
+                r#old_child = r#child_list.item(0).unwrap().clone(); // <item interface="NodeList" obj="childList" index="0" var="oldChild"/>
                 r#removed_child = r#employee_node.remove_child(old_child).unwrap(); // <removeChild var="removedChild" obj="employeeNode" oldChild="oldChild"/>
                 r#removed_name = r#removed_child.node_name().to_string(); // <nodeName obj="removedChild" var="removedName"/>
-                r#child = r#child_list[0].clone(); // <item interface="NodeList" obj="childList" index="0" var="child"/>
+                r#child = r#child_list.item(0).unwrap().clone(); // <item interface="NodeList" obj="childList" index="0" var="child"/>
                 r#child_name = r#child.node_name().to_string(); // <nodeName obj="child" var="childName"/>
-                r#length = r#child_list.len(); // <length interface="NodeList" obj="childList" var="length"/>
+                r#length = r#child_list.length(); // <length interface="NodeList" obj="childList" var="length"/>
 
                 // unimplemented: // <if><equals actual="length" expected="5" ignoreCase="false"/>	<assertEquals actual="removedName" expected="&quot;employeeId&quot;" ignoreCase="false" id="removedNameNoWhitespace"/>	<assertEquals actual="childName" expected="&quot;name&quot;" ignoreCase="false" id="childNameNoWhitespace"/><else>	<assertEquals actual="removedName" expected="&quot;#text&quot;" ignoreCase="false" id="removedName"/>	<assertEquals actual="childName" expected="&quot;employeeId&quot;" ignoreCase="false" id="childName"/>	<assertEquals actual="length" expected="12" ignoreCase="false" id="length"/></else></if>
             }
@@ -2878,7 +2885,7 @@ mod dom_test_suite {
                 r#doc = staff_xml(STAFF_XML).unwrap(); // staff.xml // <load var="doc" href="staff" willBeModified="true"/>
                 r#new_doc_fragment = r#doc.create_document_fragment(); // <createDocumentFragment obj="doc" var="newDocFragment"/>
                 r#children = r#new_doc_fragment.child_nodes(); // <childNodes obj="newDocFragment" var="children"/>
-                r#length = r#children.len(); // <length interface="NodeList" obj="children" var="length"/>
+                r#length = r#children.length(); // <length interface="NodeList" obj="children" var="length"/>
                 assert_eq!(r#length, 0); // <assertEquals actual="length" expected="0" ignoreCase="false" id="length"/>
                 r#new_doc_fragment_name = r#new_doc_fragment.node_name().to_string(); // <nodeName obj="newDocFragment" var="newDocFragmentName"/>
                 assert_eq!(r#new_doc_fragment_name, "#document-fragment"); // <assertEquals actual="newDocFragmentName" expected="&quot;#document-fragment&quot;" ignoreCase="false" id="name"/>
@@ -2970,13 +2977,13 @@ mod dom_test_suite {
                 r#retval = r#title_attr.append_child(text_node.into()).unwrap(); // <appendChild var="retval" obj="titleAttr" newChild="textNode"/>
 
                 // unimplemented: // <assertSize size="2" collection="childNodes" id="childNodesSize"/>
-                let r#text_node = r#child_nodes[0].clone(); // <item var="textNode" obj="childNodes" index="0" interface="NodeList"/>
+                let r#text_node = r#child_nodes.item(0).unwrap().clone(); // <item var="textNode" obj="childNodes" index="0" interface="NodeList"/>
                 r#value = r#text_node.node_value().unwrap().to_string(); // <nodeValue var="value" obj="textNode"/>
                 assert_eq!(r#value, "Yes"); // <assertEquals actual="value" expected="&quot;Yes&quot;" id="child1IsYes" ignoreCase="false"/>
-                let r#text_node = r#child_nodes[1].clone(); // <item var="textNode" obj="childNodes" index="1" interface="NodeList"/>
+                let r#text_node = r#child_nodes.item(1).unwrap().clone(); // <item var="textNode" obj="childNodes" index="1" interface="NodeList"/>
                 r#value = r#text_node.node_value().unwrap().to_string(); // <nodeValue var="value" obj="textNode"/>
                 assert_eq!(r#value, "terday"); // <assertEquals actual="value" expected="&quot;terday&quot;" id="child2IsTerday" ignoreCase="false"/>
-                let r#text_node = r#child_nodes.get(2); // <item var="textNode" obj="childNodes" index="2" interface="NodeList"/>
+                let r#text_node = r#child_nodes.item(2); // <item var="textNode" obj="childNodes" index="2" interface="NodeList"/>
                 assert!(text_node.is_none()); // <assertNull actual="textNode" id="thirdItemIsNull"/>
             }
             // hc_noderemovechildgetnodename.xml
@@ -2994,7 +3001,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;p&quot;" var="elementList"/>
                 r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
                 r#child_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="childList"/>
-                r#old_child = r#child_list[0].clone(); // <item interface="NodeList" obj="childList" index="0" var="oldChild"/>
+                r#old_child = r#child_list.item(0).unwrap().clone(); // <item interface="NodeList" obj="childList" index="0" var="oldChild"/>
                 r#old_name = r#old_child.node_name().to_string(); // <nodeName obj="oldChild" var="oldName"/>
                 r#removed_child = r#employee_node.remove_child(old_child).unwrap(); // <removeChild obj="employeeNode" oldChild="oldChild" var="removedChild"/>
 
@@ -3107,7 +3114,12 @@ mod dom_test_suite {
                 r#l_child = r#name_list[1].clone(); // <item interface="NodeList" obj="nameList" var="lChild" index="1"/>
                 r#l_child.normalize(); // <normalize obj="lChild"/>
                 r#child_nodes = r#l_child.child_nodes(); // <childNodes obj="lChild" var="childNodes"/>
-                r#cdata_n = r#child_nodes[1].clone().as_cdata_section().unwrap(); // <item interface="NodeList" obj="childNodes" var="cdataN" index="1"/>
+                r#cdata_n = r#child_nodes
+                    .item(1)
+                    .unwrap()
+                    .clone()
+                    .as_cdata_section()
+                    .unwrap(); // <item interface="NodeList" obj="childNodes" var="cdataN" index="1"/>
 
                 // unimplemented: // <assertNotNull actual="cdataN" id="firstCDATASection"/>
                 r#data = r#cdata_n.data().to_string(); // <data interface="CharacterData" obj="cdataN" var="data"/>
@@ -3115,7 +3127,12 @@ mod dom_test_suite {
                     r#data,
                     "This is a CDATASection with EntityReference number 2 &ent2;"
                 ); // <assertEquals actual="data" expected="&quot;This is a CDATASection with EntityReference number 2 &amp;ent2;&quot;" ignoreCase="false" id="data1"/>
-                r#cdata_n = r#child_nodes[3].clone().as_cdata_section().unwrap(); // <item interface="NodeList" obj="childNodes" var="cdataN" index="3"/>
+                r#cdata_n = r#child_nodes
+                    .item(3)
+                    .unwrap()
+                    .clone()
+                    .as_cdata_section()
+                    .unwrap(); // <item interface="NodeList" obj="childNodes" var="cdataN" index="3"/>
 
                 // unimplemented: // <assertNotNull actual="cdataN" id="secondCDATASection"/>
                 r#data = r#cdata_n.data().to_string(); // <data interface="CharacterData" obj="cdataN" var="data"/>
@@ -3212,7 +3229,7 @@ mod dom_test_suite {
                 // r#element_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;p&quot;" var="elementList"/>
                 // r#child_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="childNode"/>
                 // r#child_list = r#child_node.get_elements_by_tag_name("*"); // <getElementsByTagName interface="Element" obj="childNode" var="childList" tagname="&quot;*&quot;"/>
-                // r#new_child = r#child_list[0].clone(); // <item interface="NodeList" obj="childList" index="0" var="newChild"/>
+                // r#new_child = r#child_list.item(0).unwrap().clone(); // <item interface="NodeList" obj="childList" index="0" var="newChild"/>
                 // r#appended_child = r#child_node.append_child(new_child).unwrap(); // <appendChild var="appendedChild" obj="childNode" newChild="newChild"/>
 
                 // // unimplemented: // <for-each collection="childList" member="memberNode">    <nodeName var="memberName" obj="memberNode"/>    <append collection="actual" item="memberName"/></for-each>
@@ -3270,7 +3287,9 @@ mod dom_test_suite {
                 let mut r#target; // type: DOMString // <var name="target" type="DOMString"/>
                 r#doc = staff_xml(STAFF_XML).unwrap(); // staff.xml // <load var="doc" href="staff" willBeModified="false"/>
                 r#child_nodes = r#doc.child_nodes(); // <childNodes obj="doc" var="childNodes"/>
-                r#pi_node = r#child_nodes[0]
+                r#pi_node = r#child_nodes
+                    .item(0)
+                    .unwrap()
                     .clone()
                     .as_processing_instruction()
                     .unwrap(); // <item interface="NodeList" obj="childNodes" var="piNode" index="0"/>
@@ -3367,9 +3386,9 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("employee"); // <getElementsByTagName interface="Document" obj="doc" var="elementList" tagname="&quot;employee&quot;"/>
                 r#employee_node = r#element_list[2].clone(); // <item interface="NodeList" obj="elementList" var="employeeNode" index="2"/>
                 r#employee_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="employeeList"/>
-                r#child = r#employee_list[0].clone(); // <item interface="NodeList" obj="employeeList" var="child" index="0"/>
+                r#child = r#employee_list.item(0).unwrap().clone(); // <item interface="NodeList" obj="employeeList" var="child" index="0"/>
                 r#child_name = r#child.node_name().to_string(); // <nodeName obj="child" var="childName"/>
-                r#length = r#employee_list.len(); // <length var="length" obj="employeeList" interface="NodeList"/>
+                r#length = r#employee_list.length(); // <length var="length" obj="employeeList" interface="NodeList"/>
 
                 // unimplemented: // <if><equals actual="length" expected="6" ignoreCase="false"/><assertEquals actual="childName" expected="&quot;employeeId&quot;" ignoreCase="true" id="firstChildNoWhitespace"/><else><assertEquals actual="childName" expected="&quot;#text&quot;" ignoreCase="true" id="firstChildWithWhitespace"/></else></if>
             }
@@ -3444,7 +3463,7 @@ mod dom_test_suite {
                 // r#element_list = r#doc.get_elements_by_tag_name("address"); // <getElementsByTagName interface="Document" obj="doc" var="elementList" tagname="&quot;address&quot;"/>
                 // r#address_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" var="addressNode" index="1"/>
                 // r#child_list = r#address_node.child_nodes(); // <childNodes obj="addressNode" var="childList"/>
-                // r#length = r#child_list.len(); // <length var="length" obj="childList" interface="NodeList"/>
+                // r#length = r#child_list.length(); // <length var="length" obj="childList" interface="NodeList"/>
 
                 // // unimplemented: // <for-each collection="childList" member="child">	<nodeValue obj="child" var="value"/>	<if><isNull obj="value"/>		<firstChild interface="Node" obj="child" var="grandChild"/>		<assertNotNull actual="grandChild" id="grandChildNotNull"/>		<nodeValue obj="grandChild" var="value"/>		<append collection="result" item="value"/>		<else>			<append collection="result" item="value"/>		</else>	</if></for-each>
 
@@ -3468,7 +3487,7 @@ mod dom_test_suite {
                 // r#element_list = r#doc.get_elements_by_tag_name("acronym"); // <getElementsByTagName interface="Document" obj="doc" var="elementList" tagname="&quot;acronym&quot;"/>
                 // r#address_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" var="addressNode" index="1"/>
                 // r#child_list = r#address_node.child_nodes(); // <childNodes obj="addressNode" var="childList"/>
-                // r#length = r#child_list.len(); // <length var="length" obj="childList" interface="NodeList"/>
+                // r#length = r#child_list.length(); // <length var="length" obj="childList" interface="NodeList"/>
 
                 // // unimplemented: // <for-each collection="childList" member="child">	<nodeValue obj="child" var="value"/>	<if>		<isNull obj="value"/>		<firstChild interface="Node" obj="child" var="grandChild"/>		<assertNotNull actual="grandChild" id="grandChildNotNull"/>		<nodeValue obj="grandChild" var="value"/>		<append collection="result" item="value"/>		<else>			<append collection="result" item="value"/>		</else>	</if></for-each>
 
@@ -3495,7 +3514,7 @@ mod dom_test_suite {
                 // r#element_list = r#doc.get_elements_by_tag_name("employee"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;employee&quot;" var="elementList"/>
                 // r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
                 // r#child_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="childList"/>
-                // r#length = r#child_list.len(); // <length var="length" obj="childList" interface="NodeList"/>
+                // r#length = r#child_list.length(); // <length var="length" obj="childList" interface="NodeList"/>
 
                 // // unimplemented: // <if><equals actual="length" expected="6" ignoreCase="false"/>	<assign var="expected" value="expectedNoWhitespace"/>	<item interface="NodeList" obj="childList" index="5" var="refChild"/>	<item interface="NodeList" obj="childList" index="0" var="newChild"/>	<else>		<assign var="expected" value="expectedWhitespace"/>		<item interface="NodeList" obj="childList" index="11" var="refChild"/>		<item interface="NodeList" obj="childList" index="1" var="newChild"/>	</else></if>
                 // r#inserted_node = r#employee_node
@@ -3896,8 +3915,8 @@ mod dom_test_suite {
                 // r#element_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;p&quot;" var="elementList"/>
                 // r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
                 // r#child_list = r#employee_node.get_elements_by_tag_name("*"); // <getElementsByTagName interface="Element" obj="employeeNode" tagname="&quot;*&quot;" var="childList"/>
-                // r#ref_child = r#child_list[5].clone(); // <item interface="NodeList" obj="childList" index="5" var="refChild"/>
-                // r#new_child = r#child_list[0].clone(); // <item interface="NodeList" obj="childList" index="0" var="newChild"/>
+                // r#ref_child = r#child_list.item(5).unwrap().clone(); // <item interface="NodeList" obj="childList" index="5" var="refChild"/>
+                // r#new_child = r#child_list.item(0).unwrap().clone(); // <item interface="NodeList" obj="childList" index="0" var="newChild"/>
                 // r#inserted_node = r#employee_node
                 //     .insert_before(new_child.into(), Some(ref_child))
                 //     .unwrap(); // <insertBefore var="insertedNode" obj="employeeNode" newChild="newChild" refChild="refChild"/>
@@ -3938,7 +3957,7 @@ mod dom_test_suite {
                 r#clone_name = r#cloned_node.node_name().to_string(); // <nodeName obj="clonedNode" var="cloneName"/>
                 assert_eq!(r#clone_name, "p"); // <assertEquals actual="cloneName" expected="&quot;p&quot;" ignoreCase="auto" id="strong"/>
                 r#clone_children = r#cloned_node.child_nodes(); // <childNodes obj="clonedNode" var="cloneChildren"/>
-                r#length = r#clone_children.len(); // <length interface="NodeList" obj="cloneChildren" var="length"/>
+                r#length = r#clone_children.length(); // <length interface="NodeList" obj="cloneChildren" var="length"/>
                 assert_eq!(r#length, 0); // <assertEquals actual="length" expected="0" ignoreCase="false" id="length"/>
             }
             // nodeentitynodevalue.xml
@@ -4263,11 +4282,11 @@ mod dom_test_suite {
 
                 // unimplemented: // <assertNotNull actual="gender" id="genderNotNull"/>
                 r#gen_list = r#gender.child_nodes(); // <childNodes obj="gender" var="genList"/>
-                r#gen = r#gen_list[0].clone(); // <item interface="NodeList" obj="genList" var="gen" index="0"/>
+                r#gen = r#gen_list.item(0).unwrap().clone(); // <item interface="NodeList" obj="genList" var="gen" index="0"/>
 
                 // unimplemented: // <assertNotNull actual="gen" id="genderFirstChildNotNull"/>
                 r#g_list = r#gen.child_nodes(); // <childNodes obj="gen" var="gList"/>
-                r#g = r#g_list[0].clone(); // <item interface="NodeList" obj="gList" var="g" index="0"/>
+                r#g = r#g_list.item(0).unwrap().clone(); // <item interface="NodeList" obj="gList" var="g" index="0"/>
 
                 // unimplemented: // <assertNotNull actual="g" id="genderFirstGrandchildNotNull"/>
                 r#attr_list = r#g.attributes().unwrap(); // <attributes obj="g" var="attrList"/>
@@ -4473,7 +4492,12 @@ mod dom_test_suite {
                 let mut r#pi_name; // type: DOMString // <var name="piName" type="DOMString"/>
                 r#doc = staff_xml(STAFF_XML).unwrap(); // staff.xml // <load var="doc" href="staff" willBeModified="false"/>
                 r#test_list = r#doc.child_nodes(); // <childNodes obj="doc" var="testList"/>
-                r#pi_node = r#test_list[0].clone().as_processing_instruction().unwrap(); // <item interface="NodeList" obj="testList" index="0" var="piNode"/>
+                r#pi_node = r#test_list
+                    .item(0)
+                    .unwrap()
+                    .clone()
+                    .as_processing_instruction()
+                    .unwrap(); // <item interface="NodeList" obj="testList" index="0" var="piNode"/>
                 r#pi_name = r#pi_node.node_name().to_string(); // <nodeName obj="piNode" var="piName"/>
                 assert_eq!(r#pi_name, "TEST-STYLE"); // <assertEquals actual="piName" expected="&quot;TEST-STYLE&quot;" id="nodeProcessingInstructionNodeNameAssert1" ignoreCase="false"/>
             }
@@ -4491,7 +4515,7 @@ mod dom_test_suite {
                 // r#element_list = r#doc.get_elements_by_tag_name("employee"); // <getElementsByTagName interface="Document" obj="doc" var="elementList" tagname="&quot;employee&quot;"/>
                 // r#employee_node = r#element_list[2].clone(); // <item interface="NodeList" obj="elementList" var="employeeNode" index="2"/>
                 // r#employee_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="employeeList"/>
-                // r#length = r#employee_list.len(); // <length var="length" obj="employeeList" interface="NodeList"/>
+                // r#length = r#employee_list.length(); // <length var="length" obj="employeeList" interface="NodeList"/>
 
                 // // unimplemented: // <if><equals actual="length" expected="6" ignoreCase="false"/>	<item interface="NodeList" obj="employeeList" var="child" index="5"/>	<nodeName obj="child" var="childName"/>	<assertEquals actual="childName" expected="&quot;address&quot;" id="nodeName1" ignoreCase="false"/><else>	<item interface="NodeList" obj="employeeList" var="child" index="12"/>	<nodeName obj="child" var="childName"/>	<assertEquals actual="childName" expected="&quot;#text&quot;" id="nodeName2" ignoreCase="false"/></else></if>
             }
@@ -5196,7 +5220,7 @@ mod dom_test_suite {
                 // r#element_list = r#doc.get_elements_by_tag_name("employee"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;employee&quot;" var="elementList"/>
                 // r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
                 // r#child_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="childList"/>
-                // r#length = r#child_list.len(); // <length var="length" obj="childList" interface="NodeList"/>
+                // r#length = r#child_list.length(); // <length var="length" obj="childList" interface="NodeList"/>
 
                 // // unimplemented: // <if><equals actual="length" expected="6" ignoreCase="false"/>	<item interface="NodeList" obj="childList" index="3" var="refChild"/>	<assign var="expected" value="expectedWithoutWhitespace"/>	<else>		<item interface="NodeList" obj="childList" index="7" var="refChild"/>		<assign var="expected" value="expectedWithWhitespace"/>	</else></if>
                 // r#new_child = r#doc.create_element("newChild".to_string()).unwrap(); // <createElement obj="doc" tagName="&quot;newChild&quot;" var="newChild"/>
@@ -5272,7 +5296,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;p&quot;" var="elementList"/>
                 r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
                 r#child_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="childList"/>
-                r#ref_child = r#child_list[3].clone(); // <item interface="NodeList" obj="childList" index="3" var="refChild"/>
+                r#ref_child = r#child_list.item(3).unwrap().clone(); // <item interface="NodeList" obj="childList" index="3" var="refChild"/>
                 r#newdoc_fragment = r#doc.create_document_fragment(); // <createDocumentFragment obj="doc" var="newdocFragment"/>
                 r#new_child1 = r#doc.create_element("br".to_string()).unwrap(); // <createElement obj="doc" tagName="&quot;br&quot;" var="newChild1"/>
                 r#new_child2 = r#doc.create_element("b".to_string()).unwrap(); // <createElement obj="doc" tagName="&quot;b&quot;" var="newChild2"/>
@@ -5281,10 +5305,10 @@ mod dom_test_suite {
                 r#inserted_node = r#employee_node
                     .insert_before(newdoc_fragment.into(), ref_child.into())
                     .unwrap(); // <insertBefore var="insertedNode" obj="employeeNode" newChild="newdocFragment" refChild="refChild"/>
-                r#child = r#child_list[3].clone(); // <item interface="NodeList" obj="childList" index="3" var="child"/>
+                r#child = r#child_list.item(3).unwrap().clone(); // <item interface="NodeList" obj="childList" index="3" var="child"/>
                 r#child_name = r#child.node_name().to_string(); // <nodeName obj="child" var="childName"/>
                 assert_eq!(r#child_name, "br"); // <assertEquals actual="childName" expected="&quot;br&quot;" ignoreCase="auto" id="childName3"/>
-                r#child = r#child_list[4].clone(); // <item interface="NodeList" obj="childList" index="4" var="child"/>
+                r#child = r#child_list.item(4).unwrap().clone(); // <item interface="NodeList" obj="childList" index="4" var="child"/>
                 r#child_name = r#child.node_name().to_string(); // <nodeName obj="child" var="childName"/>
                 assert_eq!(r#child_name, "b"); // <assertEquals actual="childName" expected="&quot;b&quot;" ignoreCase="auto" id="childName4"/>
             }
@@ -5343,7 +5367,7 @@ mod dom_test_suite {
                 // r#element_list = r#doc.get_elements_by_tag_name("employee"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;employee&quot;" var="elementList"/>
                 // r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
                 // r#child_list = r#employee_node.child_nodes(); // <childNodes var="childList" obj="employeeNode"/>
-                // r#length = r#child_list.len(); // <length var="length" obj="childList" interface="NodeList"/>
+                // r#length = r#child_list.length(); // <length var="length" obj="childList" interface="NodeList"/>
                 // r#cloned_node = r#employee_node.clone_node(true); // <cloneNode obj="employeeNode" deep="true" var="clonedNode"/>
                 // r#cloned_list = r#cloned_node.child_nodes(); // <childNodes obj="clonedNode" var="clonedList"/>
 
@@ -5410,7 +5434,7 @@ mod dom_test_suite {
                 // r#element_list = r#doc.get_elements_by_tag_name("employee"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;employee&quot;" var="elementList"/>
                 // r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
                 // r#child_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="childList"/>
-                // r#ref_child = r#child_list[0].clone(); // <item interface="NodeList" obj="childList" index="0" var="refChild"/>
+                // r#ref_child = r#child_list.item(0).unwrap().clone(); // <item interface="NodeList" obj="childList" index="0" var="refChild"/>
 
                 // // unimplemented: // <assertDOMException id="throw_HIERARCHY_REQUEST_ERR"><HIERARCHY_REQUEST_ERR><insertBefore var="insertedNode" obj="employeeNode" newChild="newChild" refChild="refChild"/></HIERARCHY_REQUEST_ERR></assertDOMException>
             }
@@ -5479,7 +5503,7 @@ mod dom_test_suite {
                 // r#element_list = r#doc.get_elements_by_tag_name("employee"); // <getElementsByTagName interface="Document" obj="doc" var="elementList" tagname="&quot;employee&quot;"/>
                 // r#employee_node = r#element_list[2].clone(); // <item interface="NodeList" obj="elementList" var="employeeNode" index="2"/>
                 // r#employee_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="employeeList"/>
-                // r#length = r#employee_list.len(); // <length var="length" obj="employeeList" interface="NodeList"/>
+                // r#length = r#employee_list.length(); // <length var="length" obj="employeeList" interface="NodeList"/>
 
                 // // unimplemented: // <assertTrue id="lengthIs6or13">	<or>		<equals actual="length" expected="6" ignoreCase="false"/>		<equals actual="length" expected="13" ignoreCase="false"/>	</or></assertTrue>
             }
@@ -5589,7 +5613,7 @@ mod dom_test_suite {
                 r#clone_name = r#cloned_node.node_name().to_string(); // <nodeName obj="clonedNode" var="cloneName"/>
                 assert_eq!(r#clone_name, "employee"); // <assertEquals actual="cloneName" expected="&quot;employee&quot;" ignoreCase="false" id="name"/>
                 r#clone_children = r#cloned_node.child_nodes(); // <childNodes obj="clonedNode" var="cloneChildren"/>
-                r#length = r#clone_children.len(); // <length interface="NodeList" obj="cloneChildren" var="length"/>
+                r#length = r#clone_children.length(); // <length interface="NodeList" obj="cloneChildren" var="length"/>
                 assert_eq!(r#length, 0); // <assertEquals actual="length" expected="0" ignoreCase="false" id="length"/>
             }
             // documenttypegetnotations.xml
@@ -6018,7 +6042,7 @@ mod dom_test_suite {
                 // r#element_list = r#doc.get_elements_by_tag_name("employee"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;employee&quot;" var="elementList"/>
                 // r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
                 // r#child_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="childList"/>
-                // r#length = r#child_list.len(); // <length var="length" obj="childList" interface="NodeList"/>
+                // r#length = r#child_list.length(); // <length var="length" obj="childList" interface="NodeList"/>
 
                 // // unimplemented: // <if><equals actual="length" expected="13" ignoreCase="false"/>	<item interface="NodeList" obj="childList" index="1" var="newChild"/>	<item interface="NodeList" obj="childList" index="11" var="oldChild"/>	<assign var="expected" value="expectedWithWhitespace"/><else>	<item interface="NodeList" obj="childList" index="0" var="newChild"/>	<item interface="NodeList" obj="childList" index="5" var="oldChild"/>	<assign var="expected" value="expectedWithoutWhitespace"/></else></if>
                 // r#replaced_child = r#employee_node
@@ -6085,14 +6109,14 @@ mod dom_test_suite {
                 // r#gender_list = r#doc.get_elements_by_tag_name("gender"); // <getElementsByTagName interface="Document" obj="doc" var="genderList" tagname="&quot;gender&quot;"/>
                 // r#gender = r#gender_list[2].clone(); // <item interface="NodeList" obj="genderList" var="gender" index="2"/>
                 // r#gen_list = r#gender.child_nodes(); // <childNodes obj="gender" var="genList"/>
-                // r#gen = r#gen_list[0].clone(); // <item interface="NodeList" obj="genList" var="gen" index="0"/>
+                // r#gen = r#gen_list.item(0).unwrap().clone(); // <item interface="NodeList" obj="genList" var="gen" index="0"/>
 
                 // // unimplemented: // <assertNotNull actual="gen" id="genNotNull"/>
                 // r#node_type = r#gen.node_type(); // <nodeType var="nodeType" obj="gen"/>
 
                 // // unimplemented: // <if><equals actual="nodeType" expected="1" ignoreCase="false"/>	<createEntityReference var="gen" obj="doc" name="&quot;ent4&quot;"/>	<assertNotNull actual="gen" id="createdEntRefNotNull"/>	</if>
                 // r#g_list = r#gen.child_nodes(); // <childNodes obj="gen" var="gList"/>
-                // r#gen_element = r#g_list[0].clone(); // <item interface="NodeList" obj="gList" var="genElement" index="0"/>
+                // r#gen_element = r#g_list.item(0).unwrap().clone(); // <item interface="NodeList" obj="gList" var="genElement" index="0"/>
 
                 // // unimplemented: // <assertNotNull actual="genElement" id="genElementNotNull"/>
                 // r#attr_list = r#gen_element.attributes().unwrap(); // <attributes obj="genElement" var="attrList"/>
@@ -6172,7 +6196,7 @@ mod dom_test_suite {
                 // r#element_list = r#doc.get_elements_by_tag_name("employee"); // <getElementsByTagName interface="Document" obj="doc" var="elementList" tagname="&quot;employee&quot;"/>
                 // r#employee_node = r#element_list[2].clone(); // <item interface="NodeList" obj="elementList" var="employeeNode" index="2"/>
                 // r#employee_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="employeeList"/>
-                // r#length = r#employee_list.len(); // <length var="length" obj="employeeList" interface="NodeList"/>
+                // r#length = r#employee_list.length(); // <length var="length" obj="employeeList" interface="NodeList"/>
 
                 // // unimplemented: // <if><equals actual="length" expected="6" ignoreCase="false"/>	<item interface="NodeList" obj="employeeList" var="child" index="1"/>	<else>	<item interface="NodeList" obj="employeeList" var="child" index="3"/></else></if>
                 // r#child_name = r#child.node_name().to_string(); // <nodeName obj="child" var="childName"/>
@@ -6297,10 +6321,10 @@ mod dom_test_suite {
                 r#child_nodes = r#title_attr.child_nodes(); // <childNodes var="childNodes" obj="titleAttr"/>
 
                 // unimplemented: // <assertSize size="1" collection="childNodes" id="childNodesSize"/>
-                r#text_node = r#child_nodes[0].clone(); // <item var="textNode" obj="childNodes" index="0" interface="NodeList"/>
+                r#text_node = r#child_nodes.item(0).unwrap().clone(); // <item var="textNode" obj="childNodes" index="0" interface="NodeList"/>
                 r#value = r#text_node.node_value().unwrap().to_string(); // <nodeValue var="value" obj="textNode"/>
                 assert_eq!(r#value, "Yes"); // <assertEquals actual="value" expected="&quot;Yes&quot;" id="child1IsYes" ignoreCase="false"/>
-                let r#text_node = r#child_nodes.get(1); // <item var="textNode" obj="childNodes" index="1" interface="NodeList"/>
+                let r#text_node = r#child_nodes.item(1); // <item var="textNode" obj="childNodes" index="1" interface="NodeList"/>
                 assert!(text_node.is_none()); // <assertNull actual="textNode" id="secondItemIsNull"/>
             }
             // elementreplaceexistingattribute.xml
@@ -6429,7 +6453,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("name"); // <getElementsByTagName interface="Document" obj="doc" var="elementList" tagname="&quot;name&quot;"/>
                 r#cdata_name = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="cdataName"/>
                 r#child_list = r#cdata_name.child_nodes(); // <childNodes obj="cdataName" var="childList"/>
-                r#child = r#child_list[1].clone(); // <item interface="NodeList" obj="childList" index="1" var="child"/>
+                r#child = r#child_list.item(1).unwrap().clone(); // <item interface="NodeList" obj="childList" index="1" var="child"/>
 
                 // unimplemented: // <if><isNull obj="child"/>	<createCDATASection var="child" obj="doc" data="&quot;This is a CDATASection with EntityReference number 2 &amp;ent2;&quot;"/></if>
                 r#cdata_node_value = r#child.node_value().unwrap().to_string(); // <nodeValue obj="child" var="cdataNodeValue"/>
@@ -6531,7 +6555,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName interface="Document" obj="doc" var="elementList" tagname="&quot;p&quot;"/>
                 r#employee_node = r#element_list[2].clone(); // <item interface="NodeList" obj="elementList" var="employeeNode" index="2"/>
                 r#employee_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="employeeList"/>
-                r#child = r#employee_list[3].clone(); // <item interface="NodeList" obj="employeeList" var="child" index="3"/>
+                r#child = r#employee_list.item(3).unwrap().clone(); // <item interface="NodeList" obj="employeeList" var="child" index="3"/>
                 r#child_name = r#child.node_name().to_string(); // <nodeName obj="child" var="childName"/>
 
                 // unimplemented: // <if><equals expected="&quot;#text&quot;" actual="childName"/><assertEquals id="childName_space" actual="childName" expected="&quot;#text&quot;" ignoreCase="false"/><else><assertEquals id="childName_strong" actual="childName" expected="&quot;strong&quot;" ignoreCase="auto"/></else></if>
@@ -6733,7 +6757,7 @@ mod dom_test_suite {
                 r#doc = staff_xml(STAFF_XML).unwrap(); // staff.xml // <load var="doc" href="staff" willBeModified="true"/>
                 r#root_node = r#doc.document_element().unwrap(); // <documentElement obj="doc" var="rootNode"/>
                 r#child_list = r#root_node.child_nodes(); // <childNodes obj="rootNode" var="childList"/>
-                r#child_to_remove = r#child_list[1].clone(); // <item interface="NodeList" obj="childList" index="1" var="childToRemove"/>
+                r#child_to_remove = r#child_list.item(1).unwrap().clone(); // <item interface="NodeList" obj="childList" index="1" var="childToRemove"/>
                 r#removed_child = r#root_node.remove_child(child_to_remove).unwrap(); // <removeChild obj="rootNode" var="removedChild" oldChild="childToRemove"/>
                 let r#parent_node = r#removed_child.parent_node(); // <parentNode interface="Node" obj="removedChild" var="parentNode"/>
                 assert!(parent_node.is_none()); // <assertNull actual="parentNode" id="nodeRemoveChildAssert1"/>
@@ -7031,7 +7055,12 @@ mod dom_test_suite {
                 let mut r#pi_node; // type: Node // <var name="piNode" type="Node"/>
                 r#doc = staff_xml(STAFF_XML).unwrap(); // staff.xml // <load var="doc" href="staff" willBeModified="false"/>
                 r#test_list = r#doc.child_nodes(); // <childNodes obj="doc" var="testList"/>
-                r#pi_node = r#test_list[0].clone().as_processing_instruction().unwrap(); // <item interface="NodeList" obj="testList" index="0" var="piNode"/>
+                r#pi_node = r#test_list
+                    .item(0)
+                    .unwrap()
+                    .clone()
+                    .as_processing_instruction()
+                    .unwrap(); // <item interface="NodeList" obj="testList" index="0" var="piNode"/>
                 let r#attr_list = r#pi_node.attributes(); // <attributes obj="piNode" var="attrList"/>
                 assert!(attr_list.is_none()); // <assertNull actual="attrList" id="nodeProcessingInstructionNodeAttrAssert1"/>
             }
@@ -7070,7 +7099,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("employee"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;employee&quot;" var="elementList"/>
                 r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
                 r#child_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="childList"/>
-                r#ref_child = r#child_list[3].clone(); // <item interface="NodeList" obj="childList" index="3" var="refChild"/>
+                r#ref_child = r#child_list.item(3).unwrap().clone(); // <item interface="NodeList" obj="childList" index="3" var="refChild"/>
                 r#new_child = r#doc.create_element("newChild".to_string()).unwrap(); // <createElement obj="doc" tagName="&quot;newChild&quot;" var="newChild"/>
                 r#inserted_node = r#employee_node
                     .insert_before(new_child.into(), Some(ref_child))
@@ -7111,7 +7140,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;p&quot;" var="elementList"/>
                 r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
                 r#child_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="childList"/>
-                r#child_node = r#child_list[3].clone(); // <item interface="NodeList" obj="childList" index="3" var="childNode"/>
+                r#child_node = r#child_list.item(3).unwrap().clone(); // <item interface="NodeList" obj="childList" index="3" var="childNode"/>
                 r#cloned_node = r#child_node.clone_node(false); // <cloneNode obj="childNode" deep="false" var="clonedNode"/>
                 let r#last_child_node = r#cloned_node.last_child(); // <lastChild interface="Node" obj="clonedNode" var="lastChildNode"/>
                 assert!(last_child_node.is_none()); // <assertNull actual="lastChildNode" id="nodeCloneFalseNoCopyTextAssert1"/>
@@ -7517,7 +7546,7 @@ mod dom_test_suite {
                 r#doc = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
                 r#new_doc_fragment = r#doc.create_document_fragment(); // <createDocumentFragment obj="doc" var="newDocFragment"/>
                 r#children = r#new_doc_fragment.child_nodes(); // <childNodes obj="newDocFragment" var="children"/>
-                r#length = r#children.len(); // <length interface="NodeList" obj="children" var="length"/>
+                r#length = r#children.length(); // <length interface="NodeList" obj="children" var="length"/>
                 assert_eq!(r#length, 0); // <assertEquals actual="length" expected="0" ignoreCase="false" id="length"/>
                 r#new_doc_fragment_name = r#new_doc_fragment.node_name().to_string(); // <nodeName obj="newDocFragment" var="newDocFragmentName"/>
                 assert_eq!(r#new_doc_fragment_name, "#document-fragment"); // <assertEquals actual="newDocFragmentName" expected="&quot;#document-fragment&quot;" ignoreCase="false" id="strong"/>
@@ -7685,8 +7714,8 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("employee"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;employee&quot;" var="elementList"/>
                 r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
                 r#child_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="childList"/>
-                r#length = r#child_list.len(); // <length var="length" obj="childList" interface="NodeList"/>
-                r#old_child = r#child_list[1].clone(); // <item interface="NodeList" obj="childList" index="1" var="oldChild"/>
+                r#length = r#child_list.length(); // <length var="length" obj="childList" interface="NodeList"/>
+                r#old_child = r#child_list.item(1).unwrap().clone(); // <item interface="NodeList" obj="childList" index="1" var="oldChild"/>
                 r#new_child = r#doc.create_element("newChild".to_string()).unwrap(); // <createElement obj="doc" tagName="&quot;newChild&quot;" var="newChild"/>
                 r#replaced_node = r#employee_node
                     .replace_child(new_child.into(), old_child)
@@ -7984,14 +8013,14 @@ mod dom_test_suite {
                 r#gender_list = r#doc.get_elements_by_tag_name("gender"); // <getElementsByTagName interface="Document" obj="doc" var="genderList" tagname="&quot;gender&quot;"/>
                 r#gender = r#gender_list[2].clone(); // <item interface="NodeList" obj="genderList" var="gender" index="2"/>
                 r#gen_list = r#gender.child_nodes(); // <childNodes obj="gender" var="genList"/>
-                r#gen = r#gen_list[0].clone(); // <item interface="NodeList" obj="genList" var="gen" index="0"/>
+                r#gen = r#gen_list.item(0).unwrap().clone(); // <item interface="NodeList" obj="genList" var="gen" index="0"/>
 
                 // unimplemented: // <assertNotNull actual="gen" id="genNotNull"/>
                 r#node_type = r#gen.node_type(); // <nodeType var="nodeType" obj="gen"/>
 
                 // unimplemented: // <if><equals actual="nodeType" expected="1" ignoreCase="false"/>	<createEntityReference var="gen" obj="doc" name="&quot;ent4&quot;"/>	<assertNotNull actual="gen" id="createdEntRefNotNull"/></if>
                 r#g_list = r#gen.child_nodes(); // <childNodes obj="gen" var="gList"/>
-                r#gen_element = r#g_list[0].clone(); // <item interface="NodeList" obj="gList" var="genElement" index="0"/>
+                r#gen_element = r#g_list.item(0).unwrap().clone(); // <item interface="NodeList" obj="gList" var="genElement" index="0"/>
 
                 // unimplemented: // <assertNotNull actual="genElement" id="genElementNotNull"/>
 
@@ -8275,7 +8304,12 @@ mod dom_test_suite {
                 let mut r#pi_value; // type: DOMString // <var name="piValue" type="DOMString"/>
                 r#doc = staff_xml(STAFF_XML).unwrap(); // staff.xml // <load var="doc" href="staff" willBeModified="true"/>
                 r#test_list = r#doc.child_nodes(); // <childNodes obj="doc" var="testList"/>
-                r#pi_node = r#test_list[0].clone().as_processing_instruction().unwrap(); // <item interface="NodeList" obj="testList" index="0" var="piNode"/>
+                r#pi_node = r#test_list
+                    .item(0)
+                    .unwrap()
+                    .clone()
+                    .as_processing_instruction()
+                    .unwrap(); // <item interface="NodeList" obj="testList" index="0" var="piNode"/>
                 r#pi_node.set_node_value("Something different").unwrap(); // <nodeValue obj="piNode" value="&quot;Something different&quot;"/>
                 r#pi_value = r#pi_node.node_value().unwrap().to_string(); // <nodeValue obj="piNode" var="piValue"/>
                 assert_eq!(r#pi_value, "Something different"); // <assertEquals actual="piValue" expected="&quot;Something different&quot;" id="nodeValue" ignoreCase="false"/>
@@ -8419,8 +8453,8 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("employee"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;employee&quot;" var="elementList"/>
                 r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
                 r#child_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="childList"/>
-                r#length = r#child_list.len(); // <length var="length" obj="childList" interface="NodeList"/>
-                r#old_child = r#child_list[0].clone(); // <item interface="NodeList" obj="childList" index="0" var="oldChild"/>
+                r#length = r#child_list.length(); // <length var="length" obj="childList" interface="NodeList"/>
+                r#old_child = r#child_list.item(0).unwrap().clone(); // <item interface="NodeList" obj="childList" index="0" var="oldChild"/>
                 r#removed_child = r#employee_node.remove_child(old_child).unwrap(); // <removeChild obj="employeeNode" oldChild="oldChild" var="removedChild"/>
                 r#child_name = r#removed_child.node_name().to_string(); // <nodeName obj="removedChild" var="childName"/>
 
@@ -8511,12 +8545,12 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("employee"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;employee&quot;" var="elementList"/>
                 r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
                 r#child_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="childList"/>
-                r#old_child = r#child_list[0].clone(); // <item interface="NodeList" obj="childList" index="0" var="oldChild"/>
+                r#old_child = r#child_list.item(0).unwrap().clone(); // <item interface="NodeList" obj="childList" index="0" var="oldChild"/>
                 r#new_child = r#doc.create_element("newChild".to_string()).unwrap(); // <createElement obj="doc" tagName="&quot;newChild&quot;" var="newChild"/>
                 r#replaced_node = r#employee_node
                     .replace_child(new_child.into(), old_child)
                     .unwrap(); // <replaceChild var="replacedNode" obj="employeeNode" newChild="newChild" oldChild="oldChild"/>
-                r#child = r#child_list[0].clone(); // <item interface="NodeList" obj="childList" index="0" var="child"/>
+                r#child = r#child_list.item(0).unwrap().clone(); // <item interface="NodeList" obj="childList" index="0" var="child"/>
                 r#child_name = r#child.node_name().to_string(); // <nodeName obj="child" var="childName"/>
                 assert_eq!(r#child_name, "newChild"); // <assertEquals actual="childName" expected="&quot;newChild&quot;" id="nodeReplaceChildAssert1" ignoreCase="false"/>
             }
@@ -8593,7 +8627,7 @@ mod dom_test_suite {
                 // r#element_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;p&quot;" var="elementList"/>
                 // r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
                 // r#child_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="childList"/>
-                // r#ref_child = r#child_list[0].clone(); // <item interface="NodeList" obj="childList" index="0" var="refChild"/>
+                // r#ref_child = r#child_list.item(0).unwrap().clone(); // <item interface="NodeList" obj="childList" index="0" var="refChild"/>
 
                 // // unimplemented: // <assertDOMException id="throw_HIERARCHY_REQUEST_ERR"><HIERARCHY_REQUEST_ERR><insertBefore var="insertedNode" obj="employeeNode" newChild="newChild" refChild="refChild"/></HIERARCHY_REQUEST_ERR></assertDOMException>
             }
@@ -8611,7 +8645,7 @@ mod dom_test_suite {
                 r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
                 r#text_node = r#employee_node.first_child().unwrap(); // <firstChild var="textNode" obj="employeeNode"/>
                 r#child_list = r#text_node.child_nodes(); // <childNodes var="childList" obj="textNode"/>
-                r#length = r#child_list.len(); // <length var="length" obj="childList" interface="NodeList"/>
+                r#length = r#child_list.length(); // <length var="length" obj="childList" interface="NodeList"/>
                 assert_eq!(r#length, 0); // <assertEquals expected="0" actual="length" id="length_zero" ignoreCase="false"/>
             }
             // nodenotationnodeattributes.xml
@@ -8821,7 +8855,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("employee"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;employee&quot;" var="elementList"/>
                 r#child = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="child"/>
                 r#employee_id_list = r#child.child_nodes(); // <childNodes obj="child" var="employeeIdList"/>
-                r#employee_node = r#employee_id_list[1].clone(); // <item interface="NodeList" obj="employeeIdList" index="1" var="employeeNode"/>
+                r#employee_node = r#employee_id_list.item(1).unwrap().clone(); // <item interface="NodeList" obj="employeeIdList" index="1" var="employeeNode"/>
                 r#text_node = r#employee_node.first_child().unwrap(); // <firstChild interface="Node" obj="employeeNode" var="textNode"/>
                 r#state = r#text_node.has_child_nodes(); // <hasChildNodes obj="textNode" var="state"/>
                 assert!(!r#state); // <assertFalse actual="state" id="nodeHasChildFalseAssert1"/>
@@ -8843,7 +8877,7 @@ mod dom_test_suite {
                 // r#element_list = r#doc.get_elements_by_tag_name("employee"); // <getElementsByTagName interface="Document" obj="doc" var="elementList" tagname="&quot;employee&quot;"/>
                 // r#employee_node = r#element_list[2].clone(); // <item interface="NodeList" obj="elementList" var="employeeNode" index="2"/>
                 // r#employee_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="employeeList"/>
-                // r#length = r#employee_list.len(); // <length var="length" obj="employeeList" interface="NodeList"/>
+                // r#length = r#employee_list.length(); // <length var="length" obj="employeeList" interface="NodeList"/>
 
                 // // unimplemented: // <for-each collection="employeeList" member="child">	<nodeName obj="child" var="childName"/>	<append collection="result" item="childName"/></for-each>
 
@@ -8893,7 +8927,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName interface="Document" obj="doc" var="elementList" tagname="&quot;p&quot;"/>
                 r#employee_node = r#element_list[2].clone(); // <item interface="NodeList" obj="elementList" var="employeeNode" index="2"/>
                 r#employee_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="employeeList"/>
-                r#length = r#employee_list.len(); // <length var="length" obj="employeeList" interface="NodeList"/>
+                r#length = r#employee_list.length(); // <length var="length" obj="employeeList" interface="NodeList"/>
 
                 // unimplemented: // <if><equals actual="length" expected="6"/><assertEquals actual="length" expected="6" ignoreCase="false" id="length_wo_space"/><else><assertEquals actual="length" expected="13" ignoreCase="false" id="length_w_space"/></else></if>
             }
@@ -9124,7 +9158,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("employee"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;employee&quot;" var="elementList"/>
                 r#employee_node = r#element_list[0].clone(); // <item interface="NodeList" obj="elementList" index="0" var="employeeNode"/>
                 r#employee_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="employeeList"/>
-                r#second_child_node = r#employee_list[1].clone(); // <item interface="NodeList" obj="employeeList" index="1" var="secondChildNode"/>
+                r#second_child_node = r#employee_list.item(1).unwrap().clone(); // <item interface="NodeList" obj="employeeList" index="1" var="secondChildNode"/>
                 r#text_node = r#second_child_node.first_child().unwrap(); // <firstChild interface="Node" obj="secondChildNode" var="textNode"/>
                 let r#no_child_node = r#text_node.first_child(); // <firstChild interface="Node" obj="textNode" var="noChildNode"/>
                 assert!(no_child_node.is_none()); // <assertNull actual="noChildNode" id="nodeGetFirstChildNullAssert1"/>
@@ -9252,7 +9286,7 @@ mod dom_test_suite {
                 r#em_node = r#em_list[2].clone(); // <item interface="NodeList" obj="emList" var="emNode" index="2"/>
                 r#text_node = r#em_node.first_child().unwrap(); // <firstChild var="textNode" obj="emNode"/>
                 r#text_list = r#text_node.child_nodes(); // <childNodes var="textList" obj="textNode"/>
-                r#length = r#text_list.len(); // <length var="length" obj="textList" interface="NodeList"/>
+                r#length = r#text_list.length(); // <length var="length" obj="textList" interface="NodeList"/>
                 assert_eq!(r#length, 0); // <assertEquals actual="length" expected="0" id="length" ignoreCase="false"/>
             }
             // nodegetlastchild.xml
@@ -9436,7 +9470,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("employee"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;employee&quot;" var="elementList"/>
                 r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
                 r#child_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="childList"/>
-                r#child_node = r#child_list[3].clone(); // <item interface="NodeList" obj="childList" index="3" var="childNode"/>
+                r#child_node = r#child_list.item(3).unwrap().clone(); // <item interface="NodeList" obj="childList" index="3" var="childNode"/>
                 r#cloned_node = r#child_node.clone_node(false); // <cloneNode obj="childNode" deep="false" var="clonedNode"/>
                 let r#last_child_node = r#cloned_node.last_child(); // <lastChild interface="Node" obj="clonedNode" var="lastChildNode"/>
                 assert!(last_child_node.is_none()); // <assertNull actual="lastChildNode" id="noTextNodes"/>
@@ -9619,7 +9653,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("employee"); // <getElementsByTagName interface="Document" obj="doc" var="elementList" tagname="&quot;employee&quot;"/>
                 r#employee_node = r#element_list[2].clone(); // <item interface="NodeList" obj="elementList" var="employeeNode" index="2"/>
                 r#employee_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="employeeList"/>
-                r#child = r#employee_list[0].clone(); // <item interface="NodeList" obj="employeeList" var="child" index="0"/>
+                r#child = r#employee_list.item(0).unwrap().clone(); // <item interface="NodeList" obj="employeeList" var="child" index="0"/>
                 r#child_name = r#child.node_name().to_string(); // <nodeName obj="child" var="childName"/>
 
                 // unimplemented: // <if><notEquals actual="childName" expected="&quot;#text&quot;" ignoreCase="false"/><assertEquals actual="childName" expected="&quot;employeeId&quot;" id="childName" ignoreCase="false"/></if>
@@ -9699,7 +9733,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("employee"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;employee&quot;" var="elementList"/>
                 r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
                 r#child_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="childList"/>
-                r#second_c_node = r#child_list[1].clone(); // <item interface="NodeList" obj="childList" index="1" var="secondCNode"/>
+                r#second_c_node = r#child_list.item(1).unwrap().clone(); // <item interface="NodeList" obj="childList" index="1" var="secondCNode"/>
                 r#text_node = r#second_c_node.first_child().unwrap(); // <firstChild interface="Node" obj="secondCNode" var="textNode"/>
                 r#child_nodes_list = r#text_node.child_nodes(); // <childNodes obj="textNode" var="childNodesList"/>
 
@@ -10072,7 +10106,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName interface="Document" obj="doc" var="elementList" tagname="&quot;p&quot;"/>
                 r#employee_node = r#element_list[2].clone(); // <item interface="NodeList" obj="elementList" var="employeeNode" index="2"/>
                 r#employee_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="employeeList"/>
-                r#child = r#employee_list[0].clone(); // <item interface="NodeList" obj="employeeList" var="child" index="0"/>
+                r#child = r#employee_list.item(0).unwrap().clone(); // <item interface="NodeList" obj="employeeList" var="child" index="0"/>
                 r#child_name = r#child.node_name().to_string(); // <nodeName obj="child" var="childName"/>
 
                 // unimplemented: // <if><equals actual="childName" expected="&quot;#text&quot;"/><assertEquals actual="childName" expected="&quot;#text&quot;" ignoreCase="false" id="nodeName_w_space"/><else><assertEquals actual="childName" expected="&quot;em&quot;" ignoreCase="auto" id="nodeName_wo_space"/></else></if>
@@ -10145,7 +10179,9 @@ mod dom_test_suite {
                 let mut r#data; // type: DOMString // <var name="data" type="DOMString"/>
                 r#doc = staff_xml(STAFF_XML).unwrap(); // staff.xml // <load var="doc" href="staff" willBeModified="false"/>
                 r#child_nodes = r#doc.child_nodes(); // <childNodes obj="doc" var="childNodes"/>
-                r#pi_node = r#child_nodes[0]
+                r#pi_node = r#child_nodes
+                    .item(0)
+                    .unwrap()
                     .clone()
                     .as_processing_instruction()
                     .unwrap(); // <item interface="NodeList" obj="childNodes" var="piNode" index="0"/>
@@ -10182,7 +10218,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("employee"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;employee&quot;" var="elementList"/>
                 r#employee_node = r#element_list[0].clone(); // <item interface="NodeList" obj="elementList" index="0" var="employeeNode"/>
                 r#employee_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="employeeList"/>
-                r#second_child_node = r#employee_list[1].clone(); // <item interface="NodeList" obj="employeeList" index="1" var="secondChildNode"/>
+                r#second_child_node = r#employee_list.item(1).unwrap().clone(); // <item interface="NodeList" obj="employeeList" index="1" var="secondChildNode"/>
                 r#text_node = r#second_child_node.first_child().unwrap(); // <firstChild interface="Node" obj="secondChildNode" var="textNode"/>
                 let r#no_child_node = r#text_node.last_child(); // <lastChild interface="Node" obj="textNode" var="noChildNode"/>
                 assert!(no_child_node.is_none()); // <assertNull actual="noChildNode" id="nodeGetLastChildNullAssert1"/>
@@ -10211,7 +10247,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("employee"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;employee&quot;" var="elementList"/>
                 r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
                 r#child_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="childList"/>
-                r#expected_length = r#child_list.len(); // <length var="expectedLength" obj="childList" interface="NodeList"/>
+                r#expected_length = r#child_list.length(); // <length var="expectedLength" obj="childList" interface="NodeList"/>
                 r#expected_length += 1; // <increment var="expectedLength" value="1"/>
                 r#created_node = r#doc.create_element("text3".to_string()).unwrap(); // <createElement obj="doc" var="createdNode" tagName="&quot;text3&quot;"/>
                 r#employee_node = r#employee_node
@@ -10219,7 +10255,7 @@ mod dom_test_suite {
                     .unwrap()
                     .as_element()
                     .unwrap(); // <appendChild obj="employeeNode" newChild="createdNode" var="employeeNode"/>
-                r#length = r#child_list.len(); // <length var="length" obj="childList" interface="NodeList"/>
+                r#length = r#child_list.length(); // <length var="length" obj="childList" interface="NodeList"/>
                 assert_eq!(r#length, expected_length); // <assertEquals actual="length" expected="expectedLength" ignoreCase="false" id="childNodeLength"/>
             }
             // hc_nodeappendchildnodeancestor.xml
@@ -10588,8 +10624,8 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName interface="Document" obj="doc" var="elementList" tagname="&quot;p&quot;"/>
                 r#employee_node = r#element_list[2].clone(); // <item interface="NodeList" obj="elementList" var="employeeNode" index="2"/>
                 r#employee_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="employeeList"/>
-                r#length = r#employee_list.len(); // <length var="length" obj="employeeList" interface="NodeList"/>
-                r#child = r#employee_list[0].clone(); // <item interface="NodeList" obj="employeeList" var="child" index="0"/>
+                r#length = r#employee_list.length(); // <length var="length" obj="employeeList" interface="NodeList"/>
+                r#child = r#employee_list.item(0).unwrap().clone(); // <item interface="NodeList" obj="employeeList" var="child" index="0"/>
                 r#child_name = r#child.node_name().to_string(); // <nodeName obj="child" var="childName"/>
 
                 // unimplemented: // <if><equals expected="13" actual="length" ignoreCase="false"/><assertEquals actual="childName" expected="&quot;#text&quot;" ignoreCase="false" id="childName_w_whitespace"/><else><assertEquals actual="childName" expected="&quot;em&quot;" ignoreCase="auto" id="childName_wo_whitespace"/></else></if>
@@ -10634,7 +10670,12 @@ mod dom_test_suite {
                 let mut r#pi_value; // type: DOMString // <var name="piValue" type="DOMString"/>
                 r#doc = staff_xml(STAFF_XML).unwrap(); // staff.xml // <load var="doc" href="staff" willBeModified="false"/>
                 r#test_list = r#doc.child_nodes(); // <childNodes obj="doc" var="testList"/>
-                r#pi_node = r#test_list[0].clone().as_processing_instruction().unwrap(); // <item interface="NodeList" obj="testList" index="0" var="piNode"/>
+                r#pi_node = r#test_list
+                    .item(0)
+                    .unwrap()
+                    .clone()
+                    .as_processing_instruction()
+                    .unwrap(); // <item interface="NodeList" obj="testList" index="0" var="piNode"/>
                 r#pi_value = r#pi_node.node_value().unwrap().to_string(); // <nodeValue obj="piNode" var="piValue"/>
                 assert_eq!(r#pi_value, "PIDATA"); // <assertEquals actual="piValue" expected="&quot;PIDATA&quot;" id="value" ignoreCase="false"/>
             }
@@ -10657,7 +10698,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("employee"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;employee&quot;" var="elementList"/>
                 r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
                 r#child_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="childList"/>
-                r#ref_child = r#child_list[3].clone(); // <item interface="NodeList" obj="childList" index="3" var="refChild"/>
+                r#ref_child = r#child_list.item(3).unwrap().clone(); // <item interface="NodeList" obj="childList" index="3" var="refChild"/>
                 r#newdoc_fragment = r#doc.create_document_fragment(); // <createDocumentFragment obj="doc" var="newdocFragment"/>
                 r#new_child1 = r#doc.create_element("newChild1".to_string()).unwrap(); // <createElement obj="doc" tagName="&quot;newChild1&quot;" var="newChild1"/>
                 r#new_child2 = r#doc.create_element("newChild2".to_string()).unwrap(); // <createElement obj="doc" tagName="&quot;newChild2&quot;" var="newChild2"/>
@@ -10666,10 +10707,10 @@ mod dom_test_suite {
                 r#inserted_node = r#employee_node
                     .insert_before(newdoc_fragment.into(), ref_child.into())
                     .unwrap(); // <insertBefore var="insertedNode" obj="employeeNode" newChild="newdocFragment" refChild="refChild"/>
-                r#child = r#child_list[3].clone(); // <item interface="NodeList" obj="childList" index="3" var="child"/>
+                r#child = r#child_list.item(3).unwrap().clone(); // <item interface="NodeList" obj="childList" index="3" var="child"/>
                 r#child_name = r#child.node_name().to_string(); // <nodeName obj="child" var="childName"/>
                 assert_eq!(r#child_name, "newChild1"); // <assertEquals actual="childName" expected="&quot;newChild1&quot;" ignoreCase="false" id="childName3"/>
-                r#child = r#child_list[4].clone(); // <item interface="NodeList" obj="childList" index="4" var="child"/>
+                r#child = r#child_list.item(4).unwrap().clone(); // <item interface="NodeList" obj="childList" index="4" var="child"/>
                 r#child_name = r#child.node_name().to_string(); // <nodeName obj="child" var="childName"/>
                 assert_eq!(r#child_name, "newChild2"); // <assertEquals actual="childName" expected="&quot;newChild2&quot;" ignoreCase="false" id="childName4"/>
             }
@@ -10687,9 +10728,9 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName interface="Document" obj="doc" var="elementList" tagname="&quot;p&quot;"/>
                 r#employee_node = r#element_list[2].clone(); // <item interface="NodeList" obj="elementList" var="employeeNode" index="2"/>
                 r#employee_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="employeeList"/>
-                r#index = r#employee_list.len(); // <length var="index" obj="employeeList" interface="NodeList"/>
+                r#index = r#employee_list.length(); // <length var="index" obj="employeeList" interface="NodeList"/>
                 r#index -= 1; // <decrement var="index" value="1"/>
-                r#child = r#employee_list[index].clone(); // <item interface="NodeList" obj="employeeList" var="child" index="index"/>
+                r#child = r#employee_list.item(index).unwrap().clone(); // <item interface="NodeList" obj="employeeList" var="child" index="index"/>
                 r#child_name = r#child.node_name().to_string(); // <nodeName obj="child" var="childName"/>
 
                 // unimplemented: // <if><equals actual="index" expected="12"/> <assertEquals actual="childName" expected="&quot;#text&quot;" id="lastNodeName_w_whitespace" ignoreCase="false"/><else><assertEquals actual="childName" expected="&quot;acronym&quot;" id="lastNodeName" ignoreCase="auto"/><assertEquals actual="index" expected="5" id="index" ignoreCase="false"/></else></if>
@@ -10710,12 +10751,12 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;p&quot;" var="elementList"/>
                 r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
                 r#child_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="childList"/>
-                r#old_child = r#child_list[0].clone(); // <item interface="NodeList" obj="childList" index="0" var="oldChild"/>
+                r#old_child = r#child_list.item(0).unwrap().clone(); // <item interface="NodeList" obj="childList" index="0" var="oldChild"/>
                 r#new_child = r#doc.create_element("br".to_string()).unwrap(); // <createElement obj="doc" tagName="&quot;br&quot;" var="newChild"/>
                 r#replaced_node = r#employee_node
                     .replace_child(new_child.into(), old_child)
                     .unwrap(); // <replaceChild var="replacedNode" obj="employeeNode" newChild="newChild" oldChild="oldChild"/>
-                r#child = r#child_list[0].clone(); // <item interface="NodeList" obj="childList" index="0" var="child"/>
+                r#child = r#child_list.item(0).unwrap().clone(); // <item interface="NodeList" obj="childList" index="0" var="child"/>
                 r#child_name = r#child.node_name().to_string(); // <nodeName obj="child" var="childName"/>
                 assert_eq!(r#child_name, "br"); // <assertEquals actual="childName" expected="&quot;br&quot;" id="nodeName" ignoreCase="auto"/>
             }
@@ -10913,7 +10954,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;p&quot;" var="elementList"/>
                 r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
                 r#child_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="childList"/>
-                r#ref_child = r#child_list[3].clone(); // <item interface="NodeList" obj="childList" index="3" var="refChild"/>
+                r#ref_child = r#child_list.item(3).unwrap().clone(); // <item interface="NodeList" obj="childList" index="3" var="refChild"/>
                 r#new_child = r#doc.create_element("br".to_string()).unwrap(); // <createElement obj="doc" tagName="&quot;br&quot;" var="newChild"/>
                 r#inserted_node = r#employee_node
                     .insert_before(new_child.into(), Some(ref_child))
@@ -10999,6 +11040,8 @@ mod dom_test_suite {
     mod level2 {
         use super::*;
         mod core {
+            use exml::dom::node_list::NodeList;
+
             use super::*;
             // namednodemapsetnameditemns08.xml
             #[test]
@@ -12330,7 +12373,7 @@ mod dom_test_suite {
 
                 // unimplemented: // <if><equals actual="nodeType" expected="1" ignoreCase="false"/>	<createEntityReference name="&quot;ent4&quot;" obj="doc" var="gen"/>	<assertNotNull actual="gen" id="createdEntRefNotNull"/></if>
                 r#g_list = r#gen.child_nodes(); // <childNodes obj="gen" var="gList"/>
-                r#gen_element = r#g_list[0].clone(); // <item interface="NodeList" obj="gList" var="genElement" index="0"/>
+                r#gen_element = r#g_list.item(0).unwrap().clone(); // <item interface="NodeList" obj="gList" var="genElement" index="0"/>
 
                 // unimplemented: // <assertNotNull actual="genElement" id="notnull"/>
 
@@ -12715,7 +12758,12 @@ mod dom_test_suite {
                     .unwrap()
                     .unwrap(); // <setAttributeNodeNS var="newAttribute" obj="element" newAttr="attribute"/>
                 r#element_list = r#ent_ref.child_nodes(); // <childNodes var="elementList" obj="entRef"/>
-                r#element = r#element_list[0].clone().as_element().unwrap(); // <item var="element" obj="elementList" index="0" interface="NodeList"/>
+                r#element = r#element_list
+                    .item(0)
+                    .unwrap()
+                    .clone()
+                    .as_element()
+                    .unwrap(); // <item var="element" obj="elementList" index="0" interface="NodeList"/>
                 r#attribute2 = r#doc
                     .create_attribute_ns(Some("http://www.w3.org/DOM/Test"), "attr2".as_ref())
                     .unwrap(); // <createAttributeNS var="attribute2" obj="doc" namespaceURI="&quot;http://www.w3.org/DOM/Test&quot;" qualifiedName="&quot;attr2&quot;"/>
@@ -12789,7 +12837,7 @@ mod dom_test_suite {
                 // // unimplemented: // <createDocument var="newDoc" obj="domImpl" namespaceURI="&quot;http://www.w3.org/DOM/Test&quot;" qualifiedName="&quot;l2:root&quot;" doctype="docType"/>
                 // r#child_list = r#doc
                 //     .get_elements_by_tag_name_ns(Some("http://www.nist.gov"), "employee"); // <getElementsByTagNameNS var="childList" obj="doc" localName="&quot;employee&quot;" namespaceURI="&quot;http://www.nist.gov&quot;" interface="Document"/>
-                // r#element = r#child_list[1].clone(); // <item var="element" obj="childList" index="1" interface="NodeList"/>
+                // r#element = r#child_list.item(1).unwrap().clone(); // <item var="element" obj="childList" index="1" interface="NodeList"/>
                 // r#attr = r#element.get_attribute_node("defaultAttr").unwrap(); // <getAttributeNode var="attr" obj="element" name="&quot;defaultAttr&quot;"/>
                 // r#imported_attr = r#new_doc.import_node(r#attr.into(), true).unwrap(); // <importNode var="importedAttr" obj="newDoc" importedNode="attr" deep="true"/>
                 // r#node_name = r#imported_attr.node_name().to_string(); // <nodeName var="nodeName" obj="importedAttr"/>
@@ -13795,12 +13843,12 @@ mod dom_test_suite {
                 r#gender_list = r#doc.get_elements_by_tag_name("gender"); // <getElementsByTagName interface="Document" obj="doc" var="genderList" tagname="&quot;gender&quot;"/>
                 r#gender = r#gender_list[2].clone(); // <item interface="NodeList" obj="genderList" var="gender" index="2"/>
                 r#gen_list = r#gender.child_nodes(); // <childNodes obj="gender" var="genList"/>
-                r#gen = r#gen_list[0].clone(); // <item interface="NodeList" obj="genList" var="gen" index="0"/>
+                r#gen = r#gen_list.item(0).unwrap().clone(); // <item interface="NodeList" obj="genList" var="gen" index="0"/>
                 r#node_type = r#gen.node_type(); // <nodeType var="nodeType" obj="gen"/>
 
                 // unimplemented: // <if><equals actual="nodeType" expected="1" ignoreCase="false"/>	<createEntityReference var="gen" name="&quot;ent4&quot;" obj="doc"/>	<assertNotNull actual="gen" id="createdEntRefNotNull"/></if>
                 r#g_list = r#gen.child_nodes(); // <childNodes obj="gen" var="gList"/>
-                r#gen_element = r#g_list[0].clone(); // <item interface="NodeList" obj="gList" var="genElement" index="0"/>
+                r#gen_element = r#g_list.item(0).unwrap().clone(); // <item interface="NodeList" obj="gList" var="genElement" index="0"/>
 
                 // unimplemented: // <assertNotNull actual="genElement" id="notnull"/>
 
@@ -14700,10 +14748,10 @@ mod dom_test_suite {
                 // r#entity4 = r#node_map.get_named_item("ent4".into()).unwrap(); // <getNamedItem var="entity4" obj="nodeMap" name="&quot;ent4&quot;"/>
                 // r#entity_imp4 = r#doc_imp.import_node(r#entity4.into(), true).unwrap(); // <importNode var="entityImp4" obj="docImp" importedNode="entity4" deep="true"/>
                 // r#child_list = r#entity_imp4.child_nodes(); // <childNodes var="childList" obj="entityImp4"/>
-                // r#element = r#child_list[0].clone(); // <item var="element" obj="childList" index="0" interface="NodeList"/>
+                // r#element = r#child_list.item(0).unwrap().clone(); // <item var="element" obj="childList" index="0" interface="NodeList"/>
                 // r#elemchild_list = r#element.child_nodes(); // <childNodes var="elemchildList" obj="element"/>
                 // r#cdata = r#elemchild_list[0].clone().as_cdata_section().unwrap(); // <item var="cdata" obj="elemchildList" index="0" interface="NodeList"/>
-                // r#pi = r#child_list[1].clone().as_processing_instruction().unwrap(); // <item var="pi" obj="childList" index="1" interface="NodeList"/>
+                // r#pi = r#child_list.item(1).unwrap().clone().as_processing_instruction().unwrap(); // <item var="pi" obj="childList" index="1" interface="NodeList"/>
                 // r#ent4_name = r#entity4.node_name().to_string(); // <nodeName var="ent4Name" obj="entity4"/>
                 // r#ent4_imp_name = r#entity_imp4.node_name().to_string(); // <nodeName var="ent4ImpName" obj="entityImp4"/>
                 // r#cdata_val = r#cdata.data().to_string(); // <data var="cdataVal" obj="cdata" interface="CharacterData"/>
@@ -15447,7 +15495,7 @@ mod dom_test_suite {
 
                 // // unimplemented: // <if><implementationAttribute name="expandEntityReferences" value="false"/><getElementsByTagName interface="Document" obj="doc" var="genderList" tagname="&quot;gender&quot;"/><item interface="NodeList" obj="genderList" var="gender" index="2"/><childNodes obj="gender" var="genList"/><item interface="NodeList" obj="genList" var="gen" index="0"/><else><createEntityReference var="gen" name="&quot;ent4&quot;" obj="doc"/></else></if>
                 // r#g_list = r#gen.child_nodes(); // <childNodes obj="gen" var="gList"/>
-                // r#gen_element = r#g_list[0].clone(); // <item interface="NodeList" obj="gList" var="genElement" index="0"/>
+                // r#gen_element = r#g_list.item(0).unwrap().clone(); // <item interface="NodeList" obj="gList" var="genElement" index="0"/>
 
                 // // unimplemented: // <assertNotNull actual="genElement" id="notnull"/>
                 // r#new_attr = r#doc
@@ -16310,8 +16358,8 @@ mod dom_test_suite {
                 r#imported = r#doc.import_node(r#address_elem.into(), true).unwrap(); // <importNode var="imported" obj="doc" importedNode="addressElem" deep="true"/>
                 r#address_elem_children = r#address_elem.child_nodes(); // <childNodes var="addressElemChildren" obj="addressElem"/>
                 r#imported_children = r#imported.child_nodes(); // <childNodes var="importedChildren" obj="imported"/>
-                r#address_elem_len = r#address_elem_children.len(); // <length var="addressElemLen" obj="addressElemChildren" interface="NodeList"/>
-                r#imported_len = r#imported_children.len(); // <length var="importedLen" obj="importedChildren" interface="NodeList"/>
+                r#address_elem_len = r#address_elem_children.length(); // <length var="addressElemLen" obj="addressElemChildren" interface="NodeList"/>
+                r#imported_len = r#imported_children.length(); // <length var="importedLen" obj="importedChildren" interface="NodeList"/>
                 assert_eq!(r#address_elem_len, imported_len); // <assertEquals actual="addressElemLen" expected="importedLen" id="documentimportnode12" ignoreCase="false"/>
             }
             // documentimportnode13.xml
@@ -16329,7 +16377,7 @@ mod dom_test_suite {
                 r#employee_elem = r#child_list[0].clone(); // <item var="employeeElem" obj="childList" index="0" interface="NodeList"/>
                 r#imported = r#doc.import_node(r#employee_elem.into(), false).unwrap(); // <importNode var="imported" obj="doc" importedNode="employeeElem" deep="false"/>
                 r#imported_list = r#imported.child_nodes(); // <childNodes var="importedList" obj="imported"/>
-                r#imported_len = r#imported_list.len(); // <length var="importedLen" obj="importedList" interface="NodeList"/>
+                r#imported_len = r#imported_list.length(); // <length var="importedLen" obj="importedList" interface="NodeList"/>
                 assert_eq!(r#imported_len, 0); // <assertEquals expected="0" actual="importedLen" id="documentimportnode13" ignoreCase="false"/>
             }
             // normalize01.xml
@@ -16348,7 +16396,7 @@ mod dom_test_suite {
                 r#element_list = r#root.get_elements_by_tag_name("name"); // <getElementsByTagName interface="Element" obj="root" tagname="&quot;name&quot;" var="elementList"/>
                 r#first_child = r#element_list[2].clone(); // <item interface="NodeList" obj="elementList" index="2" var="firstChild"/>
                 r#text_list = r#first_child.child_nodes(); // <childNodes obj="firstChild" var="textList"/>
-                r#text_node = r#text_list[0].clone().as_text_node().unwrap(); // <item interface="NodeList" obj="textList" index="0" var="textNode"/>
+                r#text_node = r#text_list.item(0).unwrap().clone().as_text_node().unwrap(); // <item interface="NodeList" obj="textList" index="0" var="textNode"/>
                 r#data = r#text_node.data().to_string(); // <data interface="CharacterData" obj="textNode" var="data"/>
                 assert_eq!(r#data, "Roger\n Jones"); // <assertEquals actual="data" expected="&quot;Roger\n Jones&quot;" id="data" ignoreCase="false"/>
             }
@@ -17052,7 +17100,7 @@ mod dom_test_suite {
                 // let mut r#null_ns; // type: DOMString // <var name="nullNS" type="DOMString" isNull="true"/>
                 // r#doc = todo!(); // staffNS.xml // <load var="doc" href="staffNS" willBeModified="true"/>
                 // r#child_list = r#doc.get_elements_by_tag_name_ns(Some("*"), "employee"); // <getElementsByTagNameNS var="childList" obj="doc" namespaceURI="&quot;*&quot;" localName="&quot;employee&quot;" interface="Document"/>
-                // r#employee_elem = r#child_list[3].clone(); // <item var="employeeElem" obj="childList" index="3" interface="NodeList"/>
+                // r#employee_elem = r#child_list.item(3).unwrap().clone(); // <item var="employeeElem" obj="childList" index="3" interface="NodeList"/>
 
                 // // unimplemented: // <implementation var="domImpl"/>
 
@@ -17152,7 +17200,7 @@ mod dom_test_suite {
 
                 // // unimplemented: // <createDocument var="newDoc" obj="domImpl" namespaceURI="rootNS" qualifiedName="rootName" doctype="nullDocType"/>
                 // r#child_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName var="childList" obj="doc" tagname="&quot;p&quot;" interface="Document"/>
-                // r#element_emp = r#child_list[3].clone(); // <item var="elementEmp" obj="childList" index="3" interface="NodeList"/>
+                // r#element_emp = r#child_list.item(3).unwrap().clone(); // <item var="elementEmp" obj="childList" index="3" interface="NodeList"/>
                 // r#dir = r#element_emp.get_attribute_node("dir").unwrap(); // <getAttributeNode var="dir" obj="elementEmp" name="&quot;dir&quot;"/>
                 // r#adopted_attr = r#new_doc.adopt_node(r#dir.into()); // <adoptNode var="adoptedAttr" obj="newDoc" source="dir"/>
 
@@ -17199,7 +17247,7 @@ mod dom_test_suite {
                 // let mut r#inserted; // type: Node // <var name="inserted" type="Node"/>
                 // r#doc = todo!(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
                 // r#child_list = r#doc.get_elements_by_tag_name("var"); // <getElementsByTagName var="childList" obj="doc" tagname="&quot;var&quot;" interface="Document"/>
-                // r#element = r#child_list[2].clone(); // <item var="element" obj="childList" index="2" interface="NodeList"/>
+                // r#element = r#child_list.item(2).unwrap().clone(); // <item var="element" obj="childList" index="2" interface="NodeList"/>
                 // r#e_ref = r#element.first_child().unwrap(); // <firstChild var="eRef" obj="element" interface="Node"/>
                 // r#span = r#e_ref.first_child().unwrap(); // <firstChild var="span" obj="eRef" interface="Node"/>
 
@@ -18888,7 +18936,7 @@ mod dom_test_suite {
                 // let mut r#inserted; // type: Node // <var name="inserted" type="Node"/>
                 // r#doc = todo!(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
                 // r#child_list = r#doc.get_elements_by_tag_name("var"); // <getElementsByTagName var="childList" obj="doc" tagname="&quot;var&quot;" interface="Document"/>
-                // r#element = r#child_list[2].clone(); // <item var="element" obj="childList" index="2" interface="NodeList"/>
+                // r#element = r#child_list.item(2).unwrap().clone(); // <item var="element" obj="childList" index="2" interface="NodeList"/>
                 // r#ref_node = r#element.first_child().unwrap(); // <firstChild var="refNode" obj="element" interface="Node"/>
                 // r#new_node = r#doc
                 //     .create_attribute_ns(
@@ -19065,7 +19113,7 @@ mod dom_test_suite {
                 // let mut r#second_child_name; // type: DOMString // <var name="secondChildName" type="DOMString"/>
                 // r#doc = todo!(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
                 // r#child_list = r#doc.get_elements_by_tag_name("acronym"); // <getElementsByTagName var="childList" obj="doc" tagname="&quot;acronym&quot;" interface="Document"/>
-                // r#element = r#child_list[3].clone(); // <item var="element" obj="childList" index="3" interface="NodeList"/>
+                // r#element = r#child_list.item(3).unwrap().clone(); // <item var="element" obj="childList" index="3" interface="NodeList"/>
                 // r#attr = r#element.get_attribute_node("class").unwrap(); // <getAttributeNode var="attr" obj="element" name="&quot;class&quot;"/>
                 // r#adoptedclass = r#doc.adopt_node(r#attr.into()).unwrap(); // <adoptNode var="adoptedclass" obj="doc" source="attr"/>
 
@@ -19744,7 +19792,7 @@ mod dom_test_suite {
                 // let mut r#inserted; // type: Node // <var name="inserted" type="Node"/>
                 // r#doc = todo!(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="false"/>
                 // r#child_list = r#doc.get_elements_by_tag_name_ns(Some("*"), "p"); // <getElementsByTagNameNS var="childList" obj="doc" namespaceURI="&quot;*&quot;" localName="&quot;p&quot;" interface="Document"/>
-                // r#element = r#child_list[1].clone(); // <item var="element" obj="childList" index="1" interface="NodeList"/>
+                // r#element = r#child_list.item(1).unwrap().clone(); // <item var="element" obj="childList" index="1" interface="NodeList"/>
                 // r#ref_node = r#element.first_child().unwrap(); // <firstChild var="refNode" obj="element" interface="Node"/>
                 // r#new_text = r#doc.create_text_node("newText"); // <createTextNode var="newText" obj="doc" data="&quot;newText&quot;" interface="Document"/>
                 // r#inserted = r#element
@@ -20326,7 +20374,7 @@ mod dom_test_suite {
                 // r#doc = todo!(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
                 // r#doc_elem = r#doc.document_element().unwrap(); // <documentElement var="docElem" obj="doc"/>
                 // r#child_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName var="childList" obj="doc" tagname="&quot;p&quot;" interface="Document"/>
-                // r#elem = r#child_list[0].clone(); // <item var="elem" obj="childList" index="0" interface="NodeList"/>
+                // r#elem = r#child_list.item(0).unwrap().clone(); // <item var="elem" obj="childList" index="0" interface="NodeList"/>
                 // r#first_child = r#elem.first_child().unwrap(); // <firstChild var="firstChild" obj="elem" interface="Node"/>
 
                 // // unimplemented: // <assertDOMException id="throw_HIERARCHY_REQUEST_ERR"><HIERARCHY_REQUEST_ERR><replaceChild obj="elem" var="replaced" oldChild="firstChild" newChild="docElem"/></HIERARCHY_REQUEST_ERR></assertDOMException>
@@ -21398,7 +21446,7 @@ mod dom_test_suite {
                 // let mut r#replaced; // type: Node // <var name="replaced" type="Node"/>
                 // r#doc = todo!(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
                 // r#child_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName var="childList" obj="doc" tagname="&quot;p&quot;" interface="Document"/>
-                // r#elem = r#child_list[0].clone(); // <item var="elem" obj="childList" index="0" interface="NodeList"/>
+                // r#elem = r#child_list.item(0).unwrap().clone(); // <item var="elem" obj="childList" index="0" interface="NodeList"/>
                 // r#old_child = r#doc
                 //     .create_element_ns(
                 //         Some("http://www.w3.org/1999/xhtml"),
@@ -21614,7 +21662,7 @@ mod dom_test_suite {
                 // let mut r#node_name; // type: DOMString // <var name="nodeName" type="DOMString"/>
                 // r#doc = todo!(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
                 // r#child_list = r#doc.get_elements_by_tag_name("acronym"); // <getElementsByTagName var="childList" obj="doc" tagname="&quot;acronym&quot;" interface="Document"/>
-                // r#elem = r#child_list[1].clone(); // <item var="elem" obj="childList" index="1" interface="NodeList"/>
+                // r#elem = r#child_list.item(1).unwrap().clone(); // <item var="elem" obj="childList" index="1" interface="NodeList"/>
                 // r#ent_ref = r#elem.first_child().unwrap(); // <firstChild var="entRef" obj="elem" interface="Node"/>
 
                 // // unimplemented: // <assertDOMException id="throw_NO_MODIFICATION_ALLOWED_ERR"><NO_MODIFICATION_ALLOWED_ERR><replaceChild var="replaced" obj="entRef" oldChild="elem" newChild="entRef"/></NO_MODIFICATION_ALLOWED_ERR></assertDOMException>
@@ -22126,7 +22174,7 @@ mod dom_test_suite {
                 // r#doc_elem = r#new_doc.document_element().unwrap(); // <documentElement var="docElem" obj="newDoc"/>
                 // r#appended_child = r#doc_elem.append_child(imported.into()).unwrap(); // <appendChild obj="docElem" var="appendedChild" newChild="imported"/>
                 // r#child_list = r#new_doc.get_elements_by_tag_name("acronym"); // <getElementsByTagName var="childList" obj="newDoc" tagname="&quot;acronym&quot;" interface="Document"/>
-                // r#acronym_node = r#child_list[0].clone(); // <item var="acronymNode" obj="childList" index="0" interface="NodeList"/>
+                // r#acronym_node = r#child_list.item(0).unwrap().clone(); // <item var="acronymNode" obj="childList" index="0" interface="NodeList"/>
                 // r#appended_child = r#doc_fragment.append_child(acronym_node.into()).unwrap(); // <appendChild obj="docFragment" var="appendedChild" newChild="acronymNode"/>
                 // r#adopted_doc_frag = r#new_doc.adopt_node(r#doc_fragment.into());
                 // // <adoptNode var="adoptedDocFrag" obj="newDoc" source="docFragment"/>
@@ -22242,8 +22290,8 @@ mod dom_test_suite {
                 // let mut r#is_same; // type: boolean // <var name="isSame" type="boolean"/>
                 // r#doc = todo!(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="false"/>
                 // r#child_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName var="childList" obj="doc" tagname="&quot;p&quot;" interface="Document"/>
-                // r#element1 = r#child_list[0].clone(); // <item var="element1" obj="childList" index="0" interface="NodeList"/>
-                // r#element2 = r#child_list[0].clone(); // <item var="element2" obj="childList" index="0" interface="NodeList"/>
+                // r#element1 = r#child_list.item(0).unwrap().clone(); // <item var="element1" obj="childList" index="0" interface="NodeList"/>
+                // r#element2 = r#child_list.item(0).unwrap().clone(); // <item var="element2" obj="childList" index="0" interface="NodeList"/>
                 // // <isSameNode var="isSame" obj="element2" other="element1"/>
                 // assert!(r#is_same); // <assertTrue actual="isSame" id="nodeissamenode03"/>
             }
@@ -22351,7 +22399,7 @@ mod dom_test_suite {
                 // let mut r#inserted; // type: Node // <var name="inserted" type="Node"/>
                 // r#doc = todo!(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
                 // r#child_list = r#doc.get_elements_by_tag_name("var"); // <getElementsByTagName var="childList" obj="doc" tagname="&quot;var&quot;" interface="Document"/>
-                // r#element = r#child_list[2].clone(); // <item var="element" obj="childList" index="2" interface="NodeList"/>
+                // r#element = r#child_list.item(2).unwrap().clone(); // <item var="element" obj="childList" index="2" interface="NodeList"/>
                 // r#ref_node = r#element.first_child().unwrap(); // <firstChild var="refNode" obj="element" interface="Node"/>
                 // r#new_node = r#element.parent_node().unwrap(); // <parentNode var="newNode" obj="element" interface="Node"/>
 
@@ -22599,7 +22647,7 @@ mod dom_test_suite {
 
                 // // unimplemented: // <createDocument var="newDoc" obj="domImpl" namespaceURI="&quot;http://www.w3.org/DOM/Test&quot;" qualifiedName="&quot;dom:test&quot;" doctype="nullDocType"/>
                 // r#child_list = r#doc.get_elements_by_tag_name_ns(Some("*"), "code"); // <getElementsByTagNameNS var="childList" obj="doc" namespaceURI="&quot;*&quot;" localName="&quot;code&quot;" interface="Document"/>
-                // r#code_elem = r#child_list[0].clone(); // <item var="codeElem" obj="childList" index="0" interface="NodeList"/>
+                // r#code_elem = r#child_list.item(0).unwrap().clone(); // <item var="codeElem" obj="childList" index="0" interface="NodeList"/>
                 // r#adopted_node = r#new_doc.adopt_node(r#code_elem.into()).unwrap(); // <adoptNode var="adoptedNode" obj="newDoc" source="codeElem"/>
                 // r#code_elem_children = r#code_elem.child_nodes(); // <childNodes var="codeElemChildren" obj="codeElem"/>
                 // r#adopted_children = r#adopted_node.child_nodes(); // <childNodes var="adoptedChildren" obj="adoptedNode"/>
@@ -23429,7 +23477,7 @@ mod dom_test_suite {
                 // let mut r#null_nsuri; // type: DOMString // <var name="nullNSURI" type="DOMString" isNull="true"/>
                 // r#doc = todo!(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
                 // r#child_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName var="childList" obj="doc" tagname="&quot;p&quot;" interface="Document"/>
-                // r#employee_elem = r#child_list[3].clone(); // <item var="employeeElem" obj="childList" index="3" interface="NodeList"/>
+                // r#employee_elem = r#child_list.item(3).unwrap().clone(); // <item var="employeeElem" obj="childList" index="3" interface="NodeList"/>
                 // r#adopted_node = r#doc.adopt_node(r#employee_elem.into()); // <adoptNode var="adoptedNode" obj="doc" source="employeeElem"/>
 
                 // // unimplemented: // <if><notNull obj="adoptedNode"/><getAttributeNode var="attrImp" obj="adoptedNode" name="&quot;dir&quot;"/><nodeName var="nodeName" obj="attrImp"/><assertEquals actual="nodeName" expected="&quot;dir&quot;" id="documentadoptnode28" ignoreCase="false"/></if>
@@ -23528,7 +23576,7 @@ mod dom_test_suite {
                 // let mut r#replaced; // type: Node // <var name="replaced" type="Node"/>
                 // r#doc = todo!(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
                 // r#child_list = r#doc.get_elements_by_tag_name("var"); // <getElementsByTagName var="childList" obj="doc" tagname="&quot;var&quot;" interface="Document"/>
-                // r#elem = r#child_list[2].clone(); // <item var="elem" obj="childList" index="2" interface="NodeList"/>
+                // r#elem = r#child_list.item(2).unwrap().clone(); // <item var="elem" obj="childList" index="2" interface="NodeList"/>
                 // r#ent4_ref = r#elem.first_child().unwrap(); // <firstChild var="ent4Ref" obj="elem" interface="Node"/>
                 // r#span = r#ent4_ref.first_child().unwrap(); // <firstChild var="span" obj="ent4Ref" interface="Node"/>
 
@@ -24358,7 +24406,7 @@ mod dom_test_suite {
                 // let mut r#doc_elem_name; // type: DOMString // <var name="docElemName" type="DOMString"/>
                 // r#doc = todo!(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
                 // r#child_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName var="childList" obj="doc" tagname="&quot;p&quot;" interface="Document"/>
-                // r#element = r#child_list[3].clone(); // <item var="element" obj="childList" index="3" interface="NodeList"/>
+                // r#element = r#child_list.item(3).unwrap().clone(); // <item var="element" obj="childList" index="3" interface="NodeList"/>
                 // r#attr = r#element.get_attribute_node("dir").unwrap(); // <getAttributeNode var="attr" obj="element" name="&quot;dir&quot;"/>
 
                 // // unimplemented: // <implementation var="domImpl" obj="doc"/>
@@ -24387,7 +24435,7 @@ mod dom_test_suite {
                 // let mut r#replaced; // type: Node // <var name="replaced" type="Node"/>
                 // r#doc = todo!(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="false"/>
                 // r#child_list = r#doc.get_elements_by_tag_name_ns(Some("*"), "p"); // <getElementsByTagNameNS var="childList" obj="doc" namespaceURI="&quot;*&quot;" localName="&quot;p&quot;" interface="Document"/>
-                // r#elem = r#child_list[0].clone(); // <item var="elem" obj="childList" index="0" interface="NodeList"/>
+                // r#elem = r#child_list.item(0).unwrap().clone(); // <item var="elem" obj="childList" index="0" interface="NodeList"/>
                 // r#first_child = r#elem.first_child().unwrap(); // <firstChild var="firstChild" obj="elem" interface="Node"/>
                 // r#doc2 = todo!(); // hc_staff.xml // <load var="doc2" href="hc_staff" willBeModified="false"/>
                 // r#child_list2 = r#doc2.get_elements_by_tag_name_ns(Some("*"), "p"); // <getElementsByTagNameNS var="childList2" obj="doc2" namespaceURI="&quot;*&quot;" localName="&quot;p&quot;" interface="Document"/>
@@ -24431,7 +24479,7 @@ mod dom_test_suite {
                 // // unimplemented: // <entities var="entities" obj="docType"/>
                 // r#entity = r#entities.get_named_item("alpha".into()).unwrap(); // <getNamedItem var="entity" obj="entities" name="&quot;alpha&quot;"/>
                 // r#child_list = r#doc.get_elements_by_tag_name("acronym"); // <getElementsByTagName var="childList" obj="doc" tagname="&quot;acronym&quot;" interface="Document"/>
-                // r#elem = r#child_list[1].clone(); // <item var="elem" obj="childList" index="1" interface="NodeList"/>
+                // r#elem = r#child_list.item(1).unwrap().clone(); // <item var="elem" obj="childList" index="1" interface="NodeList"/>
                 // r#ent_ref = r#elem.first_child().unwrap(); // <firstChild var="entRef" obj="elem" interface="Node"/>
 
                 // // unimplemented: // <assertDOMException id="throw_HIERARCHY_REQUEST_ERR_1"><HIERARCHY_REQUEST_ERR><replaceChild var="replaced" obj="elem" oldChild="entRef" newChild="entity"/></HIERARCHY_REQUEST_ERR></assertDOMException>
@@ -24673,7 +24721,7 @@ mod dom_test_suite {
 
                 // // unimplemented: // <createDocument var="newDoc" obj="domImpl" namespaceURI="rootNS" qualifiedName="rootName" doctype="nullDocType"/>
                 // r#child_list = r#doc.get_elements_by_tag_name("acronym"); // <getElementsByTagName var="childList" obj="doc" tagname="&quot;acronym&quot;" interface="Document"/>
-                // r#element = r#child_list[3].clone(); // <item var="element" obj="childList" index="3" interface="NodeList"/>
+                // r#element = r#child_list.item(3).unwrap().clone(); // <item var="element" obj="childList" index="3" interface="NodeList"/>
                 // r#attr = r#element.get_attribute_node("class").unwrap(); // <getAttributeNode var="attr" obj="element" name="&quot;class&quot;"/>
                 // r#adoptedclass = r#new_doc.adopt_node(r#attr.into()).unwrap(); // <adoptNode var="adoptedclass" obj="newDoc" source="attr"/>
 
@@ -25170,7 +25218,7 @@ mod dom_test_suite {
                 // let mut r#node_value; // type: DOMString // <var name="nodeValue" type="DOMString"/>
                 // r#doc = todo!(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="false"/>
                 // r#child_list = r#doc.get_elements_by_tag_name("acronym"); // <getElementsByTagName var="childList" obj="doc" tagname="&quot;acronym&quot;" interface="Document"/>
-                // r#element = r#child_list[0].clone(); // <item var="element" obj="childList" index="0" interface="NodeList"/>
+                // r#element = r#child_list.item(0).unwrap().clone(); // <item var="element" obj="childList" index="0" interface="NodeList"/>
                 // r#attr = r#element.get_attribute_node("title").unwrap(); // <getAttributeNode var="attr" obj="element" name="&quot;title&quot;"/>
                 // r#adopted_title = r#doc
                 //     .adopt_node(r#attr.into())
@@ -27435,7 +27483,7 @@ mod dom_test_suite {
                 // r#doc = todo!(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
                 // r#doc_fragment = r#doc.create_document_fragment(); // <createDocumentFragment var="docFragment" obj="doc"/>
                 // r#child_list = r#doc.get_elements_by_tag_name("acronym"); // <getElementsByTagName var="childList" obj="doc" tagname="&quot;acronym&quot;" interface="Document"/>
-                // r#acronym_node = r#child_list[0].clone(); // <item var="acronymNode" obj="childList" index="0" interface="NodeList"/>
+                // r#acronym_node = r#child_list.item(0).unwrap().clone(); // <item var="acronymNode" obj="childList" index="0" interface="NodeList"/>
                 // r#appended_child = r#doc_fragment.append_child(acronym_node.into()).unwrap(); // <appendChild obj="docFragment" var="appendedChild" newChild="acronymNode"/>
                 // r#adopted_doc_frag = r#doc.adopt_node(r#doc_fragment.into()); // <adoptNode var="adoptedDocFrag" obj="doc" source="docFragment"/>
 
@@ -28778,7 +28826,7 @@ mod dom_test_suite {
                 // r#doc = todo!(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="false"/>
                 // r#new_child = r#doc.create_text_node("Text"); // <createTextNode var="newChild" obj="doc" data="&quot;Text&quot;"/>
                 // r#child_list = r#doc.get_elements_by_tag_name_ns(Some("*"), "acronym"); // <getElementsByTagNameNS var="childList" obj="doc" namespaceURI="&quot;*&quot;" localName="&quot;acronym&quot;" interface="Document"/>
-                // r#elem = r#child_list[3].clone(); // <item var="elem" obj="childList" index="3" interface="NodeList"/>
+                // r#elem = r#child_list.item(3).unwrap().clone(); // <item var="elem" obj="childList" index="3" interface="NodeList"/>
                 // r#parent = r#elem.get_attribute_node("class").unwrap(); // <getAttributeNode var="parent" obj="elem" name="&quot;class&quot;"/>
                 // r#en_ref = r#doc
                 //     .create_entity_reference(reference.to_string())
@@ -31251,7 +31299,7 @@ mod dom_test_suite {
                 // r#doc = todo!(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
                 // r#doc_elem = r#doc.document_element().unwrap(); // <documentElement var="docElem" obj="doc"/>
                 // r#child_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName var="childList" obj="doc" tagname="&quot;p&quot;" interface="Document"/>
-                // r#elem = r#child_list[0].clone(); // <item var="elem" obj="childList" index="0" interface="NodeList"/>
+                // r#elem = r#child_list.item(0).unwrap().clone(); // <item var="elem" obj="childList" index="0" interface="NodeList"/>
 
                 // // unimplemented: // <try>	<replaceChild obj="doc" var="replacedNode" oldChild="docElem" newChild="elem"/>	<catch>		<DOMException code="NOT_SUPPORTED_ERR">			<return/>		</DOMException>	</catch></try>
                 // r#replaced = r#doc.document_element().unwrap(); // <documentElement var="replaced" obj="doc"/>
@@ -31440,7 +31488,7 @@ mod dom_test_suite {
                 // let mut r#adopted_node_child; // type: NodeList // <var name="adoptedNodeChild" type="NodeList"/>
                 // r#doc = todo!(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
                 // r#child_list = r#doc.get_elements_by_tag_name("acronym"); // <getElementsByTagName var="childList" obj="doc" tagname="&quot;acronym&quot;" interface="Document"/>
-                // r#acronym_elem = r#child_list[0].clone(); // <item var="acronymElem" obj="childList" index="0" interface="NodeList"/>
+                // r#acronym_elem = r#child_list.item(0).unwrap().clone(); // <item var="acronymElem" obj="childList" index="0" interface="NodeList"/>
                 // r#adopted_node = r#doc.adopt_node(r#acronym_elem.into()); // <adoptNode var="adoptedNode" obj="doc" source="acronymElem"/>
 
                 // // unimplemented: // <if><notNull obj="adoptedNode"/><childNodes var="acronymElemChild" obj="acronymElem"/><length var="acronymElemLen" obj="acronymElemChild" interface="NodeList"/><childNodes var="adoptedNodeChild" obj="adoptedNode"/><length var="adoptedLen" obj="adoptedNodeChild" interface="NodeList"/><assertEquals actual="acronymElemLen" expected="adoptedLen" id="documentadoptnode23" ignoreCase="false"/></if>
@@ -35063,7 +35111,7 @@ mod dom_test_suite {
                 // let mut r#replaced_child; // type: Node // <var name="replacedChild" type="Node"/>
                 // r#doc = todo!(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
                 // r#child_list = r#doc.get_elements_by_tag_name("acronym"); // <getElementsByTagName var="childList" obj="doc" tagname="&quot;acronym&quot;" interface="Document"/>
-                // r#acronym = r#child_list[1].clone(); // <item var="acronym" obj="childList" index="1" interface="NodeList"/>
+                // r#acronym = r#child_list.item(1).unwrap().clone(); // <item var="acronym" obj="childList" index="1" interface="NodeList"/>
                 // r#beta_ref = r#acronym.first_child().unwrap(); // <firstChild var="betaRef" obj="acronym" interface="Node"/>
 
                 // // unimplemented: // <assertNotNull actual="betaRef" id="betaRefNotNull"/>

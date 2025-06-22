@@ -26,6 +26,7 @@ pub mod entity_reference;
 pub mod name_list;
 pub mod named_node_map;
 pub mod node;
+pub mod node_list;
 pub mod notation;
 pub mod pi;
 
@@ -751,6 +752,7 @@ mod dom_test_suite {
                 character_data::CharacterData,
                 dom_test_suite::{STAFF_XML, staff_xml},
                 node::Node,
+                node_list::NodeList,
             };
 
             // ./resources/DOM-Test-Suite/tests/level1/core/attrcreatedocumentfragment.xml
@@ -937,9 +939,9 @@ mod dom_test_suite {
                 let gender_list = doc.get_elements_by_tag_name("gender");
                 let gender = gender_list[2].clone();
                 let gen_list = gender.child_nodes();
-                let r#gen = gen_list[0].clone();
+                let r#gen = gen_list.item(0).unwrap().clone();
                 let g_list = r#gen.child_nodes();
-                let g = g_list[0].clone();
+                let g = g_list.item(0).unwrap().clone();
                 let attr_list = g.attributes().unwrap();
                 let mut attr_node = attr_list.get_named_item("domestic").unwrap();
                 assert_eq!(
@@ -1009,13 +1011,23 @@ mod dom_test_suite {
                 let mut l_child = name_list[1].clone();
                 l_child.normalize();
                 let child_nodes = l_child.child_nodes();
-                let cdata_n = child_nodes[1].clone().as_cdata_section().unwrap();
+                let cdata_n = child_nodes
+                    .item(1)
+                    .unwrap()
+                    .clone()
+                    .as_cdata_section()
+                    .unwrap();
                 let data = cdata_n.data();
                 assert_eq!(
                     data,
                     "This is a CDATASection with EntityReference number 2 &ent2;"
                 );
-                let cdata_n = child_nodes[3].clone().as_cdata_section().unwrap();
+                let cdata_n = child_nodes
+                    .item(3)
+                    .unwrap()
+                    .clone()
+                    .as_cdata_section()
+                    .unwrap();
                 let data = cdata_n.data();
                 assert_eq!(
                     data,

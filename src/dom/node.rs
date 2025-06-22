@@ -1,7 +1,9 @@
 use std::rc::Rc;
 
 use crate::{
-    dom::{DOCUMENT_POSITION_DISCONNECTED, check_owner_document_sameness},
+    dom::{
+        DOCUMENT_POSITION_DISCONNECTED, check_owner_document_sameness, node_list::ChildNodesList,
+    },
     tree::XML_XML_NAMESPACE,
     uri::{XmlURI, build_uri},
 };
@@ -79,16 +81,14 @@ pub trait Node: NodeConnection {
     }
     /// Implementation of `childNodes` attribute.
     ///
-    /// The specification requires that this method returns a `NodeList`,
-    /// but this method returns [`Vec`].  
-    fn child_nodes(&self) -> Vec<NodeRef> {
-        let mut res = vec![];
-        let mut children = self.first_child();
-        while let Some(child) = children {
-            children = child.next_sibling();
-            res.push(child);
-        }
-        res
+    /// # Specification
+    /// ```text
+    /// childNodes of type NodeList, readonly
+    ///     A NodeList that contains all children of this node. If there are no children,
+    ///     this is a NodeList containing no nodes.
+    /// ```
+    fn child_nodes(&self) -> ChildNodesList<NodeRef> {
+        ChildNodesList::new(self.clone().into())
     }
     /// Implementation of `firstChild` attribute.
     fn first_child(&self) -> Option<NodeRef> {
@@ -1317,13 +1317,16 @@ pub trait Node: NodeConnection {
             _ => return false,
         }
 
-        let lch = self.child_nodes();
-        let rch = arg.child_nodes();
-        if lch.len() != rch.len() || lch.into_iter().zip(rch).any(|(l, r)| !l.is_equal_node(&r)) {
-            return false;
+        let mut lch = self.first_child();
+        let mut rch = arg.first_child();
+        while let Some((l, r)) = lch.as_ref().zip(rch.as_ref()) {
+            if !l.is_equal_node(r) {
+                return false;
+            }
+            lch = l.next_sibling();
+            rch = r.next_sibling();
         }
-
-        true
+        lch.is_some() == rch.is_some()
     }
 }
 
@@ -1535,7 +1538,7 @@ impl_node_trait_to_noderef! {
     fn(mut) set_node_value(value: impl Into<String>) -> Result<(), DOMException>,
     fn node_type() -> NodeType,
     fn parent_node() -> Option<NodeRef>,
-    fn child_nodes() -> Vec<NodeRef>,
+    fn child_nodes() -> ChildNodesList<NodeRef>,
     fn first_child() -> Option<NodeRef>,
     fn last_child() -> Option<NodeRef>,
     fn previous_sibling() -> Option<NodeRef>,
