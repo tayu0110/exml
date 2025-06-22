@@ -6492,7 +6492,7 @@ mod dom_test_suite {
             #[test]
             fn test_hc_nodevalue06() {
                 let mut r#new_node: DocumentRef; // <var name="newNode" type="Document"/>
-                r#new_node = todo!(); // hc_staff.xml // <load var="newNode" href="hc_staff" willBeModified="true"/>
+                r#new_node = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="newNode" href="hc_staff" willBeModified="true"/>
                 let r#new_value = r#new_node.node_value(); // <nodeValue obj="newNode" var="newValue"/>
                 assert!(new_value.is_none()); // <assertNull actual="newValue" id="initiallyNull"/>
                 r#new_node
