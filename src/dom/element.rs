@@ -460,10 +460,6 @@ impl ElementRef {
             |l: &str, r: &str| l == r
         };
         let mut res = vec![];
-        if name == "*" || eq(&self.node_name(), name) {
-            res.push(self.clone());
-        }
-
         let mut descendant = self.first_child();
         while let Some(cur) = descendant.filter(|des| !self.is_same_node(des)) {
             if let NodeRef::Element(elem) = &cur {
@@ -782,10 +778,6 @@ impl ElementRef {
             true
         };
         let mut res = vec![];
-        if eq(self, ns_uri.as_deref(), &local_name) {
-            res.push(self.clone());
-        }
-
         let mut descendant = self.first_child();
         while let Some(cur) = descendant.filter(|des| !self.is_same_node(des)) {
             if let NodeRef::Element(elem) = &cur {
