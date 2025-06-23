@@ -22,6 +22,9 @@ mod dom_test_suite {
                 include_str!("../resources/DOM-Test-Suite/tests/level1/core/files/staff.xml");
             const HC_STAFF_XML: &str =
                 include_str!("../resources/DOM-Test-Suite/tests/level1/core/files/hc_staff.xml");
+            const HC_NODTDSTAFF_XML: &str = include_str!(
+                "../resources/DOM-Test-Suite/tests/level1/core/files/hc_nodtdstaff.xml"
+            );
 
             fn staff_xml(_doc: &str) -> Result<DocumentRef, DOMException> {
                 let doctype = DocumentTypeRef::new("staff", None, Some("staff.dtd")).unwrap();
@@ -1289,6 +1292,85 @@ mod dom_test_suite {
                     .unwrap();
                 acronym.append_child(
                     doc.create_text_node("1821 Nordic. Road, Irving Texas 98558")
+                        .into(),
+                )?;
+                acronym.set_attribute("title", "Yes").unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
+
+                Ok(doc)
+            }
+            fn hc_nodtdstaff_xml(_doc: &str) -> Result<DocumentRef, DOMException> {
+                let mut doc = DocumentRef::new(None, Some("html"), None).unwrap();
+                let mut root = doc.document_element().unwrap();
+                assert!(root.parent_node().is_some());
+
+                let mut head = root
+                    .append_child(doc.create_element("head").unwrap().into())
+                    .unwrap();
+                let mut meta = head
+                    .append_child(doc.create_element("meta").unwrap().into())
+                    .unwrap()
+                    .as_element()
+                    .unwrap();
+                meta.set_attribute("http-equiv", "Content-Type").unwrap();
+                meta.set_attribute("content", "text/html; charset=UTF-8")
+                    .unwrap();
+                let mut title = head
+                    .append_child(doc.create_element("title").unwrap().into())
+                    .unwrap();
+                title
+                    .append_child(doc.create_text_node("hc_nodtdstaff").into())
+                    .unwrap();
+
+                let mut body = root
+                    .append_child(doc.create_element("body").unwrap().into())
+                    .unwrap()
+                    .as_element()
+                    .unwrap();
+                body.set_attribute("onload", "parent.loadComplete()")
+                    .unwrap();
+
+                let mut p = body
+                    .append_child(doc.create_element("p").unwrap().into())
+                    .unwrap();
+                let mut em = p
+                    .append_child(doc.create_element("em").unwrap().into())
+                    .unwrap();
+                em.append_child(doc.create_text_node("EMP0001").into())
+                    .unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
+                let mut strong = p
+                    .append_child(doc.create_element("strong").unwrap().into())
+                    .unwrap();
+                strong
+                    .append_child(doc.create_text_node("Margaret Martin").into())
+                    .unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
+                let mut code = p
+                    .append_child(doc.create_element("code").unwrap().into())
+                    .unwrap();
+                code.append_child(doc.create_text_node("Accountant").into())
+                    .unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
+                let mut sup = p
+                    .append_child(doc.create_element("sup").unwrap().into())
+                    .unwrap();
+                sup.append_child(doc.create_text_node("56,000").into())
+                    .unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
+                let mut var = p
+                    .append_child(doc.create_element("var").unwrap().into())
+                    .unwrap();
+                var.append_child(doc.create_text_node("Female").into())
+                    .unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
+                let mut acronym = p
+                    .append_child(doc.create_element("acronym").unwrap().into())
+                    .unwrap()
+                    .as_element()
+                    .unwrap();
+                acronym.append_child(
+                    doc.create_text_node("1230 North Ave. Dallas, Texas 98551")
                         .into(),
                 )?;
                 acronym.set_attribute("title", "Yes").unwrap();
@@ -7302,7 +7384,7 @@ mod dom_test_suite {
             fn test_documentgetdoctypenodtd() {
                 // unimplemented: // <implementationAttribute name="validating" value="false"/>
                 let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
-                r#doc = todo!(); // hc_nodtdstaff.xml // <load var="doc" href="hc_nodtdstaff" willBeModified="false"/>
+                r#doc = hc_nodtdstaff_xml(HC_NODTDSTAFF_XML).unwrap(); // hc_nodtdstaff.xml // <load var="doc" href="hc_nodtdstaff" willBeModified="false"/>
                 let r#doc_type = r#doc.doctype(); // <doctype obj="doc" var="docType"/>
                 assert!(doc_type.is_none()); // <assertNull actual="docType" id="documentGetDocTypeNoDTDAssert"/>
             }
