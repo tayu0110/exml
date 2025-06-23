@@ -128,6 +128,10 @@ impl Node for DocumentFragmentRef {
     fn lookup_namespace_uri(&self, _prefix: &str) -> Option<Rc<str>> {
         None
     }
+
+    fn is_read_only(&self) -> bool {
+        false
+    }
 }
 
 impl NodeConnection for DocumentFragmentRef {

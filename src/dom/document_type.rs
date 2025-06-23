@@ -586,6 +586,12 @@ impl Node for DocumentTypeRef {
 
         true
     }
+
+    fn is_read_only(&self) -> bool {
+        // DOM Level 3 doesn't support editing DocumentType nodes.
+        // DocumentType nodes are read-only.
+        true
+    }
 }
 
 impl NodeConnection for DocumentTypeRef {

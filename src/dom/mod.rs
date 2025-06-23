@@ -241,3 +241,15 @@ fn check_owner_document_sameness(l: &impl Node, r: &impl Node) -> bool {
             .is_some_and(|(l, r)| l.is_same_node(&node::NodeRef::Document(r))),
     }
 }
+
+fn check_no_modification_allowed_err(node: &impl Node) -> Result<(), DOMException> {
+    if node.is_read_only()
+        && node
+            .owner_document()
+            .is_some_and(|doc| doc.is_enabled_read_only_check())
+    {
+        Err(DOMException::NoModificationAllowedErr)
+    } else {
+        Ok(())
+    }
+}

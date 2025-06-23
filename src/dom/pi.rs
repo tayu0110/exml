@@ -42,6 +42,10 @@ pub struct ProcessingInstruction {
     target: Rc<str>,
     /// Implementation of `data` attribute for `ProcessingInstruction`.
     data: Option<Rc<str>>,
+
+    // 0      : read-only ?
+    // 1 - 15 : unused
+    flag: u16,
 }
 
 /// Wrapper of `Rc<RefCell<ProcessingInstruction>>`.
@@ -65,6 +69,7 @@ impl ProcessingInstructionRef {
             owner_document: doc.downgrade(),
             target,
             data,
+            flag: 0,
         })))
     }
 
@@ -158,6 +163,7 @@ impl Node for ProcessingInstructionRef {
             owner_document: self.0.borrow().owner_document.clone(),
             target: self.0.borrow().target.clone(),
             data: self.0.borrow().data.clone(),
+            flag: 0,
         };
 
         ProcessingInstructionRef(Rc::new(RefCell::new(pi))).into()
@@ -178,6 +184,10 @@ impl Node for ProcessingInstructionRef {
             return false;
         };
         Rc::ptr_eq(&self.0, &other.0)
+    }
+
+    fn is_read_only(&self) -> bool {
+        self.0.borrow().flag & 1 != 0
     }
 }
 
@@ -212,6 +222,14 @@ impl NodeConnection for ProcessingInstructionRef {
 
     fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
         replace(&mut self.0.borrow_mut().owner_document, new_doc.downgrade()).upgrade()
+    }
+
+    fn set_read_only(&mut self) {
+        self.0.borrow_mut().flag |= 0b01;
+    }
+
+    fn unset_read_only(&mut self) {
+        self.0.borrow_mut().flag &= !0b01;
     }
 
     fn adopted_to(&mut self, new_doc: DocumentRef) {

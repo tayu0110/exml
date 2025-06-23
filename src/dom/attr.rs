@@ -50,6 +50,10 @@ pub struct Attr {
     specified: bool,
     /// Implementation of `isId` attribute of `Attr`.
     is_id: bool,
+
+    // 0      : read-only ?
+    // 1 - 15 : unused
+    flag: u16,
 }
 
 impl Attr {
@@ -161,6 +165,7 @@ impl AttrRef {
             local_name: None,
             specified: true,
             is_id: false,
+            flag: 0,
         })))
     }
 
@@ -316,6 +321,7 @@ impl Node for AttrRef {
             // operation, returns a specified attribute (specified is true)."
             specified: true,
             is_id: self.is_id(),
+            flag: 0,
         };
         let mut attr = AttrRef(Rc::new(RefCell::new(attr)));
         let mut children = self.first_child();
@@ -358,6 +364,10 @@ impl Node for AttrRef {
     fn lookup_namespace_uri(&self, prefix: &str) -> Option<Rc<str>> {
         self.owner_element()?.lookup_namespace_uri(prefix)
     }
+
+    fn is_read_only(&self) -> bool {
+        self.0.borrow().flag & 1 != 0
+    }
 }
 
 impl NodeConnection for AttrRef {
@@ -383,6 +393,32 @@ impl NodeConnection for AttrRef {
 
     fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
         replace(&mut self.0.borrow_mut().owner_document, new_doc.downgrade()).upgrade()
+    }
+
+    fn set_read_only(&mut self) {
+        if !self.is_read_only() {
+            self.0.borrow_mut().flag |= 0b01;
+            let mut children = self.first_child();
+            while let Some(mut child) = children {
+                children = child.next_sibling();
+                if !child.is_read_only() {
+                    child.set_read_only();
+                }
+            }
+        }
+    }
+
+    fn unset_read_only(&mut self) {
+        if self.is_read_only() {
+            self.0.borrow_mut().flag &= !0b01;
+            let mut children = self.first_child();
+            while let Some(mut child) = children {
+                children = child.next_sibling();
+                if child.is_read_only() {
+                    child.unset_read_only();
+                }
+            }
+        }
     }
 
     fn adopted_to(&mut self, new_doc: DocumentRef) {

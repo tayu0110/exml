@@ -68,8 +68,8 @@ pub struct Document {
 
     /// HTML document or not
     html: bool,
-    // 0: enable modification check for Entity if set
-    // 1: enable modification check for EntityReference if set
+    /// 0      : enable modification check if set
+    /// 1 - 31 : unused
     flag: u32,
 
     // Predefined entities.
@@ -82,6 +82,25 @@ pub struct Document {
 }
 
 impl Document {
+    /// Enable check for read-only node.\
+    /// As a result, editing of nodes specified as read-only in the DOM specification
+    /// becomes impossible.
+    pub fn enable_read_only_check(&mut self) {
+        self.flag |= 0b01;
+    }
+
+    /// Disable check for read-only node.\
+    /// It allows editing of nodes that are not editable in the DOM specification
+    /// (e.g., DTD nodes).
+    pub fn disable_read_only_check(&mut self) {
+        self.flag &= !0b01;
+    }
+
+    /// Check if read-only check is enabled.
+    pub fn is_enabled_read_only_check(&self) -> bool {
+        self.flag & 0b01 != 0
+    }
+
     /// Do an entity lookup in the document entity hash table and
     /// returns the corresponding entity, otherwise a lookup is done
     /// in the predefined entities too.
@@ -1368,6 +1387,25 @@ impl DocumentRef {
         self.0.borrow().html
     }
 
+    /// Enable check for read-only node.\
+    /// As a result, editing of nodes specified as read-only in the DOM specification
+    /// becomes impossible.
+    pub fn enable_read_only_check(&mut self) {
+        self.0.borrow_mut().enable_read_only_check();
+    }
+
+    /// Disable check for read-only node.\
+    /// It allows editing of nodes that are not editable in the DOM specification
+    /// (e.g., DTD nodes).
+    pub fn disable_read_only_check(&mut self) {
+        self.0.borrow_mut().disable_read_only_check();
+    }
+
+    /// Check if read-only check is enabled.
+    pub fn is_enabled_read_only_check(&self) -> bool {
+        self.0.borrow().is_enabled_read_only_check()
+    }
+
     /// Generate [`DocumentWeakRef`] from `self`.
     pub fn downgrade(&self) -> DocumentWeakRef {
         DocumentWeakRef(Rc::downgrade(&self.0))
@@ -1479,6 +1517,10 @@ impl Node for DocumentRef {
     fn lookup_namespace_uri(&self, prefix: &str) -> Option<Rc<str>> {
         self.document_element()
             .and_then(|elem| elem.lookup_namespace_uri(prefix))
+    }
+
+    fn is_read_only(&self) -> bool {
+        false
     }
 }
 

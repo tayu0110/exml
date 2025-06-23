@@ -229,6 +229,7 @@ pub trait Node: NodeConnection {
             }
         }
 
+        let read_only = self.is_read_only();
         if let Some(ref_child) = ref_child {
             match &mut new_child {
                 // If newChild is a DocumentFragment object, all of its children are inserted,
@@ -238,9 +239,17 @@ pub trait Node: NodeConnection {
                     while let Some(mut now) = child {
                         child = now.next_sibling();
                         now.connect_as_previous_sibling(ref_child.clone());
+                        if read_only {
+                            now.set_read_only();
+                        }
                     }
                 }
-                other => other.connect_as_previous_sibling(ref_child),
+                other => {
+                    other.connect_as_previous_sibling(ref_child);
+                    if read_only {
+                        other.set_read_only();
+                    }
+                }
             }
         } else {
             let mut children = match new_child.clone() {
@@ -252,7 +261,7 @@ pub trait Node: NodeConnection {
             };
             while let Some(mut child) = children {
                 children = child.next_sibling();
-                child.set_parent_node(Some(<Self as Into<NodeRef>>::into(self.clone())));
+                child.set_parent_node(Some(self.clone().into()));
                 let last = self.set_last_child(Some(child.clone()));
                 if let Some(mut last) = last {
                     // If old last child is found,
@@ -263,6 +272,9 @@ pub trait Node: NodeConnection {
                     // Otherwise, `self` has no children.
                     // Therefore, I need to set `new_child` as also the first child of `self`.
                     self.set_first_child(Some(child.clone()));
+                }
+                if read_only {
+                    child.set_read_only();
                 }
             }
         }
@@ -390,13 +402,18 @@ pub trait Node: NodeConnection {
                 Some(other)
             }
         };
+        let read_only = self.is_read_only();
         let par = old_child.set_parent_node(None);
         let prev = old_child.set_previous_sibling(None);
         let next = old_child.set_next_sibling(None);
+        old_child.unset_read_only();
         let prev = prev.or_else(|| {
             let mut child = children.clone()?;
             children = child.next_sibling();
             child.set_parent_node(par.clone());
+            if read_only {
+                child.set_read_only();
+            }
             self.set_first_child(Some(child.clone()));
             Some(child)
         });
@@ -405,6 +422,9 @@ pub trait Node: NodeConnection {
                 children = child.next_sibling();
                 child.set_parent_node(par.clone());
                 child.set_previous_sibling(Some(prev.clone()));
+                if read_only {
+                    child.set_read_only();
+                }
                 prev.set_next_sibling(Some(child.clone()));
                 prev = child;
             }
@@ -448,6 +468,7 @@ pub trait Node: NodeConnection {
         }
 
         old_child.disconnect_parent_and_sibling();
+        old_child.unset_read_only();
         Ok(old_child)
     }
 
@@ -1329,6 +1350,12 @@ pub trait Node: NodeConnection {
         }
         lch.is_some() == rch.is_some()
     }
+
+    /// Check if this node is a read-only node.
+    ///
+    /// This method is independent of the Document setting and always returns
+    /// whether this node is read-only based on the DOM specification.
+    fn is_read_only(&self) -> bool;
 }
 
 /// A set of operations that change the adjacency of nodes.
@@ -1360,6 +1387,11 @@ pub(super) trait NodeConnection: Clone + Into<NodeRef> {
     /// Set new owner Document node.  
     /// Return old owner Document node if exists.
     fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef>;
+
+    /// Set this node as the read-only node.
+    fn set_read_only(&mut self) {}
+    /// Unset this node as the read-only node.
+    fn unset_read_only(&mut self) {}
 
     /// Replace ownerDocument of self and all elements of the subtree.
     ///
@@ -1564,7 +1596,8 @@ impl_node_trait_to_noderef! {
     fn lookup_prefix(ns_uri: &str) -> Option<Rc<str>>,
     fn is_default_namespace(ns_uri: &str) -> bool,
     fn lookup_namespace_uri(prefix: &str) -> Option<Rc<str>>,
-    fn is_equal_node(arg: &NodeRef) -> bool
+    fn is_equal_node(arg: &NodeRef) -> bool,
+    fn is_read_only() -> bool
 }
 
 macro_rules! impl_node_connection_to_noderef {
@@ -1603,6 +1636,8 @@ impl_node_connection_to_noderef! {
     set_previous_sibling(new_sibling: Option<NodeRef>) -> Option<NodeRef>,
     set_next_sibling(new_sibling: Option<NodeRef>) -> Option<NodeRef>,
     set_owner_document(new_doc: DocumentRef) -> Option<DocumentRef>,
+    set_read_only() -> (),
+    unset_read_only() -> (),
     adopted_to(new_doc: DocumentRef) -> (),
     connect_as_previous_sibling(next: NodeRef) -> (),
     connect_as_next_sibling(prev: NodeRef) -> (),

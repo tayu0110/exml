@@ -533,6 +533,7 @@ mod dom_test_suite {
                 )?;
                 address.set_attribute("street", "Yes").unwrap();
 
+                doc.enable_read_only_check();
                 Ok(doc)
             }
             fn hc_staff_xml(_doc: &str) -> Result<DocumentRef, DOMException> {
@@ -1297,6 +1298,7 @@ mod dom_test_suite {
                 acronym.set_attribute("title", "Yes").unwrap();
                 p.append_child(doc.create_text_node("\n").into()).unwrap();
 
+                doc.enable_read_only_check();
                 Ok(doc)
             }
             fn hc_nodtdstaff_xml(_doc: &str) -> Result<DocumentRef, DOMException> {
@@ -1376,6 +1378,7 @@ mod dom_test_suite {
                 acronym.set_attribute("title", "Yes").unwrap();
                 p.append_child(doc.create_text_node("\n").into()).unwrap();
 
+                doc.enable_read_only_check();
                 Ok(doc)
             }
             // hc_elementretrieveattrvalue.xml
@@ -1467,7 +1470,13 @@ mod dom_test_suite {
                 r#doc_element = r#owner_document.document_element().unwrap(); // <documentElement obj="ownerDocument" var="docElement"/>
                 r#element_name = r#doc_element.node_name().to_string(); // <nodeName obj="docElement" var="elementName"/>
 
-                // unimplemented: // <if><contentType type="image/svg+xml"/><assertEquals actual="elementName" expected="&quot;svg&quot;" id="svgNodeName" ignoreCase="false"/><else><assertEquals actual="elementName" expected="&quot;html&quot;" id="ownerDocElemTagName" ignoreCase="auto"/></else></if>
+                // unimplemented:
+                // <if><contentType type="image/svg+xml"/>
+                //      <assertEquals actual="elementName" expected="&quot;svg&quot;" id="svgNodeName" ignoreCase="false"/>
+                // <else>
+                //      <assertEquals actual="elementName" expected="&quot;html&quot;" id="ownerDocElemTagName" ignoreCase="auto"/>
+                // </else>
+                // </if>
             }
             // nodeentitysetnodevalue.xml
             #[test]
@@ -1545,19 +1554,25 @@ mod dom_test_suite {
             // hc_elementwrongdocumenterr.xml
             #[test]
             fn test_hc_elementwrongdocumenterr() {
-                // let mut r#doc1: DocumentRef; // <var name="doc1" type="Document"/>
-                // let mut r#doc2: DocumentRef; // <var name="doc2" type="Document"/>
-                // let mut r#new_attribute; // type: Attr // <var name="newAttribute" type="Attr"/>
-                // let mut r#address_element_list; // type: NodeList // <var name="addressElementList" type="NodeList"/>
-                // let mut r#test_address; // type: Element // <var name="testAddress" type="Element"/>
-                // let mut r#attr_address; // type: Attr // <var name="attrAddress" type="Attr"/>
-                // r#doc1 = todo!(); // hc_staff.xml // <load var="doc1" href="hc_staff" willBeModified="true"/>
-                // r#doc2 = todo!(); // hc_staff.xml // <load var="doc2" href="hc_staff" willBeModified="false"/>
-                // r#new_attribute = r#doc2.create_attribute("newAttribute".to_string()).unwrap(); // <createAttribute obj="doc2" var="newAttribute" name="&quot;newAttribute&quot;"/>
-                // r#address_element_list = r#doc1.get_elements_by_tag_name("acronym"); // <getElementsByTagName interface="Document" obj="doc1" tagname="&quot;acronym&quot;" var="addressElementList"/>
-                // r#test_address = r#address_element_list[4].clone(); // <item interface="NodeList" obj="addressElementList" index="4" var="testAddress"/>
+                let mut r#doc1: DocumentRef; // <var name="doc1" type="Document"/>
+                let mut r#doc2: DocumentRef; // <var name="doc2" type="Document"/>
+                let mut r#new_attribute; // type: Attr // <var name="newAttribute" type="Attr"/>
+                let mut r#address_element_list; // type: NodeList // <var name="addressElementList" type="NodeList"/>
+                let mut r#test_address; // type: Element // <var name="testAddress" type="Element"/>
+                let mut r#attr_address; // type: Attr // <var name="attrAddress" type="Attr"/>
+                r#doc1 = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc1" href="hc_staff" willBeModified="true"/>
+                r#doc2 = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc2" href="hc_staff" willBeModified="false"/>
+                r#new_attribute = r#doc2.create_attribute("newAttribute".to_string()).unwrap(); // <createAttribute obj="doc2" var="newAttribute" name="&quot;newAttribute&quot;"/>
+                r#address_element_list = r#doc1.get_elements_by_tag_name("acronym"); // <getElementsByTagName interface="Document" obj="doc1" tagname="&quot;acronym&quot;" var="addressElementList"/>
+                r#test_address = r#address_element_list[4].clone(); // <item interface="NodeList" obj="addressElementList" index="4" var="testAddress"/>
 
-                // // unimplemented: // <assertDOMException id="throw_WRONG_DOCUMENT_ERR"><WRONG_DOCUMENT_ERR><setAttributeNode obj="testAddress" newAttr="newAttribute" var="attrAddress"/></WRONG_DOCUMENT_ERR></assertDOMException>
+                // <assertDOMException id="throw_WRONG_DOCUMENT_ERR">
+                //      <WRONG_DOCUMENT_ERR>
+                //          <setAttributeNode obj="testAddress" newAttr="newAttribute" var="attrAddress"/>
+                //      </WRONG_DOCUMENT_ERR>
+                // </assertDOMException>
+                attr_address = test_address.set_attribute_node(new_attribute);
+                assert!(attr_address.is_err_and(|err| err == DOMException::WrongDocumentErr));
             }
             // elementgettagname.xml
             #[test]
@@ -1569,7 +1584,13 @@ mod dom_test_suite {
                 r#root = r#doc.document_element().unwrap(); // <documentElement obj="doc" var="root"/>
                 r#tagname = r#root.tag_name().to_string(); // <tagName obj="root" var="tagname"/>
 
-                // unimplemented: // <if><contentType type="image/svg+xml"/><assertEquals actual="tagname" expected="&quot;svg&quot;" id="svgTagName" ignoreCase="false"/><else><assertEquals actual="tagname" expected="&quot;staff&quot;" id="elementGetTagNameAssert" ignoreCase="false"/></else></if>
+                // unimplemented:
+                // <if><contentType type="image/svg+xml"/>
+                //      <assertEquals actual="tagname" expected="&quot;svg&quot;" id="svgTagName" ignoreCase="false"/>
+                // <else>
+                //      <assertEquals actual="tagname" expected="&quot;staff&quot;" id="elementGetTagNameAssert" ignoreCase="false"/>
+                // </else>
+                // </if>
             }
             // namednodemapsetnameditemwithnewvalue.xml
             #[test]
@@ -1633,22 +1654,27 @@ mod dom_test_suite {
             // hc_namednodemapwrongdocumenterr.xml
             #[test]
             fn test_hc_namednodemapwrongdocumenterr() {
-                // let mut r#doc1: DocumentRef; // <var name="doc1" type="Document"/>
-                // let mut r#doc2: DocumentRef; // <var name="doc2" type="Document"/>
-                // let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
-                // let mut r#test_address; // type: Node // <var name="testAddress" type="Node"/>
-                // let mut r#attributes; // type: NamedNodeMap // <var name="attributes" type="NamedNodeMap"/>
-                // let mut r#new_attribute; // type: Node // <var name="newAttribute" type="Node"/>
-                // let mut r#strong; // type: DOMString // <var name="strong" type="DOMString"/>
-                // let mut r#set_node; // type: Node // <var name="setNode" type="Node"/>
-                // r#doc1 = todo!(); // hc_staff.xml // <load var="doc1" href="hc_staff" willBeModified="true"/>
-                // r#doc2 = todo!(); // hc_staff.xml // <load var="doc2" href="hc_staff" willBeModified="true"/>
-                // r#element_list = r#doc1.get_elements_by_tag_name("acronym"); // <getElementsByTagName interface="Document" obj="doc1" var="elementList" tagname="&quot;acronym&quot;"/>
-                // r#test_address = r#element_list[2].clone(); // <item interface="NodeList" obj="elementList" var="testAddress" index="2"/>
-                // r#new_attribute = r#doc2.create_attribute("newAttribute".to_string()).unwrap(); // <createAttribute obj="doc2" var="newAttribute" name="&quot;newAttribute&quot;"/>
-                // r#attributes = r#test_address.attributes(); // <attributes obj="testAddress" var="attributes"/>
+                let mut r#doc1: DocumentRef; // <var name="doc1" type="Document"/>
+                let mut r#doc2: DocumentRef; // <var name="doc2" type="Document"/>
+                let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
+                let mut r#test_address; // type: Node // <var name="testAddress" type="Node"/>
+                let mut r#attributes; // type: NamedNodeMap // <var name="attributes" type="NamedNodeMap"/>
+                let mut r#new_attribute; // type: Node // <var name="newAttribute" type="Node"/>
+                let mut r#set_node; // type: Node // <var name="setNode" type="Node"/>
+                r#doc1 = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc1" href="hc_staff" willBeModified="true"/>
+                r#doc2 = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc2" href="hc_staff" willBeModified="true"/>
+                r#element_list = r#doc1.get_elements_by_tag_name("acronym"); // <getElementsByTagName interface="Document" obj="doc1" var="elementList" tagname="&quot;acronym&quot;"/>
+                r#test_address = r#element_list[2].clone(); // <item interface="NodeList" obj="elementList" var="testAddress" index="2"/>
+                r#new_attribute = r#doc2.create_attribute("newAttribute".to_string()).unwrap(); // <createAttribute obj="doc2" var="newAttribute" name="&quot;newAttribute&quot;"/>
+                r#attributes = r#test_address.attributes(); // <attributes obj="testAddress" var="attributes"/>
 
-                // // unimplemented: // <assertDOMException id="throw_WRONG_DOCUMENT_ERR"><WRONG_DOCUMENT_ERR><setNamedItem var="setNode" obj="attributes" arg="newAttribute"/></WRONG_DOCUMENT_ERR></assertDOMException>
+                // <assertDOMException id="throw_WRONG_DOCUMENT_ERR">
+                //      <WRONG_DOCUMENT_ERR>
+                //          <setNamedItem var="setNode" obj="attributes" arg="newAttribute"/>
+                //      </WRONG_DOCUMENT_ERR>
+                // </assertDOMException>
+                set_node = attributes.set_named_item(new_attribute);
+                assert!(set_node.is_err_and(|err| err == DOMException::WrongDocumentErr));
             }
             // characterdatareplacedatanomodificationallowederr.xml
             #[test]
@@ -1668,7 +1694,13 @@ mod dom_test_suite {
                 // unimplemented: // <assertNotNull actual="entReference" id="entReferenceNotNull"/>
                 r#node_type = r#ent_reference.node_type(); // <nodeType var="nodeType" obj="entReference"/>
 
-                // unimplemented: // <if><equals actual="nodeType" expected="1" ignoreCase="false"/>	<createEntityReference var="entReference" obj="doc" name="&quot;ent4&quot;"/>	<assertNotNull actual="entReference" id="createdEntRefNotNull"/></if>
+                // <if><equals actual="nodeType" expected="1" ignoreCase="false"/>
+                //      <createEntityReference var="entReference" obj="doc" name="&quot;ent4&quot;"/>
+                //      <assertNotNull actual="entReference" id="createdEntRefNotNull"/>
+                // </if>
+                if node_type as i32 == 1 {
+                    ent_reference = doc.create_entity_reference("ent4").unwrap().into();
+                }
                 r#ent_element = r#ent_reference.first_child().unwrap(); // <firstChild var="entElement" obj="entReference" interface="Node"/>
 
                 // unimplemented: // <assertNotNull actual="entElement" id="entElementNotNull"/>
@@ -1676,7 +1708,18 @@ mod dom_test_suite {
 
                 // unimplemented: // <assertNotNull actual="entElementContent" id="entElementContentNotNull"/>
 
-                // unimplemented: // <assertDOMException id="throw_NO_MODIFICATION_ALLOWED_ERR"><NO_MODIFICATION_ALLOWED_ERR><replaceData obj="entElementContent" offset="1" count="3" arg="&quot;newArg&quot;"/></NO_MODIFICATION_ALLOWED_ERR></assertDOMException>
+                // <assertDOMException id="throw_NO_MODIFICATION_ALLOWED_ERR">
+                //      <NO_MODIFICATION_ALLOWED_ERR>
+                //          <replaceData obj="entElementContent" offset="1" count="3" arg="&quot;newArg&quot;"/>
+                //      </NO_MODIFICATION_ALLOWED_ERR>
+                // </assertDOMException>
+                assert!(
+                    ent_element_content
+                        .as_text_node()
+                        .unwrap()
+                        .replace_data(1, 3, "newArg")
+                        .is_err_and(|err| err == DOMException::NoModificationAllowedErr)
+                );
             }
             // elementinuseattributeerr.xml
             #[test]
@@ -3132,7 +3175,7 @@ mod dom_test_suite {
                 // let mut r#element_node; // type: Node // <var name="elementNode" type="Node"/>
                 // let mut r#inserted_node; // type: Node // <var name="insertedNode" type="Node"/>
                 // r#doc1 = todo!(); // hc_staff.xml // <load var="doc1" href="hc_staff" willBeModified="false"/>
-                // r#doc2 = todo!(); // hc_staff.xml // <load var="doc2" href="hc_staff" willBeModified="true"/>
+                // r#doc2 = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc2" href="hc_staff" willBeModified="true"/>
                 // r#new_child = r#doc1.create_element("br".to_string()).unwrap(); // <createElement obj="doc1" tagName="&quot;br&quot;" var="newChild"/>
                 // r#element_list = r#doc2.get_elements_by_tag_name("p"); // <getElementsByTagName interface="Document" obj="doc2" tagname="&quot;p&quot;" var="elementList"/>
                 // r#element_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="elementNode"/>
@@ -5369,7 +5412,7 @@ mod dom_test_suite {
                 // let mut r#element_node; // type: Node // <var name="elementNode" type="Node"/>
                 // let mut r#appended_child; // type: Node // <var name="appendedChild" type="Node"/>
                 // r#doc1 = todo!(); // hc_staff.xml // <load var="doc1" href="hc_staff" willBeModified="false"/>
-                // r#doc2 = todo!(); // hc_staff.xml // <load var="doc2" href="hc_staff" willBeModified="true"/>
+                // r#doc2 = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc2" href="hc_staff" willBeModified="true"/>
                 // r#new_child = r#doc1.create_element("br".to_string()).unwrap(); // <createElement obj="doc1" tagName="&quot;br&quot;" var="newChild"/>
                 // r#element_list = r#doc2.get_elements_by_tag_name("p"); // <getElementsByTagName interface="Document" obj="doc2" tagname="&quot;p&quot;" var="elementList"/>
                 // r#element_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="elementNode"/>
@@ -10969,7 +11012,7 @@ mod dom_test_suite {
                 // let mut r#element_node; // type: Node // <var name="elementNode" type="Node"/>
                 // let mut r#replaced_child; // type: Node // <var name="replacedChild" type="Node"/>
                 // r#doc1 = todo!(); // hc_staff.xml // <load var="doc1" href="hc_staff" willBeModified="false"/>
-                // r#doc2 = todo!(); // hc_staff.xml // <load var="doc2" href="hc_staff" willBeModified="true"/>
+                // r#doc2 = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc2" href="hc_staff" willBeModified="true"/>
                 // r#new_child = r#doc1.create_element("br".to_string()).unwrap(); // <createElement obj="doc1" tagName="&quot;br&quot;" var="newChild"/>
                 // r#element_list = r#doc2.get_elements_by_tag_name("p"); // <getElementsByTagName interface="Document" obj="doc2" tagname="&quot;p&quot;" var="elementList"/>
                 // r#element_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="elementNode"/>
@@ -17441,7 +17484,7 @@ mod dom_test_suite {
                 // let mut r#notation2; // type: Notation // <var name="notation2" type="Notation"/>
                 // let mut r#is_equal; // type: boolean // <var name="isEqual" type="boolean"/>
                 // r#doc1 = todo!(); // hc_staff.xml // <load var="doc1" href="hc_staff" willBeModified="false"/>
-                // r#doc2 = todo!(); // hc_staff.xml // <load var="doc2" href="hc_staff" willBeModified="false"/>
+                // r#doc2 = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc2" href="hc_staff" willBeModified="false"/>
                 // r#doc_type1 = r#doc1.doctype().unwrap(); // <doctype var="docType1" obj="doc1"/>
                 // r#doc_type2 = r#doc2.doctype().unwrap(); // <doctype var="docType2" obj="doc2"/>
 
@@ -23093,7 +23136,7 @@ mod dom_test_suite {
                 // let mut r#beta; // type: Entity // <var name="beta" type="Entity"/>
                 // let mut r#is_equal; // type: boolean // <var name="isEqual" type="boolean"/>
                 // r#doc1 = todo!(); // hc_staff.xml // <load var="doc1" href="hc_staff" willBeModified="false"/>
-                // r#doc2 = todo!(); // hc_staff.xml // <load var="doc2" href="hc_staff" willBeModified="false"/>
+                // r#doc2 = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc2" href="hc_staff" willBeModified="false"/>
                 // r#doc_type1 = r#doc1.doctype().unwrap(); // <doctype var="docType1" obj="doc1"/>
                 // r#doc_type2 = r#doc2.doctype().unwrap(); // <doctype var="docType2" obj="doc2"/>
 
@@ -24495,7 +24538,7 @@ mod dom_test_suite {
                 // r#child_list = r#doc.get_elements_by_tag_name_ns(Some("*"), "p"); // <getElementsByTagNameNS var="childList" obj="doc" namespaceURI="&quot;*&quot;" localName="&quot;p&quot;" interface="Document"/>
                 // r#elem = r#child_list.item(0).unwrap().clone(); // <item var="elem" obj="childList" index="0" interface="NodeList"/>
                 // r#first_child = r#elem.first_child().unwrap(); // <firstChild var="firstChild" obj="elem" interface="Node"/>
-                // r#doc2 = todo!(); // hc_staff.xml // <load var="doc2" href="hc_staff" willBeModified="false"/>
+                // r#doc2 = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc2" href="hc_staff" willBeModified="false"/>
                 // r#child_list2 = r#doc2.get_elements_by_tag_name_ns(Some("*"), "p"); // <getElementsByTagNameNS var="childList2" obj="doc2" namespaceURI="&quot;*&quot;" localName="&quot;p&quot;" interface="Document"/>
                 // r#elem2 = r#child_list2[0].clone(); // <item var="elem2" obj="childList2" index="0" interface="NodeList"/>
 
@@ -32263,7 +32306,7 @@ mod dom_test_suite {
                 // let mut r#attr; // type: Attr // <var name="attr" type="Attr"/>
                 // let mut r#null_handler; // type: UserDataHandler // <var name="nullHandler" type="UserDataHandler" isNull="true"/>
                 // r#doc = todo!(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
-                // r#doc2 = todo!(); // hc_staff.xml // <load var="doc2" href="hc_staff" willBeModified="true"/>
+                // r#doc2 = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc2" href="hc_staff" willBeModified="true"/>
                 // r#attr = r#doc
                 //     .create_attribute_ns(
                 //         Some("http://www.w3.org/XML/1998/namespace"),
@@ -34162,7 +34205,7 @@ mod dom_test_suite {
                 // let mut r#appended_child; // type: Node // <var name="appendedChild" type="Node"/>
                 // let mut r#inserted; // type: Node // <var name="inserted" type="Node"/>
                 // r#doc = todo!(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
-                // r#doc2 = todo!(); // hc_staff.xml // <load var="doc2" href="hc_staff" willBeModified="true"/>
+                // r#doc2 = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc2" href="hc_staff" willBeModified="true"/>
                 // r#element = r#doc
                 //     .create_element_ns(
                 //         Some("http://www.w3.org/1999/xhtml"),
@@ -35182,7 +35225,7 @@ mod dom_test_suite {
                 // let mut r#replaced; // type: Node // <var name="replaced" type="Node"/>
                 // let mut r#appended_child; // type: Node // <var name="appendedChild" type="Node"/>
                 // r#doc = todo!(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
-                // r#doc2 = todo!(); // hc_staff.xml // <load var="doc2" href="hc_staff" willBeModified="true"/>
+                // r#doc2 = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc2" href="hc_staff" willBeModified="true"/>
                 // r#parent = r#doc
                 //     .create_attribute_ns(
                 //         Some("http://www.w3.org/XML/1998/namespace"),

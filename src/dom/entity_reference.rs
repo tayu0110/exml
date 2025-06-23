@@ -175,6 +175,11 @@ impl Node for EntityReferenceRef {
         };
         Rc::ptr_eq(&self.0, &other.0)
     }
+
+    fn is_read_only(&self) -> bool {
+        // As for Entity nodes, EntityReference nodes and all their descendants are readonly.
+        true
+    }
 }
 
 impl NodeConnection for EntityReferenceRef {

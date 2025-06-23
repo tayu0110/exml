@@ -5,7 +5,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use crate::chvalid::XmlCharValid;
+use crate::{chvalid::XmlCharValid, dom::check_no_modification_allowed_err};
 
 use super::{
     DOMException, NodeType,
@@ -21,7 +21,7 @@ use super::{
 ///
 /// Furthermore, strings are encoded in UTF-8, not UTF-16.\
 /// Therefore, errors related to string boundaries are subject to the constraints of UTF-8.
-pub trait CharacterData {
+pub trait CharacterData: Node {
     /// Implementation of [`data`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-72AB8359) attribute.
     ///
     /// # Specification
@@ -165,6 +165,7 @@ pub trait CharacterData {
     /// No Return Value
     /// ```
     fn replace_data(&mut self, offset: usize, count: usize, arg: &str) -> Result<(), DOMException> {
+        check_no_modification_allowed_err(self)?;
         let mut data = self.data();
         let end = data.len().min(offset + count);
         if !data.is_char_boundary(offset) || !data.is_char_boundary(end) {
@@ -203,6 +204,10 @@ pub struct Text {
     next_sibling: Option<NodeRef>,
     owner_document: DocumentWeakRef,
     data: String,
+
+    // 0      : read-only ?
+    // 1 - 15 : unused
+    flag: u16,
 }
 
 impl Text {
@@ -550,6 +555,7 @@ impl TextRef {
             next_sibling: None,
             owner_document: doc.downgrade(),
             data,
+            flag: 0,
         })))
     }
 }
@@ -603,6 +609,7 @@ impl Node for TextRef {
             next_sibling: None,
             owner_document: self.0.borrow().owner_document.clone(),
             data: self.0.borrow().data.clone(),
+            flag: 0,
         };
         TextRef(Rc::new(RefCell::new(text))).into()
     }
@@ -621,6 +628,10 @@ impl Node for TextRef {
             return false;
         };
         Rc::ptr_eq(&self.0, &other.0)
+    }
+
+    fn is_read_only(&self) -> bool {
+        self.0.borrow().flag & 1 != 0
     }
 }
 
@@ -666,6 +677,14 @@ impl NodeConnection for TextRef {
 
     fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
         replace(&mut self.0.borrow_mut().owner_document, new_doc.downgrade()).upgrade()
+    }
+
+    fn set_read_only(&mut self) {
+        self.0.borrow_mut().flag |= 0b01;
+    }
+
+    fn unset_read_only(&mut self) {
+        self.0.borrow_mut().flag &= !0b01;
     }
 
     fn adopted_to(&mut self, new_doc: DocumentRef) {
@@ -720,6 +739,10 @@ pub struct Comment {
     next_sibling: Option<NodeRef>,
     owner_document: DocumentWeakRef,
     data: String,
+
+    // 0      : read-only ?
+    // 1 - 15 : unused
+    flag: u16,
 }
 
 impl Comment {
@@ -749,6 +772,7 @@ impl CommentRef {
             next_sibling: None,
             owner_document: doc.downgrade(),
             data,
+            flag: 0,
         })))
     }
 }
@@ -802,6 +826,7 @@ impl Node for CommentRef {
             next_sibling: None,
             owner_document: self.0.borrow().owner_document.clone(),
             data: self.0.borrow().data.clone(),
+            flag: 0,
         };
         CommentRef(Rc::new(RefCell::new(text))).into()
     }
@@ -820,6 +845,10 @@ impl Node for CommentRef {
             return false;
         };
         Rc::ptr_eq(&self.0, &other.0)
+    }
+
+    fn is_read_only(&self) -> bool {
+        self.0.borrow().flag & 1 != 0
     }
 }
 
@@ -854,6 +883,14 @@ impl NodeConnection for CommentRef {
 
     fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
         replace(&mut self.0.borrow_mut().owner_document, new_doc.downgrade()).upgrade()
+    }
+
+    fn set_read_only(&mut self) {
+        self.0.borrow_mut().flag |= 0b01;
+    }
+
+    fn unset_read_only(&mut self) {
+        self.0.borrow_mut().flag &= !0b01;
     }
 
     fn adopted_to(&mut self, new_doc: DocumentRef) {
@@ -931,6 +968,7 @@ impl CDATASectionRef {
             next_sibling: None,
             owner_document: doc.downgrade(),
             data,
+            flag: 0,
         }))))
     }
 }
@@ -984,6 +1022,7 @@ impl Node for CDATASectionRef {
             next_sibling: None,
             owner_document: self.0.borrow().owner_document.clone(),
             data: self.0.borrow().data.clone(),
+            flag: 0,
         }))))
         .into()
     }
@@ -1002,6 +1041,10 @@ impl Node for CDATASectionRef {
             return false;
         };
         Rc::ptr_eq(&self.0, &other.0)
+    }
+
+    fn is_read_only(&self) -> bool {
+        self.0.borrow().0.flag & 1 != 0
     }
 }
 
@@ -1036,6 +1079,14 @@ impl NodeConnection for CDATASectionRef {
 
     fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
         replace(&mut self.0.borrow_mut().owner_document, new_doc.downgrade()).upgrade()
+    }
+
+    fn set_read_only(&mut self) {
+        self.0.borrow_mut().0.flag |= 0b01;
+    }
+
+    fn unset_read_only(&mut self) {
+        self.0.borrow_mut().0.flag &= !0b01;
     }
 
     fn adopted_to(&mut self, new_doc: DocumentRef) {

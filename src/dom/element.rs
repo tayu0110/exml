@@ -1195,6 +1195,10 @@ impl Node for ElementRef {
         }
         None
     }
+
+    fn is_read_only(&self) -> bool {
+        self.0.borrow().flag & 0b01 != 0
+    }
 }
 
 impl NodeConnection for ElementRef {
@@ -1228,6 +1232,32 @@ impl NodeConnection for ElementRef {
 
     fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
         replace(&mut self.0.borrow_mut().owner_document, new_doc.downgrade()).upgrade()
+    }
+
+    fn set_read_only(&mut self) {
+        if !self.is_read_only() {
+            self.0.borrow_mut().flag |= 0b01;
+            let mut children = self.first_child();
+            while let Some(mut child) = children {
+                children = child.next_sibling();
+                if !child.is_read_only() {
+                    child.set_read_only();
+                }
+            }
+        }
+    }
+
+    fn unset_read_only(&mut self) {
+        if self.is_read_only() {
+            self.0.borrow_mut().flag &= !0b01;
+            let mut children = self.first_child();
+            while let Some(mut child) = children {
+                children = child.next_sibling();
+                if child.is_read_only() {
+                    child.unset_read_only();
+                }
+            }
+        }
     }
 
     fn adopted_to(&mut self, new_doc: DocumentRef) {

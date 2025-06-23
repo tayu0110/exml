@@ -218,6 +218,12 @@ impl Node for EntityRef {
     fn lookup_namespace_uri(&self, _prefix: &str) -> Option<Rc<str>> {
         None
     }
+
+    fn is_read_only(&self) -> bool {
+        // DOM Level 3 does not support editing Entity nodes <..snip..>
+        // Entity nodes and all their descendants are readonly.
+        true
+    }
 }
 
 impl NodeConnection for EntityRef {

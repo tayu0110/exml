@@ -130,6 +130,11 @@ impl Node for NotationRef {
     fn lookup_namespace_uri(&self, _prefix: &str) -> Option<Rc<str>> {
         None
     }
+
+    fn is_read_only(&self) -> bool {
+        // The DOM Core does not support editing Notation nodes; they are therefore readonly.
+        true
+    }
 }
 
 impl NodeConnection for NotationRef {
