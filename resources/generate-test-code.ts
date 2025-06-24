@@ -1,5 +1,5 @@
 /// deno run -A generate-test-code.ts && rustfmt __dom_test_suite.rs && mv __dom_test_suite.rs ../tests/
-import { DOMParser, Element } from "npm:@xmldom/xmldom";
+import { DOMParser, Element, Node } from "npm:@xmldom/xmldom";
 import * as path from "jsr:@std/path";
 import { snakeCase } from "jsr:@luca/cases";
 
@@ -60,6 +60,31 @@ for (const [d1, d] of TEST_SUITE) {
                                         buffer += `let mut r#${
                                             snakeCase(name)
                                         }: DocumentRef;`;
+                                    } else if (
+                                        type === "List" && elem.firstChild
+                                    ) {
+                                        buffer += `let mut r#${
+                                            snakeCase(name)
+                                        } = vec![`;
+                                        let child: Node | null =
+                                            elem.firstChild;
+                                        while (child) {
+                                            const value = child.textContent;
+                                            if (
+                                                child.nodeName === "member" &&
+                                                value
+                                            ) {
+                                                if (value.startsWith('"')) {
+                                                    buffer += `${value},`;
+                                                } else {
+                                                    buffer += `${
+                                                        snakeCase(value)
+                                                    },`;
+                                                }
+                                            }
+                                            child = child.nextSibling;
+                                        }
+                                        buffer += `]; // type: ${type}`;
                                     } else if (value) {
                                         buffer += `let mut r#${
                                             snakeCase(name)

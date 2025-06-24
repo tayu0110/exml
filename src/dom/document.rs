@@ -323,19 +323,17 @@ impl DocumentRef {
         }
 
         // Setup predefined entities
-        for mut ent in new.0.borrow_mut().predefined_entities.iter().cloned() {
+        let predefined_entities = new.0.borrow().predefined_entities.clone();
+        for (mut ent, text) in predefined_entities.iter().cloned().zip([
+            new.create_text_node("<"),
+            new.create_text_node(">"),
+            new.create_text_node("&"),
+            new.create_text_node("'"),
+            new.create_text_node("\""),
+        ]) {
             ent.set_owner_document(new.clone());
+            ent.append_child(text.into())?;
         }
-        let lt = new.create_text_node("<");
-        new.0.borrow_mut().predefined_entities[0].append_child(lt.into())?;
-        let gt = new.create_text_node(">");
-        new.0.borrow_mut().predefined_entities[1].append_child(gt.into())?;
-        let amp = new.create_text_node("&");
-        new.0.borrow_mut().predefined_entities[2].append_child(amp.into())?;
-        let apos = new.create_text_node("'");
-        new.0.borrow_mut().predefined_entities[3].append_child(apos.into())?;
-        let quot = new.create_text_node("\"");
-        new.0.borrow_mut().predefined_entities[4].append_child(quot.into())?;
 
         Ok(new)
     }
@@ -571,10 +569,15 @@ impl DocumentRef {
         let mut entref = EntityReferenceRef::from_doc(self.clone(), name);
 
         if let Some(entity) = self.get_entity(entref.node_name()) {
+            let read_only_check = self.is_enabled_read_only_check();
+            self.0.borrow_mut().disable_read_only_check();
             let mut children = entity.first_child();
             while let Some(child) = children {
                 children = child.next_sibling();
                 entref.append_child(child.clone_node(true))?;
+            }
+            if read_only_check {
+                self.0.borrow_mut().enable_read_only_check();
             }
         }
         Ok(entref)

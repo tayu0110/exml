@@ -2,7 +2,8 @@ use std::rc::Rc;
 
 use crate::{
     dom::{
-        DOCUMENT_POSITION_DISCONNECTED, check_owner_document_sameness,
+        DOCUMENT_POSITION_DISCONNECTED, check_no_modification_allowed_err,
+        check_owner_document_sameness,
         named_node_map::{AttributeMap, NamedNodeMap},
         node_list::ChildNodesList,
     },
@@ -172,6 +173,8 @@ pub trait Node: NodeConnection {
             return Ok(new_child);
         }
 
+        check_no_modification_allowed_err(self)?;
+
         // HIERARCHY_REQUEST_ERR: Raised if this node is of a type that does not allow children
         // of the type of the newChild node (..snip)
         if new_child.node_type() == NodeType::DocumentFragment {
@@ -332,6 +335,8 @@ pub trait Node: NodeConnection {
             return Ok(new_child);
         }
 
+        check_no_modification_allowed_err(self)?;
+
         // HIERARCHY_REQUEST_ERR: Raised if this node is of a type that does not allow children
         // of the type of the newChild node (..snip)
         if new_child.node_type() == NodeType::DocumentFragment {
@@ -352,15 +357,9 @@ pub trait Node: NodeConnection {
         {
             return Err(DOMException::NotFoundErr);
         }
-        let rdoc = self.owner_document();
-        let ndoc = new_child.owner_document();
         // WRONG_DOCUMENT_ERR: Raised if newChild was created from a different document
         // than the one that created this node.
-        if rdoc.is_some() != ndoc.is_some()
-            || rdoc
-                .zip(ndoc)
-                .is_some_and(|(rd, nd)| !rd.is_same_node(&NodeRef::Document(nd)))
-        {
+        if !check_owner_document_sameness(self, &new_child) {
             return Err(DOMException::WrongDocumentErr);
         }
 
@@ -459,6 +458,8 @@ pub trait Node: NodeConnection {
     ///                                  Element child.
     /// ```
     fn remove_child(&mut self, mut old_child: NodeRef) -> Result<NodeRef, DOMException> {
+        check_no_modification_allowed_err(self)?;
+
         // NOT_FOUND_ERR: Raised if oldChild is not a child of this node.
         if old_child
             .parent_node()
@@ -1120,6 +1121,8 @@ pub trait Node: NodeConnection {
     ///     NO_MODIFICATION_ALLOWED_ERR: Raised when the node is readonly.
     /// ```
     fn set_text_content(&mut self, text: impl Into<String>) -> Result<(), DOMException> {
+        check_no_modification_allowed_err(self)?;
+
         let mut children = self.first_child();
         while let Some(child) = children {
             children = child.next_sibling();

@@ -55,6 +55,23 @@ pub trait CharacterData: Node {
     /// ```
     fn set_data(&mut self, data: impl Into<String>) -> Result<(), DOMException>;
 
+    /// Implementation of [`length`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-7D61178C) attribute.
+    ///
+    /// # Note
+    /// Unlike the specification,
+    /// this implementation returns **the number of bytes in a UTF-8 string**.
+    ///
+    /// # Specification
+    /// ```text
+    /// length of type unsigned long, readonly
+    ///     The number of 16-bit units that are available through data
+    ///     and the substringData method below. This may have the value zero,
+    ///     i.e., CharacterData nodes may be empty.
+    /// ```
+    fn length(&self) -> usize {
+        self.data().len()
+    }
+
     /// Implementation of [`appendData`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-32791A2F) method.
     ///
     /// # Specification
@@ -73,6 +90,7 @@ pub trait CharacterData: Node {
     /// No Return Value
     /// ```
     fn append_data(&mut self, arg: &str) -> Result<(), DOMException> {
+        check_no_modification_allowed_err(self)?;
         let mut data = self.data();
         data.push_str(arg);
         self.set_data(data)
@@ -98,6 +116,7 @@ pub trait CharacterData: Node {
     /// No Return Value
     /// ```
     fn insert_data(&mut self, offset: usize, arg: &str) -> Result<(), DOMException> {
+        check_no_modification_allowed_err(self)?;
         let mut data = self.data();
         if !data.is_char_boundary(offset) {
             return Err(DOMException::IndexSizeErr);
@@ -129,6 +148,7 @@ pub trait CharacterData: Node {
     /// No Return Value
     /// ```
     fn delete_data(&mut self, offset: usize, count: usize) -> Result<(), DOMException> {
+        check_no_modification_allowed_err(self)?;
         let mut data = self.data();
         let end = data.len().min(offset + count);
         if !data.is_char_boundary(offset) || !data.is_char_boundary(end) {
@@ -250,6 +270,8 @@ impl TextRef {
     /// NO_MODIFICATION_ALLOWED_ERR: Raised if this node is readonly.
     /// ```
     pub fn split_text(&mut self, offset: usize) -> Result<TextRef, DOMException> {
+        check_no_modification_allowed_err(self)?;
+
         if !self.0.borrow().data.is_char_boundary(offset) {
             return Err(DOMException::IndexSizeErr);
         }
@@ -641,6 +663,7 @@ impl CharacterData for TextRef {
     }
 
     fn set_data(&mut self, data: impl Into<String>) -> Result<(), DOMException> {
+        check_no_modification_allowed_err(self)?;
         self.0.borrow_mut().data = data.into();
         Ok(())
     }
@@ -904,6 +927,7 @@ impl CharacterData for CommentRef {
     }
 
     fn set_data(&mut self, data: impl Into<String>) -> Result<(), DOMException> {
+        check_no_modification_allowed_err(self)?;
         self.0.borrow_mut().data = data.into();
         Ok(())
     }
@@ -1100,6 +1124,7 @@ impl CharacterData for CDATASectionRef {
     }
 
     fn set_data(&mut self, data: impl Into<String>) -> Result<(), DOMException> {
+        check_no_modification_allowed_err(self)?;
         self.0.borrow_mut().data = data.into();
         Ok(())
     }

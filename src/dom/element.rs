@@ -6,7 +6,7 @@ use std::{
 
 use crate::{
     dom::{
-        check_owner_document_sameness,
+        check_no_modification_allowed_err, check_owner_document_sameness,
         named_node_map::{AttributeMap, NamedNodeMap},
     },
     parser::split_qname2,
@@ -276,6 +276,8 @@ impl ElementRef {
         name: impl Into<Rc<str>>,
         value: impl Into<String>,
     ) -> Result<(), DOMException> {
+        check_no_modification_allowed_err(self)?;
+
         let name: Rc<str> = name.into();
         if validate_name::<false>(&name).is_err() {
             return Err(DOMException::InvalidCharacterErr);
@@ -312,6 +314,8 @@ impl ElementRef {
     /// No Return Value
     /// ```
     pub fn remove_attribute(&mut self, name: Rc<str>) -> Result<(), DOMException> {
+        check_no_modification_allowed_err(self)?;
+
         let mut attrs = self.attributes();
         let mut attr = attrs.remove_named_item(name.as_ref())?;
         attr.set_owner_element(None);
@@ -380,6 +384,8 @@ impl ElementRef {
         &mut self,
         mut new_attr: AttrRef,
     ) -> Result<Option<AttrRef>, DOMException> {
+        check_no_modification_allowed_err(self)?;
+
         if !check_owner_document_sameness(self, &new_attr) {
             return Err(DOMException::WrongDocumentErr);
         }
@@ -394,6 +400,9 @@ impl ElementRef {
         let mut attrs = self.attributes();
         let res = attrs.set_named_item(new_attr.clone())?;
         new_attr.set_owner_element(Some(self.clone()));
+        if self.is_read_only() {
+            new_attr.set_read_only();
+        }
         Ok(res)
     }
     /// Implementation of [`removeAttributeNode`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-D589198) method.
@@ -420,7 +429,12 @@ impl ElementRef {
     ///     NOT_FOUND_ERR:               Raised if oldAttr is not an attribute of the element.
     /// ```
     pub fn remove_attribute_node(&mut self, old_attr: AttrRef) -> Result<AttrRef, DOMException> {
-        if !check_owner_document_sameness(self, &old_attr) {
+        check_no_modification_allowed_err(self)?;
+
+        if !old_attr
+            .owner_element()
+            .is_some_and(|elem| self.is_same_node(&elem.into()))
+        {
             return Err(DOMException::NotFoundErr);
         }
         let attr_name = old_attr.node_name();
@@ -581,6 +595,8 @@ impl ElementRef {
         qname: Rc<str>,
         value: impl Into<String>,
     ) -> Result<(), DOMException> {
+        check_no_modification_allowed_err(self)?;
+
         let doc = self.owner_document().expect("Internal Error");
         if doc.is_html() {
             return Err(DOMException::NotSupportedErr);
@@ -594,6 +610,9 @@ impl ElementRef {
         let text = doc.create_text_node(value);
         attr.append_child(text.into())?;
         attr.set_owner_element(Some(self.clone()));
+        if self.is_read_only() {
+            attr.set_read_only();
+        }
         Ok(())
     }
     /// Implementation of [`removeAttributeNS`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-ElRemAtNS) method.
@@ -632,6 +651,8 @@ impl ElementRef {
         ns_uri: Option<&str>,
         local_name: &str,
     ) -> Result<(), DOMException> {
+        check_no_modification_allowed_err(self)?;
+
         if self.owner_document().is_some_and(|doc| doc.is_html()) {
             return Err(DOMException::NotSupportedErr);
         }
@@ -712,6 +733,8 @@ impl ElementRef {
         &mut self,
         mut new_attr: AttrRef,
     ) -> Result<Option<AttrRef>, DOMException> {
+        check_no_modification_allowed_err(self)?;
+
         if !check_owner_document_sameness(self, &new_attr) {
             return Err(DOMException::WrongDocumentErr);
         }
@@ -726,6 +749,9 @@ impl ElementRef {
         let mut attrs = self.attributes();
         let res = attrs.set_named_item_ns(new_attr.clone())?;
         new_attr.set_owner_element(Some(self.clone()));
+        if self.is_read_only() {
+            new_attr.set_read_only();
+        }
         Ok(res)
     }
 
@@ -745,8 +771,7 @@ impl ElementRef {
     ///         all local names.
     ///
     /// Return Value
-    /// NodeList
-    /// A new NodeList object containing all the matched Elements.
+    ///     NodeList A new NodeList object containing all the matched Elements.
     ///
     /// Exceptions
     ///     DOMException
@@ -759,6 +784,8 @@ impl ElementRef {
         ns_uri: Option<Rc<str>>,
         local_name: Rc<str>,
     ) -> Result<Vec<ElementRef>, DOMException> {
+        check_no_modification_allowed_err(self)?;
+
         if self.owner_document().is_some_and(|doc| doc.is_html()) {
             return Err(DOMException::NotSupportedErr);
         }
@@ -887,6 +914,8 @@ impl ElementRef {
     /// No Return Value
     /// ```
     pub fn set_id_attribute(&mut self, name: &str, is_id: bool) -> Result<(), DOMException> {
+        check_no_modification_allowed_err(self)?;
+
         let mut attr = self
             .get_attribute_node(name)
             .ok_or(DOMException::NotFoundErr)?;
@@ -926,6 +955,8 @@ impl ElementRef {
         local_name: &str,
         is_id: bool,
     ) -> Result<(), DOMException> {
+        check_no_modification_allowed_err(self)?;
+
         let mut attr = self
             .get_attribute_node_ns(ns_uri, local_name)?
             .ok_or(DOMException::NotFoundErr)?;
@@ -963,6 +994,8 @@ impl ElementRef {
         mut id_attr: AttrRef,
         is_id: bool,
     ) -> Result<(), DOMException> {
+        check_no_modification_allowed_err(self)?;
+
         if id_attr
             .owner_element()
             .is_none_or(|elem| !self.is_same_node(&NodeRef::Element(elem)))
@@ -1236,6 +1269,12 @@ impl NodeConnection for ElementRef {
                     child.set_read_only();
                 }
             }
+
+            let attrs = self.attributes();
+            let len = attrs.length();
+            for i in 0..len {
+                attrs.item(i).unwrap().set_read_only();
+            }
         }
     }
 
@@ -1248,6 +1287,12 @@ impl NodeConnection for ElementRef {
                 if child.is_read_only() {
                     child.unset_read_only();
                 }
+            }
+
+            let attrs = self.attributes();
+            let len = attrs.length();
+            for i in 0..len {
+                attrs.item(i).unwrap().unset_read_only();
             }
         }
     }
