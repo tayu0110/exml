@@ -16,10 +16,7 @@ use super::{
 /// Implementation of [CharacterData](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-FF21A306)
 /// interface on [1.4 Fundamental Interfaces: Core Module](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-BBACDC08)
 ///
-/// `substringData` method is not implemented
-/// because it is easy to cut substrings out of the return value of the `data` method.
-///
-/// Furthermore, strings are encoded in UTF-8, not UTF-16.\
+/// Strings are encoded in UTF-8, not UTF-16.\
 /// Therefore, errors related to string boundaries are subject to the constraints of UTF-8.
 pub trait CharacterData: Node {
     /// Implementation of [`data`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-72AB8359) attribute.
@@ -70,6 +67,42 @@ pub trait CharacterData: Node {
     /// ```
     fn length(&self) -> usize {
         self.data().len()
+    }
+
+    /// Implementation of [`substringData`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-6531BCCF).
+    ///
+    /// # Note
+    /// Unlike the specification, `offset` and `count` is **the number of bytes in a UTF-8 string**.
+    ///
+    /// # Specification
+    /// ```text
+    /// Extracts a range of data from the node.
+    ///
+    /// Parameters
+    ///     offset of type unsigned long
+    ///         Start offset of substring to extract.
+    ///     count of type unsigned long
+    ///         The number of 16-bit units to extract.
+    ///
+    /// Return Value
+    ///     DOMString The specified substring. If the sum of offset and count exceeds the
+    ///               length, then all 16-bit units to the end of the data are returned.
+    ///
+    /// Exceptions
+    ///     DOMException
+    ///     INDEX_SIZE_ERR:     Raised if the specified offset is negative or greater than
+    ///                         the number of 16-bit units in data, or if the specified
+    ///                         count is negative.
+    ///     DOMSTRING_SIZE_ERR: Raised if the specified range of text does not fit into
+    ///                         a DOMString.
+    /// ```
+    fn substring_data(&self, offset: usize, count: usize) -> Result<String, DOMException> {
+        let data = self.data();
+        let end = data.len().min(offset + count);
+        if !data.is_char_boundary(offset) || !data.is_char_boundary(end) {
+            return Err(DOMException::IndexSizeErr);
+        }
+        Ok(data[offset..end].to_owned())
     }
 
     /// Implementation of [`appendData`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-32791A2F) method.

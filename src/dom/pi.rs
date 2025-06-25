@@ -4,7 +4,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use crate::dom::DOMException;
+use crate::dom::{DOMException, check_no_modification_allowed_err};
 
 use super::{
     NodeType,
@@ -108,6 +108,8 @@ impl ProcessingInstructionRef {
     ///     NO_MODIFICATION_ALLOWED_ERR: Raised when the node is readonly.
     /// ```
     pub fn set_data(&mut self, value: impl Into<Rc<str>>) -> Result<(), DOMException> {
+        check_no_modification_allowed_err(self)?;
+
         self.0.borrow_mut().data = Some(value.into());
         Ok(())
     }

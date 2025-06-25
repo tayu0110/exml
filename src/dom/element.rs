@@ -111,7 +111,7 @@ impl Element {
         // so we should retain the attributes before execute `AttrRef::adopted_to`.
         self.attributes.retain(|attr| attr.specified());
         self.attributes.set_owner_document(new_doc.clone());
-        for i in 0..self.attributes.len() {
+        for i in 0..self.attributes.length() {
             let mut attr = self.attributes.item(i).unwrap();
             let elem = attr.owner_element();
             attr.adopted_to(new_doc.clone());
@@ -313,18 +313,18 @@ impl ElementRef {
     ///
     /// No Return Value
     /// ```
-    pub fn remove_attribute(&mut self, name: Rc<str>) -> Result<(), DOMException> {
+    pub fn remove_attribute(&mut self, name: &str) -> Result<(), DOMException> {
         check_no_modification_allowed_err(self)?;
 
         let mut attrs = self.attributes();
-        let mut attr = attrs.remove_named_item(name.as_ref())?;
+        let mut attr = attrs.remove_named_item(name)?;
         attr.set_owner_element(None);
 
         // If the owner Document has a default attribute,
         // insert it to this element.
         if let Some(def) = self
             .owner_document()
-            .and_then(|doc| doc.get_default_attribute(&self.node_name(), &name))
+            .and_then(|doc| doc.get_default_attribute(&self.node_name(), name))
         {
             self.set_attribute_node(def)?;
         }
@@ -1029,7 +1029,7 @@ impl ElementRef {
         }
 
         let attrs = self.attributes();
-        for i in 0..attrs.len() {
+        for i in 0..attrs.length() {
             let attr = attrs.item(i).unwrap();
             if attr.prefix().is_some_and(|pre| pre.as_ref() == "xml")
                 && attr.node_value().is_some_and(|val| val.as_ref() == ns_uri)
@@ -1126,7 +1126,7 @@ impl Node for ElementRef {
         })));
 
         let attrs = self.attributes();
-        for i in 0..attrs.len() {
+        for i in 0..attrs.length() {
             let NodeRef::Attribute(attr) = attrs.item(i).unwrap().clone_node(true) else {
                 unreachable!()
             };
@@ -1201,7 +1201,7 @@ impl Node for ElementRef {
         }
 
         let attrs = self.attributes();
-        for i in 0..attrs.len() {
+        for i in 0..attrs.length() {
             let attr = attrs.item(i).unwrap();
             if (attr.prefix().as_deref() == Some("xmlns")
                 && self.local_name().as_deref() == Some(prefix))

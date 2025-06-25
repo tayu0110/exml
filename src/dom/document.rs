@@ -714,7 +714,7 @@ impl DocumentRef {
                 }?;
 
                 let attrs = elem.attributes();
-                for i in 0..attrs.len() {
+                for i in 0..attrs.length() {
                     let attr = attrs.item(i).unwrap();
                     if attr.specified() {
                         let NodeRef::Attribute(attr) = self.import_node(attr.into(), deep)? else {
@@ -750,7 +750,7 @@ impl DocumentRef {
                 while let Some(mut child) = children {
                     child.set_owner_document(self.clone());
                     if let Some(attrs) = child.attributes() {
-                        for i in 0..attrs.len() {
+                        for i in 0..attrs.length() {
                             let mut attr = attrs.item(i).unwrap();
                             attr.set_owner_document(self.clone());
                             let mut children = attr.first_child();

@@ -604,7 +604,7 @@ pub trait Node: NodeConnection {
         }
 
         if let Some(attrs) = self.attributes() {
-            for i in 0..attrs.len() {
+            for i in 0..attrs.length() {
                 let mut attr = attrs.item(i).unwrap();
                 attr.normalize();
             }
@@ -1320,17 +1320,17 @@ pub trait Node: NodeConnection {
 
         match (self.attributes(), arg.attributes()) {
             (Some(lattrs), Some(rattrs)) => {
-                if lattrs.len() != rattrs.len() {
+                if lattrs.length() != rattrs.length() {
                     return false;
                 }
 
                 let mut r = vec![];
-                for i in 0..rattrs.len() {
+                for i in 0..rattrs.length() {
                     r.push(rattrs.item(i).unwrap());
                 }
                 // Simply scanning and deleting.
                 // Not efficient, but probably sufficient.
-                for i in 0..lattrs.len() {
+                for i in 0..lattrs.length() {
                     let attr = NodeRef::Attribute(lattrs.item(i).unwrap());
                     let Some(pos) = r.iter().position(|r| r.is_equal_node(&attr)) else {
                         return false;

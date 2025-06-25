@@ -161,9 +161,15 @@ impl Node for EntityReferenceRef {
         })));
 
         let mut children = self.first_child();
+        let mut doc = self.owner_document().unwrap();
+        let is_enabled_read_only_check = doc.is_enabled_read_only_check();
+        doc.disable_read_only_check();
         while let Some(child) = children {
             children = child.next_sibling();
             entref.append_child(child.clone_node(true)).unwrap();
+        }
+        if is_enabled_read_only_check {
+            doc.enable_read_only_check();
         }
 
         entref.into()

@@ -624,15 +624,10 @@ impl AttributeMap {
         }
     }
 
-    /// Implementation of `length` attribute.
-    pub fn len(&self) -> usize {
-        self.data.borrow().len()
-    }
-
     /// Check if this list is empty.\
     /// In other words, check `self.len() == 0` is satisfied.
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        self.length() == 0
     }
 
     /// Check if this map has `node` or not.
