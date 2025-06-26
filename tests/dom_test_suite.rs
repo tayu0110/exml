@@ -1058,6 +1058,7 @@ mod dom_test_suite {
                 let mut p = body
                     .append_child(doc.create_element("p").unwrap().into())
                     .unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
                 let mut em = p
                     .append_child(doc.create_element("em").unwrap().into())
                     .unwrap();
@@ -1104,6 +1105,7 @@ mod dom_test_suite {
                 let mut p = body
                     .append_child(doc.create_element("p").unwrap().into())
                     .unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
                 let mut em = p
                     .append_child(doc.create_element("em").unwrap().into())
                     .unwrap();
@@ -1159,6 +1161,7 @@ mod dom_test_suite {
                 let mut p = body
                     .append_child(doc.create_element("p").unwrap().into())
                     .unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
                 let mut em = p
                     .append_child(doc.create_element("em").unwrap().into())
                     .unwrap();
@@ -1205,6 +1208,7 @@ mod dom_test_suite {
                 let mut p = body
                     .append_child(doc.create_element("p").unwrap().into())
                     .unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
                 let mut em = p
                     .append_child(doc.create_element("em").unwrap().into())
                     .unwrap();
@@ -1255,6 +1259,7 @@ mod dom_test_suite {
                 let mut p = body
                     .append_child(doc.create_element("p").unwrap().into())
                     .unwrap();
+                p.append_child(doc.create_text_node("\n").into()).unwrap();
                 let mut em = p
                     .append_child(doc.create_element("em").unwrap().into())
                     .unwrap();
@@ -10778,7 +10783,17 @@ mod dom_test_suite {
                 r#employee_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="employeeList"/>
                 r#length = r#employee_list.length(); // <length var="length" obj="employeeList" interface="NodeList"/>
 
-                // unimplemented: // <if><equals actual="length" expected="6"/><assertEquals actual="length" expected="6" ignoreCase="false" id="length_wo_space"/><else><assertEquals actual="length" expected="13" ignoreCase="false" id="length_w_space"/></else></if>
+                // <if><equals actual="length" expected="6"/>
+                //  <assertEquals actual="length" expected="6" ignoreCase="false" id="length_wo_space"/>
+                // <else>
+                //  <assertEquals actual="length" expected="13" ignoreCase="false" id="length_w_space"/>
+                // </else>
+                // </if>
+                if length == 6 {
+                    assert_eq!(length, 6);
+                } else {
+                    assert_eq!(length, 13);
+                }
             }
             // nodegetownerdocument.xml
             #[test]
@@ -10796,7 +10811,13 @@ mod dom_test_suite {
                 r#doc_element = r#owner_document.document_element().unwrap(); // <documentElement obj="ownerDocument" var="docElement"/>
                 r#element_name = r#doc_element.node_name().to_string(); // <nodeName obj="docElement" var="elementName"/>
 
-                // unimplemented: // <if><contentType type="image/svg+xml"/><assertEquals actual="elementName" expected="&quot;svg&quot;" id="svgTagName" ignoreCase="false"/><else><assertEquals actual="elementName" expected="&quot;staff&quot;" id="nodeGetOwnerDocumentAssert1" ignoreCase="false"/></else></if>
+                // unimplemented:
+                // <if><contentType type="image/svg+xml"/>
+                //  <assertEquals actual="elementName" expected="&quot;svg&quot;" id="svgTagName" ignoreCase="false"/>
+                // <else>
+                //  <assertEquals actual="elementName" expected="&quot;staff&quot;" id="nodeGetOwnerDocumentAssert1" ignoreCase="false"/>
+                // </else>
+                // </if>
             }
             // hc_attrinsertbefore7.xml
             #[test]
@@ -10884,11 +10905,24 @@ mod dom_test_suite {
                 r#ent_ref = r#gender.first_child().unwrap(); // <firstChild interface="Node" var="entRef" obj="gender"/>
 
                 // unimplemented: // <assertNotNull actual="entRef" id="entRefNotNull"/>
-                r#pi_node = r#ent_ref.last_child().unwrap(); // <lastChild interface="Node" var="piNode" obj="entRef"/>
+                r#pi_node = r#ent_ref
+                    .last_child()
+                    .unwrap()
+                    .as_processing_instruction()
+                    .unwrap(); // <lastChild interface="Node" var="piNode" obj="entRef"/>
 
                 // unimplemented: // <assertNotNull actual="piNode" id="piNodeNotNull"/>
 
-                // unimplemented: // <assertDOMException id="throw_NO_MODIFICATION_ALLOWED_ERR"><NO_MODIFICATION_ALLOWED_ERR><data interface="ProcessingInstruction" obj="piNode" value="&quot;newData&quot;"/></NO_MODIFICATION_ALLOWED_ERR></assertDOMException>
+                // <assertDOMException id="throw_NO_MODIFICATION_ALLOWED_ERR">
+                //  <NO_MODIFICATION_ALLOWED_ERR>
+                //      <data interface="ProcessingInstruction" obj="piNode" value="&quot;newData&quot;"/>
+                //  </NO_MODIFICATION_ALLOWED_ERR>
+                // </assertDOMException>
+                assert!(
+                    pi_node
+                        .set_data("newData")
+                        .is_err_and(|err| err == DOMException::NoModificationAllowedErr)
+                );
             }
             // elementcreatenewattribute.xml
             #[test]
@@ -10949,7 +10983,16 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("acronym"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;acronym&quot;" var="elementList"/>
                 r#test_address = r#element_list[0].clone(); // <item interface="NodeList" obj="elementList" index="0" var="testAddress"/>
 
-                // unimplemented: // <assertDOMException id="throw_INVALID_CHARACTER_ERR"><INVALID_CHARACTER_ERR><setAttribute obj="testAddress" name="&quot;invalid^Name&quot;" value="&quot;value&quot;"/></INVALID_CHARACTER_ERR></assertDOMException>
+                // <assertDOMException id="throw_INVALID_CHARACTER_ERR">
+                //  <INVALID_CHARACTER_ERR>
+                //      <setAttribute obj="testAddress" name="&quot;invalid^Name&quot;" value="&quot;value&quot;"/>
+                //  </INVALID_CHARACTER_ERR>
+                // </assertDOMException>
+                assert!(
+                    test_address
+                        .set_attribute("invalid^Name", "value")
+                        .is_err_and(|err| err == DOMException::InvalidCharacterErr)
+                );
             }
             // notationgetpublicidnull.xml
             #[test]
@@ -11051,15 +11094,31 @@ mod dom_test_suite {
                 // unimplemented: // <assertNotNull actual="entReference" id="entReferenceNotNull"/>
                 r#node_type = r#ent_reference.node_type(); // <nodeType var="nodeType" obj="entReference"/>
 
-                // unimplemented: // <if><equals actual="nodeType" expected="1" ignoreCase="false"/>	<createEntityReference var="entReference" obj="doc" name="&quot;ent4&quot;"/>	<assertNotNull actual="entReference" id="createdEntRefNotNull"/></if>
+                // <if><equals actual="nodeType" expected="1" ignoreCase="false"/>
+                //  <createEntityReference var="entReference" obj="doc" name="&quot;ent4&quot;"/>
+                //  <assertNotNull actual="entReference" id="createdEntRefNotNull"/>
+                // </if>
+                if node_type as i32 == 1 {
+                    ent_reference = doc.create_entity_reference("ent4").unwrap().into();
+                }
                 r#ent_element = r#ent_reference.first_child().unwrap(); // <firstChild var="entElement" obj="entReference" interface="Node"/>
 
                 // unimplemented: // <assertNotNull actual="entElement" id="entElementNotNull"/>
-                r#ent_element_content = r#ent_element.first_child().unwrap(); // <firstChild var="entElementContent" obj="entElement" interface="Node"/>
+                r#ent_element_content =
+                    r#ent_element.first_child().unwrap().as_text_node().unwrap(); // <firstChild var="entElementContent" obj="entElement" interface="Node"/>
 
                 // unimplemented: // <assertNotNull actual="entElementContent" id="entElementContentNotNull"/>
 
-                // unimplemented: // <assertDOMException id="throw_NO_MODIFICATION_ALLOWED_ERR"><NO_MODIFICATION_ALLOWED_ERR><appendData obj="entElementContent" arg="&quot;newString&quot;"/></NO_MODIFICATION_ALLOWED_ERR></assertDOMException>
+                // <assertDOMException id="throw_NO_MODIFICATION_ALLOWED_ERR">
+                //  <NO_MODIFICATION_ALLOWED_ERR>
+                //      <appendData obj="entElementContent" arg="&quot;newString&quot;"/>
+                //  </NO_MODIFICATION_ALLOWED_ERR>
+                // </assertDOMException>
+                assert!(
+                    ent_element_content
+                        .append_data("newString")
+                        .is_err_and(|err| err == DOMException::NoModificationAllowedErr)
+                );
             }
             // hc_characterdatagetlength.xml
             #[test]
@@ -11108,7 +11167,12 @@ mod dom_test_suite {
                 // r#name_node = r#element_list[2].clone(); // <item interface="NodeList" obj="elementList" var="nameNode" index="2"/>
                 // r#text_node = r#name_node.first_child().unwrap().as_text_node().unwrap(); // <firstChild interface="Node" obj="nameNode" var="textNode"/>
 
-                // // unimplemented: // <assertDOMException id="throws_INDEX_SIZE_ERR"><INDEX_SIZE_ERR><splitText obj="textNode" var="splitNode" offset="-69"/></INDEX_SIZE_ERR></assertDOMException>
+                // // unimplemented:
+                // // <assertDOMException id="throws_INDEX_SIZE_ERR">
+                // //  <INDEX_SIZE_ERR>
+                // //      <splitText obj="textNode" var="splitNode" offset="-69"/>
+                // //  </INDEX_SIZE_ERR>
+                // // </assertDOMException>
             }
             // hc_nodedocumentfragmentnodename.xml
             #[test]
@@ -11152,7 +11216,14 @@ mod dom_test_suite {
                 r#lchild_node = r#employee_node.last_child().unwrap(); // <lastChild interface="Node" obj="employeeNode" var="lchildNode"/>
                 r#child_name = r#lchild_node.node_name().to_string(); // <nodeName obj="lchildNode" var="childName"/>
 
-                // unimplemented: // <if><equals actual="childName" expected="&quot;#text&quot;" ignoreCase="false"/><previousSibling interface="Node" obj="lchildNode" var="lchildNode"/><nodeName obj="lchildNode" var="childName"/></if>
+                // <if><equals actual="childName" expected="&quot;#text&quot;" ignoreCase="false"/>
+                //  <previousSibling interface="Node" obj="lchildNode" var="lchildNode"/>
+                //  <nodeName obj="lchildNode" var="childName"/>
+                // </if>
+                if child_name == "#text" {
+                    lchild_node = lchild_node.previous_sibling().unwrap();
+                    child_name = lchild_node.node_name().to_string();
+                }
                 assert_eq!(r#child_name, "address"); // <assertEquals actual="childName" expected="&quot;address&quot;" id="nodeName" ignoreCase="false"/>
             }
             // hc_nodecloneattributescopied.xml
@@ -11192,7 +11263,14 @@ mod dom_test_suite {
                 r#ps_node = r#name_node.previous_sibling().unwrap(); // <previousSibling interface="Node" obj="nameNode" var="psNode"/>
                 r#ps_name = r#ps_node.node_name().to_string(); // <nodeName obj="psNode" var="psName"/>
 
-                // unimplemented: // <if><equals actual="psName" expected="&quot;#text&quot;" ignoreCase="false"/><previousSibling interface="Node" obj="psNode" var="psNode"/><nodeName obj="psNode" var="psName"/></if>
+                // <if><equals actual="psName" expected="&quot;#text&quot;" ignoreCase="false"/>
+                //  <previousSibling interface="Node" obj="psNode" var="psNode"/>
+                //  <nodeName obj="psNode" var="psName"/>
+                // </if>
+                if ps_name == "#text" {
+                    ps_node = ps_node.previous_sibling().unwrap();
+                    ps_name = ps_node.node_name().to_string();
+                }
                 assert_eq!(r#ps_name, "employeeId"); // <assertEquals actual="psName" expected="&quot;employeeId&quot;" id="nodeName" ignoreCase="false"/>
             }
             // hc_characterdatagetdata.xml
@@ -11284,19 +11362,27 @@ mod dom_test_suite {
             // nodereplacechildinvalidnodetype.xml
             #[test]
             fn test_nodereplacechildinvalidnodetype() {
-                // let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
-                // let mut r#root_node; // type: Element // <var name="rootNode" type="Element"/>
-                // let mut r#new_child; // type: Node // <var name="newChild" type="Node"/>
-                // let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
-                // let mut r#old_child; // type: Node // <var name="oldChild" type="Node"/>
-                // let mut r#replaced_child; // type: Node // <var name="replacedChild" type="Node"/>
-                // r#doc = staff_xml(STAFF_XML).unwrap(); // staff.xml // <load var="doc" href="staff" willBeModified="true"/>
-                // r#root_node = r#doc.document_element().unwrap(); // <documentElement obj="doc" var="rootNode"/>
-                // r#new_child = r#doc.create_attribute("newAttribute".to_string()).unwrap(); // <createAttribute obj="doc" name="&quot;newAttribute&quot;" var="newChild"/>
-                // r#element_list = r#doc.get_elements_by_tag_name("employee"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;employee&quot;" var="elementList"/>
-                // r#old_child = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="oldChild"/>
+                let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
+                let mut r#root_node; // type: Element // <var name="rootNode" type="Element"/>
+                let mut r#new_child; // type: Node // <var name="newChild" type="Node"/>
+                let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
+                let mut r#old_child; // type: Node // <var name="oldChild" type="Node"/>
+                r#doc = staff_xml(STAFF_XML).unwrap(); // staff.xml // <load var="doc" href="staff" willBeModified="true"/>
+                r#root_node = r#doc.document_element().unwrap(); // <documentElement obj="doc" var="rootNode"/>
+                r#new_child = r#doc.create_attribute("newAttribute".to_string()).unwrap(); // <createAttribute obj="doc" name="&quot;newAttribute&quot;" var="newChild"/>
+                r#element_list = r#doc.get_elements_by_tag_name("employee"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;employee&quot;" var="elementList"/>
+                r#old_child = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="oldChild"/>
 
-                // // unimplemented: // <assertDOMException id="throw_HIERARCHY_REQUEST_ERR"><HIERARCHY_REQUEST_ERR><replaceChild var="replacedChild" obj="rootNode" newChild="newChild" oldChild="oldChild"/></HIERARCHY_REQUEST_ERR></assertDOMException>
+                // <assertDOMException id="throw_HIERARCHY_REQUEST_ERR">
+                //  <HIERARCHY_REQUEST_ERR>
+                //      <replaceChild var="replacedChild" obj="rootNode" newChild="newChild" oldChild="oldChild"/>
+                //  </HIERARCHY_REQUEST_ERR>
+                // </assertDOMException>
+                assert!(
+                    root_node
+                        .replace_child(new_child.into(), old_child.into())
+                        .is_err_and(|err| err == DOMException::HierarchyRequestErr)
+                );
             }
             // nodedocumentnodeattribute.xml
             #[test]
@@ -11376,17 +11462,25 @@ mod dom_test_suite {
             // hc_noderemovechildoldchildnonexistent.xml
             #[test]
             fn test_hc_noderemovechildoldchildnonexistent() {
-                // let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
-                // let mut r#old_child; // type: Node // <var name="oldChild" type="Node"/>
-                // let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
-                // let mut r#element_node; // type: Node // <var name="elementNode" type="Node"/>
-                // let mut r#removed_child; // type: Node // <var name="removedChild" type="Node"/>
-                // r#doc = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
-                // r#old_child = r#doc.create_element("br".to_string()).unwrap(); // <createElement obj="doc" tagName="&quot;br&quot;" var="oldChild"/>
-                // r#element_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;p&quot;" var="elementList"/>
-                // r#element_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="elementNode"/>
+                let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
+                let mut r#old_child; // type: Node // <var name="oldChild" type="Node"/>
+                let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
+                let mut r#element_node; // type: Node // <var name="elementNode" type="Node"/>
+                r#doc = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
+                r#old_child = r#doc.create_element("br".to_string()).unwrap(); // <createElement obj="doc" tagName="&quot;br&quot;" var="oldChild"/>
+                r#element_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;p&quot;" var="elementList"/>
+                r#element_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="elementNode"/>
 
-                // // unimplemented: // <assertDOMException id="throw_NOT_FOUND_ERR"><NOT_FOUND_ERR><removeChild var="removedChild" obj="elementNode" oldChild="oldChild"/></NOT_FOUND_ERR></assertDOMException>
+                // <assertDOMException id="throw_NOT_FOUND_ERR">
+                //  <NOT_FOUND_ERR>
+                //      <removeChild var="removedChild" obj="elementNode" oldChild="oldChild"/>
+                //  </NOT_FOUND_ERR>
+                // </assertDOMException>
+                assert!(
+                    element_node
+                        .remove_child(old_child.into())
+                        .is_err_and(|err| err == DOMException::NotFoundErr)
+                );
             }
             // documentcreateelementdefaultattr.xml
             #[test]
@@ -11408,24 +11502,43 @@ mod dom_test_suite {
                 assert_eq!(r#name, "street"); // <assertEquals actual="name" expected="&quot;street&quot;" id="attrName" ignoreCase="false"/>
                 r#value = r#child.node_value().unwrap().to_string(); // <nodeValue obj="child" var="value"/>
                 assert_eq!(r#value, "Yes"); // <assertEquals actual="value" expected="&quot;Yes&quot;" id="attrValue" ignoreCase="false"/>
-
-                // unimplemented: // <assertSize collection="defaultAttr" size="1" id="attrCount"/>
+                assert_eq!(default_attr.length(), 1); // <assertSize collection="defaultAttr" size="1" id="attrCount"/>
             }
             // commentgetcomment.xml
             #[test]
             fn test_commentgetcomment() {
-                // let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
-                // let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
-                // let mut r#child; // type: Node // <var name="child" type="Node"/>
-                // let mut r#child_name; // type: DOMString // <var name="childName" type="DOMString"/>
-                // let mut r#child_value; // type: DOMString // <var name="childValue" type="DOMString"/>
-                // let mut r#comment_count; // type: int // <var name="commentCount" type="int" value="0"/>
-                // let mut r#child_type; // type: int // <var name="childType" type="int"/>
-                // r#doc = staff_xml(STAFF_XML).unwrap(); // staff.xml // <load var="doc" href="staff" willBeModified="false"/>
-                // r#element_list = r#doc.child_nodes(); // <childNodes obj="doc" var="elementList"/>
+                let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
+                let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
+                let mut r#child; // type: Node // <var name="child" type="Node"/>
+                let mut r#child_name; // type: DOMString // <var name="childName" type="DOMString"/>
+                let mut r#child_value; // type: DOMString // <var name="childValue" type="DOMString"/>
+                let mut r#comment_count = 0; // type: int // <var name="commentCount" type="int" value="0"/>
+                let mut r#child_type; // type: int // <var name="childType" type="int"/>
+                r#doc = staff_xml(STAFF_XML).unwrap(); // staff.xml // <load var="doc" href="staff" willBeModified="false"/>
+                r#element_list = r#doc.child_nodes(); // <childNodes obj="doc" var="elementList"/>
 
-                // // unimplemented: // <for-each collection="elementList" member="child"><nodeType obj="child" var="childType"/><if><equals actual="childType" expected="8" ignoreCase="false"/><nodeName obj="child" var="childName"/><assertEquals actual="childName" expected="&quot;#comment&quot;" ignoreCase="false" id="nodeName"/><nodeValue obj="child" var="childValue"/><assertEquals actual="childValue" expected="&quot; This is comment number 1.&quot;" id="nodeValue" ignoreCase="false"/><plus var="commentCount" op1="commentCount" op2="1"/></if></for-each>
-                // assert_eq!(r#comment_count, 1); // <assertEquals actual="commentCount" expected="1" ignoreCase="false" id="commentCount"/>
+                // <for-each collection="elementList" member="child">
+                //  <nodeType obj="child" var="childType"/>
+                //  <if><equals actual="childType" expected="8" ignoreCase="false"/>
+                //      <nodeName obj="child" var="childName"/>
+                //      <assertEquals actual="childName" expected="&quot;#comment&quot;" ignoreCase="false" id="nodeName"/>
+                //      <nodeValue obj="child" var="childValue"/>
+                //      <assertEquals actual="childValue" expected="&quot; This is comment number 1.&quot;" id="nodeValue" ignoreCase="false"/>
+                //      <plus var="commentCount" op1="commentCount" op2="1"/>
+                //  </if>
+                // </for-each>
+                for i in 0..element_list.length() {
+                    child = element_list.item(i).unwrap();
+                    child_type = child.node_type();
+                    if child_type as i32 == 8 {
+                        child_name = child.node_name().to_string();
+                        assert_eq!(child_name, "#comment");
+                        child_value = child.node_value().unwrap().to_string();
+                        assert_eq!(child_value, " This is comment number 1.");
+                        comment_count += 1;
+                    }
+                }
+                assert_eq!(r#comment_count, 1); // <assertEquals actual="commentCount" expected="1" ignoreCase="false" id="commentCount"/>
             }
             // hc_documentgetrootnode.xml
             #[test]
@@ -11442,17 +11555,25 @@ mod dom_test_suite {
             // hc_textindexsizeerroffsetoutofbounds.xml
             #[test]
             fn test_hc_textindexsizeerroffsetoutofbounds() {
-                // let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
-                // let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
-                // let mut r#name_node; // type: Node // <var name="nameNode" type="Node"/>
-                // let mut r#text_node; // type: Text // <var name="textNode" type="Text"/>
-                // let mut r#split_node; // type: Text // <var name="splitNode" type="Text"/>
-                // r#doc = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
-                // r#element_list = r#doc.get_elements_by_tag_name("strong"); // <getElementsByTagName interface="Document" obj="doc" var="elementList" tagname="&quot;strong&quot;"/>
-                // r#name_node = r#element_list[2].clone(); // <item interface="NodeList" obj="elementList" var="nameNode" index="2"/>
-                // r#text_node = r#name_node.first_child().unwrap().as_text_node().unwrap(); // <firstChild interface="Node" obj="nameNode" var="textNode"/>
+                let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
+                let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
+                let mut r#name_node; // type: Node // <var name="nameNode" type="Node"/>
+                let mut r#text_node; // type: Text // <var name="textNode" type="Text"/>
+                r#doc = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
+                r#element_list = r#doc.get_elements_by_tag_name("strong"); // <getElementsByTagName interface="Document" obj="doc" var="elementList" tagname="&quot;strong&quot;"/>
+                r#name_node = r#element_list[2].clone(); // <item interface="NodeList" obj="elementList" var="nameNode" index="2"/>
+                r#text_node = r#name_node.first_child().unwrap().as_text_node().unwrap(); // <firstChild interface="Node" obj="nameNode" var="textNode"/>
 
-                // // unimplemented: // <assertDOMException id="throw_INDEX_SIZE_ERR"><INDEX_SIZE_ERR><splitText obj="textNode" var="splitNode" offset="300"/></INDEX_SIZE_ERR></assertDOMException>
+                // <assertDOMException id="throw_INDEX_SIZE_ERR">
+                //  <INDEX_SIZE_ERR>
+                //      <splitText obj="textNode" var="splitNode" offset="300"/>
+                //  </INDEX_SIZE_ERR>
+                // </assertDOMException>
+                assert!(
+                    text_node
+                        .split_text(300)
+                        .is_err_and(|err| err == DOMException::IndexSizeErr)
+                );
             }
             // attrnotspecifiedvalue.xml
             #[test]
@@ -11505,22 +11626,35 @@ mod dom_test_suite {
                 r#child = r#employee_list.item(0).unwrap().clone(); // <item interface="NodeList" obj="employeeList" var="child" index="0"/>
                 r#child_name = r#child.node_name().to_string(); // <nodeName obj="child" var="childName"/>
 
-                // unimplemented: // <if><notEquals actual="childName" expected="&quot;#text&quot;" ignoreCase="false"/><assertEquals actual="childName" expected="&quot;employeeId&quot;" id="childName" ignoreCase="false"/></if>
+                // <if><notEquals actual="childName" expected="&quot;#text&quot;" ignoreCase="false"/>
+                //  <assertEquals actual="childName" expected="&quot;employeeId&quot;" id="childName" ignoreCase="false"/>
+                // </if>
+                if child_name != "#text" {
+                    assert_eq!(child_name, "employeeId");
+                }
             }
             // hc_namednodemapnotfounderr.xml
             #[test]
             fn test_hc_namednodemapnotfounderr() {
-                // let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
-                // let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
-                // let mut r#test_employee; // type: Element // <var name="testEmployee" type="Element"/>
-                // let mut r#attributes; // type: NamedNodeMap // <var name="attributes" type="NamedNodeMap"/>
-                // let mut r#removed_node; // type: Node // <var name="removedNode" type="Node"/>
-                // r#doc = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
-                // r#element_list = r#doc.get_elements_by_tag_name("acronym"); // <getElementsByTagName interface="Document" obj="doc" var="elementList" tagname="&quot;acronym&quot;"/>
-                // r#test_employee = r#element_list[2].clone(); // <item interface="NodeList" obj="elementList" var="testEmployee" index="2"/>
-                // r#attributes = r#test_employee.attributes(); // <attributes obj="testEmployee" var="attributes"/>
+                let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
+                let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
+                let mut r#test_employee; // type: Element // <var name="testEmployee" type="Element"/>
+                let mut r#attributes; // type: NamedNodeMap // <var name="attributes" type="NamedNodeMap"/>
+                r#doc = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
+                r#element_list = r#doc.get_elements_by_tag_name("acronym"); // <getElementsByTagName interface="Document" obj="doc" var="elementList" tagname="&quot;acronym&quot;"/>
+                r#test_employee = r#element_list[2].clone(); // <item interface="NodeList" obj="elementList" var="testEmployee" index="2"/>
+                r#attributes = r#test_employee.attributes(); // <attributes obj="testEmployee" var="attributes"/>
 
-                // // unimplemented: // <assertDOMException id="throw_NOT_FOUND_ERR"><NOT_FOUND_ERR><removeNamedItem var="removedNode" interface="NamedNodeMap" obj="attributes" name="&quot;lang&quot;"/></NOT_FOUND_ERR></assertDOMException>
+                // <assertDOMException id="throw_NOT_FOUND_ERR">
+                //  <NOT_FOUND_ERR>
+                //      <removeNamedItem var="removedNode" interface="NamedNodeMap" obj="attributes" name="&quot;lang&quot;"/>
+                //  </NOT_FOUND_ERR>
+                // </assertDOMException>
+                assert!(
+                    attributes
+                        .remove_named_item("lang")
+                        .is_err_and(|err| err == DOMException::NotFoundErr)
+                );
             }
             // hc_elementnormalize.xml
             #[test]
@@ -11585,8 +11719,7 @@ mod dom_test_suite {
                 r#second_c_node = r#child_list.item(1).unwrap().clone(); // <item interface="NodeList" obj="childList" index="1" var="secondCNode"/>
                 r#text_node = r#second_c_node.first_child().unwrap(); // <firstChild interface="Node" obj="secondCNode" var="textNode"/>
                 r#child_nodes_list = r#text_node.child_nodes(); // <childNodes obj="textNode" var="childNodesList"/>
-
-                // unimplemented: // <assertSize collection="childNodesList" size="0" id="nodeChildNodesEmptyAssert1"/>
+                assert_eq!(child_nodes_list.length(), 0); // <assertSize collection="childNodesList" size="0" id="nodeChildNodesEmptyAssert1"/>
             }
             // hc_nodevalue05.xml
             #[test]
@@ -11642,19 +11775,27 @@ mod dom_test_suite {
             // hc_nodereplacechildoldchildnonexistent.xml
             #[test]
             fn test_hc_nodereplacechildoldchildnonexistent() {
-                // let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
-                // let mut r#old_child; // type: Node // <var name="oldChild" type="Node"/>
-                // let mut r#new_child; // type: Node // <var name="newChild" type="Node"/>
-                // let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
-                // let mut r#element_node; // type: Node // <var name="elementNode" type="Node"/>
-                // let mut r#replaced_node; // type: Node // <var name="replacedNode" type="Node"/>
-                // r#doc = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
-                // r#new_child = r#doc.create_element("br".to_string()).unwrap(); // <createElement obj="doc" tagName="&quot;br&quot;" var="newChild"/>
-                // r#old_child = r#doc.create_element("b".to_string()).unwrap(); // <createElement obj="doc" tagName="&quot;b&quot;" var="oldChild"/>
-                // r#element_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;p&quot;" var="elementList"/>
-                // r#element_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="elementNode"/>
+                let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
+                let mut r#old_child; // type: Node // <var name="oldChild" type="Node"/>
+                let mut r#new_child; // type: Node // <var name="newChild" type="Node"/>
+                let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
+                let mut r#element_node; // type: Node // <var name="elementNode" type="Node"/>
+                r#doc = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
+                r#new_child = r#doc.create_element("br".to_string()).unwrap(); // <createElement obj="doc" tagName="&quot;br&quot;" var="newChild"/>
+                r#old_child = r#doc.create_element("b".to_string()).unwrap(); // <createElement obj="doc" tagName="&quot;b&quot;" var="oldChild"/>
+                r#element_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;p&quot;" var="elementList"/>
+                r#element_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="elementNode"/>
 
-                // // unimplemented: // <assertDOMException id="throw_NOT_FOUND_ERR"><NOT_FOUND_ERR><replaceChild var="replacedNode" obj="elementNode" newChild="newChild" oldChild="oldChild"/></NOT_FOUND_ERR></assertDOMException>
+                // <assertDOMException id="throw_NOT_FOUND_ERR">
+                //  <NOT_FOUND_ERR>
+                //      <replaceChild var="replacedNode" obj="elementNode" newChild="newChild" oldChild="oldChild"/>
+                //  </NOT_FOUND_ERR>
+                // </assertDOMException>
+                assert!(
+                    element_node
+                        .replace_child(new_child.into(), old_child.into())
+                        .is_err_and(|err| err == DOMException::NotFoundErr)
+                );
             }
             // hc_attreffectivevalue.xml
             #[test]
@@ -11703,35 +11844,48 @@ mod dom_test_suite {
                 r#cdata_node = r#cdata_name.last_child().unwrap(); // <lastChild interface="Node" obj="cdataName" var="cdataNode"/>
                 r#node_type = r#cdata_node.node_type(); // <nodeType var="nodeType" obj="cdataNode"/>
 
-                // unimplemented: // <if><notEquals actual="nodeType" expected="4" ignoreCase="false"/>	<createCDATASection var="cdataNode" obj="doc" data="&quot;&quot;"/></if>
+                // <if><notEquals actual="nodeType" expected="4" ignoreCase="false"/>
+                //  <createCDATASection var="cdataNode" obj="doc" data="&quot;&quot;"/>
+                // </if>
+                if node_type as i32 == 4 {
+                    cdata_node = doc.create_cdata_section("").unwrap().into();
+                }
                 let r#attr_list = r#cdata_node.attributes(); // <attributes obj="cdataNode" var="attrList"/>
                 assert!(attr_list.is_none()); // <assertNull actual="attrList" id="cdataSection"/>
             }
             // hc_namednodemapinuseattributeerr.xml
             #[test]
             fn test_hc_namednodemapinuseattributeerr() {
-                // let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
-                // let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
-                // let mut r#first_node; // type: Element // <var name="firstNode" type="Element"/>
-                // let mut r#test_node; // type: Node // <var name="testNode" type="Node"/>
-                // let mut r#attributes; // type: NamedNodeMap // <var name="attributes" type="NamedNodeMap"/>
-                // let mut r#domestic_attr; // type: Attr // <var name="domesticAttr" type="Attr"/>
-                // let mut r#set_attr; // type: Attr // <var name="setAttr" type="Attr"/>
-                // let mut r#set_node; // type: Node // <var name="setNode" type="Node"/>
-                // r#doc = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
-                // r#element_list = r#doc.get_elements_by_tag_name("acronym"); // <getElementsByTagName interface="Document" obj="doc" var="elementList" tagname="&quot;acronym&quot;"/>
-                // r#first_node = r#element_list[0].clone(); // <item interface="NodeList" obj="elementList" var="firstNode" index="0"/>
-                // r#domestic_attr = r#doc.create_attribute("title".to_string()).unwrap(); // <createAttribute obj="doc" var="domesticAttr" name="&quot;title&quot;"/>
-                // r#domestic_attr.set_value("Yα").unwrap(); // <value interface="Attr" obj="domesticAttr" value="&quot;Yα&quot;"/>
-                // r#set_attr = r#first_node
-                //     .set_attribute_node(r#domestic_attr.into())
-                //     .unwrap()
-                //     .unwrap(); // <setAttributeNode var="setAttr" obj="firstNode" newAttr="domesticAttr"/>
-                // r#element_list = r#doc.get_elements_by_tag_name("acronym"); // <getElementsByTagName interface="Document" obj="doc" var="elementList" tagname="&quot;acronym&quot;"/>
-                // r#test_node = r#element_list[2].clone(); // <item interface="NodeList" obj="elementList" var="testNode" index="2"/>
-                // r#attributes = r#test_node.attributes(); // <attributes obj="testNode" var="attributes"/>
+                let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
+                let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
+                let mut r#first_node; // type: Element // <var name="firstNode" type="Element"/>
+                let mut r#test_node; // type: Node // <var name="testNode" type="Node"/>
+                let mut r#attributes; // type: NamedNodeMap // <var name="attributes" type="NamedNodeMap"/>
+                let mut r#domestic_attr; // type: Attr // <var name="domesticAttr" type="Attr"/>
+                let mut r#set_attr; // type: Attr // <var name="setAttr" type="Attr"/>
+                r#doc = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
+                r#element_list = r#doc.get_elements_by_tag_name("acronym"); // <getElementsByTagName interface="Document" obj="doc" var="elementList" tagname="&quot;acronym&quot;"/>
+                r#first_node = r#element_list[0].clone(); // <item interface="NodeList" obj="elementList" var="firstNode" index="0"/>
+                r#domestic_attr = r#doc.create_attribute("title".to_string()).unwrap(); // <createAttribute obj="doc" var="domesticAttr" name="&quot;title&quot;"/>
+                r#domestic_attr.set_value("Yα").unwrap(); // <value interface="Attr" obj="domesticAttr" value="&quot;Yα&quot;"/>
+                r#set_attr = r#first_node
+                    .set_attribute_node(r#domestic_attr.clone())
+                    .unwrap()
+                    .unwrap(); // <setAttributeNode var="setAttr" obj="firstNode" newAttr="domesticAttr"/>
+                r#element_list = r#doc.get_elements_by_tag_name("acronym"); // <getElementsByTagName interface="Document" obj="doc" var="elementList" tagname="&quot;acronym&quot;"/>
+                r#test_node = r#element_list[2].clone(); // <item interface="NodeList" obj="elementList" var="testNode" index="2"/>
+                r#attributes = r#test_node.attributes(); // <attributes obj="testNode" var="attributes"/>
 
-                // // unimplemented: // <assertDOMException id="throw_INUSE_ATTRIBUTE_ERR"><INUSE_ATTRIBUTE_ERR><setNamedItem var="setNode" interface="NamedNodeMap" obj="attributes" arg="domesticAttr"/></INUSE_ATTRIBUTE_ERR></assertDOMException>
+                // <assertDOMException id="throw_INUSE_ATTRIBUTE_ERR">
+                //  <INUSE_ATTRIBUTE_ERR>
+                //      <setNamedItem var="setNode" interface="NamedNodeMap" obj="attributes" arg="domesticAttr"/>
+                //  </INUSE_ATTRIBUTE_ERR>
+                // </assertDOMException>
+                assert!(
+                    attributes
+                        .set_named_item(domestic_attr)
+                        .is_err_and(|err| err == DOMException::InuseAttributeErr)
+                );
             }
             // hc_namednodemapreturnnull.xml
             #[test]
@@ -11767,19 +11921,33 @@ mod dom_test_suite {
             // nodecommentnodeattributes.xml
             #[test]
             fn test_nodecommentnodeattributes() {
-                // let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
-                // let mut r#child_list; // type: NodeList // <var name="childList" type="NodeList"/>
-                // let mut r#child_node; // type: Node // <var name="childNode" type="Node"/>
-                // let mut r#attr_list; // type: NamedNodeMap // <var name="attrList" type="NamedNodeMap"/>
-                // let mut r#node_type; // type: int // <var name="nodeType" type="int"/>
-                // r#doc = staff_xml(STAFF_XML).unwrap(); // staff.xml // <load var="doc" href="staff" willBeModified="false"/>
-                // r#child_list = r#doc.child_nodes(); // <childNodes obj="doc" var="childList"/>
+                let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
+                let mut r#child_list; // type: NodeList // <var name="childList" type="NodeList"/>
+                let mut r#child_node; // type: Node // <var name="childNode" type="Node"/>
+                let mut r#attr_list; // type: NamedNodeMap // <var name="attrList" type="NamedNodeMap"/>
+                let mut r#node_type; // type: int // <var name="nodeType" type="int"/>
+                r#doc = staff_xml(STAFF_XML).unwrap(); // staff.xml // <load var="doc" href="staff" willBeModified="false"/>
+                r#child_list = r#doc.child_nodes(); // <childNodes obj="doc" var="childList"/>
 
-                // // unimplemented: // <for-each collection="childList" member="childNode"><nodeType var="nodeType" obj="childNode"/><if><equals actual="nodeType" expected="8"/><attributes obj="childNode" var="attrList"/><assertNull actual="attrList" id="attributesNull"/></if></for-each>
-                // r#child_node = r#doc.create_comment("This is a comment"); // <createComment var="childNode" obj="doc" data="&quot;This is a comment&quot;"/>
-                // r#attr_list = r#child_node.attributes(); // <attributes obj="childNode" var="attrList"/>
+                // <for-each collection="childList" member="childNode">
+                //  <nodeType var="nodeType" obj="childNode"/>
+                //  <if><equals actual="nodeType" expected="8"/>
+                //      <attributes obj="childNode" var="attrList"/>
+                //      <assertNull actual="attrList" id="attributesNull"/>
+                //  </if>
+                // </for-each>
+                for i in 0..child_list.length() {
+                    child_node = child_list.item(i).unwrap();
+                    node_type = child_node.node_type();
+                    if node_type as i32 == 8 {
+                        attr_list = child_node.attributes();
+                        assert!(attr_list.is_none());
+                    }
+                }
+                let r#child_node = r#doc.create_comment("This is a comment"); // <createComment var="childNode" obj="doc" data="&quot;This is a comment&quot;"/>
+                r#attr_list = r#child_node.attributes(); // <attributes obj="childNode" var="attrList"/>
 
-                // // unimplemented: // <assertNull actual="attrList" id="createdAttributesNull"/>
+                assert!(attr_list.is_none()); // <assertNull actual="attrList" id="createdAttributesNull"/>
             }
             // elementremoveattributenode.xml
             #[test]
@@ -11882,22 +12050,43 @@ mod dom_test_suite {
             // nodechildnodes.xml
             #[test]
             fn test_nodechildnodes() {
-                // let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
-                // let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
-                // let mut r#employee_node; // type: Node // <var name="employeeNode" type="Node"/>
-                // let mut r#child_nodes; // type: NodeList // <var name="childNodes" type="NodeList"/>
-                // let mut r#child_node; // type: Node // <var name="childNode" type="Node"/>
-                // let mut r#child_type; // type: int // <var name="childType" type="int"/>
-                // let mut r#child_name; // type: DOMString // <var name="childName" type="DOMString"/>
-                // let mut r#element_names; // type: List // <var name="elementNames" type="List"/>
-                // let mut r#expected_element_names; // type: List // <var name="expectedElementNames" type="List">  <member>"employeeId"</member>  <member>"name"</member>  <member>"position"</member>  <member>"salary"</member>  <member>"gender"</member>  <member>"address"</member></var>
-                // r#doc = staff_xml(STAFF_XML).unwrap(); // staff.xml // <load var="doc" href="staff" willBeModified="false"/>
-                // r#element_list = r#doc.get_elements_by_tag_name("employee"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;employee&quot;" var="elementList"/>
-                // r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
-                // r#child_nodes = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="childNodes"/>
+                let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
+                let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
+                let mut r#employee_node; // type: Node // <var name="employeeNode" type="Node"/>
+                let mut r#child_nodes; // type: NodeList // <var name="childNodes" type="NodeList"/>
+                let mut r#child_node; // type: Node // <var name="childNode" type="Node"/>
+                let mut r#child_type; // type: int // <var name="childType" type="int"/>
+                let mut r#child_name; // type: DOMString // <var name="childName" type="DOMString"/>
+                let mut r#element_names = vec![]; // type: List // <var name="elementNames" type="List"/>
+                let mut r#expected_element_names = vec![
+                    "employeeId",
+                    "name",
+                    "position",
+                    "salary",
+                    "gender",
+                    "address",
+                ]; // type: List // <var name="expectedElementNames" type="List"><member>"employeeId"</member>  <member>"name"</member>  <member>"position"</member>  <member>"salary"</member>  <member>"gender"</member>  <member>"address"</member></var>
+                r#doc = staff_xml(STAFF_XML).unwrap(); // staff.xml // <load var="doc" href="staff" willBeModified="false"/>
+                r#element_list = r#doc.get_elements_by_tag_name("employee"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;employee&quot;" var="elementList"/>
+                r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
+                r#child_nodes = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="childNodes"/>
 
-                // // unimplemented: // <for-each collection="childNodes" member="childNode">	<nodeType var="childType" obj="childNode"/>	<if><equals actual="childType" expected="1" ignoreCase="false"/>		<nodeName var="childName" obj="childNode"/>		<append collection="elementNames" item="childName"/>	</if></for-each>
-                // assert_eq!(r#element_names, expected_element_names); // <assertEquals actual="elementNames" expected="expectedElementNames" id="elementNames" ignoreCase="false"/>
+                // <for-each collection="childNodes" member="childNode">
+                //  <nodeType var="childType" obj="childNode"/>
+                //  <if><equals actual="childType" expected="1" ignoreCase="false"/>
+                //      <nodeName var="childName" obj="childNode"/>
+                //      <append collection="elementNames" item="childName"/>
+                //  </if>
+                // </for-each>
+                for i in 0..child_nodes.length() {
+                    child_node = child_nodes.item(i).unwrap();
+                    child_type = child_node.node_type();
+                    if child_type as i32 == 1 {
+                        child_name = child_node.node_name().to_string();
+                        element_names.push(child_name);
+                    }
+                }
+                assert_eq!(r#element_names, expected_element_names); // <assertEquals actual="elementNames" expected="expectedElementNames" id="elementNames" ignoreCase="false"/>
             }
             // textwithnomarkup.xml
             #[test]
@@ -11929,7 +12118,13 @@ mod dom_test_suite {
                 r#cdata_node = r#test_name.last_child().unwrap(); // <lastChild interface="Node" obj="testName" var="cdataNode"/>
                 r#node_type = r#cdata_node.node_type(); // <nodeType obj="cdataNode" var="nodeType"/>
 
-                // unimplemented: // <if><equals actual="nodeType" expected="3" ignoreCase="false"/>	<createCDATASection var="cdataNode" obj="doc" data="&quot;&quot;"/>	<nodeType obj="cdataNode" var="nodeType"/></if>
+                // <if><equals actual="nodeType" expected="3" ignoreCase="false"/>
+                //  <createCDATASection var="cdataNode" obj="doc" data="&quot;&quot;"/>
+                //  <nodeType obj="cdataNode" var="nodeType"/>
+                // </if>
+                if node_type as i32 == 3 {
+                    cdata_node = doc.create_cdata_section("").unwrap().into();
+                }
                 assert_eq!(r#node_type as i32, 4); // <assertEquals actual="nodeType" expected="4" id="nodeTypeCDATA" ignoreCase="false"/>
             }
             // documentgetelementsbytagnamelength.xml
@@ -11939,8 +12134,7 @@ mod dom_test_suite {
                 let mut r#name_list; // type: NodeList // <var name="nameList" type="NodeList"/>
                 r#doc = staff_xml(STAFF_XML).unwrap(); // staff.xml // <load var="doc" href="staff" willBeModified="false"/>
                 r#name_list = r#doc.get_elements_by_tag_name("name"); // <getElementsByTagName interface="Document" obj="doc" var="nameList" tagname="&quot;name&quot;"/>
-
-                // unimplemented: // <assertSize collection="nameList" size="5" id="documentGetElementsByTagNameLengthAssert"/>
+                assert_eq!(name_list.len(), 5); // <assertSize collection="nameList" size="5" id="documentGetElementsByTagNameLengthAssert"/>
             }
             // hc_nodelistreturnfirstitem.xml
             #[test]
@@ -11958,7 +12152,17 @@ mod dom_test_suite {
                 r#child = r#employee_list.item(0).unwrap().clone(); // <item interface="NodeList" obj="employeeList" var="child" index="0"/>
                 r#child_name = r#child.node_name().to_string(); // <nodeName obj="child" var="childName"/>
 
-                // unimplemented: // <if><equals actual="childName" expected="&quot;#text&quot;"/><assertEquals actual="childName" expected="&quot;#text&quot;" ignoreCase="false" id="nodeName_w_space"/><else><assertEquals actual="childName" expected="&quot;em&quot;" ignoreCase="auto" id="nodeName_wo_space"/></else></if>
+                // <if><equals actual="childName" expected="&quot;#text&quot;"/>
+                //  <assertEquals actual="childName" expected="&quot;#text&quot;" ignoreCase="false" id="nodeName_w_space"/>
+                // <else>
+                //  <assertEquals actual="childName" expected="&quot;em&quot;" ignoreCase="auto" id="nodeName_wo_space"/>
+                // </else>
+                // </if>
+                if child_name == "#text" {
+                    assert_eq!(child_name, "#text");
+                } else {
+                    assert_eq!(child_name, "em");
+                }
             }
             // nodedocumentnodevalue.xml
             #[test]
@@ -11971,17 +12175,25 @@ mod dom_test_suite {
             // characterdataindexsizeerrsubstringoffsetgreater.xml
             #[test]
             fn test_characterdataindexsizeerrsubstringoffsetgreater() {
-                // let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
-                // let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
-                // let mut r#name_node; // type: Node // <var name="nameNode" type="Node"/>
-                // let mut r#child; // type: CharacterData // <var name="child" type="CharacterData"/>
-                // let mut r#bad_string; // type: DOMString // <var name="badString" type="DOMString"/>
-                // r#doc = staff_xml(STAFF_XML).unwrap(); // staff.xml // <load var="doc" href="staff" willBeModified="false"/>
-                // r#element_list = r#doc.get_elements_by_tag_name("address"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;address&quot;" var="elementList"/>
-                // r#name_node = r#element_list[0].clone(); // <item interface="NodeList" obj="elementList" index="0" var="nameNode"/>
-                // r#child = r#name_node.first_child().unwrap(); // <firstChild interface="Node" obj="nameNode" var="child"/>
+                let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
+                let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
+                let mut r#name_node; // type: Node // <var name="nameNode" type="Node"/>
+                let mut r#child; // type: CharacterData // <var name="child" type="CharacterData"/>
+                r#doc = staff_xml(STAFF_XML).unwrap(); // staff.xml // <load var="doc" href="staff" willBeModified="false"/>
+                r#element_list = r#doc.get_elements_by_tag_name("address"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;address&quot;" var="elementList"/>
+                r#name_node = r#element_list[0].clone(); // <item interface="NodeList" obj="elementList" index="0" var="nameNode"/>
+                r#child = r#name_node.first_child().unwrap().as_text_node().unwrap(); // <firstChild interface="Node" obj="nameNode" var="child"/>
 
-                // // unimplemented: // <assertDOMException id="throw_INDEX_SIZE_ERR"><INDEX_SIZE_ERR><substringData var="badString" obj="child" offset="40" count="3"/></INDEX_SIZE_ERR></assertDOMException>
+                // <assertDOMException id="throw_INDEX_SIZE_ERR">
+                //  <INDEX_SIZE_ERR>
+                //      <substringData var="badString" obj="child" offset="40" count="3"/>
+                //  </INDEX_SIZE_ERR>
+                // </assertDOMException>
+                assert!(
+                    child
+                        .substring_data(40, 3)
+                        .is_err_and(|err| err == DOMException::IndexSizeErr)
+                );
             }
             // hc_elementgetattributenode.xml
             #[test]
@@ -12110,19 +12322,25 @@ mod dom_test_suite {
             // hc_nodeappendchildnodeancestor.xml
             #[test]
             fn test_hc_nodeappendchildnodeancestor() {
-                // let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
-                // let mut r#new_child; // type: Node // <var name="newChild" type="Node"/>
-                // let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
-                // let mut r#employee_node; // type: Node // <var name="employeeNode" type="Node"/>
-                // let mut r#child_list; // type: NodeList // <var name="childList" type="NodeList"/>
-                // let mut r#old_child; // type: Node // <var name="oldChild" type="Node"/>
-                // let mut r#appended_child; // type: Node // <var name="appendedChild" type="Node"/>
-                // r#doc = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
-                // r#new_child = r#doc.document_element().unwrap(); // <documentElement obj="doc" var="newChild"/>
-                // r#element_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;p&quot;" var="elementList"/>
-                // r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
+                let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
+                let mut r#new_child; // type: Node // <var name="newChild" type="Node"/>
+                let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
+                let mut r#employee_node; // type: Node // <var name="employeeNode" type="Node"/>
+                r#doc = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
+                r#new_child = r#doc.document_element().unwrap(); // <documentElement obj="doc" var="newChild"/>
+                r#element_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;p&quot;" var="elementList"/>
+                r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
 
-                // // unimplemented: // <assertDOMException id="throw_HIERARCHY_REQUEST_ERR"><HIERARCHY_REQUEST_ERR><appendChild var="appendedChild" obj="employeeNode" newChild="newChild"/></HIERARCHY_REQUEST_ERR></assertDOMException>
+                // <assertDOMException id="throw_HIERARCHY_REQUEST_ERR">
+                //  <HIERARCHY_REQUEST_ERR>
+                //      <appendChild var="appendedChild" obj="employeeNode" newChild="newChild"/>
+                //  </HIERARCHY_REQUEST_ERR>
+                // </assertDOMException>
+                assert!(
+                    employee_node
+                        .append_child(new_child.into())
+                        .is_err_and(|err| err == DOMException::HierarchyRequestErr)
+                );
             }
             // hc_nodegetlastchildnull.xml
             #[test]
@@ -12154,18 +12372,17 @@ mod dom_test_suite {
             // characterdatasubstringvalue.xml
             #[test]
             fn test_characterdatasubstringvalue() {
-                // let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
-                // let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
-                // let mut r#name_node; // type: Node // <var name="nameNode" type="Node"/>
-                // let mut r#child; // type: CharacterData // <var name="child" type="CharacterData"/>
-                // let mut r#substring; // type: DOMString // <var name="substring" type="DOMString"/>
-                // r#doc = staff_xml(STAFF_XML).unwrap(); // staff.xml // <load var="doc" href="staff" willBeModified="false"/>
-                // r#element_list = r#doc.get_elements_by_tag_name("name"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;name&quot;" var="elementList"/>
-                // r#name_node = r#element_list[0].clone(); // <item interface="NodeList" obj="elementList" index="0" var="nameNode"/>
-                // r#child = r#name_node.first_child().unwrap(); // <firstChild interface="Node" obj="nameNode" var="child"/>
-
-                // // unimplemented: // <substringData obj="child" var="substring" offset="0" count="8"/>
-                // assert_eq!(r#substring, "Margaret"); // <assertEquals actual="substring" expected="&quot;Margaret&quot;" id="characterdataSubStringValueAssert" ignoreCase="false"/>
+                let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
+                let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
+                let mut r#name_node; // type: Node // <var name="nameNode" type="Node"/>
+                let mut r#child; // type: CharacterData // <var name="child" type="CharacterData"/>
+                let mut r#substring; // type: DOMString // <var name="substring" type="DOMString"/>
+                r#doc = staff_xml(STAFF_XML).unwrap(); // staff.xml // <load var="doc" href="staff" willBeModified="false"/>
+                r#element_list = r#doc.get_elements_by_tag_name("name"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;name&quot;" var="elementList"/>
+                r#name_node = r#element_list[0].clone(); // <item interface="NodeList" obj="elementList" index="0" var="nameNode"/>
+                r#child = r#name_node.first_child().unwrap().as_text_node().unwrap(); // <firstChild interface="Node" obj="nameNode" var="child"/>
+                substring = child.substring_data(0, 8).unwrap(); // <substringData obj="child" var="substring" offset="0" count="8"/>
+                assert_eq!(r#substring, "Margaret"); // <assertEquals actual="substring" expected="&quot;Margaret&quot;" id="characterdataSubStringValueAssert" ignoreCase="false"/>
             }
             // documentinvalidcharacterexceptioncreateentref1.xml
             #[test]
@@ -12180,62 +12397,66 @@ mod dom_test_suite {
             // hc_attrinsertbefore3.xml
             #[test]
             fn test_hc_attrinsertbefore3() {
-                // let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
-                // let mut r#acronym_list; // type: NodeList // <var name="acronymList" type="NodeList"/>
-                // let mut r#test_node; // type: Node // <var name="testNode" type="Node"/>
-                // let mut r#attributes; // type: NamedNodeMap // <var name="attributes" type="NamedNodeMap"/>
-                // let mut r#title_attr; // type: Attr // <var name="titleAttr" type="Attr"/>
-                // let mut r#value; // type: DOMString // <var name="value" type="DOMString"/>
-                // let mut r#ter_node; // type: Text // <var name="terNode" type="Text"/>
-                // let mut r#day_node; // type: Text // <var name="dayNode" type="Text"/>
-                // let mut r#doc_frag; // type: DocumentFragment // <var name="docFrag" type="DocumentFragment"/>
-                // let mut r#retval; // type: Node // <var name="retval" type="Node"/>
-                // let mut r#first_child; // type: Node // <var name="firstChild" type="Node"/>
-                // let mut r#last_child; // type: Node // <var name="lastChild" type="Node"/>
-                // let mut r#ref_child; // type: Node // <var name="refChild" type="Node" isNull="true"/>
-                // r#doc = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
-                // r#acronym_list = r#doc.get_elements_by_tag_name("acronym"); // <getElementsByTagName interface="Document" obj="doc" var="acronymList" tagname="&quot;acronym&quot;"/>
-                // r#test_node = r#acronym_list[3].clone(); // <item interface="NodeList" obj="acronymList" var="testNode" index="3"/>
-                // r#attributes = r#test_node.attributes(); // <attributes obj="testNode" var="attributes"/>
-                // r#title_attr = r#attributes.get_named_item("title").unwrap(); // <getNamedItem obj="attributes" var="titleAttr" name="&quot;title&quot;"/>
-                // r#ter_node = r#doc.create_text_node("ter"); // <createTextNode var="terNode" obj="doc" data="&quot;ter&quot;"/>
-                // r#day_node = r#doc.create_text_node("day"); // <createTextNode var="dayNode" obj="doc" data="&quot;day&quot;"/>
-                // r#doc_frag = r#doc.create_document_fragment(); // <createDocumentFragment var="docFrag" obj="doc"/>
-                // r#retval = r#doc_frag.append_child(ter_node.into()).unwrap(); // <appendChild var="retval" obj="docFrag" newChild="terNode"/>
-                // r#retval = r#doc_frag.append_child(day_node.into()).unwrap(); // <appendChild var="retval" obj="docFrag" newChild="dayNode"/>
-                // r#retval = r#title_attr
-                //     .insert_before(doc_frag.into(), ref_child.into())
-                //     .unwrap(); // <insertBefore var="retval" obj="titleAttr" newChild="docFrag" refChild="refChild"/>
-                // r#value = r#title_attr.value().to_string(); // <value interface="Attr" obj="titleAttr" var="value"/>
-                // assert_eq!(r#value, "Yesterday"); // <assertEquals actual="value" expected="&quot;Yesterday&quot;" id="attrValue" ignoreCase="false"/>
-                // r#value = r#title_attr.node_value().unwrap().to_string(); // <nodeValue obj="titleAttr" var="value"/>
-                // assert_eq!(r#value, "Yesterday"); // <assertEquals actual="value" expected="&quot;Yesterday&quot;" id="attrNodeValue" ignoreCase="false"/>
-                // r#value = r#retval.node_value().unwrap().to_string(); // <nodeValue obj="retval" var="value"/>
-
-                // // unimplemented: // <assertNull actual="value" id="retvalValue"/>
-                // r#first_child = r#title_attr.first_child().unwrap(); // <firstChild var="firstChild" obj="titleAttr" interface="Node"/>
-                // r#value = r#first_child.node_value().unwrap().to_string(); // <nodeValue obj="firstChild" var="value"/>
-                // assert_eq!(r#value, "Yes"); // <assertEquals actual="value" expected="&quot;Yes&quot;" id="firstChildValue" ignoreCase="false"/>
-                // r#last_child = r#title_attr.last_child().unwrap(); // <lastChild var="lastChild" obj="titleAttr" interface="Node"/>
-                // r#value = r#last_child.node_value().unwrap().to_string(); // <nodeValue obj="lastChild" var="value"/>
-                // assert_eq!(r#value, "day"); // <assertEquals actual="value" expected="&quot;day&quot;" id="lastChildValue" ignoreCase="false"/>
+                let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
+                let mut r#acronym_list; // type: NodeList // <var name="acronymList" type="NodeList"/>
+                let mut r#test_node; // type: Node // <var name="testNode" type="Node"/>
+                let mut r#attributes; // type: NamedNodeMap // <var name="attributes" type="NamedNodeMap"/>
+                let mut r#title_attr; // type: Attr // <var name="titleAttr" type="Attr"/>
+                let mut r#value; // type: DOMString // <var name="value" type="DOMString"/>
+                let mut r#ter_node; // type: Text // <var name="terNode" type="Text"/>
+                let mut r#day_node; // type: Text // <var name="dayNode" type="Text"/>
+                let mut r#doc_frag; // type: DocumentFragment // <var name="docFrag" type="DocumentFragment"/>
+                let mut r#retval; // type: Node // <var name="retval" type="Node"/>
+                let mut r#first_child; // type: Node // <var name="firstChild" type="Node"/>
+                let mut r#last_child; // type: Node // <var name="lastChild" type="Node"/>
+                r#doc = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
+                r#acronym_list = r#doc.get_elements_by_tag_name("acronym"); // <getElementsByTagName interface="Document" obj="doc" var="acronymList" tagname="&quot;acronym&quot;"/>
+                r#test_node = r#acronym_list[3].clone(); // <item interface="NodeList" obj="acronymList" var="testNode" index="3"/>
+                r#attributes = r#test_node.attributes(); // <attributes obj="testNode" var="attributes"/>
+                r#title_attr = r#attributes.get_named_item("title").unwrap(); // <getNamedItem obj="attributes" var="titleAttr" name="&quot;title&quot;"/>
+                r#ter_node = r#doc.create_text_node("ter"); // <createTextNode var="terNode" obj="doc" data="&quot;ter&quot;"/>
+                r#day_node = r#doc.create_text_node("day"); // <createTextNode var="dayNode" obj="doc" data="&quot;day&quot;"/>
+                r#doc_frag = r#doc.create_document_fragment(); // <createDocumentFragment var="docFrag" obj="doc"/>
+                r#retval = r#doc_frag.append_child(ter_node.into()).unwrap(); // <appendChild var="retval" obj="docFrag" newChild="terNode"/>
+                r#retval = r#doc_frag.append_child(day_node.into()).unwrap(); // <appendChild var="retval" obj="docFrag" newChild="dayNode"/>
+                r#retval = r#title_attr.insert_before(doc_frag.into(), None).unwrap(); // <insertBefore var="retval" obj="titleAttr" newChild="docFrag" refChild="refChild"/>
+                r#value = r#title_attr.value().to_string(); // <value interface="Attr" obj="titleAttr" var="value"/>
+                assert_eq!(r#value, "Yesterday"); // <assertEquals actual="value" expected="&quot;Yesterday&quot;" id="attrValue" ignoreCase="false"/>
+                r#value = r#title_attr.node_value().unwrap().to_string(); // <nodeValue obj="titleAttr" var="value"/>
+                assert_eq!(r#value, "Yesterday"); // <assertEquals actual="value" expected="&quot;Yesterday&quot;" id="attrNodeValue" ignoreCase="false"/>
+                let r#value = r#retval.node_value(); // <nodeValue obj="retval" var="value"/>
+                assert!(value.is_none()); // <assertNull actual="value" id="retvalValue"/>
+                r#first_child = r#title_attr.first_child().unwrap(); // <firstChild var="firstChild" obj="titleAttr" interface="Node"/>
+                let mut r#value = r#first_child.node_value().unwrap().to_string(); // <nodeValue obj="firstChild" var="value"/>
+                assert_eq!(r#value, "Yes"); // <assertEquals actual="value" expected="&quot;Yes&quot;" id="firstChildValue" ignoreCase="false"/>
+                r#last_child = r#title_attr.last_child().unwrap(); // <lastChild var="lastChild" obj="titleAttr" interface="Node"/>
+                r#value = r#last_child.node_value().unwrap().to_string(); // <nodeValue obj="lastChild" var="value"/>
+                assert_eq!(r#value, "day"); // <assertEquals actual="value" expected="&quot;day&quot;" id="lastChildValue" ignoreCase="false"/>
             }
             // hc_nodeinsertbeforerefchildnonexistent.xml
             #[test]
             fn test_hc_nodeinsertbeforerefchildnonexistent() {
-                // let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
-                // let mut r#ref_child; // type: Node // <var name="refChild" type="Node"/>
-                // let mut r#new_child; // type: Node // <var name="newChild" type="Node"/>
-                // let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
-                // let mut r#element_node; // type: Node // <var name="elementNode" type="Node"/>
-                // let mut r#inserted_node; // type: Node // <var name="insertedNode" type="Node"/>
-                // r#doc = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
-                // r#new_child = r#doc.create_element("br".to_string()).unwrap(); // <createElement obj="doc" tagName="&quot;br&quot;" var="newChild"/>
-                // r#ref_child = r#doc.create_element("b".to_string()).unwrap(); // <createElement obj="doc" tagName="&quot;b&quot;" var="refChild"/>
-                // r#element_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;p&quot;" var="elementList"/>
-                // r#element_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="elementNode"/>
+                let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
+                let mut r#ref_child; // type: Node // <var name="refChild" type="Node"/>
+                let mut r#new_child; // type: Node // <var name="newChild" type="Node"/>
+                let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
+                let mut r#element_node; // type: Node // <var name="elementNode" type="Node"/>
+                r#doc = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
+                r#new_child = r#doc.create_element("br".to_string()).unwrap(); // <createElement obj="doc" tagName="&quot;br&quot;" var="newChild"/>
+                r#ref_child = r#doc.create_element("b".to_string()).unwrap(); // <createElement obj="doc" tagName="&quot;b&quot;" var="refChild"/>
+                r#element_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;p&quot;" var="elementList"/>
+                r#element_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="elementNode"/>
 
-                // // unimplemented: // <assertDOMException id="throw_NOT_FOUND_ERR"><NOT_FOUND_ERR><insertBefore var="insertedNode" obj="elementNode" newChild="newChild" refChild="refChild"/></NOT_FOUND_ERR></assertDOMException>
+                // <assertDOMException id="throw_NOT_FOUND_ERR">
+                //  <NOT_FOUND_ERR>
+                //      <insertBefore var="insertedNode" obj="elementNode" newChild="newChild" refChild="refChild"/>
+                //  </NOT_FOUND_ERR>
+                // </assertDOMException>
+                assert!(
+                    element_node
+                        .insert_before(new_child.into(), Some(ref_child.into()))
+                        .is_err_and(|err| err == DOMException::NotFoundErr)
+                );
             }
             // nodevalue09.xml
             #[test]
@@ -12391,29 +12612,45 @@ mod dom_test_suite {
             // hc_nodeclonenodetrue.xml
             #[test]
             fn test_hc_nodeclonenodetrue() {
-                // let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
-                // let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
-                // let mut r#employee_node; // type: Node // <var name="employeeNode" type="Node"/>
-                // let mut r#cloned_node; // type: Node // <var name="clonedNode" type="Node"/>
-                // let mut r#cloned_list; // type: NodeList // <var name="clonedList" type="NodeList"/>
-                // let mut r#cloned_child; // type: Node // <var name="clonedChild" type="Node"/>
-                // let mut r#cloned_child_name; // type: DOMString // <var name="clonedChildName" type="DOMString"/>
-                // let mut r#orig_list; // type: NodeList // <var name="origList" type="NodeList"/>
-                // let mut r#orig_child; // type: Node // <var name="origChild" type="Node"/>
-                // let mut r#orig_child_name; // type: DOMString // <var name="origChildName" type="DOMString"/>
-                // let mut r#result; // type: List // <var name="result" type="List"/>
-                // let mut r#expected; // type: List // <var name="expected" type="List"/>
-                // r#doc = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
-                // r#element_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;p&quot;" var="elementList"/>
-                // r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
-                // r#orig_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="origList"/>
+                let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
+                let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
+                let mut r#employee_node; // type: Node // <var name="employeeNode" type="Node"/>
+                let mut r#cloned_node; // type: Node // <var name="clonedNode" type="Node"/>
+                let mut r#cloned_list; // type: NodeList // <var name="clonedList" type="NodeList"/>
+                let mut r#cloned_child; // type: Node // <var name="clonedChild" type="Node"/>
+                let mut r#cloned_child_name; // type: DOMString // <var name="clonedChildName" type="DOMString"/>
+                let mut r#orig_list; // type: NodeList // <var name="origList" type="NodeList"/>
+                let mut r#orig_child; // type: Node // <var name="origChild" type="Node"/>
+                let mut r#orig_child_name; // type: DOMString // <var name="origChildName" type="DOMString"/>
+                let mut r#result = vec![]; // type: List // <var name="result" type="List"/>
+                let mut r#expected = vec![]; // type: List // <var name="expected" type="List"/>
+                r#doc = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
+                r#element_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;p&quot;" var="elementList"/>
+                r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
+                r#orig_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="origList"/>
 
-                // // unimplemented: // <for-each collection="origList" member="origChild"><nodeName obj="origChild" var="origChildName"/><append collection="expected" item="origChildName"/></for-each>
-                // r#cloned_node = r#employee_node.clone_node(true); // <cloneNode obj="employeeNode" deep="true" var="clonedNode"/>
-                // r#cloned_list = r#cloned_node.child_nodes(); // <childNodes obj="clonedNode" var="clonedList"/>
+                // <for-each collection="origList" member="origChild">
+                //  <nodeName obj="origChild" var="origChildName"/>
+                //  <append collection="expected" item="origChildName"/>
+                // </for-each>
+                for i in 0..orig_list.length() {
+                    orig_child = orig_list.item(i).unwrap();
+                    orig_child_name = orig_child.node_name().to_string();
+                    expected.push(orig_child_name);
+                }
+                r#cloned_node = r#employee_node.clone_node(true); // <cloneNode obj="employeeNode" deep="true" var="clonedNode"/>
+                r#cloned_list = r#cloned_node.child_nodes(); // <childNodes obj="clonedNode" var="clonedList"/>
 
-                // // unimplemented: // <for-each collection="clonedList" member="clonedChild"><nodeName obj="clonedChild" var="clonedChildName"/><append collection="result" item="clonedChildName"/></for-each>
-                // assert_eq!(r#result, expected); // <assertEquals actual="result" expected="expected" id="clone" ignoreCase="false"/>
+                // <for-each collection="clonedList" member="clonedChild">
+                //  <nodeName obj="clonedChild" var="clonedChildName"/>
+                //  <append collection="result" item="clonedChildName"/>
+                // </for-each>
+                for i in 0..cloned_list.length() {
+                    cloned_child = cloned_list.item(i).unwrap();
+                    cloned_child_name = cloned_child.node_name().to_string();
+                    result.push(cloned_child_name);
+                }
+                assert_eq!(r#result, expected); // <assertEquals actual="result" expected="expected" id="clone" ignoreCase="false"/>
             }
             // hc_characterdataindexsizeerrdeletedataoffsetgreater.xml
             #[test]
@@ -12425,9 +12662,18 @@ mod dom_test_suite {
                 r#doc = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
                 r#element_list = r#doc.get_elements_by_tag_name("acronym"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;acronym&quot;" var="elementList"/>
                 r#name_node = r#element_list[0].clone(); // <item interface="NodeList" obj="elementList" index="0" var="nameNode"/>
-                r#child = r#name_node.first_child().unwrap(); // <firstChild interface="Node" obj="nameNode" var="child"/>
+                r#child = r#name_node.first_child().unwrap().as_text_node().unwrap(); // <firstChild interface="Node" obj="nameNode" var="child"/>
 
-                // unimplemented: // <assertDOMException id="throw_INDEX_SIZE_ERR"><INDEX_SIZE_ERR><deleteData obj="child" offset="40" count="3"/></INDEX_SIZE_ERR></assertDOMException>
+                // <assertDOMException id="throw_INDEX_SIZE_ERR">
+                //  <INDEX_SIZE_ERR>
+                //      <deleteData obj="child" offset="40" count="3"/>
+                //  </INDEX_SIZE_ERR>
+                // </assertDOMException>
+                assert!(
+                    child
+                        .delete_data(40, 3)
+                        .is_err_and(|err| err == DOMException::IndexSizeErr)
+                );
             }
             // elementgetattributenode.xml
             #[test]
@@ -12447,17 +12693,25 @@ mod dom_test_suite {
             // nodeappendchildnodeancestor.xml
             #[test]
             fn test_nodeappendchildnodeancestor() {
-                // let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
-                // let mut r#new_child; // type: Node // <var name="newChild" type="Node"/>
-                // let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
-                // let mut r#employee_node; // type: Node // <var name="employeeNode" type="Node"/>
-                // let mut r#appended_child; // type: Node // <var name="appendedChild" type="Node"/>
-                // r#doc = staff_xml(STAFF_XML).unwrap(); // staff.xml // <load var="doc" href="staff" willBeModified="true"/>
-                // r#new_child = r#doc.document_element().unwrap(); // <documentElement obj="doc" var="newChild"/>
-                // r#element_list = r#doc.get_elements_by_tag_name("employee"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;employee&quot;" var="elementList"/>
-                // r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
+                let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
+                let mut r#new_child; // type: Node // <var name="newChild" type="Node"/>
+                let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
+                let mut r#employee_node; // type: Node // <var name="employeeNode" type="Node"/>
+                r#doc = staff_xml(STAFF_XML).unwrap(); // staff.xml // <load var="doc" href="staff" willBeModified="true"/>
+                r#new_child = r#doc.document_element().unwrap(); // <documentElement obj="doc" var="newChild"/>
+                r#element_list = r#doc.get_elements_by_tag_name("employee"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;employee&quot;" var="elementList"/>
+                r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
 
-                // // unimplemented: // <assertDOMException id="throw_HIERARCHY_REQUEST_ERR"><HIERARCHY_REQUEST_ERR><appendChild var="appendedChild" obj="employeeNode" newChild="newChild"/></HIERARCHY_REQUEST_ERR></assertDOMException>
+                // <assertDOMException id="throw_HIERARCHY_REQUEST_ERR">
+                //  <HIERARCHY_REQUEST_ERR>
+                //      <appendChild var="appendedChild" obj="employeeNode" newChild="newChild"/>
+                //  </HIERARCHY_REQUEST_ERR>
+                // </assertDOMException>
+                assert!(
+                    employee_node
+                        .append_child(new_child.into())
+                        .is_err_and(|err| err == DOMException::HierarchyRequestErr)
+                );
             }
             // hc_nodelistindexequalzero.xml
             #[test]
@@ -12477,24 +12731,47 @@ mod dom_test_suite {
                 r#child = r#employee_list.item(0).unwrap().clone(); // <item interface="NodeList" obj="employeeList" var="child" index="0"/>
                 r#child_name = r#child.node_name().to_string(); // <nodeName obj="child" var="childName"/>
 
-                // unimplemented: // <if><equals expected="13" actual="length" ignoreCase="false"/><assertEquals actual="childName" expected="&quot;#text&quot;" ignoreCase="false" id="childName_w_whitespace"/><else><assertEquals actual="childName" expected="&quot;em&quot;" ignoreCase="auto" id="childName_wo_whitespace"/></else></if>
+                // <if><equals expected="13" actual="length" ignoreCase="false"/>
+                //  <assertEquals actual="childName" expected="&quot;#text&quot;" ignoreCase="false" id="childName_w_whitespace"/>
+                // <else>
+                //  <assertEquals actual="childName" expected="&quot;em&quot;" ignoreCase="auto" id="childName_wo_whitespace"/>
+                // </else>
+                // </if>
+                if length == 13 {
+                    assert_eq!(child_name, "#text");
+                } else {
+                    assert_eq!(child_name, "em");
+                }
             }
             // hc_nodecommentnodename.xml
             #[test]
             fn test_hc_nodecommentnodename() {
-                // let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
-                // let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
-                // let mut r#comment_node; // type: Node // <var name="commentNode" type="Node"/>
-                // let mut r#node_type; // type: int // <var name="nodeType" type="int"/>
-                // let mut r#comment_name; // type: DOMString // <var name="commentName" type="DOMString"/>
-                // let mut r#comment_node_name; // type: DOMString // <var name="commentNodeName" type="DOMString"/>
-                // r#doc = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="false"/>
-                // r#element_list = r#doc.child_nodes(); // <childNodes obj="doc" var="elementList"/>
+                let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
+                let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
+                let mut r#comment_node; // type: Node // <var name="commentNode" type="Node"/>
+                let mut r#node_type; // type: int // <var name="nodeType" type="int"/>
+                let mut r#comment_node_name; // type: DOMString // <var name="commentNodeName" type="DOMString"/>
+                r#doc = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="false"/>
+                r#element_list = r#doc.child_nodes(); // <childNodes obj="doc" var="elementList"/>
 
-                // // unimplemented: // <for-each collection="elementList" member="commentNode"><nodeType obj="commentNode" var="nodeType"/><if><equals actual="nodeType" expected="8" ignoreCase="false"/><nodeName obj="commentNode" var="commentNodeName"/><assertEquals actual="commentNodeName" expected="&quot;#comment&quot;" id="existingNodeName" ignoreCase="false"/></if></for-each>
-                // r#comment_node = r#doc.create_comment("This is a comment"); // <createComment var="commentNode" obj="doc" data="&quot;This is a comment&quot;"/>
-                // r#comment_node_name = r#comment_node.node_name().to_string(); // <nodeName obj="commentNode" var="commentNodeName"/>
-                // assert_eq!(r#comment_node_name, "#comment"); // <assertEquals actual="commentNodeName" expected="&quot;#comment&quot;" id="createdNodeName" ignoreCase="false"/>
+                // <for-each collection="elementList" member="commentNode">
+                //  <nodeType obj="commentNode" var="nodeType"/>
+                //  <if><equals actual="nodeType" expected="8" ignoreCase="false"/>
+                //      <nodeName obj="commentNode" var="commentNodeName"/>
+                //      <assertEquals actual="commentNodeName" expected="&quot;#comment&quot;" id="existingNodeName" ignoreCase="false"/>
+                //  </if>
+                // </for-each>
+                for i in 0..element_list.length() {
+                    comment_node = element_list.item(i).unwrap();
+                    node_type = comment_node.node_type();
+                    if node_type as i32 == 8 {
+                        comment_node_name = comment_node.node_name().to_string();
+                        assert_eq!(comment_node_name, "#comment");
+                    }
+                }
+                let r#comment_node = r#doc.create_comment("This is a comment"); // <createComment var="commentNode" obj="doc" data="&quot;This is a comment&quot;"/>
+                r#comment_node_name = r#comment_node.node_name().to_string(); // <nodeName obj="commentNode" var="commentNodeName"/>
+                assert_eq!(r#comment_node_name, "#comment"); // <assertEquals actual="commentNodeName" expected="&quot;#comment&quot;" id="createdNodeName" ignoreCase="false"/>
             }
             // hc_elementsetattributenodenull.xml
             #[test]
@@ -12582,7 +12859,19 @@ mod dom_test_suite {
                 r#child = r#employee_list.item(index).unwrap().clone(); // <item interface="NodeList" obj="employeeList" var="child" index="index"/>
                 r#child_name = r#child.node_name().to_string(); // <nodeName obj="child" var="childName"/>
 
-                // unimplemented: // <if><equals actual="index" expected="12"/> <assertEquals actual="childName" expected="&quot;#text&quot;" id="lastNodeName_w_whitespace" ignoreCase="false"/><else><assertEquals actual="childName" expected="&quot;acronym&quot;" id="lastNodeName" ignoreCase="auto"/><assertEquals actual="index" expected="5" id="index" ignoreCase="false"/></else></if>
+                // <if><equals actual="index" expected="12"/>
+                //  <assertEquals actual="childName" expected="&quot;#text&quot;" id="lastNodeName_w_whitespace" ignoreCase="false"/>
+                // <else>
+                //  <assertEquals actual="childName" expected="&quot;acronym&quot;" id="lastNodeName" ignoreCase="auto"/>
+                //  <assertEquals actual="index" expected="5" id="index" ignoreCase="false"/>
+                // </else>
+                // </if>
+                if index == 12 {
+                    assert_eq!(child_name, "#text");
+                } else {
+                    assert_eq!(child_name, "acronym");
+                    assert_eq!(index, 5);
+                }
             }
             // hc_nodereplacechild.xml
             #[test]
@@ -12612,22 +12901,21 @@ mod dom_test_suite {
             // characterdatadeletedatagetlengthanddata.xml
             #[test]
             fn test_characterdatadeletedatagetlengthanddata() {
-                // let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
-                // let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
-                // let mut r#name_node; // type: Node // <var name="nameNode" type="Node"/>
-                // let mut r#child; // type: CharacterData // <var name="child" type="CharacterData"/>
-                // let mut r#child_data; // type: DOMString // <var name="childData" type="DOMString"/>
-                // let mut r#child_length; // type: int // <var name="childLength" type="int"/>
-                // let mut r#result; // type: List // <var name="result" type="List"/>
-                // r#doc = staff_xml(STAFF_XML).unwrap(); // staff.xml // <load var="doc" href="staff" willBeModified="true"/>
-                // r#element_list = r#doc.get_elements_by_tag_name("address"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;address&quot;" var="elementList"/>
-                // r#name_node = r#element_list[0].clone(); // <item interface="NodeList" obj="elementList" index="0" var="nameNode"/>
-                // r#child = r#name_node.first_child().unwrap().as_text_node().unwrap(); // <firstChild interface="Node" obj="nameNode" var="child"/>
-                // r#child.delete_data(30, 5).unwrap(); // <deleteData obj="child" offset="30" count="5"/>
-                // r#child_data = r#child.data().to_string(); // <data interface="CharacterData" obj="child" var="childData"/>
-                // assert_eq!(r#child_data, "1230 North Ave. Dallas, Texas "); // <assertEquals actual="childData" expected="&quot;1230 North Ave. Dallas, Texas &quot;" ignoreCase="false" id="data"/>
-                // r#child_length = r#child.len(); // <length interface="CharacterData" obj="child" var="childLength"/>
-                // assert_eq!(r#child_length, 30); // <assertEquals actual="childLength" expected="30" ignoreCase="false" id="length"/>
+                let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
+                let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
+                let mut r#name_node; // type: Node // <var name="nameNode" type="Node"/>
+                let mut r#child; // type: CharacterData // <var name="child" type="CharacterData"/>
+                let mut r#child_data; // type: DOMString // <var name="childData" type="DOMString"/>
+                let mut r#child_length; // type: int // <var name="childLength" type="int"/>
+                r#doc = staff_xml(STAFF_XML).unwrap(); // staff.xml // <load var="doc" href="staff" willBeModified="true"/>
+                r#element_list = r#doc.get_elements_by_tag_name("address"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;address&quot;" var="elementList"/>
+                r#name_node = r#element_list[0].clone(); // <item interface="NodeList" obj="elementList" index="0" var="nameNode"/>
+                r#child = r#name_node.first_child().unwrap().as_text_node().unwrap(); // <firstChild interface="Node" obj="nameNode" var="child"/>
+                r#child.delete_data(30, 5).unwrap(); // <deleteData obj="child" offset="30" count="5"/>
+                r#child_data = r#child.data().to_string(); // <data interface="CharacterData" obj="child" var="childData"/>
+                assert_eq!(r#child_data, "1230 North Ave. Dallas, Texas "); // <assertEquals actual="childData" expected="&quot;1230 North Ave. Dallas, Texas &quot;" ignoreCase="false" id="data"/>
+                r#child_length = r#child.length(); // <length interface="CharacterData" obj="child" var="childLength"/>
+                assert_eq!(r#child_length, 30); // <assertEquals actual="childLength" expected="30" ignoreCase="false" id="length"/>
             }
             // hc_nodeclonetruecopytext.xml
             #[test]
@@ -12698,21 +12986,29 @@ mod dom_test_suite {
             // hc_nodereplacechildnewchilddiffdocument.xml
             #[test]
             fn test_hc_nodereplacechildnewchilddiffdocument() {
-                // let mut r#doc1: DocumentRef; // <var name="doc1" type="Document"/>
-                // let mut r#doc2: DocumentRef; // <var name="doc2" type="Document"/>
-                // let mut r#old_child; // type: Node // <var name="oldChild" type="Node"/>
-                // let mut r#new_child; // type: Node // <var name="newChild" type="Node"/>
-                // let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
-                // let mut r#element_node; // type: Node // <var name="elementNode" type="Node"/>
-                // let mut r#replaced_child; // type: Node // <var name="replacedChild" type="Node"/>
-                // r#doc1 = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc1" href="hc_staff" willBeModified="false"/>
-                // r#doc2 = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc2" href="hc_staff" willBeModified="true"/>
-                // r#new_child = r#doc1.create_element("br".to_string()).unwrap(); // <createElement obj="doc1" tagName="&quot;br&quot;" var="newChild"/>
-                // r#element_list = r#doc2.get_elements_by_tag_name("p"); // <getElementsByTagName interface="Document" obj="doc2" tagname="&quot;p&quot;" var="elementList"/>
-                // r#element_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="elementNode"/>
-                // r#old_child = r#element_node.first_child().unwrap(); // <firstChild obj="elementNode" var="oldChild" interface="Node"/>
+                let mut r#doc1: DocumentRef; // <var name="doc1" type="Document"/>
+                let mut r#doc2: DocumentRef; // <var name="doc2" type="Document"/>
+                let mut r#old_child; // type: Node // <var name="oldChild" type="Node"/>
+                let mut r#new_child; // type: Node // <var name="newChild" type="Node"/>
+                let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
+                let mut r#element_node; // type: Node // <var name="elementNode" type="Node"/>
+                r#doc1 = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc1" href="hc_staff" willBeModified="false"/>
+                r#doc2 = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc2" href="hc_staff" willBeModified="true"/>
+                r#new_child = r#doc1.create_element("br".to_string()).unwrap(); // <createElement obj="doc1" tagName="&quot;br&quot;" var="newChild"/>
+                r#element_list = r#doc2.get_elements_by_tag_name("p"); // <getElementsByTagName interface="Document" obj="doc2" tagname="&quot;p&quot;" var="elementList"/>
+                r#element_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="elementNode"/>
+                r#old_child = r#element_node.first_child().unwrap(); // <firstChild obj="elementNode" var="oldChild" interface="Node"/>
 
-                // // unimplemented: // <assertDOMException id="throw_WRONG_DOCUMENT_ERR"><WRONG_DOCUMENT_ERR><replaceChild var="replacedChild" obj="elementNode" newChild="newChild" oldChild="oldChild"/></WRONG_DOCUMENT_ERR></assertDOMException>
+                // <assertDOMException id="throw_WRONG_DOCUMENT_ERR">
+                //  <WRONG_DOCUMENT_ERR>
+                //      <replaceChild var="replacedChild" obj="elementNode" newChild="newChild" oldChild="oldChild"/>
+                //  </WRONG_DOCUMENT_ERR>
+                // </assertDOMException>
+                assert!(
+                    element_node
+                        .replace_child(new_child.into(), old_child)
+                        .is_err_and(|err| err == DOMException::WrongDocumentErr)
+                );
             }
             // hc_nodeelementnodeattributes.xml
             #[test]
@@ -12777,16 +13073,24 @@ mod dom_test_suite {
             // hc_nodeappendchildinvalidnodetype.xml
             #[test]
             fn test_hc_nodeappendchildinvalidnodetype() {
-                // let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
-                // let mut r#root_node; // type: Element // <var name="rootNode" type="Element"/>
-                // let mut r#new_child; // type: Node // <var name="newChild" type="Node"/>
-                // let mut r#appended_child; // type: Node // <var name="appendedChild" type="Node"/>
-                // r#doc = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
-                // r#root_node = r#doc.document_element().unwrap(); // <documentElement obj="doc" var="rootNode"/>
-                // r#new_child = r#doc.create_attribute("newAttribute".to_string()).unwrap();
-                // // <createAttribute obj="doc" name="&quot;newAttribute&quot;" var="newChild"/>
+                let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
+                let mut r#root_node; // type: Element // <var name="rootNode" type="Element"/>
+                let mut r#new_child; // type: Node // <var name="newChild" type="Node"/>
+                r#doc = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
+                r#root_node = r#doc.document_element().unwrap(); // <documentElement obj="doc" var="rootNode"/>
+                r#new_child = r#doc.create_attribute("newAttribute".to_string()).unwrap();
+                // <createAttribute obj="doc" name="&quot;newAttribute&quot;" var="newChild"/>
 
-                // // unimplemented: // <assertDOMException id="throw_HIERARCHY_REQUEST_ERR"><HIERARCHY_REQUEST_ERR><appendChild var="appendedChild" obj="rootNode" newChild="newChild"/></HIERARCHY_REQUEST_ERR></assertDOMException>
+                // <assertDOMException id="throw_HIERARCHY_REQUEST_ERR">
+                //  <HIERARCHY_REQUEST_ERR>
+                //      <appendChild var="appendedChild" obj="rootNode" newChild="newChild"/>
+                //  </HIERARCHY_REQUEST_ERR>
+                // </assertDOMException>
+                assert!(
+                    root_node
+                        .append_child(new_child.into())
+                        .is_err_and(|err| err == DOMException::HierarchyRequestErr)
+                );
             }
             // hc_nodeinsertbeforenodename.xml
             #[test]
