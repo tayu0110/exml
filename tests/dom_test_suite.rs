@@ -1927,8 +1927,8 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;p&quot;" var="elementList"/>
                 r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
                 r#child_list = r#employee_node.get_elements_by_tag_name("*"); // <getElementsByTagName interface="Element" obj="employeeNode" var="childList" tagname="&quot;*&quot;"/>
-                r#new_child = r#child_list[0].clone(); // <item interface="NodeList" obj="childList" index="0" var="newChild"/>
-                r#old_child = r#child_list[5].clone(); // <item interface="NodeList" obj="childList" index="5" var="oldChild"/>
+                r#new_child = r#child_list.item(0).unwrap(); // <item interface="NodeList" obj="childList" index="0" var="newChild"/>
+                r#old_child = r#child_list.item(5).unwrap(); // <item interface="NodeList" obj="childList" index="5" var="oldChild"/>
                 r#replaced_child = r#employee_node
                     .replace_child(new_child.into(), old_child.clone().into())
                     .unwrap(); // <replaceChild var="replacedChild" obj="employeeNode" newChild="newChild" oldChild="oldChild"/>
@@ -1946,7 +1946,8 @@ mod dom_test_suite {
                 //      </else>
                 //      </if>
                 // </for-each>
-                for child_node in child_list {
+                for i in 0..child_list.length() {
+                    let child_node = child_list.item(i).unwrap();
                     child_name = child_node.node_name();
                     node_type = child_node.node_type();
                     if node_type as i32 == 1 {
@@ -3594,7 +3595,8 @@ mod dom_test_suite {
                 //  <nodeName obj="child" var="childName"/>
                 //  <append collection="result" item="childName"/>
                 // </for-each>
-                for child in lastemp_list {
+                for i in 0..lastemp_list.length() {
+                    let child = lastemp_list.item(i).unwrap();
                     child_name = child.node_name().to_string();
                     result.push(child_name);
                 }
@@ -3728,14 +3730,15 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;p&quot;" var="elementList"/>
                 r#child_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="childNode"/>
                 r#child_list = r#child_node.get_elements_by_tag_name("*"); // <getElementsByTagName interface="Element" obj="childNode" var="childList" tagname="&quot;*&quot;"/>
-                r#new_child = r#child_list[0].clone(); // <item interface="NodeList" obj="childList" index="0" var="newChild"/>
+                r#new_child = r#child_list.item(0).unwrap(); // <item interface="NodeList" obj="childList" index="0" var="newChild"/>
                 r#appended_child = r#child_node.append_child(new_child.clone().into()).unwrap(); // <appendChild var="appendedChild" obj="childNode" newChild="newChild"/>
 
                 // <for-each collection="childList" member="memberNode">
                 //  <nodeName var="memberName" obj="memberNode"/>
                 //  <append collection="actual" item="memberName"/>
                 // </for-each>
-                for member_node in child_list {
+                for i in 0..child_list.length() {
+                    let member_node = child_list.item(i).unwrap();
                     member_name = member_node.node_name().to_string();
                     actual.push(member_name);
                 }
@@ -3983,7 +3986,7 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;p&quot;" var="elementList"/>
                 r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
                 r#child_list = r#employee_node.get_elements_by_tag_name("em"); // <getElementsByTagName obj="employeeNode" var="childList" interface="Element" tagname="&quot;em&quot;"/>
-                r#old_child = r#child_list[0].clone(); // <item interface="NodeList" obj="childList" index="0" var="oldChild"/>
+                r#old_child = r#child_list.item(0).unwrap(); // <item interface="NodeList" obj="childList" index="0" var="oldChild"/>
                 r#new_child = r#doc.create_element("br".to_string()).unwrap(); // <createElement obj="doc" tagName="&quot;br&quot;" var="newChild"/>
                 r#replaced_node = r#employee_node
                     .replace_child(new_child.into(), old_child.into())
@@ -4708,8 +4711,8 @@ mod dom_test_suite {
                 r#element_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;p&quot;" var="elementList"/>
                 r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
                 r#child_list = r#employee_node.get_elements_by_tag_name("*"); // <getElementsByTagName interface="Element" obj="employeeNode" tagname="&quot;*&quot;" var="childList"/>
-                r#ref_child = r#child_list[5].clone(); // <item interface="NodeList" obj="childList" index="5" var="refChild"/>
-                r#new_child = r#child_list[0].clone(); // <item interface="NodeList" obj="childList" index="0" var="newChild"/>
+                r#ref_child = r#child_list.item(5).unwrap(); // <item interface="NodeList" obj="childList" index="5" var="refChild"/>
+                r#new_child = r#child_list.item(0).unwrap(); // <item interface="NodeList" obj="childList" index="0" var="newChild"/>
                 r#inserted_node = r#employee_node
                     .insert_before(new_child.into(), Some(ref_child.into()))
                     .unwrap(); // <insertBefore var="insertedNode" obj="employeeNode" newChild="newChild" refChild="refChild"/>
@@ -4721,7 +4724,8 @@ mod dom_test_suite {
                 //      <append collection="result" item="childName"/>
                 //  </if>
                 // </for-each>
-                for child in child_list {
+                for i in 0..child_list.length() {
+                    let child = child_list.item(i).unwrap();
                     node_type = child.node_type();
                     if node_type as i32 == 1 {
                         child_name = child.node_name().to_string();
@@ -6652,7 +6656,8 @@ mod dom_test_suite {
                 //  <nodeName obj="child" var="childName"/>
                 //  <append collection="result" item="childName"/>
                 // </for-each>
-                for child in lastemp_list {
+                for i in 0..lastemp_list.length() {
+                    let child = lastemp_list.item(i).unwrap();
                     child_name = child.node_name().to_string();
                     result.push(child_name);
                 }
@@ -8700,7 +8705,7 @@ mod dom_test_suite {
                 r#employee_node = r#element_list[1].clone(); // <item interface="NodeList" obj="elementList" index="1" var="employeeNode"/>
                 r#child_list = r#employee_node.child_nodes(); // <childNodes obj="employeeNode" var="childList"/>
                 r#em_list = r#employee_node.get_elements_by_tag_name("em"); // <getElementsByTagName interface="Element" var="emList" obj="employeeNode" tagname="&quot;em&quot;"/>
-                r#old_child = r#em_list[0].clone(); // <item interface="NodeList" obj="emList" index="0" var="oldChild"/>
+                r#old_child = r#em_list.item(0).unwrap(); // <item interface="NodeList" obj="emList" index="0" var="oldChild"/>
                 r#removed_child = r#employee_node.remove_child(old_child.into()).unwrap(); // <removeChild var="removedChild" obj="employeeNode" oldChild="oldChild"/>
                 r#removed_name = r#removed_child.node_name().to_string(); // <nodeName obj="removedChild" var="removedName"/>
                 assert_eq!(r#removed_name, "em"); // <assertEquals actual="removedName" expected="&quot;em&quot;" ignoreCase="auto" id="removedName"/>
@@ -9552,7 +9557,7 @@ mod dom_test_suite {
                 r#root = r#doc.document_element().unwrap(); // <documentElement obj="doc" var="root"/>
                 r#root.normalize(); // <normalize obj="root"/>
                 r#element_list = r#root.get_elements_by_tag_name("name"); // <getElementsByTagName interface="Element" obj="root" tagname="&quot;name&quot;" var="elementList"/>
-                r#test_name = r#element_list[2].clone(); // <item interface="NodeList" obj="elementList" index="2" var="testName"/>
+                r#test_name = r#element_list.item(2).unwrap(); // <item interface="NodeList" obj="elementList" index="2" var="testName"/>
                 r#first_child = r#test_name.first_child().unwrap(); // <firstChild interface="Node" obj="testName" var="firstChild"/>
                 r#child_value = r#first_child.node_value().unwrap().to_string(); // <nodeValue obj="firstChild" var="childValue"/>
                 assert_eq!(r#child_value, "Roger\n Jones"); // <assertEquals actual="childValue" expected="&quot;Roger\n Jones&quot;" id="elementNormalizeAssert" ignoreCase="false"/>
@@ -10363,7 +10368,7 @@ mod dom_test_suite {
                 r#root = r#doc.document_element().unwrap(); // <documentElement obj="doc" var="root"/>
                 r#empty_text = r#doc.create_text_node(""); // <createTextNode var="emptyText" obj="doc" data="&quot;&quot;"/>
                 r#element_list = r#root.get_elements_by_tag_name("acronym"); // <getElementsByTagName interface="Element" obj="root" tagname="&quot;acronym&quot;" var="elementList"/>
-                r#element = r#element_list[0].clone(); // <item interface="NodeList" obj="elementList" index="0" var="element"/>
+                r#element = r#element_list.item(0).unwrap(); // <item interface="NodeList" obj="elementList" index="0" var="element"/>
                 r#attr_node = r#element.get_attribute_node("title").unwrap(); // <getAttributeNode var="attrNode" obj="element" name="&quot;title&quot;"/>
                 r#retval = r#attr_node.append_child(empty_text.into()).unwrap(); // <appendChild var="retval" obj="attrNode" newChild="emptyText"/>
                 r#element.normalize(); // <normalize obj="element"/>
@@ -18532,7 +18537,7 @@ mod dom_test_suite {
                 r#root = r#doc.document_element().unwrap(); // <documentElement obj="doc" var="root"/>
                 r#root.normalize(); // <normalize obj="root"/>
                 r#element_list = r#root.get_elements_by_tag_name("name"); // <getElementsByTagName interface="Element" obj="root" tagname="&quot;name&quot;" var="elementList"/>
-                r#first_child = r#element_list[2].clone(); // <item interface="NodeList" obj="elementList" index="2" var="firstChild"/>
+                r#first_child = r#element_list.item(2).unwrap(); // <item interface="NodeList" obj="elementList" index="2" var="firstChild"/>
                 r#text_list = r#first_child.child_nodes(); // <childNodes obj="firstChild" var="textList"/>
                 r#text_node = r#text_list.item(0).unwrap().clone().as_text_node().unwrap(); // <item interface="NodeList" obj="textList" index="0" var="textNode"/>
                 r#data = r#text_node.data().to_string(); // <data interface="CharacterData" obj="textNode" var="data"/>

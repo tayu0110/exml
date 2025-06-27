@@ -8,6 +8,7 @@ use crate::{
     dom::{
         check_no_modification_allowed_err, check_owner_document_sameness,
         named_node_map::{AttributeMap, NamedNodeMap},
+        node_list::FilteredSubtreeElementsList,
     },
     parser::split_qname2,
     tree::validate_name,
@@ -467,38 +468,22 @@ impl ElementRef {
     ///
     /// No Exceptions
     /// ```
-    pub fn get_elements_by_tag_name(&self, name: &str) -> Vec<ElementRef> {
-        let eq = if self.owner_document().is_some_and(|doc| doc.is_html()) {
-            |l: &str, r: &str| l.eq_ignore_ascii_case(r)
+    pub fn get_elements_by_tag_name(&self, name: &str) -> FilteredSubtreeElementsList {
+        if self.owner_document().is_some_and(|doc| doc.is_html()) {
+            FilteredSubtreeElementsList::new(
+                self.clone().into(),
+                None,
+                name.to_owned(),
+                |elem, _, name| name == "*" || elem.node_name().eq_ignore_ascii_case(name),
+            )
         } else {
-            |l: &str, r: &str| l == r
-        };
-        let mut res = vec![];
-        let mut descendant = self.first_child();
-        while let Some(cur) = descendant.filter(|des| !self.is_same_node(des)) {
-            if let NodeRef::Element(elem) = &cur {
-                if name == "*" || eq(&elem.node_name(), name) {
-                    res.push(elem.clone());
-                }
-            }
-
-            if let Some(first) = cur.first_child() {
-                descendant = Some(first);
-            } else if let Some(next) = cur.next_sibling() {
-                descendant = Some(next);
-            } else {
-                descendant = cur.parent_node();
-                while let Some(par) = descendant.as_ref().filter(|des| !self.is_same_node(des)) {
-                    if let Some(next) = par.next_sibling() {
-                        descendant = Some(next);
-                        break;
-                    }
-                    descendant = par.parent_node();
-                }
-            }
+            FilteredSubtreeElementsList::new(
+                self.clone().into(),
+                None,
+                name.to_owned(),
+                |elem, _, name| name == "*" || elem.node_name().as_ref() == name,
+            )
         }
-
-        res
     }
 
     /// Implementation of [`getAttributeNS`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-ElGetAttrNS) method.

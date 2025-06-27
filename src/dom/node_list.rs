@@ -1,4 +1,7 @@
-use crate::dom::node::{Node, NodeRef};
+use crate::dom::{
+    element::ElementRef,
+    node::{Node, NodeRef},
+};
 
 /// Implementation of [NodeList](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-536297177)
 /// interface on [1.4 Fundamental Interfaces: Core Module](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-BBACDC08)
@@ -85,5 +88,85 @@ impl<N: Node> NodeList for ChildNodesList<N> {
             children = child.next_sibling();
         }
         cnt
+    }
+}
+
+pub struct FilteredSubtreeElementsList {
+    root: NodeRef,
+    namespace_uri: Option<String>,
+    local_name: String,
+    // fn(element, namespace_uri, local_name)
+    eq: fn(ElementRef, Option<&str>, &str) -> bool,
+}
+
+impl FilteredSubtreeElementsList {
+    pub(super) fn new(
+        root: NodeRef,
+        namespace_uri: Option<String>,
+        local_name: String,
+        eq: fn(ElementRef, Option<&str>, &str) -> bool,
+    ) -> Self {
+        Self {
+            root,
+            namespace_uri,
+            local_name,
+            eq,
+        }
+    }
+
+    /// If an `index` element with `eq` returning `true` is found, wrap it with `Ok` and return it.
+    /// Otherwise, wrap the found count with `Err` and return it.
+    fn seek(
+        &self,
+        index: usize,
+        eq: impl Fn(ElementRef, Option<&str>, &str) -> bool,
+    ) -> Result<ElementRef, usize> {
+        let mut descendant = self.root.first_child();
+        let mut cnt = 0;
+        while let Some(mut now) = descendant.filter(|dsc| !self.root.is_same_node(dsc)) {
+            if let Some(elem) = now.as_element().filter(|elem| {
+                eq(
+                    elem.clone(),
+                    self.namespace_uri.as_deref(),
+                    &self.local_name,
+                )
+            }) {
+                if cnt == index {
+                    return Ok(elem);
+                }
+                cnt += 1;
+            }
+
+            if let Some(child) = now.first_child() {
+                descendant = Some(child);
+            } else if let Some(sibling) = now.next_sibling() {
+                descendant = Some(sibling);
+            } else {
+                descendant = None;
+                while let Some(par) = now
+                    .parent_node()
+                    .filter(|par| !par.is_same_node(&self.root))
+                {
+                    if let Some(sibling) = par.next_sibling() {
+                        descendant = Some(sibling);
+                        break;
+                    }
+                    now = par;
+                }
+            }
+        }
+        Err(cnt)
+    }
+}
+
+impl NodeList for FilteredSubtreeElementsList {
+    type Output = ElementRef;
+
+    fn item(&self, index: usize) -> Option<Self::Output> {
+        self.seek(index, self.eq).ok()
+    }
+
+    fn length(&self) -> usize {
+        self.seek(usize::MAX, self.eq).err().unwrap_or(usize::MAX)
     }
 }
