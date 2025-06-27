@@ -91,6 +91,11 @@ impl<N: Node> NodeList for ChildNodesList<N> {
     }
 }
 
+/// A [NodeList] that [ElementRef::get_elements_by_tag_name] returns.
+///
+/// In the current implementation, both [`item`](`FilteredSubtreeElementsList::item`)
+/// and [`length`](`FilteredSubtreeElementsList::length`) are the linear complexity
+/// of the number of all nodes in the document.
 pub struct FilteredSubtreeElementsList {
     root: NodeRef,
     namespace_uri: Option<String>,
