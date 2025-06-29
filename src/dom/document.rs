@@ -367,6 +367,12 @@ impl DocumentRef {
     /// Return Value
     ///     Element A new Element object with the nodeName attribute set to tagName,
     ///             and localName, prefix, and namespaceURI set to null.
+    ///
+    /// Exceptions
+    ///     DOMException
+    ///     INVALID_CHARACTER_ERR: Raised if the specified name is not an XML name
+    ///                            according to the XML version in use specified in
+    ///                            the Document.xmlVersion attribute.
     /// ```
     pub fn create_element(&self, tag_name: impl Into<Rc<str>>) -> Result<ElementRef, DOMException> {
         let tag_name: Rc<str> = tag_name.into();
@@ -385,6 +391,9 @@ impl DocumentRef {
     ///
     /// Return Value
     ///     DocumentFragment A new DocumentFragment.
+    ///
+    /// No Parameters
+    /// No Exceptions
     /// ```
     pub fn create_document_fragment(&self) -> DocumentFragmentRef {
         DocumentFragmentRef::from_doc(self.clone())
@@ -402,6 +411,8 @@ impl DocumentRef {
     ///
     /// Return Value
     ///     Text The new Text object.
+    ///
+    /// No Exceptions
     /// ```
     pub fn create_text_node(&self, data: impl Into<String>) -> TextRef {
         TextRef::from_doc(self.clone(), data.into())
@@ -419,6 +430,8 @@ impl DocumentRef {
     ///
     /// Return Value
     ///     Comment The new Comment object.
+    ///
+    /// No Exceptions
     /// ```
     pub fn create_comment(&self, data: impl Into<String>) -> CommentRef {
         CommentRef::from_doc(self.clone(), data.into())
@@ -438,6 +451,10 @@ impl DocumentRef {
     ///
     /// Return Value
     ///     CDATASection The new CDATASection object.
+    ///
+    /// Exceptions
+    ///     DOMException
+    ///     NOT_SUPPORTED_ERR: Raised if this document is an HTML document.
     /// ```
     pub fn create_cdata_section(
         &self,
@@ -607,6 +624,8 @@ impl DocumentRef {
     ///
     /// Return Value
     ///     NodeList A new NodeList object containing all the matched Elements.
+    ///
+    /// No Exceptions
     /// ```
     pub fn get_elements_by_tag_name(&self, tag_name: &str) -> Vec<ElementRef> {
         let mut children = self.first_child();
@@ -1502,7 +1521,19 @@ impl DocumentRef {
         Ok(())
     }
 
-    /// Implementation of `documentURI` attribute.
+    /// Implementation of [`documentURI`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-Document3-documentURI) attribute.
+    ///
+    /// # Specification
+    /// ```text
+    /// documentURI of type DOMString, introduced in DOM Level 3
+    ///     The location of the document or null if undefined or if the Document was created
+    ///     using DOMImplementation.createDocument. No lexical checking is performed when
+    ///     setting this attribute; this could result in a null value returned when using
+    ///     Node.baseURI.
+    ///     Beware that when the Document supports the feature "HTML" [DOM Level 2 HTML],
+    ///     the href attribute of the HTML BASE element takes precedence over this attribute
+    ///     when computing Node.baseURI.
+    /// ```
     pub fn document_uri(&self) -> Option<Rc<str>> {
         self.0.borrow().document_uri.clone()
     }

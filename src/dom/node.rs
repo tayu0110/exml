@@ -36,52 +36,67 @@ use super::{
 /// Actual node representations are implemented as [`NodeRef`].
 #[allow(private_bounds)]
 pub trait Node: NodeConnection {
-    /// Implementation of `nodeName` attribute.
+    /// Implementation of [`nodeName`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-F68D095) attribute.
     ///
     /// # Specification
     /// ```text
-    /// The name of this node, depending on its type; see the table above.
+    /// nodeName of type DOMString, readonly
+    ///     The name of this node, depending on its type; see the table above.
     /// ```
     fn node_name(&self) -> Rc<str>;
-    /// Implementation of `nodeValue` attribute.
+    /// Implementation of [`nodeValue`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-F68D080) attribute.
     ///
     /// # Specification
     /// ```text
-    /// The value of this node, depending on its type; see the table above. When it is defined
-    /// to be null, setting it has no effect, including if the node is read-only.
+    /// nodeValue of type DOMString
+    ///     The value of this node, depending on its type; see the table above.
+    ///     When it is defined to be null, setting it has no effect, including
+    ///     if the node is read-only.
     ///
-    /// Exceptions on retrieval
-    ///     DOMException
-    ///     DOMSTRING_SIZE_ERR: Raised when it would return more characters than fit in a
-    ///                         DOMString variable on the implementation platform.
+    ///     Exceptions on retrieval
+    ///         DOMException
+    ///         DOMSTRING_SIZE_ERR: Raised when it would return more characters than fit
+    ///                             in a DOMString variable on the implementation platform.
     /// ```
     fn node_value(&self) -> Option<Rc<str>>;
-    /// Implementation of `nodeValue` attribute.
+    /// Implementation of [`nodeValue`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-F68D080) attribute.
     ///
     /// # Specification
     /// ```text
-    /// The value of this node, depending on its type; see the table above. When it is defined
-    /// to be null, setting it has no effect, including if the node is read-only.
+    /// nodeValue of type DOMString
+    ///     The value of this node, depending on its type; see the table above.
+    ///     When it is defined to be null, setting it has no effect, including
+    ///     if the node is read-only.
     ///
-    /// Exceptions on setting
-    ///     DOMException
-    ///     NO_MODIFICATION_ALLOWED_ERR: Raised when the node is readonly and if it is not
-    ///                                  defined to be null.
+    ///     Exceptions on setting
+    ///         DOMException
+    ///         NO_MODIFICATION_ALLOWED_ERR: Raised when the node is readonly and
+    ///                                      if it is not defined to be null.
     /// ```
     fn set_node_value(&mut self, value: impl Into<String>) -> Result<(), DOMException>;
 
-    /// Implementation of `nodeType` attribute.
+    /// Implementation of [`nodeType`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-111237558) attribute.
     ///
     /// # Specification
     /// ```text
-    /// A code representing the type of the underlying object, as defined above.
+    /// nodeType of type unsigned short, readonly
+    ///     A code representing the type of the underlying object, as defined above.
     /// ```
     fn node_type(&self) -> NodeType;
-    /// Implementation of `parentNode` attribute.
+    /// Implementation of [`parentNode`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-1060184317) attribute.
+    ///
+    /// # Specification
+    /// ```text
+    /// parentNode of type Node, readonly
+    ///     The parent of this node. All nodes, except Attr, Document, DocumentFragment,
+    ///     Entity, and Notation may have a parent. However, if a node has just been
+    ///     created and not yet added to the tree, or if it has been removed from the tree,
+    ///     this is null.
+    /// ```
     fn parent_node(&self) -> Option<NodeRef> {
         None
     }
-    /// Implementation of `childNodes` attribute.
+    /// Implementation of [`childNodes`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-1451460987) attribute.
     ///
     /// # Specification
     /// ```text
@@ -92,27 +107,68 @@ pub trait Node: NodeConnection {
     fn child_nodes(&self) -> ChildNodesList<NodeRef> {
         ChildNodesList::new(self.clone().into())
     }
-    /// Implementation of `firstChild` attribute.
+    /// Implementation of [`firstChild`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-169727388) attribute.
+    ///
+    /// # Specification
+    /// ```text
+    /// firstChild of type Node, readonly
+    ///     The first child of this node. If there is no such node, this returns null.
+    /// ```
     fn first_child(&self) -> Option<NodeRef> {
         None
     }
-    /// Implementation of `lastChild` attribute.
+    /// Implementation of [`lastChild`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-61AD09FB) attribute.
+    ///
+    /// # Specification
+    /// ```text
+    /// lastChild of type Node, readonly
+    ///     The last child of this node. If there is no such node, this returns null.
+    /// ```
     fn last_child(&self) -> Option<NodeRef> {
         None
     }
-    /// Implementation of `previousSibling` attribute.
+    /// Implementation of [`previousSibling`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-640FB3C8) attribute.
+    ///
+    /// # Specification
+    /// ```text
+    /// previousSibling of type Node, readonly
+    ///     The node immediately preceding this node. If there is no such node,
+    ///     this returns null.
+    /// ```
     fn previous_sibling(&self) -> Option<NodeRef> {
         None
     }
-    /// Implementation of `nextSibling` attribute.
+    /// Implementation of [`nextSibling`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-6AC54C2F) attribute.
+    ///
+    /// # Specification
+    /// ```text
+    /// nextSibling of type Node, readonly
+    ///     The node immediately following this node. If there is no such node,
+    ///     this returns null.
+    /// ```
     fn next_sibling(&self) -> Option<NodeRef> {
         None
     }
-    /// Implementation of `attributes` attribute.
+    /// Implementation of [`attributes`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-84CF096) attribute.
+    ///
+    /// # Specification
+    /// ```text
+    /// attributes of type NamedNodeMap, readonly
+    ///     A NamedNodeMap containing the attributes of this node (if it is an Element)
+    ///     or null otherwise.
+    /// ```
     fn attributes(&self) -> Option<AttributeMap> {
         None
     }
-    /// Implementation of `ownerDocument` attribute.
+    /// Implementation of [`ownerDocument`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-node-ownerDoc) attribute.
+    ///
+    /// # Specification
+    /// ```text
+    /// ownerDocument of type Document, readonly, modified in DOM Level 2
+    ///     The Document object associated with this node. This is also the Document object
+    ///     used to create new nodes. When this node is a Document or a DocumentType which
+    ///     is not used with any Document yet, this is null.
+    /// ```
     fn owner_document(&self) -> Option<DocumentRef> {
         None
     }
@@ -547,6 +603,8 @@ pub trait Node: NodeConnection {
     ///
     /// Return Value
     ///     Node The duplicate node.
+    ///
+    /// No Exceptions
     /// ```
     fn clone_node(&self, deep: bool) -> NodeRef;
 
@@ -570,9 +628,7 @@ pub trait Node: NodeConnection {
     /// and CDATASection nodes.
     ///
     /// No Parameters
-    ///
     /// No Return Value
-    ///
     /// No Exceptions
     /// ```
     fn normalize(&mut self) {
@@ -611,21 +667,46 @@ pub trait Node: NodeConnection {
         }
     }
 
+    /// Implementation of [`isSupported`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-Level-2-Core-Node-supports) attribute.
+    ///
+    /// # Specification
+    /// ```text
+    /// Tests whether the DOM implementation implements a specific feature and that feature
+    /// is supported by this node, as specified in DOM Features.
+    ///
+    /// Parameters
+    ///     feature of type DOMString
+    ///         The name of the feature to test.
+    ///     version of type DOMString
+    ///         This is the version number of the feature to test.
+    ///
+    /// Return Value
+    ///     boolean Returns true if the specified feature is supported on this node,
+    ///             false otherwise.
+    ///
+    /// No Exceptions
+    /// ```
+    fn is_supported(&self, feature: &str, version: Option<&str>) -> bool {
+        self.owner_document()
+            .is_some_and(|doc| doc.implementation().has_feature(feature, version))
+    }
+
     /// Implementation of [`namespaceURI`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-NodeNSname) attribute.
     ///
     /// # Specification
     /// ```text
-    /// The namespace URI of this node, or null if it is unspecified (see XML Namespaces).
-    /// This is not a computed value that is the result of a namespace lookup
-    /// based on an examination of the namespace declarations in scope.
-    /// It is merely the namespace URI given at creation time.
-    /// For nodes of any type other than ELEMENT_NODE and ATTRIBUTE_NODE and
-    /// nodes created with a DOM Level 1 method, such as Document.createElement(),
-    /// this is always null.
+    /// namespaceURI of type DOMString, readonly, introduced in DOM Level 2
+    ///     The namespace URI of this node, or null if it is unspecified (see XML Namespaces).
+    ///     This is not a computed value that is the result of a namespace lookup
+    ///     based on an examination of the namespace declarations in scope.
+    ///     It is merely the namespace URI given at creation time.
+    ///     For nodes of any type other than ELEMENT_NODE and ATTRIBUTE_NODE and
+    ///     nodes created with a DOM Level 1 method, such as Document.createElement(),
+    ///     this is always null.
     ///
-    /// Note: Per the Namespaces in XML Specification [XML Namespaces] an attribute
-    /// does not inherit its namespace from the element it is attached to.
-    /// If an attribute is not explicitly given a namespace, it simply has no namespace.
+    ///     Note: Per the Namespaces in XML Specification [XML Namespaces] an attribute
+    ///     does not inherit its namespace from the element it is attached to.
+    ///     If an attribute is not explicitly given a namespace, it simply has no namespace.
     /// ```
     fn namespace_uri(&self) -> Option<Rc<str>> {
         None
@@ -635,20 +716,20 @@ pub trait Node: NodeConnection {
     ///
     /// # Specification
     /// ```text
-    /// The namespace prefix of this node, or null if it is unspecified.
-    /// When it is defined to be null, setting it has no effect,
-    /// including if the node is read-only.
-    /// Note that setting this attribute, when permitted, changes the nodeName attribute,
-    /// which holds the qualified name, as well as the tagName and name attributes
-    /// of the Element and Attr interfaces, when applicable.
-    /// Setting the prefix to null makes it unspecified, setting it to an empty string
-    /// is implementation dependent.
-    /// Note also that changing the prefix of an attribute that is known to
-    /// have a default value, does not make a new attribute with the default value
-    /// and the original prefix appear, since the namespaceURI and localName do not change.
-    /// For nodes of any type other than ELEMENT_NODE and ATTRIBUTE_NODE and nodes
-    /// created with a DOM Level 1 method, such as createElement from the Document interface,
-    /// this is always null.
+    /// prefix of type DOMString, introduced in DOM Level 2
+    ///     The namespace prefix of this node, or null if it is unspecified. When it is
+    ///     defined to be null, setting it has no effect, including if the node is read-only.
+    ///     Note that setting this attribute, when permitted, changes the nodeName
+    ///     attribute, which holds the qualified name, as well as the tagName and name
+    ///     attributes of the Element and Attr interfaces, when applicable.
+    ///     Setting the prefix to null makes it unspecified, setting it to an empty string
+    ///     is implementation dependent.
+    ///     Note also that changing the prefix of an attribute that is known to have
+    ///     a default value, does not make a new attribute with the default value and the
+    ///     original prefix appear, since the namespaceURI and localName do not change.
+    ///     For nodes of any type other than ELEMENT_NODE and ATTRIBUTE_NODE and nodes
+    ///     created with a DOM Level 1 method, such as createElement from the Document
+    ///     interface, this is always null.
     /// ```
     fn prefix(&self) -> Option<Rc<str>> {
         None
@@ -658,10 +739,11 @@ pub trait Node: NodeConnection {
     ///
     /// # Specification
     /// ```text
-    /// Returns the local part of the qualified name of this node.
-    /// For nodes of any type other than ELEMENT_NODE and ATTRIBUTE_NODE
-    /// and nodes created with a DOM Level 1 method, such as Document.createElement(),
-    /// this is always null.
+    /// localName of type DOMString, readonly, introduced in DOM Level 2
+    ///     Returns the local part of the qualified name of this node.
+    ///     For nodes of any type other than ELEMENT_NODE and ATTRIBUTE_NODE and nodes
+    ///     created with a DOM Level 1 method, such as Document.createElement(), this is
+    ///     always null.
     /// ```
     fn local_name(&self) -> Option<Rc<str>> {
         None
@@ -684,12 +766,13 @@ pub trait Node: NodeConnection {
     ///
     /// # Specification
     /// ```text
-    /// The absolute base URI of this node or null if the implementation wasn't able
-    /// to obtain an absolute URI. This value is computed as described in Base URIs.
-    /// However, when the Document supports the feature "HTML" [DOM Level 2 HTML],
-    /// the base URI is computed using first the value of the href attribute
-    /// of the HTML BASE element if any, and the value of the documentURI attribute
-    /// from the Document interface otherwise.
+    /// baseURI of type DOMString, readonly, introduced in DOM Level 3
+    ///     The absolute base URI of this node or null if the implementation wasn't able
+    ///     to obtain an absolute URI. This value is computed as described in Base URIs.
+    ///     However, when the Document supports the feature "HTML" [DOM Level 2 HTML],
+    ///     the base URI is computed using first the value of the href attribute
+    ///     of the HTML BASE element if any, and the value of the documentURI attribute
+    ///     from the Document interface otherwise.
     /// ```
     fn base_uri(&self) -> Option<String> {
         if let Some(doc) = self.owner_document().filter(|doc| doc.is_html()) {
@@ -1059,24 +1142,26 @@ pub trait Node: NodeConnection {
     ///
     /// # Specification
     /// ```text
-    /// This attribute returns the text content of this node and its descendants. When it is
-    /// defined to be null, setting it has no effect. On setting, any possible children this
-    /// node may have are removed and, if it the new string is not empty or null, replaced by
-    /// a single Text node containing the string this attribute is set to.
-    /// On getting, no serialization is performed, the returned string does not contain any
-    /// markup. No whitespace normalization is performed and the returned string does not
-    /// contain the white spaces in element content (see the attribute
-    /// Text.isElementContentWhitespace). Similarly, on setting, no parsing is performed
-    /// either, the input string is taken as pure textual content.
-    /// The string returned is made of the text content of this node depending on its type,
-    /// as defined below:
+    /// textContent of type DOMString, introduced in DOM Level 3
+    ///     This attribute returns the text content of this node and its descendants.
+    ///     When it is defined to be null, setting it has no effect. On setting, any
+    ///     possible children this node may have are removed and, if it the new string is
+    ///     not empty or null, replaced by a single Text node containing the string this
+    ///     attribute is set to.
+    ///     On getting, no serialization is performed, the returned string does not contain
+    ///     any markup. No whitespace normalization is performed and the returned string
+    ///     does not contain the white spaces in element content (see the attribute
+    ///     Text.isElementContentWhitespace). Similarly, on setting, no parsing is performed
+    ///     either, the input string is taken as pure textual content.
+    ///     The string returned is made of the text content of this node depending on its
+    ///     type, as defined below:
     ///
-    /// <omitted>
+    ///     <omitted>
     ///
-    /// Exceptions on retrieval
-    ///     DOMException
-    ///     DOMSTRING_SIZE_ERR: Raised when it would return more characters than fit in a
-    ///                         DOMString variable on the implementation platform.
+    ///     Exceptions on retrieval
+    ///         DOMException
+    ///         DOMSTRING_SIZE_ERR: Raised when it would return more characters than fit
+    ///                             in a DOMString variable on the implementation platform.
     /// ```
     fn text_content(&self) -> Option<String> {
         use NodeRef::*;
@@ -1102,23 +1187,25 @@ pub trait Node: NodeConnection {
     ///
     /// # Specification
     /// ```text
-    /// This attribute returns the text content of this node and its descendants. When it is
-    /// defined to be null, setting it has no effect. On setting, any possible children this
-    /// node may have are removed and, if it the new string is not empty or null, replaced by
-    /// a single Text node containing the string this attribute is set to.
-    /// On getting, no serialization is performed, the returned string does not contain any
-    /// markup. No whitespace normalization is performed and the returned string does not
-    /// contain the white spaces in element content (see the attribute
-    /// Text.isElementContentWhitespace). Similarly, on setting, no parsing is performed
-    /// either, the input string is taken as pure textual content.
-    /// The string returned is made of the text content of this node depending on its type,
-    /// as defined below:
+    /// textContent of type DOMString, introduced in DOM Level 3
+    ///     This attribute returns the text content of this node and its descendants.
+    ///     When it is defined to be null, setting it has no effect. On setting, any
+    ///     possible children this node may have are removed and, if it the new string is
+    ///     not empty or null, replaced by a single Text node containing the string this
+    ///     attribute is set to.
+    ///     On getting, no serialization is performed, the returned string does not contain
+    ///     any markup. No whitespace normalization is performed and the returned string
+    ///     does not contain the white spaces in element content (see the attribute
+    ///     Text.isElementContentWhitespace). Similarly, on setting, no parsing is performed
+    ///     either, the input string is taken as pure textual content.
+    ///     The string returned is made of the text content of this node depending on its
+    ///     type, as defined below:
     ///
-    /// <omitted>
+    ///     <omitted>
     ///
-    /// Exceptions on setting
-    ///     DOMException
-    ///     NO_MODIFICATION_ALLOWED_ERR: Raised when the node is readonly.
+    ///     Exceptions on setting
+    ///         DOMException
+    ///         NO_MODIFICATION_ALLOWED_ERR: Raised when the node is readonly.
     /// ```
     fn set_text_content(&mut self, text: impl Into<String>) -> Result<(), DOMException> {
         check_no_modification_allowed_err(self)?;
@@ -1352,6 +1439,40 @@ pub trait Node: NodeConnection {
             rch = r.next_sibling();
         }
         lch.is_some() == rch.is_some()
+    }
+
+    /// Implementation of [`getFeature`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-Node3-getFeature) method.
+    ///
+    /// # Note
+    /// In this crate, this method simply clones and returns `self` if
+    /// [`DOMImplementation::has_feature`](crate::dom::dom_implementation::DOMImplementation::has_feature)
+    /// returns `true`.\
+    /// Since cast possibilities are uniquely determined by the type implementation,
+    /// there is basically no need to use this method.
+    ///
+    /// # Specification
+    /// ```text
+    /// This method returns a specialized object which implements the specialized APIs of the specified feature and version, as specified in DOM Features. The specialized object may also be obtained by using binding-specific casting methods but is not necessarily expected to, as discussed in Mixed DOM Implementations. This method also allow the implementation to provide specialized objects which do not support the Node interface.
+    ///
+    /// Parameters
+    ///     feature of type DOMString
+    ///         The name of the feature requested. Note that any plus sign "+" prepended to the name of the feature will be ignored since it is not significant in the context of this method.
+    ///     version of type DOMString
+    ///         This is the version number of the feature to test.
+    ///
+    /// Return Value
+    ///     DOMObject Returns an object which implements the specialized APIs of the
+    ///               specified feature and version, if any, or null if there is no
+    ///               object which implements interfaces associated with that feature.
+    ///               If the DOMObject returned by this method implements the Node
+    ///               interface, it must delegate to the primary core Node and not return
+    ///               results inconsistent with the primary core Node such as attributes,
+    ///               childNodes, etc.
+    ///
+    /// No Exceptions
+    /// ```
+    fn get_feature(&self, feature: &str, version: Option<&str>) -> Option<Self> {
+        self.is_supported(feature, version).then(|| self.clone())
     }
 
     /// Check if this node is a read-only node.
