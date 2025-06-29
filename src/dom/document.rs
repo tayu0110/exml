@@ -2,11 +2,17 @@ use std::{
     cell::RefCell,
     mem::replace,
     rc::{Rc, Weak},
+    sync::Arc,
 };
 
 use crate::{
     chvalid::XmlCharValid,
-    dom::{attlistdecl::DefaultDecl, entity::EntityType, named_node_map::NamedNodeMap},
+    dom::{
+        attlistdecl::DefaultDecl,
+        dom_implementation::{DEFAULT_DOM_IMPLEMENTATION, DOMImplementation},
+        entity::EntityType,
+        named_node_map::NamedNodeMap,
+    },
     error::XmlParserErrors,
     parser::split_qname2,
     tree::{validate_name, validate_qname},
@@ -45,6 +51,8 @@ pub struct Document {
     // next_sibling: Option<NodeRef>,
     /// Implementation of `doctype` attribute.  
     doctype: Option<DocumentTypeRef>,
+    /// Implementation of `implementation` attribute.
+    implementation: Arc<dyn DOMImplementation>,
     /// Implementation of `documentElement` attribute.
     document_element: Option<ElementRef>,
     /// Implementation of `documentURI` attribute.
@@ -253,8 +261,8 @@ impl DocumentRef {
     ///                            does not support XML Namespaces (such as [HTML 4.01]).
     /// ```
     pub fn new(
-        ns_uri: Option<&str>,
-        qname: Option<&str>,
+        namespace_uri: Option<&str>,
+        qualified_name: Option<&str>,
         doctype: Option<DocumentTypeRef>,
     ) -> Result<Self, DOMException> {
         if doctype
@@ -268,6 +276,7 @@ impl DocumentRef {
             first_child: None,
             last_child: None,
             doctype: None,
+            implementation: (*DEFAULT_DOM_IMPLEMENTATION).clone(),
             document_element: None,
             document_uri: None,
             input_encoding: None,
@@ -292,13 +301,13 @@ impl DocumentRef {
             new.append_child(doctype.into())?;
         }
 
-        if let Some(qname) = qname {
+        if let Some(qname) = qualified_name {
             if validate_qname::<false>(qname).is_err() {
                 return Err(DOMException::InvalidCharacterErr);
             }
 
             let elem = if let Some((prefix, _)) = split_qname2(qname) {
-                let Some(ns_uri) = ns_uri else {
+                let Some(ns_uri) = namespace_uri else {
                     // ... if the qualifiedName has a prefix and the namespaceURI is null,
                     return Err(DOMException::NamespaceErr);
                 };
@@ -317,7 +326,7 @@ impl DocumentRef {
             new.append_child(elem.into())?;
         } else {
             // ... or if the qualifiedName is null and the namespaceURI is different from null
-            if ns_uri.is_some() {
+            if namespace_uri.is_some() {
                 return Err(DOMException::NamespaceErr);
             }
         }
@@ -1287,6 +1296,12 @@ impl DocumentRef {
         self.0.borrow().doctype.clone()
     }
 
+    /// Implementation of `implementation` attribute.
+    pub fn implementation(&self) -> Arc<dyn DOMImplementation> {
+        self.0.borrow().implementation.clone()
+    }
+
+    /// Implementation of `documentElement` attribute.
     pub fn document_element(&self) -> Option<ElementRef> {
         self.0.borrow().document_element.clone()
     }
@@ -1458,6 +1473,7 @@ impl Node for DocumentRef {
             last_child: None,
             doctype,
             document_element,
+            implementation: self.0.borrow().implementation.clone(),
             document_uri: self.0.borrow().document_uri.clone(),
             input_encoding: self.0.borrow().input_encoding.clone(),
             xml_encoding: self.0.borrow().xml_encoding.clone(),

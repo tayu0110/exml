@@ -19,6 +19,7 @@ pub mod character_data;
 pub mod document;
 pub mod document_fragment;
 pub mod document_type;
+pub mod dom_implementation;
 pub mod element;
 pub mod elementdecl;
 pub mod entity;
@@ -42,22 +43,45 @@ pub const XML_NS_NAMESPACE: &str = "http://www.w3.org/2000/xmlns/";
 /// it merely inherits its name from the specification and is in fact just an error code.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DOMException {
+    /// If index or size is negative, or greater than the allowed value.
     IndexSizeErr = 1,
+    /// If the specified range of text does not fit into a DOMString.
     DOMStringSizeErr = 2,
+    /// If any Node is inserted somewhere it doesn't belong.
     HierarchyRequestErr = 3,
+    /// If a Node is used in a different document than the one that created it
+    /// (that doesn't support it).
     WrongDocumentErr = 4,
+    /// If an invalid or illegal character is specified, such as in an XML name.
     InvalidCharacterErr = 5,
+    /// If data is specified for a Node which does not support data.
     NoDataAllowedErr = 6,
+    /// If an attempt is made to modify an object where modifications are not allowed.
     NoModificationAllowedErr = 7,
+    /// If an attempt is made to reference a Node in a context where it does not exist.
     NotFoundErr = 8,
+    /// If the implementation does not support the requested type of object or operation.
     NotSupportedErr = 9,
+    /// If an attempt is made to add an attribute that is already in use elsewhere.
     InuseAttributeErr = 10,
+    /// If an attempt is made to use an object that is not, or is no longer, usable.
     InvalidStateErr = 11,
+    /// If an invalid or illegal string is specified.
     SyntaxErr = 12,
+    /// If an attempt is made to modify the type of the underlying object.
     InvalidModificationErr = 13,
+    /// If an attempt is made to create or change an object in a way which is incorrect with
+    /// regard to namespaces.
     NamespaceErr = 14,
+    /// If a parameter or an operation is not supported by the underlying object.
     InvalidAccessErr = 15,
+    /// If a call to a method such as insertBefore or removeChild would make the Node invalid
+    /// with respect to "partial validity", this exception would be raised and the operation
+    /// would not be done. This code is used in [DOM Level 3 Validation]. Refer to this
+    /// specification for further information.
     ValidationErr = 16,
+    /// If the type of an object is incompatible with the expected type of the parameter
+    /// associated to the object.
     TypeMismatchErr = 17,
 }
 

@@ -219,11 +219,11 @@ impl DocumentTypeRef {
     ///                            does not support XML Namespaces (such as [HTML 4.01]).
     /// ```
     pub fn new(
-        qname: &str,
+        qualified_name: &str,
         public_id: Option<&str>,
         system_id: Option<&str>,
     ) -> Result<Self, DOMException> {
-        if validate_qname::<false>(qname).is_err() {
+        if validate_qname::<false>(qualified_name).is_err() {
             return Err(DOMException::InvalidCharacterErr);
         }
 
@@ -232,7 +232,7 @@ impl DocumentTypeRef {
             previous_sibling: None,
             next_sibling: None,
             owner_document: None,
-            name: qname.into(),
+            name: qualified_name.into(),
             public_id: public_id.map(|pubid| pubid.into()),
             system_id: system_id.map(|systemid| systemid.into()),
             internal_subset: None,
