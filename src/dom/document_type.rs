@@ -260,6 +260,16 @@ impl DocumentTypeRef {
         DocumentTypeWeakRef(Rc::downgrade(&self.0))
     }
 
+    /// Check if an internal subset exists.
+    pub fn has_internal_subset(&self) -> bool {
+        self.0.borrow().internal_subset.is_some()
+    }
+
+    /// Check if an external subset exists.
+    pub fn has_external_subset(&self) -> bool {
+        self.0.borrow().external_subset.is_some()
+    }
+
     /// Create a new [`EntityRef`] that has `name` as the entity name.
     ///
     /// This is not a required method by the DOM specification.

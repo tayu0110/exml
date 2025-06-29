@@ -117,7 +117,7 @@ pub struct XmlParserCtxt<'a> {
     // The SAX handler
     pub sax: Option<Box<XmlSAXHandler>>,
     // For SAX interface only, used by DOM build
-    pub(crate) user_data: Option<GenericErrorContext>,
+    pub user_data: Option<GenericErrorContext>,
     // the document being built
     pub my_doc: Option<XmlDocPtr>,
     // is the document well formed

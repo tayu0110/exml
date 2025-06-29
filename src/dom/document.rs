@@ -1146,7 +1146,36 @@ impl DocumentRef {
         Ok(source)
     }
 
-    /// Implementation of `normalizeDocument` method.
+    /// Implementation of [`normalizeDocument`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-Document3-normalizeDocument) method.
+    ///
+    /// # Specification
+    /// ```text
+    /// This method acts as if the document was going through a save and load cycle,
+    /// putting the document in a "normal" form. As a consequence, this method updates the
+    /// replacement tree of EntityReference nodes and normalizes Text nodes, as defined in
+    /// the method Node.normalize().
+    /// Otherwise, the actual result depends on the features being set on the
+    /// Document.domConfig object and governing what operations actually take place.
+    /// Noticeably this method could also make the document namespace well-formed according
+    /// to the algorithm described in Namespace Normalization, check the character
+    /// normalization, remove the CDATASection nodes, etc. See DOMConfiguration for details.
+    ///
+    /// <..snip..>
+    ///
+    /// Mutation events, when supported, are generated to reflect the changes occurring
+    /// onthe document.
+    /// If errors occur during the invocation of this method, such as an attempt to update
+    /// a read-only node or a Node.nodeName contains an invalid character according to
+    /// the XML version in use, errors or warnings (DOMError.SEVERITY_ERROR or
+    /// DOMError.SEVERITY_WARNING) will be reported using the DOMErrorHandler object
+    /// associated with the "error-handler" parameter. Note this method might also report
+    /// fatal errors (DOMError.SEVERITY_FATAL_ERROR) if an implementation cannot recover
+    /// from an error.
+    ///
+    /// No Parameters
+    /// No Return Value
+    /// No Exceptions
+    /// ```
     pub fn normalize_document(&mut self) {
         todo!()
     }
@@ -1291,19 +1320,186 @@ impl DocumentRef {
         }
     }
 
-    /// Get a [`DocumentTypeRef`] if exists.
+    /// Implementation of [`doctype`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-B63ED1A31) attribute.
+    ///
+    /// # Specification
+    /// ```text
+    /// doctype of type DocumentType, readonly, modified in DOM Level 3
+    ///     The Document Type Declaration (see DocumentType) associated with this document.
+    ///     For XML documents without a document type declaration this returns null.
+    ///     For HTML documents, a DocumentType object may be returned, independently of the
+    ///     presence or absence of document type declaration in the HTML document.
+    ///     This provides direct access to the DocumentType node, child node of this Document.
+    ///     This node can be set at document creation time and later changed through the use
+    ///     of child nodes manipulation methods, such as Node.insertBefore,
+    ///     or Node.replaceChild. Note, however, that while some implementations may
+    ///     instantiate different types of Document objects supporting additional features
+    ///     than the "Core", such as "HTML" [DOM Level 2 HTML], based on the DocumentType
+    ///     specified at creation time, changing it afterwards is very unlikely to result
+    ///     in a change of the features supported.
+    /// ```
     pub fn doctype(&self) -> Option<DocumentTypeRef> {
         self.0.borrow().doctype.clone()
     }
 
-    /// Implementation of `implementation` attribute.
+    /// Implementation of [`implementation`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-1B793EBA) attribute.
+    ///
+    /// # Specification
+    /// ```text
+    /// implementation of type DOMImplementation, readonly
+    ///     The DOMImplementation object that handles this document. A DOM application may
+    ///     use objects from multiple implementations.
+    /// ```
     pub fn implementation(&self) -> Arc<dyn DOMImplementation> {
         self.0.borrow().implementation.clone()
     }
 
-    /// Implementation of `documentElement` attribute.
+    /// Implementation of [`documentElement`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-87CD092) attribute.
+    ///
+    /// # Specification
+    /// ```text
+    /// documentElement of type Element, readonly
+    ///     This is a convenience attribute that allows direct access to the child node
+    ///     that is the document element of the document.
+    /// ```
     pub fn document_element(&self) -> Option<ElementRef> {
         self.0.borrow().document_element.clone()
+    }
+
+    /// Implementation of [`inputEncoding`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-Document3-inputEncoding) attribute.
+    ///
+    /// # Specification
+    /// ```text
+    /// inputEncoding of type DOMString, readonly, introduced in DOM Level 3
+    ///     An attribute specifying the encoding used for this document at the time of
+    ///     the parsing. This is null when it is not known, such as when the Document was
+    ///     created in memory.
+    /// ```
+    pub fn input_encoding(&self) -> Option<Rc<str>> {
+        self.0.borrow().input_encoding.clone()
+    }
+
+    /// Implementation of [`xmlEncoding`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-Document3-encoding) attribute.
+    ///
+    /// # Specification
+    /// ```text
+    /// xmlEncoding of type DOMString, readonly, introduced in DOM Level 3
+    ///     An attribute specifying, as part of the XML declaration, the encoding of
+    ///     this document. This is null when unspecified or when it is not known, such as
+    ///     when the Document was created in memory.
+    /// ```
+    pub fn xml_encoding(&self) -> Option<Rc<str>> {
+        self.0.borrow().xml_encoding.clone()
+    }
+
+    /// Implementation of [`xmlStandalone`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-Document3-standalone) attribute.
+    ///
+    /// # Specification
+    /// ```text
+    /// xmlStandalone of type boolean, introduced in DOM Level 3
+    ///     An attribute specifying, as part of the XML declaration, whether this document
+    ///     is standalone. This is false when unspecified.
+    ///
+    ///     Note: No verification is done on the value when setting this attribute.
+    ///           Applications should use Document.normalizeDocument() with the "validate"
+    ///           parameter to verify if the value matches the validity constraint for
+    ///           standalone document declaration as defined in [XML 1.0].
+    /// ```
+    pub fn xml_standalone(&self) -> bool {
+        self.0.borrow().xml_standalone == 1
+    }
+
+    /// Implementation of [`xmlStandalone`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-Document3-standalone) attribute.
+    ///
+    /// # Specification
+    /// ```text
+    /// xmlStandalone of type boolean, introduced in DOM Level 3
+    ///     An attribute specifying, as part of the XML declaration, whether this document
+    ///     is standalone. This is false when unspecified.
+    ///
+    ///     Note: No verification is done on the value when setting this attribute.
+    ///           Applications should use Document.normalizeDocument() with the "validate"
+    ///           parameter to verify if the value matches the validity constraint for
+    ///           standalone document declaration as defined in [XML 1.0].
+    ///
+    /// Exceptions on setting
+    ///     DOMException
+    ///     NOT_SUPPORTED_ERR: Raised if this document does not support the "XML" feature.
+    /// ```
+    pub fn set_xml_standalone(&mut self, standalone: bool) -> Result<(), DOMException> {
+        if !self.implementation().has_feature("XML", None) {
+            return Err(DOMException::NotSupportedErr);
+        }
+        self.0.borrow_mut().xml_standalone = standalone as i8;
+        Ok(())
+    }
+
+    /// Implementation of [`xmlVersion`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-Document3-version) attribute.
+    ///
+    /// # Specification
+    /// ```text
+    /// An attribute specifying, as part of the XML declaration, the version numberof
+    /// this document. If there is no declaration and if this document supports the
+    /// "XML" feature, the value is "1.0". If this document does not support the "XML" feature,
+    /// the value is always null. Changing this attribute will affect methods that check
+    /// for invalid characters in XML names. Application should invoke
+    /// Document.normalizeDocument() in order to check for invalid characters in the Nodes
+    /// that are already part of this Document.
+    /// DOM applications may use the DOMImplementation.hasFeature(feature, version) method
+    /// with parameter values "XMLVersion" and "1.0" (respectively) to determine if
+    /// an implementation supports [XML 1.0]. DOM applications may use the same method
+    /// with parameter values "XMLVersion" and "1.1" (respectively) to determine if
+    /// an implementation supports [XML 1.1]. In both cases, in order to support XML,
+    /// an implementation must also support the "XML" feature defined in this specification.
+    /// Document objects supporting a version of the "XMLVersion" feature must not raise
+    /// a NOT_SUPPORTED_ERR exception for the same version number when using Document.xmlVersion.
+    /// ```
+    pub fn xml_version(&self) -> Option<Rc<str>> {
+        if let Some(version) = self.0.borrow().xml_version.clone() {
+            Some(version)
+        } else if self.implementation().has_feature("XML", None) {
+            Some("1.0".into())
+        } else {
+            None
+        }
+    }
+
+    /// Implementation of [`xmlVersion`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-Document3-version) attribute.
+    ///
+    /// # Specification
+    /// ```text
+    /// An attribute specifying, as part of the XML declaration, the version numberof
+    /// this document. If there is no declaration and if this document supports the
+    /// "XML" feature, the value is "1.0". If this document does not support the "XML"
+    /// feature, the value is always null. Changing this attribute will affect methods
+    /// that check for invalid characters in XML names. Application should invoke
+    /// Document.normalizeDocument() in order to check for invalid characters in the Nodes
+    /// that are already part of this Document.
+    /// DOM applications may use the DOMImplementation.hasFeature(feature, version) method
+    /// with parameter values "XMLVersion" and "1.0" (respectively) to determine if
+    /// an implementation supports [XML 1.0]. DOM applications may use the same method
+    /// with parameter values "XMLVersion" and "1.1" (respectively) to determine if
+    /// an implementation supports [XML 1.1]. In both cases, in order to support XML,
+    /// an implementation must also support the "XML" feature defined in this specification.
+    /// Document objects supporting a version of the "XMLVersion" feature must not raise
+    /// a NOT_SUPPORTED_ERR exception for the same version number when using Document.xmlVersion.
+    ///
+    /// Exceptions on setting
+    ///     DOMException
+    ///     NOT_SUPPORTED_ERR: Raised if the version is set to a value that is not supported
+    ///                        by this Document or if this document does not support the
+    ///                        "XML" feature.
+    /// ```
+    pub fn set_xml_version(&mut self, xml_version: &str) -> Result<(), DOMException> {
+        if !self.implementation().has_feature("XML", None)
+            || !self
+                .implementation()
+                .has_feature("XMLVersion", Some(xml_version))
+        {
+            return Err(DOMException::NotSupportedErr);
+        }
+        self.0.borrow_mut().xml_version = Some(xml_version.into());
+        Ok(())
     }
 
     /// Implementation of `documentURI` attribute.

@@ -281,6 +281,8 @@ impl DOMImplementation for DefaultDOMImplementation {
             && version.is_none_or(|version| matches!(version, "1.0" | "2.0" | "3.0")))
             || (feature.eq_ignore_ascii_case("XML")
                 && version.is_none_or(|version| matches!(version, "1.0" | "2.0" | "3.0")))
+            || (feature.eq_ignore_ascii_case("XMLVersion")
+                && version.is_none_or(|version| matches!(version, "1.0")))
     }
 
     fn create_document_type(
