@@ -1,5 +1,4 @@
 # exml
-
 Re-implementation of [libxml2](https://gitlab.gnome.org/GNOME/libxml2) by Rust.\
 This library is based on v2.11.8.
 
@@ -37,8 +36,15 @@ Since the implementation is still insufficient, it may not be possible to build 
 | libxml_writer      | Corresponds to `XML_WITH_WRITER`                                          |
 | libxml_xptr_locs   | Corresponds to the behavior when `LIBXML_XPTR_LOCS_ENABLED` is enabled.   |
 
-# Tests
+## DOM Support
+The `dom` module is in implementation for the purpose of replacing the `tree` module.
 
+The `tree` APIs require the users to manage memory, making it difficult to handle safely, but the `dom` module introduces memory management by reference counters, making it safer to handle.\
+In addition, by providing APIs that conform to the DOM specification, users can manipulate the document tree in a more generally accepted way.
+
+Since the `tree` module is an important module used in most aspects of libxml, it is expected that the replacement will be completed in a later version of this crate as well.
+
+# Tests
 All tests under the `tests/` directory are also based on original libxml2.\
 These tests passes test under `test/` and `result/` directory in original libxml2.
 
@@ -49,6 +55,5 @@ The test code for `schematron` is not included in the original v2.11.8 repositor
 For coverage, only this test is ported from `master` (probably v2.14) and the original `runtest.c` output for the existing data is added to the test as expected values.
 
 # License
-
 This library is provided under the MIT License.  
 Please refer to `LICENSE` file.
