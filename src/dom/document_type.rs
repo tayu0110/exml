@@ -10,6 +10,8 @@ use crate::{
         attlistdecl::{AttType, AttlistDeclRef, DefaultDecl},
         elementdecl::{ContentSpec, ElementDeclRef},
         entity::EntityType,
+        named_node_map::{EntityMap, NotationMap, SubsetEntityMap, SubsetNotationMap},
+        notation::NotationIdentifier,
     },
     tree::{validate_name, validate_qname},
 };
@@ -20,7 +22,6 @@ use super::{
     document::{DocumentRef, DocumentWeakRef},
     entity::EntityRef,
     entity_reference::EntityReferenceRef,
-    named_node_map::_NamedNodeMap,
     node::{Node, NodeConnection, NodeRef, NodeWeakRef},
     notation::NotationRef,
     pi::ProcessingInstructionRef,
@@ -58,10 +59,10 @@ pub struct DocumentType {
 
 impl DocumentType {
     /// Return an entity that is specified by `name` if exists.
-    pub fn get_entity(&self, name: Rc<str>) -> Option<EntityRef> {
+    pub fn get_entity(&self, name: &str) -> Option<EntityRef> {
         self.internal_subset
             .as_ref()
-            .and_then(|int| int.get_entity(name.clone()))
+            .and_then(|int| int.get_entity(name))
             .or_else(|| {
                 self.external_subset
                     .as_ref()
@@ -240,17 +241,98 @@ impl DocumentTypeRef {
         }))))
     }
 
-    /// Implementation of `name` attribute.
+    /// Implementation of [`name`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-1844763134) attribute.
+    ///
+    /// # Specification
+    /// ```text
+    /// name of type DOMString, readonly
+    ///     The name of DTD; i.e., the name immediately following the DOCTYPE keyword.
+    /// ```
     pub fn name(&self) -> Rc<str> {
         self.0.borrow().name.clone()
     }
 
-    /// Implementation of `publicId` attribute.
+    /// Implementation of [`entities`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-1788794630) attribute.
+    ///
+    /// # Specification
+    /// ```text
+    /// entities of type NamedNodeMap, readonly
+    ///     A NamedNodeMap containing the general entities, both external and internal,
+    ///     declared in the DTD. Parameter entities are not contained. Duplicates are
+    ///     discarded. For example in:
+    ///     --------------------------------
+    ///     <!DOCTYPE ex SYSTEM "ex.dtd" [
+    ///       <!ENTITY foo "foo">
+    ///       <!ENTITY bar "bar">
+    ///       <!ENTITY bar "bar2">
+    ///       <!ENTITY % baz "baz">
+    ///     ]>
+    ///     <ex/>
+    ///     --------------------------------
+    ///     the interface provides access to foo and the first declaration of bar but not
+    ///     the second declaration of bar or baz. Every node in this map also implements
+    ///     the Entity interface.
+    ///     The DOM Level 2 does not support editing entities, therefore entities cannot
+    ///     be altered in any way.
+    /// ```
+    pub fn entities(&self) -> EntityMap {
+        EntityMap::new(
+            self.0
+                .borrow()
+                .internal_subset
+                .as_ref()
+                .map(|sub| sub.entities.clone()),
+            self.0
+                .borrow()
+                .external_subset
+                .as_ref()
+                .map(|sub| sub.entities.clone()),
+        )
+    }
+
+    /// Implementation of [`notations`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-D46829EF) attribute.
+    ///
+    /// # Specification
+    /// ```text
+    /// notations of type NamedNodeMap, readonly
+    ///     A NamedNodeMap containing the notations declared in the DTD. Duplicates are
+    ///     discarded. Every node in this map also implements the Notation interface.
+    ///     The DOM Level 2 does not support editing notations, therefore notations
+    ///     cannot be altered in any way.
+    /// ```
+    pub fn notations(&self) -> NotationMap {
+        NotationMap::new(
+            self.0
+                .borrow()
+                .internal_subset
+                .as_ref()
+                .map(|sub| sub.notations.clone()),
+            self.0
+                .borrow()
+                .external_subset
+                .as_ref()
+                .map(|sub| sub.notations.clone()),
+        )
+    }
+
+    /// Implementation of [`publicId`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-Core-DocType-publicId) attribute.
+    ///
+    /// # Specification
+    /// ```text
+    /// publicId of type DOMString, readonly, introduced in DOM Level 2
+    ///     The public identifier of the external subset.
+    /// ```
     pub fn public_id(&self) -> Option<Rc<str>> {
         self.0.borrow().public_id.clone()
     }
 
-    /// Implementation of `systemId` attribute.
+    /// Implementation of [`systemId`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-Core-DocType-systemId) attribute.
+    ///
+    /// # Specification
+    /// ```text
+    /// systemId of type DOMString, readonly, introduced in DOM Level 2
+    ///     The system identifier of the external subset. This may be an absolute URI or not.
+    /// ```
     pub fn system_id(&self) -> Option<Rc<str>> {
         self.0.borrow().system_id.clone()
     }
@@ -294,12 +376,16 @@ impl DocumentTypeRef {
     ///
     /// # Errors
     /// - If `name` is not a valid XML Name, return `Err(DOMException::InvalidCharacterErr)`
-    pub fn create_notation(&self, name: impl Into<Rc<str>>) -> Result<NotationRef, DOMException> {
+    pub fn create_notation(
+        &self,
+        name: impl Into<Rc<str>>,
+        id: NotationIdentifier,
+    ) -> Result<NotationRef, DOMException> {
         let name: Rc<str> = name.into();
         if validate_name::<false>(&name).is_err() {
             return Err(DOMException::InvalidCharacterErr);
         }
-        Ok(NotationRef::new(self.owner_document(), name))
+        Ok(NotationRef::new(self.owner_document(), name, id))
     }
 
     /// Create a new [`ElementDeclRef`] that has `name` as the element name.
@@ -355,7 +441,7 @@ impl DocumentTypeRef {
     }
 
     /// Return an entity that is specified by `name` if exists.
-    pub fn get_entity(&self, name: Rc<str>) -> Option<EntityRef> {
+    pub fn get_entity(&self, name: &str) -> Option<EntityRef> {
         self.0.borrow().get_entity(name)
     }
 
@@ -677,9 +763,9 @@ pub struct DtdSubset<const EXT: bool> {
     /// as same as `nodeName` for `Node`.
     name: Rc<str>,
     /// Implementation of `entities` for `DocumentType`.
-    entities: _NamedNodeMap<EntityRef>,
+    entities: SubsetEntityMap,
     /// Implementation of `notations` for `DocumentType`.
-    notations: _NamedNodeMap<NotationRef>,
+    notations: SubsetNotationMap,
     /// Implementation of `publicId` for `DocumentType`.
     public_id: Option<Rc<str>>,
     /// Implementation of `systemId` for `DocumentType`.
@@ -711,8 +797,8 @@ impl<const EXT: bool> DtdSubset<EXT> {
             last_child: None,
             owner_document: doc.map(|doc| doc.downgrade()),
             name: name.into(),
-            entities: _NamedNodeMap::new(ddoc.clone()),
-            notations: _NamedNodeMap::new(ddoc),
+            entities: SubsetEntityMap::new(ddoc.clone()),
+            notations: SubsetNotationMap::new(ddoc),
             public_id: public_id.map(|id| id.into()),
             system_id: system_id.map(|id| id.into()),
             elements: HashMap::new(),
@@ -720,12 +806,12 @@ impl<const EXT: bool> DtdSubset<EXT> {
     }
 
     /// Return an entity that is specified by `name` if exists.
-    pub fn get_entity(&self, name: Rc<str>) -> Option<EntityRef> {
+    pub fn get_entity(&self, name: &str) -> Option<EntityRef> {
         self.entities.get_named_item(name)
     }
 
     /// Return a notation that is specified by `name` if exists.
-    pub fn get_notation(&self, name: Rc<str>) -> Option<NotationRef> {
+    pub fn get_notation(&self, name: &str) -> Option<NotationRef> {
         self.notations.get_named_item(name)
     }
 
@@ -736,12 +822,12 @@ impl<const EXT: bool> DtdSubset<EXT> {
 
     /// Check if this subset has `entity` or not.
     pub fn has_entity(&self, entity: &EntityRef) -> bool {
-        self.entities.contains(entity)
+        self.entities.has_equal_node(entity)
     }
 
     /// Check if this subset has `notation` or not.
     pub fn has_notation(&self, notation: &NotationRef) -> bool {
-        self.notations.contains(notation)
+        self.notations.has_equal_node(notation)
     }
 
     fn append_markup_decl(&mut self, data: MarkupDecl) {
@@ -774,7 +860,7 @@ impl<const EXT: bool> DtdSubset<EXT> {
         if validate_name::<false>(&name).is_err() {
             return Err(DOMException::InvalidCharacterErr);
         }
-        if self.entities.get_named_item(name.clone()).is_some() {
+        if self.entities.get_named_item(&name).is_some() {
             // Is this correct ??
             return Err(DOMException::NoDataAllowedErr);
         }
@@ -795,7 +881,7 @@ impl<const EXT: bool> DtdSubset<EXT> {
         if validate_name::<false>(&name).is_err() {
             return Err(DOMException::InvalidCharacterErr);
         }
-        if self.notations.get_named_item(name.clone()).is_some() {
+        if self.notations.get_named_item(&name).is_some() {
             // Is this correct ??
             return Err(DOMException::NoDataAllowedErr);
         }
@@ -876,13 +962,13 @@ impl<const EXT: bool> DtdSubset<EXT> {
             last_child: None,
             owner_document: self.owner_document.clone(),
             name: self.name.clone(),
-            entities: _NamedNodeMap::new(
+            entities: SubsetEntityMap::new(
                 self.entities
                     .owner_document()
                     .unwrap_or(DUMMY_DOCUMENT.with(|doc| (**doc).clone()))
                     .downgrade(),
             ),
-            notations: _NamedNodeMap::new(
+            notations: SubsetNotationMap::new(
                 self.notations
                     .owner_document()
                     .unwrap_or(DUMMY_DOCUMENT.with(|doc| (**doc).clone()))

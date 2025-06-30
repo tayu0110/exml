@@ -6,10 +6,12 @@ use std::{
     rc::Rc,
 };
 
-use crate::dom::attr::AttrRef;
+use crate::dom::{entity::EntityRef, notation::NotationRef};
 
 use super::{
-    DOMException, check_owner_document_sameness,
+    DOMException,
+    attr::AttrRef,
+    check_owner_document_sameness,
     document::{DocumentRef, DocumentWeakRef},
     node::{Node, NodeRef},
 };
@@ -143,7 +145,6 @@ impl<N: Node + Clone> _NamedNodeMap<N> {
     /// - If an attempt is made to add a node doesn't belong in this NamedNodeMap,
     ///   return `DOMError::HierarchyRequestErr`.
     ///   Examples would include trying to insert something other than an Attr node into an Element's map of attributes, or a non-Entity node into the DocumentType's map of Entities.
-    /// ```
     pub fn set_named_item(&mut self, node: N) -> Result<Option<N>, DOMException> {
         let doc = self.owner_document.upgrade();
         let ndoc = node.owner_document();
@@ -883,5 +884,166 @@ impl NamedNodeMap for AttributeMap {
             self.data.borrow_mut().remove(index)
         };
         Ok(res)
+    }
+}
+
+#[derive(Clone)]
+pub(crate) struct DTDSubsetMap<N: Node> {
+    owner_document: DocumentWeakRef,
+    index: Rc<RefCell<HashMap<String, usize>>>,
+    data: Rc<RefCell<Vec<N>>>,
+}
+
+impl<N: Node> DTDSubsetMap<N> {
+    /// Create new empty [`DTDSubsetMap`]
+    pub(super) fn new(doc: DocumentWeakRef) -> Self {
+        Self {
+            owner_document: doc,
+            index: Rc::new(RefCell::new(HashMap::new())),
+            data: Rc::new(RefCell::new(vec![])),
+        }
+    }
+
+    /// Return the number of data in this map.
+    pub fn len(&self) -> usize {
+        self.data.borrow().len()
+    }
+
+    /// Check if this map is empty.\
+    /// In other words, check `self.len() == 0` is satisfied.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Check if this map has `node` or not.
+    ///
+    /// This method checks the equality of the `node`.
+    pub fn has_equal_node(&self, node: &N) -> bool {
+        self.index
+            .borrow()
+            .get(node.node_name().as_ref())
+            .is_some_and(|&index| self.data.borrow()[index].is_equal_node(&node.clone().into()))
+    }
+
+    /// Implementation of `getNamedItem` method.
+    pub fn get_named_item(&self, name: &str) -> Option<N> {
+        let &index = self.index.borrow().get(name)?;
+        self.item(index)
+    }
+
+    /// Implementation of `setNamedItem` method.
+    pub fn set_named_item(&mut self, node: N) -> Result<Option<N>, DOMException> {
+        if !check_owner_document_sameness(&self.owner_document.upgrade().unwrap(), &node) {
+            return Err(DOMException::WrongDocumentErr);
+        }
+
+        let name = node.node_name();
+        match self.index.borrow_mut().entry(name.to_string()) {
+            Entry::Occupied(entry) => {
+                let &index = entry.get();
+                Ok(Some(replace(&mut self.data.borrow_mut()[index], node)))
+            }
+            Entry::Vacant(entry) => {
+                let index = self.data.borrow().len();
+                entry.insert(index);
+                self.data.borrow_mut().push(node);
+                Ok(None)
+            }
+        }
+    }
+
+    /// Implementation of `item` method.
+    pub fn item(&self, index: usize) -> Option<N> {
+        self.data.borrow().get(index).cloned()
+    }
+
+    /// Get the owner Document.
+    pub(super) fn owner_document(&self) -> Option<DocumentRef> {
+        self.owner_document.upgrade()
+    }
+
+    /// Replace ownerDocument of this map.
+    ///
+    /// All data in this map won't modified.  
+    /// If need, the caller should modify the ownerDocument of all data in this map additionally.
+    pub(super) fn set_owner_document(&mut self, new_doc: DocumentRef) {
+        self.owner_document = new_doc.downgrade();
+    }
+}
+
+pub(crate) type SubsetEntityMap = DTDSubsetMap<EntityRef>;
+pub(crate) type SubsetNotationMap = DTDSubsetMap<NotationRef>;
+
+#[derive(Clone)]
+pub struct DTDMap<N: Node> {
+    internal_map: Option<DTDSubsetMap<N>>,
+    external_map: Option<DTDSubsetMap<N>>,
+}
+
+pub type EntityMap = DTDMap<EntityRef>;
+pub type NotationMap = DTDMap<NotationRef>;
+
+impl<N: Node> DTDMap<N> {
+    pub(super) fn new(
+        internal_map: Option<DTDSubsetMap<N>>,
+        external_map: Option<DTDSubsetMap<N>>,
+    ) -> Self {
+        Self {
+            internal_map,
+            external_map,
+        }
+    }
+}
+
+impl<N: Node> NamedNodeMap for DTDMap<N> {
+    type Item = N;
+
+    fn get_named_item(&self, name: &str) -> Option<Self::Item> {
+        self.internal_map
+            .as_ref()
+            .and_then(|map| map.get_named_item(name))
+            .or_else(|| {
+                self.external_map
+                    .as_ref()
+                    .and_then(|map| map.get_named_item(name))
+            })
+    }
+    fn set_named_item(&mut self, _node: Self::Item) -> Result<Option<Self::Item>, DOMException> {
+        Err(DOMException::NoModificationAllowedErr)
+    }
+    fn remove_named_item(&mut self, _name: &str) -> Result<Self::Item, DOMException> {
+        Err(DOMException::NoModificationAllowedErr)
+    }
+    fn item(&self, mut index: usize) -> Option<Self::Item> {
+        if let Some(map) = self.internal_map.as_ref() {
+            if index < map.len() {
+                return map.item(index);
+            } else {
+                index -= map.len();
+            }
+        }
+        self.external_map.as_ref().and_then(|map| map.item(index))
+    }
+    fn length(&self) -> usize {
+        self.internal_map.as_ref().map_or(0, |map| map.len())
+            + self.external_map.as_ref().map_or(0, |map| map.len())
+    }
+
+    fn get_named_item_ns(
+        &self,
+        _ns_uri: Option<&str>,
+        _local_name: &str,
+    ) -> Result<Option<Self::Item>, DOMException> {
+        Err(DOMException::NotSupportedErr)
+    }
+    fn set_named_item_ns(&mut self, _node: Self::Item) -> Result<Option<Self::Item>, DOMException> {
+        Err(DOMException::NotSupportedErr)
+    }
+    fn remove_named_item_ns(
+        &mut self,
+        _ns_uri: Option<&str>,
+        _local_name: &str,
+    ) -> Result<Self::Item, DOMException> {
+        Err(DOMException::NotSupportedErr)
     }
 }

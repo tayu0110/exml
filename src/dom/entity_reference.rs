@@ -50,7 +50,7 @@ impl EntityReference {
     /// All character and general parsed entities in the value are expanded.
     pub(crate) fn get_entity_ref_value(&self) -> Option<String> {
         let doc = self.owner_document.upgrade()?;
-        let ent = doc.get_entity(self.name.clone())?;
+        let ent = doc.get_entity(&self.name)?;
         let mut children = ent.first_child();
         let mut buf = String::new();
         while let Some(child) = children {

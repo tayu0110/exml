@@ -116,16 +116,16 @@ impl Document {
     /// If found, return found entity wrapped `Some`.  
     /// Otherwise, return `None`.
     #[doc(alias = "xmlGetDocEntity")]
-    pub fn get_entity(&self, name: Rc<str>) -> Option<EntityRef> {
+    pub fn get_entity(&self, name: &str) -> Option<EntityRef> {
         if let Some(ent) = self
             .doctype
             .as_ref()
-            .and_then(|doctype| doctype.get_entity(name.clone()))
+            .and_then(|doctype| doctype.get_entity(name))
         {
             return Some(ent);
         }
 
-        match name.as_ref() {
+        match name {
             "lt" => Some(self.predefined_entities[0].clone()),
             "gt" => Some(self.predefined_entities[1].clone()),
             "amp" => Some(self.predefined_entities[2].clone()),
@@ -594,7 +594,7 @@ impl DocumentRef {
         }
         let mut entref = EntityReferenceRef::from_doc(self.clone(), name);
 
-        if let Some(entity) = self.get_entity(entref.node_name()) {
+        if let Some(entity) = self.get_entity(&entref.node_name()) {
             let read_only_check = self.is_enabled_read_only_check();
             self.0.borrow_mut().disable_read_only_check();
             let mut children = entity.first_child();
@@ -1545,7 +1545,7 @@ impl DocumentRef {
     /// If found, return found entity wrapped `Some`.  
     /// Otherwise, return `None`.
     #[doc(alias = "xmlGetDocEntity")]
-    pub fn get_entity(&self, name: Rc<str>) -> Option<EntityRef> {
+    pub fn get_entity(&self, name: &str) -> Option<EntityRef> {
         self.0.borrow().get_entity(name)
     }
 
