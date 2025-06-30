@@ -278,11 +278,11 @@ pub struct DefaultDOMImplementation;
 impl DOMImplementation for DefaultDOMImplementation {
     fn has_feature(&self, feature: &str, version: Option<&str>) -> bool {
         (feature.eq_ignore_ascii_case("Core")
-            && version.is_none_or(|version| matches!(version, "1.0" | "2.0" | "3.0")))
+            && version.is_none_or(|version| matches!(version, "" | "1.0" | "2.0" | "3.0")))
             || (feature.eq_ignore_ascii_case("XML")
-                && version.is_none_or(|version| matches!(version, "1.0" | "2.0" | "3.0")))
+                && version.is_none_or(|version| matches!(version, "" | "1.0" | "2.0" | "3.0")))
             || (feature.eq_ignore_ascii_case("XMLVersion")
-                && version.is_none_or(|version| matches!(version, "1.0")))
+                && version.is_none_or(|version| matches!(version, "" | "1.0")))
     }
 
     fn create_document_type(

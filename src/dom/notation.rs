@@ -82,7 +82,7 @@ impl NotationRef {
         self.0.borrow().public_id.clone()
     }
 
-    /// Set new PublicID.
+    /// Set the new PublicID.
     ///
     /// Note that the SystemID that has already been set will be removed.
     pub fn set_public_id(&mut self, public_id: impl Into<Rc<str>>) {
@@ -102,6 +102,7 @@ impl NotationRef {
         self.0.borrow().system_id.clone()
     }
 
+    /// Set the new ExternalID.
     pub fn set_external_id(
         &mut self,
         public_id: Option<impl Into<Rc<str>>>,
