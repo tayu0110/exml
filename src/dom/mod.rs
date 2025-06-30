@@ -3,8 +3,7 @@
 //! I will try to maintain compatibility with the libxml2 tree as much as possible.  
 //!
 //! Currently, full implementation of the specification is not a goal.  
-//! For example, I do not plan to provide components equivalent to the `DOMImplementation` interface
-//! and a feature selection mechanism.
+//! For example, I do not plan to provide a feature selection mechanism.
 //!
 //! # Note
 //! - The iterators that walk through the nodes of the DOM are not implemented.\
