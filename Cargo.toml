@@ -13,10 +13,10 @@ rust-version = "1.85.0"
 
 [dependencies]
 anyhow = "1.0.98"
-clap = { version = "4.5.37", features = ["derive"] }
+clap = { version = "4.5.40", features = ["derive"] }
 const_format = { version = "0.2.34" }
 encoding_rs = "0.8.35"
-libc = "0.2.172"
+libc = "0.2.174"
 rand = "0.9.1"
 
 [features]
