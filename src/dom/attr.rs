@@ -4,7 +4,11 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use crate::{dom::DOMException, parser::split_qname2};
+use crate::{
+    dom::{DOMException, XML_NS_NAMESPACE, XML_XML_NAMESPACE, check_no_modification_allowed_err},
+    parser::split_qname2,
+    tree::validate_ncname,
+};
 
 use super::{
     NodeType,
@@ -339,6 +343,43 @@ impl Node for AttrRef {
 
     fn prefix(&self) -> Option<Rc<str>> {
         self.0.borrow().prefix.clone()
+    }
+
+    fn set_prefix(&mut self, prefix: Option<impl Into<Rc<str>>>) -> Result<(), DOMException> {
+        let Some(local_name) = self.local_name() else {
+            // This should have been created with DOM Level 1 method.
+            return Ok(());
+        };
+
+        let prefix: Option<Rc<str>> = prefix.map(|pre| pre.into());
+        if self.prefix() == prefix {
+            return Ok(());
+        }
+        check_no_modification_allowed_err(self)?;
+        if let Some(prefix) = prefix {
+            if validate_ncname::<false>(&prefix).is_err() {
+                return Err(DOMException::InvalidCharacterErr);
+            }
+            if self.namespace_uri().is_none()
+                || (prefix.as_ref() == "xml"
+                    && self.namespace_uri().as_deref() != Some(XML_XML_NAMESPACE))
+                || (prefix.as_ref() == "xmlns"
+                    && self.namespace_uri().as_deref() != Some(XML_NS_NAMESPACE))
+            {
+                return Err(DOMException::NamespaceErr);
+            }
+            self.0.borrow_mut().prefix = Some(prefix.clone());
+            self.0.borrow_mut().name = format!("{prefix}:{local_name}").into();
+        } else {
+            if local_name.as_ref() == "xmlns"
+                && self.namespace_uri().as_deref() != Some(XML_NS_NAMESPACE)
+            {
+                return Err(DOMException::NamespaceErr);
+            }
+            self.0.borrow_mut().prefix = None;
+            self.0.borrow_mut().name = local_name.clone();
+        }
+        Ok(())
     }
 
     fn local_name(&self) -> Option<Rc<str>> {

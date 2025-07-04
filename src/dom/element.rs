@@ -11,7 +11,7 @@ use crate::{
         node_list::FilteredSubtreeElementsList,
     },
     parser::split_qname2,
-    tree::validate_name,
+    tree::{validate_name, validate_ncname},
 };
 
 use super::{
@@ -1112,6 +1112,33 @@ impl Node for ElementRef {
 
     fn prefix(&self) -> Option<Rc<str>> {
         self.0.borrow().prefix.clone()
+    }
+
+    fn set_prefix(&mut self, prefix: Option<impl Into<Rc<str>>>) -> Result<(), DOMException> {
+        let Some(local_name) = self.local_name() else {
+            // This should have been created with DOM Level 1 method.
+            return Ok(());
+        };
+
+        let prefix: Option<Rc<str>> = prefix.map(|pre| pre.into());
+        if self.prefix() == prefix {
+            return Ok(());
+        }
+        check_no_modification_allowed_err(self)?;
+        if let Some(prefix) = prefix {
+            if validate_ncname::<false>(&prefix).is_err() {
+                return Err(DOMException::InvalidCharacterErr);
+            }
+            if self.namespace_uri().is_none() {
+                return Err(DOMException::NamespaceErr);
+            }
+            self.0.borrow_mut().prefix = Some(prefix.clone());
+            self.0.borrow_mut().tag_name = format!("{prefix}:{local_name}").into();
+        } else {
+            self.0.borrow_mut().prefix = None;
+            self.0.borrow_mut().tag_name = local_name.clone();
+        }
+        Ok(())
     }
 
     fn local_name(&self) -> Option<Rc<str>> {
