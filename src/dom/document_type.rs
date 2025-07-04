@@ -186,6 +186,10 @@ impl DocumentType {
     }
 }
 
+thread_local! {
+    pub(super) static DUMMY_DOCUMENT: LazyCell<DocumentRef> = LazyCell::new(|| DocumentRef::new(None, None, None).unwrap());
+}
+
 /// Wrapper of `Rc<RefCell<DocumentType>>`.
 #[derive(Clone)]
 pub struct DocumentTypeRef(Rc<RefCell<DocumentType>>);
@@ -232,7 +236,7 @@ impl DocumentTypeRef {
             parent_node: None,
             previous_sibling: None,
             next_sibling: None,
-            owner_document: None,
+            owner_document: DUMMY_DOCUMENT.with(|dum| Some((**dum).clone().downgrade())),
             name: qualified_name.into(),
             public_id: public_id.map(|pubid| pubid.into()),
             system_id: system_id.map(|systemid| systemid.into()),
@@ -776,10 +780,6 @@ pub struct DtdSubset<const EXT: bool> {
 
 pub type InternalSubset = DtdSubset<false>;
 pub type ExternalSubset = DtdSubset<true>;
-
-thread_local! {
-    static DUMMY_DOCUMENT: LazyCell<DocumentRef> = LazyCell::new(|| DocumentRef::new(None, None, None).unwrap());
-}
 
 impl<const EXT: bool> DtdSubset<EXT> {
     fn new(

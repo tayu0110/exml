@@ -110,9 +110,11 @@ impl ElementContent {
     ///
     /// Return the old first child if it exists.  
     /// The parent of the returned node is cleared.
-    pub fn set_first_child(self: &Rc<Self>, child: Rc<Self>) -> Option<Rc<Self>> {
-        *child.parent.borrow_mut() = Rc::downgrade(self);
-        replace(&mut *self.first_child.borrow_mut(), Some(child))
+    pub fn set_first_child(self: &mut Rc<Self>, child: Option<Rc<Self>>) -> Option<Rc<Self>> {
+        if let Some(child) = child.as_deref() {
+            *child.parent.borrow_mut() = Rc::downgrade(self);
+        }
+        replace(&mut *self.first_child.borrow_mut(), child)
             .inspect(|res| *res.parent.borrow_mut() = Weak::new())
     }
 
@@ -121,9 +123,11 @@ impl ElementContent {
     ///
     /// Return the old second child if it exists.  
     /// The parent of the returned node is cleared.
-    pub fn set_second_child(self: &Rc<Self>, child: Rc<Self>) -> Option<Rc<Self>> {
-        *child.parent.borrow_mut() = Rc::downgrade(self);
-        replace(&mut *self.second_child.borrow_mut(), Some(child))
+    pub fn set_second_child(self: &mut Rc<Self>, child: Option<Rc<Self>>) -> Option<Rc<Self>> {
+        if let Some(child) = child.as_deref() {
+            *child.parent.borrow_mut() = Rc::downgrade(self);
+        }
+        replace(&mut *self.second_child.borrow_mut(), child)
             .inspect(|res| *res.parent.borrow_mut() = Weak::new())
     }
 }

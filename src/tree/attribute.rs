@@ -42,14 +42,14 @@ use super::{
 pub struct XmlAttr {
     pub _private: *mut c_void,                  /* application data */
     pub(crate) typ: XmlElementType,             /* XML_ATTRIBUTE_NODE, must be second ! */
-    pub(crate) name: Box<str>,                  /* the name of the property */
+    pub name: Box<str>,                         /* the name of the property */
     pub(crate) children: Option<XmlNodePtr>,    /* the value of the property */
     pub(crate) last: Option<XmlNodePtr>,        /* NULL */
     pub(crate) parent: Option<XmlNodePtr>,      /* child->parent link */
-    pub(crate) next: Option<XmlAttrPtr>,        /* next sibling link  */
+    pub next: Option<XmlAttrPtr>,               /* next sibling link  */
     pub(crate) prev: Option<XmlAttrPtr>,        /* previous sibling link  */
     pub(crate) doc: Option<XmlDocPtr>,          /* the containing document */
-    pub(crate) ns: Option<XmlNsPtr>,            /* pointer to the associated namespace */
+    pub ns: Option<XmlNsPtr>,                   /* pointer to the associated namespace */
     pub(crate) atype: Option<XmlAttributeType>, /* the attribute type if validating */
     pub(crate) psvi: *mut c_void,               /* for type/PSVI information */
 }

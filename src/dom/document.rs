@@ -9,6 +9,8 @@ use crate::{
     chvalid::XmlCharValid,
     dom::{
         attlistdecl::DefaultDecl,
+        check_vertical_hierarchy,
+        document_type::DUMMY_DOCUMENT,
         dom_implementation::{DEFAULT_DOM_IMPLEMENTATION, DOMImplementation},
         entity::EntityType,
         named_node_map::NamedNodeMap,
@@ -265,10 +267,11 @@ impl DocumentRef {
         qualified_name: Option<&str>,
         doctype: Option<DocumentTypeRef>,
     ) -> Result<Self, DOMException> {
-        if doctype
-            .as_ref()
-            .is_some_and(|doctype| doctype.owner_document().is_some())
-        {
+        if doctype.as_ref().is_some_and(|doctype| {
+            doctype
+                .owner_document()
+                .is_some_and(|doc| DUMMY_DOCUMENT.with(|dum| !dum.is_same_node(&doc.into())))
+        }) {
             return Err(DOMException::WrongDocumentErr);
         }
 
@@ -295,9 +298,7 @@ impl DocumentRef {
         })));
 
         // TODO: check if the DTD specifies this document is HTML or not.
-        if let Some(mut doctype) = doctype {
-            doctype.set_owner_document(new.clone());
-            new.0.borrow_mut().doctype = Some(doctype.clone());
+        if let Some(doctype) = doctype {
             new.append_child(doctype.into())?;
         }
 
@@ -322,7 +323,6 @@ impl DocumentRef {
                 ElementRef::new(new.clone(), qname.into())
             };
 
-            new.0.borrow_mut().document_element = Some(elem.clone());
             new.append_child(elem.into())?;
         } else {
             // ... or if the qualifiedName is null and the namespaceURI is different from null
@@ -1680,6 +1680,128 @@ impl Node for DocumentRef {
 
     fn last_child(&self) -> Option<NodeRef> {
         self.0.borrow().last_child.clone()
+    }
+
+    fn insert_before(
+        &mut self,
+        mut new_child: NodeRef,
+        ref_child: Option<NodeRef>,
+    ) -> Result<NodeRef, DOMException> {
+        // In this implementation, if `new_child` and `ref_child` are same node,
+        // do nothing and return `new_child`.
+        if ref_child
+            .as_ref()
+            .is_some_and(|ref_child| new_child.is_same_node(ref_child))
+        {
+            return Ok(new_child);
+        }
+
+        // HIERARCHY_REQUEST_ERR: Raised if this node is of a type that does not allow children
+        // of the type of the newChild node (..snip)
+        if new_child.node_type() == NodeType::DocumentFragment {
+            let mut children = new_child.first_child();
+            while let Some(child) = children {
+                children = child.next_sibling();
+                if !check_vertical_hierarchy(self.node_type(), child.node_type()) {
+                    return Err(DOMException::HierarchyRequestErr);
+                }
+                match child.node_type() {
+                    NodeType::Element if self.document_element().is_some() => {
+                        return Err(DOMException::HierarchyRequestErr);
+                    }
+                    NodeType::DocumentType if self.doctype().is_some() => {
+                        return Err(DOMException::HierarchyRequestErr);
+                    }
+                    _ => {}
+                }
+            }
+        } else if !check_vertical_hierarchy(self.node_type(), new_child.node_type()) {
+            return Err(DOMException::HierarchyRequestErr);
+        }
+        // NOT_FOUND_ERR: Raised if refChild is not a child of this node.
+        if ref_child.as_ref().is_some_and(|ref_child| {
+            ref_child
+                .parent_node()
+                .is_none_or(|par| !self.is_same_node(&par))
+        }) {
+            return Err(DOMException::NotFoundErr);
+        }
+        // WRONG_DOCUMENT_ERR: Raised if newChild was created from a different document
+        // than the one that created this node.
+        if new_child.owner_document().is_none_or(|doc| {
+            // If `new_child` is a DocumentType node and its owner Document is
+            // a dummy Document node, it is not invalid.
+            !doc.is_same_node(&self.clone().into())
+                && (new_child.node_type() != NodeType::DocumentType
+                    || DUMMY_DOCUMENT.with(|dum| !dum.is_same_node(&doc.into())))
+        }) {
+            return Err(DOMException::WrongDocumentErr);
+        }
+
+        // HIERARCHY_REQUEST_ERR: Raised if (..snip..) this node is of type Document
+        // and the DOM application attempts to insert a second DocumentType or Element node.
+        match new_child.node_type() {
+            NodeType::Element => {
+                if self.document_element().is_some() {
+                    return Err(DOMException::HierarchyRequestErr);
+                }
+                // If `new_child` is an Element that passes all checks, it is a document element.
+                self.0.borrow_mut().document_element = new_child.as_element();
+            }
+            NodeType::DocumentType => {
+                if self.doctype().is_some() {
+                    return Err(DOMException::HierarchyRequestErr);
+                }
+                // The DocumentType that passed the check should have a dummy Document set,
+                // so set the owner Document here to `self`.
+                new_child.set_owner_document(self.clone());
+                // and set `new_child` as the `doctype` of this document.
+                self.0.borrow_mut().doctype = new_child.as_document_type();
+            }
+            _ => {}
+        }
+
+        if let Some(ref_child) = ref_child {
+            match &mut new_child {
+                // If newChild is a DocumentFragment object, all of its children are inserted,
+                // in the same order, before refChild.
+                NodeRef::DocumentFragment(frag) => {
+                    let mut child = frag.first_child();
+                    while let Some(mut now) = child {
+                        child = now.next_sibling();
+                        now.connect_as_previous_sibling(ref_child.clone());
+                    }
+                }
+                other => {
+                    other.connect_as_previous_sibling(ref_child);
+                }
+            }
+        } else {
+            let mut children = match new_child.clone() {
+                NodeRef::DocumentFragment(frag) => frag.first_child(),
+                mut other => {
+                    other.disconnect_parent_and_sibling();
+                    Some(other)
+                }
+            };
+            while let Some(mut child) = children {
+                children = child.next_sibling();
+                child.set_parent_node(Some(self.clone().into()));
+                let last = self.set_last_child(Some(child.clone()));
+                if let Some(mut last) = last {
+                    // If old last child is found,
+                    // it is set as the previous sibling of `new_child`.
+                    last.set_next_sibling(Some(child.clone()));
+                    child.set_previous_sibling(Some(last));
+                } else {
+                    // Otherwise, `self` has no children.
+                    // Therefore, I need to set `new_child` as also the first child of `self`.
+                    self.set_first_child(Some(child.clone()));
+                }
+            }
+        }
+
+        Ok(new_child)
     }
 
     fn clone_node(&self, deep: bool) -> NodeRef {

@@ -169,13 +169,13 @@ pub enum XmlElementContentOccur {
 /// An XML Element content as stored after parsing an element definition in a DTD.
 #[repr(C)]
 pub struct XmlElementContent {
-    pub(crate) typ: XmlElementContentType, /* PCDATA, ELEMENT, SEQ or OR */
-    pub(crate) ocur: XmlElementContentOccur, /* ONCE, OPT, MULT or PLUS */
-    pub(crate) name: Option<Box<str>>,     /* Element name */
-    pub(crate) c1: Option<Rc<RefCell<XmlElementContent>>>, /* first child */
-    pub(crate) c2: Option<Rc<RefCell<XmlElementContent>>>, /* second child */
-    pub(crate) parent: Weak<RefCell<XmlElementContent>>, /* parent */
-    pub(crate) prefix: Option<Box<str>>,   /* Namespace prefix */
+    pub typ: XmlElementContentType,   /* PCDATA, ELEMENT, SEQ or OR */
+    pub ocur: XmlElementContentOccur, /* ONCE, OPT, MULT or PLUS */
+    pub name: Option<Box<str>>,       /* Element name */
+    pub c1: Option<Rc<RefCell<XmlElementContent>>>, /* first child */
+    pub c2: Option<Rc<RefCell<XmlElementContent>>>, /* second child */
+    pub parent: Weak<RefCell<XmlElementContent>>, /* parent */
+    pub prefix: Option<Box<str>>,     /* Namespace prefix */
 }
 
 impl Default for XmlElementContent {

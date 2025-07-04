@@ -27,9 +27,9 @@ use std::io::Write;
 #[derive(Debug, Default)]
 pub struct XmlEnumeration {
     // next one
-    pub(crate) next: Option<Box<XmlEnumeration>>,
+    pub next: Option<Box<XmlEnumeration>>,
     // Enumeration name
-    pub(crate) name: String,
+    pub name: String,
 }
 
 impl Clone for XmlEnumeration {

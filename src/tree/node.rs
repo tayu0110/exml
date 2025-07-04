@@ -68,7 +68,7 @@ pub struct XmlNode {
     /* End of common part */
     pub(crate) ns: Option<XmlNsPtr>, /* pointer to the associated namespace */
     pub content: Option<String>,     /* the content */
-    pub(crate) properties: Option<XmlAttrPtr>, /* properties list */
+    pub properties: Option<XmlAttrPtr>, /* properties list */
     pub ns_def: Option<XmlNsPtr>,    /* namespace definitions on this node */
     pub(crate) psvi: *mut c_void,    /* for type/PSVI information */
     pub(crate) line: u16,            /* line number */
