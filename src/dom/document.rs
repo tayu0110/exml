@@ -14,6 +14,7 @@ use crate::{
         dom_implementation::{DEFAULT_DOM_IMPLEMENTATION, DOMImplementation},
         entity::EntityType,
         named_node_map::NamedNodeMap,
+        node_list::FilteredSubtreeElementsList,
     },
     error::XmlParserErrors,
     parser::split_qname2,
@@ -627,38 +628,22 @@ impl DocumentRef {
     ///
     /// No Exceptions
     /// ```
-    pub fn get_elements_by_tag_name(&self, tag_name: &str) -> Vec<ElementRef> {
-        let mut children = self.first_child();
-        let mut res = vec![];
-        // If this document is HTML document, the tagname is case-insensitive.
-        let eq = if self.is_html() {
-            |l: &str, r: &str| l.eq_ignore_ascii_case(r)
-        } else {
-            |l: &str, r: &str| l == r
-        };
-        while let Some(child) = children {
-            if let NodeRef::Element(elem) = &child {
-                if tag_name == "*" || eq(&elem.node_name(), tag_name) {
-                    res.push(elem.clone());
-                }
-            }
+    pub fn get_elements_by_tag_name(&self, tag_name: &str) -> FilteredSubtreeElementsList {
+        let root: NodeRef = self
+            .document_element()
+            .map(|elem| elem.into())
+            .unwrap_or_else(|| self.clone().into());
 
-            if let Some(first) = child.first_child() {
-                children = Some(first);
-            } else if let Some(next) = child.next_sibling() {
-                children = Some(next);
-            } else {
-                children = child.parent_node();
-                while let Some(par) = children {
-                    if let Some(next) = par.next_sibling() {
-                        children = Some(next);
-                        break;
-                    }
-                    children = par.parent_node();
-                }
-            }
+        // If this document is HTML document, the tagname is case-insensitive.
+        if self.is_html() {
+            FilteredSubtreeElementsList::new(root, None, tag_name.to_owned(), |elem, _, name| {
+                name == "*" || elem.node_name().eq_ignore_ascii_case(name)
+            })
+        } else {
+            FilteredSubtreeElementsList::new(root, None, tag_name.to_owned(), |elem, _, name| {
+                name == "*" || elem.node_name().as_ref() == name
+            })
         }
-        res
     }
 
     /// Implementation of [`importNode`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-Core-Document-importNode) method.
@@ -1013,48 +998,51 @@ impl DocumentRef {
         &self,
         ns_uri: Option<&str>,
         local_name: &str,
-    ) -> Vec<ElementRef> {
-        let mut res = vec![];
-        let mut children = self.first_child();
+    ) -> FilteredSubtreeElementsList {
         // If this document is HTML document, the tagname is case-insensitive.
-        let eq = if self.is_html() {
-            |l: &str, r: &str| l.eq_ignore_ascii_case(r)
+        let root = self
+            .document_element()
+            .map(|elem| elem.into())
+            .unwrap_or_else(|| self.clone().into());
+        if self.is_html() {
+            FilteredSubtreeElementsList::new(
+                root,
+                ns_uri.map(|uri| uri.to_owned()),
+                local_name.to_owned(),
+                |elem, uri, local_name| {
+                    (local_name == "*"
+                        || elem
+                            .local_name()
+                            .is_some_and(|ln| ln.eq_ignore_ascii_case(local_name)))
+                        && (uri == Some("*")
+                            || match (elem.namespace_uri(), uri) {
+                                (Some(elem_ns), Some(uri)) if elem_ns.eq_ignore_ascii_case(uri) => {
+                                    true
+                                }
+                                (None, None) => true,
+                                _ => false,
+                            })
+                },
+            )
         } else {
-            |l: &str, r: &str| l == r
-        };
-
-        while let Some(child) = children {
-            if let NodeRef::Element(elem) = &child {
-                if local_name == "*" || elem.local_name().is_some_and(|ln| eq(&ln, local_name)) {
-                    match (elem.namespace_uri(), ns_uri) {
-                        (Some(elem_ns), Some(ns_uri)) if eq(&elem_ns, ns_uri) => {
-                            res.push(elem.clone());
-                        }
-                        (None, None) => {
-                            res.push(elem.clone());
-                        }
-                        _ => {}
-                    }
-                }
-            }
-
-            if let Some(first) = child.first_child() {
-                children = Some(first);
-            } else if let Some(next) = child.next_sibling() {
-                children = Some(next);
-            } else {
-                children = child.parent_node();
-                while let Some(par) = children {
-                    if let Some(next) = par.next_sibling() {
-                        children = Some(next);
-                        break;
-                    }
-                    children = par.parent_node();
-                }
-            }
+            FilteredSubtreeElementsList::new(
+                root,
+                ns_uri.map(|uri| uri.to_owned()),
+                local_name.to_owned(),
+                |elem, uri, local_name| {
+                    (local_name == "*"
+                        || elem
+                            .local_name()
+                            .is_some_and(|ln| ln.as_ref() == local_name))
+                        && (uri == Some("*")
+                            || match (elem.namespace_uri(), uri) {
+                                (Some(elem_ns), Some(uri)) if elem_ns.as_ref() == uri => true,
+                                (None, None) => true,
+                                _ => false,
+                            })
+                },
+            )
         }
-
-        res
     }
 
     /// Implementation of [`getElementById`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-getElBId) method.

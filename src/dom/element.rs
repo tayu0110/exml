@@ -766,55 +766,29 @@ impl ElementRef {
     /// ```
     pub fn get_elements_by_tag_name_ns(
         &self,
-        ns_uri: Option<Rc<str>>,
-        local_name: Rc<str>,
-    ) -> Result<Vec<ElementRef>, DOMException> {
-        check_no_modification_allowed_err(self)?;
-
+        ns_uri: Option<&str>,
+        local_name: &str,
+    ) -> Result<FilteredSubtreeElementsList, DOMException> {
         if self.owner_document().is_some_and(|doc| doc.is_html()) {
             return Err(DOMException::NotSupportedErr);
         }
-        let eq = |elem: &ElementRef, ns_uri: Option<&str>, local_name: &str| -> bool {
-            match (elem.namespace_uri(), ns_uri) {
-                (Some(ns), Some(ns_uri)) if ns_uri == "*" || ns_uri == ns.as_ref() => {}
-                (None, None) => {}
-                _ => return false,
-            }
-            if local_name != "*"
-                && elem
-                    .local_name()
-                    .is_none_or(|local| local_name != local.as_ref())
-            {
-                return false;
-            }
-            true
-        };
-        let mut res = vec![];
-        let mut descendant = self.first_child();
-        while let Some(cur) = descendant.filter(|des| !self.is_same_node(des)) {
-            if let NodeRef::Element(elem) = &cur {
-                if eq(elem, ns_uri.as_deref(), &local_name) {
-                    res.push(elem.clone());
-                }
-            }
-
-            if let Some(first) = cur.first_child() {
-                descendant = Some(first);
-            } else if let Some(next) = cur.next_sibling() {
-                descendant = Some(next);
-            } else {
-                descendant = cur.parent_node();
-                while let Some(par) = descendant.as_ref().filter(|des| !self.is_same_node(des)) {
-                    if let Some(next) = par.next_sibling() {
-                        descendant = Some(next);
-                        break;
-                    }
-                    descendant = par.parent_node();
-                }
-            }
-        }
-
-        Ok(res)
+        Ok(FilteredSubtreeElementsList::new(
+            self.clone().into(),
+            ns_uri.map(|uri| uri.to_owned()),
+            local_name.to_owned(),
+            |elem, uri, local_name| {
+                (local_name == "*"
+                    || elem
+                        .local_name()
+                        .is_some_and(|ln| ln.as_ref() == local_name))
+                    && (uri == Some("*")
+                        || match (elem.namespace_uri(), uri) {
+                            (Some(elem_ns), Some(uri)) if elem_ns.as_ref() == uri => true,
+                            (None, None) => true,
+                            _ => false,
+                        })
+            },
+        ))
     }
 
     /// Implementation of [`hasAttribute`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-ElHasAttr) method.
