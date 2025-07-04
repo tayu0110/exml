@@ -576,8 +576,8 @@ impl ElementRef {
     /// ```
     pub fn set_attribute_ns(
         &mut self,
-        ns_uri: Option<Rc<str>>,
-        qname: Rc<str>,
+        ns_uri: Option<&str>,
+        qname: &str,
         value: impl Into<String>,
     ) -> Result<(), DOMException> {
         check_no_modification_allowed_err(self)?;
@@ -589,7 +589,7 @@ impl ElementRef {
 
         // `INVALID_CHARACTER_ERR` and `NAMESPACE_ERR` are checked
         // by `DocumentRef::create_attribute_ns`.
-        let mut attr = doc.create_attribute_ns(ns_uri.as_deref(), &qname)?;
+        let mut attr = doc.create_attribute_ns(ns_uri, qname)?;
         let mut attrs = self.attributes();
         attrs.set_named_item_ns(attr.clone())?;
         let text = doc.create_text_node(value);

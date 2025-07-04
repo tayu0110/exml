@@ -11460,7 +11460,7 @@ mod dom_test_suite {
                 doctype.add_entity::<false>(ent).unwrap();
                 let mut ent = doctype.create_entity("ent4", EntityType::InternalGeneralEntity).unwrap();
                 let mut ent_element = doc.create_element("entElement1").unwrap();
-                ent_element.set_attribute_ns(Some(XML_NS_NAMESPACE.into()), "xmlns:local1".into(), "www.xyz.com").unwrap();
+                ent_element.set_attribute_ns(Some(XML_NS_NAMESPACE), "xmlns:local1", "www.xyz.com").unwrap();
                 ent_element.append_child(doc.create_text_node("Element data").into()).unwrap();
                 ent.append_child(ent_element.into()).unwrap();
                 ent.append_child(doc.create_processing_instruction("PItarget", Some("PIdata")).unwrap().into()).unwrap();
@@ -11581,8 +11581,8 @@ mod dom_test_suite {
                 doc.insert_before(comment, Some(root.clone().into())).unwrap();
 
                 let mut employee = root.append_child(doc.create_element("employee").unwrap().into()).unwrap().as_element().unwrap();
-                employee.set_attribute_ns(Some(XML_NS_NAMESPACE.into()), "xmlns".into(), "http://www.nist.gov").unwrap();
-                employee.set_attribute_ns(Some(XML_NS_NAMESPACE.into()), "xmlns:dmstc".into(), "http://www.usa.com").unwrap();
+                employee.set_attribute_ns(Some(XML_NS_NAMESPACE), "xmlns", "http://www.nist.gov").unwrap();
+                employee.set_attribute_ns(Some(XML_NS_NAMESPACE), "xmlns:dmstc", "http://www.usa.com").unwrap();
                 let mut employee_id = employee.append_child(doc.create_element("employeeId").unwrap().into()).unwrap();
                 employee_id.append_child(doc.create_text_node("EMP0001").into()).unwrap();
                 let mut name = employee.append_child(doc.create_element("name").unwrap().into()).unwrap();
@@ -11595,10 +11595,10 @@ mod dom_test_suite {
                 gender.append_child(doc.create_text_node("Female").into()).unwrap();
                 let mut address = employee.append_child(doc.create_element("address").unwrap().into()).unwrap().as_element().unwrap();
                 address.append_child(doc.create_text_node("1230 North Ave. Dallas, Texas 98551").into())?;
-                address.set_attribute_ns(Some("http://www.usa.com".into()), "dmstc:domestic".into(), "Yes").unwrap();
+                address.set_attribute_ns(Some("http://www.usa.com"), "dmstc:domestic", "Yes").unwrap();
 
                 let mut employee = root.append_child(doc.create_element("employee").unwrap().into()).unwrap().as_element().unwrap();
-                employee.set_attribute_ns(Some(XML_NS_NAMESPACE.into()), "xmlns:dmstc".into(), "http://www.usa.com").unwrap();
+                employee.set_attribute_ns(Some(XML_NS_NAMESPACE), "xmlns:dmstc", "http://www.usa.com").unwrap();
                 let mut employee_id = employee.append_child(doc.create_element("employeeId").unwrap().into()).unwrap();
                 employee_id.append_child(doc.create_text_node("EMP0002").into()).unwrap();
                 let mut name = employee.append_child(doc.create_element("name").unwrap().into()).unwrap();
@@ -11617,11 +11617,11 @@ mod dom_test_suite {
                 address.append_child(doc.create_text_node(" Dallas, ").into()).unwrap();
                 address.append_child(doc.create_entity_reference("ent3").unwrap().into()).unwrap();
                 address.append_child(doc.create_text_node("\n 98554").into()).unwrap();
-                address.set_attribute_ns(Some("http://www.usa.com".into()), "dmstc:domestic".into(), "Yes").unwrap();
-                address.set_attribute_ns(None, "street".into(), "Yes").unwrap();
+                address.set_attribute_ns(Some("http://www.usa.com"), "dmstc:domestic", "Yes").unwrap();
+                address.set_attribute_ns(None, "street", "Yes").unwrap();
 
                 let mut employee = root.append_child(doc.create_element("employee").unwrap().into()).unwrap().as_element().unwrap();
-                employee.set_attribute_ns(Some(XML_NS_NAMESPACE.into()), "xmlns:dmstc".into(), "http://www.netzero.com");
+                employee.set_attribute_ns(Some(XML_NS_NAMESPACE), "xmlns:dmstc", "http://www.netzero.com");
                 let mut employee_id = employee.append_child(doc.create_element("employeeId").unwrap().into()).unwrap();
                 employee_id.append_child(doc.create_text_node("EMP0003").into()).unwrap();
                 let mut name = employee.append_child(doc.create_element("name").unwrap().into()).unwrap();
@@ -11634,12 +11634,12 @@ mod dom_test_suite {
                 gender.append_child(doc.create_entity_reference("ent4").unwrap().into()).unwrap();
                 let mut address = employee.append_child(doc.create_element("address").unwrap().into()).unwrap().as_element().unwrap();
                 address.append_child(doc.create_text_node("PO Box 27 Irving, texas 98553").into()).unwrap();
-                address.set_attribute_ns(Some("http://www.netzero.com".into()), "dmstc:domestic".into(), "Yes").unwrap();
+                address.set_attribute_ns(Some("http://www.netzero.com"), "dmstc:domestic", "Yes").unwrap();
                 address.set_attribute("street", "No").unwrap();
 
-                let mut employee = root.append_child(doc.create_element("employee").unwrap().into()).unwrap().as_element().unwrap();
-                employee.set_attribute_ns(Some(XML_NS_NAMESPACE.into()), "xmlns:emp".into(), "http://www.nist.gov").unwrap();
-                employee.set_attribute_ns(Some(XML_NS_NAMESPACE.into()), "xmlns:nm".into(), "http://www.altavista.com").unwrap();
+                let mut employee = root.append_child(doc.create_element_ns(Some("http://www.nist.gov"), "emp:employee").unwrap().into()).unwrap().as_element().unwrap();
+                employee.set_attribute_ns(Some(XML_NS_NAMESPACE), "xmlns:emp", "http://www.nist.gov").unwrap();
+                employee.set_attribute_ns(Some(XML_NS_NAMESPACE), "xmlns:nm", "http://www.altavista.com").unwrap();
                 let mut employee_id = employee.append_child(doc.create_element_ns(Some("http://www.nist.gov"), "emp:employeeId").unwrap().into()).unwrap();
                 employee_id.append_child(doc.create_text_node("EMP0004").into()).unwrap();
                 let mut name = employee.append_child(doc.create_element_ns(Some("http://www.altavista.com"), "nm:name").unwrap().into()).unwrap();
@@ -11652,15 +11652,15 @@ mod dom_test_suite {
                 gender.append_child(doc.create_text_node("Female").into()).unwrap();
                 let mut address = employee.append_child(doc.create_element_ns(Some("http://www.nist.gov"), "emp:address").unwrap().into()).unwrap().as_element().unwrap();
                 address.append_child(doc.create_text_node("PO Box 27 Irving, texas 98553").into()).unwrap();
-                address.set_attribute_ns(Some("http://www.nist.gov".into()), "emp:domestic".into(), "Yes").unwrap();
+                address.set_attribute_ns(Some("http://www.nist.gov"), "emp:domestic", "Yes").unwrap();
                 address.set_attribute("street", "Y").unwrap();
                 let mut street = address.get_attribute_node("street").unwrap();
                 street.append_child(doc.create_entity_reference("ent1").unwrap().into()).unwrap();
-                address.set_attribute_ns(Some("http://www.nist.gov".into()), "emp:zone".into(), "CANADA").unwrap();
-                address.set_attribute_ns(Some("http://www.nist.gov".into()), "emp:local1".into(), "TRUE").unwrap();
+                address.set_attribute_ns(Some("http://www.nist.gov"), "emp:zone", "CANADA").unwrap();
+                address.set_attribute_ns(Some("http://www.nist.gov"), "emp:local1", "TRUE").unwrap();
 
                 let mut employee = root.append_child(doc.create_element("employee").unwrap().into()).unwrap().as_element().unwrap();
-                employee.set_attribute_ns(Some(XML_NS_NAMESPACE.into()), "xmlns:emp2".into(), "http://www.nist.gov").unwrap();
+                employee.set_attribute_ns(Some(XML_NS_NAMESPACE), "xmlns:emp2", "http://www.nist.gov").unwrap();
                 let mut employee_id = employee.append_child(doc.create_element("employeeId").unwrap().into()).unwrap();
                 employee_id.append_child(doc.create_text_node("EMP0005").into()).unwrap();
                 let mut name = employee.append_child(doc.create_element("name").unwrap().into()).unwrap();
@@ -11674,7 +11674,7 @@ mod dom_test_suite {
                 let mut address = employee.append_child(doc.create_element("address").unwrap().into()).unwrap().as_element().unwrap();
                 address.append_child(doc.create_text_node("1821 Nordic. Road, Irving Texas 98558").into())?;
                 address.set_attribute("street", "Yes").unwrap();
-                address.set_attribute_ns(Some(XML_NS_NAMESPACE.into()), "xmlns".into(), "http://www.nist.gov").unwrap();
+                address.set_attribute_ns(Some(XML_NS_NAMESPACE), "xmlns", "http://www.nist.gov").unwrap();
 
                 doc.enable_read_only_check();
                 Ok(doc)
@@ -12543,11 +12543,7 @@ mod dom_test_suite {
                 r#test_addr = r#element_list.item(0).unwrap(); // <item interface="NodeList" obj="elementList" var="testAddr" index="0"/>
                 // unimplemented: // <assertNotNull actual="testAddr" id="empAddrNotNull"/>
                 r#test_addr
-                    .set_attribute_ns(
-                        Some("http://www.nist.gov".into()),
-                        "newprefix:zone".into(),
-                        "newValue",
-                    )
+                    .set_attribute_ns(Some("http://www.nist.gov"), "newprefix:zone", "newValue")
                     .unwrap(); // <setAttributeNS obj="testAddr" namespaceURI="&quot;http://www.nist.gov&quot;" qualifiedName="&quot;newprefix:zone&quot;" value="&quot;newValue&quot;"/>
                 r#addr_attr = r#test_addr
                     .get_attribute_node_ns(Some("http://www.nist.gov"), "zone")
@@ -12713,11 +12709,7 @@ mod dom_test_suite {
                 r#test_addr = r#element_list.item(0).unwrap(); // <item interface="NodeList" obj="elementList" var="testAddr" index="0"/>
                 // unimplemented: // <assertNotNull actual="testAddr" id="empAddrNotNull"/>
                 r#test_addr
-                    .set_attribute_ns(
-                        Some(r#namespace_uri.into()),
-                        r#qualified_name.into(),
-                        "newValue",
-                    )
+                    .set_attribute_ns(Some(r#namespace_uri), r#qualified_name, "newValue")
                     .unwrap(); // <setAttributeNS obj="testAddr" namespaceURI="namespaceURI" qualifiedName="qualifiedName" value="&quot;newValue&quot;"/>
                 r#addr_attr = r#test_addr
                     .get_attribute_node_ns(Some(r#namespace_uri), r#local_name)
@@ -14477,8 +14469,8 @@ mod dom_test_suite {
                 r#element = r#element_list.item(0).unwrap(); // <item var="element" obj="elementList" index="0" interface="NodeList"/>
                 r#element
                     .set_attribute_ns(
-                        Some("http://www.w3.org/DOM/Test/setAttributeNS".into()),
-                        "this:street".into(),
+                        Some("http://www.w3.org/DOM/Test/setAttributeNS"),
+                        "this:street",
                         "Silver Street",
                     )
                     .unwrap(); // <setAttributeNS obj="element" namespaceURI="&quot;http://www.w3.org/DOM/Test/setAttributeNS&quot;" qualifiedName="&quot;this:street&quot;" value="&quot;Silver Street&quot;"/>
@@ -16483,8 +16475,8 @@ mod dom_test_suite {
                     .unwrap(); // <createElementNS var="element" obj="doc" namespaceURI="&quot;http://www.w3.org/DOM&quot;" qualifiedName="&quot;dom:elem&quot;"/>
                 r#element
                     .set_attribute_ns(
-                        Some("http://www.w3.org/DOM/Test/setAttributeNS".into()),
-                        "attr".into(),
+                        Some("http://www.w3.org/DOM/Test/setAttributeNS"),
+                        "attr",
                         "value",
                     )
                     .unwrap(); // <setAttributeNS obj="element" namespaceURI="&quot;http://www.w3.org/DOM/Test/setAttributeNS&quot;" qualifiedName="&quot;attr&quot;" value="&quot;value&quot;"/>
@@ -17371,15 +17363,15 @@ mod dom_test_suite {
                 // unimplemented: // <assertNotNull actual="element" id="empEmployeeNotNull"/>
                 r#element
                     .set_attribute_ns(
-                        Some("http://www.w3.org/DOM/Test/1".into()),
-                        "defaultAttr".into(),
+                        Some("http://www.w3.org/DOM/Test/1"),
+                        "defaultAttr",
                         "default1",
                     )
                     .unwrap(); // <setAttributeNS obj="element" namespaceURI="&quot;http://www.w3.org/DOM/Test/1&quot;" qualifiedName="&quot;defaultAttr&quot;" value="&quot;default1&quot;"/>
                 r#element
                     .set_attribute_ns(
-                        Some("http://www.w3.org/DOM/Test/2".into()),
-                        "defaultAttr".into(),
+                        Some("http://www.w3.org/DOM/Test/2"),
+                        "defaultAttr",
                         "default2",
                     )
                     .unwrap(); // <setAttributeNS obj="element" namespaceURI="&quot;http://www.w3.org/DOM/Test/2&quot;" qualifiedName="&quot;defaultAttr&quot;" value="&quot;default2&quot;"/>
@@ -18327,8 +18319,8 @@ mod dom_test_suite {
                 r#name_elem = r#elem_list.item(1).unwrap(); // <item var="nameElem" obj="elemList" index="1" interface="NodeList"/>
                 r#name_elem
                     .set_attribute_ns(
-                        Some("http://www.w3.org/2000/xmlns/".into()),
-                        "xmlns:middle".into(),
+                        Some("http://www.w3.org/2000/xmlns/"),
+                        "xmlns:middle",
                         "http://www.example.com/middle",
                     )
                     .unwrap(); // <setAttributeNS obj="nameElem" namespaceURI="&quot;http://www.w3.org/2000/xmlns/&quot;" qualifiedName="&quot;xmlns:middle&quot;" value="&quot;http://www.example.com/middle&quot;"/>
@@ -18894,8 +18886,8 @@ mod dom_test_suite {
                 r#employee_id_elem = r#elem_list.item(0).unwrap(); // <item var="employeeIdElem" obj="elemList" index="0" interface="NodeList"/>
                 r#employee_id_elem
                     .set_attribute_ns(
-                        Some("http://www.w3.org/2000/xmlns/".into()),
-                        "xmlns:newAttr".into(),
+                        Some("http://www.w3.org/2000/xmlns/"),
+                        "xmlns:newAttr",
                         "newValue",
                     )
                     .unwrap(); // <setAttributeNS obj="employeeIdElem" qualifiedName="&quot;xmlns:newAttr&quot;" namespaceURI="&quot;http://www.w3.org/2000/xmlns/&quot;" value="&quot;newValue&quot;"/>
@@ -19994,8 +19986,8 @@ mod dom_test_suite {
                 r#acronym_elem3 = r#elem_list.item(2).unwrap(); // <item var="acronymElem3" obj="elemList" index="2" interface="NodeList"/>
                 r#acronym_elem1
                     .set_attribute_ns(
-                        Some("http://www.w3.org/2001/XMLSchema-instance".into()),
-                        "xsi:noNamespaceSchemaLocation".into(),
+                        Some("http://www.w3.org/2001/XMLSchema-instance"),
+                        "xsi:noNamespaceSchemaLocation",
                         "No",
                     )
                     .unwrap(); // <setAttributeNS obj="acronymElem1" qualifiedName="&quot;xsi:noNamespaceSchemaLocation&quot;" namespaceURI="&quot;http://www.w3.org/2001/XMLSchema-instance&quot;" value="&quot;No&quot;"/>
@@ -24147,11 +24139,7 @@ mod dom_test_suite {
                 r#elem_list = r#doc.get_elements_by_tag_name_ns(Some("*"), "acronym"); // <getElementsByTagNameNS var="elemList" obj="doc" localName="&quot;acronym&quot;" namespaceURI="&quot;*&quot;" interface="Document"/>
                 r#acronym_elem = r#elem_list.item(2).unwrap(); // <item var="acronymElem" obj="elemList" index="2" interface="NodeList"/>
                 r#acronym_elem
-                    .set_attribute_ns(
-                        Some("http://www.w3.org/DOM".into()),
-                        "dom3:newAttr".into(),
-                        "null",
-                    )
+                    .set_attribute_ns(Some("http://www.w3.org/DOM"), "dom3:newAttr", "null")
                     .unwrap(); // <setAttributeNS obj="acronymElem" namespaceURI="&quot;http://www.w3.org/DOM&quot;" qualifiedName="&quot;dom3:newAttr&quot;" value="&quot;null&quot;"/>
                 r#acronym_elem
                     .set_id_attribute_ns(Some("http://www.w3.org/DOM"), "newAttr", true)
@@ -26510,8 +26498,8 @@ mod dom_test_suite {
                 r#name_elem = r#elem_list.item(2).unwrap(); // <item var="nameElem" obj="elemList" index="2" interface="NodeList"/>
                 r#name_elem
                     .set_attribute_ns(
-                        Some("http://www.w3.org/2000/xmlns/".into()),
-                        "xmlns:newAttr".into(),
+                        Some("http://www.w3.org/2000/xmlns/"),
+                        "xmlns:newAttr",
                         "newValue",
                     )
                     .unwrap(); // <setAttributeNS obj="nameElem" qualifiedName="&quot;xmlns:newAttr&quot;" namespaceURI="&quot;http://www.w3.org/2000/xmlns/&quot;" value="&quot;newValue&quot;"/>
@@ -27100,8 +27088,8 @@ mod dom_test_suite {
                 r#elem = r#elem_list.item(3).unwrap(); // <item var="elem" obj="elemList" index="3" interface="NodeList"/>
                 r#elem
                     .set_attribute_ns(
-                        Some("http://www.w3.org/XML/1998/namespace".into()),
-                        "xml:lang".into(),
+                        Some("http://www.w3.org/XML/1998/namespace"),
+                        "xml:lang",
                         "en-US",
                     )
                     .unwrap(); // <setAttributeNS obj="elem" namespaceURI="&quot;http://www.w3.org/XML/1998/namespace&quot;" qualifiedName="&quot;xml:lang&quot;" value="&quot;en-US&quot;"/>
@@ -30985,8 +30973,8 @@ mod dom_test_suite {
                 r#attr1 = r#elem.get_attribute_node("class").unwrap(); // <getAttributeNode var="attr1" obj="elem" name="&quot;class&quot;"/>
                 r#elem
                     .set_attribute_ns(
-                        Some("http://www.w3.org/XML/1998/namespace".into()),
-                        "xml:lang".into(),
+                        Some("http://www.w3.org/XML/1998/namespace"),
+                        "xml:lang",
                         "FR-fr",
                     )
                     .unwrap(); // <setAttributeNS obj="elem" namespaceURI="&quot;http://www.w3.org/XML/1998/namespace&quot;" qualifiedName="&quot;xml:lang&quot;" value="&quot;FR-fr&quot;"/>
@@ -32673,11 +32661,7 @@ mod dom_test_suite {
                 r#elem_list = r#doc.get_elements_by_tag_name_ns(Some("*"), "strong"); // <getElementsByTagNameNS var="elemList" obj="doc" localName="&quot;strong&quot;" namespaceURI="&quot;*&quot;" interface="Document"/>
                 r#strong_elem = r#elem_list.item(2).unwrap(); // <item var="strongElem" obj="elemList" index="2" interface="NodeList"/>
                 r#strong_elem
-                    .set_attribute_ns(
-                        Some("http://www.netzero.com".into()),
-                        "dmstc:newAttr".into(),
-                        "newValue",
-                    )
+                    .set_attribute_ns(Some("http://www.netzero.com"), "dmstc:newAttr", "newValue")
                     .unwrap(); // <setAttributeNS obj="strongElem" qualifiedName="&quot;dmstc:newAttr&quot;" namespaceURI="&quot;http://www.netzero.com&quot;" value="&quot;newValue&quot;"/>
                 r#strong_elem
                     .set_id_attribute_ns(Some("http://www.netzero.com"), "newAttr", true)
@@ -35087,13 +35071,13 @@ mod dom_test_suite {
                 r#elem_list = r#doc.get_elements_by_tag_name("acronym"); // <getElementsByTagName var="elemList" obj="doc" tagname="&quot;acronym&quot;" interface="Document"/>
                 r#acronym_elem = r#elem_list.item(2).unwrap(); // <item var="acronymElem" obj="elemList" index="2" interface="NodeList"/>
                 r#acronym_elem
-                    .set_attribute_ns(Some(r#xml_ns), "xml:lang".into(), "FR-fr")
+                    .set_attribute_ns(Some(r#xml_ns), "xml:lang", "FR-fr")
                     .unwrap(); // <setAttributeNS obj="acronymElem" namespaceURI="xmlNS" qualifiedName="&quot;xml:lang&quot;" value="&quot;FR-fr&quot;"/>
                 r#acronym_elem
-                    .set_id_attribute_ns(Some(&r#xml_ns), "lang", false)
+                    .set_id_attribute_ns(Some(r#xml_ns), "lang", false)
                     .unwrap(); // <setIdAttributeNS obj="acronymElem" localName="&quot;lang&quot;" namespaceURI="xmlNS" isId="false"/>
                 r#attr = r#acronym_elem
-                    .get_attribute_node_ns(Some(&r#xml_ns), "lang")
+                    .get_attribute_node_ns(Some(r#xml_ns), "lang")
                     .unwrap()
                     .unwrap(); // <getAttributeNodeNS var="attr" obj="acronymElem" namespaceURI="xmlNS" localName="&quot;lang&quot;"/>
                 r#id = r#attr.is_id(); // <isId var="id" obj="attr"/>
@@ -35437,7 +35421,7 @@ mod dom_test_suite {
                 r#elem_list = r#doc.get_elements_by_tag_name_ns(Some("*"), "acronym"); // <getElementsByTagNameNS var="elemList" obj="doc" localName="&quot;acronym&quot;" namespaceURI="&quot;*&quot;" interface="Document"/>
                 r#acronym_elem = r#elem_list.item(2).unwrap(); // <item var="acronymElem" obj="elemList" index="2" interface="NodeList"/>
                 r#acronym_elem
-                    .set_attribute_ns(Some("*".into()), "title".into(), "newValue")
+                    .set_attribute_ns(Some("*"), "title", "newValue")
                     .unwrap(); // <setAttributeNS obj="acronymElem" qualifiedName="&quot;title&quot;" namespaceURI="&quot;*&quot;" value="&quot;newValue&quot;"/>
                 r#acronym_elem
                     .set_id_attribute_ns(Some("*"), "title", true)
