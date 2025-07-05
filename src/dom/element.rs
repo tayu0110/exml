@@ -158,7 +158,11 @@ impl ElementRef {
     }
 
     /// Create new [`ElementRef`] with namespace whose URI is `ns_uri`.
-    pub(super) fn with_namespace(doc: DocumentRef, tag_name: Rc<str>, ns_uri: Rc<str>) -> Self {
+    pub(super) fn with_namespace(
+        doc: DocumentRef,
+        tag_name: Rc<str>,
+        namespace_uri: Option<Rc<str>>,
+    ) -> Self {
         let ddoc = doc.downgrade();
         let mut new = if let Some((prefix, local_name)) = split_qname2(&tag_name) {
             Self(Rc::new(RefCell::new(Element {
@@ -170,7 +174,7 @@ impl ElementRef {
                 attributes: AttributeMap::new(ddoc.clone()),
                 owner_document: ddoc,
                 tag_name: tag_name.clone(),
-                namespace_uri: Some(ns_uri),
+                namespace_uri,
                 prefix: Some(prefix.into()),
                 local_name: Some(local_name.into()),
                 flag: 0,
@@ -185,7 +189,7 @@ impl ElementRef {
                 attributes: AttributeMap::new(ddoc.clone()),
                 owner_document: ddoc,
                 tag_name: tag_name.clone(),
-                namespace_uri: Some(ns_uri),
+                namespace_uri,
                 prefix: None,
                 local_name: Some(tag_name.clone()),
                 flag: 0,

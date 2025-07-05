@@ -11580,39 +11580,39 @@ mod dom_test_suite {
                 let comment = doc.create_comment(" This is comment number 1.").into();
                 doc.insert_before(comment, Some(root.clone().into())).unwrap();
 
-                let mut employee = root.append_child(doc.create_element("employee").unwrap().into()).unwrap().as_element().unwrap();
+                let mut employee = root.append_child(doc.create_element_ns(None, "employee").unwrap().into()).unwrap().as_element().unwrap();
                 employee.set_attribute_ns(Some(XML_NS_NAMESPACE), "xmlns", "http://www.nist.gov").unwrap();
                 employee.set_attribute_ns(Some(XML_NS_NAMESPACE), "xmlns:dmstc", "http://www.usa.com").unwrap();
-                let mut employee_id = employee.append_child(doc.create_element("employeeId").unwrap().into()).unwrap();
+                let mut employee_id = employee.append_child(doc.create_element_ns(None, "employeeId").unwrap().into()).unwrap();
                 employee_id.append_child(doc.create_text_node("EMP0001").into()).unwrap();
-                let mut name = employee.append_child(doc.create_element("name").unwrap().into()).unwrap();
+                let mut name = employee.append_child(doc.create_element_ns(None, "name").unwrap().into()).unwrap();
                 name.append_child(doc.create_text_node("Margaret Martin").into()).unwrap();
-                let mut position = employee.append_child(doc.create_element("position").unwrap().into()).unwrap();
+                let mut position = employee.append_child(doc.create_element_ns(None, "position").unwrap().into()).unwrap();
                 position.append_child(doc.create_text_node("Accountant").into()).unwrap();
-                let mut salary = employee.append_child(doc.create_element("salary").unwrap().into()).unwrap();
+                let mut salary = employee.append_child(doc.create_element_ns(None, "salary").unwrap().into()).unwrap();
                 salary.append_child(doc.create_text_node("56,000").into()).unwrap();
-                let mut gender = employee.append_child(doc.create_element("gender").unwrap().into()).unwrap();
+                let mut gender = employee.append_child(doc.create_element_ns(None, "gender").unwrap().into()).unwrap();
                 gender.append_child(doc.create_text_node("Female").into()).unwrap();
-                let mut address = employee.append_child(doc.create_element("address").unwrap().into()).unwrap().as_element().unwrap();
+                let mut address = employee.append_child(doc.create_element_ns(None, "address").unwrap().into()).unwrap().as_element().unwrap();
                 address.append_child(doc.create_text_node("1230 North Ave. Dallas, Texas 98551").into())?;
                 address.set_attribute_ns(Some("http://www.usa.com"), "dmstc:domestic", "Yes").unwrap();
 
-                let mut employee = root.append_child(doc.create_element("employee").unwrap().into()).unwrap().as_element().unwrap();
+                let mut employee = root.append_child(doc.create_element_ns(None, "employee").unwrap().into()).unwrap().as_element().unwrap();
                 employee.set_attribute_ns(Some(XML_NS_NAMESPACE), "xmlns:dmstc", "http://www.usa.com").unwrap();
-                let mut employee_id = employee.append_child(doc.create_element("employeeId").unwrap().into()).unwrap();
+                let mut employee_id = employee.append_child(doc.create_element_ns(None, "employeeId").unwrap().into()).unwrap();
                 employee_id.append_child(doc.create_text_node("EMP0002").into()).unwrap();
-                let mut name = employee.append_child(doc.create_element("name").unwrap().into()).unwrap();
+                let mut name = employee.append_child(doc.create_element_ns(None, "name").unwrap().into()).unwrap();
                 name.append_child(doc.create_text_node("Martha Raynolds").into()).unwrap();
                 name.append_child(doc.create_cdata_section("This is a CDATASection with EntityReference number 2 &ent2;").unwrap().into())?;
                 name.append_child(doc.create_text_node("\n").into()).unwrap();
                 name.append_child(doc.create_cdata_section("This is an adjacent CDATASection with a reference to a tab &tab;").unwrap().into())?;
-                let mut position = employee.append_child(doc.create_element("position").unwrap().into()).unwrap();
+                let mut position = employee.append_child(doc.create_element_ns(None, "position").unwrap().into()).unwrap();
                 position.append_child(doc.create_text_node("Secretary").into()).unwrap();
-                let mut salary = employee.append_child(doc.create_element("salary").unwrap().into()).unwrap();
+                let mut salary = employee.append_child(doc.create_element_ns(None, "salary").unwrap().into()).unwrap();
                 salary.append_child(doc.create_text_node("35,000").into()).unwrap();
-                let mut gender = employee.append_child(doc.create_element("gender").unwrap().into()).unwrap();
+                let mut gender = employee.append_child(doc.create_element_ns(None, "gender").unwrap().into()).unwrap();
                 gender.append_child(doc.create_text_node("Female").into()).unwrap();
-                let mut address = employee.append_child(doc.create_element("address").unwrap().into()).unwrap().as_element().unwrap();
+                let mut address = employee.append_child(doc.create_element_ns(None, "address").unwrap().into()).unwrap().as_element().unwrap();
                 address.append_child(doc.create_entity_reference("ent2").unwrap().into()).unwrap();
                 address.append_child(doc.create_text_node(" Dallas, ").into()).unwrap();
                 address.append_child(doc.create_entity_reference("ent3").unwrap().into()).unwrap();
@@ -11620,19 +11620,19 @@ mod dom_test_suite {
                 address.set_attribute_ns(Some("http://www.usa.com"), "dmstc:domestic", "Yes").unwrap();
                 address.set_attribute_ns(None, "street", "Yes").unwrap();
 
-                let mut employee = root.append_child(doc.create_element("employee").unwrap().into()).unwrap().as_element().unwrap();
+                let mut employee = root.append_child(doc.create_element_ns(None, "employee").unwrap().into()).unwrap().as_element().unwrap();
                 employee.set_attribute_ns(Some(XML_NS_NAMESPACE), "xmlns:dmstc", "http://www.netzero.com");
-                let mut employee_id = employee.append_child(doc.create_element("employeeId").unwrap().into()).unwrap();
+                let mut employee_id = employee.append_child(doc.create_element_ns(None, "employeeId").unwrap().into()).unwrap();
                 employee_id.append_child(doc.create_text_node("EMP0003").into()).unwrap();
-                let mut name = employee.append_child(doc.create_element("name").unwrap().into()).unwrap();
+                let mut name = employee.append_child(doc.create_element_ns(None, "name").unwrap().into()).unwrap();
                 name.append_child(doc.create_text_node("Roger\n Jones").into()).unwrap();
-                let mut position = employee.append_child(doc.create_element("position").unwrap().into()).unwrap();
+                let mut position = employee.append_child(doc.create_element_ns(None, "position").unwrap().into()).unwrap();
                 position.append_child(doc.create_text_node("Department Manager").into()).unwrap();
-                let mut salary = employee.append_child(doc.create_element("salary").unwrap().into()).unwrap();
+                let mut salary = employee.append_child(doc.create_element_ns(None, "salary").unwrap().into()).unwrap();
                 salary.append_child(doc.create_text_node("100,000").into()).unwrap();
-                let mut gender = employee.append_child(doc.create_element("gender").unwrap().into()).unwrap();
+                let mut gender = employee.append_child(doc.create_element_ns(None, "gender").unwrap().into()).unwrap();
                 gender.append_child(doc.create_entity_reference("ent4").unwrap().into()).unwrap();
-                let mut address = employee.append_child(doc.create_element("address").unwrap().into()).unwrap().as_element().unwrap();
+                let mut address = employee.append_child(doc.create_element_ns(None, "address").unwrap().into()).unwrap().as_element().unwrap();
                 address.append_child(doc.create_text_node("PO Box 27 Irving, texas 98553").into()).unwrap();
                 address.set_attribute_ns(Some("http://www.netzero.com"), "dmstc:domestic", "Yes").unwrap();
                 address.set_attribute("street", "No").unwrap();
@@ -11659,19 +11659,19 @@ mod dom_test_suite {
                 address.set_attribute_ns(Some("http://www.nist.gov"), "emp:zone", "CANADA").unwrap();
                 address.set_attribute_ns(Some("http://www.nist.gov"), "emp:local1", "TRUE").unwrap();
 
-                let mut employee = root.append_child(doc.create_element("employee").unwrap().into()).unwrap().as_element().unwrap();
+                let mut employee = root.append_child(doc.create_element_ns(None, "employee").unwrap().into()).unwrap().as_element().unwrap();
                 employee.set_attribute_ns(Some(XML_NS_NAMESPACE), "xmlns:emp2", "http://www.nist.gov").unwrap();
-                let mut employee_id = employee.append_child(doc.create_element("employeeId").unwrap().into()).unwrap();
+                let mut employee_id = employee.append_child(doc.create_element_ns(None, "employeeId").unwrap().into()).unwrap();
                 employee_id.append_child(doc.create_text_node("EMP0005").into()).unwrap();
-                let mut name = employee.append_child(doc.create_element("name").unwrap().into()).unwrap();
+                let mut name = employee.append_child(doc.create_element_ns(None, "name").unwrap().into()).unwrap();
                 name.append_child(doc.create_text_node("Robert Myers").into()).unwrap();
-                let mut position = employee.append_child(doc.create_element("position").unwrap().into()).unwrap();
+                let mut position = employee.append_child(doc.create_element_ns(None, "position").unwrap().into()).unwrap();
                 position.append_child(doc.create_text_node("Computer Specialist").into()).unwrap();
-                let mut salary = employee.append_child(doc.create_element("salary").unwrap().into()).unwrap();
+                let mut salary = employee.append_child(doc.create_element_ns(None, "salary").unwrap().into()).unwrap();
                 salary.append_child(doc.create_text_node("90,000").into()).unwrap();
-                let mut gender = employee.append_child(doc.create_element("gender").unwrap().into()).unwrap();
+                let mut gender = employee.append_child(doc.create_element_ns(None, "gender").unwrap().into()).unwrap();
                 gender.append_child(doc.create_text_node("male").into()).unwrap();
-                let mut address = employee.append_child(doc.create_element("address").unwrap().into()).unwrap().as_element().unwrap();
+                let mut address = employee.append_child(doc.create_element_ns(None, "address").unwrap().into()).unwrap().as_element().unwrap();
                 address.append_child(doc.create_text_node("1821 Nordic. Road, Irving Texas 98558").into())?;
                 address.set_attribute("street", "Yes").unwrap();
                 address.set_attribute_ns(Some(XML_NS_NAMESPACE), "xmlns", "http://www.nist.gov").unwrap();
@@ -12237,10 +12237,7 @@ mod dom_test_suite {
                 r#attribute = r#doc
                     .create_attribute_ns(Some("http://www.w3.org/DOM/Test"), "attr".as_ref())
                     .unwrap(); // <createAttributeNS var="attribute" obj="doc" namespaceURI="&quot;http://www.w3.org/DOM/Test&quot;" qualifiedName="&quot;attr&quot;"/>
-                r#new_attribute = r#element1
-                    .set_attribute_node_ns(r#attribute)
-                    .unwrap()
-                    .unwrap(); // <setAttributeNodeNS var="newAttribute" obj="element1" newAttr="attribute"/>
+                r#new_attribute = r#element1.set_attribute_node_ns(r#attribute).unwrap(); // <setAttributeNodeNS var="newAttribute" obj="element1" newAttr="attribute"/>
 
                 // unimplemented: // <assertDOMException id="elementsetattributenodens04">    <INUSE_ATTRIBUTE_ERR>      <setAttributeNodeNS var="newAttribute" obj="element2" newAttr="attribute"/>    </INUSE_ATTRIBUTE_ERR>  </assertDOMException>
             }
@@ -17726,7 +17723,7 @@ mod dom_test_suite {
                 r#name = r#attribute2.name().to_string(); // <name var="name" obj="attribute2" interface="Attr"/>
                 r#node_name = r#attribute2.node_name().to_string(); // <nodeName var="nodeName" obj="attribute2"/>
                 r#node_value = r#attribute2.node_value().unwrap().to_string(); // <nodeValue var="nodeValue" obj="attribute2"/>
-                r#prefix = r#attribute2.prefix().unwrap().to_string(); // <prefix var="prefix" obj="attribute2"/>
+                // r#prefix = r#attribute2.prefix(); // <prefix var="prefix" obj="attribute2"/>
                 r#namespace_uri = r#attribute2.namespace_uri().unwrap().to_string(); // <namespaceURI var="namespaceURI" obj="attribute2"/>
                 assert_eq!(r#name, "xmlns"); // <assertEquals actual="name" expected="&quot;xmlns&quot;" id="documentcreateattributeNS02_att2_name" ignoreCase="false"/>
                 assert_eq!(r#node_name, "xmlns"); // <assertEquals actual="nodeName" expected="&quot;xmlns&quot;" id="documentcreateattributeNS02_att2_nodeName" ignoreCase="false"/>

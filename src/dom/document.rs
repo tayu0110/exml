@@ -319,7 +319,7 @@ impl DocumentRef {
                 if prefix == "xml" && ns_uri != "http://www.w3.org/XML/1998/namespace" {
                     return Err(DOMException::NamespaceErr);
                 }
-                ElementRef::with_namespace(new.clone(), qname.into(), ns_uri.into())
+                ElementRef::with_namespace(new.clone(), qname.into(), Some(ns_uri.into()))
             } else {
                 ElementRef::new(new.clone(), qname.into())
             };
@@ -629,20 +629,21 @@ impl DocumentRef {
     /// No Exceptions
     /// ```
     pub fn get_elements_by_tag_name(&self, tag_name: &str) -> FilteredSubtreeElementsList {
-        let root: NodeRef = self
-            .document_element()
-            .map(|elem| elem.into())
-            .unwrap_or_else(|| self.clone().into());
-
         // If this document is HTML document, the tagname is case-insensitive.
         if self.is_html() {
-            FilteredSubtreeElementsList::new(root, None, tag_name.to_owned(), |elem, _, name| {
-                name == "*" || elem.node_name().eq_ignore_ascii_case(name)
-            })
+            FilteredSubtreeElementsList::new(
+                self.clone().into(),
+                None,
+                tag_name.to_owned(),
+                |elem, _, name| name == "*" || elem.node_name().eq_ignore_ascii_case(name),
+            )
         } else {
-            FilteredSubtreeElementsList::new(root, None, tag_name.to_owned(), |elem, _, name| {
-                name == "*" || elem.node_name().as_ref() == name
-            })
+            FilteredSubtreeElementsList::new(
+                self.clone().into(),
+                None,
+                tag_name.to_owned(),
+                |elem, _, name| name == "*" || elem.node_name().as_ref() == name,
+            )
         }
     }
 
@@ -868,20 +869,14 @@ impl DocumentRef {
                 Ok(ElementRef::with_namespace(
                     self.clone(),
                     qname.into(),
-                    ns_uri.into(),
+                    Some(ns_uri.into()),
                 ))
             }
-            None => {
-                if let Some(ns_uri) = ns_uri {
-                    Ok(ElementRef::with_namespace(
-                        self.clone(),
-                        qname.into(),
-                        ns_uri.into(),
-                    ))
-                } else {
-                    Ok(ElementRef::new(self.clone(), qname.into()))
-                }
-            }
+            None => Ok(ElementRef::with_namespace(
+                self.clone(),
+                qname.into(),
+                ns_uri.map(|uri| uri.into()),
+            )),
         }
     }
 
@@ -1000,13 +995,9 @@ impl DocumentRef {
         local_name: &str,
     ) -> FilteredSubtreeElementsList {
         // If this document is HTML document, the tagname is case-insensitive.
-        let root = self
-            .document_element()
-            .map(|elem| elem.into())
-            .unwrap_or_else(|| self.clone().into());
         if self.is_html() {
             FilteredSubtreeElementsList::new(
-                root,
+                self.clone().into(),
                 ns_uri.map(|uri| uri.to_owned()),
                 local_name.to_owned(),
                 |elem, uri, local_name| {
@@ -1026,7 +1017,7 @@ impl DocumentRef {
             )
         } else {
             FilteredSubtreeElementsList::new(
-                root,
+                self.clone().into(),
                 ns_uri.map(|uri| uri.to_owned()),
                 local_name.to_owned(),
                 |elem, uri, local_name| {
