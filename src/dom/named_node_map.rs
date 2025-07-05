@@ -497,10 +497,12 @@ impl NamedNodeMap for AttributeMap {
             .borrow()
             .get(&(Cow::Borrowed(local_name), ns_uri.map(Cow::Borrowed)))
             .ok_or(DOMException::NotFoundErr)?;
-        let attr_name = self.data.borrow()[index].node_name();
+        let attr = self.data.borrow()[index].clone();
+        let attr_name = attr.node_name();
+        let context_node = attr.owner_element().unwrap();
         let res = if let Some(def) = self
             .owner_document()
-            .and_then(|doc| doc.get_default_attribute(&self.owner_tagname, &attr_name))
+            .and_then(|doc| doc.get_default_attribute_ns(context_node, &attr_name))
         {
             replace(&mut self.data.borrow_mut()[index], def)
         } else {

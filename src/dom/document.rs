@@ -1555,6 +1555,33 @@ impl DocumentRef {
         }
     }
 
+    pub(super) fn get_default_attribute_ns(
+        &self,
+        context_node: ElementRef,
+        attr_name: &str,
+    ) -> Option<AttrRef> {
+        let elemdecl = self
+            .doctype()?
+            .get_element_decl(&context_node.node_name())?;
+        let attlistdecl = elemdecl.get_attribute_decl(attr_name)?;
+        match attlistdecl.default_decl() {
+            DefaultDecl::None(def) | DefaultDecl::Fixed(def) => {
+                let mut attr = if let Some(namespace_uri) = split_qname2(attr_name)
+                    .and_then(|(pre, _)| context_node.lookup_namespace_uri(pre))
+                {
+                    self.create_attribute_ns(Some(&namespace_uri), attr_name)
+                        .ok()?
+                } else {
+                    self.create_attribute_ns(None, attr_name).ok()?
+                };
+                attr.set_value(def.as_ref()).ok()?;
+                attr.set_specified(false);
+                Some(attr)
+            }
+            _ => None,
+        }
+    }
+
     pub(super) fn get_default_attributes(&self, elem_name: &str) -> Option<Vec<AttrRef>> {
         let elemdecl = self.doctype()?.get_element_decl(elem_name)?;
         let mut res = vec![];
