@@ -3,10 +3,14 @@ use std::{
     cell::RefCell,
     collections::{HashMap, hash_map::Entry},
     mem::replace,
-    rc::Rc,
+    rc::{Rc, Weak},
 };
 
-use crate::dom::{entity::EntityRef, notation::NotationRef};
+use crate::dom::{
+    element::{Element, ElementRef},
+    entity::EntityRef,
+    notation::NotationRef,
+};
 
 use super::{
     DOMException,
@@ -235,7 +239,7 @@ pub trait NamedNodeMap {
 #[derive(Clone)]
 pub struct AttributeMap {
     owner_document: DocumentWeakRef,
-    owner_tagname: Rc<str>,
+    owner_element: Weak<RefCell<Element>>,
     // (LocalPart, namespaceURI) : if inserted by Level 2 method
     // (Name, None)              : if inserted by Level 1 method
     index: Rc<RefCell<HashMap<(Cow<'static, str>, Option<Cow<'static, str>>), usize>>>,
@@ -244,10 +248,10 @@ pub struct AttributeMap {
 
 impl AttributeMap {
     /// Create new empty [`AttributeMap`]
-    pub(super) fn new(doc: DocumentWeakRef, tagname: Rc<str>) -> Self {
+    pub(super) fn new(doc: DocumentWeakRef) -> Self {
         Self {
             owner_document: doc,
-            owner_tagname: tagname,
+            owner_element: Weak::new(),
             index: Rc::new(RefCell::new(HashMap::new())),
             data: Rc::new(RefCell::new(vec![])),
         }
@@ -359,6 +363,10 @@ impl AttributeMap {
     pub(super) fn set_owner_document(&mut self, new_doc: DocumentRef) {
         self.owner_document = new_doc.downgrade();
     }
+
+    pub(super) fn set_owner_element(&mut self, owner_element: ElementRef) {
+        self.owner_element = Rc::downgrade(&owner_element.0);
+    }
 }
 
 impl NamedNodeMap for AttributeMap {
@@ -407,10 +415,12 @@ impl NamedNodeMap for AttributeMap {
             .borrow()
             .get(&(Cow::Borrowed(name), None))
             .ok_or(DOMException::NotFoundErr)?;
-        let res = if let Some(def) = self
-            .owner_document()
-            .and_then(|doc| doc.get_default_attribute(&self.owner_tagname, name))
-        {
+        let res = if let Some(def) = self.owner_document().and_then(|doc| {
+            doc.get_default_attribute(
+                &ElementRef::from(self.owner_element.upgrade().unwrap()).node_name(),
+                name,
+            )
+        }) {
             replace(&mut self.data.borrow_mut()[index], def)
         } else {
             self.index

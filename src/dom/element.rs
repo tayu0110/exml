@@ -127,7 +127,7 @@ impl Element {
 
 /// Wrapper of `Rc<RefCell<Element>>`.
 #[derive(Clone)]
-pub struct ElementRef(Rc<RefCell<Element>>);
+pub struct ElementRef(pub(super) Rc<RefCell<Element>>);
 
 impl ElementRef {
     /// Create new [`ElementRef`].
@@ -139,7 +139,7 @@ impl ElementRef {
             last_child: None,
             previous_sibling: None,
             next_sibling: None,
-            attributes: AttributeMap::new(ddoc.clone(), tag_name.clone()),
+            attributes: AttributeMap::new(ddoc.clone()),
             owner_document: ddoc,
             tag_name: tag_name.clone(),
             namespace_uri: None,
@@ -147,6 +147,7 @@ impl ElementRef {
             local_name: None,
             flag: 0,
         })));
+        new.0.borrow_mut().attributes.set_owner_element(new.clone());
 
         if let Some(def) = doc.get_default_attributes(&tag_name) {
             for attr in def {
@@ -166,7 +167,7 @@ impl ElementRef {
                 last_child: None,
                 previous_sibling: None,
                 next_sibling: None,
-                attributes: AttributeMap::new(ddoc.clone(), tag_name.clone()),
+                attributes: AttributeMap::new(ddoc.clone()),
                 owner_document: ddoc,
                 tag_name: tag_name.clone(),
                 namespace_uri: Some(ns_uri),
@@ -181,7 +182,7 @@ impl ElementRef {
                 last_child: None,
                 previous_sibling: None,
                 next_sibling: None,
-                attributes: AttributeMap::new(ddoc.clone(), tag_name.clone()),
+                attributes: AttributeMap::new(ddoc.clone()),
                 owner_document: ddoc,
                 tag_name: tag_name.clone(),
                 namespace_uri: Some(ns_uri),
@@ -190,6 +191,7 @@ impl ElementRef {
                 flag: 0,
             })))
         };
+        new.0.borrow_mut().attributes.set_owner_element(new.clone());
 
         if let Some(def) = doc.get_default_attributes_ns(&tag_name) {
             for attr in def {
@@ -1072,10 +1074,7 @@ impl Node for ElementRef {
             last_child: None,
             previous_sibling: None,
             next_sibling: None,
-            attributes: AttributeMap::new(
-                self.0.borrow().owner_document.clone(),
-                self.0.borrow().tag_name.clone(),
-            ),
+            attributes: AttributeMap::new(self.0.borrow().owner_document.clone()),
             owner_document: self.0.borrow().owner_document.clone(),
             tag_name: self.0.borrow().tag_name.clone(),
             namespace_uri: self.0.borrow().namespace_uri.clone(),
@@ -1083,12 +1082,19 @@ impl Node for ElementRef {
             local_name: self.0.borrow().local_name.clone(),
             flag: 0,
         })));
+        elem.0
+            .borrow_mut()
+            .attributes
+            .set_owner_element(elem.clone());
 
         let attrs = self.attributes();
         for i in 0..attrs.length() {
-            let NodeRef::Attribute(attr) = attrs.item(i).unwrap().clone_node(true) else {
-                unreachable!()
-            };
+            let attr = attrs
+                .item(i)
+                .unwrap()
+                .clone_node(true)
+                .as_attribute()
+                .unwrap();
             if elem.set_attribute_node_ns(attr.clone()).is_err() {
                 elem.set_attribute_node(attr).expect("Internal Error");
             }
@@ -1291,6 +1297,12 @@ impl NodeConnection for ElementRef {
 impl From<ElementRef> for NodeRef {
     fn from(value: ElementRef) -> Self {
         NodeRef::Element(value)
+    }
+}
+
+impl From<Rc<RefCell<Element>>> for ElementRef {
+    fn from(value: Rc<RefCell<Element>>) -> Self {
+        Self(value)
     }
 }
 
