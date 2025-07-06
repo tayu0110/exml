@@ -726,7 +726,7 @@ impl DocumentRef {
                         elem.node_name().as_ref(),
                     )
                 } else {
-                    self.create_element(self.node_name())
+                    self.create_element(elem.node_name())
                 }?;
 
                 let attrs = elem.attributes();
