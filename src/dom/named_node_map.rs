@@ -152,7 +152,7 @@ pub trait NamedNodeMap {
     /// ```
     fn get_named_item_ns(
         &self,
-        ns_uri: Option<&str>,
+        namespace_uri: Option<&str>,
         local_name: &str,
     ) -> Result<Option<Self::Item>, DOMException>;
     /// Implementation of [`setNamedItemNS`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-setNamedItemNS) method.
@@ -228,7 +228,7 @@ pub trait NamedNodeMap {
     /// ```
     fn remove_named_item_ns(
         &mut self,
-        ns_uri: Option<&str>,
+        namespace_uri: Option<&str>,
         local_name: &str,
     ) -> Result<Self::Item, DOMException>;
 }

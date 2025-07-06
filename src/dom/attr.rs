@@ -393,13 +393,13 @@ impl Node for AttrRef {
         Rc::ptr_eq(&self.0, &other.0)
     }
 
-    fn lookup_prefix(&self, ns_uri: &str) -> Option<Rc<str>> {
-        self.owner_element()?.lookup_prefix(ns_uri)
+    fn lookup_prefix(&self, namespace_uri: &str) -> Option<Rc<str>> {
+        self.owner_element()?.lookup_prefix(namespace_uri)
     }
 
-    fn is_default_namespace(&self, ns_uri: &str) -> bool {
+    fn is_default_namespace(&self, namespace_uri: &str) -> bool {
         self.owner_element()
-            .is_some_and(|elem| elem.is_default_namespace(ns_uri))
+            .is_some_and(|elem| elem.is_default_namespace(namespace_uri))
     }
 
     fn lookup_namespace_uri(&self, prefix: &str) -> Option<Rc<str>> {

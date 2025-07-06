@@ -518,7 +518,7 @@ impl ElementRef {
     /// ```
     pub fn get_attribute_ns(
         &self,
-        ns_uri: Option<&str>,
+        namespace_uri: Option<&str>,
         local_name: &str,
     ) -> Result<Option<String>, DOMException> {
         if self.owner_document().is_some_and(|doc| doc.is_html()) {
@@ -527,7 +527,7 @@ impl ElementRef {
 
         Ok(self
             .attributes()
-            .get_named_item_ns(ns_uri, local_name)?
+            .get_named_item_ns(namespace_uri, local_name)?
             .and_then(|attr| attr.text_content()))
     }
     /// Implementation of [`setAttributeNS`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-ElSetAttrNS) method.
@@ -582,8 +582,8 @@ impl ElementRef {
     /// ```
     pub fn set_attribute_ns(
         &mut self,
-        ns_uri: Option<&str>,
-        qname: &str,
+        namespace_uri: Option<&str>,
+        qualified_name: &str,
         value: impl Into<String>,
     ) -> Result<(), DOMException> {
         check_no_modification_allowed_err(self)?;
@@ -595,7 +595,7 @@ impl ElementRef {
 
         // `INVALID_CHARACTER_ERR` and `NAMESPACE_ERR` are checked
         // by `DocumentRef::create_attribute_ns`.
-        let mut attr = doc.create_attribute_ns(ns_uri, qname)?;
+        let mut attr = doc.create_attribute_ns(namespace_uri, qualified_name)?;
         let mut attrs = self.attributes();
         attrs.set_named_item_ns(attr.clone())?;
         let text = doc.create_text_node(value);
@@ -639,7 +639,7 @@ impl ElementRef {
     /// ```
     pub fn remove_attribute_ns(
         &mut self,
-        ns_uri: Option<&str>,
+        namespace_uri: Option<&str>,
         local_name: &str,
     ) -> Result<(), DOMException> {
         check_no_modification_allowed_err(self)?;
@@ -648,7 +648,7 @@ impl ElementRef {
             return Err(DOMException::NotSupportedErr);
         }
         let mut attrs = self.attributes();
-        let mut attr = attrs.remove_named_item_ns(ns_uri, local_name)?;
+        let mut attr = attrs.remove_named_item_ns(namespace_uri, local_name)?;
         attr.set_owner_element(None);
         // TODO: restore the default attribute if exists in DTD.
         Ok(())
@@ -680,13 +680,14 @@ impl ElementRef {
     /// ```
     pub fn get_attribute_node_ns(
         &self,
-        ns_uri: Option<&str>,
+        namespace_uri: Option<&str>,
         local_name: &str,
     ) -> Result<Option<AttrRef>, DOMException> {
         if self.owner_document().is_some_and(|doc| doc.is_html()) {
             return Err(DOMException::NotSupportedErr);
         }
-        self.attributes().get_named_item_ns(ns_uri, local_name)
+        self.attributes()
+            .get_named_item_ns(namespace_uri, local_name)
     }
     /// Implementation of [`setAttributeNodeNS`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-ElSetAtNodeNS) method.
     ///
@@ -772,7 +773,7 @@ impl ElementRef {
     /// ```
     pub fn get_elements_by_tag_name_ns(
         &self,
-        ns_uri: Option<&str>,
+        namespace_uri: Option<&str>,
         local_name: &str,
     ) -> Result<FilteredSubtreeElementsList, DOMException> {
         if self.owner_document().is_some_and(|doc| doc.is_html()) {
@@ -780,7 +781,7 @@ impl ElementRef {
         }
         Ok(FilteredSubtreeElementsList::new(
             self.clone().into(),
-            ns_uri.map(|uri| uri.to_owned()),
+            namespace_uri.map(|uri| uri.to_owned()),
             local_name.to_owned(),
             |elem, uri, local_name| {
                 (local_name == "*"
@@ -844,11 +845,11 @@ impl ElementRef {
     /// ```
     pub fn has_attribute_ns(
         &self,
-        ns_uri: Option<&str>,
+        namespace_uri: Option<&str>,
         local_name: &str,
     ) -> Result<bool, DOMException> {
         self.attributes()
-            .get_named_item_ns(ns_uri, local_name)
+            .get_named_item_ns(namespace_uri, local_name)
             .map(|attr| attr.is_some())
     }
 
@@ -916,14 +917,14 @@ impl ElementRef {
     /// ```
     pub fn set_id_attribute_ns(
         &mut self,
-        ns_uri: Option<&str>,
+        namespace_uri: Option<&str>,
         local_name: &str,
         is_id: bool,
     ) -> Result<(), DOMException> {
         check_no_modification_allowed_err(self)?;
 
         let mut attr = self
-            .get_attribute_node_ns(ns_uri, local_name)?
+            .get_attribute_node_ns(namespace_uri, local_name)?
             .ok_or(DOMException::NotFoundErr)?;
         attr.set_is_id(is_id);
         Ok(())
@@ -981,14 +982,14 @@ impl ElementRef {
     /// Implementation of [`lookupNamespacePrefix`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#namespaces-algorithms-lookupNamespacePrefixAlgo)
     pub(super) fn lookup_namespace_prefix(
         &self,
-        ns_uri: &str,
+        namespace_uri: &str,
         orig: ElementRef,
     ) -> Option<Rc<str>> {
-        if self.namespace_uri().as_deref() == Some(ns_uri)
+        if self.namespace_uri().as_deref() == Some(namespace_uri)
             && self
                 .prefix()
                 .and_then(|pre| orig.lookup_namespace_uri(&pre))
-                .is_some_and(|uri| uri.as_ref() == ns_uri)
+                .is_some_and(|uri| uri.as_ref() == namespace_uri)
         {
             return self.prefix();
         }
@@ -997,11 +998,13 @@ impl ElementRef {
         for i in 0..attrs.length() {
             let attr = attrs.item(i).unwrap();
             if attr.prefix().is_some_and(|pre| pre.as_ref() == "xml")
-                && attr.node_value().is_some_and(|val| val.as_ref() == ns_uri)
+                && attr
+                    .node_value()
+                    .is_some_and(|val| val.as_ref() == namespace_uri)
                 && attr
                     .local_name()
                     .and_then(|loc| orig.lookup_namespace_uri(&loc))
-                    .is_some_and(|uri| uri.as_ref() == ns_uri)
+                    .is_some_and(|uri| uri.as_ref() == namespace_uri)
             {
                 return attr.local_name();
             }
@@ -1011,7 +1014,7 @@ impl ElementRef {
         while let Some(par) = ancestor {
             ancestor = par.parent_node();
             if let NodeRef::Element(elem) = par {
-                return elem.lookup_namespace_prefix(ns_uri, orig);
+                return elem.lookup_namespace_prefix(namespace_uri, orig);
             }
         }
         None

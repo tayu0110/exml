@@ -7,15 +7,6 @@ use std::{
 
 use crate::{
     chvalid::XmlCharValid,
-    dom::{
-        attlistdecl::DefaultDecl,
-        check_vertical_hierarchy,
-        document_type::DUMMY_DOCUMENT,
-        dom_implementation::{DEFAULT_DOM_IMPLEMENTATION, DOMImplementation},
-        entity::EntityType,
-        named_node_map::NamedNodeMap,
-        node_list::FilteredSubtreeElementsList,
-    },
     error::XmlParserErrors,
     parser::split_qname2,
     tree::{validate_name, validate_qname},
@@ -23,15 +14,21 @@ use crate::{
 
 use super::{
     DOMException, NodeType, XML_NS_NAMESPACE, XML_XML_NAMESPACE,
+    attlistdecl::DefaultDecl,
     attr::AttrRef,
     character_data::{CDATASectionRef, CommentRef, TextRef},
-    check_owner_document_sameness,
+    check_owner_document_sameness, check_vertical_hierarchy,
     document_fragment::DocumentFragmentRef,
+    document_type::DUMMY_DOCUMENT,
     document_type::DocumentTypeRef,
+    dom_implementation::{DEFAULT_DOM_IMPLEMENTATION, DOMImplementation},
     element::ElementRef,
+    entity::EntityType,
     entity::{EntityRef, xml_entities_err},
     entity_reference::EntityReferenceRef,
+    named_node_map::NamedNodeMap,
     node::{Node, NodeConnection, NodeRef},
+    node_list::FilteredSubtreeElementsList,
     pi::ProcessingInstructionRef,
 };
 
@@ -827,17 +824,17 @@ impl DocumentRef {
     /// ```
     pub fn create_element_ns(
         &mut self,
-        ns_uri: Option<&str>,
-        qname: &str,
+        namespace_uri: Option<&str>,
+        qualified_name: &str,
     ) -> Result<ElementRef, DOMException> {
-        if validate_qname::<false>(qname).is_err() {
+        if validate_qname::<false>(qualified_name).is_err() {
             return Err(DOMException::InvalidCharacterErr);
         }
 
-        match split_qname2(qname) {
+        match split_qname2(qualified_name) {
             Some((prefix, _)) => {
                 // ... if the qualifiedName has a prefix and the namespaceURI is null, ...
-                let Some(ns_uri) = ns_uri else {
+                let Some(ns_uri) = namespace_uri else {
                     return Err(DOMException::NamespaceErr);
                 };
 
@@ -849,26 +846,26 @@ impl DocumentRef {
 
                 // ... if the qualifiedName or its prefix is "xmlns"
                 // and the namespaceURI is different from "http://www.w3.org/2000/xmlns/" ...
-                if (prefix == "xmlns" || qname == "xmlns") && ns_uri != XML_NS_NAMESPACE {
+                if (prefix == "xmlns" || qualified_name == "xmlns") && ns_uri != XML_NS_NAMESPACE {
                     return Err(DOMException::NamespaceErr);
                 }
 
                 // ... if the namespaceURI is "http://www.w3.org/2000/xmlns/"
                 // and neither the qualifiedName nor its prefix is "xmlns".
-                if ns_uri == XML_NS_NAMESPACE && prefix != "xmlns" && qname != "xmlns" {
+                if ns_uri == XML_NS_NAMESPACE && prefix != "xmlns" && qualified_name != "xmlns" {
                     return Err(DOMException::NamespaceErr);
                 }
 
                 Ok(ElementRef::with_namespace(
                     self.clone(),
-                    qname.into(),
+                    qualified_name.into(),
                     Some(ns_uri.into()),
                 ))
             }
             None => Ok(ElementRef::with_namespace(
                 self.clone(),
-                qname.into(),
-                ns_uri.map(|uri| uri.into()),
+                qualified_name.into(),
+                namespace_uri.map(|uri| uri.into()),
             )),
         }
     }
@@ -910,17 +907,17 @@ impl DocumentRef {
     /// ```
     pub fn create_attribute_ns(
         &self,
-        ns_uri: Option<&str>,
-        qname: &str,
+        namespace_uri: Option<&str>,
+        qualified_name: &str,
     ) -> Result<AttrRef, DOMException> {
-        if validate_qname::<false>(qname).is_err() {
+        if validate_qname::<false>(qualified_name).is_err() {
             return Err(DOMException::InvalidCharacterErr);
         }
 
-        match split_qname2(qname) {
+        match split_qname2(qualified_name) {
             Some((prefix, _)) => {
                 // ... if the qualifiedName has a prefix and the namespaceURI is null, ...
-                let Some(ns_uri) = ns_uri else {
+                let Some(ns_uri) = namespace_uri else {
                     return Err(DOMException::NamespaceErr);
                 };
 
@@ -932,31 +929,31 @@ impl DocumentRef {
 
                 // ... if the qualifiedName or its prefix is "xmlns"
                 // and the namespaceURI is different from "http://www.w3.org/2000/xmlns/" ...
-                if (prefix == "xmlns" || qname == "xmlns") && ns_uri != XML_NS_NAMESPACE {
+                if (prefix == "xmlns" || qualified_name == "xmlns") && ns_uri != XML_NS_NAMESPACE {
                     return Err(DOMException::NamespaceErr);
                 }
 
                 // ... if the namespaceURI is "http://www.w3.org/2000/xmlns/"
                 // and neither the qualifiedName nor its prefix is "xmlns".
-                if ns_uri == XML_NS_NAMESPACE && prefix != "xmlns" && qname != "xmlns" {
+                if ns_uri == XML_NS_NAMESPACE && prefix != "xmlns" && qualified_name != "xmlns" {
                     return Err(DOMException::NamespaceErr);
                 }
 
                 Ok(AttrRef::with_namespace(
                     self.clone(),
-                    qname.into(),
+                    qualified_name.into(),
                     ns_uri.into(),
                 ))
             }
             None => {
-                if let Some(ns_uri) = ns_uri {
+                if let Some(ns_uri) = namespace_uri {
                     Ok(AttrRef::with_namespace(
                         self.clone(),
-                        qname.into(),
+                        qualified_name.into(),
                         ns_uri.into(),
                     ))
                 } else {
-                    Ok(AttrRef::new(self.clone(), qname.into()))
+                    Ok(AttrRef::new(self.clone(), qualified_name.into()))
                 }
             }
         }
@@ -984,14 +981,14 @@ impl DocumentRef {
     /// ```
     pub fn get_elements_by_tag_name_ns(
         &self,
-        ns_uri: Option<&str>,
+        namespace_uri: Option<&str>,
         local_name: &str,
     ) -> FilteredSubtreeElementsList {
         // If this document is HTML document, the tagname is case-insensitive.
         if self.is_html() {
             FilteredSubtreeElementsList::new(
                 self.clone().into(),
-                ns_uri.map(|uri| uri.to_owned()),
+                namespace_uri.map(|uri| uri.to_owned()),
                 local_name.to_owned(),
                 |elem, uri, local_name| {
                     (local_name == "*"
@@ -1011,7 +1008,7 @@ impl DocumentRef {
         } else {
             FilteredSubtreeElementsList::new(
                 self.clone().into(),
-                ns_uri.map(|uri| uri.to_owned()),
+                namespace_uri.map(|uri| uri.to_owned()),
                 local_name.to_owned(),
                 |elem, uri, local_name| {
                     (local_name == "*"
@@ -1239,8 +1236,8 @@ impl DocumentRef {
     pub fn rename_node(
         &mut self,
         mut n: NodeRef,
-        ns_uri: Option<impl Into<Rc<str>>>,
-        qname: impl Into<Rc<str>>,
+        namespace_uri: Option<impl Into<Rc<str>>>,
+        qualified_name: impl Into<Rc<str>>,
     ) -> Result<NodeRef, DOMException> {
         // TODO: handle HTML element and attribute
         if self.is_html() {
@@ -1251,12 +1248,12 @@ impl DocumentRef {
             return Err(DOMException::WrongDocumentErr);
         }
 
-        let qname: Rc<str> = qname.into();
+        let qname: Rc<str> = qualified_name.into();
         if validate_qname::<false>(&qname).is_err() {
             return Err(DOMException::InvalidCharacterErr);
         }
 
-        let ns_uri: Option<Rc<str>> = ns_uri.map(|uri| uri.into());
+        let ns_uri: Option<Rc<str>> = namespace_uri.map(|uri| uri.into());
         match &mut n {
             NodeRef::Element(elem) => {
                 match (split_qname2(&qname), ns_uri.as_deref()) {

@@ -1319,12 +1319,12 @@ pub trait Node: NodeConnection {
     ///
     /// No Exceptions
     /// ```
-    fn lookup_prefix(&self, ns_uri: &str) -> Option<Rc<str>> {
+    fn lookup_prefix(&self, namespace_uri: &str) -> Option<Rc<str>> {
         let mut ancestor = self.parent_node();
         while let Some(par) = ancestor {
             ancestor = par.parent_node();
             if let NodeRef::Element(elem) = par {
-                return elem.lookup_prefix(ns_uri);
+                return elem.lookup_prefix(namespace_uri);
             }
         }
         None
@@ -1349,12 +1349,12 @@ pub trait Node: NodeConnection {
     ///
     /// No Exceptions
     /// ```
-    fn is_default_namespace(&self, ns_uri: &str) -> bool {
+    fn is_default_namespace(&self, namespace_uri: &str) -> bool {
         let mut ancestor = self.parent_node();
         while let Some(par) = ancestor {
             ancestor = par.parent_node();
             if let NodeRef::Element(elem) = par {
-                return elem.is_default_namespace(ns_uri);
+                return elem.is_default_namespace(namespace_uri);
             }
         }
         false
