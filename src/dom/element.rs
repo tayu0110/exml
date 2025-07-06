@@ -498,6 +498,12 @@ impl ElementRef {
 
     /// Implementation of [`getAttributeNS`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-ElGetAttrNS) method.
     ///
+    /// # Note
+    /// As the DOM specification describes, this method returns an empty string if the attribute
+    /// is not found. Therefore, the return value is not [`Option`].\
+    /// You can use [`get_attribute_node_ns`](crate::dom::element::ElementRef::get_attribute_node_ns)
+    /// to determine the existence of an attribute.
+    ///
     /// # Specification
     /// ```text
     /// Retrieves an attribute value by local name and namespace URI.
@@ -524,7 +530,7 @@ impl ElementRef {
         &self,
         namespace_uri: Option<&str>,
         local_name: &str,
-    ) -> Result<Option<String>, DOMException> {
+    ) -> Result<String, DOMException> {
         if self.owner_document().is_some_and(|doc| doc.is_html()) {
             return Err(DOMException::NotSupportedErr);
         }
@@ -532,7 +538,8 @@ impl ElementRef {
         Ok(self
             .attributes()
             .get_named_item_ns(namespace_uri, local_name)?
-            .and_then(|attr| attr.text_content()))
+            .and_then(|attr| attr.text_content())
+            .unwrap_or_default())
     }
     /// Implementation of [`setAttributeNS`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-ElSetAttrNS) method.
     ///

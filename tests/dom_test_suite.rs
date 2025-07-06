@@ -12155,7 +12155,6 @@ mod dom_test_suite {
                     .unwrap(); // <getAttributeNodeNS obj="testAddr" var="addrAttr" namespaceURI="&quot;http://www.nist.gov&quot;" localName="&quot;local1&quot;"/>
                 r#attr = r#test_addr
                     .get_attribute_ns(Some("http://www.nist.gov"), "local1")
-                    .unwrap()
                     .unwrap(); // <getAttributeNS obj="testAddr" var="attr" namespaceURI="&quot;http://www.nist.gov&quot;" localName="&quot;local1&quot;"/>
                 r#namespace_uri = r#addr_attr.namespace_uri().unwrap().to_string(); // <namespaceURI obj="addrAttr" var="namespaceURI"/>
                 r#local_name = r#addr_attr.local_name().unwrap().to_string(); // <localName obj="addrAttr" var="localName"/>
@@ -12548,7 +12547,6 @@ mod dom_test_suite {
                     .unwrap(); // <getAttributeNodeNS obj="testAddr" var="addrAttr" namespaceURI="&quot;http://www.nist.gov&quot;" localName="&quot;zone&quot;"/>
                 r#result_attr = r#test_addr
                     .get_attribute_ns(Some("http://www.nist.gov"), "zone")
-                    .unwrap()
                     .unwrap(); // <getAttributeNS obj="testAddr" var="resultAttr" namespaceURI="&quot;http://www.nist.gov&quot;" localName="&quot;zone&quot;"/>
                 assert_eq!(r#result_attr, "newValue"); // <assertEquals actual="resultAttr" expected="&quot;newValue&quot;" id="attrValue" ignoreCase="false"/>
                 r#result_namespace_uri = r#addr_attr.namespace_uri().unwrap().to_string(); // <namespaceURI obj="addrAttr" var="resultNamespaceURI"/>
@@ -12714,7 +12712,6 @@ mod dom_test_suite {
                     .unwrap(); // <getAttributeNodeNS obj="testAddr" var="addrAttr" namespaceURI="namespaceURI" localName="localName"/>
                 r#result_attr = r#test_addr
                     .get_attribute_ns(Some(r#namespace_uri), r#local_name)
-                    .unwrap()
                     .unwrap(); // <getAttributeNS obj="testAddr" var="resultAttr" namespaceURI="namespaceURI" localName="localName"/>
                 assert_eq!(r#result_attr, "newValue"); // <assertEquals actual="resultAttr" expected="&quot;newValue&quot;" id="attrValue" ignoreCase="false"/>
                 r#result_namespace_uri = r#addr_attr.namespace_uri().unwrap().to_string(); // <namespaceURI obj="addrAttr" var="resultNamespaceURI"/>
@@ -13019,7 +13016,6 @@ mod dom_test_suite {
                 // unimplemented: // <assertNotNull actual="testAddr" id="empAddrNotNull"/>
                 r#attr_value = r#test_addr
                     .get_attribute_ns(Some("http://www.nist.gov"), "domestic")
-                    .unwrap()
                     .unwrap(); // <getAttributeNS obj="testAddr" var="attrValue" namespaceURI="&quot;http://www.nist.gov&quot;" localName="&quot;domestic&quot;"/>
                 assert_eq!(r#attr_value, "Yes"); // <assertEquals actual="attrValue" expected="&quot;Yes&quot;" id="attrValue" ignoreCase="false"/>
             }
@@ -13694,7 +13690,6 @@ mod dom_test_suite {
                     .unwrap(); // <removeAttributeNS obj="testAddr" namespaceURI="namespaceURI" localName="localName"/>
                 r#attr_value = r#test_addr
                     .get_attribute_ns(Some(r#namespace_uri), r#local_name)
-                    .unwrap()
                     .unwrap(); // <getAttributeNS obj="testAddr" var="attrValue" namespaceURI="namespaceURI" localName="localName"/>
                 assert_eq!(r#attr_value, ""); // <assertEquals actual="attrValue" expected="&quot;&quot;" id="throw_Equals" ignoreCase="false"/>
             }
@@ -17287,10 +17282,7 @@ mod dom_test_suite {
                 r#child_list =
                     r#doc.get_elements_by_tag_name_ns(Some("http://www.nist.gov"), "employee"); // <getElementsByTagNameNS var="childList" obj="doc" localName="&quot;employee&quot;" namespaceURI="&quot;http://www.nist.gov&quot;" interface="Document"/>
                 r#element = r#child_list.item(1).unwrap(); // <item var="element" obj="childList" index="1" interface="NodeList"/>
-                r#attr_value = r#element
-                    .get_attribute_ns(None, "defaultAttr")
-                    .unwrap()
-                    .unwrap(); // <getAttributeNS var="attrValue" obj="element" localName="&quot;defaultAttr&quot;" namespaceURI="nullNS"/>
+                r#attr_value = r#element.get_attribute_ns(None, "defaultAttr").unwrap(); // <getAttributeNS var="attrValue" obj="element" localName="&quot;defaultAttr&quot;" namespaceURI="nullNS"/>
                 assert_eq!(r#attr_value, "defaultVal"); // <assertEquals actual="attrValue" expected="&quot;defaultVal&quot;" id="elementgetattributens02" ignoreCase="false"/>
             }
             // getElementsByTagNameNS06.xml

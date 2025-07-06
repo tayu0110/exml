@@ -425,6 +425,9 @@ impl NamedNodeMap for AttributeMap {
         } else {
             self.index
                 .borrow_mut()
+                .remove(&(name.to_owned().into(), None));
+            self.index
+                .borrow_mut()
                 .values_mut()
                 .filter(|i| **i > index)
                 .for_each(|i| *i -= 1);
@@ -516,6 +519,10 @@ impl NamedNodeMap for AttributeMap {
         {
             replace(&mut self.data.borrow_mut()[index], def)
         } else {
+            self.index.borrow_mut().remove(&(
+                local_name.to_owned().into(),
+                ns_uri.map(|uri| uri.to_owned().into()),
+            ));
             self.index
                 .borrow_mut()
                 .values_mut()

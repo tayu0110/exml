@@ -873,7 +873,11 @@ pub trait Node: NodeConnection {
             parents = parent.parent_node();
 
             if let NodeRef::Element(elem) = parent {
-                if let Ok(Some(attr)) = elem.get_attribute_ns(Some(XML_XML_NAMESPACE), "base") {
+                if let Some(attr) = elem
+                    .get_attribute_ns(Some(XML_XML_NAMESPACE), "base")
+                    .ok()
+                    .filter(|base| !base.is_empty())
+                {
                     if XmlURI::parse(&attr).is_some_and(|base| base.scheme.is_some()) {
                         return bases
                             .into_iter()
