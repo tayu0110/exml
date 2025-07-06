@@ -346,6 +346,76 @@ impl AttributeMap {
     pub(super) fn set_owner_element(&mut self, owner_element: ElementRef) {
         self.owner_element = Rc::downgrade(&owner_element.0);
     }
+
+    fn set_named_item_common(
+        &mut self,
+        node: AttrRef,
+        namespace_check: bool,
+    ) -> Result<Option<AttrRef>, DOMException> {
+        let Some(doc) = self
+            .owner_document
+            .upgrade()
+            .filter(|doc| check_owner_document_sameness(doc, &node))
+        else {
+            return Err(DOMException::WrongDocumentErr);
+        };
+        if namespace_check && doc.is_html() {
+            return Err(DOMException::NotSupportedErr);
+        }
+
+        if node.owner_element().is_some() {
+            return Err(DOMException::InuseAttributeErr);
+        }
+
+        let ns_uri = node.namespace_uri();
+        if let Some(local_name) = node.local_name() {
+            if let Some(&index) = self.index.borrow().get(&(
+                Cow::Borrowed(local_name.as_ref()),
+                ns_uri.as_deref().map(Cow::Borrowed),
+            )) {
+                let res = replace(&mut self.data.borrow_mut()[index], node.clone());
+                if res.node_name() != node.node_name() {
+                    self.index_fullname
+                        .borrow_mut()
+                        .remove(&res.node_name().to_string());
+                    self.index_fullname
+                        .borrow_mut()
+                        .insert(node.node_name().to_string(), index);
+                }
+                Ok(Some(res))
+            } else {
+                self.index.borrow_mut().insert(
+                    (
+                        local_name.to_string().into(),
+                        ns_uri.as_deref().map(|uri| uri.to_owned().into()),
+                    ),
+                    self.data.borrow().len(),
+                );
+                self.index_fullname
+                    .borrow_mut()
+                    .insert(node.node_name().to_string(), self.data.borrow().len());
+                self.data.borrow_mut().push(node);
+                Ok(None)
+            }
+        } else {
+            let name = node.node_name();
+            match self.index_fullname.borrow_mut().entry(name.to_string()) {
+                Entry::Occupied(entry) => {
+                    let &index = entry.get();
+                    Ok(Some(replace(&mut self.data.borrow_mut()[index], node)))
+                }
+                Entry::Vacant(entry) => {
+                    let index = self.data.borrow().len();
+                    entry.insert(index);
+                    self.index
+                        .borrow_mut()
+                        .insert((name.to_string().into(), None), index);
+                    self.data.borrow_mut().push(node);
+                    Ok(None)
+                }
+            }
+        }
+    }
 }
 
 impl NamedNodeMap for AttributeMap {
@@ -356,31 +426,7 @@ impl NamedNodeMap for AttributeMap {
         self.item(index)
     }
     fn set_named_item(&mut self, node: Self::Item) -> Result<Option<Self::Item>, DOMException> {
-        if self
-            .owner_document
-            .upgrade()
-            .is_none_or(|doc| !check_owner_document_sameness(&doc, &node))
-        {
-            return Err(DOMException::WrongDocumentErr);
-        }
-
-        if node.owner_element().is_some() {
-            return Err(DOMException::InuseAttributeErr);
-        }
-
-        let name = node.node_name();
-        match self.index_fullname.borrow_mut().entry(name.to_string()) {
-            Entry::Occupied(entry) => {
-                let &index = entry.get();
-                Ok(Some(replace(&mut self.data.borrow_mut()[index], node)))
-            }
-            Entry::Vacant(entry) => {
-                let index = self.data.borrow().len();
-                entry.insert(index);
-                self.data.borrow_mut().push(node);
-                Ok(None)
-            }
-        }
+        self.set_named_item_common(node, false)
     }
     fn remove_named_item(&mut self, name: &str) -> Result<Self::Item, DOMException> {
         let &index = self
@@ -455,55 +501,7 @@ impl NamedNodeMap for AttributeMap {
             .and_then(|index| self.item(index)))
     }
     fn set_named_item_ns(&mut self, node: Self::Item) -> Result<Option<Self::Item>, DOMException> {
-        let Some(doc) = self
-            .owner_document
-            .upgrade()
-            .filter(|doc| check_owner_document_sameness(doc, &node))
-        else {
-            return Err(DOMException::WrongDocumentErr);
-        };
-        if doc.is_html() {
-            return Err(DOMException::NotSupportedErr);
-        }
-
-        if node.owner_element().is_some() {
-            return Err(DOMException::InuseAttributeErr);
-        }
-
-        let ns_uri = node.namespace_uri();
-        if let Some(local_name) = node.local_name() {
-            if let Some(&index) = self.index.borrow().get(&(
-                Cow::Borrowed(local_name.as_ref()),
-                ns_uri.as_deref().map(Cow::Borrowed),
-            )) {
-                let res = replace(&mut self.data.borrow_mut()[index], node.clone());
-                if res.node_name() != node.node_name() {
-                    self.index_fullname
-                        .borrow_mut()
-                        .remove(&res.node_name().to_string());
-                    self.index_fullname
-                        .borrow_mut()
-                        .insert(node.node_name().to_string(), index);
-                }
-                Ok(Some(res))
-            } else {
-                self.index.borrow_mut().insert(
-                    (
-                        local_name.to_string().into(),
-                        ns_uri.as_deref().map(|uri| uri.to_owned().into()),
-                    ),
-                    self.data.borrow().len(),
-                );
-                self.index_fullname
-                    .borrow_mut()
-                    .insert(node.node_name().to_string(), self.data.borrow().len());
-                self.data.borrow_mut().push(node);
-                Ok(None)
-            }
-        } else {
-            // Is this correct ??
-            self.set_named_item(node)
-        }
+        self.set_named_item_common(node, true)
     }
     fn remove_named_item_ns(
         &mut self,
