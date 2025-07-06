@@ -17,7 +17,7 @@ use super::{
     attr::AttrRef,
     check_owner_document_sameness,
     document::{DocumentRef, DocumentWeakRef},
-    node::{Node, NodeRef},
+    node::Node,
 };
 
 pub trait NamedNodeMap {
@@ -243,6 +243,8 @@ pub struct AttributeMap {
     // (LocalPart, namespaceURI) : if inserted by Level 2 method
     // (Name, None)              : if inserted by Level 1 method
     index: Rc<RefCell<HashMap<(Cow<'static, str>, Option<Cow<'static, str>>), usize>>>,
+    // For Name and QName
+    index_fullname: Rc<RefCell<HashMap<String, usize>>>,
     data: Rc<RefCell<Vec<AttrRef>>>,
 }
 
@@ -253,6 +255,7 @@ impl AttributeMap {
             owner_document: doc,
             owner_element: Weak::new(),
             index: Rc::new(RefCell::new(HashMap::new())),
+            index_fullname: Rc::new(RefCell::new(HashMap::new())),
             data: Rc::new(RefCell::new(vec![])),
         }
     }
@@ -268,20 +271,9 @@ impl AttributeMap {
     /// This method checks the equality of the `node`.\
     /// If you need to check the sameness, please use [`AttributeMap::has_same_node`].
     pub fn has_equal_node(&self, node: &AttrRef) -> bool {
-        if let Some(local_name) = node.local_name() {
-            let ns_uri = node.namespace_uri();
-            if let Some(&index) = self.index.borrow().get(&(
-                Cow::Borrowed(local_name.as_ref()),
-                ns_uri.as_deref().map(Cow::Borrowed),
-            )) {
-                if self.data.borrow()[index].is_equal_node(&node.clone().into()) {
-                    return true;
-                }
-            }
-        }
-        self.index
+        self.index_fullname
             .borrow()
-            .get(&(Cow::Borrowed(node.node_name().as_ref()), None))
+            .get(node.node_name().as_ref())
             .is_some_and(|&index| self.data.borrow()[index].is_equal_node(&node.clone().into()))
     }
 
@@ -290,20 +282,9 @@ impl AttributeMap {
     /// This method checks the sameness of the `node`.\
     /// If you need to check the equality, please use [`AttributeMap::has_equal_node`].
     pub fn has_same_node(&self, node: &AttrRef) -> bool {
-        if let Some(local_name) = node.local_name() {
-            let ns_uri = node.namespace_uri();
-            if let Some(&index) = self.index.borrow().get(&(
-                Cow::Borrowed(local_name.as_ref()),
-                ns_uri.as_deref().map(Cow::Borrowed),
-            )) {
-                if self.data.borrow()[index].is_same_node(&node.clone().into()) {
-                    return true;
-                }
-            }
-        }
-        self.index
+        self.index_fullname
             .borrow()
-            .get(&(Cow::Borrowed(node.node_name().as_ref()), None))
+            .get(node.node_name().as_ref())
             .is_some_and(|&index| self.data.borrow()[index].is_same_node(&node.clone().into()))
     }
 
@@ -330,25 +311,23 @@ impl AttributeMap {
                 false
             }
         });
+        self.index_fullname.borrow_mut().retain(|_, index| {
+            if let Ok(new) = remain.binary_search(&*index) {
+                *index = new;
+                true
+            } else {
+                false
+            }
+        });
     }
 
     /// If `node` exists in this map, return the index of `node`.\
     /// Otherwise return `None`.
     pub fn index_of(&self, node: &AttrRef) -> Option<usize> {
-        if let Some(local_name) = node.local_name() {
-            self.index
-                .borrow()
-                .get(&(
-                    Cow::Borrowed(local_name.as_ref()),
-                    node.namespace_uri().as_deref().map(Cow::Borrowed),
-                ))
-                .copied()
-        } else {
-            self.index
-                .borrow()
-                .get(&(Cow::Borrowed(node.node_name().as_ref()), None))
-                .copied()
-        }
+        self.index_fullname
+            .borrow()
+            .get(node.node_name().as_ref())
+            .copied()
     }
 
     /// Get the owner Document.
@@ -373,16 +352,14 @@ impl NamedNodeMap for AttributeMap {
     type Item = AttrRef;
 
     fn get_named_item(&self, name: &str) -> Option<Self::Item> {
-        let &index = self.index.borrow().get(&(name.into(), None))?;
+        let &index = self.index_fullname.borrow().get(name)?;
         self.item(index)
     }
     fn set_named_item(&mut self, node: Self::Item) -> Result<Option<Self::Item>, DOMException> {
-        let doc = self.owner_document.upgrade();
-        let ndoc = node.owner_document();
-        if doc.is_some() != ndoc.is_some()
-            || doc
-                .zip(ndoc)
-                .is_some_and(|(doc, ndoc)| !doc.is_same_node(&NodeRef::Document(ndoc)))
+        if self
+            .owner_document
+            .upgrade()
+            .is_none_or(|doc| !check_owner_document_sameness(&doc, &node))
         {
             return Err(DOMException::WrongDocumentErr);
         }
@@ -392,11 +369,7 @@ impl NamedNodeMap for AttributeMap {
         }
 
         let name = node.node_name();
-        match self
-            .index
-            .borrow_mut()
-            .entry((Cow::Owned(name.to_string()), None))
-        {
+        match self.index_fullname.borrow_mut().entry(name.to_string()) {
             Entry::Occupied(entry) => {
                 let &index = entry.get();
                 Ok(Some(replace(&mut self.data.borrow_mut()[index], node)))
@@ -411,29 +384,56 @@ impl NamedNodeMap for AttributeMap {
     }
     fn remove_named_item(&mut self, name: &str) -> Result<Self::Item, DOMException> {
         let &index = self
-            .index
+            .index_fullname
             .borrow()
-            .get(&(Cow::Borrowed(name), None))
+            .get(name)
             .ok_or(DOMException::NotFoundErr)?;
-        let res = if let Some(def) = self.owner_document().and_then(|doc| {
+        if let Some(def) = self.owner_document().and_then(|doc| {
             doc.get_default_attribute(
                 &ElementRef::from(self.owner_element.upgrade().unwrap()).node_name(),
                 name,
             )
         }) {
-            replace(&mut self.data.borrow_mut()[index], def)
+            let res = replace(&mut self.data.borrow_mut()[index], def.clone());
+            if let Some(local_name) = res.local_name() {
+                if def.namespace_uri() != res.namespace_uri() {
+                    self.index.borrow_mut().remove(&(
+                        local_name.to_string().into(),
+                        res.namespace_uri()
+                            .as_deref()
+                            .map(|uri| uri.to_owned().into()),
+                    ));
+                    self.index.borrow_mut().insert(
+                        (
+                            local_name.to_string().into(),
+                            def.namespace_uri()
+                                .as_deref()
+                                .map(|uri| uri.to_owned().into()),
+                        ),
+                        index,
+                    );
+                }
+            }
+            Ok(res)
         } else {
-            self.index
-                .borrow_mut()
-                .remove(&(name.to_owned().into(), None));
-            self.index
+            self.index_fullname.borrow_mut().remove(name);
+            self.index_fullname
                 .borrow_mut()
                 .values_mut()
                 .filter(|i| **i > index)
                 .for_each(|i| *i -= 1);
-            self.data.borrow_mut().remove(index)
-        };
-        Ok(res)
+
+            let res = self.data.borrow_mut().remove(index);
+            if let Some(local_name) = res.local_name() {
+                self.index.borrow_mut().remove(&(
+                    local_name.to_string().into(),
+                    res.namespace_uri()
+                        .as_deref()
+                        .map(|uri| uri.to_string().into()),
+                ));
+            }
+            Ok(res)
+        }
     }
     fn item(&self, index: usize) -> Option<Self::Item> {
         self.data.borrow().get(index).cloned()
@@ -476,7 +476,16 @@ impl NamedNodeMap for AttributeMap {
                 Cow::Borrowed(local_name.as_ref()),
                 ns_uri.as_deref().map(Cow::Borrowed),
             )) {
-                Ok(Some(replace(&mut self.data.borrow_mut()[index], node)))
+                let res = replace(&mut self.data.borrow_mut()[index], node.clone());
+                if res.node_name() != node.node_name() {
+                    self.index_fullname
+                        .borrow_mut()
+                        .remove(&res.node_name().to_string());
+                    self.index_fullname
+                        .borrow_mut()
+                        .insert(node.node_name().to_string(), index);
+                }
+                Ok(Some(res))
             } else {
                 self.index.borrow_mut().insert(
                     (
@@ -485,6 +494,9 @@ impl NamedNodeMap for AttributeMap {
                     ),
                     self.data.borrow().len(),
                 );
+                self.index_fullname
+                    .borrow_mut()
+                    .insert(node.node_name().to_string(), self.data.borrow().len());
                 self.data.borrow_mut().push(node);
                 Ok(None)
             }
@@ -513,27 +525,31 @@ impl NamedNodeMap for AttributeMap {
         let attr = self.data.borrow()[index].clone();
         let attr_name = attr.node_name();
         let context_node = attr.owner_element().unwrap();
-        let res = if let Some(def) = self
+        if let Some(def) = self
             .owner_document()
             .and_then(|doc| doc.get_default_attribute_ns(context_node, &attr_name))
         {
-            replace(&mut self.data.borrow_mut()[index], def)
+            // Since the nodeName is the same, there should be no need to modify index_fullname.
+            Ok(replace(&mut self.data.borrow_mut()[index], def))
         } else {
-            self.index.borrow_mut().remove(&(
-                local_name.to_owned().into(),
-                ns_uri.map(|uri| uri.to_owned().into()),
-            ));
-            self.index
-                .borrow_mut()
-                .values_mut()
-                .filter(|i| **i > index)
-                .for_each(|i| *i -= 1);
-            self.data.borrow_mut().remove(index)
-        };
-        Ok(res)
+            self.index.borrow_mut().retain(|key, value| {
+                if *value > index {
+                    *value -= 1;
+                }
+                key.0.as_ref() != local_name || key.1.as_deref() != ns_uri
+            });
+            self.index_fullname.borrow_mut().retain(|key, value| {
+                if *value > index {
+                    *value -= 1;
+                }
+                key.as_str() != attr_name.as_ref()
+            });
+            Ok(self.data.borrow_mut().remove(index))
+        }
     }
 }
 
+/// Since the data is shared by [`Rc`], [`clone`](Clone::clone) means shallow copy, not deep copy.
 #[derive(Clone)]
 pub(crate) struct DTDSubsetMap<N: Node> {
     owner_document: DocumentWeakRef,
@@ -621,6 +637,7 @@ impl<N: Node> DTDSubsetMap<N> {
 pub(crate) type SubsetEntityMap = DTDSubsetMap<EntityRef>;
 pub(crate) type SubsetNotationMap = DTDSubsetMap<NotationRef>;
 
+/// Since the data is shared by [`Rc`], [`clone`](Clone::clone) means shallow copy, not deep copy.
 #[derive(Clone)]
 pub struct DTDMap<N: Node> {
     internal_map: Option<DTDSubsetMap<N>>,
