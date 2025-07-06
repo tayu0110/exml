@@ -11651,7 +11651,7 @@ mod dom_test_suite {
                 let mut gender = employee.append_child(doc.create_element_ns(Some("http://www.nist.gov"), "emp:gender").unwrap().into()).unwrap();
                 gender.append_child(doc.create_text_node("Female").into()).unwrap();
                 let mut address = employee.append_child(doc.create_element_ns(Some("http://www.nist.gov"), "emp:address").unwrap().into()).unwrap().as_element().unwrap();
-                address.append_child(doc.create_text_node("PO Box 27 Irving, texas 98553").into()).unwrap();
+                address.append_child(doc.create_text_node("27 South Road. Dallas, texas 98556").into()).unwrap();
                 address.set_attribute_ns(Some("http://www.nist.gov"), "emp:domestic", "Yes").unwrap();
                 address.set_attribute("street", "Y").unwrap();
                 let mut street = address.get_attribute_node("street").unwrap();
