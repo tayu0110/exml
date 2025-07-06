@@ -11580,7 +11580,7 @@ mod dom_test_suite {
                 let comment = doc.create_comment(" This is comment number 1.").into();
                 doc.insert_before(comment, Some(root.clone().into())).unwrap();
 
-                let mut employee = root.append_child(doc.create_element_ns(None, "employee").unwrap().into()).unwrap().as_element().unwrap();
+                let mut employee = root.append_child(doc.create_element_ns(Some("http://www.nist.gov"), "employee").unwrap().into()).unwrap().as_element().unwrap();
                 employee.set_attribute_ns(Some(XML_NS_NAMESPACE), "xmlns", "http://www.nist.gov").unwrap();
                 employee.set_attribute_ns(Some(XML_NS_NAMESPACE), "xmlns:dmstc", "http://www.usa.com").unwrap();
                 let mut employee_id = employee.append_child(doc.create_element_ns(None, "employeeId").unwrap().into()).unwrap();
