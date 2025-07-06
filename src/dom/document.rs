@@ -695,15 +695,20 @@ impl DocumentRef {
     ) -> Result<NodeRef, DOMException> {
         match &imported_node {
             NodeRef::Attribute(attr) => {
-                let NodeRef::Attribute(mut attr) = attr.clone_node(deep) else {
-                    unreachable!()
-                };
+                let mut new_attr = if attr.local_name().is_some() {
+                    self.create_attribute_ns(
+                        attr.namespace_uri().as_deref(),
+                        attr.node_name().as_ref(),
+                    )
+                } else {
+                    self.create_attribute(attr.node_name().as_ref())
+                }?;
                 let mut children = attr.first_child();
                 while let Some(child) = children {
                     children = child.next_sibling();
-                    attr.replace_child(self.import_node(child.clone(), true)?, child)?;
+                    new_attr.append_child(self.import_node(child, true)?)?;
                 }
-                Ok(attr.into())
+                Ok(new_attr.into())
             }
             NodeRef::DocumentFragment(frag) => {
                 let mut new = self.create_document_fragment();
@@ -731,9 +736,7 @@ impl DocumentRef {
                 for i in 0..attrs.length() {
                     let attr = attrs.item(i).unwrap();
                     if attr.specified() {
-                        let NodeRef::Attribute(attr) = self.import_node(attr.into(), deep)? else {
-                            unreachable!()
-                        };
+                        let attr = self.import_node(attr.into(), deep)?.as_attribute().unwrap();
                         new.set_attribute_node_ns(attr.clone())
                             .or_else(|_| new.set_attribute_node(attr))?;
                     }
@@ -762,18 +765,8 @@ impl DocumentRef {
 
                 let mut children = new.first_child();
                 while let Some(mut child) = children {
-                    child.set_owner_document(self.clone());
-                    if let Some(attrs) = child.attributes() {
-                        for i in 0..attrs.length() {
-                            let mut attr = attrs.item(i).unwrap();
-                            attr.set_owner_document(self.clone());
-                            let mut children = attr.first_child();
-                            while let Some(child) = children {
-                                children = child.next_sibling();
-                                attr.replace_child(self.import_node(child.clone(), true)?, child)?;
-                            }
-                        }
-                    }
+                    let new_child = self.import_node(child.clone(), deep)?;
+                    new.append_child(new_child);
 
                     if let Some(ch) = child.first_child() {
                         children = Some(ch);
@@ -1580,40 +1573,6 @@ impl DocumentRef {
             match decl.default_decl() {
                 DefaultDecl::None(def) | DefaultDecl::Fixed(def) => {
                     let mut attr = self.create_attribute(decl.name()).ok()?;
-                    attr.set_value(def.as_ref()).ok()?;
-                    attr.set_specified(false);
-
-                    // Due to the requirements of the XML specification, attributes
-                    // with default values are not ID attributes, so it is not necessary
-                    // to check whether they should be set as ID attributes.
-                    //
-                    // 3.3.1 Attribute Types
-                    // [Validity constraint: ID Attribute Default]
-                    // An ID attribute MUST have a declared default of #IMPLIED or #REQUIRED.
-
-                    res.push(attr);
-                }
-                _ => {}
-            }
-        }
-        Some(res)
-    }
-
-    pub(super) fn get_default_attributes_ns(&self, elem_name: &str) -> Option<Vec<AttrRef>> {
-        let elemdecl = self.doctype()?.get_element_decl(elem_name)?;
-        let mut res = vec![];
-        for decl in elemdecl.get_attribute_decls() {
-            match decl.default_decl() {
-                DefaultDecl::None(def) | DefaultDecl::Fixed(def) => {
-                    let mut attr = if let Some((pre, _)) = split_qname2(&decl.name()) {
-                        self.create_attribute_ns(
-                            self.lookup_namespace_uri(pre).as_deref(),
-                            &decl.name(),
-                        )
-                        .ok()?
-                    } else {
-                        self.create_attribute(decl.name()).ok()?
-                    };
                     attr.set_value(def.as_ref()).ok()?;
                     attr.set_specified(false);
 

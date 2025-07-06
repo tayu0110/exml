@@ -15415,8 +15415,7 @@ mod dom_test_suite {
                     .unwrap(); // <createElementNS obj="aNewDoc" var="element" namespaceURI="namespaceURI" qualifiedName="qualifiedName"/>
                 r#a_node = r#doc.import_node(r#element.into(), false).unwrap(); // <importNode obj="doc" var="aNode" importedNode="element" deep="false"/>
                 r#attributes = r#a_node.attributes().unwrap(); // <attributes obj="aNode" var="attributes"/>
-
-                // unimplemented: // <assertSize collection="attributes" size="1" id="throw_Size"/>
+                assert_eq!(attributes.length(), 1); // <assertSize collection="attributes" size="1" id="throw_Size"/>
                 r#name = r#a_node.node_name().to_string(); // <nodeName obj="aNode" var="name"/>
                 assert_eq!(r#name, "emp:employee"); // <assertEquals actual="name" expected="&quot;emp:employee&quot;" ignoreCase="false" id="nodeName"/>
                 r#attr = r#attributes.item(0).unwrap(); // <item interface="NamedNodeMap" obj="attributes" var="attr" index="0"/>

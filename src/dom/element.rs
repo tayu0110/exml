@@ -197,9 +197,9 @@ impl ElementRef {
         };
         new.0.borrow_mut().attributes.set_owner_element(new.clone());
 
-        if let Some(def) = doc.get_default_attributes_ns(&tag_name) {
+        if let Some(def) = doc.get_default_attributes(&tag_name) {
             for attr in def {
-                new.set_attribute_node_ns(attr).ok();
+                new.set_attribute_node(attr).ok();
             }
         }
         new
