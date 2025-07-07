@@ -992,9 +992,10 @@ impl DocumentRef {
                 local_name.to_owned(),
                 |elem, uri, local_name| {
                     (local_name == "*"
-                        || elem
-                            .local_name()
-                            .is_some_and(|ln| ln.eq_ignore_ascii_case(local_name)))
+                        || match elem.local_name() {
+                            Some(ln) => ln.eq_ignore_ascii_case(local_name),
+                            None => elem.node_name().eq_ignore_ascii_case(local_name),
+                        })
                         && (uri == Some("*")
                             || match (elem.namespace_uri(), uri) {
                                 (Some(elem_ns), Some(uri)) if elem_ns.eq_ignore_ascii_case(uri) => {
@@ -1012,9 +1013,10 @@ impl DocumentRef {
                 local_name.to_owned(),
                 |elem, uri, local_name| {
                     (local_name == "*"
-                        || elem
-                            .local_name()
-                            .is_some_and(|ln| ln.as_ref() == local_name))
+                        || match elem.local_name() {
+                            Some(ln) => ln.as_ref() == local_name,
+                            None => elem.node_name().as_ref() == local_name,
+                        })
                         && (uri == Some("*")
                             || match (elem.namespace_uri(), uri) {
                                 (Some(elem_ns), Some(uri)) if elem_ns.as_ref() == uri => true,
