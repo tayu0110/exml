@@ -11995,27 +11995,53 @@ mod dom_test_suite {
             // namednodemapremovenameditemns05.xml
             #[test]
             fn test_namednodemapremovenameditemns05() {
-                // // unimplemented: // <implementationAttribute name="namespaceAware" value="true"/>
-                // let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
-                // let mut r#doc_type; // type: DocumentType // <var name="docType" type="DocumentType"/>
-                // let mut r#entities; // type: NamedNodeMap // <var name="entities" type="NamedNodeMap"/>
-                // let mut r#notations; // type: NamedNodeMap // <var name="notations" type="NamedNodeMap"/>
-                // let mut r#removed_node; // type: Node // <var name="removedNode" type="Node"/>
-                // let mut r#null_ns; // type: DOMString // <var name="nullNS" type="DOMString" isNull="true"/>
-                // r#doc = staff_ns_xml(STAFF_NS_XML).unwrap(); // staffNS.xml // <load var="doc" href="staffNS" willBeModified="true"/>
-                // r#doc_type = r#doc.doctype().unwrap(); // <doctype var="docType" obj="doc"/>
-
-                // // unimplemented: // <entities var="entities" obj="docType"/>
-
-                // // unimplemented: // <assertNotNull actual="entities" id="entitiesNotNull"/>
-
-                // // unimplemented: // <notations var="notations" obj="docType"/>
-
-                // // unimplemented: // <assertNotNull actual="notations" id="notationsNotNull"/>
-
-                // // unimplemented: // <try>   <removeNamedItemNS var="removedNode" obj="entities" namespaceURI="nullNS" localName="&quot;ent1&quot;"/>   <fail id="entity_throw_DOMException"/>   <catch>   		<DOMException code="NOT_FOUND_ERR"/>   		<DOMException code="NO_MODIFICATION_ALLOWED_ERR"/>   </catch></try>
-
-                // // unimplemented: // <try>	<removeNamedItemNS var="removedNode" obj="notations" namespaceURI="nullNS" localName="&quot;notation1&quot;"/>    <fail id="notation_throw_DOMException"/>    <catch>    	<DOMException code="NOT_FOUND_ERR"/>    	<DOMException code="NO_MODIFICATION_ALLOWED_ERR"/>    </catch></try>
+                // unimplemented: // <implementationAttribute name="namespaceAware" value="true"/>
+                let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
+                let mut r#doc_type; // type: DocumentType // <var name="docType" type="DocumentType"/>
+                let mut r#entities; // type: NamedNodeMap // <var name="entities" type="NamedNodeMap"/>
+                let mut r#notations; // type: NamedNodeMap // <var name="notations" type="NamedNodeMap"/>
+                r#doc = staff_ns_xml(STAFF_NS_XML).unwrap(); // staffNS.xml // <load var="doc" href="staffNS" willBeModified="true"/>
+                r#doc_type = r#doc.doctype().unwrap(); // <doctype var="docType" obj="doc"/>
+                entities = doc_type.entities(); // <entities var="entities" obj="docType"/>
+                // unimplemented: // <assertNotNull actual="entities" id="entitiesNotNull"/>
+                notations = doc_type.notations(); // <notations var="notations" obj="docType"/>
+                // unimplemented: // <assertNotNull actual="notations" id="notationsNotNull"/>
+                // <try>
+                //  <removeNamedItemNS var="removedNode" obj="entities" namespaceURI="nullNS" localName="&quot;ent1&quot;"/>
+                //  <fail id="entity_throw_DOMException"/>
+                // <catch>
+                //  <DOMException code="NOT_FOUND_ERR"/>
+                //  <DOMException code="NO_MODIFICATION_ALLOWED_ERR"/>
+                // </catch>
+                // </try>
+                assert!(
+                    entities
+                        .remove_named_item_ns(None, "ent1")
+                        .is_err_and(|err| {
+                            matches!(
+                                err,
+                                DOMException::NotFoundErr | DOMException::NoModificationAllowedErr
+                            )
+                        })
+                );
+                // <try>
+                //  <removeNamedItemNS var="removedNode" obj="notations" namespaceURI="nullNS" localName="&quot;notation1&quot;"/>
+                //  <fail id="notation_throw_DOMException"/>
+                // <catch>
+                //  <DOMException code="NOT_FOUND_ERR"/>
+                //  <DOMException code="NO_MODIFICATION_ALLOWED_ERR"/>
+                // </catch>
+                // </try>
+                assert!(
+                    notations
+                        .remove_named_item_ns(None, "notation1")
+                        .is_err_and(|err| {
+                            matches!(
+                                err,
+                                DOMException::NotFoundErr | DOMException::NoModificationAllowedErr
+                            )
+                        })
+                );
             }
             // prefix07.xml
             #[test]
