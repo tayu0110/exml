@@ -16611,10 +16611,7 @@ mod dom_test_suite {
                 r#new_attr1 = r#doc
                     .create_attribute_ns(Some("http://www.w3.org/DOM/L1"), "street".as_ref())
                     .unwrap(); // <createAttributeNS var="newAttr1" obj="doc" namespaceURI="&quot;http://www.w3.org/DOM/L1&quot;" qualifiedName="&quot;street&quot;"/>
-                r#new_attribute = r#element
-                    .set_attribute_node_ns(r#new_attr1)
-                    .unwrap()
-                    .unwrap(); // <setAttributeNodeNS var="newAttribute" obj="element" newAttr="newAttr1"/>
+                r#new_attribute = r#element.set_attribute_node_ns(r#new_attr1).unwrap(); // <setAttributeNodeNS var="newAttribute" obj="element" newAttr="newAttr1"/>
                 r#attribute = r#attributes_map1
                     .get_named_item_ns(Some("http://www.w3.org/DOM/L1"), "street")
                     .unwrap()
