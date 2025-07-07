@@ -696,7 +696,7 @@ impl<N: Node> NamedNodeMap for DTDMap<N> {
         _ns_uri: Option<&str>,
         _local_name: &str,
     ) -> Result<Option<Self::Item>, DOMException> {
-        Err(DOMException::NotSupportedErr)
+        Ok(None)
     }
     fn set_named_item_ns(&mut self, _node: Self::Item) -> Result<Option<Self::Item>, DOMException> {
         Err(DOMException::NoModificationAllowedErr)
