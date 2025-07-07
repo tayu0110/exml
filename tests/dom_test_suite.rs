@@ -11583,17 +11583,17 @@ mod dom_test_suite {
                 let mut employee = root.append_child(doc.create_element_ns(Some("http://www.nist.gov"), "employee").unwrap().into()).unwrap().as_element().unwrap();
                 employee.set_attribute_ns(Some(XML_NS_NAMESPACE), "xmlns", "http://www.nist.gov").unwrap();
                 employee.set_attribute_ns(Some(XML_NS_NAMESPACE), "xmlns:dmstc", "http://www.usa.com").unwrap();
-                let mut employee_id = employee.append_child(doc.create_element_ns(None, "employeeId").unwrap().into()).unwrap();
+                let mut employee_id = employee.append_child(doc.create_element_ns(Some("http://www.nist.gov"), "employeeId").unwrap().into()).unwrap();
                 employee_id.append_child(doc.create_text_node("EMP0001").into()).unwrap();
-                let mut name = employee.append_child(doc.create_element_ns(None, "name").unwrap().into()).unwrap();
+                let mut name = employee.append_child(doc.create_element_ns(Some("http://www.nist.gov"), "name").unwrap().into()).unwrap();
                 name.append_child(doc.create_text_node("Margaret Martin").into()).unwrap();
-                let mut position = employee.append_child(doc.create_element_ns(None, "position").unwrap().into()).unwrap();
+                let mut position = employee.append_child(doc.create_element_ns(Some("http://www.nist.gov"), "position").unwrap().into()).unwrap();
                 position.append_child(doc.create_text_node("Accountant").into()).unwrap();
-                let mut salary = employee.append_child(doc.create_element_ns(None, "salary").unwrap().into()).unwrap();
+                let mut salary = employee.append_child(doc.create_element_ns(Some("http://www.nist.gov"), "salary").unwrap().into()).unwrap();
                 salary.append_child(doc.create_text_node("56,000").into()).unwrap();
-                let mut gender = employee.append_child(doc.create_element_ns(None, "gender").unwrap().into()).unwrap();
+                let mut gender = employee.append_child(doc.create_element_ns(Some("http://www.nist.gov"), "gender").unwrap().into()).unwrap();
                 gender.append_child(doc.create_text_node("Female").into()).unwrap();
-                let mut address = employee.append_child(doc.create_element_ns(None, "address").unwrap().into()).unwrap().as_element().unwrap();
+                let mut address = employee.append_child(doc.create_element_ns(Some("http://www.nist.gov"), "address").unwrap().into()).unwrap().as_element().unwrap();
                 address.append_child(doc.create_text_node("1230 North Ave. Dallas, Texas 98551").into())?;
                 address.set_attribute_ns(Some("http://www.usa.com"), "dmstc:domestic", "Yes").unwrap();
 
