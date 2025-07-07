@@ -639,7 +639,7 @@ impl Node for DocumentTypeRef {
         false
     }
 
-    fn lookup_namespace_uri(&self, _prefix: &str) -> Option<Rc<str>> {
+    fn lookup_namespace_uri(&self, _prefix: Option<&str>) -> Option<Rc<str>> {
         None
     }
 

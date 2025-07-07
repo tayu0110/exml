@@ -1384,15 +1384,8 @@ pub trait Node: NodeConnection {
     ///
     /// No Exceptions
     /// ```
-    fn lookup_namespace_uri(&self, prefix: &str) -> Option<Rc<str>> {
-        let mut ancestor = self.parent_node();
-        while let Some(par) = ancestor {
-            ancestor = par.parent_node();
-            if let NodeRef::Element(elem) = par {
-                return elem.lookup_namespace_uri(prefix);
-            }
-        }
-        None
+    fn lookup_namespace_uri(&self, prefix: Option<&str>) -> Option<Rc<str>> {
+        self.parent_node()?.lookup_namespace_uri(prefix)
     }
 
     /// Implementation of [`isEqualNode`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-Node3-isEqualNode) method.
@@ -1777,7 +1770,7 @@ impl_node_trait_to_noderef! {
     fn is_same_node(other: &NodeRef) -> bool,
     fn lookup_prefix(ns_uri: &str) -> Option<Rc<str>>,
     fn is_default_namespace(ns_uri: &str) -> bool,
-    fn lookup_namespace_uri(prefix: &str) -> Option<Rc<str>>,
+    fn lookup_namespace_uri(prefix: Option<&str>) -> Option<Rc<str>>,
     fn is_equal_node(arg: &NodeRef) -> bool,
     fn is_read_only() -> bool
 }

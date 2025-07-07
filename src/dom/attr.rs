@@ -402,7 +402,7 @@ impl Node for AttrRef {
             .is_some_and(|elem| elem.is_default_namespace(namespace_uri))
     }
 
-    fn lookup_namespace_uri(&self, prefix: &str) -> Option<Rc<str>> {
+    fn lookup_namespace_uri(&self, prefix: Option<&str>) -> Option<Rc<str>> {
         self.owner_element()?.lookup_namespace_uri(prefix)
     }
 

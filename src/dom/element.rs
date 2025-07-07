@@ -716,8 +716,28 @@ impl ElementRef {
         if self.owner_document().is_some_and(|doc| doc.is_html()) {
             return Err(DOMException::NotSupportedErr);
         }
-        self.attributes()
-            .get_named_item_ns(namespace_uri, local_name)
+        if let Some(attr) = self
+            .attributes()
+            .get_named_item_ns(namespace_uri, local_name)?
+        {
+            return Ok(Some(attr));
+        }
+
+        // fallback for the unspecified attribute.
+        if let Some(prefix) = self.lookup_prefix(namespace_uri.unwrap_or_default()) {
+            let qname = format!("{prefix}:{local_name}");
+            if let Some(mut attr) = self
+                .attributes()
+                .get_named_item(&qname)
+                .filter(|attr| !attr.specified())
+            {
+                // If found, we register the namespaceURI for the attribute.
+                attr.rename(qname.into(), namespace_uri.map(|uri| uri.into()));
+                self.attributes().set_named_item_ns(attr.clone());
+                return Ok(Some(attr));
+            }
+        }
+        Ok(None)
     }
     /// Implementation of [`setAttributeNodeNS`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-ElSetAtNodeNS) method.
     ///
@@ -1025,10 +1045,10 @@ impl ElementRef {
         orig: ElementRef,
     ) -> Option<Rc<str>> {
         if self.namespace_uri().as_deref() == Some(namespace_uri)
-            && self
-                .prefix()
-                .and_then(|pre| orig.lookup_namespace_uri(&pre))
-                .is_some_and(|uri| uri.as_ref() == namespace_uri)
+            && orig
+                .lookup_namespace_uri(self.prefix().as_deref())
+                .as_deref()
+                == Some(namespace_uri)
         {
             return self.prefix();
         }
@@ -1036,14 +1056,12 @@ impl ElementRef {
         let attrs = self.attributes();
         for i in 0..attrs.length() {
             let attr = attrs.item(i).unwrap();
-            if attr.prefix().is_some_and(|pre| pre.as_ref() == "xml")
-                && attr
-                    .node_value()
-                    .is_some_and(|val| val.as_ref() == namespace_uri)
-                && attr
-                    .local_name()
-                    .and_then(|loc| orig.lookup_namespace_uri(&loc))
-                    .is_some_and(|uri| uri.as_ref() == namespace_uri)
+            if attr.prefix().as_deref() == Some("xmlns")
+                && attr.node_value().as_deref() == Some(namespace_uri)
+                && orig
+                    .lookup_namespace_uri(attr.local_name().as_deref())
+                    .as_deref()
+                    == Some(namespace_uri)
             {
                 return attr.local_name();
             }
@@ -1052,8 +1070,8 @@ impl ElementRef {
         let mut ancestor = self.parent_node();
         while let Some(par) = ancestor {
             ancestor = par.parent_node();
-            if let NodeRef::Element(elem) = par {
-                return elem.lookup_namespace_prefix(namespace_uri, orig);
+            if let Some(element) = par.as_element() {
+                return element.lookup_namespace_prefix(namespace_uri, orig);
             }
         }
         None
@@ -1232,29 +1250,27 @@ impl Node for ElementRef {
         false
     }
 
-    fn lookup_namespace_uri(&self, prefix: &str) -> Option<Rc<str>> {
-        if self.namespace_uri().is_some() && self.prefix().is_some_and(|pre| pre.as_ref() == prefix)
-        {
-            return self.namespace_uri();
-        }
-
-        let attrs = self.attributes();
-        for i in 0..attrs.length() {
-            let attr = attrs.item(i).unwrap();
-            if (attr.prefix().as_deref() == Some("xmlns")
-                && self.local_name().as_deref() == Some(prefix))
-                || (attr.local_name().as_deref() == Some("xmlns") && attr.prefix().is_none())
-            {
-                return attr.node_value();
+    fn lookup_namespace_uri(&self, prefix: Option<&str>) -> Option<Rc<str>> {
+        if self.prefix().as_deref() == prefix {
+            if let Some(namespace_uri) = self.namespace_uri() {
+                return Some(namespace_uri);
             }
         }
-
-        let mut ancestor = self.parent_node();
-        while let Some(par) = ancestor {
-            ancestor = par.parent_node();
-            if let NodeRef::Element(elem) = par {
+        if let Some(attr) =
+            prefix.and_then(|prefix| self.get_attribute_node(&format!("xmlns:{prefix}")))
+        {
+            return attr.node_value().filter(|value| !value.is_empty());
+        } else if prefix.is_none_or(|prefix| prefix.is_empty()) {
+            if let Some(attr) = self.get_attribute_node("xmlns") {
+                return attr.node_value().filter(|value| !value.is_empty());
+            }
+        }
+        let mut par = self.parent_node();
+        while let Some(now) = par {
+            if let Some(elem) = now.as_element() {
                 return elem.lookup_namespace_uri(prefix);
             }
+            par = now.parent_node();
         }
         None
     }

@@ -11569,7 +11569,7 @@ mod dom_test_suite {
                 // <!ATTLIST emp:address emp:zone ID #IMPLIED>
                 doctype.add_attlist_decl::<true>(doctype.create_attlist_decl("emp:address","emp:zone",AttType::ID,DefaultDecl::Implied).unwrap()).unwrap();
                 // <!ATTLIST emp:address emp:district CDATA 'DISTRICT'>
-                doctype.add_attlist_decl::<true>(doctype.create_attlist_decl("emp:address","emp:distric",AttType::CDATA,DefaultDecl::None("DISTRICT".into())).unwrap()).unwrap();
+                doctype.add_attlist_decl::<true>(doctype.create_attlist_decl("emp:address","emp:district",AttType::CDATA,DefaultDecl::None("DISTRICT".into())).unwrap()).unwrap();
                 // <!ATTLIST emp:address emp:local1 CDATA 'FALSE'>
                 doctype.add_attlist_decl::<true>(doctype.create_attlist_decl("emp:address","emp:local1",AttType::CDATA,DefaultDecl::None("FALSE".into())).unwrap()).unwrap();
 
@@ -19240,7 +19240,10 @@ mod dom_test_suite {
                 r#txt = r#doc.create_text_node("Text"); // <createTextNode var="txt" obj="doc" data="&quot;Text&quot;"/>
                 r#appended_child = r#elem.append_child(txt.into()).unwrap(); // <appendChild obj="elem" var="appendedChild" newChild="txt"/>
                 r#appended_child = r#doc_elem.append_child(elem.into()).unwrap(); // <appendChild obj="docElem" var="appendedChild" newChild="elem"/>
-                r#namespace_uri = r#txt.lookup_namespace_uri("dom3").unwrap().to_string(); // <lookupNamespaceURI var="namespaceURI" obj="txt" prefix="&quot;dom3&quot;" interface="Node"/>
+                r#namespace_uri = r#txt
+                    .lookup_namespace_uri(Some("dom3"))
+                    .unwrap()
+                    .to_string(); // <lookupNamespaceURI var="namespaceURI" obj="txt" prefix="&quot;dom3&quot;" interface="Node"/>
                 assert_eq!(r#namespace_uri, "http://www.w3.org/1999/xhtml"); // <assertEquals actual="namespaceURI" expected="&quot;http://www.w3.org/1999/xhtml&quot;" id="nodelookupnamespaceuri13" ignoreCase="false"/>
             }
             // domconfigparameternames01.xml
@@ -21829,7 +21832,10 @@ mod dom_test_suite {
                     .unwrap(); // <createElementNS var="parent" obj="doc" namespaceURI="&quot;http://www.w3.org/1999/xhtml&quot;" qualifiedName="&quot;xhtml:body&quot;"/>
                 r#child = r#doc.create_element("p".to_string()).unwrap(); // <createElement var="child" obj="doc" tagName="&quot;p&quot;"/>
                 r#appended_child = r#parent.append_child(child.into()).unwrap(); // <appendChild obj="parent" var="appendedChild" newChild="child"/>
-                r#namespace_uri = r#child.lookup_namespace_uri("xhtml").unwrap().to_string(); // <lookupNamespaceURI var="namespaceURI" obj="child" prefix="&quot;xhtml&quot;" interface="Node"/>
+                r#namespace_uri = r#child
+                    .lookup_namespace_uri(Some("xhtml"))
+                    .unwrap()
+                    .to_string(); // <lookupNamespaceURI var="namespaceURI" obj="child" prefix="&quot;xhtml&quot;" interface="Node"/>
                 assert_eq!(r#namespace_uri, "http://www.w3.org/1999/xhtml"); // <assertEquals actual="namespaceURI" expected="&quot;http://www.w3.org/1999/xhtml&quot;" id="nodelookupnamespaceuri10" ignoreCase="false"/>
             }
             // nodelookupnamespaceuri19.xml
@@ -21847,7 +21853,10 @@ mod dom_test_suite {
                 r#elem = r#elem_list.item(3).unwrap(); // <item var="elem" obj="elemList" index="3" interface="NodeList"/>
                 r#attributes_map = r#elem.attributes(); // <attributes var="attributesMap" obj="elem"/>
                 r#attr = r#attributes_map.get_named_item("class").unwrap(); // <getNamedItem var="attr" obj="attributesMap" name="&quot;class&quot;"/>
-                r#namespace_uri = r#attr.lookup_namespace_uri("xsi").unwrap().to_string(); // <lookupNamespaceURI var="namespaceURI" obj="attr" prefix="&quot;xsi&quot;" interface="Node"/>
+                r#namespace_uri = r#attr
+                    .lookup_namespace_uri(Some("xsi"))
+                    .unwrap()
+                    .to_string(); // <lookupNamespaceURI var="namespaceURI" obj="attr" prefix="&quot;xsi&quot;" interface="Node"/>
                 assert_eq!(r#namespace_uri, "http://www.w3.org/2001/XMLSchema-instance");
                 // <assertEquals actual="namespaceURI" expected="&quot;http://www.w3.org/2001/XMLSchema-instance&quot;" id="nodelookupnamespaceuri19" ignoreCase="false"/>
             }
@@ -22173,9 +22182,12 @@ mod dom_test_suite {
                 r#doc = todo!(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="false"/>
                 r#elem_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName var="elemList" obj="doc" tagname="&quot;p&quot;" interface="Document"/>
                 r#elem = r#elem_list.item(0).unwrap(); // <item var="elem" obj="elemList" index="0" interface="NodeList"/>
-                r#namespace_uri = r#elem.lookup_namespace_uri("dmstc").unwrap().to_string(); // <lookupNamespaceURI var="namespaceURI" obj="elem" prefix="&quot;dmstc&quot;" interface="Node"/>
+                r#namespace_uri = r#elem
+                    .lookup_namespace_uri(Some("dmstc"))
+                    .unwrap()
+                    .to_string(); // <lookupNamespaceURI var="namespaceURI" obj="elem" prefix="&quot;dmstc&quot;" interface="Node"/>
                 assert_eq!(r#namespace_uri, "http://www.usa.com"); // <assertEquals actual="namespaceURI" expected="&quot;http://www.usa.com&quot;" id="nodelookupnamespaceuri08" ignoreCase="false"/>
-                r#namespace_uri_empty = r#elem.lookup_namespace_uri("").unwrap().to_string();
+                r#namespace_uri_empty = r#elem.lookup_namespace_uri(Some("")).unwrap().to_string();
                 // <lookupNamespaceURI var="namespaceURIEmpty" obj="elem" prefix="&quot;&quot;" interface="Node"/>
 
                 // unimplemented: // <assertNull actual="namespaceURIEmpty" id="nodelookupnamespaceprefixEmpty08"/>
@@ -22471,7 +22483,7 @@ mod dom_test_suite {
                 r#elem = r#elem_list.item(3).unwrap(); // <item var="elem" obj="elemList" index="3" interface="NodeList"/>
                 r#attributes_map = r#elem.attributes(); // <attributes var="attributesMap" obj="elem"/>
                 r#attr = r#attributes_map.get_named_item("dir").unwrap(); // <getNamedItem var="attr" obj="attributesMap" name="&quot;dir&quot;"/>
-                r#namespace_uri = r#attr.lookup_namespace_uri("nm").unwrap().to_string(); // <lookupNamespaceURI var="namespaceURI" obj="attr" prefix="&quot;nm&quot;" interface="Node"/>
+                r#namespace_uri = r#attr.lookup_namespace_uri(Some("nm")).unwrap().to_string(); // <lookupNamespaceURI var="namespaceURI" obj="attr" prefix="&quot;nm&quot;" interface="Node"/>
                 assert_eq!(r#namespace_uri, "http://www.altavista.com"); // <assertEquals actual="namespaceURI" expected="&quot;http://www.altavista.com&quot;" id="nodelookupnamespaceuri18" ignoreCase="false"/>
             }
             // elementsetidattributenode10.xml
@@ -22576,9 +22588,12 @@ mod dom_test_suite {
                 r#doc = todo!(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="false"/>
                 r#elem_list = r#doc.get_elements_by_tag_name("em"); // <getElementsByTagName var="elemList" obj="doc" tagname="&quot;em&quot;" interface="Document"/>
                 r#elem = r#elem_list.item(0).unwrap(); // <item var="elem" obj="elemList" index="0" interface="NodeList"/>
-                r#namespace_uri = r#elem.lookup_namespace_uri("dmstc").unwrap().to_string(); // <lookupNamespaceURI var="namespaceURI" obj="elem" prefix="&quot;dmstc&quot;" interface="Node"/>
+                r#namespace_uri = r#elem
+                    .lookup_namespace_uri(Some("dmstc"))
+                    .unwrap()
+                    .to_string(); // <lookupNamespaceURI var="namespaceURI" obj="elem" prefix="&quot;dmstc&quot;" interface="Node"/>
                 assert_eq!(r#namespace_uri, "http://www.usa.com"); // <assertEquals actual="namespaceURI" expected="&quot;http://www.usa.com&quot;" id="nodelookupnamespaceuri09" ignoreCase="false"/>
-                r#namespace_uri_empty = r#elem.lookup_namespace_uri("").unwrap().to_string();
+                r#namespace_uri_empty = r#elem.lookup_namespace_uri(Some("")).unwrap().to_string();
                 // <lookupNamespaceURI var="namespaceURIEmpty" obj="elem" prefix="&quot;&quot;" interface="Node"/>
 
                 // unimplemented: // <assertNull actual="namespaceURIEmpty" id="nodelookupnamespaceprefixEmpty09"/>
@@ -23208,7 +23223,10 @@ mod dom_test_suite {
                 r#attr = r#attributes_map
                     .get_named_item("xsi:noNamespaceSchemaLocation")
                     .unwrap(); // <getNamedItem var="attr" obj="attributesMap" name="&quot;xsi:noNamespaceSchemaLocation&quot;"/>
-                r#namespace_uri = r#attr.lookup_namespace_uri("dmstc").unwrap().to_string(); // <lookupNamespaceURI var="namespaceURI" obj="attr" prefix="&quot;dmstc&quot;" interface="Node"/>
+                r#namespace_uri = r#attr
+                    .lookup_namespace_uri(Some("dmstc"))
+                    .unwrap()
+                    .to_string(); // <lookupNamespaceURI var="namespaceURI" obj="attr" prefix="&quot;dmstc&quot;" interface="Node"/>
                 assert_eq!(r#namespace_uri, "http://www.netzero.com"); // <assertEquals actual="namespaceURI" expected="&quot;http://www.netzero.com&quot;" id="nodelookupnamespaceuri17" ignoreCase="false"/>
             }
             // documentsetstricterrorchecking01.xml
@@ -28002,7 +28020,10 @@ mod dom_test_suite {
                     )
                     .unwrap(); // <createAttributeNS var="attr" obj="doc" namespaceURI="&quot;http://www.w3.org/XML/1998/namespace&quot;" qualifiedName="&quot;xml:lang&quot;"/>
                 r#att_node = r#elem.set_attribute_node_ns(r#attr).unwrap().unwrap(); // <setAttributeNodeNS obj="elem" var="attNode" newAttr="attr"/>
-                r#namespace_uri = r#attr.lookup_namespace_uri("xml").unwrap().to_string();
+                r#namespace_uri = r#attr
+                    .lookup_namespace_uri(Some("xml"))
+                    .unwrap()
+                    .to_string();
                 // <lookupNamespaceURI var="namespaceURI" obj="attr" prefix="&quot;xml&quot;" interface="Node"/>
 
                 // unimplemented: // <assertNull actual="namespaceURI" id="nodelookupnamespaceuri16"/>
@@ -30716,7 +30737,7 @@ mod dom_test_suite {
                 r#elem = r#elem_list.item(3).unwrap(); // <item var="elem" obj="elemList" index="3" interface="NodeList"/>
                 r#attributes_map = r#elem.attributes(); // <attributes var="attributesMap" obj="elem"/>
                 r#attr = r#attributes_map.get_named_item("xmlns:nm").unwrap(); // <getNamedItem var="attr" obj="attributesMap" name="&quot;xmlns:nm&quot;"/>
-                r#namespace_uri = r#attr.lookup_namespace_uri("nm").unwrap().to_string(); // <lookupNamespaceURI var="namespaceURI" obj="attr" prefix="&quot;nm&quot;" interface="Node"/>
+                r#namespace_uri = r#attr.lookup_namespace_uri(Some("nm")).unwrap().to_string(); // <lookupNamespaceURI var="namespaceURI" obj="attr" prefix="&quot;nm&quot;" interface="Node"/>
                 assert_eq!(r#namespace_uri, "http://www.altavista.com"); // <assertEquals actual="namespaceURI" expected="&quot;http://www.altavista.com&quot;" id="nodelookupnamespaceuri20" ignoreCase="false"/>
             }
             // typeinfoisderivedfrom22.xml
@@ -32468,7 +32489,7 @@ mod dom_test_suite {
                 r#appended_child = r#elem.append_child(cloned_comment).unwrap(); // <appendChild obj="elem" var="appendedChild" newChild="clonedComment"/>
                 r#appended_child = r#doc_elem.append_child(elem.into()).unwrap(); // <appendChild obj="docElem" var="appendedChild" newChild="elem"/>
                 r#namespace_uri = r#cloned_comment
-                    .lookup_namespace_uri("dom3")
+                    .lookup_namespace_uri(Some("dom3"))
                     .unwrap()
                     .to_string(); // <lookupNamespaceURI var="namespaceURI" obj="clonedComment" prefix="&quot;dom3&quot;" interface="Node"/>
                 assert_eq!(r#namespace_uri, "http://www.w3.org/1999/xhtml"); // <assertEquals actual="namespaceURI" expected="&quot;http://www.w3.org/1999/xhtml&quot;" id="nodelookupnamespaceuri15" ignoreCase="false"/>
@@ -33141,7 +33162,10 @@ mod dom_test_suite {
                 r#cdata = r#doc.create_cdata_section("Text").unwrap(); // <createCDATASection var="cdata" obj="doc" data="&quot;Text&quot;"/>
                 r#appended_child = r#elem.append_child(cdata.into()).unwrap(); // <appendChild var="appendedChild" obj="elem" newChild="cdata"/>
                 r#appended_child = r#doc_elem.append_child(elem.into()).unwrap(); // <appendChild var="appendedChild" obj="docElem" newChild="elem"/>
-                r#lookup_namespace_uri = r#cdata.lookup_namespace_uri("dom3").unwrap().to_string(); // <lookupNamespaceURI var="lookupNamespaceURI" obj="cdata" prefix="&quot;dom3&quot;" interface="Node"/>
+                r#lookup_namespace_uri = r#cdata
+                    .lookup_namespace_uri(Some("dom3"))
+                    .unwrap()
+                    .to_string(); // <lookupNamespaceURI var="lookupNamespaceURI" obj="cdata" prefix="&quot;dom3&quot;" interface="Node"/>
                 assert_eq!(r#lookup_namespace_uri, "http://www.w3.org/1999/xhtml");
                 // <assertEquals actual="lookupNamespaceURI" expected="&quot;http://www.w3.org/1999/xhtml&quot;" id="nodelookupnamespaceuri14" ignoreCase="false"/>
             }
@@ -34797,7 +34821,10 @@ mod dom_test_suite {
                 r#doc = todo!(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="false"/>
                 r#elem_list = r#doc.get_elements_by_tag_name("em"); // <getElementsByTagName var="elemList" obj="doc" tagname="&quot;em&quot;" interface="Document"/>
                 r#elem = r#elem_list.item(2).unwrap(); // <item var="elem" obj="elemList" index="2" interface="NodeList"/>
-                r#namespace_uri = r#elem.lookup_namespace_uri("dmstc").unwrap().to_string(); // <lookupNamespaceURI var="namespaceURI" obj="elem" prefix="&quot;dmstc&quot;" interface="Node"/>
+                r#namespace_uri = r#elem
+                    .lookup_namespace_uri(Some("dmstc"))
+                    .unwrap()
+                    .to_string(); // <lookupNamespaceURI var="namespaceURI" obj="elem" prefix="&quot;dmstc&quot;" interface="Node"/>
                 assert_eq!(r#namespace_uri, "http://www.netzero.com"); // <assertEquals actual="namespaceURI" expected="&quot;http://www.netzero.com&quot;" id="nodelookupnamespaceuri07" ignoreCase="false"/>
             }
             // documentsetdocumenturi01.xml
@@ -35867,7 +35894,10 @@ mod dom_test_suite {
                 r#doc = todo!(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="false"/>
                 r#elem_list = r#doc.get_elements_by_tag_name("p"); // <getElementsByTagName var="elemList" obj="doc" tagname="&quot;p&quot;" interface="Document"/>
                 r#elem = r#elem_list.item(2).unwrap(); // <item var="elem" obj="elemList" index="2" interface="NodeList"/>
-                r#namespace_uri = r#elem.lookup_namespace_uri("dmstc").unwrap().to_string(); // <lookupNamespaceURI var="namespaceURI" obj="elem" prefix="&quot;dmstc&quot;" interface="Node"/>
+                r#namespace_uri = r#elem
+                    .lookup_namespace_uri(Some("dmstc"))
+                    .unwrap()
+                    .to_string(); // <lookupNamespaceURI var="namespaceURI" obj="elem" prefix="&quot;dmstc&quot;" interface="Node"/>
                 assert_eq!(r#namespace_uri, "http://www.netzero.com"); // <assertEquals actual="namespaceURI" expected="&quot;http://www.netzero.com&quot;" id="nodelookupnamespaceuri06" ignoreCase="false"/>
             }
             // domimplementationregistry07.xml

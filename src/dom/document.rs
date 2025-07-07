@@ -1551,7 +1551,7 @@ impl DocumentRef {
         match attlistdecl.default_decl() {
             DefaultDecl::None(def) | DefaultDecl::Fixed(def) => {
                 let mut attr = if let Some(namespace_uri) = split_qname2(attr_name)
-                    .and_then(|(pre, _)| context_node.lookup_namespace_uri(pre))
+                    .and_then(|(pre, _)| context_node.lookup_namespace_uri(Some(pre)))
                 {
                     self.create_attribute_ns(Some(&namespace_uri), attr_name)
                         .ok()?
@@ -1847,9 +1847,8 @@ impl Node for DocumentRef {
             .unwrap_or(false)
     }
 
-    fn lookup_namespace_uri(&self, prefix: &str) -> Option<Rc<str>> {
-        self.document_element()
-            .and_then(|elem| elem.lookup_namespace_uri(prefix))
+    fn lookup_namespace_uri(&self, prefix: Option<&str>) -> Option<Rc<str>> {
+        self.document_element()?.lookup_namespace_uri(prefix)
     }
 
     fn is_read_only(&self) -> bool {
