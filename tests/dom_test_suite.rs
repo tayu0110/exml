@@ -11927,25 +11927,33 @@ mod dom_test_suite {
             // namednodemapsetnameditemns08.xml
             #[test]
             fn test_namednodemapsetnameditemns08() {
-                // // unimplemented: // <implementationAttribute name="namespaceAware" value="true"/>
-                // let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
-                // let mut r#attributes; // type: NamedNodeMap // <var name="attributes" type="NamedNodeMap"/>
-                // let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
-                // let mut r#element; // type: Element // <var name="element" type="Element"/>
-                // let mut r#attr; // type: Attr // <var name="attr" type="Attr"/>
-                // let mut r#new_node; // type: Node // <var name="newNode" type="Node"/>
-                // r#doc = staff_ns_xml(STAFF_NS_XML).unwrap(); // staffNS.xml // <load var="doc" href="staffNS" willBeModified="true"/>
-                // r#element_list = r#doc.get_elements_by_tag_name_ns(Some("*"), "address"); // <getElementsByTagNameNS var="elementList" obj="doc" namespaceURI="&quot;*&quot;" localName="&quot;address&quot;" interface="Document"/>
-                // r#element = r#element_list.item(0).unwrap(); // <item var="element" obj="elementList" index="0" interface="NodeList"/>
-                // r#attributes = r#element.attributes(); // <attributes var="attributes" obj="element"/>
-                // r#attr = r#attributes
-                //     .get_named_item_ns(Some("http://www.usa.com".into()), "domestic".into())
-                //     .unwrap()
-                //     .unwrap(); // <getNamedItemNS var="attr" obj="attributes" namespaceURI="&quot;http://www.usa.com&quot;" localName="&quot;domestic&quot;"/>
-                // r#element = r#element_list.item(1).unwrap(); // <item var="element" obj="elementList" index="1" interface="NodeList"/>
-                // r#attributes = r#element.attributes(); // <attributes var="attributes" obj="element"/>
+                // unimplemented: // <implementationAttribute name="namespaceAware" value="true"/>
+                let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
+                let mut r#attributes; // type: NamedNodeMap // <var name="attributes" type="NamedNodeMap"/>
+                let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
+                let mut r#element; // type: Element // <var name="element" type="Element"/>
+                let mut r#attr; // type: Attr // <var name="attr" type="Attr"/>
+                r#doc = staff_ns_xml(STAFF_NS_XML).unwrap(); // staffNS.xml // <load var="doc" href="staffNS" willBeModified="true"/>
+                r#element_list = r#doc.get_elements_by_tag_name_ns(Some("*"), "address"); // <getElementsByTagNameNS var="elementList" obj="doc" namespaceURI="&quot;*&quot;" localName="&quot;address&quot;" interface="Document"/>
+                r#element = r#element_list.item(0).unwrap(); // <item var="element" obj="elementList" index="0" interface="NodeList"/>
+                r#attributes = r#element.attributes(); // <attributes var="attributes" obj="element"/>
+                r#attr = r#attributes
+                    .get_named_item_ns(Some("http://www.usa.com"), "domestic")
+                    .unwrap()
+                    .unwrap(); // <getNamedItemNS var="attr" obj="attributes" namespaceURI="&quot;http://www.usa.com&quot;" localName="&quot;domestic&quot;"/>
+                r#element = r#element_list.item(1).unwrap(); // <item var="element" obj="elementList" index="1" interface="NodeList"/>
+                r#attributes = r#element.attributes(); // <attributes var="attributes" obj="element"/>
 
-                // // unimplemented: // <assertDOMException id="namednodemapsetnameditemns08"><INUSE_ATTRIBUTE_ERR><setNamedItemNS var="newNode" obj="attributes" arg="attr"/></INUSE_ATTRIBUTE_ERR></assertDOMException>
+                // <assertDOMException id="namednodemapsetnameditemns08">
+                //  <INUSE_ATTRIBUTE_ERR>
+                //      <setNamedItemNS var="newNode" obj="attributes" arg="attr"/>
+                //  </INUSE_ATTRIBUTE_ERR>
+                // </assertDOMException>
+                assert!(
+                    attributes
+                        .set_named_item_ns(attr)
+                        .is_err_and(|err| err == DOMException::InuseAttributeErr)
+                );
             }
             // prefix08.xml
             #[test]
@@ -11963,13 +11971,26 @@ mod dom_test_suite {
                 r#gender_node = r#gender_list.item(2).unwrap().clone(); // <item interface="NodeList" obj="genderList" index="2" var="genderNode"/>
                 r#ent_ref = r#gender_node.first_child().unwrap(); // <firstChild interface="Node" obj="genderNode" var="entRef"/>
                 r#node_type = r#ent_ref.node_type(); // <nodeType var="nodeType" obj="entRef"/>
-
-                // unimplemented: // <if><equals actual="nodeType" expected="1" ignoreCase="false"/>	<createEntityReference var="entRef" name="&quot;ent4&quot;" obj="doc"/>	<assertNotNull actual="entRef" id="createdEntRefNotNull"/></if>
+                // <if><equals actual="nodeType" expected="1" ignoreCase="false"/>
+                //  <createEntityReference var="entRef" name="&quot;ent4&quot;" obj="doc"/>
+                //  <assertNotNull actual="entRef" id="createdEntRefNotNull"/>
+                // </if>
+                if node_type as i32 == 1 {
+                    ent_ref = doc.create_entity_reference("ent4").unwrap().into();
+                }
                 r#ent_element = r#ent_ref.first_child().unwrap(); // <firstChild interface="Node" obj="entRef" var="entElement"/>
                 // unimplemented: // <assertNotNull actual="entElement" id="entElement"/>
                 r#created_node = r#doc.create_element("text3".to_string()).unwrap(); // <createElement obj="doc" tagName="&quot;text3&quot;" var="createdNode"/>
-
-                // unimplemented: // <assertDOMException id="throw_NO_MODIFICATION_ALLOWED_ERR"><NO_MODIFICATION_ALLOWED_ERR><prefix obj="entElement" value="&quot;newPrefix&quot;"/></NO_MODIFICATION_ALLOWED_ERR></assertDOMException>
+                // <assertDOMException id="throw_NO_MODIFICATION_ALLOWED_ERR">
+                //  <NO_MODIFICATION_ALLOWED_ERR>
+                //      <prefix obj="entElement" value="&quot;newPrefix&quot;"/>
+                //  </NO_MODIFICATION_ALLOWED_ERR>
+                // </assertDOMException>
+                assert!(
+                    ent_element
+                        .set_prefix(Some("newPrefix"))
+                        .is_err_and(|err| err == DOMException::NoModificationAllowedErr)
+                );
             }
             // namednodemapremovenameditemns05.xml
             #[test]

@@ -1185,6 +1185,7 @@ impl Node for ElementRef {
     }
 
     fn set_prefix(&mut self, prefix: Option<impl Into<Rc<str>>>) -> Result<(), DOMException> {
+        check_no_modification_allowed_err(self)?;
         let Some(local_name) = self.local_name() else {
             // This should have been created with DOM Level 1 method.
             return Ok(());
@@ -1194,7 +1195,6 @@ impl Node for ElementRef {
         if self.prefix() == prefix {
             return Ok(());
         }
-        check_no_modification_allowed_err(self)?;
         if let Some(prefix) = prefix {
             if validate_ncname::<false>(&prefix).is_err() {
                 return Err(DOMException::InvalidCharacterErr);
