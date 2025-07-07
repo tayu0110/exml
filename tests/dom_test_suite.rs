@@ -11671,7 +11671,7 @@ mod dom_test_suite {
                 salary.append_child(doc.create_text_node("90,000").into()).unwrap();
                 let mut gender = employee.append_child(doc.create_element_ns(None, "gender").unwrap().into()).unwrap();
                 gender.append_child(doc.create_text_node("male").into()).unwrap();
-                let mut address = employee.append_child(doc.create_element_ns(None, "address").unwrap().into()).unwrap().as_element().unwrap();
+                let mut address = employee.append_child(doc.create_element_ns(Some("http://www.nist.gov"), "address").unwrap().into()).unwrap().as_element().unwrap();
                 address.append_child(doc.create_text_node("1821 Nordic. Road, Irving Texas 98558").into())?;
                 address.set_attribute("street", "Yes").unwrap();
                 address.set_attribute_ns(Some(XML_NS_NAMESPACE), "xmlns", "http://www.nist.gov").unwrap();
