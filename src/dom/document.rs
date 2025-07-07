@@ -1054,11 +1054,12 @@ impl DocumentRef {
         let mut children = self.first_child();
         while let Some(child) = children {
             if let NodeRef::Element(elem) = &child {
-                if elem
-                    .get_attribute_node(element_id.as_ref())
-                    .is_some_and(|attr| attr.is_id())
-                {
-                    return Some(elem.clone());
+                let attrs = elem.attributes();
+                for i in 0..attrs.length() {
+                    let attr = attrs.item(i).unwrap();
+                    if attr.is_id() && attr.node_value().as_deref() == Some(&element_id) {
+                        return Some(elem.clone());
+                    }
                 }
             }
 

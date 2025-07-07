@@ -414,6 +414,15 @@ impl ElementRef {
         if self.is_read_only() {
             new_attr.set_read_only();
         }
+        if self
+            .owner_document()
+            .and_then(|doc| doc.doctype())
+            .and_then(|doctype| doctype.get_element_decl(&self.node_name()))
+            .and_then(|elemdecl| elemdecl.get_attribute_decl(&new_attr.name()))
+            .is_some_and(|attrdecl| attrdecl.is_id())
+        {
+            new_attr.set_is_id(true);
+        }
         Ok(res)
     }
     /// Implementation of [`removeAttributeNode`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-D589198) method.
@@ -615,6 +624,16 @@ impl ElementRef {
         if self.is_read_only() {
             attr.set_read_only();
         }
+        if self
+            .owner_document()
+            .and_then(|doc| doc.doctype())
+            .and_then(|doctype| doctype.get_element_decl(&self.node_name()))
+            .and_then(|elemdecl| elemdecl.get_attribute_decl(&attr.name()))
+            .is_some_and(|attrdecl| attrdecl.is_id())
+        {
+            attr.set_is_id(true);
+        }
+
         Ok(())
     }
     /// Implementation of [`removeAttributeNS`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-ElRemAtNS) method.
@@ -754,6 +773,15 @@ impl ElementRef {
         new_attr.set_owner_element(Some(self.clone()));
         if self.is_read_only() {
             new_attr.set_read_only();
+        }
+        if self
+            .owner_document()
+            .and_then(|doc| doc.doctype())
+            .and_then(|doctype| doctype.get_element_decl(&self.node_name()))
+            .and_then(|elemdecl| elemdecl.get_attribute_decl(&new_attr.name()))
+            .is_some_and(|attrdecl| attrdecl.is_id())
+        {
+            new_attr.set_is_id(true);
         }
         Ok(res)
     }

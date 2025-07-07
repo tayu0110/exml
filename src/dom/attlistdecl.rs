@@ -93,6 +93,10 @@ impl AttlistDeclRef {
         self.0.borrow().default_decl.clone()
     }
 
+    pub fn is_id(&self) -> bool {
+        matches!(self.att_type(), AttType::ID)
+    }
+
     pub fn set_owner_document(&mut self, doc: DocumentRef) -> Option<DocumentRef> {
         replace(
             &mut self.0.borrow_mut().owner_document,
