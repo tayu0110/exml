@@ -929,13 +929,13 @@ impl DocumentRef {
 
                 // ... if the qualifiedName or its prefix is "xmlns"
                 // and the namespaceURI is different from "http://www.w3.org/2000/xmlns/" ...
-                if (prefix == "xmlns" || qualified_name == "xmlns") && ns_uri != XML_NS_NAMESPACE {
+                if prefix == "xmlns" && ns_uri != XML_NS_NAMESPACE {
                     return Err(DOMException::NamespaceErr);
                 }
 
                 // ... if the namespaceURI is "http://www.w3.org/2000/xmlns/"
                 // and neither the qualifiedName nor its prefix is "xmlns".
-                if ns_uri == XML_NS_NAMESPACE && prefix != "xmlns" && qualified_name != "xmlns" {
+                if ns_uri == XML_NS_NAMESPACE && prefix != "xmlns" {
                     return Err(DOMException::NamespaceErr);
                 }
 
@@ -946,6 +946,18 @@ impl DocumentRef {
                 ))
             }
             None => {
+                // ... if the qualifiedName or its prefix is "xmlns"
+                // and the namespaceURI is different from "http://www.w3.org/2000/xmlns/" ...
+                if qualified_name == "xmlns" && namespace_uri != Some(XML_NS_NAMESPACE) {
+                    return Err(DOMException::NamespaceErr);
+                }
+
+                // ... if the namespaceURI is "http://www.w3.org/2000/xmlns/"
+                // and neither the qualifiedName nor its prefix is "xmlns".
+                if namespace_uri == Some(XML_NS_NAMESPACE) && qualified_name != "xmlns" {
+                    return Err(DOMException::NamespaceErr);
+                }
+
                 if let Some(ns_uri) = namespace_uri {
                     Ok(AttrRef::with_namespace(
                         self.clone(),

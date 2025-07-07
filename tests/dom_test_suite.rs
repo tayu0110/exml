@@ -12087,14 +12087,13 @@ mod dom_test_suite {
             // isSupported07.xml
             #[test]
             fn test_is_supported07() {
-                // let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
-                // let mut r#root_node; // type: Node // <var name="rootNode" type="Node"/>
-                // let mut r#state; // type: boolean // <var name="state" type="boolean"/>
-                // r#doc = staff_xml(STAFF_XML).unwrap(); // staff.xml // <load var="doc" href="staff" willBeModified="false"/>
-                // r#root_node = r#doc.document_element().unwrap(); // <documentElement obj="doc" var="rootNode"/>
-
-                // // unimplemented: // <isSupported obj="rootNode" feature="&quot;XML&quot;" version="&quot;&quot;" var="state"/>
-                // assert!(r#state); // <assertTrue actual="state" id="throw_True"/>
+                let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
+                let mut r#root_node; // type: Node // <var name="rootNode" type="Node"/>
+                let mut r#state; // type: boolean // <var name="state" type="boolean"/>
+                r#doc = staff_xml(STAFF_XML).unwrap(); // staff.xml // <load var="doc" href="staff" willBeModified="false"/>
+                r#root_node = r#doc.document_element().unwrap(); // <documentElement obj="doc" var="rootNode"/>
+                state = root_node.is_supported("XML", Some("")); // <isSupported obj="rootNode" feature="&quot;XML&quot;" version="&quot;&quot;" var="state"/>
+                assert!(r#state); // <assertTrue actual="state" id="throw_True"/>
             }
             // localName02.xml
             #[test]
@@ -12110,26 +12109,33 @@ mod dom_test_suite {
             // setNamedItemNS02.xml
             #[test]
             fn test_set_named_item_n_s02() {
-                // let mut r#namespace_uri; // type: DOMString // <var name="namespaceURI" type="DOMString" value="&quot;http://www.usa.com&quot;"/>
-                // let mut r#qualified_name; // type: DOMString // <var name="qualifiedName" type="DOMString" value="&quot;dmstc:domestic&quot;"/>
-                // let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
-                // let mut r#another_doc: DocumentRef; // <var name="anotherDoc" type="Document"/>
-                // let mut r#arg; // type: Node // <var name="arg" type="Node"/>
-                // let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
-                // let mut r#test_address; // type: Node // <var name="testAddress" type="Node"/>
-                // let mut r#attributes; // type: NamedNodeMap // <var name="attributes" type="NamedNodeMap"/>
-                // let mut r#set_node; // type: Node // <var name="setNode" type="Node"/>
-                // r#doc = staff_ns_xml(STAFF_NS_XML).unwrap(); // staffNS.xml // <load var="doc" href="staffNS" willBeModified="true"/>
-                // r#another_doc = staff_ns_xml(STAFF_NS_XML).unwrap(); // staffNS.xml // <load var="anotherDoc" href="staffNS" willBeModified="true"/>
-                // r#arg = r#another_doc
-                //     .create_attribute_ns(Some(r#namespace_uri), r#qualified_name.as_ref())
-                //     .unwrap(); // <createAttributeNS obj="anotherDoc" var="arg" namespaceURI="namespaceURI" qualifiedName="qualifiedName"/>
-                // r#arg.set_node_value("Maybe").unwrap(); // <nodeValue obj="arg" value="&quot;Maybe&quot;"/>
-                // r#element_list = r#doc.get_elements_by_tag_name("address"); // <getElementsByTagName interface="Document" obj="doc" var="elementList" tagname="&quot;address&quot;"/>
-                // r#test_address = r#element_list.item(0).unwrap(); // <item interface="NodeList" obj="elementList" var="testAddress" index="0"/>
-                // r#attributes = r#test_address.attributes(); // <attributes obj="testAddress" var="attributes"/>
-
-                // // unimplemented: // <assertDOMException id="throw_WRONG_DOCUMENT_ERR"><WRONG_DOCUMENT_ERR><setNamedItemNS var="setNode" interface="NamedNodeMap" obj="attributes" arg="arg"/></WRONG_DOCUMENT_ERR></assertDOMException>
+                let mut r#namespace_uri = "http://www.usa.com"; // type: DOMString // <var name="namespaceURI" type="DOMString" value="&quot;http://www.usa.com&quot;"/>
+                let mut r#qualified_name = "dmstc:domestic"; // type: DOMString // <var name="qualifiedName" type="DOMString" value="&quot;dmstc:domestic&quot;"/>
+                let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
+                let mut r#another_doc: DocumentRef; // <var name="anotherDoc" type="Document"/>
+                let mut r#arg; // type: Node // <var name="arg" type="Node"/>
+                let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
+                let mut r#test_address; // type: Node // <var name="testAddress" type="Node"/>
+                let mut r#attributes; // type: NamedNodeMap // <var name="attributes" type="NamedNodeMap"/>
+                r#doc = staff_ns_xml(STAFF_NS_XML).unwrap(); // staffNS.xml // <load var="doc" href="staffNS" willBeModified="true"/>
+                r#another_doc = staff_ns_xml(STAFF_NS_XML).unwrap(); // staffNS.xml // <load var="anotherDoc" href="staffNS" willBeModified="true"/>
+                r#arg = r#another_doc
+                    .create_attribute_ns(Some(r#namespace_uri), r#qualified_name.as_ref())
+                    .unwrap(); // <createAttributeNS obj="anotherDoc" var="arg" namespaceURI="namespaceURI" qualifiedName="qualifiedName"/>
+                r#arg.set_node_value("Maybe").unwrap(); // <nodeValue obj="arg" value="&quot;Maybe&quot;"/>
+                r#element_list = r#doc.get_elements_by_tag_name("address"); // <getElementsByTagName interface="Document" obj="doc" var="elementList" tagname="&quot;address&quot;"/>
+                r#test_address = r#element_list.item(0).unwrap(); // <item interface="NodeList" obj="elementList" var="testAddress" index="0"/>
+                r#attributes = r#test_address.attributes(); // <attributes obj="testAddress" var="attributes"/>
+                // <assertDOMException id="throw_WRONG_DOCUMENT_ERR">
+                //  <WRONG_DOCUMENT_ERR>
+                //      <setNamedItemNS var="setNode" interface="NamedNodeMap" obj="attributes" arg="arg"/>
+                //  </WRONG_DOCUMENT_ERR>
+                // </assertDOMException>
+                assert!(
+                    attributes
+                        .set_named_item_ns(arg)
+                        .is_err_and(|err| err == DOMException::WrongDocumentErr)
+                );
             }
             // namednodemapgetnameditemns05.xml
             #[test]
@@ -12163,30 +12169,44 @@ mod dom_test_suite {
             // createDocument06.xml
             #[test]
             fn test_create_document06() {
-                // let mut r#namespace_uri; // type: DOMString // <var name="namespaceURI" type="DOMString" value="&quot;http://ecommerce.org/schema&quot;"/>
-                // let mut r#qualified_name; // type: DOMString // <var name="qualifiedName" type="DOMString" value="&quot;xml:local&quot;"/>
-                // let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
-                // let mut r#doc_type; // type: DocumentType // <var name="docType" type="DocumentType" isNull="true"/>
-                // let mut r#dom_impl; // type: DOMImplementation // <var name="domImpl" type="DOMImplementation"/>
-                // let mut r#a_new_doc: DocumentRef; // <var name="aNewDoc" type="Document"/>
-                // r#doc = staff_ns_xml(STAFF_NS_XML).unwrap(); // staffNS.xml // <load var="doc" href="staffNS" willBeModified="false"/>
-
-                // // unimplemented: // <implementation obj="doc" var="domImpl"/>
-
-                // // unimplemented: // <assertDOMException id="throw_NAMESPACE_ERR"><NAMESPACE_ERR><createDocument obj="domImpl" var="aNewDoc" namespaceURI="namespaceURI" qualifiedName="qualifiedName" doctype="docType"/></NAMESPACE_ERR></assertDOMException>
+                let mut r#namespace_uri = "http://ecommerce.org/schema"; // type: DOMString // <var name="namespaceURI" type="DOMString" value="&quot;http://ecommerce.org/schema&quot;"/>
+                let mut r#qualified_name = "xml:local"; // type: DOMString // <var name="qualifiedName" type="DOMString" value="&quot;xml:local&quot;"/>
+                let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
+                let mut r#dom_impl; // type: DOMImplementation // <var name="domImpl" type="DOMImplementation"/>
+                let mut r#a_new_doc: DocumentRef; // <var name="aNewDoc" type="Document"/>
+                r#doc = staff_ns_xml(STAFF_NS_XML).unwrap(); // staffNS.xml // <load var="doc" href="staffNS" willBeModified="false"/>
+                dom_impl = doc.implementation(); // <implementation obj="doc" var="domImpl"/>
+                // <assertDOMException id="throw_NAMESPACE_ERR">
+                //  <NAMESPACE_ERR>
+                //      <createDocument obj="domImpl" var="aNewDoc" namespaceURI="namespaceURI" qualifiedName="qualifiedName" doctype="docType"/>
+                //  </NAMESPACE_ERR>
+                // </assertDOMException>
+                assert!(
+                    dom_impl
+                        .create_document(Some(namespace_uri), Some(qualified_name), None)
+                        .is_err_and(|err| err == DOMException::NamespaceErr)
+                );
             }
             // setAttributeNS10.xml
             #[test]
             fn test_set_attribute_n_s10() {
-                // let mut r#namespace_uri; // type: DOMString // <var name="namespaceURI" type="DOMString" value="&quot;http://www.example.gov&quot;"/>
-                // let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
-                // let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
-                // let mut r#test_addr; // type: Node // <var name="testAddr" type="Node"/>
-                // r#doc = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
-                // r#element_list = r#doc.get_elements_by_tag_name("em"); // <getElementsByTagName interface="Document" obj="doc" var="elementList" tagname="&quot;em&quot;"/>
-                // r#test_addr = r#element_list.item(0).unwrap(); // <item interface="NodeList" obj="elementList" var="testAddr" index="0"/>
-
-                // // unimplemented: // <assertDOMException id="throw_INVALID_CHARACTER_ERR"><INVALID_CHARACTER_ERR><setAttributeNS obj="testAddr" namespaceURI="namespaceURI" qualifiedName="&quot;&quot;" value="&quot;newValue&quot;"/></INVALID_CHARACTER_ERR></assertDOMException>
+                let mut r#namespace_uri = "http://www.example.gov"; // type: DOMString // <var name="namespaceURI" type="DOMString" value="&quot;http://www.example.gov&quot;"/>
+                let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
+                let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
+                let mut r#test_addr; // type: Node // <var name="testAddr" type="Node"/>
+                r#doc = hc_staff_xml(HC_STAFF_XML).unwrap(); // hc_staff.xml // <load var="doc" href="hc_staff" willBeModified="true"/>
+                r#element_list = r#doc.get_elements_by_tag_name("em"); // <getElementsByTagName interface="Document" obj="doc" var="elementList" tagname="&quot;em&quot;"/>
+                r#test_addr = r#element_list.item(0).unwrap(); // <item interface="NodeList" obj="elementList" var="testAddr" index="0"/>
+                // <assertDOMException id="throw_INVALID_CHARACTER_ERR">
+                //  <INVALID_CHARACTER_ERR>
+                //      <setAttributeNS obj="testAddr" namespaceURI="namespaceURI" qualifiedName="&quot;&quot;" value="&quot;newValue&quot;"/>
+                //  </INVALID_CHARACTER_ERR>
+                // </assertDOMException>
+                assert!(
+                    test_addr
+                        .set_attribute_ns(Some(namespace_uri), "", "newValue")
+                        .is_err_and(|err| err == DOMException::InvalidCharacterErr)
+                );
             }
             // removeAttributeNS02.xml
             #[test]
@@ -12245,13 +12265,19 @@ mod dom_test_suite {
             // documentcreateattributeNS07.xml
             #[test]
             fn test_documentcreateattribute_n_s07() {
-                // let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
-                // let mut r#attribute; // type: Attr // <var name="attribute" type="Attr"/>
-                // let mut r#namespace_uri; // type: DOMString // <var name="namespaceURI" type="DOMString" value="&quot;http://www.W3.org/2000/xmlns&quot;"/>
-                // let mut r#qualified_name; // type: DOMString // <var name="qualifiedName" type="DOMString" value="&quot;xmlns&quot;"/>
-                // r#doc = staff_ns_xml(STAFF_NS_XML).unwrap(); // staffNS.xml // <load var="doc" href="staffNS" willBeModified="false"/>
-
-                // // unimplemented: // <assertDOMException id="documentcreateattributeNS07"><NAMESPACE_ERR><createAttributeNS obj="doc" var="attribute" namespaceURI="namespaceURI" qualifiedName="qualifiedName"/></NAMESPACE_ERR></assertDOMException>
+                let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
+                let mut r#namespace_uri = "http://www.W3.org/2000/xmlns"; // type: DOMString // <var name="namespaceURI" type="DOMString" value="&quot;http://www.W3.org/2000/xmlns&quot;"/>
+                let mut r#qualified_name = "xmlns"; // type: DOMString // <var name="qualifiedName" type="DOMString" value="&quot;xmlns&quot;"/>
+                r#doc = staff_ns_xml(STAFF_NS_XML).unwrap(); // staffNS.xml // <load var="doc" href="staffNS" willBeModified="false"/>
+                // <assertDOMException id="documentcreateattributeNS07">
+                //  <NAMESPACE_ERR>
+                //      <createAttributeNS obj="doc" var="attribute" namespaceURI="namespaceURI" qualifiedName="qualifiedName"/>
+                //  </NAMESPACE_ERR>
+                // </assertDOMException>
+                assert!(
+                    doc.create_attribute_ns(Some(namespace_uri), qualified_name)
+                        .is_err_and(|err| err == DOMException::NamespaceErr)
+                );
             }
             // nodesetprefix07.xml
             #[test]
