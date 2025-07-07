@@ -12052,8 +12052,16 @@ mod dom_test_suite {
                 r#doc = staff_ns_xml(STAFF_NS_XML).unwrap(); // staffNS.xml // <load var="doc" href="staffNS" willBeModified="true"/>
                 r#element_list = r#doc.get_elements_by_tag_name("employee"); // <getElementsByTagName interface="Document" obj="doc" tagname="&quot;employee&quot;" var="elementList"/>
                 r#employee_node = r#element_list.item(0).unwrap(); // <item interface="NodeList" obj="elementList" index="0" var="employeeNode"/>
-
-                // unimplemented: // <assertDOMException id="throw_NAMESPACE_ERR"><NAMESPACE_ERR><prefix obj="employeeNode" value="&quot;emp::&quot;"/></NAMESPACE_ERR></assertDOMException>
+                // <assertDOMException id="throw_NAMESPACE_ERR">
+                //  <NAMESPACE_ERR>
+                //      <prefix obj="employeeNode" value="&quot;emp::&quot;"/>
+                //  </NAMESPACE_ERR>
+                // </assertDOMException>
+                assert!(
+                    employee_node
+                        .set_prefix(Some("emp::"))
+                        .is_err_and(|err| err == DOMException::NamespaceErr)
+                );
             }
             // createDocument01.xml
             #[test]

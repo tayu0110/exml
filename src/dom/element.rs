@@ -1197,7 +1197,7 @@ impl Node for ElementRef {
         }
         if let Some(prefix) = prefix {
             if validate_ncname::<false>(&prefix).is_err() {
-                return Err(DOMException::InvalidCharacterErr);
+                return Err(DOMException::NamespaceErr);
             }
             if self.namespace_uri().is_none() {
                 return Err(DOMException::NamespaceErr);
