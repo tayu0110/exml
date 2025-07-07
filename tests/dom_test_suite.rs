@@ -12066,17 +12066,23 @@ mod dom_test_suite {
             // createDocument01.xml
             #[test]
             fn test_create_document01() {
-                // let mut r#namespace_uri; // type: DOMString // <var name="namespaceURI" type="DOMString" value="&quot;http://www.ecommerce.org/&quot;"/>
-                // let mut r#malformed_name; // type: DOMString // <var name="malformedName" type="DOMString" value="&quot;prefix::local&quot;"/>
-                // let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
-                // let mut r#doc_type; // type: DocumentType // <var name="docType" type="DocumentType" isNull="true"/>
-                // let mut r#dom_impl; // type: DOMImplementation // <var name="domImpl" type="DOMImplementation"/>
-                // let mut r#a_new_doc: DocumentRef; // <var name="aNewDoc" type="Document"/>
-                // r#doc = staff_ns_xml(STAFF_NS_XML).unwrap(); // staffNS.xml // <load var="doc" href="staffNS" willBeModified="false"/>
-
-                // // unimplemented: // <implementation obj="doc" var="domImpl"/>
-
-                // // unimplemented: // <assertDOMException id="throw_NAMESPACE_ERR"><NAMESPACE_ERR><createDocument obj="domImpl" var="aNewDoc" namespaceURI="namespaceURI" qualifiedName="malformedName" doctype="docType"/></NAMESPACE_ERR></assertDOMException>
+                let mut r#namespace_uri = "http://www.ecommerce.org/"; // type: DOMString // <var name="namespaceURI" type="DOMString" value="&quot;http://www.ecommerce.org/&quot;"/>
+                let mut r#malformed_name = "prefix::local"; // type: DOMString // <var name="malformedName" type="DOMString" value="&quot;prefix::local&quot;"/>
+                let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
+                let mut r#dom_impl; // type: DOMImplementation // <var name="domImpl" type="DOMImplementation"/>
+                let mut r#a_new_doc: DocumentRef; // <var name="aNewDoc" type="Document"/>
+                r#doc = staff_ns_xml(STAFF_NS_XML).unwrap(); // staffNS.xml // <load var="doc" href="staffNS" willBeModified="false"/>
+                dom_impl = doc.implementation(); // <implementation obj="doc" var="domImpl"/>
+                // <assertDOMException id="throw_NAMESPACE_ERR">
+                //  <NAMESPACE_ERR>
+                //      <createDocument obj="domImpl" var="aNewDoc" namespaceURI="namespaceURI" qualifiedName="malformedName" doctype="docType"/>
+                //  </NAMESPACE_ERR>
+                // </assertDOMException>
+                assert!(
+                    dom_impl
+                        .create_document(Some(namespace_uri), Some(malformed_name), None)
+                        .is_err_and(|err| err == DOMException::NamespaceErr)
+                );
             }
             // isSupported07.xml
             #[test]

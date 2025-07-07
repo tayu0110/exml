@@ -302,7 +302,7 @@ impl DocumentRef {
 
         if let Some(qname) = qualified_name {
             if validate_qname::<false>(qname).is_err() {
-                return Err(DOMException::InvalidCharacterErr);
+                return Err(DOMException::NamespaceErr);
             }
 
             let elem = if let Some((prefix, _)) = split_qname2(qname) {
