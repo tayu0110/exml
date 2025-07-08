@@ -227,8 +227,11 @@ impl DocumentTypeRef {
         public_id: Option<&str>,
         system_id: Option<&str>,
     ) -> Result<Self, DOMException> {
-        if validate_qname::<false>(qualified_name).is_err() {
+        if validate_name::<false>(qualified_name).is_err() {
             return Err(DOMException::InvalidCharacterErr);
+        }
+        if validate_qname::<false>(qualified_name).is_err() {
+            return Err(DOMException::NamespaceErr);
         }
 
         Ok(DocumentTypeRef(Rc::new(RefCell::new(DocumentType {
