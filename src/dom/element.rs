@@ -6,7 +6,7 @@ use std::{
 
 use crate::{
     dom::{
-        check_no_modification_allowed_err, check_owner_document_sameness,
+        XML_XML_NAMESPACE, check_no_modification_allowed_err, check_owner_document_sameness,
         named_node_map::{AttributeMap, NamedNodeMap},
         node_list::FilteredSubtreeElementsList,
     },
@@ -1202,6 +1202,11 @@ impl Node for ElementRef {
                 return Err(DOMException::NamespaceErr);
             }
             if self.namespace_uri().is_none() {
+                return Err(DOMException::NamespaceErr);
+            }
+            if prefix.as_ref() == "xml"
+                && self.namespace_uri().as_deref() != Some(XML_XML_NAMESPACE)
+            {
                 return Err(DOMException::NamespaceErr);
             }
             self.0.borrow_mut().prefix = Some(prefix.clone());
