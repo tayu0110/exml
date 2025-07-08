@@ -661,6 +661,9 @@ pub trait Node: NodeConnection {
                             }
                         }
                     }
+                    if text.length() == 0 {
+                        self.remove_child(text.into()).ok();
+                    }
                 }
                 NodeRef::Element(mut elem) => {
                     elem.normalize();
