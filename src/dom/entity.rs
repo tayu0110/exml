@@ -189,12 +189,20 @@ impl Node for EntityRef {
         })));
 
         if deep {
+            let mut read_only_check = false;
+            if let Some(mut doc) = self.owner_document() {
+                read_only_check = doc.is_enabled_read_only_check();
+                doc.disable_read_only_check();
+            }
             let mut children = self.first_child();
             while let Some(child) = children {
                 children = child.next_sibling();
                 entity
                     .append_child(child.clone_node(true))
                     .expect("Internal Error");
+            }
+            if read_only_check {
+                self.owner_document().unwrap().enable_read_only_check();
             }
         }
         entity.into()

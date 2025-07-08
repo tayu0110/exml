@@ -12212,7 +12212,6 @@ mod dom_test_suite {
             #[test]
             fn test_remove_attribute_n_s02() {
                 // unimplemented: // <implementationAttribute name="namespaceAware" value="true"/>
-
                 // unimplemented: // <implementationAttribute name="validating" value="true"/>
                 let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
                 let mut r#element_list; // type: NodeList // <var name="elementList" type="NodeList"/>
@@ -12590,37 +12589,35 @@ mod dom_test_suite {
             // importNode12.xml
             #[test]
             fn test_import_node12() {
-                // let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
-                // let mut r#a_new_doc: DocumentRef; // <var name="aNewDoc" type="Document"/>
-                // let mut r#doc1_type; // type: DocumentType // <var name="doc1Type" type="DocumentType"/>
-                // let mut r#entity_list; // type: NamedNodeMap // <var name="entityList" type="NamedNodeMap"/>
-                // let mut r#entity2; // type: Entity // <var name="entity2" type="Entity"/>
-                // let mut r#entity1; // type: Entity // <var name="entity1" type="Entity"/>
-                // let mut r#owner_document: DocumentRef; // <var name="ownerDocument" type="Document"/>
-                // let mut r#doc_type; // type: DocumentType // <var name="docType" type="DocumentType"/>
-                // let mut r#system; // type: DOMString // <var name="system" type="DOMString"/>
-                // let mut r#entity_name; // type: DOMString // <var name="entityName" type="DOMString"/>
-                // let mut r#child; // type: Node // <var name="child" type="Node"/>
-                // let mut r#child_name; // type: DOMString // <var name="childName" type="DOMString"/>
-                // r#doc = staff_ns_xml(STAFF_NS_XML).unwrap(); // staffNS.xml // <load var="doc" href="staffNS" willBeModified="true"/>
-                // r#a_new_doc = staff_ns_xml(STAFF_NS_XML).unwrap(); // staffNS.xml // <load var="aNewDoc" href="staffNS" willBeModified="true"/>
-                // r#doc1_type = r#a_new_doc.doctype().unwrap(); // <doctype obj="aNewDoc" var="doc1Type"/>
-                // entity_list = doc_type.entities(); // <entities obj="doc1Type" var="entityList"/>
-                // // unimplemented: // <assertNotNull actual="entityList" id="entitiesNotNull"/>
-                // r#entity2 = r#entity_list.get_named_item("ent4".into()).unwrap(); // <getNamedItem obj="entityList" var="entity2" name="&quot;ent4&quot;"/>
-                // r#entity1 = r#doc.import_node(r#entity2.into(), true).unwrap(); // <importNode obj="doc" var="entity1" importedNode="entity2" deep="true"/>
-                // r#owner_document = r#entity1.owner_document().unwrap(); // <ownerDocument obj="entity1" var="ownerDocument"/>
-                // r#doc_type = r#owner_document.doctype().unwrap(); // <doctype obj="ownerDocument" var="docType"/>
-                // r#system = r#doc_type.system_id().unwrap().to_string(); // <systemId interface="DocumentType" obj="docType" var="system"/>
-
-                // // unimplemented: // <assertURIEquals actual="system" file="&quot;staffNS.dtd&quot;" id="systemId"/>
-                // r#entity_name = r#entity1.node_name().to_string(); // <nodeName obj="entity1" var="entityName"/>
-                // assert_eq!(r#entity_name, "ent4"); // <assertEquals actual="entityName" expected="&quot;ent4&quot;" id="entityName" ignoreCase="false"/>
-                // r#child = r#entity1.first_child().unwrap(); // <firstChild interface="Node" obj="entity1" var="child"/>
-
-                // // unimplemented: // <assertNotNull actual="child" id="notnull"/>
-                // r#child_name = r#child.node_name().to_string(); // <nodeName obj="child" var="childName"/>
-                // assert_eq!(r#child_name, "entElement1"); // <assertEquals actual="childName" expected="&quot;entElement1&quot;" id="childName" ignoreCase="false"/>
+                let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
+                let mut r#a_new_doc: DocumentRef; // <var name="aNewDoc" type="Document"/>
+                let mut r#doc1_type; // type: DocumentType // <var name="doc1Type" type="DocumentType"/>
+                let mut r#entity_list; // type: NamedNodeMap // <var name="entityList" type="NamedNodeMap"/>
+                let mut r#entity2; // type: Entity // <var name="entity2" type="Entity"/>
+                let mut r#entity1; // type: Entity // <var name="entity1" type="Entity"/>
+                let mut r#owner_document: DocumentRef; // <var name="ownerDocument" type="Document"/>
+                let mut r#doc_type; // type: DocumentType // <var name="docType" type="DocumentType"/>
+                let mut r#system; // type: DOMString // <var name="system" type="DOMString"/>
+                let mut r#entity_name; // type: DOMString // <var name="entityName" type="DOMString"/>
+                let mut r#child; // type: Node // <var name="child" type="Node"/>
+                let mut r#child_name; // type: D`OMString // <var name="childName" type="DOMString"/>
+                r#doc = staff_ns_xml(STAFF_NS_XML).unwrap(); // staffNS.xml // <load var="doc" href="staffNS" willBeModified="true"/>
+                r#a_new_doc = staff_ns_xml(STAFF_NS_XML).unwrap(); // staffNS.xml // <load var="aNewDoc" href="staffNS" willBeModified="true"/>
+                r#doc1_type = r#a_new_doc.doctype().unwrap(); // <doctype obj="aNewDoc" var="doc1Type"/>
+                entity_list = doc1_type.entities(); // <entities obj="doc1Type" var="entityList"/>
+                // unimplemented: // <assertNotNull actual="entityList" id="entitiesNotNull"/>
+                r#entity2 = r#entity_list.get_named_item("ent4").unwrap(); // <getNamedItem obj="entityList" var="entity2" name="&quot;ent4&quot;"/>
+                r#entity1 = r#doc.import_node(r#entity2.into(), true).unwrap(); // <importNode obj="doc" var="entity1" importedNode="entity2" deep="true"/>
+                r#owner_document = r#entity1.owner_document().unwrap(); // <ownerDocument obj="entity1" var="ownerDocument"/>
+                r#doc_type = r#owner_document.doctype().unwrap(); // <doctype obj="ownerDocument" var="docType"/>
+                r#system = r#doc_type.system_id().unwrap().to_string(); // <systemId interface="DocumentType" obj="docType" var="system"/>
+                assert_eq!(system, "staffNS.dtd"); // <assertURIEquals actual="system" file="&quot;staffNS.dtd&quot;" id="systemId"/>
+                r#entity_name = r#entity1.node_name().to_string(); // <nodeName obj="entity1" var="entityName"/>
+                assert_eq!(r#entity_name, "ent4"); // <assertEquals actual="entityName" expected="&quot;ent4&quot;" id="entityName" ignoreCase="false"/>
+                r#child = r#entity1.first_child().unwrap(); // <firstChild interface="Node" obj="entity1" var="child"/>
+                // unimplemented: // <assertNotNull actual="child" id="notnull"/>
+                r#child_name = r#child.node_name().to_string(); // <nodeName obj="child" var="childName"/>
+                assert_eq!(r#child_name, "entElement1"); // <assertEquals actual="childName" expected="&quot;entElement1&quot;" id="childName" ignoreCase="false"/>
             }
             // setAttributeNS04.xml
             #[test]
