@@ -124,6 +124,18 @@ for (const [d1, d] of TEST_SUITE) {
                                             : snakeCase(expected)
                                     });`;
                                 }
+                            } else if (child.nodeName === "assertURIEquals") {
+                                const actual = elem.getAttribute("actual");
+                                const expected = elem.getAttribute("expected");
+                                if (actual && expected) {
+                                    buffer += `assert_eq!(r#${
+                                        snakeCase(actual)
+                                    }, ${
+                                        expected?.startsWith('"')
+                                            ? expected
+                                            : `r#${snakeCase(expected)}`
+                                    });`;
+                                }
                             } else if (
                                 child.nodeName === "assertTrue" ||
                                 child.nodeName === "assertFalse"
@@ -135,6 +147,15 @@ for (const [d1, d] of TEST_SUITE) {
                                             ? "!"
                                             : ""
                                     }r#${snakeCase(actual)});`;
+                                } else {
+                                    buffer += `\n// unimplemented: `;
+                                }
+                            } else if (child.nodeName === "assertNull") {
+                                const actual = elem.getAttribute("actual");
+                                if (actual) {
+                                    buffer += `assert!(r#${
+                                        snakeCase(actual)
+                                    }.is_none());`;
                                 } else {
                                     buffer += `\n// unimplemented: `;
                                 }
@@ -824,8 +845,7 @@ for (const [d1, d] of TEST_SUITE) {
                                     }).unwrap().unwrap();`;
                                 }
                             } else if (
-                                child.nodeName === "getAttributeNodeNS" ||
-                                child.nodeName === "getAttributeNS"
+                                child.nodeName === "getAttributeNodeNS"
                             ) {
                                 const vr = elem.getAttribute("var");
                                 const obj = elem.getAttribute("obj");
@@ -851,6 +871,34 @@ for (const [d1, d] of TEST_SUITE) {
                                             ? local_name
                                             : `r#${snakeCase(local_name)}`
                                     }).unwrap().unwrap();`;
+                                }
+                            } else if (
+                                child.nodeName === "getAttributeNS"
+                            ) {
+                                const vr = elem.getAttribute("var");
+                                const obj = elem.getAttribute("obj");
+                                const ns_uri = elem.getAttribute(
+                                    "namespaceURI",
+                                );
+                                const local_name = elem.getAttribute(
+                                    "localName",
+                                );
+                                if (vr && obj && local_name) {
+                                    buffer += `r#${snakeCase(vr)} = r#${
+                                        snakeCase(obj)
+                                    }.${snakeCase(child.nodeName)}(${
+                                        ns_uri
+                                            ? (ns_uri.startsWith('"')
+                                                ? `Some(${ns_uri})`
+                                                : `Some(r#${
+                                                    snakeCase(ns_uri)
+                                                })`)
+                                            : "None"
+                                    }, ${
+                                        local_name.startsWith('"')
+                                            ? local_name
+                                            : `r#${snakeCase(local_name)}`
+                                    }).unwrap();`;
                                 }
                             } else if (
                                 child.nodeName === "createAttributeNS" ||

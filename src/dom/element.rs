@@ -545,8 +545,7 @@ impl ElementRef {
         }
 
         Ok(self
-            .attributes()
-            .get_named_item_ns(namespace_uri, local_name)?
+            .get_attribute_node_ns(namespace_uri, local_name)?
             .and_then(|attr| attr.text_content())
             .unwrap_or_default())
     }

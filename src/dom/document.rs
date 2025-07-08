@@ -825,8 +825,11 @@ impl DocumentRef {
         namespace_uri: Option<&str>,
         qualified_name: &str,
     ) -> Result<ElementRef, DOMException> {
-        if validate_qname::<false>(qualified_name).is_err() {
+        if validate_name::<false>(qualified_name).is_err() {
             return Err(DOMException::InvalidCharacterErr);
+        }
+        if validate_qname::<false>(qualified_name).is_err() {
+            return Err(DOMException::NamespaceErr);
         }
 
         match split_qname2(qualified_name) {
@@ -908,8 +911,11 @@ impl DocumentRef {
         namespace_uri: Option<&str>,
         qualified_name: &str,
     ) -> Result<AttrRef, DOMException> {
-        if validate_qname::<false>(qualified_name).is_err() {
+        if validate_name::<false>(qualified_name).is_err() {
             return Err(DOMException::InvalidCharacterErr);
+        }
+        if validate_qname::<false>(qualified_name).is_err() {
+            return Err(DOMException::NamespaceErr);
         }
 
         match split_qname2(qualified_name) {
