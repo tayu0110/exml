@@ -1,5 +1,5 @@
 use std::{
-    cell::{LazyCell, RefCell},
+    cell::RefCell,
     collections::HashMap,
     mem::replace,
     rc::{Rc, Weak},
@@ -8,6 +8,7 @@ use std::{
 use crate::{
     dom::{
         attlistdecl::{AttType, AttlistDeclRef, DefaultDecl},
+        document::Document,
         elementdecl::{ContentSpec, ElementDeclRef},
         entity::EntityType,
         named_node_map::{EntityMap, NotationMap, SubsetEntityMap, SubsetNotationMap},
@@ -19,7 +20,7 @@ use crate::{
 use super::{
     DOMException, NodeType,
     character_data::CommentRef,
-    document::{DocumentRef, DocumentWeakRef},
+    document::DocumentRef,
     entity::EntityRef,
     entity_reference::EntityReferenceRef,
     node::{Node, NodeConnection, NodeRef, NodeWeakRef},
@@ -43,7 +44,7 @@ pub struct DocumentType {
     /// - `Comment`
     previous_sibling: Option<NodeWeakRef>,
     next_sibling: Option<NodeRef>,
-    owner_document: Option<DocumentWeakRef>,
+    owner_document: Weak<RefCell<Document>>,
 
     /// Implementation of `name` for `DocumentType`.
     /// as same as `nodeName` for `Node`.
@@ -172,7 +173,7 @@ impl DocumentType {
     }
 
     fn owner_document(&self) -> Option<DocumentRef> {
-        self.owner_document.as_ref().and_then(|doc| doc.upgrade())
+        self.owner_document.upgrade().map(From::from)
     }
 
     fn set_owner_document(&mut self, doc: DocumentRef) -> Option<DocumentRef> {
@@ -182,12 +183,10 @@ impl DocumentType {
         if let Some(sub) = self.external_subset.as_mut() {
             sub.set_owner_document(doc.clone());
         }
-        replace(&mut self.owner_document, Some(doc.downgrade())).and_then(|doc| doc.upgrade())
+        replace(&mut self.owner_document, Rc::downgrade(&doc.0))
+            .upgrade()
+            .map(From::from)
     }
-}
-
-thread_local! {
-    pub(super) static DUMMY_DOCUMENT: LazyCell<DocumentRef> = LazyCell::new(|| DocumentRef::new(None, None, None).unwrap());
 }
 
 /// Wrapper of `Rc<RefCell<DocumentType>>`.
@@ -236,7 +235,7 @@ impl DocumentTypeRef {
             parent_node: None,
             previous_sibling: None,
             next_sibling: None,
-            owner_document: DUMMY_DOCUMENT.with(|dum| Some((**dum).clone().downgrade())),
+            owner_document: Weak::new(),
             name: qualified_name.into(),
             public_id: public_id.map(|pubid| pubid.into()),
             system_id: system_id.map(|systemid| systemid.into()),
@@ -584,11 +583,7 @@ impl Node for DocumentTypeRef {
     }
 
     fn owner_document(&self) -> Option<DocumentRef> {
-        self.0
-            .borrow()
-            .owner_document
-            .as_ref()
-            .and_then(|doc| doc.upgrade())
+        self.0.borrow().owner_document()
     }
 
     fn clone_node(&self, deep: bool) -> NodeRef {
@@ -761,7 +756,7 @@ pub struct DtdSubset<const EXT: bool> {
 
     // If this subset is the independent external subset,
     // this subset may have no owner documents.
-    owner_document: Option<DocumentWeakRef>,
+    owner_document: Weak<RefCell<Document>>,
 
     /// Implementation of `name` for `DocumentType`.
     /// as same as `nodeName` for `Node`.
@@ -788,17 +783,14 @@ impl<const EXT: bool> DtdSubset<EXT> {
         public_id: Option<impl Into<Rc<str>>>,
         system_id: Option<impl Into<Rc<str>>>,
     ) -> Self {
-        let ddoc = doc
-            .clone()
-            .unwrap_or(DUMMY_DOCUMENT.with(|doc| (**doc).clone()))
-            .downgrade();
+        let owner_document = doc.map(|doc| Rc::downgrade(&doc.0)).unwrap_or_default();
         Self {
             first_child: None,
             last_child: None,
-            owner_document: doc.map(|doc| doc.downgrade()),
+            owner_document: owner_document.clone(),
             name: name.into(),
-            entities: SubsetEntityMap::new(ddoc.clone()),
-            notations: SubsetNotationMap::new(ddoc),
+            entities: SubsetEntityMap::new(owner_document.clone()),
+            notations: SubsetNotationMap::new(owner_document.clone()),
             public_id: public_id.map(|id| id.into()),
             system_id: system_id.map(|id| id.into()),
             elements: HashMap::new(),
@@ -953,7 +945,9 @@ impl<const EXT: bool> DtdSubset<EXT> {
                 MarkupDecl::ProcessingInstruction(pi) => pi.set_owner_document(doc.clone()),
             };
         }
-        replace(&mut self.owner_document, Some(doc.downgrade())).and_then(|doc| doc.upgrade())
+        replace(&mut self.owner_document, Rc::downgrade(&doc.0))
+            .upgrade()
+            .map(From::from)
     }
 
     pub fn clone_node(&self, deep: bool) -> Self {
@@ -965,14 +959,14 @@ impl<const EXT: bool> DtdSubset<EXT> {
             entities: SubsetEntityMap::new(
                 self.entities
                     .owner_document()
-                    .unwrap_or(DUMMY_DOCUMENT.with(|doc| (**doc).clone()))
-                    .downgrade(),
+                    .map(|doc| Rc::downgrade(&doc.0))
+                    .unwrap_or_default(),
             ),
             notations: SubsetNotationMap::new(
                 self.notations
                     .owner_document()
-                    .unwrap_or(DUMMY_DOCUMENT.with(|doc| (**doc).clone()))
-                    .downgrade(),
+                    .map(|doc| Rc::downgrade(&doc.0))
+                    .unwrap_or_default(),
             ),
             public_id: self.public_id.clone(),
             system_id: self.system_id.clone(),

@@ -19,7 +19,6 @@ use super::{
     character_data::{CDATASectionRef, CommentRef, TextRef},
     check_owner_document_sameness, check_vertical_hierarchy,
     document_fragment::DocumentFragmentRef,
-    document_type::DUMMY_DOCUMENT,
     document_type::DocumentTypeRef,
     dom_implementation::{DEFAULT_DOM_IMPLEMENTATION, DOMImplementation},
     element::ElementRef,
@@ -210,7 +209,7 @@ impl Document {
 
 /// Wrapper of `Rc<RefCell<Document>>`.
 #[derive(Clone)]
-pub struct DocumentRef(Rc<RefCell<Document>>);
+pub struct DocumentRef(pub(super) Rc<RefCell<Document>>);
 
 impl DocumentRef {
     /// Implementation of [`createDocument`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-Level-2-Core-DOM-createDocument) method.
@@ -265,11 +264,10 @@ impl DocumentRef {
         qualified_name: Option<&str>,
         doctype: Option<DocumentTypeRef>,
     ) -> Result<Self, DOMException> {
-        if doctype.as_ref().is_some_and(|doctype| {
-            doctype
-                .owner_document()
-                .is_some_and(|doc| DUMMY_DOCUMENT.with(|dum| !dum.is_same_node(&doc.into())))
-        }) {
+        if doctype
+            .as_ref()
+            .is_some_and(|doctype| doctype.owner_document().is_some())
+        {
             return Err(DOMException::WrongDocumentErr);
         }
 
@@ -1705,13 +1703,7 @@ impl Node for DocumentRef {
         }
         // WRONG_DOCUMENT_ERR: Raised if newChild was created from a different document
         // than the one that created this node.
-        if new_child.owner_document().is_none_or(|doc| {
-            // If `new_child` is a DocumentType node and its owner Document is
-            // a dummy Document node, it is not invalid.
-            !doc.is_same_node(&self.clone().into())
-                && (new_child.node_type() != NodeType::DocumentType
-                    || DUMMY_DOCUMENT.with(|dum| !dum.is_same_node(&doc.into())))
-        }) {
+        if !check_owner_document_sameness(self, &new_child) {
             return Err(DOMException::WrongDocumentErr);
         }
 
@@ -1901,6 +1893,12 @@ impl NodeConnection for DocumentRef {
 impl From<DocumentRef> for NodeRef {
     fn from(value: DocumentRef) -> Self {
         NodeRef::Document(value)
+    }
+}
+
+impl From<Rc<RefCell<Document>>> for DocumentRef {
+    fn from(value: Rc<RefCell<Document>>) -> Self {
+        Self(value)
     }
 }
 

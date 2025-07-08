@@ -251,6 +251,16 @@ fn check_vertical_hierarchy(parent: NodeType, child: NodeType) -> bool {
 /// Check if the nodes belong to the same document or not.
 fn check_owner_document_sameness(l: &impl Node, r: &impl Node) -> bool {
     match (l.node_type(), r.node_type()) {
+        (NodeType::DocumentType, NodeType::DocumentType) => {
+            let ldoc = l.owner_document();
+            let rdoc = r.owner_document();
+            ldoc.is_some() == rdoc.is_some()
+                && ldoc
+                    .zip(rdoc)
+                    .is_none_or(|(l, r)| l.is_same_node(&r.into()))
+        }
+        (NodeType::DocumentType, _) if l.owner_document().is_none() => true,
+        (_, NodeType::DocumentType) if r.owner_document().is_none() => true,
         (NodeType::Document, NodeType::Document) => l.is_same_node(&r.clone().into()),
         (NodeType::Document, _) => r
             .owner_document()

@@ -7,6 +7,7 @@ use std::{
 };
 
 use crate::dom::{
+    document::Document,
     element::{Element, ElementRef},
     entity::EntityRef,
     notation::NotationRef,
@@ -550,16 +551,16 @@ impl NamedNodeMap for AttributeMap {
 /// Since the data is shared by [`Rc`], [`clone`](Clone::clone) means shallow copy, not deep copy.
 #[derive(Clone)]
 pub(crate) struct DTDSubsetMap<N: Node> {
-    owner_document: DocumentWeakRef,
+    owner_document: Weak<RefCell<Document>>,
     index: Rc<RefCell<HashMap<String, usize>>>,
     data: Rc<RefCell<Vec<N>>>,
 }
 
 impl<N: Node> DTDSubsetMap<N> {
     /// Create new empty [`DTDSubsetMap`]
-    pub(super) fn new(doc: DocumentWeakRef) -> Self {
+    pub(super) fn new(owner_document: Weak<RefCell<Document>>) -> Self {
         Self {
-            owner_document: doc,
+            owner_document,
             index: Rc::new(RefCell::new(HashMap::new())),
             data: Rc::new(RefCell::new(vec![])),
         }
@@ -594,7 +595,10 @@ impl<N: Node> DTDSubsetMap<N> {
 
     /// Implementation of `setNamedItem` method.
     pub fn set_named_item(&mut self, node: N) -> Result<Option<N>, DOMException> {
-        if !check_owner_document_sameness(&self.owner_document.upgrade().unwrap(), &node) {
+        if self
+            .owner_document()
+            .is_some_and(|doc| !check_owner_document_sameness(&doc, &node))
+        {
             return Err(DOMException::WrongDocumentErr);
         }
 
@@ -620,7 +624,7 @@ impl<N: Node> DTDSubsetMap<N> {
 
     /// Get the owner Document.
     pub(super) fn owner_document(&self) -> Option<DocumentRef> {
-        self.owner_document.upgrade()
+        self.owner_document.upgrade().map(From::from)
     }
 
     /// Replace ownerDocument of this map.
@@ -628,7 +632,7 @@ impl<N: Node> DTDSubsetMap<N> {
     /// All data in this map won't modified.  
     /// If need, the caller should modify the ownerDocument of all data in this map additionally.
     pub(super) fn set_owner_document(&mut self, new_doc: DocumentRef) {
-        self.owner_document = new_doc.downgrade();
+        self.owner_document = Rc::downgrade(&new_doc.0);
     }
 }
 
