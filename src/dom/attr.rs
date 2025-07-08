@@ -349,7 +349,11 @@ impl Node for AttrRef {
         check_no_modification_allowed_err(self)?;
         let Some(local_name) = self.local_name() else {
             // This should have been created with DOM Level 1 method.
-            return Ok(());
+            return if prefix.is_some() {
+                Err(DOMException::NamespaceErr)
+            } else {
+                Ok(())
+            };
         };
 
         let prefix: Option<Rc<str>> = prefix.map(|pre| pre.into());

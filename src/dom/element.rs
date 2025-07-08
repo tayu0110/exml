@@ -1187,7 +1187,11 @@ impl Node for ElementRef {
         check_no_modification_allowed_err(self)?;
         let Some(local_name) = self.local_name() else {
             // This should have been created with DOM Level 1 method.
-            return Ok(());
+            return if prefix.is_some() {
+                Err(DOMException::NamespaceErr)
+            } else {
+                Ok(())
+            };
         };
 
         let prefix: Option<Rc<str>> = prefix.map(|pre| pre.into());
@@ -1195,13 +1199,13 @@ impl Node for ElementRef {
             return Ok(());
         }
         if let Some(prefix) = prefix {
+            if self.namespace_uri().is_none() {
+                return Err(DOMException::NamespaceErr);
+            }
             if validate_name::<false>(&prefix).is_err() {
                 return Err(DOMException::InvalidCharacterErr);
             }
             if validate_ncname::<false>(&prefix).is_err() {
-                return Err(DOMException::NamespaceErr);
-            }
-            if self.namespace_uri().is_none() {
                 return Err(DOMException::NamespaceErr);
             }
             if prefix.as_ref() == "xml"
