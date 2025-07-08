@@ -7,6 +7,7 @@ use std::{
 };
 
 use crate::dom::{
+    check_no_modification_allowed_err,
     document::Document,
     element::{Element, ElementRef},
     entity::EntityRef,
@@ -364,6 +365,10 @@ impl AttributeMap {
             return Err(DOMException::NotSupportedErr);
         }
 
+        if let Some(elem) = self.owner_element.upgrade().map(ElementRef::from) {
+            check_no_modification_allowed_err(&elem)?;
+        }
+
         if node.owner_element().is_some() {
             return Err(DOMException::InuseAttributeErr);
         }
@@ -430,6 +435,10 @@ impl NamedNodeMap for AttributeMap {
         self.set_named_item_common(node, false)
     }
     fn remove_named_item(&mut self, name: &str) -> Result<Self::Item, DOMException> {
+        if let Some(elem) = self.owner_element.upgrade().map(ElementRef::from) {
+            check_no_modification_allowed_err(&elem)?;
+        }
+
         let &index = self
             .index_fullname
             .borrow()
@@ -509,6 +518,10 @@ impl NamedNodeMap for AttributeMap {
         ns_uri: Option<&str>,
         local_name: &str,
     ) -> Result<Self::Item, DOMException> {
+        if let Some(elem) = self.owner_element.upgrade().map(ElementRef::from) {
+            check_no_modification_allowed_err(&elem)?;
+        }
+
         if self
             .owner_document
             .upgrade()
