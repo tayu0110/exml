@@ -299,6 +299,9 @@ impl DocumentRef {
         }
 
         if let Some(qname) = qualified_name {
+            if validate_name::<false>(qname).is_err() {
+                return Err(DOMException::InvalidCharacterErr);
+            }
             if validate_qname::<false>(qname).is_err() {
                 return Err(DOMException::NamespaceErr);
             }
