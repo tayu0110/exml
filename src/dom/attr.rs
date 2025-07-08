@@ -7,7 +7,7 @@ use std::{
 use crate::{
     dom::{DOMException, XML_NS_NAMESPACE, XML_XML_NAMESPACE, check_no_modification_allowed_err},
     parser::split_qname2,
-    tree::validate_ncname,
+    tree::{validate_name, validate_ncname},
 };
 
 use super::{
@@ -346,6 +346,7 @@ impl Node for AttrRef {
     }
 
     fn set_prefix(&mut self, prefix: Option<impl Into<Rc<str>>>) -> Result<(), DOMException> {
+        check_no_modification_allowed_err(self)?;
         let Some(local_name) = self.local_name() else {
             // This should have been created with DOM Level 1 method.
             return Ok(());
@@ -355,10 +356,12 @@ impl Node for AttrRef {
         if self.prefix() == prefix {
             return Ok(());
         }
-        check_no_modification_allowed_err(self)?;
         if let Some(prefix) = prefix {
-            if validate_ncname::<false>(&prefix).is_err() {
+            if validate_name::<false>(&prefix).is_err() {
                 return Err(DOMException::InvalidCharacterErr);
+            }
+            if validate_ncname::<false>(&prefix).is_err() {
+                return Err(DOMException::NamespaceErr);
             }
             if local_name.as_ref() == "xmlns" {
                 return Err(DOMException::NamespaceErr);
