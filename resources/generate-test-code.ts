@@ -214,7 +214,7 @@ for (const [d1, d] of TEST_SUITE) {
                                         name?.startsWith('"')
                                             ? name
                                             : `r#${snakeCase(name)}`
-                                    }.into()).unwrap().unwrap();`;
+                                    }.into()).unwrap();`;
                                 }
                             } else if (
                                 child.nodeName === "setAttributeNodeNS"
@@ -230,7 +230,7 @@ for (const [d1, d] of TEST_SUITE) {
                                         name?.startsWith('"')
                                             ? name
                                             : `r#${snakeCase(name)}`
-                                    }.as_attribute().unwrap()).unwrap().unwrap();`;
+                                    }.as_attribute().unwrap()).unwrap();`;
                                 }
                             } else if (
                                 child.nodeName === "firstChild" ||
@@ -1093,6 +1093,46 @@ for (const [d1, d] of TEST_SUITE) {
                                         snakeCase(obj)
                                     }.${snakeCase(child.nodeName)}(
                                         &r#${snakeCase(other)}.into());`;
+                                }
+                            } else if (
+                                child.nodeName === "notations" ||
+                                child.nodeName === "entities" ||
+                                child.nodeName === "implementation"
+                            ) {
+                                const vr = elem.getAttribute("var");
+                                const obj = elem.getAttribute("obj");
+                                if (vr && obj) {
+                                    buffer += `r#${snakeCase(vr)} = r#${
+                                        snakeCase(obj)
+                                    }.${snakeCase(child.nodeName)}();`;
+                                }
+                            } else if (child.nodeName === "createDocument") {
+                                const vr = elem.getAttribute("var");
+                                const obj = elem.getAttribute("obj");
+                                const namespaceURI = elem.getAttribute(
+                                    "namespaceURI",
+                                );
+                                const qualifiedName = elem.getAttribute(
+                                    "qualifiedName",
+                                );
+                                const doctype = elem.getAttribute("doctype");
+                                if (
+                                    vr && obj && namespaceURI &&
+                                    qualifiedName && doctype
+                                ) {
+                                    buffer += `r#${snakeCase(vr)} = r#${
+                                        snakeCase(obj)
+                                    }.${
+                                        snakeCase(child.nodeName)
+                                    }().unwrap(Some(${
+                                        namespaceURI.startsWith('"')
+                                            ? namespaceURI
+                                            : `r#${snakeCase(namespaceURI)}`
+                                    }), Some(${
+                                        qualifiedName.startsWith('"')
+                                            ? qualifiedName
+                                            : `r#${snakeCase(qualifiedName)}`
+                                    }), Some(r#${snakeCase(doctype)}));`;
                                 }
                             } else {
                                 buffer += `\n// unimplemented: `;

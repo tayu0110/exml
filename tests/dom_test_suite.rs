@@ -12656,34 +12656,39 @@ mod dom_test_suite {
             // documentimportnode08.xml
             #[test]
             fn test_documentimportnode08() {
-                // // unimplemented: // <implementationAttribute name="namespaceAware" value="true"/>
-                // let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
-                // let mut r#imported; // type: Node // <var name="imported" type="Node"/>
-                // let mut r#doc_type; // type: DocumentType // <var name="docType" type="DocumentType"/>
-                // let mut r#dom_impl; // type: DOMImplementation // <var name="domImpl" type="DOMImplementation"/>
-                // let mut r#null_ns; // type: DOMString // <var name="nullNS" type="DOMString" isNull="true"/>
-                // r#doc = staff_ns_xml(STAFF_NS_XML).unwrap(); // staffNS.xml // <load var="doc" href="staffNS" willBeModified="true"/>
-
-                // dom_impl = doc.implementation(); // <implementation var="domImpl" obj="doc"/>
-
-                // // unimplemented: // <createDocumentType var="docType" obj="domImpl" qualifiedName="&quot;test:root&quot;" publicId="nullNS" systemId="nullNS"/>
-
-                // // unimplemented: // <assertDOMException id="throw_NOT_SUPPORTED_ERR"><NOT_SUPPORTED_ERR><importNode var="imported" obj="doc" importedNode="docType" deep="true"/></NOT_SUPPORTED_ERR></assertDOMException>
+                // unimplemented: // <implementationAttribute name="namespaceAware" value="true"/>
+                let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
+                let mut r#doc_type; // type: DocumentType // <var name="docType" type="DocumentType"/>
+                let mut r#dom_impl; // type: DOMImplementation // <var name="domImpl" type="DOMImplementation"/>
+                r#doc = staff_ns_xml(STAFF_NS_XML).unwrap(); // staffNS.xml // <load var="doc" href="staffNS" willBeModified="true"/>
+                dom_impl = doc.implementation(); // <implementation var="domImpl" obj="doc"/>
+                doc_type = dom_impl
+                    .create_document_type("test:root", None, None)
+                    .unwrap(); // <createDocumentType var="docType" obj="domImpl" qualifiedName="&quot;test:root&quot;" publicId="nullNS" systemId="nullNS"/>
+                // <assertDOMException id="throw_NOT_SUPPORTED_ERR">
+                //  <NOT_SUPPORTED_ERR>
+                //      <importNode var="imported" obj="doc" importedNode="docType" deep="true"/>
+                //  </NOT_SUPPORTED_ERR>
+                // </assertDOMException>
+                assert!(
+                    doc.import_node(doc_type.into(), true)
+                        .is_err_and(|err| err == DOMException::NotSupportedErr)
+                );
             }
             // createElementNS05.xml
             #[test]
             fn test_create_element_n_s05() {
-                // let mut r#namespace_uri; // type: DOMString // <var name="namespaceURI" type="DOMString" value="&quot;http://www.nist.gov&quot;"/>
-                // let mut r#qualified_name; // type: DOMString // <var name="qualifiedName" type="DOMString" value="&quot;gov:faculty&quot;"/>
-                // let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
-                // let mut r#new_element; // type: Element // <var name="newElement" type="Element"/>
-                // let mut r#element_name; // type: DOMString // <var name="elementName" type="DOMString"/>
-                // r#doc = staff_ns_xml(STAFF_NS_XML).unwrap(); // staffNS.xml // <load var="doc" href="staffNS" willBeModified="false"/>
-                // r#new_element = r#doc
-                //     .create_element_ns(Some(r#namespace_uri), r#qualified_name.as_ref())
-                //     .unwrap(); // <createElementNS obj="doc" var="newElement" namespaceURI="namespaceURI" qualifiedName="qualifiedName"/>
-                // r#element_name = r#new_element.tag_name().to_string(); // <tagName obj="newElement" var="elementName"/>
-                // assert_eq!(r#element_name, qualified_name); // <assertEquals actual="elementName" expected="qualifiedName" id="throw_Equals" ignoreCase="false"/>
+                let mut r#namespace_uri = "http://www.nist.gov"; // type: DOMString // <var name="namespaceURI" type="DOMString" value="&quot;http://www.nist.gov&quot;"/>
+                let mut r#qualified_name = "gov:faculty"; // type: DOMString // <var name="qualifiedName" type="DOMString" value="&quot;gov:faculty&quot;"/>
+                let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
+                let mut r#new_element; // type: Element // <var name="newElement" type="Element"/>
+                let mut r#element_name; // type: DOMString // <var name="elementName" type="DOMString"/>
+                r#doc = staff_ns_xml(STAFF_NS_XML).unwrap(); // staffNS.xml // <load var="doc" href="staffNS" willBeModified="false"/>
+                r#new_element = r#doc
+                    .create_element_ns(Some(r#namespace_uri), r#qualified_name.as_ref())
+                    .unwrap(); // <createElementNS obj="doc" var="newElement" namespaceURI="namespaceURI" qualifiedName="qualifiedName"/>
+                r#element_name = r#new_element.tag_name().to_string(); // <tagName obj="newElement" var="elementName"/>
+                assert_eq!(r#element_name, qualified_name); // <assertEquals actual="elementName" expected="qualifiedName" id="throw_Equals" ignoreCase="false"/>
             }
             // documentgetelementsbytagnameNS02.xml
             #[test]
@@ -12701,83 +12706,76 @@ mod dom_test_suite {
                     .unwrap(); // <createElementNS var="element" obj="doc" namespaceURI="&quot;test&quot;" qualifiedName="&quot;employeeId&quot;"/>
                 r#appended_child = r#doc_elem.append_child(element.into()).unwrap(); // <appendChild var="appendedChild" obj="docElem" newChild="element"/>
                 r#child_list = r#doc.get_elements_by_tag_name_ns(Some("*"), "employeeId"); // <getElementsByTagNameNS var="childList" obj="doc" namespaceURI="&quot;*&quot;" localName="&quot;employeeId&quot;" interface="Document"/>
-
-                // unimplemented: // <assertSize size="6" collection="childList" id="documentgetelementsbytagnameNS02"/>
+                assert_eq!(child_list.length(), 6); // <assertSize size="6" collection="childList" id="documentgetelementsbytagnameNS02"/>
             }
             // documentimportnode22.xml
             #[test]
             fn test_documentimportnode22() {
-                // // unimplemented: // <implementationAttribute name="namespaceAware" value="true"/>
-                // let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
-                // let mut r#doc_type_null; // type: DocumentType // <var name="docTypeNull" type="DocumentType" isNull="true"/>
-                // let mut r#doc_imp: DocumentRef; // <var name="docImp" type="Document"/>
-                // let mut r#dom_impl; // type: DOMImplementation // <var name="domImpl" type="DOMImplementation"/>
-                // let mut r#doc_type; // type: DocumentType // <var name="docType" type="DocumentType"/>
-                // let mut r#node_map; // type: NamedNodeMap // <var name="nodeMap" type="NamedNodeMap"/>
-                // let mut r#notation1; // type: Notation // <var name="notation1" type="Notation"/>
-                // let mut r#notation2; // type: Notation // <var name="notation2" type="Notation"/>
-                // let mut r#notation_imp1; // type: Notation // <var name="notationImp1" type="Notation"/>
-                // let mut r#notation_imp2; // type: Notation // <var name="notationImp2" type="Notation"/>
-                // let mut r#notation_imp_new1; // type: Notation // <var name="notationImpNew1" type="Notation"/>
-                // let mut r#notation_imp_new2; // type: Notation // <var name="notationImpNew2" type="Notation"/>
-                // let mut r#public_id1; // type: DOMString // <var name="publicId1" type="DOMString"/>
-                // let mut r#public_id1_imp; // type: DOMString // <var name="publicId1Imp" type="DOMString"/>
-                // let mut r#public_id1_new_imp; // type: DOMString // <var name="publicId1NewImp" type="DOMString"/>
-                // let mut r#public_id2_imp; // type: DOMString // <var name="publicId2Imp" type="DOMString"/>
-                // let mut r#public_id2_new_imp; // type: DOMString // <var name="publicId2NewImp" type="DOMString"/>
-                // let mut r#system_id1_imp; // type: DOMString // <var name="systemId1Imp" type="DOMString"/>
-                // let mut r#system_id1_new_imp; // type: DOMString // <var name="systemId1NewImp" type="DOMString"/>
-                // let mut r#system_id2; // type: DOMString // <var name="systemId2" type="DOMString"/>
-                // let mut r#system_id2_imp; // type: DOMString // <var name="systemId2Imp" type="DOMString"/>
-                // let mut r#system_id2_new_imp; // type: DOMString // <var name="systemId2NewImp" type="DOMString"/>
-                // r#doc = staff_ns_xml(STAFF_NS_XML).unwrap(); // staffNS.xml // <load var="doc" href="staffNS" willBeModified="true"/>
-                // dom_impl = doc.implementation(); // <implementation var="domImpl" obj="doc"/>
-                // r#doc_type = r#doc.doctype().unwrap(); // <doctype var="docType" obj="doc"/>
-
-                // // unimplemented: // <createDocument var="docImp" obj="domImpl" namespaceURI="&quot;http://www.w3.org/DOM/Test&quot;" qualifiedName="&quot;a:b&quot;" doctype="docTypeNull"/>
-                // node_map = doc_type.notations(); // <notations var="nodeMap" obj="docType"/>
-                // // unimplemented: // <assertNotNull actual="nodeMap" id="notationsNotNull"/>
-                // r#notation1 = r#node_map.get_named_item("notation1".into()).unwrap(); // <getNamedItem var="notation1" obj="nodeMap" name="&quot;notation1&quot;"/>
-                // r#notation2 = r#node_map.get_named_item("notation2".into()).unwrap(); // <getNamedItem var="notation2" obj="nodeMap" name="&quot;notation2&quot;"/>
-                // r#notation_imp1 = r#doc.import_node(r#notation1.into(), true); // <importNode var="notationImp1" obj="doc" importedNode="notation1" deep="true"/>
-                // r#notation_imp2 = r#doc.import_node(r#notation2.into(), false); // <importNode var="notationImp2" obj="doc" importedNode="notation2" deep="false"/>
-                // r#notation_imp_new1 = r#doc_imp.import_node(r#notation1.into(), false); // <importNode var="notationImpNew1" obj="docImp" importedNode="notation1" deep="false"/>
-                // r#notation_imp_new2 = r#doc_imp.import_node(r#notation2.into(), true); // <importNode var="notationImpNew2" obj="docImp" importedNode="notation2" deep="true"/>
-                // r#public_id1 = r#notation1.public_id().unwrap().to_string(); // <publicId var="publicId1" obj="notation1" interface="Notation"/>
-                // r#public_id1_imp = r#notation1.public_id().unwrap().to_string(); // <publicId var="publicId1Imp" obj="notation1" interface="Notation"/>
-                // r#public_id1_new_imp = r#notation1.public_id().unwrap().to_string(); // <publicId var="publicId1NewImp" obj="notation1" interface="Notation"/>
-                // r#system_id1_imp = r#notation1.system_id().unwrap().to_string(); // <systemId var="systemId1Imp" obj="notation1" interface="Notation"/>
-                // r#system_id1_new_imp = r#notation1.system_id().unwrap().to_string(); // <systemId var="systemId1NewImp" obj="notation1" interface="Notation"/>
-                // r#public_id2_imp = r#notation2.public_id().unwrap().to_string(); // <publicId var="publicId2Imp" obj="notation2" interface="Notation"/>
-                // r#public_id2_new_imp = r#notation2.public_id().unwrap().to_string(); // <publicId var="publicId2NewImp" obj="notation2" interface="Notation"/>
-                // r#system_id2 = r#notation2.system_id().unwrap().to_string(); // <systemId var="systemId2" obj="notation2" interface="Notation"/>
-                // r#system_id2_imp = r#notation2.system_id().unwrap().to_string(); // <systemId var="systemId2Imp" obj="notation2" interface="Notation"/>
-                // r#system_id2_new_imp = r#notation2.system_id().unwrap().to_string(); // <systemId var="systemId2NewImp" obj="notation2" interface="Notation"/>
-                // assert_eq!(r#public_id1_imp, public_id1); // <assertEquals expected="publicId1" actual="publicId1Imp" id="documentimportnode22_N1PID" ignoreCase="false"/>
-                // assert_eq!(r#public_id1_new_imp, public_id1); // <assertEquals expected="publicId1" actual="publicId1NewImp" id="documentimportnode22_N1NPID" ignoreCase="false"/>
-
-                // // unimplemented: // <assertNull actual="systemId1Imp" id="documentimportnode22_N1SID"/>
-
-                // // unimplemented: // <assertNull actual="systemId1NewImp" id="documentimportnode22_N1NSID"/>
-                // assert_eq!(r#system_id2_imp, system_id2); // <assertEquals expected="systemId2" actual="systemId2Imp" id="documentimportnode22_N2SID" ignoreCase="false"/>
-                // assert_eq!(r#system_id2_new_imp, system_id2); // <assertEquals expected="systemId2" actual="systemId2NewImp" id="documentimportnode22_N2NSID" ignoreCase="false"/>
-
-                // // unimplemented: // <assertNull actual="publicId2Imp" id="documentimportnode22_N2PID"/>
-
-                // // unimplemented: // <assertNull actual="publicId2Imp" id="documentimportnode22_N2NPID"/>
+                // unimplemented: // <implementationAttribute name="namespaceAware" value="true"/>
+                let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
+                let mut r#doc_imp: DocumentRef; // <var name="docImp" type="Document"/>
+                let mut r#dom_impl; // type: DOMImplementation // <var name="domImpl" type="DOMImplementation"/>
+                let mut r#doc_type; // type: DocumentType // <var name="docType" type="DocumentType"/>
+                let mut r#node_map; // type: NamedNodeMap // <var name="nodeMap" type="NamedNodeMap"/>
+                let mut r#notation1; // type: Notation // <var name="notation1" type="Notation"/>
+                let mut r#notation2; // type: Notation // <var name="notation2" type="Notation"/>
+                let mut r#notation_imp1; // type: Notation // <var name="notationImp1" type="Notation"/>
+                let mut r#notation_imp2; // type: Notation // <var name="notationImp2" type="Notation"/>
+                let mut r#notation_imp_new1; // type: Notation // <var name="notationImpNew1" type="Notation"/>
+                let mut r#notation_imp_new2; // type: Notation // <var name="notationImpNew2" type="Notation"/>
+                let mut r#public_id1; // type: DOMString // <var name="publicId1" type="DOMString"/>
+                let mut r#public_id1_imp; // type: DOMString // <var name="publicId1Imp" type="DOMString"/>
+                let mut r#public_id1_new_imp; // type: DOMString // <var name="publicId1NewImp" type="DOMString"/>
+                let mut r#public_id2_imp; // type: DOMString // <var name="publicId2Imp" type="DOMString"/>
+                let mut r#public_id2_new_imp; // type: DOMString // <var name="publicId2NewImp" type="DOMString"/>
+                let mut r#system_id1_imp; // type: DOMString // <var name="systemId1Imp" type="DOMString"/>
+                let mut r#system_id1_new_imp; // type: DOMString // <var name="systemId1NewImp" type="DOMString"/>
+                let mut r#system_id2; // type: DOMString // <var name="systemId2" type="DOMString"/>
+                let mut r#system_id2_imp; // type: DOMString // <var name="systemId2Imp" type="DOMString"/>
+                let mut r#system_id2_new_imp; // type: DOMString // <var name="systemId2NewImp" type="DOMString"/>
+                r#doc = staff_ns_xml(STAFF_NS_XML).unwrap(); // staffNS.xml // <load var="doc" href="staffNS" willBeModified="true"/>
+                dom_impl = doc.implementation(); // <implementation var="domImpl" obj="doc"/>
+                r#doc_type = r#doc.doctype().unwrap(); // <doctype var="docType" obj="doc"/>
+                doc_imp = dom_impl
+                    .create_document(Some("http://www.w3.org/DOM/Test"), Some("a:b"), None)
+                    .unwrap(); // <createDocument var="docImp" obj="domImpl" namespaceURI="&quot;http://www.w3.org/DOM/Test&quot;" qualifiedName="&quot;a:b&quot;" doctype="docTypeNull"/>
+                node_map = doc_type.notations(); // <notations var="nodeMap" obj="docType"/>
+                // unimplemented: // <assertNotNull actual="nodeMap" id="notationsNotNull"/>
+                r#notation1 = r#node_map.get_named_item("notation1").unwrap(); // <getNamedItem var="notation1" obj="nodeMap" name="&quot;notation1&quot;"/>
+                r#notation2 = r#node_map.get_named_item("notation2").unwrap(); // <getNamedItem var="notation2" obj="nodeMap" name="&quot;notation2&quot;"/>
+                r#notation_imp1 = r#doc.import_node(r#notation1.clone().into(), true); // <importNode var="notationImp1" obj="doc" importedNode="notation1" deep="true"/>
+                r#notation_imp2 = r#doc.import_node(r#notation2.clone().into(), false); // <importNode var="notationImp2" obj="doc" importedNode="notation2" deep="false"/>
+                r#notation_imp_new1 = r#doc_imp.import_node(r#notation1.clone().into(), false); // <importNode var="notationImpNew1" obj="docImp" importedNode="notation1" deep="false"/>
+                r#notation_imp_new2 = r#doc_imp.import_node(r#notation2.clone().into(), true); // <importNode var="notationImpNew2" obj="docImp" importedNode="notation2" deep="true"/>
+                r#public_id1 = r#notation1.public_id().unwrap().to_string(); // <publicId var="publicId1" obj="notation1" interface="Notation"/>
+                r#public_id1_imp = r#notation1.public_id().unwrap().to_string(); // <publicId var="publicId1Imp" obj="notation1" interface="Notation"/>
+                r#public_id1_new_imp = r#notation1.public_id().unwrap().to_string(); // <publicId var="publicId1NewImp" obj="notation1" interface="Notation"/>
+                r#system_id1_imp = r#notation1.system_id(); // <systemId var="systemId1Imp" obj="notation1" interface="Notation"/>
+                r#system_id1_new_imp = r#notation1.system_id(); // <systemId var="systemId1NewImp" obj="notation1" interface="Notation"/>
+                r#public_id2_imp = r#notation2.public_id(); // <publicId var="publicId2Imp" obj="notation2" interface="Notation"/>
+                r#public_id2_new_imp = r#notation2.public_id(); // <publicId var="publicId2NewImp" obj="notation2" interface="Notation"/>
+                r#system_id2 = r#notation2.system_id().unwrap().to_string(); // <systemId var="systemId2" obj="notation2" interface="Notation"/>
+                r#system_id2_imp = r#notation2.system_id().unwrap().to_string(); // <systemId var="systemId2Imp" obj="notation2" interface="Notation"/>
+                r#system_id2_new_imp = r#notation2.system_id().unwrap().to_string(); // <systemId var="systemId2NewImp" obj="notation2" interface="Notation"/>
+                assert_eq!(r#public_id1_imp, public_id1); // <assertEquals expected="publicId1" actual="publicId1Imp" id="documentimportnode22_N1PID" ignoreCase="false"/>
+                assert_eq!(r#public_id1_new_imp, public_id1); // <assertEquals expected="publicId1" actual="publicId1NewImp" id="documentimportnode22_N1NPID" ignoreCase="false"/>
+                assert!(system_id1_imp.is_none()); // <assertNull actual="systemId1Imp" id="documentimportnode22_N1SID"/>
+                assert!(system_id1_new_imp.is_none()); // <assertNull actual="systemId1NewImp" id="documentimportnode22_N1NSID"/>
+                assert_eq!(r#system_id2_imp, system_id2); // <assertEquals expected="systemId2" actual="systemId2Imp" id="documentimportnode22_N2SID" ignoreCase="false"/>
+                assert_eq!(r#system_id2_new_imp, system_id2); // <assertEquals expected="systemId2" actual="systemId2NewImp" id="documentimportnode22_N2NSID" ignoreCase="false"/>
+                assert!(public_id2_imp.is_none()); // <assertNull actual="publicId2Imp" id="documentimportnode22_N2PID"/>
+                assert!(public_id2_new_imp.is_none()); // <assertNull actual="publicId2Imp" id="documentimportnode22_N2NPID"/>
             }
             // systemId01.xml
             #[test]
             fn test_system_id01() {
-                // let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
-                // let mut r#doc_type; // type: DocumentType // <var name="docType" type="DocumentType"/>
-                // let mut r#system_id; // type: DOMString // <var name="systemId" type="DOMString"/>
-                // let mut r#index; // type: int // <var name="index" type="int"/>
-                // r#doc = staff_ns_xml(STAFF_NS_XML).unwrap(); // staffNS.xml // <load var="doc" href="staffNS" willBeModified="false"/>
-                // r#doc_type = r#doc.doctype().unwrap(); // <doctype obj="doc" var="docType"/>
-                // r#system_id = r#doc_type.system_id().unwrap().to_string(); // <systemId interface="DocumentType" obj="docType" var="systemId"/>
-
-                // // unimplemented: // <assertURIEquals actual="systemId" file="&quot;staffNS.dtd&quot;" id="systemId"/>
+                let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
+                let mut r#doc_type; // type: DocumentType // <var name="docType" type="DocumentType"/>
+                let mut r#system_id; // type: DOMString // <var name="systemId" type="DOMString"/>
+                r#doc = staff_ns_xml(STAFF_NS_XML).unwrap(); // staffNS.xml // <load var="doc" href="staffNS" willBeModified="false"/>
+                r#doc_type = r#doc.doctype().unwrap(); // <doctype obj="doc" var="docType"/>
+                r#system_id = r#doc_type.system_id().unwrap().to_string(); // <systemId interface="DocumentType" obj="docType" var="systemId"/>
+                assert_eq!(system_id, "staffNS.dtd"); // <assertURIEquals actual="systemId" file="&quot;staffNS.dtd&quot;" id="systemId"/>
             }
             // setAttributeNS09.xml
             #[test]
@@ -12843,18 +12841,31 @@ mod dom_test_suite {
             // domimplementationcreatedocumenttype02.xml
             #[test]
             fn test_domimplementationcreatedocumenttype02() {
-                // let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
-                // let mut r#dom_impl; // type: DOMImplementation // <var name="domImpl" type="DOMImplementation"/>
-                // let mut r#new_doc_type; // type: DocumentType // <var name="newDocType" type="DocumentType"/>
-                // let mut r#owner_document: DocumentRef; // <var name="ownerDocument" type="Document"/>
-                // let mut r#public_id; // type: DOMString // <var name="publicId" type="DOMString" value="&quot;http://www.w3.org/DOM/Test/dom2.dtd&quot;"/>
-                // let mut r#system_id; // type: DOMString // <var name="systemId" type="DOMString" value="&quot;dom2.dtd&quot;"/>
-                // let mut r#qualified_name; // type: DOMString // <var name="qualifiedName" type="DOMString"/>
-                // let mut r#qualified_names; // type: List // <var name="qualifiedNames" type="List"><member>"_:_"</member><member>"_:h0"</member><member>"_:test"</member><member>"_:_."</member><member>"_:a-"</member><member>"l_:_"</member><member>"ns:_0"</member><member>"ns:a0"</member><member>"ns0:test"</member><member>"ns:EEE."</member><member>"ns:_-"</member><member>"a.b:c"</member><member>"a-b:c.j"</member><member>"a-b:c"</member></var>
-                // r#doc = staff_ns_xml(STAFF_NS_XML).unwrap(); // staffNS.xml // <load var="doc" href="staffNS" willBeModified="false"/>
-                // dom_impl = doc.implementation(); // <implementation obj="doc" var="domImpl"/>
-
-                // // unimplemented: // <for-each collection="qualifiedNames" member="qualifiedName"><createDocumentType obj="domImpl" var="newDocType" qualifiedName="qualifiedName" publicId="publicId" systemId="systemId"/><assertNotNull actual="newDocType" id="domimplementationcreatedocumenttype02_newDocType"/><ownerDocument obj="newDocType" var="ownerDocument"/><assertNull actual="ownerDocument" id="domimplementationcreatedocumenttype02_ownerDocument"/></for-each>
+                let mut r#doc: DocumentRef; // <var name="doc" type="Document"/>
+                let mut r#dom_impl; // type: DOMImplementation // <var name="domImpl" type="DOMImplementation"/>
+                let mut r#new_doc_type; // type: DocumentType // <var name="newDocType" type="DocumentType"/>
+                let mut r#owner_document: DocumentRef; // <var name="ownerDocument" type="Document"/>
+                let mut r#public_id = "http://www.w3.org/DOM/Test/dom2.dtd"; // type: DOMString // <var name="publicId" type="DOMString" value="&quot;http://www.w3.org/DOM/Test/dom2.dtd&quot;"/>
+                let mut r#system_id = "dom2.dtd"; // type: DOMString // <var name="systemId" type="DOMString" value="&quot;dom2.dtd&quot;"/>
+                let mut r#qualified_names = vec![
+                    "_:_", "_:h0", "_:test", "_:_.", "_:a-", "l_:_", "ns:_0", "ns:a0", "ns0:test",
+                    "ns:EEE.", "ns:_-", "a.b:c", "a-b:c.j", "a-b:c",
+                ]; // type: List // <var name="qualifiedNames" type="List"><member>"_:_"</member><member>"_:h0"</member><member>"_:test"</member><member>"_:_."</member><member>"_:a-"</member><member>"l_:_"</member><member>"ns:_0"</member><member>"ns:a0"</member><member>"ns0:test"</member><member>"ns:EEE."</member><member>"ns:_-"</member><member>"a.b:c"</member><member>"a-b:c.j"</member><member>"a-b:c"</member></var>
+                r#doc = staff_ns_xml(STAFF_NS_XML).unwrap(); // staffNS.xml // <load var="doc" href="staffNS" willBeModified="false"/>
+                dom_impl = doc.implementation(); // <implementation obj="doc" var="domImpl"/>
+                // <for-each collection="qualifiedNames" member="qualifiedName">
+                //  <createDocumentType obj="domImpl" var="newDocType" qualifiedName="qualifiedName" publicId="publicId" systemId="systemId"/>
+                //  <assertNotNull actual="newDocType" id="domimplementationcreatedocumenttype02_newDocType"/>
+                //  <ownerDocument obj="newDocType" var="ownerDocument"/>
+                //  <assertNull actual="ownerDocument" id="domimplementationcreatedocumenttype02_ownerDocument"/>
+                // </for-each>
+                for qualified_name in qualified_names {
+                    new_doc_type = dom_impl
+                        .create_document_type(qualified_name, Some(public_id), Some(system_id))
+                        .unwrap();
+                    let owner_document = new_doc_type.owner_document();
+                    assert!(owner_document.is_none());
+                }
             }
             // localName03.xml
             #[test]
