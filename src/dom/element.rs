@@ -906,9 +906,9 @@ impl ElementRef {
         namespace_uri: Option<&str>,
         local_name: &str,
     ) -> Result<bool, DOMException> {
-        self.attributes()
-            .get_named_item_ns(namespace_uri, local_name)
-            .map(|attr| attr.is_some())
+        Ok(self
+            .get_attribute_node_ns(namespace_uri, local_name)?
+            .is_some())
     }
 
     /// Implementation of [`setIdAttribute`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-ElSetIdAttr) method.

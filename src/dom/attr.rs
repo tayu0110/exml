@@ -360,6 +360,9 @@ impl Node for AttrRef {
             if validate_ncname::<false>(&prefix).is_err() {
                 return Err(DOMException::InvalidCharacterErr);
             }
+            if local_name.as_ref() == "xmlns" {
+                return Err(DOMException::NamespaceErr);
+            }
             if self.namespace_uri().is_none()
                 || (prefix.as_ref() == "xml"
                     && self.namespace_uri().as_deref() != Some(XML_XML_NAMESPACE))
