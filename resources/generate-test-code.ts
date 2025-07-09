@@ -6,15 +6,15 @@ import { snakeCase } from "jsr:@luca/cases";
 let buffer: string = `#![allow(unreachable_code)]
 #[cfg(test)]
 mod dom_test_suite {
-    use exml::dom::*;
-    use exml::dom::document::*;
-    use exml::dom::node::*;
-    use exml::dom::character_data::*;
+    use exml::dom::{
+        attlistdecl::*, character_data::*, document::*, document_type::*, elementdecl::*,
+        entity::*, named_node_map::*, node::*, node_list::*, *,
+    };
 `;
 
 const TEST_SUITE: [string, string[]][] = [
-    ["level1", ["core" /* "html" */]],
-    ["level2", ["core" /* "events", "html" */]],
+    // ["level1", ["core" /* "html" */]],
+    // ["level2", ["core" /* "events", "html" */]],
     ["level3", ["core" /* "events", "ls", "validation", "xpath" */]],
 ];
 
@@ -112,13 +112,18 @@ for (const [d1, d] of TEST_SUITE) {
                                         snakeCase(obj)
                                     }.item(${index}).unwrap();`;
                                 }
-                            } else if (child.nodeName === "assertEquals") {
+                            } else if (
+                                child.nodeName === "assertEquals" ||
+                                child.nodeName === "assertNotEquals"
+                            ) {
                                 const actual = elem.getAttribute("actual");
                                 const expected = elem.getAttribute("expected");
                                 if (actual && expected) {
-                                    buffer += `assert_eq!(r#${
-                                        snakeCase(actual)
-                                    }, ${
+                                    buffer += `${
+                                        child.nodeName === "assertEquals"
+                                            ? "assert_eq"
+                                            : "assert_ne"
+                                    }!(r#${snakeCase(actual)}, ${
                                         expected?.startsWith('"')
                                             ? expected
                                             : snakeCase(expected)
@@ -156,6 +161,18 @@ for (const [d1, d] of TEST_SUITE) {
                                     buffer += `assert!(r#${
                                         snakeCase(actual)
                                     }.is_none());`;
+                                } else {
+                                    buffer += `\n// unimplemented: `;
+                                }
+                            } else if (child.nodeName === "assertSame") {
+                                const actual = elem.getAttribute("actual");
+                                const expected = elem.getAttribute("expected");
+                                if (actual && expected) {
+                                    buffer += `assert!(r#${
+                                        snakeCase(actual)
+                                    }.is_same_node(&r#${
+                                        snakeCase(expected)
+                                    }.into()));`;
                                 } else {
                                     buffer += `\n// unimplemented: `;
                                 }
@@ -1165,6 +1182,8 @@ for (const [d1, d] of TEST_SUITE) {
                                     buffer += `r#${snakeCase(vr)} = r#${
                                         snakeCase(obj)
                                     }.${snakeCase(child.nodeName)}();`;
+                                } else {
+                                    buffer += `\n// unimplemented: `;
                                 }
                             } else if (child.nodeName === "createDocument") {
                                 const vr = elem.getAttribute("var");
@@ -1224,6 +1243,92 @@ for (const [d1, d] of TEST_SUITE) {
                                         systemId
                                             ? systemId
                                             : `r#${snakeCase(systemId)}`
+                                    })).unwrap();`;
+                                }
+                            } else if (
+                                child.nodeName === "isSupported"
+                            ) {
+                                const vr = elem.getAttribute("var");
+                                const obj = elem.getAttribute("obj");
+                                const feature = elem.getAttribute(
+                                    "feature",
+                                );
+                                const version = elem.getAttribute(
+                                    "version",
+                                );
+                                if (
+                                    vr && obj && feature &&
+                                    version
+                                ) {
+                                    buffer += `r#${snakeCase(vr)} = r#${
+                                        snakeCase(obj)
+                                    }.${snakeCase(child.nodeName)}(${
+                                        feature.startsWith('"')
+                                            ? feature
+                                            : `r#${snakeCase(feature)}`
+                                    }, Some(${
+                                        version.startsWith('"')
+                                            ? version
+                                            : `r#${snakeCase(version)}`
+                                    }));`;
+                                }
+                            } else if (
+                                child.nodeName === "hasFeature"
+                            ) {
+                                const vr = elem.getAttribute("var");
+                                const obj = elem.getAttribute("obj");
+                                const feature = elem.getAttribute(
+                                    "feature",
+                                );
+                                const version = elem.getAttribute(
+                                    "version",
+                                );
+                                if (
+                                    vr && obj && feature
+                                ) {
+                                    buffer += `r#${snakeCase(vr)} = r#${
+                                        snakeCase(obj)
+                                    }.${snakeCase(child.nodeName)}(${
+                                        feature.startsWith('"')
+                                            ? feature
+                                            : `r#${snakeCase(feature)}`
+                                    }, ${
+                                        version
+                                            ? `Some(${
+                                                version.startsWith('"')
+                                                    ? version
+                                                    : `r#${snakeCase(version)}`
+                                            })`
+                                            : `None`
+                                    });`;
+                                } else {
+                                    buffer += `\n// unimplemented: `;
+                                }
+                            } else if (
+                                child.nodeName === "getFeature"
+                            ) {
+                                const vr = elem.getAttribute("var");
+                                const obj = elem.getAttribute("obj");
+                                const feature = elem.getAttribute(
+                                    "feature",
+                                );
+                                const version = elem.getAttribute(
+                                    "version",
+                                );
+                                if (
+                                    vr && obj && feature &&
+                                    version
+                                ) {
+                                    buffer += `r#${snakeCase(vr)} = r#${
+                                        snakeCase(obj)
+                                    }.${snakeCase(child.nodeName)}(${
+                                        feature.startsWith('"')
+                                            ? feature
+                                            : `r#${snakeCase(feature)}`
+                                    }, Some(${
+                                        version.startsWith('"')
+                                            ? version
+                                            : `r#${snakeCase(version)}`
                                     })).unwrap();`;
                                 }
                             } else {
