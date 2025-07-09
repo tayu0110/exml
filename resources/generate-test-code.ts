@@ -1182,9 +1182,7 @@ for (const [d1, d] of TEST_SUITE) {
                                 ) {
                                     buffer += `r#${snakeCase(vr)} = r#${
                                         snakeCase(obj)
-                                    }.${
-                                        snakeCase(child.nodeName)
-                                    }().unwrap(Some(${
+                                    }.${snakeCase(child.nodeName)}(Some(${
                                         namespaceURI.startsWith('"')
                                             ? namespaceURI
                                             : `r#${snakeCase(namespaceURI)}`
@@ -1192,7 +1190,41 @@ for (const [d1, d] of TEST_SUITE) {
                                         qualifiedName.startsWith('"')
                                             ? qualifiedName
                                             : `r#${snakeCase(qualifiedName)}`
-                                    }), Some(r#${snakeCase(doctype)}));`;
+                                    }), Some(r#${
+                                        snakeCase(doctype)
+                                    })).unwrap();`;
+                                }
+                            } else if (
+                                child.nodeName === "createDocumentType"
+                            ) {
+                                const vr = elem.getAttribute("var");
+                                const obj = elem.getAttribute("obj");
+                                const qualifiedName = elem.getAttribute(
+                                    "qualifiedName",
+                                );
+                                const publicId = elem.getAttribute(
+                                    "publicId",
+                                );
+                                const systemId = elem.getAttribute("systemId");
+                                if (
+                                    vr && obj && qualifiedName &&
+                                    publicId && systemId
+                                ) {
+                                    buffer += `r#${snakeCase(vr)} = r#${
+                                        snakeCase(obj)
+                                    }.${snakeCase(child.nodeName)}(${
+                                        qualifiedName.startsWith('"')
+                                            ? qualifiedName
+                                            : `r#${snakeCase(qualifiedName)}`
+                                    }, Some(${
+                                        publicId.startsWith('"')
+                                            ? publicId
+                                            : `r#${snakeCase(publicId)}`
+                                    }), Some(r#${
+                                        systemId
+                                            ? systemId
+                                            : `r#${snakeCase(systemId)}`
+                                    })).unwrap();`;
                                 }
                             } else {
                                 buffer += `\n// unimplemented: `;
