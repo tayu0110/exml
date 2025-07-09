@@ -758,30 +758,19 @@ impl DocumentRef {
             | NodeRef::ProcessingInstruction(_)
             | NodeRef::Text(_)
             | NodeRef::Entity(_)) => {
-                let mut new = node.clone_node(deep);
+                let mut new = node.clone_node(false);
                 new.set_owner_document(self.clone());
 
-                let mut children = new.first_child();
-                while let Some(mut child) = children {
+                let read_only_check = self.is_enabled_read_only_check();
+                self.disable_read_only_check();
+                let mut children = node.first_child();
+                while let Some(child) = children {
                     let new_child = self.import_node(child.clone(), deep)?;
-                    new.append_child(new_child);
-
-                    if let Some(ch) = child.first_child() {
-                        children = Some(ch);
-                    } else if let Some(sib) = child.next_sibling() {
-                        children = Some(sib);
-                    } else {
-                        children = None;
-                        while let Some(par) =
-                            child.parent_node().filter(|par| !new.is_same_node(par))
-                        {
-                            if let Some(sib) = par.next_sibling() {
-                                children = Some(sib);
-                                break;
-                            }
-                            child = par;
-                        }
-                    }
+                    new.append_child(new_child)?;
+                    children = child.next_sibling();
+                }
+                if read_only_check {
+                    self.enable_read_only_check();
                 }
                 Ok(new)
             }

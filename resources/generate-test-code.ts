@@ -159,6 +159,18 @@ for (const [d1, d] of TEST_SUITE) {
                                 } else {
                                     buffer += `\n// unimplemented: `;
                                 }
+                            } else if (child.nodeName === "assertSize") {
+                                const collection = elem.getAttribute(
+                                    "collection",
+                                );
+                                const size = elem.getAttribute("size");
+                                if (collection && size) {
+                                    buffer += `assert_eq!(r#${
+                                        snakeCase(collection)
+                                    }.length(), ${size});`;
+                                } else {
+                                    buffer += `\n// unimplemented: `;
+                                }
                             } else if (child.nodeName === "splitText") {
                                 const vr = elem.getAttribute("var");
                                 const obj = elem.getAttribute("obj");
