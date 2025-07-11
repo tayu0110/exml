@@ -91,3 +91,19 @@ pub trait UserDataHandler {
         dst: Option<NodeRef>,
     );
 }
+
+impl<F> UserDataHandler for F
+where
+    F: Fn(OperationType, &str, DOMUserData, NodeRef, Option<NodeRef>),
+{
+    fn handle(
+        &self,
+        operation: OperationType,
+        key: &str,
+        data: DOMUserData,
+        src: NodeRef,
+        dst: Option<NodeRef>,
+    ) {
+        (*self)(operation, key, data, src, dst)
+    }
+}
