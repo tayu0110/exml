@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{rc::Rc, sync::Arc};
 
 use crate::{
     dom::{
@@ -6,6 +6,7 @@ use crate::{
         check_owner_document_sameness,
         named_node_map::{AttributeMap, NamedNodeMap},
         node_list::ChildNodesList,
+        user_data::{DOMUserData, OperationType, UserDataHandler},
     },
     tree::XML_XML_NAMESPACE,
     uri::{XmlURI, build_uri},
@@ -1528,6 +1529,54 @@ pub trait Node: NodeConnection {
         self.is_supported(feature, version).then(|| self.clone())
     }
 
+    /// Implementation of [`setUserData`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-Node3-setUserData) method.
+    ///
+    /// # Specification
+    /// ```text
+    /// Associate an object to a key on this node. The object can later be retrieved
+    /// from this node by calling getUserData with the same key.
+    ///
+    /// Parameters
+    ///     key of type DOMString
+    ///         The key to associate the object to.
+    ///     data of type DOMUserData
+    ///         The object to associate to the given key, or null to remove any
+    ///         existing association to that key.
+    ///     handler of type UserDataHandler
+    ///         The handler to associate to that key, or null.
+    ///
+    /// Return Value
+    ///     DOMUserData Returns the DOMUserData previously associated to the given key
+    ///                 on this node, or null if there was none.
+    ///
+    /// No Exceptions
+    /// ```
+    fn set_user_data(
+        &mut self,
+        key: impl Into<String>,
+        data: DOMUserData,
+        handler: Option<Arc<dyn UserDataHandler>>,
+    ) -> Option<DOMUserData>;
+
+    /// Implementation of [`getUserData`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-Node3-getUserData) method.
+    ///
+    /// # Specification
+    /// ```text
+    /// Retrieves the object associated to a key on a this node. The object must first
+    /// have been set to this node by calling setUserData with the same key.
+    ///
+    /// Parameters
+    ///     key of type DOMString
+    ///         The key the object is associated to.
+    ///
+    /// Return Value
+    ///     DOMUserData Returns the DOMUserData associated to the given key on this node,
+    ///                 or null if there was none.
+    ///
+    /// No Exceptions
+    /// ```
+    fn get_user_data(&self, key: &str) -> Option<DOMUserData>;
+
     /// Check if this node is a read-only node.
     ///
     /// This method is independent of the Document setting and always returns
@@ -1672,6 +1721,8 @@ pub(super) trait NodeConnection: Clone + Into<NodeRef> {
         }
         par
     }
+
+    fn handle_user_data(&self, operation: OperationType, dst: Option<NodeRef>);
 }
 
 /// Implementation of [Node](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-1950641247)
@@ -1775,18 +1826,20 @@ impl_node_trait_to_noderef! {
     fn is_default_namespace(ns_uri: &str) -> bool,
     fn lookup_namespace_uri(prefix: Option<&str>) -> Option<Rc<str>>,
     fn is_equal_node(arg: &NodeRef) -> bool,
+    fn(mut) set_user_data(key: impl Into<String>, data: DOMUserData, handler: Option<Arc<dyn UserDataHandler>>) -> Option<DOMUserData>,
+    fn get_user_data(key: &str) -> Option<DOMUserData>,
     fn is_read_only() -> bool
 }
 
 macro_rules! impl_node_connection_to_noderef {
     (
         $(
-            $fn:ident($( $arg_name:ident : $arg_type:ty ),*) -> $ret:ty
+            fn $( ($mut:tt) )? $fn:ident($( $arg_name:ident : $arg_type:ty ),*) -> $ret:ty
         ),*
     ) => {
         impl NodeConnection for NodeRef {
             $(
-                fn $fn(&mut self, $( $arg_name: $arg_type),* ) -> $ret {
+                fn $fn(& $( $mut )? self, $( $arg_name: $arg_type),* ) -> $ret {
                     match self {
                         NodeRef::Element(elem) => elem.$fn( $( $arg_name ),* ),
                         NodeRef::Attribute(attr) => attr.$fn( $( $arg_name ),* ),
@@ -1808,18 +1861,19 @@ macro_rules! impl_node_connection_to_noderef {
 }
 
 impl_node_connection_to_noderef! {
-    set_parent_node(new_parent: Option<NodeRef>) -> Option<NodeRef>,
-    set_first_child(new_child: Option<NodeRef>) -> Option<NodeRef>,
-    set_last_child(new_child: Option<NodeRef>) -> Option<NodeRef>,
-    set_previous_sibling(new_sibling: Option<NodeRef>) -> Option<NodeRef>,
-    set_next_sibling(new_sibling: Option<NodeRef>) -> Option<NodeRef>,
-    set_owner_document(new_doc: DocumentRef) -> Option<DocumentRef>,
-    set_read_only() -> (),
-    unset_read_only() -> (),
-    adopted_to(new_doc: DocumentRef) -> (),
-    connect_as_previous_sibling(next: NodeRef) -> (),
-    connect_as_next_sibling(prev: NodeRef) -> (),
-    disconnect_parent_and_sibling() -> Option<NodeRef>
+    fn(mut) set_parent_node(new_parent: Option<NodeRef>) -> Option<NodeRef>,
+    fn(mut) set_first_child(new_child: Option<NodeRef>) -> Option<NodeRef>,
+    fn(mut) set_last_child(new_child: Option<NodeRef>) -> Option<NodeRef>,
+    fn(mut) set_previous_sibling(new_sibling: Option<NodeRef>) -> Option<NodeRef>,
+    fn(mut) set_next_sibling(new_sibling: Option<NodeRef>) -> Option<NodeRef>,
+    fn(mut) set_owner_document(new_doc: DocumentRef) -> Option<DocumentRef>,
+    fn(mut) set_read_only() -> (),
+    fn(mut) unset_read_only() -> (),
+    fn(mut) adopted_to(new_doc: DocumentRef) -> (),
+    fn(mut) connect_as_previous_sibling(next: NodeRef) -> (),
+    fn(mut) connect_as_next_sibling(prev: NodeRef) -> (),
+    fn(mut) disconnect_parent_and_sibling() -> Option<NodeRef>,
+    fn handle_user_data(operation: OperationType, dst: Option<NodeRef>) -> ()
 }
 
 macro_rules! impl_node_conversion {

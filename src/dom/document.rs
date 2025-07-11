@@ -1,5 +1,6 @@
 use std::{
     cell::RefCell,
+    collections::HashMap,
     mem::replace,
     rc::{Rc, Weak},
     sync::Arc,
@@ -7,6 +8,7 @@ use std::{
 
 use crate::{
     chvalid::XmlCharValid,
+    dom::user_data::{DOMUserData, OperationType, UserDataHandler},
     error::XmlParserErrors,
     parser::split_qname2,
     tree::{validate_name, validate_qname},
@@ -22,8 +24,7 @@ use super::{
     document_type::DocumentTypeRef,
     dom_implementation::{DEFAULT_DOM_IMPLEMENTATION, DOMImplementation},
     element::ElementRef,
-    entity::EntityType,
-    entity::{EntityRef, xml_entities_err},
+    entity::{EntityRef, EntityType, xml_entities_err},
     entity_reference::EntityReferenceRef,
     named_node_map::NamedNodeMap,
     node::{Node, NodeConnection, NodeRef},
@@ -72,6 +73,8 @@ pub struct Document {
     xml_standalone: i8,
     /// Implementation of `xmlVersion` attribute.
     xml_version: Option<Rc<str>>,
+
+    user_data: Option<HashMap<String, (DOMUserData, Option<Arc<dyn UserDataHandler>>)>>,
 
     /// HTML document or not
     html: bool,
@@ -282,6 +285,7 @@ impl DocumentRef {
             xml_encoding: None,
             xml_standalone: 0,
             xml_version: None,
+            user_data: None,
             html: false,
             flag: 0,
             predefined_entities: [
@@ -706,6 +710,8 @@ impl DocumentRef {
                     children = child.next_sibling();
                     new_attr.append_child(self.import_node(child, true)?)?;
                 }
+
+                attr.handle_user_data(OperationType::NodeImported, Some(new_attr.clone().into()));
                 Ok(new_attr.into())
             }
             NodeRef::DocumentFragment(frag) => {
@@ -717,6 +723,7 @@ impl DocumentRef {
                         new.append_child(self.import_node(child, true)?)?;
                     }
                 }
+                frag.handle_user_data(OperationType::NodeImported, Some(new.clone().into()));
                 Ok(new.into())
             }
             NodeRef::Document(_) | NodeRef::DocumentType(_) => Err(DOMException::NotSupportedErr),
@@ -747,11 +754,14 @@ impl DocumentRef {
                         new.append_child(self.import_node(child, true)?)?;
                     }
                 }
+                elem.handle_user_data(OperationType::NodeImported, Some(new.clone().into()));
                 Ok(new.into())
             }
-            NodeRef::EntityReference(entref) => Ok(self
-                .create_entity_reference(entref.node_name().as_ref())?
-                .into()),
+            NodeRef::EntityReference(entref) => {
+                let new = self.create_entity_reference(entref.node_name().as_ref())?;
+                entref.handle_user_data(OperationType::NodeImported, Some(new.clone().into()));
+                Ok(new.into())
+            }
             node @ (NodeRef::Notation(_)
             | NodeRef::CDATASection(_)
             | NodeRef::Comment(_)
@@ -772,6 +782,7 @@ impl DocumentRef {
                 if read_only_check {
                     self.enable_read_only_check();
                 }
+                node.handle_user_data(OperationType::NodeImported, Some(new.clone()));
                 Ok(new)
             }
         }
@@ -1142,6 +1153,7 @@ impl DocumentRef {
         }
 
         source.adopted_to(self.clone());
+
         Ok(source)
     }
 
@@ -1280,6 +1292,7 @@ impl DocumentRef {
                 }
                 let mut res = elem.clone();
                 res.rename(qname, ns_uri);
+                elem.handle_user_data(OperationType::NodeRenamed, None);
                 Ok(n)
             }
             NodeRef::Attribute(attr) => {
@@ -1313,6 +1326,7 @@ impl DocumentRef {
                 if let Some(mut elem) = keep {
                     elem.set_attribute_node(attr.clone())?;
                 }
+                attr.handle_user_data(OperationType::NodeRenamed, None);
                 Ok(n)
             }
             _ => Err(DOMException::NotSupportedErr),
@@ -1795,6 +1809,7 @@ impl Node for DocumentRef {
             xml_encoding: self.0.borrow().xml_encoding.clone(),
             xml_standalone: self.0.borrow().xml_standalone,
             xml_version: self.0.borrow().xml_version.clone(),
+            user_data: None,
             html: self.0.borrow().html,
             flag: self.0.borrow().flag,
             predefined_entities: self.0.borrow().predefined_entities.clone(),
@@ -1820,6 +1835,7 @@ impl Node for DocumentRef {
             }
         }
 
+        self.handle_user_data(OperationType::NodeCloned, Some(doc.clone().into()));
         doc.into()
     }
 
@@ -1851,6 +1867,29 @@ impl Node for DocumentRef {
 
     fn lookup_namespace_uri(&self, prefix: Option<&str>) -> Option<Rc<str>> {
         self.document_element()?.lookup_namespace_uri(prefix)
+    }
+
+    fn set_user_data(
+        &mut self,
+        key: impl Into<String>,
+        data: DOMUserData,
+        handler: Option<Arc<dyn UserDataHandler>>,
+    ) -> Option<DOMUserData> {
+        self.0
+            .borrow_mut()
+            .user_data
+            .get_or_insert_default()
+            .insert(key.into(), (data, handler))
+            .map(|v| v.0)
+    }
+
+    fn get_user_data(&self, key: &str) -> Option<DOMUserData> {
+        self.0
+            .borrow()
+            .user_data
+            .as_ref()
+            .and_then(|user_data| user_data.get(key))
+            .map(|v| v.0.clone())
     }
 
     fn is_read_only(&self) -> bool {
@@ -1885,6 +1924,22 @@ impl NodeConnection for DocumentRef {
 
     fn adopted_to(&mut self, _new_doc: DocumentRef) {
         // `Document` nodes cannot be adopted.
+    }
+
+    fn handle_user_data(&self, operation: OperationType, dst: Option<NodeRef>) {
+        if let Some(user_data) = self.0.borrow().user_data.as_ref() {
+            for (key, value) in user_data.iter() {
+                if let Some(handler) = value.1.clone() {
+                    handler.handle(
+                        operation,
+                        key.as_str(),
+                        value.0.clone(),
+                        self.clone().into(),
+                        dst.clone(),
+                    );
+                }
+            }
+        }
     }
 }
 

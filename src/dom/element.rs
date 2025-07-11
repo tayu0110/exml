@@ -1,24 +1,26 @@
 use std::{
     cell::RefCell,
+    collections::HashMap,
     mem::replace,
     rc::{Rc, Weak},
+    sync::Arc,
 };
 
 use crate::{
-    dom::{
-        XML_XML_NAMESPACE, check_no_modification_allowed_err, check_owner_document_sameness,
-        named_node_map::{AttributeMap, NamedNodeMap},
-        node_list::FilteredSubtreeElementsList,
-    },
+    dom::user_data::OperationType,
     parser::split_qname2,
     tree::{validate_name, validate_ncname},
 };
 
 use super::{
-    DOMException, NodeType,
+    DOMException, NodeType, XML_XML_NAMESPACE,
     attr::AttrRef,
+    check_no_modification_allowed_err, check_owner_document_sameness,
     document::{DocumentRef, DocumentWeakRef},
+    named_node_map::{AttributeMap, NamedNodeMap},
     node::{Node, NodeConnection, NodeRef, NodeWeakRef},
+    node_list::FilteredSubtreeElementsList,
+    user_data::{DOMUserData, UserDataHandler},
 };
 
 /// Implementation of [Element](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-745549614)
@@ -65,6 +67,8 @@ pub struct Element {
     prefix: Option<Rc<str>>,
     /// Implementation of `localName` for `Node`.
     local_name: Option<Rc<str>>,
+
+    user_data: Option<HashMap<String, (DOMUserData, Option<Arc<dyn UserDataHandler>>)>>,
 
     // 0: read-only ?
     // 1 - 15: unused
@@ -145,6 +149,7 @@ impl ElementRef {
             namespace_uri: None,
             prefix: None,
             local_name: None,
+            user_data: None,
             flag: 0,
         })));
         new.0.borrow_mut().attributes.set_owner_element(new.clone());
@@ -177,6 +182,7 @@ impl ElementRef {
                 namespace_uri,
                 prefix: Some(prefix.into()),
                 local_name: Some(local_name.into()),
+                user_data: None,
                 flag: 0,
             })))
         } else {
@@ -192,6 +198,7 @@ impl ElementRef {
                 namespace_uri,
                 prefix: None,
                 local_name: Some(tag_name.clone()),
+                user_data: None,
                 flag: 0,
             })))
         };
@@ -1143,6 +1150,7 @@ impl Node for ElementRef {
             namespace_uri: self.0.borrow().namespace_uri.clone(),
             prefix: self.0.borrow().prefix.clone(),
             local_name: self.0.borrow().local_name.clone(),
+            user_data: None,
             flag: 0,
         })));
         elem.0
@@ -1172,6 +1180,7 @@ impl Node for ElementRef {
             }
         }
 
+        self.handle_user_data(OperationType::NodeCloned, Some(elem.clone().into()));
         elem.into()
     }
 
@@ -1286,6 +1295,29 @@ impl Node for ElementRef {
         None
     }
 
+    fn set_user_data(
+        &mut self,
+        key: impl Into<String>,
+        data: DOMUserData,
+        handler: Option<Arc<dyn UserDataHandler>>,
+    ) -> Option<DOMUserData> {
+        self.0
+            .borrow_mut()
+            .user_data
+            .get_or_insert_default()
+            .insert(key.into(), (data, handler))
+            .map(|v| v.0)
+    }
+
+    fn get_user_data(&self, key: &str) -> Option<DOMUserData> {
+        self.0
+            .borrow()
+            .user_data
+            .as_ref()
+            .and_then(|user_data| user_data.get(key))
+            .map(|v| v.0.clone())
+    }
+
     fn is_read_only(&self) -> bool {
         self.0.borrow().flag & 0b01 != 0
     }
@@ -1364,6 +1396,36 @@ impl NodeConnection for ElementRef {
 
     fn adopted_to(&mut self, new_doc: DocumentRef) {
         self.0.borrow_mut().adopted_to(new_doc);
+
+        if let Some(user_data) = self.0.borrow().user_data.as_ref() {
+            for (key, value) in user_data.iter() {
+                if let Some(handler) = value.1.clone() {
+                    handler.handle(
+                        OperationType::NodeAdopted,
+                        key.as_str(),
+                        value.0.clone(),
+                        self.clone().into(),
+                        None,
+                    );
+                }
+            }
+        }
+    }
+
+    fn handle_user_data(&self, operation: OperationType, dst: Option<NodeRef>) {
+        if let Some(user_data) = self.0.borrow().user_data.as_ref() {
+            for (key, value) in user_data.iter() {
+                if let Some(handler) = value.1.clone() {
+                    handler.handle(
+                        operation,
+                        key.as_str(),
+                        value.0.clone(),
+                        self.clone().into(),
+                        dst.clone(),
+                    );
+                }
+            }
+        }
     }
 }
 

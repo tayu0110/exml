@@ -1,10 +1,15 @@
 use std::{
     cell::RefCell,
+    collections::HashMap,
     mem::replace,
     rc::{Rc, Weak},
+    sync::Arc,
 };
 
-use crate::dom::{DOMException, check_no_modification_allowed_err};
+use crate::dom::{
+    DOMException, check_no_modification_allowed_err,
+    user_data::{DOMUserData, OperationType, UserDataHandler},
+};
 
 use super::{
     NodeType,
@@ -43,6 +48,8 @@ pub struct ProcessingInstruction {
     /// Implementation of `data` attribute for `ProcessingInstruction`.
     data: Option<Rc<str>>,
 
+    user_data: Option<HashMap<String, (DOMUserData, Option<Arc<dyn UserDataHandler>>)>>,
+
     // 0      : read-only ?
     // 1 - 15 : unused
     flag: u16,
@@ -69,6 +76,7 @@ impl ProcessingInstructionRef {
             owner_document: doc.downgrade(),
             target,
             data,
+            user_data: None,
             flag: 0,
         })))
     }
@@ -158,17 +166,19 @@ impl Node for ProcessingInstructionRef {
     }
 
     fn clone_node(&self, _deep: bool) -> NodeRef {
-        let pi = ProcessingInstruction {
+        let pi = ProcessingInstructionRef(Rc::new(RefCell::new(ProcessingInstruction {
             parent_node: None,
             previous_sibling: None,
             next_sibling: None,
             owner_document: self.0.borrow().owner_document.clone(),
             target: self.0.borrow().target.clone(),
             data: self.0.borrow().data.clone(),
+            user_data: None,
             flag: 0,
-        };
+        })));
 
-        ProcessingInstructionRef(Rc::new(RefCell::new(pi))).into()
+        self.handle_user_data(OperationType::NodeCloned, Some(pi.clone().into()));
+        pi.into()
     }
 
     fn text_content(&self) -> Option<String> {
@@ -186,6 +196,29 @@ impl Node for ProcessingInstructionRef {
             return false;
         };
         Rc::ptr_eq(&self.0, &other.0)
+    }
+
+    fn set_user_data(
+        &mut self,
+        key: impl Into<String>,
+        data: DOMUserData,
+        handler: Option<Arc<dyn UserDataHandler>>,
+    ) -> Option<DOMUserData> {
+        self.0
+            .borrow_mut()
+            .user_data
+            .get_or_insert_default()
+            .insert(key.into(), (data, handler))
+            .map(|v| v.0)
+    }
+
+    fn get_user_data(&self, key: &str) -> Option<DOMUserData> {
+        self.0
+            .borrow()
+            .user_data
+            .as_ref()
+            .and_then(|user_data| user_data.get(key))
+            .map(|v| v.0.clone())
     }
 
     fn is_read_only(&self) -> bool {
@@ -236,6 +269,36 @@ impl NodeConnection for ProcessingInstructionRef {
 
     fn adopted_to(&mut self, new_doc: DocumentRef) {
         self.0.borrow_mut().owner_document = new_doc.downgrade();
+
+        if let Some(user_data) = self.0.borrow().user_data.as_ref() {
+            for (key, value) in user_data.iter() {
+                if let Some(handler) = value.1.clone() {
+                    handler.handle(
+                        OperationType::NodeAdopted,
+                        key.as_str(),
+                        value.0.clone(),
+                        self.clone().into(),
+                        None,
+                    );
+                }
+            }
+        }
+    }
+
+    fn handle_user_data(&self, operation: OperationType, dst: Option<NodeRef>) {
+        if let Some(user_data) = self.0.borrow().user_data.as_ref() {
+            for (key, value) in user_data.iter() {
+                if let Some(handler) = value.1.clone() {
+                    handler.handle(
+                        operation,
+                        key.as_str(),
+                        value.0.clone(),
+                        self.clone().into(),
+                        dst.clone(),
+                    );
+                }
+            }
+        }
     }
 }
 

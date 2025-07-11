@@ -1,10 +1,15 @@
 use std::{
     cell::RefCell,
+    collections::HashMap,
     mem::replace,
     rc::{Rc, Weak},
+    sync::Arc,
 };
 
-use crate::error::{__xml_simple_error, XmlErrorDomain, XmlParserErrors};
+use crate::{
+    dom::user_data::{DOMUserData, OperationType, UserDataHandler},
+    error::{__xml_simple_error, XmlErrorDomain, XmlParserErrors},
+};
 
 use super::{
     NodeType,
@@ -66,6 +71,8 @@ pub struct Entity {
     /// Implementation of `xmlVersion` attribute.
     xml_version: Option<Rc<str>>,
 
+    user_data: Option<HashMap<String, (DOMUserData, Option<Arc<dyn UserDataHandler>>)>>,
+
     etype: EntityType,
 }
 
@@ -86,6 +93,7 @@ impl EntityRef {
             input_encoding: None,
             xml_encoding: None,
             xml_version: None,
+            user_data: None,
             etype,
         })))
     }
@@ -185,6 +193,7 @@ impl Node for EntityRef {
             input_encoding: self.0.borrow().input_encoding.clone(),
             xml_encoding: self.0.borrow().xml_encoding.clone(),
             xml_version: self.0.borrow().xml_version.clone(),
+            user_data: None,
             etype: self.0.borrow().etype,
         })));
 
@@ -205,6 +214,8 @@ impl Node for EntityRef {
                 self.owner_document().unwrap().enable_read_only_check();
             }
         }
+
+        self.handle_user_data(OperationType::NodeCloned, Some(entity.clone().into()));
         entity.into()
     }
 
@@ -225,6 +236,29 @@ impl Node for EntityRef {
 
     fn lookup_namespace_uri(&self, _prefix: Option<&str>) -> Option<Rc<str>> {
         None
+    }
+
+    fn set_user_data(
+        &mut self,
+        key: impl Into<String>,
+        data: DOMUserData,
+        handler: Option<Arc<dyn UserDataHandler>>,
+    ) -> Option<DOMUserData> {
+        self.0
+            .borrow_mut()
+            .user_data
+            .get_or_insert_default()
+            .insert(key.into(), (data, handler))
+            .map(|v| v.0)
+    }
+
+    fn get_user_data(&self, key: &str) -> Option<DOMUserData> {
+        self.0
+            .borrow()
+            .user_data
+            .as_ref()
+            .and_then(|user_data| user_data.get(key))
+            .map(|v| v.0.clone())
     }
 
     fn is_read_only(&self) -> bool {
@@ -265,6 +299,22 @@ impl NodeConnection for EntityRef {
 
     fn adopted_to(&mut self, _new_doc: DocumentRef) {
         // Entity nodes cannot be adopted.
+    }
+
+    fn handle_user_data(&self, operation: OperationType, dst: Option<NodeRef>) {
+        if let Some(user_data) = self.0.borrow().user_data.as_ref() {
+            for (key, value) in user_data.iter() {
+                if let Some(handler) = value.1.clone() {
+                    handler.handle(
+                        operation,
+                        key.as_str(),
+                        value.0.clone(),
+                        self.clone().into(),
+                        dst.clone(),
+                    );
+                }
+            }
+        }
     }
 }
 

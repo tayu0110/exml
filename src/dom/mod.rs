@@ -29,6 +29,7 @@ pub mod node;
 pub mod node_list;
 pub mod notation;
 pub mod pi;
+pub mod user_data;
 
 /// This is the namespace for the special xml: prefix predefined in the
 /// XML Namespace specification.

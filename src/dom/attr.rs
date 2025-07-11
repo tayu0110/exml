@@ -1,11 +1,16 @@
 use std::{
     cell::RefCell,
+    collections::HashMap,
     mem::replace,
     rc::{Rc, Weak},
+    sync::Arc,
 };
 
 use crate::{
-    dom::{DOMException, XML_NS_NAMESPACE, XML_XML_NAMESPACE, check_no_modification_allowed_err},
+    dom::{
+        DOMException, XML_NS_NAMESPACE, XML_XML_NAMESPACE, check_no_modification_allowed_err,
+        user_data::{DOMUserData, OperationType, UserDataHandler},
+    },
     parser::split_qname2,
     tree::{validate_name, validate_ncname},
 };
@@ -54,6 +59,8 @@ pub struct Attr {
     specified: bool,
     /// Implementation of `isId` attribute of `Attr`.
     is_id: bool,
+
+    user_data: Option<HashMap<String, (DOMUserData, Option<Arc<dyn UserDataHandler>>)>>,
 
     // 0      : read-only ?
     // 1 - 15 : unused
@@ -169,6 +176,7 @@ impl AttrRef {
             local_name: None,
             specified: true,
             is_id: false,
+            user_data: None,
             flag: 0,
         })))
     }
@@ -325,6 +333,7 @@ impl Node for AttrRef {
             // operation, returns a specified attribute (specified is true)."
             specified: true,
             is_id: self.is_id(),
+            user_data: None,
             flag: 0,
         };
         let mut attr = AttrRef(Rc::new(RefCell::new(attr)));
@@ -334,6 +343,8 @@ impl Node for AttrRef {
             attr.append_child(child.clone_node(true))
                 .expect("Internal Error");
         }
+
+        self.handle_user_data(OperationType::NodeCloned, Some(attr.clone().into()));
         attr.into()
     }
 
@@ -416,6 +427,29 @@ impl Node for AttrRef {
         self.owner_element()?.lookup_namespace_uri(prefix)
     }
 
+    fn set_user_data(
+        &mut self,
+        key: impl Into<String>,
+        data: DOMUserData,
+        handler: Option<Arc<dyn UserDataHandler>>,
+    ) -> Option<DOMUserData> {
+        self.0
+            .borrow_mut()
+            .user_data
+            .get_or_insert_default()
+            .insert(key.into(), (data, handler))
+            .map(|v| v.0)
+    }
+
+    fn get_user_data(&self, key: &str) -> Option<DOMUserData> {
+        self.0
+            .borrow()
+            .user_data
+            .as_ref()
+            .and_then(|user_data| user_data.get(key))
+            .map(|v| v.0.clone())
+    }
+
     fn is_read_only(&self) -> bool {
         self.0.borrow().flag & 1 != 0
     }
@@ -474,6 +508,36 @@ impl NodeConnection for AttrRef {
 
     fn adopted_to(&mut self, new_doc: DocumentRef) {
         self.0.borrow_mut().adopted_to(new_doc);
+
+        if let Some(user_data) = self.0.borrow().user_data.as_ref() {
+            for (key, value) in user_data.iter() {
+                if let Some(handler) = value.1.clone() {
+                    handler.handle(
+                        OperationType::NodeAdopted,
+                        key.as_str(),
+                        value.0.clone(),
+                        self.clone().into(),
+                        None,
+                    );
+                }
+            }
+        }
+    }
+
+    fn handle_user_data(&self, operation: OperationType, dst: Option<NodeRef>) {
+        if let Some(user_data) = self.0.borrow().user_data.as_ref() {
+            for (key, value) in user_data.iter() {
+                if let Some(handler) = value.1.clone() {
+                    handler.handle(
+                        operation,
+                        key.as_str(),
+                        value.0.clone(),
+                        self.clone().into(),
+                        dst.clone(),
+                    );
+                }
+            }
+        }
     }
 }
 

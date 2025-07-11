@@ -1,11 +1,19 @@
 use std::{
     cell::RefCell,
+    collections::HashMap,
     mem::replace,
     ops::{Deref, DerefMut},
     rc::{Rc, Weak},
+    sync::Arc,
 };
 
-use crate::{chvalid::XmlCharValid, dom::check_no_modification_allowed_err};
+use crate::{
+    chvalid::XmlCharValid,
+    dom::{
+        check_no_modification_allowed_err,
+        user_data::{DOMUserData, OperationType, UserDataHandler},
+    },
+};
 
 use super::{
     DOMException, NodeType,
@@ -257,6 +265,8 @@ pub struct Text {
     next_sibling: Option<NodeRef>,
     owner_document: DocumentWeakRef,
     data: String,
+
+    user_data: Option<HashMap<String, (DOMUserData, Option<Arc<dyn UserDataHandler>>)>>,
 
     // 0      : read-only ?
     // 1 - 15 : unused
@@ -610,6 +620,7 @@ impl TextRef {
             next_sibling: None,
             owner_document: doc.downgrade(),
             data,
+            user_data: None,
             flag: 0,
         })))
     }
@@ -658,15 +669,18 @@ impl Node for TextRef {
     }
 
     fn clone_node(&self, _deep: bool) -> NodeRef {
-        let text = Text {
+        let text = TextRef(Rc::new(RefCell::new(Text {
             parent_node: None,
             previous_sibling: None,
             next_sibling: None,
             owner_document: self.0.borrow().owner_document.clone(),
             data: self.0.borrow().data.clone(),
+            user_data: None,
             flag: 0,
-        };
-        TextRef(Rc::new(RefCell::new(text))).into()
+        })));
+
+        self.handle_user_data(OperationType::NodeCloned, Some(text.clone().into()));
+        text.into()
     }
 
     fn text_content(&self) -> Option<String> {
@@ -683,6 +697,29 @@ impl Node for TextRef {
             return false;
         };
         Rc::ptr_eq(&self.0, &other.0)
+    }
+
+    fn set_user_data(
+        &mut self,
+        key: impl Into<String>,
+        data: DOMUserData,
+        handler: Option<Arc<dyn UserDataHandler>>,
+    ) -> Option<DOMUserData> {
+        self.0
+            .borrow_mut()
+            .user_data
+            .get_or_insert_default()
+            .insert(key.into(), (data, handler))
+            .map(|v| v.0)
+    }
+
+    fn get_user_data(&self, key: &str) -> Option<DOMUserData> {
+        self.0
+            .borrow()
+            .user_data
+            .as_ref()
+            .and_then(|user_data| user_data.get(key))
+            .map(|v| v.0.clone())
     }
 
     fn is_read_only(&self) -> bool {
@@ -745,6 +782,36 @@ impl NodeConnection for TextRef {
 
     fn adopted_to(&mut self, new_doc: DocumentRef) {
         self.0.borrow_mut().adopted_to(new_doc);
+
+        if let Some(user_data) = self.0.borrow().user_data.as_ref() {
+            for (key, value) in user_data.iter() {
+                if let Some(handler) = value.1.clone() {
+                    handler.handle(
+                        OperationType::NodeAdopted,
+                        key.as_str(),
+                        value.0.clone(),
+                        self.clone().into(),
+                        None,
+                    );
+                }
+            }
+        }
+    }
+
+    fn handle_user_data(&self, operation: OperationType, dst: Option<NodeRef>) {
+        if let Some(user_data) = self.0.borrow().user_data.as_ref() {
+            for (key, value) in user_data.iter() {
+                if let Some(handler) = value.1.clone() {
+                    handler.handle(
+                        operation,
+                        key.as_str(),
+                        value.0.clone(),
+                        self.clone().into(),
+                        dst.clone(),
+                    );
+                }
+            }
+        }
     }
 }
 
@@ -796,6 +863,8 @@ pub struct Comment {
     owner_document: DocumentWeakRef,
     data: String,
 
+    user_data: Option<HashMap<String, (DOMUserData, Option<Arc<dyn UserDataHandler>>)>>,
+
     // 0      : read-only ?
     // 1 - 15 : unused
     flag: u16,
@@ -828,6 +897,7 @@ impl CommentRef {
             next_sibling: None,
             owner_document: doc.downgrade(),
             data,
+            user_data: None,
             flag: 0,
         })))
     }
@@ -876,15 +946,18 @@ impl Node for CommentRef {
     }
 
     fn clone_node(&self, _deep: bool) -> NodeRef {
-        let text = Comment {
+        let text = CommentRef(Rc::new(RefCell::new(Comment {
             parent_node: None,
             previous_sibling: None,
             next_sibling: None,
             owner_document: self.0.borrow().owner_document.clone(),
             data: self.0.borrow().data.clone(),
+            user_data: None,
             flag: 0,
-        };
-        CommentRef(Rc::new(RefCell::new(text))).into()
+        })));
+
+        self.handle_user_data(OperationType::NodeCloned, Some(text.clone().into()));
+        text.into()
     }
 
     fn text_content(&self) -> Option<String> {
@@ -901,6 +974,29 @@ impl Node for CommentRef {
             return false;
         };
         Rc::ptr_eq(&self.0, &other.0)
+    }
+
+    fn set_user_data(
+        &mut self,
+        key: impl Into<String>,
+        data: DOMUserData,
+        handler: Option<Arc<dyn UserDataHandler>>,
+    ) -> Option<DOMUserData> {
+        self.0
+            .borrow_mut()
+            .user_data
+            .get_or_insert_default()
+            .insert(key.into(), (data, handler))
+            .map(|v| v.0)
+    }
+
+    fn get_user_data(&self, key: &str) -> Option<DOMUserData> {
+        self.0
+            .borrow()
+            .user_data
+            .as_ref()
+            .and_then(|user_data| user_data.get(key))
+            .map(|v| v.0.clone())
     }
 
     fn is_read_only(&self) -> bool {
@@ -951,6 +1047,36 @@ impl NodeConnection for CommentRef {
 
     fn adopted_to(&mut self, new_doc: DocumentRef) {
         self.0.borrow_mut().adopted_to(new_doc);
+
+        if let Some(user_data) = self.0.borrow().user_data.as_ref() {
+            for (key, value) in user_data.iter() {
+                if let Some(handler) = value.1.clone() {
+                    handler.handle(
+                        OperationType::NodeAdopted,
+                        key.as_str(),
+                        value.0.clone(),
+                        self.clone().into(),
+                        None,
+                    );
+                }
+            }
+        }
+    }
+
+    fn handle_user_data(&self, operation: OperationType, dst: Option<NodeRef>) {
+        if let Some(user_data) = self.0.borrow().user_data.as_ref() {
+            for (key, value) in user_data.iter() {
+                if let Some(handler) = value.1.clone() {
+                    handler.handle(
+                        operation,
+                        key.as_str(),
+                        value.0.clone(),
+                        self.clone().into(),
+                        dst.clone(),
+                    );
+                }
+            }
+        }
     }
 }
 
@@ -1025,6 +1151,7 @@ impl CDATASectionRef {
             next_sibling: None,
             owner_document: doc.downgrade(),
             data,
+            user_data: None,
             flag: 0,
         }))))
     }
@@ -1073,15 +1200,18 @@ impl Node for CDATASectionRef {
     }
 
     fn clone_node(&self, _deep: bool) -> NodeRef {
-        CDATASectionRef(Rc::new(RefCell::new(CDATASection(Text {
+        let text = CDATASectionRef(Rc::new(RefCell::new(CDATASection(Text {
             parent_node: None,
             previous_sibling: None,
             next_sibling: None,
             owner_document: self.0.borrow().owner_document.clone(),
             data: self.0.borrow().data.clone(),
+            user_data: None,
             flag: 0,
-        }))))
-        .into()
+        }))));
+
+        self.handle_user_data(OperationType::NodeCloned, Some(text.clone().into()));
+        text.into()
     }
 
     fn text_content(&self) -> Option<String> {
@@ -1098,6 +1228,29 @@ impl Node for CDATASectionRef {
             return false;
         };
         Rc::ptr_eq(&self.0, &other.0)
+    }
+
+    fn set_user_data(
+        &mut self,
+        key: impl Into<String>,
+        data: DOMUserData,
+        handler: Option<Arc<dyn UserDataHandler>>,
+    ) -> Option<DOMUserData> {
+        self.0
+            .borrow_mut()
+            .user_data
+            .get_or_insert_default()
+            .insert(key.into(), (data, handler))
+            .map(|v| v.0)
+    }
+
+    fn get_user_data(&self, key: &str) -> Option<DOMUserData> {
+        self.0
+            .borrow()
+            .user_data
+            .as_ref()
+            .and_then(|user_data| user_data.get(key))
+            .map(|v| v.0.clone())
     }
 
     fn is_read_only(&self) -> bool {
@@ -1148,6 +1301,36 @@ impl NodeConnection for CDATASectionRef {
 
     fn adopted_to(&mut self, new_doc: DocumentRef) {
         self.0.borrow_mut().adopted_to(new_doc);
+
+        if let Some(user_data) = self.0.borrow().user_data.as_ref() {
+            for (key, value) in user_data.iter() {
+                if let Some(handler) = value.1.clone() {
+                    handler.handle(
+                        OperationType::NodeAdopted,
+                        key.as_str(),
+                        value.0.clone(),
+                        self.clone().into(),
+                        None,
+                    );
+                }
+            }
+        }
+    }
+
+    fn handle_user_data(&self, operation: OperationType, dst: Option<NodeRef>) {
+        if let Some(user_data) = self.0.borrow().user_data.as_ref() {
+            for (key, value) in user_data.iter() {
+                if let Some(handler) = value.1.clone() {
+                    handler.handle(
+                        operation,
+                        key.as_str(),
+                        value.0.clone(),
+                        self.clone().into(),
+                        dst.clone(),
+                    );
+                }
+            }
+        }
     }
 }
 

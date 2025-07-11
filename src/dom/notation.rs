@@ -1,8 +1,12 @@
 use std::{
     cell::RefCell,
+    collections::HashMap,
     mem::replace,
     rc::{Rc, Weak},
+    sync::Arc,
 };
+
+use crate::dom::user_data::{DOMUserData, OperationType, UserDataHandler};
 
 use super::{
     DOMException, NodeType,
@@ -42,6 +46,8 @@ pub struct Notation {
     public_id: Option<Rc<str>>,
     /// Implementation of `systemId` attribute.
     system_id: Option<Rc<str>>,
+
+    user_data: Option<HashMap<String, (DOMUserData, Option<Arc<dyn UserDataHandler>>)>>,
 }
 
 /// Wrapper of `Rc<RefCell<Notation>>`.
@@ -62,6 +68,7 @@ impl NotationRef {
             name,
             public_id,
             system_id,
+            user_data: None,
         })))
     }
 
@@ -144,13 +151,16 @@ impl Node for NotationRef {
     }
 
     fn clone_node(&self, _deep: bool) -> NodeRef {
-        NotationRef(Rc::new(RefCell::new(Notation {
+        let notation = NotationRef(Rc::new(RefCell::new(Notation {
             owner_document: self.0.borrow().owner_document.clone(),
             name: self.0.borrow().name.clone(),
             public_id: self.0.borrow().public_id.clone(),
             system_id: self.0.borrow().system_id.clone(),
-        })))
-        .into()
+            user_data: None,
+        })));
+
+        self.handle_user_data(OperationType::NodeCloned, Some(notation.clone().into()));
+        notation.into()
     }
 
     fn text_content(&self) -> Option<String> {
@@ -178,6 +188,29 @@ impl Node for NotationRef {
 
     fn lookup_namespace_uri(&self, _prefix: Option<&str>) -> Option<Rc<str>> {
         None
+    }
+
+    fn set_user_data(
+        &mut self,
+        key: impl Into<String>,
+        data: DOMUserData,
+        handler: Option<Arc<dyn UserDataHandler>>,
+    ) -> Option<DOMUserData> {
+        self.0
+            .borrow_mut()
+            .user_data
+            .get_or_insert_default()
+            .insert(key.into(), (data, handler))
+            .map(|v| v.0)
+    }
+
+    fn get_user_data(&self, key: &str) -> Option<DOMUserData> {
+        self.0
+            .borrow()
+            .user_data
+            .as_ref()
+            .and_then(|user_data| user_data.get(key))
+            .map(|v| v.0.clone())
     }
 
     fn is_read_only(&self) -> bool {
@@ -217,6 +250,22 @@ impl NodeConnection for NotationRef {
 
     fn adopted_to(&mut self, _new_doc: DocumentRef) {
         // `Notation` nodes cannot be adopted.
+    }
+
+    fn handle_user_data(&self, operation: OperationType, dst: Option<NodeRef>) {
+        if let Some(user_data) = self.0.borrow().user_data.as_ref() {
+            for (key, value) in user_data.iter() {
+                if let Some(handler) = value.1.clone() {
+                    handler.handle(
+                        operation,
+                        key.as_str(),
+                        value.0.clone(),
+                        self.clone().into(),
+                        dst.clone(),
+                    );
+                }
+            }
+        }
     }
 }
 

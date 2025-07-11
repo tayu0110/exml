@@ -1,8 +1,12 @@
 use std::{
     cell::RefCell,
+    collections::HashMap,
     mem::replace,
     rc::{Rc, Weak},
+    sync::Arc,
 };
+
+use crate::dom::user_data::{DOMUserData, OperationType, UserDataHandler};
 
 use super::{
     NodeType,
@@ -42,6 +46,8 @@ pub struct EntityReference {
 
     /// Name of entity referenced. as same as `nodeName` for `Node`.
     name: Rc<str>,
+
+    user_data: Option<HashMap<String, (DOMUserData, Option<Arc<dyn UserDataHandler>>)>>,
 }
 
 impl EntityReference {
@@ -87,6 +93,7 @@ impl EntityReferenceRef {
             next_sibling: None,
             owner_document: doc.downgrade(),
             name,
+            user_data: None,
         })))
     }
 
@@ -158,6 +165,7 @@ impl Node for EntityReferenceRef {
             next_sibling: None,
             owner_document: self.0.borrow().owner_document.clone(),
             name: self.0.borrow().name.clone(),
+            user_data: None,
         })));
 
         let mut children = self.first_child();
@@ -172,6 +180,7 @@ impl Node for EntityReferenceRef {
             doc.enable_read_only_check();
         }
 
+        self.handle_user_data(OperationType::NodeCloned, Some(entref.clone().into()));
         entref.into()
     }
 
@@ -180,6 +189,29 @@ impl Node for EntityReferenceRef {
             return false;
         };
         Rc::ptr_eq(&self.0, &other.0)
+    }
+
+    fn set_user_data(
+        &mut self,
+        key: impl Into<String>,
+        data: DOMUserData,
+        handler: Option<Arc<dyn UserDataHandler>>,
+    ) -> Option<DOMUserData> {
+        self.0
+            .borrow_mut()
+            .user_data
+            .get_or_insert_default()
+            .insert(key.into(), (data, handler))
+            .map(|v| v.0)
+    }
+
+    fn get_user_data(&self, key: &str) -> Option<DOMUserData> {
+        self.0
+            .borrow()
+            .user_data
+            .as_ref()
+            .and_then(|user_data| user_data.get(key))
+            .map(|v| v.0.clone())
     }
 
     fn is_read_only(&self) -> bool {
@@ -248,6 +280,36 @@ impl NodeConnection for EntityReferenceRef {
             while let Some(mut child) = children {
                 child.set_parent_node(Some(self.clone().into()));
                 children = child.next_sibling();
+            }
+        }
+
+        if let Some(user_data) = self.0.borrow().user_data.as_ref() {
+            for (key, value) in user_data.iter() {
+                if let Some(handler) = value.1.clone() {
+                    handler.handle(
+                        OperationType::NodeAdopted,
+                        key.as_str(),
+                        value.0.clone(),
+                        self.clone().into(),
+                        None,
+                    );
+                }
+            }
+        }
+    }
+
+    fn handle_user_data(&self, operation: OperationType, dst: Option<NodeRef>) {
+        if let Some(user_data) = self.0.borrow().user_data.as_ref() {
+            for (key, value) in user_data.iter() {
+                if let Some(handler) = value.1.clone() {
+                    handler.handle(
+                        operation,
+                        key.as_str(),
+                        value.0.clone(),
+                        self.clone().into(),
+                        dst.clone(),
+                    );
+                }
             }
         }
     }

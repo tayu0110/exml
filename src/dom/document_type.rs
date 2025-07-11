@@ -3,6 +3,7 @@ use std::{
     collections::HashMap,
     mem::replace,
     rc::{Rc, Weak},
+    sync::Arc,
 };
 
 use crate::{
@@ -13,6 +14,7 @@ use crate::{
         entity::EntityType,
         named_node_map::{EntityMap, NotationMap, SubsetEntityMap, SubsetNotationMap},
         notation::NotationIdentifier,
+        user_data::{DOMUserData, OperationType, UserDataHandler},
     },
     tree::{validate_name, validate_qname},
 };
@@ -56,6 +58,8 @@ pub struct DocumentType {
 
     internal_subset: Option<InternalSubset>,
     external_subset: Option<ExternalSubset>,
+
+    user_data: Option<HashMap<String, (DOMUserData, Option<Arc<dyn UserDataHandler>>)>>,
 }
 
 impl DocumentType {
@@ -244,6 +248,7 @@ impl DocumentTypeRef {
             system_id: system_id.map(|systemid| systemid.into()),
             internal_subset: None,
             external_subset: None,
+            user_data: None,
         }))))
     }
 
@@ -590,7 +595,7 @@ impl Node for DocumentTypeRef {
     }
 
     fn clone_node(&self, deep: bool) -> NodeRef {
-        DocumentTypeRef(Rc::new(RefCell::new(DocumentType {
+        let doctype = DocumentTypeRef(Rc::new(RefCell::new(DocumentType {
             parent_node: None,
             previous_sibling: None,
             next_sibling: None,
@@ -610,8 +615,11 @@ impl Node for DocumentTypeRef {
                 .external_subset
                 .as_ref()
                 .map(|sub| sub.clone_node(deep)),
-        })))
-        .into()
+            user_data: None,
+        })));
+
+        self.handle_user_data(OperationType::NodeCloned, Some(doctype.clone().into()));
+        doctype.into()
     }
 
     fn text_content(&self) -> Option<String> {
@@ -685,6 +693,29 @@ impl Node for DocumentTypeRef {
         true
     }
 
+    fn set_user_data(
+        &mut self,
+        key: impl Into<String>,
+        data: DOMUserData,
+        handler: Option<Arc<dyn UserDataHandler>>,
+    ) -> Option<DOMUserData> {
+        self.0
+            .borrow_mut()
+            .user_data
+            .get_or_insert_default()
+            .insert(key.into(), (data, handler))
+            .map(|v| v.0)
+    }
+
+    fn get_user_data(&self, key: &str) -> Option<DOMUserData> {
+        self.0
+            .borrow()
+            .user_data
+            .as_ref()
+            .and_then(|user_data| user_data.get(key))
+            .map(|v| v.0.clone())
+    }
+
     fn is_read_only(&self) -> bool {
         // DOM Level 3 doesn't support editing DocumentType nodes.
         // DocumentType nodes are read-only.
@@ -727,6 +758,22 @@ impl NodeConnection for DocumentTypeRef {
 
     fn adopted_to(&mut self, _new_doc: DocumentRef) {
         // `DocumentType` nodes cannot be adopted.
+    }
+
+    fn handle_user_data(&self, operation: OperationType, dst: Option<NodeRef>) {
+        if let Some(user_data) = self.0.borrow().user_data.as_ref() {
+            for (key, value) in user_data.iter() {
+                if let Some(handler) = value.1.clone() {
+                    handler.handle(
+                        operation,
+                        key.as_str(),
+                        value.0.clone(),
+                        self.clone().into(),
+                        dst.clone(),
+                    );
+                }
+            }
+        }
     }
 }
 
