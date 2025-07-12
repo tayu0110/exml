@@ -18,6 +18,8 @@ pub mod character_data;
 pub mod document;
 pub mod document_fragment;
 pub mod document_type;
+pub mod dom_configuration;
+pub mod dom_error;
 pub mod dom_implementation;
 pub mod element;
 pub mod elementdecl;
