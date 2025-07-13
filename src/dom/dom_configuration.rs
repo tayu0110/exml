@@ -176,32 +176,32 @@ pub struct DOMConfiguration {
     ///
     /// | offset | parameter                                    | default |
     /// | -----: | :------------------------------------------- | :-----: |
-    /// |   0    | "canonical-form"                             |  false  |
-    /// |   1    | "cdata-sections"                             |  true   |
-    /// |   2    | "check-character-normalization"              |  false  |
-    /// |   3    | "comments"                                   |  true   |
-    /// |   4    | "datatype-normalization"                     |  false  |
-    /// |   5    | "element-content-whitespace"                 |  true   |
-    /// |   6    | "entities"                                   |  true   |
-    /// |   7    | "error-handler"                              |    -    |
-    /// |   8    | "infoset"                                    |  true   |
-    /// |   9    | "namespaces"                                 |  true   |
-    /// |  10    | "namespace-declarations"                     |  true   |
-    /// |  11    | "normalize-characters"                       |  false  |
-    /// |  12    | "schema-location"                            |    -    |
-    /// |  13    | "schema-type"                                |    -    |
-    /// |  14    | "split-cdata-sections"                       |  true   |
-    /// |  15    | "validate"                                   |  false  |
-    /// |  16    | "validate-if-schema"                         |  false  |
-    /// |  17    | "well-formed"                                |  true   |
-    /// |  18    | "charset-overrides-xml-encoding"             |  true   |
-    /// |  19    | "disallow-doctype"                           |  false  |
-    /// |  20    | "ignore-unknown-character-denormalizations"  |  true   |
-    /// |  21    | "resource-resolver"                          |    -    |
-    /// |  22    | "supported-media-types-only"                 |  false  |
-    /// |  23    | "discard-default-content"                    |  true   |
-    /// |  24    | "format-pretty-print"                        |  false  |
-    /// |  25    | "xml-declaration"                            |  true   |
+    /// |    0   | "canonical-form"                             |  false  |
+    /// |    1   | "cdata-sections"                             |  true   |
+    /// |    2   | "check-character-normalization"              |  false  |
+    /// |    3   | "comments"                                   |  true   |
+    /// |    4   | "datatype-normalization"                     |  false  |
+    /// |    5   | "element-content-whitespace"                 |  true   |
+    /// |    6   | "entities"                                   |  true   |
+    /// |    7   | "error-handler"                              |    -    |
+    /// |    8   | "infoset"                                    |  true   |
+    /// |    9   | "namespaces"                                 |  true   |
+    /// |   10   | "namespace-declarations"                     |  true   |
+    /// |   11   | "normalize-characters"                       |  false  |
+    /// |   12   | "schema-location"                            |    -    |
+    /// |   13   | "schema-type"                                |    -    |
+    /// |   14   | "split-cdata-sections"                       |  true   |
+    /// |   15   | "validate"                                   |  false  |
+    /// |   16   | "validate-if-schema"                         |  false  |
+    /// |   17   | "well-formed"                                |  true   |
+    /// |   18   | "charset-overrides-xml-encoding"             |  true   |
+    /// |   19   | "disallow-doctype"                           |  false  |
+    /// |   20   | "ignore-unknown-character-denormalizations"  |  true   |
+    /// |   21   | "resource-resolver"                          |    -    |
+    /// |   22   | "supported-media-types-only"                 |  false  |
+    /// |   23   | "discard-default-content"                    |  true   |
+    /// |   24   | "format-pretty-print"                        |  false  |
+    /// |   25   | "xml-declaration"                            |  true   |
     flags: u64,
 
     error_handler: Option<Arc<dyn DOMErrorHandler>>,
