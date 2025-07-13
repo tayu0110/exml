@@ -37,9 +37,7 @@ mod node;
 
 use std::{
     borrow::Cow,
-    cell::RefCell,
     fmt::Display,
-    rc::{Rc, Weak},
     sync::atomic::{AtomicBool, AtomicI32, Ordering},
 };
 
@@ -144,52 +142,6 @@ pub enum XmlAttributeDefault {
     XmlAttributeRequired,
     XmlAttributeImplied,
     XmlAttributeFixed,
-}
-
-/// Possible definitions of element content types.
-#[repr(C)]
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum XmlElementContentType {
-    XmlElementContentPCDATA = 1,
-    XmlElementContentElement,
-    XmlElementContentSeq,
-    XmlElementContentOr,
-}
-
-/// Possible definitions of element content occurrences.
-#[repr(C)]
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum XmlElementContentOccur {
-    XmlElementContentOnce = 1,
-    XmlElementContentOpt,
-    XmlElementContentMult,
-    XmlElementContentPlus,
-}
-
-/// An XML Element content as stored after parsing an element definition in a DTD.
-#[repr(C)]
-pub struct XmlElementContent {
-    pub typ: XmlElementContentType,   /* PCDATA, ELEMENT, SEQ or OR */
-    pub ocur: XmlElementContentOccur, /* ONCE, OPT, MULT or PLUS */
-    pub name: Option<Box<str>>,       /* Element name */
-    pub c1: Option<Rc<RefCell<XmlElementContent>>>, /* first child */
-    pub c2: Option<Rc<RefCell<XmlElementContent>>>, /* second child */
-    pub parent: Weak<RefCell<XmlElementContent>>, /* parent */
-    pub prefix: Option<Box<str>>,     /* Namespace prefix */
-}
-
-impl Default for XmlElementContent {
-    fn default() -> Self {
-        Self {
-            typ: XmlElementContentType::XmlElementContentPCDATA,
-            ocur: XmlElementContentOccur::XmlElementContentOnce,
-            name: None,
-            c1: None,
-            c2: None,
-            parent: Weak::new(),
-            prefix: None,
-        }
-    }
 }
 
 /// The different possibilities for an element content type.
