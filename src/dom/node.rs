@@ -5,7 +5,6 @@ use std::{
 };
 
 use crate::{
-    dom::document::Document,
     tree::XML_XML_NAMESPACE,
     uri::{XmlURI, build_uri},
 };
@@ -14,22 +13,21 @@ use super::{
     DOCUMENT_POSITION_CONTAINED_BY, DOCUMENT_POSITION_CONTAINS, DOCUMENT_POSITION_DISCONNECTED,
     DOCUMENT_POSITION_FOLLOWING, DOCUMENT_POSITION_PRECEDING, DOMException, DocumentPosition,
     NodeType,
-    attr::{AttrRef, AttrWeakRef},
+    attr::{Attr, AttrRef},
     character_data::{
-        CDATASectionRef, CDATASectionWeakRef, CharacterData, CommentRef, CommentWeakRef, TextRef,
-        TextWeakRef,
+        CDATASection, CDATASectionRef, CharacterData, Comment, CommentRef, Text, TextRef,
     },
     check_no_modification_allowed_err, check_owner_document_sameness, check_vertical_hierarchy,
-    document::DocumentRef,
-    document_fragment::{DocumentFragmentRef, DocumentFragmentWeakRef},
-    document_type::{DocumentTypeRef, DocumentTypeWeakRef},
-    element::{ElementRef, ElementWeakRef},
-    entity::{EntityRef, EntityWeakRef},
-    entity_reference::{EntityReferenceRef, EntityReferenceWeakRef},
+    document::{Document, DocumentRef},
+    document_fragment::{DocumentFragment, DocumentFragmentRef},
+    document_type::{DocumentType, DocumentTypeRef},
+    element::{Element, ElementRef},
+    entity::{Entity, EntityRef},
+    entity_reference::{EntityReference, EntityReferenceRef},
     named_node_map::{AttributeMap, NamedNodeMap},
     node_list::ChildNodesList,
-    notation::{NotationRef, NotationWeakRef},
-    pi::{ProcessingInstructionRef, ProcessingInstructionWeakRef},
+    notation::{Notation, NotationRef},
+    pi::{ProcessingInstruction, ProcessingInstructionRef},
     user_data::{DOMUserData, OperationType, UserDataHandler},
 };
 
@@ -1750,18 +1748,20 @@ impl NodeRef {
     pub fn downgrade(&self) -> NodeWeakRef {
         use NodeRef::*;
         match self {
-            Element(node) => NodeWeakRef::Element(node.downgrade()),
-            Attribute(node) => NodeWeakRef::Attribute(node.downgrade()),
-            Text(node) => NodeWeakRef::Text(node.downgrade()),
-            CDATASection(node) => NodeWeakRef::CDATASection(node.downgrade()),
-            EntityReference(node) => NodeWeakRef::EntityReference(node.downgrade()),
-            Entity(node) => NodeWeakRef::Entity(node.downgrade()),
-            ProcessingInstruction(node) => NodeWeakRef::ProcessingInstruction(node.downgrade()),
-            Comment(node) => NodeWeakRef::Comment(node.downgrade()),
+            Element(node) => NodeWeakRef::Element(Rc::downgrade(&node.0)),
+            Attribute(node) => NodeWeakRef::Attribute(Rc::downgrade(&node.0)),
+            Text(node) => NodeWeakRef::Text(Rc::downgrade(&node.0)),
+            CDATASection(node) => NodeWeakRef::CDATASection(Rc::downgrade(&node.0)),
+            EntityReference(node) => NodeWeakRef::EntityReference(Rc::downgrade(&node.0)),
+            Entity(node) => NodeWeakRef::Entity(Rc::downgrade(&node.0)),
+            ProcessingInstruction(node) => {
+                NodeWeakRef::ProcessingInstruction(Rc::downgrade(&node.0))
+            }
+            Comment(node) => NodeWeakRef::Comment(Rc::downgrade(&node.0)),
             Document(node) => NodeWeakRef::Document(Rc::downgrade(&node.0)),
-            DocumentType(node) => NodeWeakRef::DocumentType(node.downgrade()),
-            DocumentFragment(node) => NodeWeakRef::DocumentFragment(node.downgrade()),
-            Notation(node) => NodeWeakRef::Notation(node.downgrade()),
+            DocumentType(node) => NodeWeakRef::DocumentType(Rc::downgrade(&node.0)),
+            DocumentFragment(node) => NodeWeakRef::DocumentFragment(Rc::downgrade(&node.0)),
+            Notation(node) => NodeWeakRef::Notation(Rc::downgrade(&node.0)),
         }
     }
 }
@@ -1912,18 +1912,18 @@ impl_node_conversion! {
 /// interface on [1.4 Fundamental Interfaces: Core Module](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-BBACDC08)
 #[derive(Clone)]
 pub enum NodeWeakRef {
-    Element(ElementWeakRef),
-    Attribute(AttrWeakRef),
-    Text(TextWeakRef),
-    CDATASection(CDATASectionWeakRef),
-    EntityReference(EntityReferenceWeakRef),
-    Entity(EntityWeakRef),
-    ProcessingInstruction(ProcessingInstructionWeakRef),
-    Comment(CommentWeakRef),
+    Element(Weak<RefCell<Element>>),
+    Attribute(Weak<RefCell<Attr>>),
+    Text(Weak<RefCell<Text>>),
+    CDATASection(Weak<RefCell<CDATASection>>),
+    EntityReference(Weak<RefCell<EntityReference>>),
+    Entity(Weak<RefCell<Entity>>),
+    ProcessingInstruction(Weak<RefCell<ProcessingInstruction>>),
+    Comment(Weak<RefCell<Comment>>),
     Document(Weak<RefCell<Document>>),
-    DocumentType(DocumentTypeWeakRef),
-    DocumentFragment(DocumentFragmentWeakRef),
-    Notation(NotationWeakRef),
+    DocumentType(Weak<RefCell<DocumentType>>),
+    DocumentFragment(Weak<RefCell<DocumentFragment>>),
+    Notation(Weak<RefCell<Notation>>),
 }
 
 impl NodeWeakRef {
@@ -1931,22 +1931,35 @@ impl NodeWeakRef {
     /// Success conditions are the same as for [`std::rc::Weak::upgrade`].
     pub fn upgrade(&self) -> Option<NodeRef> {
         match self {
-            NodeWeakRef::Element(node) => node.upgrade().map(NodeRef::Element),
-            NodeWeakRef::Attribute(node) => node.upgrade().map(NodeRef::Attribute),
-            NodeWeakRef::Text(node) => node.upgrade().map(NodeRef::Text),
-            NodeWeakRef::CDATASection(node) => node.upgrade().map(NodeRef::CDATASection),
-            NodeWeakRef::EntityReference(node) => node.upgrade().map(NodeRef::EntityReference),
-            NodeWeakRef::Entity(node) => node.upgrade().map(NodeRef::Entity),
-            NodeWeakRef::ProcessingInstruction(node) => {
-                node.upgrade().map(NodeRef::ProcessingInstruction)
-            }
-            NodeWeakRef::Comment(node) => node.upgrade().map(NodeRef::Comment),
+            NodeWeakRef::Element(node) => node.upgrade().map(ElementRef).map(NodeRef::Element),
+            NodeWeakRef::Attribute(node) => node.upgrade().map(AttrRef).map(NodeRef::Attribute),
+            NodeWeakRef::Text(node) => node.upgrade().map(TextRef).map(NodeRef::Text),
+            NodeWeakRef::CDATASection(node) => node
+                .upgrade()
+                .map(CDATASectionRef)
+                .map(NodeRef::CDATASection),
+            NodeWeakRef::EntityReference(node) => node
+                .upgrade()
+                .map(EntityReferenceRef)
+                .map(NodeRef::EntityReference),
+            NodeWeakRef::Entity(node) => node.upgrade().map(EntityRef).map(NodeRef::Entity),
+            NodeWeakRef::ProcessingInstruction(node) => node
+                .upgrade()
+                .map(ProcessingInstructionRef)
+                .map(NodeRef::ProcessingInstruction),
+            NodeWeakRef::Comment(node) => node.upgrade().map(CommentRef).map(NodeRef::Comment),
             NodeWeakRef::Document(node) => {
                 node.upgrade().map(DocumentRef::from).map(NodeRef::Document)
             }
-            NodeWeakRef::DocumentType(node) => node.upgrade().map(NodeRef::DocumentType),
-            NodeWeakRef::DocumentFragment(node) => node.upgrade().map(NodeRef::DocumentFragment),
-            NodeWeakRef::Notation(node) => node.upgrade().map(NodeRef::Notation),
+            NodeWeakRef::DocumentType(node) => node
+                .upgrade()
+                .map(DocumentTypeRef)
+                .map(NodeRef::DocumentType),
+            NodeWeakRef::DocumentFragment(node) => node
+                .upgrade()
+                .map(DocumentFragmentRef)
+                .map(NodeRef::DocumentFragment),
+            NodeWeakRef::Notation(node) => node.upgrade().map(NotationRef).map(NodeRef::Notation),
         }
     }
 }

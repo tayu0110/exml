@@ -51,7 +51,7 @@ pub struct Notation {
 
 /// Wrapper of `Rc<RefCell<Notation>>`.
 #[derive(Clone)]
-pub struct NotationRef(Rc<RefCell<Notation>>);
+pub struct NotationRef(pub(super) Rc<RefCell<Notation>>);
 
 impl NotationRef {
     pub(crate) fn new(doc: Option<DocumentRef>, name: Rc<str>, id: NotationIdentifier) -> Self {
@@ -116,11 +116,6 @@ impl NotationRef {
     ) {
         self.0.borrow_mut().public_id = public_id.map(|id| id.into());
         self.0.borrow_mut().system_id = Some(system_id.into());
-    }
-
-    /// Generate [`NotationWeakRef`] from `self`.
-    pub fn downgrade(&self) -> NotationWeakRef {
-        NotationWeakRef(Rc::downgrade(&self.0))
     }
 }
 
@@ -268,17 +263,5 @@ impl NodeConnection for NotationRef {
 impl From<NotationRef> for NodeRef {
     fn from(value: NotationRef) -> Self {
         NodeRef::Notation(value)
-    }
-}
-
-/// Wrapper of `Weak<RefCell<Notation>>`.
-#[derive(Clone)]
-pub struct NotationWeakRef(Weak<RefCell<Notation>>);
-
-impl NotationWeakRef {
-    /// Generate [`NotationRef`] from `self`.  
-    /// Success conditions are the same as for [`std::rc::Weak::upgrade`].
-    pub fn upgrade(&self) -> Option<NotationRef> {
-        self.0.upgrade().map(NotationRef)
     }
 }

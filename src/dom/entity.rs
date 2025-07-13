@@ -76,7 +76,7 @@ pub struct Entity {
 
 /// Wrapper of `Rc<RefCell<Entity>>`.
 #[derive(Clone)]
-pub struct EntityRef(Rc<RefCell<Entity>>);
+pub struct EntityRef(pub(super) Rc<RefCell<Entity>>);
 
 impl EntityRef {
     pub(crate) fn new(doc: Option<DocumentRef>, name: Rc<str>, etype: EntityType) -> Self {
@@ -94,11 +94,6 @@ impl EntityRef {
             user_data: None,
             etype,
         })))
-    }
-
-    /// Generate [`EntityWeakRef`] from `self`.
-    pub fn downgrade(&self) -> EntityWeakRef {
-        EntityWeakRef(Rc::downgrade(&self.0))
     }
 
     /// Get `name` attribute of this entity.
@@ -316,17 +311,5 @@ impl NodeConnection for EntityRef {
 impl From<EntityRef> for NodeRef {
     fn from(value: EntityRef) -> Self {
         NodeRef::Entity(value)
-    }
-}
-
-/// Wrapper of `Weak<RefCell<Entity>>`.
-#[derive(Clone)]
-pub struct EntityWeakRef(Weak<RefCell<Entity>>);
-
-impl EntityWeakRef {
-    /// Generate [`EntityRef`] from `self`.  
-    /// Success conditions are the same as for [`std::rc::Weak::upgrade`].
-    pub fn upgrade(&self) -> Option<EntityRef> {
-        self.0.upgrade().map(EntityRef)
     }
 }

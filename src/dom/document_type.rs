@@ -195,7 +195,7 @@ impl DocumentType {
 
 /// Wrapper of `Rc<RefCell<DocumentType>>`.
 #[derive(Clone)]
-pub struct DocumentTypeRef(Rc<RefCell<DocumentType>>);
+pub struct DocumentTypeRef(pub(super) Rc<RefCell<DocumentType>>);
 
 impl DocumentTypeRef {
     /// Implementation of [`createDocumentType`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-Level-2-Core-DOM-createDocType)
@@ -346,11 +346,6 @@ impl DocumentTypeRef {
     /// ```
     pub fn system_id(&self) -> Option<Rc<str>> {
         self.0.borrow().system_id.clone()
-    }
-
-    /// Generate [`DocumentTypeWeakRef`] from `self`.
-    pub fn downgrade(&self) -> DocumentTypeWeakRef {
-        DocumentTypeWeakRef(Rc::downgrade(&self.0))
     }
 
     /// Check if an internal subset exists.
@@ -780,18 +775,6 @@ impl NodeConnection for DocumentTypeRef {
 impl From<DocumentTypeRef> for NodeRef {
     fn from(value: DocumentTypeRef) -> Self {
         NodeRef::DocumentType(value)
-    }
-}
-
-/// Wrapper of `Weak<RefCell<DocumentType>>`.
-#[derive(Clone)]
-pub struct DocumentTypeWeakRef(Weak<RefCell<DocumentType>>);
-
-impl DocumentTypeWeakRef {
-    /// Generate [`DocumentTypeRef`] from `self`.  
-    /// Success conditions are the same as for [`std::rc::Weak::upgrade`].
-    pub fn upgrade(&self) -> Option<DocumentTypeRef> {
-        self.0.upgrade().map(DocumentTypeRef)
     }
 }
 

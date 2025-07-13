@@ -279,7 +279,7 @@ impl Text {
 /// Strings are encoded in UTF-8. Unlike the specification, methods that specify string
 /// boundaries are constrained to be UTF-8 character boundaries.
 #[derive(Clone)]
-pub struct TextRef(Rc<RefCell<Text>>);
+pub struct TextRef(pub(super) Rc<RefCell<Text>>);
 
 impl TextRef {
     /// Implementation of [`splitText`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-38853C1D) method.
@@ -602,11 +602,6 @@ impl TextRef {
         buf
     }
 
-    /// Generate [`TextWeakRef`] from `self`.
-    pub fn downgrade(&self) -> TextWeakRef {
-        TextWeakRef(Rc::downgrade(&self.0))
-    }
-
     /// Create new [`TextRef`] whose ownerDocument is `doc`.
     pub(super) fn from_doc(doc: DocumentRef, data: String) -> Self {
         Self(Rc::new(RefCell::new(Text {
@@ -821,18 +816,6 @@ impl From<TextRef> for NodeRef {
     }
 }
 
-/// Wrapper of `Weak<RefCell<Text>>`.
-#[derive(Clone)]
-pub struct TextWeakRef(Weak<RefCell<Text>>);
-
-impl TextWeakRef {
-    /// Generate [`TextRef`] from `self`.  
-    /// Success conditions are the same as for [`std::rc::Weak::upgrade`].
-    pub fn upgrade(&self) -> Option<TextRef> {
-        self.0.upgrade().map(TextRef)
-    }
-}
-
 /// Implementation of [Comment](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-1728279322)
 /// interface on [1.4 Fundamental Interfaces: Core Module](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-BBACDC08)
 ///
@@ -881,14 +864,9 @@ impl Comment {
 /// Strings are encoded in UTF-8. Unlike the specification, methods that specify string
 /// boundaries are constrained to be UTF-8 character boundaries.
 #[derive(Clone)]
-pub struct CommentRef(Rc<RefCell<Comment>>);
+pub struct CommentRef(pub(super) Rc<RefCell<Comment>>);
 
 impl CommentRef {
-    /// Generate [`CommentWeakRef`] from `self`.
-    pub fn downgrade(&self) -> CommentWeakRef {
-        CommentWeakRef(Rc::downgrade(&self.0))
-    }
-
     /// Create new [`CommentRef`] whose ownerDocument is `doc`.
     pub(super) fn from_doc(doc: DocumentRef, data: String) -> Self {
         Self(Rc::new(RefCell::new(Comment {
@@ -1103,18 +1081,6 @@ impl From<CommentRef> for NodeRef {
     }
 }
 
-/// Wrapper of `Weak<RefCell<Comment>>`.
-#[derive(Clone)]
-pub struct CommentWeakRef(Weak<RefCell<Comment>>);
-
-impl CommentWeakRef {
-    /// Generate [`CommentRef`] from `self`.  
-    /// Success conditions are the same as for [`std::rc::Weak::upgrade`].
-    pub fn upgrade(&self) -> Option<CommentRef> {
-        self.0.upgrade().map(CommentRef)
-    }
-}
-
 /// Implementation of [CDATASection](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-667469212)
 /// interface on [1.5 Extended Interfaces: XML Module](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-E067D597)
 ///
@@ -1140,14 +1106,9 @@ impl DerefMut for CDATASection {
 /// Strings are encoded in UTF-8. Unlike the specification, methods that specify string
 /// boundaries are constrained to be UTF-8 character boundaries.
 #[derive(Clone)]
-pub struct CDATASectionRef(Rc<RefCell<CDATASection>>);
+pub struct CDATASectionRef(pub(super) Rc<RefCell<CDATASection>>);
 
 impl CDATASectionRef {
-    /// Generate [`CDATASectionWeakRef`] from `self`.
-    pub fn downgrade(&self) -> CDATASectionWeakRef {
-        CDATASectionWeakRef(Rc::downgrade(&self.0))
-    }
-
     /// Create new [`CDATASectionRef`] whose ownerDocument is `doc`.
     pub(super) fn from_doc(doc: DocumentRef, data: String) -> Self {
         Self(Rc::new(RefCell::new(CDATASection(Text {
@@ -1359,17 +1320,5 @@ impl CharacterData for CDATASectionRef {
 impl From<CDATASectionRef> for NodeRef {
     fn from(value: CDATASectionRef) -> Self {
         NodeRef::CDATASection(value)
-    }
-}
-
-/// Wrapper of `Weak<RefCell<CDATASection>>`.
-#[derive(Clone)]
-pub struct CDATASectionWeakRef(Weak<RefCell<CDATASection>>);
-
-impl CDATASectionWeakRef {
-    /// Generate [`CDATASectionRef`] from `self`.  
-    /// Success conditions are the same as for [`std::rc::Weak::upgrade`].
-    pub fn upgrade(&self) -> Option<CDATASectionRef> {
-        self.0.upgrade().map(CDATASectionRef)
     }
 }

@@ -156,7 +156,7 @@ impl Attr {
 
 /// Wrapper of `Rc<RefCell<Attr>>`.
 #[derive(Clone)]
-pub struct AttrRef(Rc<RefCell<Attr>>);
+pub struct AttrRef(pub(super) Rc<RefCell<Attr>>);
 
 impl AttrRef {
     /// Create new [`AttrRef`].
@@ -269,11 +269,6 @@ impl AttrRef {
 
     pub(super) fn set_is_id(&mut self, is_id: bool) -> bool {
         self.0.borrow_mut().set_is_id(is_id)
-    }
-
-    /// Generate [`AttrWeakRef`] from `self`.
-    pub fn downgrade(&self) -> AttrWeakRef {
-        AttrWeakRef(Rc::downgrade(&self.0))
     }
 
     /// Rename this element and replace namespaceURI with `ns_uri`.\
@@ -545,17 +540,5 @@ impl NodeConnection for AttrRef {
 impl From<AttrRef> for NodeRef {
     fn from(value: AttrRef) -> Self {
         NodeRef::Attribute(value)
-    }
-}
-
-/// Wrapper of `Weak<RefCell<Attr>>`.
-#[derive(Clone)]
-pub struct AttrWeakRef(Weak<RefCell<Attr>>);
-
-impl AttrWeakRef {
-    /// Generate [`AttrRef`] from `self`.  
-    /// Success conditions are the same as for [`std::rc::Weak::upgrade`].
-    pub fn upgrade(&self) -> Option<AttrRef> {
-        self.0.upgrade().map(AttrRef)
     }
 }

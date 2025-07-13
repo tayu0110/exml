@@ -52,14 +52,9 @@ impl DocumentFragment {
 
 /// Wrapper of `Rc<RefCell<DocumentFragment>>`.
 #[derive(Clone)]
-pub struct DocumentFragmentRef(Rc<RefCell<DocumentFragment>>);
+pub struct DocumentFragmentRef(pub(super) Rc<RefCell<DocumentFragment>>);
 
 impl DocumentFragmentRef {
-    /// Generate [`DocumentFragmentWeakRef`] from `self`.
-    pub fn downgrade(&self) -> DocumentFragmentWeakRef {
-        DocumentFragmentWeakRef(Rc::downgrade(&self.0))
-    }
-
     /// Create new [`DocumentFragmentRef`] whose ownerDocument is `doc`.
     pub(super) fn from_doc(doc: DocumentRef) -> Self {
         Self(Rc::new(RefCell::new(DocumentFragment {
@@ -236,17 +231,5 @@ impl NodeConnection for DocumentFragmentRef {
 impl From<DocumentFragmentRef> for NodeRef {
     fn from(value: DocumentFragmentRef) -> Self {
         NodeRef::DocumentFragment(value)
-    }
-}
-
-/// Wrapper of `Weak<RefCell<DocumentFragment>>`.
-#[derive(Clone)]
-pub struct DocumentFragmentWeakRef(Weak<RefCell<DocumentFragment>>);
-
-impl DocumentFragmentWeakRef {
-    /// Generate [`DocumentFragmentRef`] from `self`.  
-    /// Success conditions are the same as for [`std::rc::Weak::upgrade`].
-    pub fn upgrade(&self) -> Option<DocumentFragmentRef> {
-        self.0.upgrade().map(DocumentFragmentRef)
     }
 }

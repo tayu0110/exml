@@ -81,7 +81,7 @@ impl EntityReference {
 
 /// Wrapper of `Rc<RefCell<EntityReference>>`.
 #[derive(Clone)]
-pub struct EntityReferenceRef(Rc<RefCell<EntityReference>>);
+pub struct EntityReferenceRef(pub(super) Rc<RefCell<EntityReference>>);
 
 impl EntityReferenceRef {
     /// Create new [`EntityReferenceRef`] whose ownerDocument is `doc`.
@@ -100,11 +100,6 @@ impl EntityReferenceRef {
 
     pub(crate) fn get_entity_ref_value(&self) -> Option<String> {
         self.0.borrow().get_entity_ref_value()
-    }
-
-    /// Generate [`EntityReferenceWeakRef`] from `self`.
-    pub fn downgrade(&self) -> EntityReferenceWeakRef {
-        EntityReferenceWeakRef(Rc::downgrade(&self.0))
     }
 }
 
@@ -324,17 +319,5 @@ impl NodeConnection for EntityReferenceRef {
 impl From<EntityReferenceRef> for NodeRef {
     fn from(value: EntityReferenceRef) -> Self {
         NodeRef::EntityReference(value)
-    }
-}
-
-/// Wrapper of `Weak<RefCell<EntityReference>>`.
-#[derive(Clone)]
-pub struct EntityReferenceWeakRef(Weak<RefCell<EntityReference>>);
-
-impl EntityReferenceWeakRef {
-    /// Generate [`EntityReferenceRef`] from `self`.  
-    /// Success conditions are the same as for [`std::rc::Weak::upgrade`].
-    pub fn upgrade(&self) -> Option<EntityReferenceRef> {
-        self.0.upgrade().map(EntityReferenceRef)
     }
 }

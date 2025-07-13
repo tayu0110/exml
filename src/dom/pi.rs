@@ -55,14 +55,9 @@ pub struct ProcessingInstruction {
 
 /// Wrapper of `Rc<RefCell<ProcessingInstruction>>`.
 #[derive(Clone)]
-pub struct ProcessingInstructionRef(Rc<RefCell<ProcessingInstruction>>);
+pub struct ProcessingInstructionRef(pub(super) Rc<RefCell<ProcessingInstruction>>);
 
 impl ProcessingInstructionRef {
-    /// Generate [`ProcessingInstructionWeakRef`] from `self`.
-    pub fn downgrade(&self) -> ProcessingInstructionWeakRef {
-        ProcessingInstructionWeakRef(Rc::downgrade(&self.0))
-    }
-
     /// Create new [`ProcessingInstructionRef`] whose ownerDocument is `doc`.
     ///
     /// This method does not validate `target`.
@@ -308,17 +303,5 @@ impl NodeConnection for ProcessingInstructionRef {
 impl From<ProcessingInstructionRef> for NodeRef {
     fn from(value: ProcessingInstructionRef) -> Self {
         NodeRef::ProcessingInstruction(value)
-    }
-}
-
-/// Wrapper of `Weak<RefCell<ProcessingInstruction>>`.
-#[derive(Clone)]
-pub struct ProcessingInstructionWeakRef(Weak<RefCell<ProcessingInstruction>>);
-
-impl ProcessingInstructionWeakRef {
-    /// Generate [`ProcessingInstructionRef`] from `self`.  
-    /// Success conditions are the same as for [`std::rc::Weak::upgrade`].
-    pub fn upgrade(&self) -> Option<ProcessingInstructionRef> {
-        self.0.upgrade().map(ProcessingInstructionRef)
     }
 }
