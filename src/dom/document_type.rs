@@ -821,6 +821,7 @@ pub struct DtdSubset<const EXT: bool> {
     system_id: Option<Rc<str>>,
 
     elements: HashMap<String, ElementDeclRef>,
+    pentities: HashMap<String, EntityRef>,
 }
 
 pub type InternalSubset = DtdSubset<false>;
@@ -844,6 +845,7 @@ impl<const EXT: bool> DtdSubset<EXT> {
             public_id: public_id.map(|id| id.into()),
             system_id: system_id.map(|id| id.into()),
             elements: HashMap::new(),
+            pentities: HashMap::new(),
         }
     }
 
@@ -908,6 +910,27 @@ impl<const EXT: bool> DtdSubset<EXT> {
         }
 
         self.entities.set_named_item(entity.clone())?;
+        let decl = MarkupDecl::EntityDecl(entity);
+        self.append_markup_decl(decl);
+        Ok(())
+    }
+
+    /// Add an entity `entity` to this subset.
+    ///
+    /// If this subset already has an entity with the same name as the name of the `entity`,
+    /// `entity` is not added and this method returns [`Err`].  
+    /// The name of the entity is also verified.
+    pub fn add_parameter_entity(&mut self, entity: EntityRef) -> Result<(), DOMException> {
+        let name = entity.node_name();
+        if validate_name::<false>(&name).is_err() {
+            return Err(DOMException::InvalidCharacterErr);
+        }
+        if self.entities.get_named_item(&name).is_some() {
+            // Is this correct ??
+            return Err(DOMException::NoDataAllowedErr);
+        }
+
+        self.pentities.insert(name.to_string(), entity.clone());
         let decl = MarkupDecl::EntityDecl(entity);
         self.append_markup_decl(decl);
         Ok(())
@@ -1021,28 +1044,30 @@ impl<const EXT: bool> DtdSubset<EXT> {
             public_id: self.public_id.clone(),
             system_id: self.system_id.clone(),
             elements: HashMap::new(),
+            pentities: HashMap::new(),
         };
 
         if deep {
             for i in 0..self.entities.len() {
                 let ent = self.entities.item(i).unwrap();
-                let NodeRef::Entity(ent) = ent.clone_node(true) else {
-                    unreachable!()
-                };
+                let ent = ent.clone_node(true).as_entity().unwrap();
                 subset.add_entity(ent).unwrap();
             }
 
             for i in 0..self.notations.len() {
                 let not = self.notations.item(i).unwrap();
-                let NodeRef::Notation(not) = not.clone_node(true) else {
-                    unreachable!()
-                };
+                let not = not.clone_node(true).as_notation().unwrap();
                 subset.add_notation(not).unwrap();
             }
 
             for element_decl in self.elements.values() {
                 let element_decl = element_decl.clone_node(true);
                 subset.add_element_decl(element_decl).unwrap();
+            }
+
+            for pentity in self.pentities.values() {
+                let pentity = pentity.clone_node(true).as_entity().unwrap();
+                subset.add_parameter_entity(pentity).unwrap();
             }
         }
 
@@ -1184,9 +1209,7 @@ impl<const EXT: bool> DtdSubset<EXT> {
 /// [29] markupdecl ::= elementdecl | AttlistDecl | EntityDecl | NotationDecl | PI | Comment
 /// ```
 pub(crate) enum MarkupDecl {
-    // TODO: implement ElementDecl
     ElementDecl(ElementDeclRef),
-    // TODO: implement AttlistDecl
     AttlistDecl(AttlistDeclRef),
     EntityDecl(EntityRef),
     NotationDecl(NotationRef),
