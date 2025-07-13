@@ -807,7 +807,7 @@ impl XmlParserCtxt<'_> {
                     self.depth += 1;
                     ret = xml_parse_balanced_chunk_memory_internal(
                         self,
-                        ent.content.as_deref().unwrap(),
+                        ent.content.as_deref().unwrap().as_bytes(),
                         user_data,
                         Some(&mut list),
                     );
@@ -925,7 +925,7 @@ impl XmlParserCtxt<'_> {
                         self.depth += 1;
                         ret = xml_parse_balanced_chunk_memory_internal(
                             self,
-                            ent.content.as_deref().unwrap(),
+                            ent.content.as_deref().unwrap().as_bytes(),
                             user_data,
                             None,
                         );

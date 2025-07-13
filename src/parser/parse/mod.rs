@@ -482,7 +482,7 @@ pub unsafe fn xml_parse_in_node_context(
 #[doc(alias = "xmlParseBalancedChunkMemoryInternal")]
 pub(crate) fn xml_parse_balanced_chunk_memory_internal(
     oldctxt: &mut XmlParserCtxt,
-    string: &str,
+    string: &[u8],
     user_data: Option<GenericErrorContext>,
     mut lst: Option<&mut Option<XmlGenericNodePtr>>,
 ) -> XmlParserErrors {
@@ -506,7 +506,7 @@ pub(crate) fn xml_parse_balanced_chunk_memory_internal(
             **lst = None;
         }
 
-        let Some(mut ctxt) = XmlParserCtxt::from_memory(string.as_bytes()) else {
+        let Some(mut ctxt) = XmlParserCtxt::from_memory(string) else {
             return XmlParserErrors::XmlWarUndeclaredEntity;
         };
         ctxt.nb_errors = oldctxt.nb_errors;
