@@ -39,7 +39,6 @@ use crate::{
         XmlEntityType, XmlGenericNodePtr, XmlNodePtr, XmlNs, XmlNsPtr, validate_name,
         xml_free_node_list, xml_get_doc_entity,
     },
-    valid::xml_snprintf_element_content,
     xpath::{XmlXPathContext, XmlXPathObject},
 };
 
@@ -485,10 +484,7 @@ impl XmlDebugCtxt<'_> {
             }
             if elem.element_type() != XmlElementType::XmlElementNode {
                 if let Some(content) = elem.content.clone() {
-                    let mut buf = String::with_capacity(5000);
-
-                    xml_snprintf_element_content(&mut buf, 5000, content, 1);
-                    write!(self.output, "{}", buf).ok();
+                    write!(self.output, "{}", content).ok();
                 }
             }
             writeln!(self.output).ok();

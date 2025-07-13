@@ -1891,9 +1891,10 @@ fn xml_search_ns_by_prefix_strict(
                 }
                 ns = now.next;
             }
-        } else if (matches!(cur_node.element_type(), XmlElementType::XmlEntityNode)
-            || matches!(cur_node.element_type(), XmlElementType::XmlEntityDecl))
-        {
+        } else if matches!(
+            cur_node.element_type(),
+            XmlElementType::XmlEntityNode | XmlElementType::XmlEntityDecl
+        ) {
             return 0;
         }
         cur = cur_node.parent();

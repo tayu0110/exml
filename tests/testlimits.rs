@@ -13,6 +13,7 @@ use std::{
 };
 
 use exml::{
+    dom::elementdecl::ElementContent,
     error::{XmlError, XmlErrorDomain, XmlErrorLevel, parser_print_file_context_internal},
     globals::{
         GenericErrorContext, set_get_warnings_default_value, set_pedantic_parser_default_value,
@@ -30,8 +31,8 @@ use exml::{
         xml_set_external_entity_loader,
     },
     tree::{
-        XmlAttributeDefault, XmlAttributeType, XmlElementContent, XmlElementType,
-        XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNodePtr, xml_free_doc,
+        XmlAttributeDefault, XmlAttributeType, XmlElementType, XmlElementTypeVal, XmlEntityPtr,
+        XmlEntityType, XmlEnumeration, XmlNodePtr, xml_free_doc,
     },
 };
 use libc::{memcpy, strlen};
@@ -751,7 +752,7 @@ fn element_decl_callback(
     _ctx: &mut XmlParserCtxt,
     _name: &str,
     _typ: Option<XmlElementTypeVal>,
-    _content: Option<Rc<RefCell<XmlElementContent>>>,
+    _content: Option<Rc<ElementContent>>,
 ) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }

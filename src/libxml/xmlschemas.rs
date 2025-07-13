@@ -21,7 +21,6 @@
 
 use std::{
     borrow::Cow,
-    cell::RefCell,
     ffi::{CStr, CString, c_char},
     mem::{size_of, take},
     os::raw::c_void,
@@ -38,6 +37,7 @@ use crate::libxml::xmlautomata::XmlAutomata;
 use crate::pattern::{XmlPattern, XmlPatternFlags, XmlStreamCtxt, xml_pattern_compile};
 use crate::{
     chvalid::XmlCharValid,
+    dom::elementdecl::ElementContent,
     encoding::XmlCharEncoding,
     error::{XmlErrorDomain, XmlParserErrors},
     generic_error,
@@ -105,10 +105,10 @@ use crate::{
         XmlSAXHandler, XmlSAXLocator, split_qname2, xml_ctxt_read_file, xml_ctxt_read_memory,
     },
     tree::{
-        NodeCommon, XmlAttrPtr, XmlAttributeDefault, XmlAttributeType, XmlDocPtr,
-        XmlElementContent, XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType,
-        XmlEnumeration, XmlGenericNodePtr, XmlNodePtr, validate_ncname, validate_qname,
-        xml_free_doc, xml_free_node, xml_new_doc_text, xml_new_ns, xml_new_ns_prop, xml_new_prop,
+        NodeCommon, XmlAttrPtr, XmlAttributeDefault, XmlAttributeType, XmlDocPtr, XmlElementType,
+        XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlGenericNodePtr,
+        XmlNodePtr, validate_ncname, validate_qname, xml_free_doc, xml_free_node, xml_new_doc_text,
+        xml_new_ns, xml_new_ns_prop, xml_new_prop,
     },
     uri::build_uri,
     valid::xml_add_id,
@@ -19150,7 +19150,7 @@ fn element_decl_split(
     ctxt: &mut XmlParserCtxt,
     name: &str,
     typ: Option<XmlElementTypeVal>,
-    content: Option<Rc<RefCell<XmlElementContent>>>,
+    content: Option<Rc<ElementContent>>,
 ) {
     unsafe {
         let user_data = ctxt.user_data.clone().unwrap();

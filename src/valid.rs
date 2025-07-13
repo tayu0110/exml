@@ -19,8 +19,12 @@
 // daniel@veillard.com
 
 use std::{
-    borrow::Cow, cell::RefCell, collections::hash_map::Entry, os::raw::c_void, ptr::null_mut,
-    rc::Rc,
+    borrow::Cow,
+    cell::RefCell,
+    collections::hash_map::Entry,
+    os::raw::c_void,
+    ptr::null_mut,
+    rc::{Rc, Weak},
 };
 #[cfg(feature = "libxml_output")]
 use std::{collections::HashMap, io::Write};
@@ -31,6 +35,9 @@ use crate::libxml::{xmlautomata::XmlAutomata, xmlregexp::XmlRegExecCtxt};
 use crate::tree::{XmlElementPtr, XmlGenericNodePtr, XmlNsPtr};
 use crate::{
     chvalid::XmlCharValid,
+    dom::elementdecl::{
+        ElementContent, ElementContentOccur, ElementContentType, deep_clone_element_content,
+    },
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     globals::{GenericError, GenericErrorContext, StructuredError},
     list::XmlList,
@@ -553,9 +560,11 @@ impl XmlValidCtxt {
                     }
                     XmlElementTypeVal::XmlElementTypeMixed => {
                         // simple case of declared as #PCDATA
-                        if elem_decl.content.as_deref().is_some_and(|content| {
-                            content.borrow().typ == XmlElementContentType::XmlElementContentPCDATA
-                        }) {
+                        if elem_decl
+                            .content
+                            .as_deref()
+                            .is_some_and(|content| content.r#type() == ElementContentType::PCDATA)
+                        {
                             let name = state.node.name().unwrap().into_owned();
                             let node = state.node.into();
                             xml_err_valid_node(
@@ -575,7 +584,7 @@ impl XmlValidCtxt {
                         } else {
                             let name = state.node.name().unwrap().into_owned();
                             let node = state.node.into();
-                            ret = xml_validate_check_mixed(self, elem_decl.content.clone(), qname);
+                            ret = xml_validate_check_mixed(elem_decl.content.clone(), qname);
                             if ret != 1 {
                                 xml_err_valid_node(
                                     Some(self),
@@ -1159,7 +1168,7 @@ pub unsafe fn xml_add_element_decl(
     dtd: Option<XmlDtdPtr>,
     mut name: &str,
     typ: Option<XmlElementTypeVal>,
-    content: Option<Rc<RefCell<XmlElementContent>>>,
+    content: Option<Rc<ElementContent>>,
 ) -> Option<XmlElementPtr> {
     unsafe {
         let mut dtd = dtd?;
@@ -1312,7 +1321,7 @@ pub unsafe fn xml_add_element_decl(
         // Avoid a stupid copy when called by the parser
         // and flag it by setting a special parent value
         // so the parser doesn't unallocate it.
-        ret.content = xml_copy_doc_element_content(dtd.doc, content);
+        ret.content = deep_clone_element_content(content, Weak::new());
 
         // Link it to the DTD
         ret.parent = Some(dtd);
@@ -1460,18 +1469,14 @@ pub fn xml_dump_element_decl<'a>(buf: &mut (impl Write + 'a), elem: XmlElementPt
             if let Some(prefix) = elem.prefix.as_deref() {
                 write!(buf, "{prefix}:").ok();
             }
-            write!(buf, "{} ", name).ok();
-            xml_dump_element_content(buf, elem.content.clone().unwrap());
-            writeln!(buf, ">",).ok();
+            writeln!(buf, "{} {}>", name, elem.content.as_ref().unwrap()).ok();
         }
         XmlElementTypeVal::XmlElementTypeElement => {
             write!(buf, "<!ELEMENT ").ok();
             if let Some(prefix) = elem.prefix.as_deref() {
                 write!(buf, "{prefix}:").ok();
             }
-            write!(buf, "{} ", name).ok();
-            xml_dump_element_content(buf, elem.content.clone().unwrap());
-            writeln!(buf, ">",).ok();
+            writeln!(buf, "{} {}>", name, elem.content.as_ref().unwrap()).ok();
         }
         _ => {
             xml_err_valid!(
@@ -2161,34 +2166,32 @@ pub fn xml_validate_element_decl(
     if matches!(elem.etype, XmlElementTypeVal::XmlElementTypeMixed) {
         let mut cur = elem.content.clone();
         while let Some(now) = cur {
-            let now = now.borrow();
-            if !matches!(now.typ, XmlElementContentType::XmlElementContentOr) {
+            if now.r#type() != ElementContentType::Or {
                 break;
             }
-            let Some(c1) = now.c1.as_deref().map(|c1| c1.borrow()) else {
+            let Some(c1) = now.first_child() else {
                 break;
             };
-            if matches!(c1.typ, XmlElementContentType::XmlElementContentElement) {
-                let name = c1.name.as_deref().unwrap();
-                let mut next = now.c2.clone();
+            if c1.r#type() == ElementContentType::Element {
+                let mut next = now.second_child();
                 while let Some(nx) = next {
-                    let nx = nx.borrow();
-                    if matches!(nx.typ, XmlElementContentType::XmlElementContentElement) {
-                        if nx.name.as_deref() == Some(name) && nx.prefix == c1.prefix {
+                    if nx.r#type() == ElementContentType::Element {
+                        if nx.name() == c1.name() {
                             let elem_name = elem.name.as_deref().unwrap();
-                            if let Some(prefix) = c1.prefix.as_deref() {
+                            if let Some(prefix) = c1.prefix().as_deref() {
                                 xml_err_valid_node(
                                     Some(&mut *ctxt),
                                     Some(elem.into()),
                                     XmlParserErrors::XmlDTDContentError,
                                     format!(
-                                        "Definition of {} has duplicate references of {}:{}\n",
-                                        elem_name, prefix, name
+                                        "Definition of {} has duplicate references of {}\n",
+                                        elem_name,
+                                        c1.name().unwrap()
                                     )
                                     .as_str(),
                                     Some(elem_name),
                                     Some(prefix),
-                                    Some(name),
+                                    Some(&c1.name().unwrap()),
                                 );
                             } else {
                                 xml_err_valid_node(
@@ -2197,11 +2200,12 @@ pub fn xml_validate_element_decl(
                                     XmlParserErrors::XmlDTDContentError,
                                     format!(
                                         "Definition of {} has duplicate references of {}\n",
-                                        elem_name, name
+                                        elem_name,
+                                        c1.name().unwrap()
                                     )
                                     .as_str(),
                                     Some(elem_name),
-                                    Some(name),
+                                    Some(&c1.name().unwrap()),
                                     None,
                                 );
                             }
@@ -2209,27 +2213,29 @@ pub fn xml_validate_element_decl(
                         }
                         break;
                     }
-                    let Some(nx_c1) = nx.c1.as_deref().map(|c1| c1.borrow()) else {
+                    let Some(nx_c1) = nx.first_child() else {
                         break;
                     };
-                    if !matches!(nx_c1.typ, XmlElementContentType::XmlElementContentElement) {
+                    if nx_c1.r#type() != ElementContentType::Element {
                         break;
                     }
-                    if nx_c1.name.as_deref() == Some(name) && nx_c1.prefix == c1.prefix {
+                    if nx_c1.name() == c1.name() {
                         let elem_name = elem.name.as_deref().unwrap();
-                        if let Some(prefix) = c1.prefix.as_deref() {
+                        if let Some(prefix) = c1.prefix().as_deref() {
                             xml_err_valid_node(
                                 Some(&mut *ctxt),
                                 Some(elem.into()),
                                 XmlParserErrors::XmlDTDContentError,
                                 format!(
                                     "Definition of {} has duplicate references to {}:{}\n",
-                                    elem_name, prefix, name
+                                    elem_name,
+                                    prefix,
+                                    c1.name().unwrap()
                                 )
                                 .as_str(),
                                 Some(elem_name),
                                 Some(prefix),
-                                Some(name),
+                                Some(&c1.name().unwrap()),
                             );
                         } else {
                             xml_err_valid_node(
@@ -2238,20 +2244,21 @@ pub fn xml_validate_element_decl(
                                 XmlParserErrors::XmlDTDContentError,
                                 format!(
                                     "Definition of {} has duplicate references to {}\n",
-                                    elem_name, name
+                                    elem_name,
+                                    c1.name().unwrap()
                                 )
                                 .as_str(),
                                 Some(elem_name),
-                                Some(name),
+                                Some(&c1.name().unwrap()),
                                 None,
                             );
                         }
                         ret = 0;
                     }
-                    next = nx.c2.clone();
+                    next = nx.second_child();
                 }
             }
-            cur = now.c2.clone();
+            cur = now.second_child();
         }
     }
 
@@ -3439,10 +3446,8 @@ fn xml_validate_element_content(
     }
 
     if warn != 0 && (ret != 1 && ret != -3) {
-        let mut expr = String::with_capacity(5000);
+        let expr = format!("{:?}", elem_decl.content.as_ref().unwrap());
         let mut list = String::with_capacity(5000);
-
-        xml_snprintf_element_content(&mut expr, 5000, elem_decl.content.clone().unwrap(), 1);
 
         #[cfg(feature = "libxml_regexp")]
         {
@@ -3690,9 +3695,11 @@ pub fn xml_validate_one_element(
             }
             XmlElementTypeVal::XmlElementTypeMixed => {
                 // simple case of declared as #PCDATA
-                if elem_decl.content.as_deref().is_some_and(|cont| {
-                    cont.borrow().typ == XmlElementContentType::XmlElementContentPCDATA
-                }) {
+                if elem_decl
+                    .content
+                    .as_deref()
+                    .is_some_and(|cont| cont.r#type() == ElementContentType::PCDATA)
+                {
                     ret = xml_validate_one_cdata_element(ctxt, doc, elem);
                     if ret == 0 {
                         let name = elem.name().unwrap();
@@ -3722,35 +3729,22 @@ pub fn xml_validate_one_element(
                                 let fullname = build_qname(&cur_node.name, Some(&prefix));
                                 let mut cont = elem_decl.content.clone();
                                 while let Some(now) = cont.clone() {
-                                    let now = now.borrow();
-                                    if matches!(
-                                        now.typ,
-                                        XmlElementContentType::XmlElementContentElement
-                                    ) {
-                                        if now.name.as_deref() == Some(&fullname) {
+                                    if now.r#type() == ElementContentType::Element {
+                                        if now.name().as_deref() == Some(&fullname) {
                                             break;
                                         }
-                                    } else if matches!(
-                                        now.typ,
-                                        XmlElementContentType::XmlElementContentOr
-                                    ) && now.c1.as_deref().is_some_and(|c1| {
-                                        c1.borrow().typ
-                                            == XmlElementContentType::XmlElementContentElement
+                                    } else if let Some(c1) = now.first_child().filter(|c1| {
+                                        c1.r#type() == ElementContentType::Element
+                                            && now.r#type() == ElementContentType::Or
                                     }) {
-                                        if now.c1.as_deref().unwrap().borrow().name.as_deref()
-                                            == Some(&fullname)
-                                        {
+                                        if c1.name().as_deref() == Some(&fullname) {
                                             break;
                                         }
-                                    } else if !matches!(
-                                        now.typ,
-                                        XmlElementContentType::XmlElementContentOr
-                                    ) || now.c1.as_deref().is_none_or(|c1| {
-                                        !matches!(
-                                            c1.borrow().typ,
-                                            XmlElementContentType::XmlElementContentPCDATA
-                                        )
-                                    }) {
+                                    } else if now.r#type() != ElementContentType::Or
+                                        || now.first_child().is_none_or(|c1| {
+                                            c1.r#type() != ElementContentType::PCDATA
+                                        })
+                                    {
                                         xml_err_valid!(
                                             None::<&mut XmlValidCtxt>,
                                             XmlParserErrors::XmlDTDMixedCorrupt,
@@ -3758,7 +3752,7 @@ pub fn xml_validate_one_element(
                                         );
                                         break;
                                     }
-                                    cont = now.c2.clone();
+                                    cont = now.second_child();
                                 }
                                 if cont.is_some() {
                                     child = cur_node.next();
@@ -3768,37 +3762,22 @@ pub fn xml_validate_one_element(
 
                             let mut cont = elem_decl.content.clone();
                             while let Some(now) = cont.clone() {
-                                let now = now.borrow();
-                                if matches!(
-                                    now.typ,
-                                    XmlElementContentType::XmlElementContentElement
-                                ) {
-                                    if now.name.as_deref() == Some(&name) {
+                                if now.r#type() == ElementContentType::Element {
+                                    if now.name().as_deref() == Some(&name) {
                                         break;
                                     }
-                                } else if matches!(
-                                    now.typ,
-                                    XmlElementContentType::XmlElementContentOr
-                                ) && now.c1.as_deref().is_some_and(|c1| {
-                                    matches!(
-                                        c1.borrow().typ,
-                                        XmlElementContentType::XmlElementContentElement
-                                    )
+                                } else if let Some(c1) = now.first_child().filter(|c1| {
+                                    c1.r#type() == ElementContentType::Element
+                                        && now.r#type() == ElementContentType::Or
                                 }) {
-                                    if now.c1.as_deref().unwrap().borrow().name.as_deref()
-                                        == Some(&name)
-                                    {
+                                    if c1.name().as_deref() == Some(&name) {
                                         break;
                                     }
-                                } else if !matches!(
-                                    now.typ,
-                                    XmlElementContentType::XmlElementContentOr
-                                ) || now.c1.as_deref().is_none_or(|c1| {
-                                    !matches!(
-                                        c1.borrow().typ,
-                                        XmlElementContentType::XmlElementContentPCDATA
-                                    )
-                                }) {
+                                } else if now.r#type() != ElementContentType::Or
+                                    || now
+                                        .first_child()
+                                        .is_none_or(|c1| c1.r#type() != ElementContentType::PCDATA)
+                                {
                                     xml_err_valid!(
                                         Some(&mut *ctxt),
                                         XmlParserErrors::XmlDTDMixedCorrupt,
@@ -3806,7 +3785,7 @@ pub fn xml_validate_one_element(
                                     );
                                     break;
                                 }
-                                cont = now.c2.clone();
+                                cont = now.second_child();
                             }
                             if cont.is_none() {
                                 let elem_name = elem.name().unwrap();
@@ -4933,45 +4912,44 @@ pub fn xml_get_dtd_element_desc(dtd: Option<XmlDtdPtr>, name: &str) -> Option<Xm
 #[doc(alias = "xmlValidGetPotentialChildren")]
 #[cfg(feature = "libxml_valid")]
 pub fn xml_valid_get_potential_children(
-    ctree: Option<Rc<RefCell<XmlElementContent>>>,
+    ctree: Option<Rc<ElementContent>>,
     names: &mut [Cow<'static, str>],
     len: &mut usize,
 ) -> usize {
     let Some(ctree) = ctree else {
         return usize::MAX;
     };
-    let ctree = ctree.borrow();
 
     if *len >= names.len() {
         return *len;
     }
 
-    match ctree.typ {
-        XmlElementContentType::XmlElementContentPCDATA => {
+    match ctree.r#type() {
+        ElementContentType::PCDATA => {
             if names.iter().take(*len).any(|name| name == "#PCDATA") {
                 return *len;
             }
             names[*len] = "#PCDATA".into();
             *len += 1;
         }
-        XmlElementContentType::XmlElementContentElement => {
+        ElementContentType::Element => {
             if names
                 .iter()
                 .take(*len)
-                .any(|name| Some(name.as_ref()) == ctree.name.as_deref())
+                .any(|name| Some(name.as_ref()) == ctree.name().as_deref())
             {
                 return *len;
             }
-            names[*len] = ctree.name.as_deref().unwrap().to_owned().into();
+            names[*len] = ctree.name().as_deref().unwrap().to_owned().into();
             *len += 1;
         }
-        XmlElementContentType::XmlElementContentSeq => {
-            xml_valid_get_potential_children(ctree.c1.clone(), names, len);
-            xml_valid_get_potential_children(ctree.c2.clone(), names, len);
+        ElementContentType::Seq => {
+            xml_valid_get_potential_children(ctree.first_child(), names, len);
+            xml_valid_get_potential_children(ctree.second_child(), names, len);
         }
-        XmlElementContentType::XmlElementContentOr => {
-            xml_valid_get_potential_children(ctree.c1.clone(), names, len);
-            xml_valid_get_potential_children(ctree.c2.clone(), names, len);
+        ElementContentType::Or => {
+            xml_valid_get_potential_children(ctree.first_child(), names, len);
+            xml_valid_get_potential_children(ctree.second_child(), names, len);
         }
     }
 
@@ -5151,11 +5129,11 @@ pub fn xml_validate_nmtokens_value(value: &str) -> i32 {
 /// Returns 1 if successful or 0 in case of error.
 #[doc(alias = "xmlValidBuildAContentModel")]
 fn xml_valid_build_a_content_model(
-    content: Option<Rc<RefCell<XmlElementContent>>>,
+    content: Option<Rc<ElementContent>>,
     ctxt: &mut XmlValidCtxt,
     name: &str,
 ) -> i32 {
-    let Some(mut content) = content else {
+    let Some(mut cont) = content else {
         xml_err_valid_node(
             Some(&mut *ctxt),
             None,
@@ -5167,9 +5145,8 @@ fn xml_valid_build_a_content_model(
         );
         return 0;
     };
-    let mut cont = content.borrow();
-    match cont.typ {
-        XmlElementContentType::XmlElementContentPCDATA => {
+    match cont.r#type() {
+        ElementContentType::PCDATA => {
             xml_err_valid_node(
                 Some(&mut *ctxt),
                 None,
@@ -5181,12 +5158,12 @@ fn xml_valid_build_a_content_model(
             );
             return 0;
         }
-        XmlElementContentType::XmlElementContentElement => {
+        ElementContentType::Element => {
             let oldstate = ctxt.state;
-            let fullname = build_qname(cont.name.as_deref().unwrap(), cont.prefix.as_deref());
+            let fullname = cont.name().unwrap();
 
-            match cont.ocur {
-                XmlElementContentOccur::XmlElementContentOnce => {
+            match cont.occur() {
+                ElementContentOccur::Once => {
                     ctxt.state = ctxt.am.as_mut().unwrap().new_transition(
                         ctxt.state,
                         usize::MAX,
@@ -5194,7 +5171,7 @@ fn xml_valid_build_a_content_model(
                         null_mut(),
                     );
                 }
-                XmlElementContentOccur::XmlElementContentOpt => {
+                ElementContentOccur::Opt => {
                     ctxt.state = ctxt.am.as_mut().unwrap().new_transition(
                         ctxt.state,
                         usize::MAX,
@@ -5203,7 +5180,7 @@ fn xml_valid_build_a_content_model(
                     );
                     ctxt.am.as_mut().unwrap().new_epsilon(oldstate, ctxt.state);
                 }
-                XmlElementContentOccur::XmlElementContentPlus => {
+                ElementContentOccur::Plus => {
                     ctxt.state = ctxt.am.as_mut().unwrap().new_transition(
                         ctxt.state,
                         usize::MAX,
@@ -5217,7 +5194,7 @@ fn xml_valid_build_a_content_model(
                         null_mut(),
                     );
                 }
-                XmlElementContentOccur::XmlElementContentMult => {
+                ElementContentOccur::Mult => {
                     ctxt.state = ctxt
                         .am
                         .as_mut()
@@ -5232,47 +5209,40 @@ fn xml_valid_build_a_content_model(
                 }
             }
         }
-        XmlElementContentType::XmlElementContentSeq => {
+        ElementContentType::Seq => {
             // Simply iterate over the content
             let mut oldstate = ctxt.state;
-            let ocur: XmlElementContentOccur = cont.ocur;
-            if !matches!(ocur, XmlElementContentOccur::XmlElementContentOnce) {
+            let ocur = cont.occur();
+            if ocur != ElementContentOccur::Once {
                 ctxt.state = ctxt.am.as_mut().unwrap().new_epsilon(oldstate, usize::MAX);
                 oldstate = ctxt.state;
             }
             while {
-                xml_valid_build_a_content_model(cont.c1.clone(), ctxt, name);
-                let next = cont.c2.clone().unwrap();
-                drop(cont);
-                content = next;
-                cont = content.borrow();
-                matches!(cont.typ, XmlElementContentType::XmlElementContentSeq)
-                    && matches!(cont.ocur, XmlElementContentOccur::XmlElementContentOnce)
+                xml_valid_build_a_content_model(cont.first_child(), ctxt, name);
+                cont = cont.second_child().unwrap();
+                cont.r#type() == ElementContentType::Seq
+                    && cont.occur() == ElementContentOccur::Once
             } {}
-            xml_valid_build_a_content_model(Some(content.clone()), ctxt, name);
+            xml_valid_build_a_content_model(Some(cont.clone()), ctxt, name);
             let oldend = ctxt.state;
             ctxt.state = ctxt.am.as_mut().unwrap().new_epsilon(oldend, usize::MAX);
             match ocur {
-                XmlElementContentOccur::XmlElementContentOnce => {}
-                XmlElementContentOccur::XmlElementContentOpt => {
+                ElementContentOccur::Once => {}
+                ElementContentOccur::Opt => {
                     ctxt.am.as_mut().unwrap().new_epsilon(oldstate, ctxt.state);
                 }
-                XmlElementContentOccur::XmlElementContentMult => {
+                ElementContentOccur::Mult => {
                     ctxt.am.as_mut().unwrap().new_epsilon(oldstate, ctxt.state);
                     ctxt.am.as_mut().unwrap().new_epsilon(oldend, oldstate);
                 }
-                XmlElementContentOccur::XmlElementContentPlus => {
+                ElementContentOccur::Plus => {
                     ctxt.am.as_mut().unwrap().new_epsilon(oldend, oldstate);
                 }
             }
         }
-        XmlElementContentType::XmlElementContentOr => {
-            let ocur: XmlElementContentOccur = cont.ocur;
-            if matches!(
-                ocur,
-                XmlElementContentOccur::XmlElementContentPlus
-                    | XmlElementContentOccur::XmlElementContentMult
-            ) {
+        ElementContentType::Or => {
+            let ocur = cont.occur();
+            if matches!(ocur, ElementContentOccur::Plus | ElementContentOccur::Mult) {
                 ctxt.state = ctxt
                     .am
                     .as_mut()
@@ -5286,29 +5256,25 @@ fn xml_valid_build_a_content_model(
             // epsilon transition
             while {
                 ctxt.state = oldstate;
-                xml_valid_build_a_content_model(cont.c1.clone(), ctxt, name);
+                xml_valid_build_a_content_model(cont.first_child(), ctxt, name);
                 ctxt.am.as_mut().unwrap().new_epsilon(ctxt.state, oldend);
-                let next = cont.c2.clone().unwrap();
-                drop(cont);
-                content = next;
-                cont = content.borrow();
-                cont.typ == XmlElementContentType::XmlElementContentOr
-                    && matches!(cont.ocur, XmlElementContentOccur::XmlElementContentOnce)
+                cont = cont.second_child().unwrap();
+                cont.r#type() == ElementContentType::Or && cont.occur() == ElementContentOccur::Once
             } {}
             ctxt.state = oldstate;
-            xml_valid_build_a_content_model(Some(content.clone()), ctxt, name);
+            xml_valid_build_a_content_model(Some(cont.clone()), ctxt, name);
             ctxt.am.as_mut().unwrap().new_epsilon(ctxt.state, oldend);
             ctxt.state = ctxt.am.as_mut().unwrap().new_epsilon(oldend, usize::MAX);
             match ocur {
-                XmlElementContentOccur::XmlElementContentOnce => {}
-                XmlElementContentOccur::XmlElementContentOpt => {
+                ElementContentOccur::Once => {}
+                ElementContentOccur::Opt => {
                     ctxt.am.as_mut().unwrap().new_epsilon(oldstate, ctxt.state);
                 }
-                XmlElementContentOccur::XmlElementContentMult => {
+                ElementContentOccur::Mult => {
                     ctxt.am.as_mut().unwrap().new_epsilon(oldstate, ctxt.state);
                     ctxt.am.as_mut().unwrap().new_epsilon(oldend, oldstate);
                 }
-                XmlElementContentOccur::XmlElementContentPlus => {
+                ElementContentOccur::Plus => {
                     ctxt.am.as_mut().unwrap().new_epsilon(oldend, oldstate);
                 }
             }
@@ -5367,8 +5333,7 @@ pub fn xml_valid_build_content_model(ctxt: &mut XmlValidCtxt, mut elem: XmlEleme
         .as_deref()
         .is_none_or(|cont_model| cont_model.is_determinist() != 1)
     {
-        let mut expr = String::with_capacity(5000);
-        xml_snprintf_element_content(&mut expr, 5000, elem.content.clone().unwrap(), 1);
+        let expr = format!("{}", elem.content.as_ref().unwrap());
         let name = elem.name.as_deref().unwrap();
         xml_err_valid_node(
             Some(&mut *ctxt),
@@ -5394,79 +5359,31 @@ pub fn xml_valid_build_content_model(ctxt: &mut XmlValidCtxt, mut elem: XmlEleme
 /// Returns 1 if yes, 0 if no, -1 in case of error
 #[doc(alias = "xmlValidateCheckMixed")]
 #[cfg(feature = "libxml_regexp")]
-fn xml_validate_check_mixed(
-    ctxt: &mut XmlValidCtxt,
-    mut cont: Option<Rc<RefCell<XmlElementContent>>>,
-    qname: &str,
-) -> i32 {
-    if let Some((prefix, local)) = split_qname2(qname) {
-        while let Some(now) = cont {
-            let now = now.borrow();
-            if matches!(now.typ, XmlElementContentType::XmlElementContentElement) {
-                if now.prefix.as_deref().is_some_and(|pre| pre == prefix)
-                    && now.name.as_deref() == Some(local)
-                {
-                    return 1;
-                }
-            } else if matches!(now.typ, XmlElementContentType::XmlElementContentOr)
-                && now.c1.as_deref().is_some_and(|c1| {
-                    c1.borrow().typ == XmlElementContentType::XmlElementContentElement
-                })
-            {
-                let c1 = now.c1.as_deref().unwrap();
-                if c1
-                    .borrow()
-                    .prefix
-                    .as_deref()
-                    .is_some_and(|pre| pre == prefix)
-                    && c1.borrow().name.as_deref() == Some(local)
-                {
-                    return 1;
-                }
-            } else if !matches!(now.typ, XmlElementContentType::XmlElementContentOr)
-                || now.c1.as_deref().is_none_or(|c1| {
-                    c1.borrow().typ != XmlElementContentType::XmlElementContentPCDATA
-                })
-            {
-                xml_err_valid!(
-                    Some(&mut *ctxt),
-                    XmlParserErrors::XmlDTDMixedCorrupt,
-                    "Internal: MIXED struct corrupted\n"
-                );
-                break;
+pub(crate) fn xml_validate_check_mixed(mut cont: Option<Rc<ElementContent>>, qname: &str) -> i32 {
+    while let Some(now) = cont {
+        if now.r#type() == ElementContentType::Element {
+            if now.name().as_deref() == Some(qname) {
+                return 1;
             }
-            cont = now.c2.clone();
-        }
-    } else {
-        while let Some(now) = cont {
-            let now = now.borrow();
-            if matches!(now.typ, XmlElementContentType::XmlElementContentElement) {
-                if now.prefix.is_none() && now.name.as_deref() == Some(qname) {
-                    return 1;
-                }
-            } else if matches!(now.typ, XmlElementContentType::XmlElementContentOr)
-                && now.c1.as_deref().is_some_and(|c1| {
-                    c1.borrow().typ == XmlElementContentType::XmlElementContentElement
-                })
-            {
-                let c1 = now.c1.as_deref().unwrap();
-                if c1.borrow().prefix.is_none() && c1.borrow().name.as_deref() == Some(qname) {
-                    return 1;
-                }
-            } else if !matches!(now.typ, XmlElementContentType::XmlElementContentOr)
-                || now.c1.as_deref().is_none_or(|c1| {
-                    c1.borrow().typ != XmlElementContentType::XmlElementContentPCDATA
-                })
-            {
-                xml_err_valid!(
-                    None::<&mut XmlValidCtxt>,
-                    XmlParserErrors::XmlDTDMixedCorrupt,
-                    "Internal: MIXED struct corrupted\n"
-                );
-                break;
+        } else if let Some(c1) = now.first_child().filter(|c1| {
+            c1.r#type() == ElementContentType::Element && now.r#type() == ElementContentType::Or
+        }) {
+            if c1.name().as_deref() == Some(qname) {
+                return 1;
             }
-            cont = now.c2.clone();
+        } else if now.r#type() != ElementContentType::Or
+            || now
+                .first_child()
+                .is_none_or(|c1| c1.r#type() != ElementContentType::PCDATA)
+        {
+            xml_err_valid!(
+                None::<&mut XmlValidCtxt>,
+                XmlParserErrors::XmlDTDMixedCorrupt,
+                "Internal: MIXED struct corrupted\n"
+            );
+            break;
         }
+        cont = now.second_child();
     }
     0
 }

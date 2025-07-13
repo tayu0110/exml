@@ -38,6 +38,7 @@ use exml::xinclude::xml_xinclude_process_flags;
 use exml::xmlschemas::schema::XmlSchemaPtr;
 use exml::{
     SYSCONFDIR,
+    dom::elementdecl::ElementContent,
     error::{
         XmlError, XmlErrorDomain, XmlErrorLevel, XmlParserErrors,
         parser_print_file_context_internal,
@@ -65,8 +66,8 @@ use exml::{
     },
     relaxng::xml_relaxng_init_types,
     tree::{
-        XmlAttributeDefault, XmlAttributeType, XmlDocPtr, XmlElementContent, XmlElementType,
-        XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNodePtr, xml_free_doc,
+        XmlAttributeDefault, XmlAttributeType, XmlDocPtr, XmlElementType, XmlElementTypeVal,
+        XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNodePtr, xml_free_doc,
     },
     uri::{XmlURI, build_uri, normalize_uri_path},
 };
@@ -751,7 +752,7 @@ fn element_decl_debug(
     _ctx: &mut XmlParserCtxt,
     name: &str,
     typ: Option<XmlElementTypeVal>,
-    _content: Option<Rc<RefCell<XmlElementContent>>>,
+    _content: Option<Rc<ElementContent>>,
 ) {
     increment_callbacks_counter();
     sax_debugln!(

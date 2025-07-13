@@ -21,7 +21,6 @@
 use std::{
     any::type_name,
     borrow::Cow,
-    cell::RefCell,
     ops::{Deref, DerefMut},
     os::raw::c_void,
     ptr::{NonNull, null_mut},
@@ -30,9 +29,12 @@ use std::{
 
 #[cfg(feature = "libxml_regexp")]
 use crate::libxml::xmlregexp::XmlRegexp;
-use crate::tree::{
-    InvalidNodePointerCastError, NodeCommon, XmlDocPtr, XmlElementContent, XmlElementType,
-    XmlElementTypeVal, XmlGenericNodePtr,
+use crate::{
+    dom::elementdecl::ElementContent,
+    tree::{
+        InvalidNodePointerCastError, NodeCommon, XmlDocPtr, XmlElementType, XmlElementTypeVal,
+        XmlGenericNodePtr,
+    },
 };
 
 use super::{XmlAttributePtr, XmlDtdPtr};
@@ -49,10 +51,10 @@ pub struct XmlElement {
     pub(crate) prev: Option<XmlGenericNodePtr>,     /* previous sibling link  */
     pub(crate) doc: Option<XmlDocPtr>,              /* the containing document */
 
-    pub(crate) etype: XmlElementTypeVal, /* The type */
-    pub(crate) content: Option<Rc<RefCell<XmlElementContent>>>, /* the allowed element content */
+    pub(crate) etype: XmlElementTypeVal,            /* The type */
+    pub(crate) content: Option<Rc<ElementContent>>, /* the allowed element content */
     pub(crate) attributes: Option<XmlAttributePtr>, /* List of the declared attributes */
-    pub(crate) prefix: Option<String>,   /* the namespace prefix if any */
+    pub(crate) prefix: Option<String>,              /* the namespace prefix if any */
     #[cfg(feature = "libxml_regexp")]
     pub(crate) cont_model: Option<Rc<XmlRegexp>>, /* the validating regexp */
     #[cfg(not(feature = "libxml_regexp"))]
@@ -252,14 +254,16 @@ impl From<XmlElementPtr> for *mut XmlElement {
 #[doc(alias = "xmlCopyElement")]
 #[cfg(feature = "libxml_tree")]
 pub(crate) fn xml_copy_element(elem: XmlElementPtr) -> Option<XmlElementPtr> {
-    use crate::valid::{xml_copy_element_content, xml_verr_memory};
+    use std::rc::Weak;
+
+    use crate::{dom::elementdecl::deep_clone_element_content, valid::xml_verr_memory};
 
     let res = XmlElementPtr::new(XmlElement {
         typ: XmlElementType::XmlElementDecl,
         etype: elem.etype,
         name: elem.name.clone(),
         prefix: elem.prefix.clone(),
-        content: xml_copy_element_content(elem.content.clone()),
+        content: deep_clone_element_content(elem.content.clone(), Weak::new()),
         // TODO : rebuild the attribute list on the copy
         attributes: None,
         ..Default::default()

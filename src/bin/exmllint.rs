@@ -52,6 +52,7 @@ use exml::xinclude::xml_xinclude_process_flags;
 #[cfg(feature = "schema")]
 use exml::xmlschemas::schema::XmlSchema;
 use exml::{
+    dom::elementdecl::ElementContent,
     encoding::{XmlCharEncoding, add_encoding_alias},
     error::generic_error_default,
     generic_error,
@@ -87,9 +88,9 @@ use exml::{
     save::{XmlSaveCtxt, XmlSaveOption},
     tree::{
         NodeCommon, XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDocPtr,
-        XmlDtdPtr, XmlElementContent, XmlElementPtr, XmlElementTypeVal, XmlEntityPtr,
-        XmlEntityType, XmlEnumeration, XmlGenericNodePtr, XmlNodePtr, XmlNsPtr, xml_copy_doc,
-        xml_encode_entities_reentrant, xml_free_doc, xml_free_dtd, xml_new_doc, xml_new_doc_node,
+        XmlDtdPtr, XmlElementPtr, XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration,
+        XmlGenericNodePtr, XmlNodePtr, XmlNsPtr, xml_copy_doc, xml_encode_entities_reentrant,
+        xml_free_doc, xml_free_dtd, xml_new_doc, xml_new_doc_node,
     },
     valid::{XmlValidCtxt, xml_valid_get_valid_elements, xml_validate_document, xml_validate_dtd},
     xmlschemas::{
@@ -1444,7 +1445,7 @@ fn element_decl_debug(
     _ctx: &mut XmlParserCtxt,
     name: &str,
     typ: Option<XmlElementTypeVal>,
-    _content: Option<Rc<RefCell<XmlElementContent>>>,
+    _content: Option<Rc<ElementContent>>,
 ) {
     CALLBACKS.fetch_add(1, Ordering::Relaxed);
     if CMD_ARGS.noout {

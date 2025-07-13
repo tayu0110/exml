@@ -1,12 +1,8 @@
-use std::{
-    borrow::Cow,
-    cell::RefCell,
-    collections::hash_map::Entry,
-    rc::{Rc, Weak},
-};
+use std::{borrow::Cow, collections::hash_map::Entry, rc::Rc};
 
 use crate::{
     chvalid::XmlCharValid,
+    dom::elementdecl::{ElementContent, ElementContentOccur, ElementContentType},
     encoding::{XmlCharEncoding, detect_encoding},
     error::XmlParserErrors,
     generic_error,
@@ -19,12 +15,10 @@ use crate::{
     },
     tree::{
         XML_ENT_EXPANDING, XML_ENT_PARSED, XmlAttributeDefault, XmlAttributeType, XmlDocProperties,
-        XmlElementContent, XmlElementContentOccur, XmlElementContentType, XmlElementTypeVal,
-        XmlEntityType, XmlEnumeration, xml_create_enumeration, xml_create_int_subset, xml_new_doc,
-        xml_new_dtd,
+        XmlElementTypeVal, XmlEntityType, XmlEnumeration, xml_create_enumeration,
+        xml_create_int_subset, xml_new_doc, xml_new_dtd,
     },
     uri::XmlURI,
-    valid::xml_new_doc_element_content,
 };
 #[cfg(feature = "libxml_valid")]
 use crate::{io::XmlParserInputBuffer, parser::XmlSAXHandler, tree::XmlDtdPtr};
@@ -443,9 +437,10 @@ impl XmlParserCtxt<'_> {
                 .filter(|_| !self.disable_sax)
                 .and_then(|sax| sax.element_decl)
             {
-                if let Some(content) = content.as_ref() {
-                    content.borrow_mut().parent = Weak::new();
-                }
+                // What is this operation for ???
+                // if let Some(content) = content.as_ref() {
+                //     content.borrow_mut().parent = Weak::new();
+                // }
                 element_decl(self, &name, ret, content);
             }
         }
@@ -464,7 +459,7 @@ impl XmlParserCtxt<'_> {
     fn parse_element_content_decl(
         &mut self,
         name: &str,
-        result: &mut Option<Rc<RefCell<XmlElementContent>>>,
+        result: &mut Option<Rc<ElementContent>>,
     ) -> Option<XmlElementTypeVal> {
         let inputid: i32 = self.input().unwrap().id;
 
@@ -523,10 +518,10 @@ impl XmlParserCtxt<'_> {
         &mut self,
         inputchk: i32,
         depth: i32,
-    ) -> Option<Rc<RefCell<XmlElementContent>>> {
+    ) -> Option<Rc<ElementContent>> {
         let mut ret;
         let mut cur;
-        let mut last: Option<Rc<RefCell<XmlElementContent>>> = None;
+        let mut last: Option<Rc<ElementContent>> = None;
         let mut typ = 0;
 
         if (depth > 128 && self.options & XmlParserOption::XmlParseHuge as i32 == 0) || depth > 2048
@@ -556,28 +551,23 @@ impl XmlParserCtxt<'_> {
                 xml_fatal_err(self, XmlParserErrors::XmlErrElemcontentNotStarted, None);
                 return None;
             };
-            let mut c = xml_new_doc_element_content(
-                self.my_doc,
-                Some(&elem),
-                XmlElementContentType::XmlElementContentElement,
-            );
             self.grow();
-            match self.current_byte() {
+            let occur = match self.current_byte() {
                 b'?' => {
-                    c.ocur = XmlElementContentOccur::XmlElementContentOpt;
                     self.skip_char();
+                    ElementContentOccur::Opt
                 }
                 b'*' => {
-                    c.ocur = XmlElementContentOccur::XmlElementContentMult;
                     self.skip_char();
+                    ElementContentOccur::Mult
                 }
                 b'+' => {
-                    c.ocur = XmlElementContentOccur::XmlElementContentPlus;
                     self.skip_char();
+                    ElementContentOccur::Plus
                 }
-                _ => c.ocur = XmlElementContentOccur::XmlElementContentOnce,
-            }
-            cur = Some(Rc::new(RefCell::new(c)));
+                _ => ElementContentOccur::Once,
+            };
+            cur = Some(ElementContent::new_element(occur, elem));
             ret = cur.clone();
             self.grow();
         }
@@ -605,25 +595,14 @@ impl XmlParserCtxt<'_> {
                 }
                 self.skip_char();
 
-                let mut op = xml_new_doc_element_content(
-                    self.my_doc,
-                    None,
-                    XmlElementContentType::XmlElementContentSeq,
-                );
+                let mut op = ElementContent::new_seq(ElementContentOccur::Once);
                 if let Some(last) = last.take() {
-                    op.parent = Rc::downgrade(cur.as_ref().unwrap());
-                    op.c1 = Some(last.clone());
-                    let op = Rc::new(RefCell::new(op));
-                    last.borrow_mut().parent = Rc::downgrade(&op);
-                    cur.as_deref().unwrap().borrow_mut().c2 = Some(op.clone());
+                    cur.as_mut().unwrap().set_second_child(Some(op.clone()));
+                    op.set_first_child(Some(last));
                     cur = Some(op);
                 } else {
-                    op.c1 = ret.clone();
-                    let op = Rc::new(RefCell::new(op));
-                    if let Some(ret) = ret.as_deref() {
-                        ret.borrow_mut().parent = Rc::downgrade(&op);
-                    }
-                    ret = Some(op);
+                    op.set_first_child(ret.clone());
+                    ret = Some(op.clone());
                     cur = ret.clone();
                 }
             } else if self.current_byte() == b'|' {
@@ -645,24 +624,13 @@ impl XmlParserCtxt<'_> {
                 }
                 self.skip_char();
 
-                let mut op = xml_new_doc_element_content(
-                    self.my_doc,
-                    None,
-                    XmlElementContentType::XmlElementContentOr,
-                );
+                let mut op = ElementContent::new_or(ElementContentOccur::Once);
                 if let Some(last) = last.take() {
-                    op.parent = Rc::downgrade(cur.as_ref().unwrap());
-                    op.c1 = Some(last.clone());
-                    let op = Rc::new(RefCell::new(op));
-                    last.borrow_mut().parent = Rc::downgrade(&op);
-                    cur.as_deref().unwrap().borrow_mut().c2 = Some(op.clone());
+                    cur.as_mut().unwrap().set_second_child(Some(op.clone()));
+                    op.set_first_child(Some(last));
                     cur = Some(op);
                 } else {
-                    op.c1 = ret.clone();
-                    let op = Rc::new(RefCell::new(op));
-                    if let Some(ret) = ret.as_deref() {
-                        ret.borrow_mut().parent = Rc::downgrade(&op);
-                    }
+                    op.set_first_child(ret);
                     ret = Some(op);
                     cur = ret.clone();
                 }
@@ -685,34 +653,28 @@ impl XmlParserCtxt<'_> {
                     xml_fatal_err(self, XmlParserErrors::XmlErrElemcontentNotStarted, None);
                     return None;
                 };
-                let mut l = xml_new_doc_element_content(
-                    self.my_doc,
-                    Some(&elem),
-                    XmlElementContentType::XmlElementContentElement,
-                );
-                match self.current_byte() {
+                let occur = match self.current_byte() {
                     b'?' => {
-                        l.ocur = XmlElementContentOccur::XmlElementContentOpt;
                         self.skip_char();
+                        ElementContentOccur::Opt
                     }
                     b'*' => {
-                        l.ocur = XmlElementContentOccur::XmlElementContentMult;
                         self.skip_char();
+                        ElementContentOccur::Mult
                     }
                     b'+' => {
-                        l.ocur = XmlElementContentOccur::XmlElementContentPlus;
                         self.skip_char();
+                        ElementContentOccur::Plus
                     }
-                    _ => l.ocur = XmlElementContentOccur::XmlElementContentOnce,
-                }
-                last = Some(Rc::new(RefCell::new(l)));
+                    _ => ElementContentOccur::Once,
+                };
+                last = Some(ElementContent::new_element(occur, elem));
             }
             self.skip_blanks();
             self.grow();
         }
-        if let Some((cur, last)) = cur.as_ref().zip(last.clone()) {
-            last.borrow_mut().parent = Rc::downgrade(cur);
-            cur.borrow_mut().c2 = Some(last);
+        if let Some((cur, last)) = cur.as_mut().zip(last.clone()) {
+            cur.set_second_child(Some(last.clone()));
         }
         if self.input().unwrap().id != inputchk {
             xml_fatal_err_msg(
@@ -723,100 +685,87 @@ impl XmlParserCtxt<'_> {
         }
         self.skip_char();
         if self.current_byte() == b'?' {
-            if let Some(ret) = ret.as_deref() {
-                let mut ret = ret.borrow_mut();
+            if let Some(mut ret) = ret.clone() {
                 if matches!(
-                    ret.ocur,
-                    XmlElementContentOccur::XmlElementContentPlus
-                        | XmlElementContentOccur::XmlElementContentMult
+                    ret.occur(),
+                    ElementContentOccur::Plus | ElementContentOccur::Mult
                 ) {
-                    ret.ocur = XmlElementContentOccur::XmlElementContentMult;
+                    ret.set_occur(ElementContentOccur::Mult);
                 } else {
-                    ret.ocur = XmlElementContentOccur::XmlElementContentOpt;
+                    ret.set_occur(ElementContentOccur::Opt);
                 }
             }
             self.skip_char();
         } else if self.current_byte() == b'*' {
-            if let Some(ret) = ret.clone() {
-                ret.borrow_mut().ocur = XmlElementContentOccur::XmlElementContentMult;
+            if let Some(mut ret) = ret.clone() {
+                ret.set_occur(ElementContentOccur::Mult);
                 let mut cur = Some(ret);
                 // Some normalization:
                 // (a | b* | c?)* == (a | b | c)*
-                while let Some(now) = cur.filter(|cur| {
-                    cur.borrow().typ == { XmlElementContentType::XmlElementContentOr }
-                }) {
-                    let now = now.borrow();
-                    if let Some(c1) = now.c1.as_deref().filter(|c1| {
-                        let c1 = c1.borrow();
+                while let Some(now) = cur.filter(|cur| cur.r#type() == ElementContentType::Or) {
+                    if let Some(mut c1) = now.first_child().filter(|c1| {
                         matches!(
-                            c1.ocur,
-                            XmlElementContentOccur::XmlElementContentOpt
-                                | XmlElementContentOccur::XmlElementContentMult
+                            c1.occur(),
+                            ElementContentOccur::Opt | ElementContentOccur::Mult
                         )
                     }) {
-                        c1.borrow_mut().ocur = XmlElementContentOccur::XmlElementContentOnce;
+                        c1.set_occur(ElementContentOccur::Once);
                     }
-                    if let Some(c2) = now.c2.as_deref().filter(|c2| {
-                        let c2 = c2.borrow();
+                    if let Some(mut c2) = now.second_child().filter(|c2| {
                         matches!(
-                            c2.ocur,
-                            XmlElementContentOccur::XmlElementContentOpt
-                                | XmlElementContentOccur::XmlElementContentMult
+                            c2.occur(),
+                            ElementContentOccur::Opt | ElementContentOccur::Mult
                         )
                     }) {
-                        c2.borrow_mut().ocur = XmlElementContentOccur::XmlElementContentOnce;
+                        c2.set_occur(ElementContentOccur::Once);
                     }
-                    cur = now.c2.clone();
+                    cur = now.second_child();
                 }
             }
             self.skip_char();
         } else if self.current_byte() == b'+' {
-            if let Some(ret) = ret.as_deref() {
+            if let Some(mut ret) = ret.clone() {
                 let mut found: i32 = 0;
 
                 {
-                    let mut ret = ret.borrow_mut();
                     if matches!(
-                        ret.ocur,
-                        XmlElementContentOccur::XmlElementContentOpt
-                            | XmlElementContentOccur::XmlElementContentMult
+                        ret.occur(),
+                        ElementContentOccur::Opt | ElementContentOccur::Mult
                     ) {
-                        ret.ocur = XmlElementContentOccur::XmlElementContentMult;
+                        ret.set_occur(ElementContentOccur::Mult);
                     } else {
-                        ret.ocur = XmlElementContentOccur::XmlElementContentPlus;
+                        ret.set_occur(ElementContentOccur::Plus);
                     }
                 }
                 // Some normalization:
                 // (a | b*)+ == (a | b)*
                 // (a | b?)+ == (a | b)*
-                while let Some(now) = cur.clone().filter(|cur| {
-                    matches!(cur.borrow().typ, XmlElementContentType::XmlElementContentOr)
-                }) {
-                    let now = now.borrow_mut();
-                    if let Some(c1) = now.c1.as_deref().filter(|c1| {
+                while let Some(now) = cur
+                    .clone()
+                    .filter(|cur| cur.r#type() == ElementContentType::Or)
+                {
+                    if let Some(mut c1) = now.first_child().filter(|c1| {
                         matches!(
-                            c1.borrow().ocur,
-                            XmlElementContentOccur::XmlElementContentOpt
-                                | XmlElementContentOccur::XmlElementContentMult
+                            c1.occur(),
+                            ElementContentOccur::Opt | ElementContentOccur::Mult
                         )
                     }) {
-                        c1.borrow_mut().ocur = XmlElementContentOccur::XmlElementContentOnce;
+                        c1.set_occur(ElementContentOccur::Once);
                         found = 1;
                     }
-                    if let Some(c2) = now.c2.as_deref().filter(|c2| {
+                    if let Some(mut c2) = now.second_child().filter(|c2| {
                         matches!(
-                            c2.borrow().ocur,
-                            XmlElementContentOccur::XmlElementContentOpt
-                                | XmlElementContentOccur::XmlElementContentMult
+                            c2.occur(),
+                            ElementContentOccur::Opt | ElementContentOccur::Mult
                         )
                     }) {
-                        c2.borrow_mut().ocur = XmlElementContentOccur::XmlElementContentOnce;
+                        c2.set_occur(ElementContentOccur::Once);
                     }
 
-                    cur = now.c2.clone();
+                    cur = now.second_child();
                 }
                 if found != 0 {
-                    ret.borrow_mut().ocur = XmlElementContentOccur::XmlElementContentMult;
+                    ret.set_occur(ElementContentOccur::Mult);
                 }
             }
             self.skip_char();
@@ -839,10 +788,7 @@ impl XmlParserCtxt<'_> {
     ///
     /// returns: the list of the xmlElementContentPtr describing the element choices
     #[doc(alias = "xmlParseElementMixedContentDecl")]
-    fn parse_element_mixed_content_decl(
-        &mut self,
-        inputchk: i32,
-    ) -> Option<Rc<RefCell<XmlElementContent>>> {
+    fn parse_element_mixed_content_decl(&mut self, inputchk: i32) -> Option<Rc<ElementContent>> {
         let mut ret = None;
         let mut cur = None;
 
@@ -861,23 +807,15 @@ impl XmlParserCtxt<'_> {
                 );
             }
             self.skip_char();
-            let mut ret = xml_new_doc_element_content(
-                self.my_doc,
-                None,
-                XmlElementContentType::XmlElementContentPCDATA,
-            );
-            if self.current_byte() == b'*' {
-                ret.ocur = XmlElementContentOccur::XmlElementContentMult;
+            return if self.current_byte() == b'*' {
                 self.skip_char();
-            }
-            return Some(Rc::new(RefCell::new(ret)));
+                Some(ElementContent::new_pcdata(ElementContentOccur::Mult))
+            } else {
+                Some(ElementContent::new_pcdata(ElementContentOccur::Once))
+            };
         }
         if matches!(self.current_byte(), b'(' | b'|') {
-            ret = Some(Rc::new(RefCell::new(xml_new_doc_element_content(
-                self.my_doc,
-                None,
-                XmlElementContentType::XmlElementContentPCDATA,
-            ))));
+            ret = Some(ElementContent::new_pcdata(ElementContentOccur::Once));
             cur = ret.clone();
         }
         let mut elem: Option<String> = None;
@@ -886,33 +824,15 @@ impl XmlParserCtxt<'_> {
         {
             self.skip_char();
             if let Some(elem) = elem.as_deref() {
-                let mut n = xml_new_doc_element_content(
-                    self.my_doc,
-                    None,
-                    XmlElementContentType::XmlElementContentOr,
-                );
-                let c1 = Rc::new(RefCell::new(xml_new_doc_element_content(
-                    self.my_doc,
-                    Some(elem),
-                    XmlElementContentType::XmlElementContentElement,
-                )));
-                n.c1 = Some(c1.clone());
-                n.parent = Rc::downgrade(cur.as_ref().unwrap());
-                let n = Rc::new(RefCell::new(n));
-                c1.borrow_mut().parent = Rc::downgrade(&n);
-                cur.as_ref().unwrap().borrow_mut().c2 = Some(n.clone());
+                let mut n = ElementContent::new_or(ElementContentOccur::Once);
+                let c1 = ElementContent::new_element(ElementContentOccur::Once, elem);
+                n.set_first_child(Some(c1));
+                cur.as_mut().unwrap().set_second_child(Some(n.clone()));
                 cur = Some(n);
             } else {
-                let mut n = xml_new_doc_element_content(
-                    self.my_doc,
-                    None,
-                    XmlElementContentType::XmlElementContentOr,
-                );
-                n.c1 = cur.clone();
-                ret = Some(Rc::new(RefCell::new(n)));
-                if let Some(cur) = cur.as_deref() {
-                    cur.borrow_mut().parent = Rc::downgrade(ret.as_ref().unwrap());
-                }
+                let mut n = ElementContent::new_or(ElementContentOccur::Once);
+                n.set_first_child(cur.clone());
+                ret = Some(n);
                 cur = ret.clone();
             }
             self.skip_blanks();
@@ -930,16 +850,11 @@ impl XmlParserCtxt<'_> {
         }
         if self.content_bytes().starts_with(b")*") {
             if let Some(elem) = elem {
-                let mut c2 = xml_new_doc_element_content(
-                    self.my_doc,
-                    Some(&elem),
-                    XmlElementContentType::XmlElementContentElement,
-                );
-                c2.parent = Rc::downgrade(cur.as_ref().unwrap());
-                cur.as_ref().unwrap().borrow_mut().c2 = Some(Rc::new(RefCell::new(c2)));
+                let c2 = ElementContent::new_element(ElementContentOccur::Once, elem);
+                cur.as_mut().unwrap().set_second_child(Some(c2));
             }
-            if let Some(ret) = ret.as_ref() {
-                ret.borrow_mut().ocur = XmlElementContentOccur::XmlElementContentMult;
+            if let Some(mut ret) = ret.clone() {
+                ret.set_occur(ElementContentOccur::Mult);
             }
             if self.input().unwrap().id != inputchk {
                 xml_fatal_err_msg(

@@ -20,7 +20,6 @@
 // Daniel Veillard <daniel@veillard.com>
 
 use std::{
-    cell::RefCell,
     ffi::c_void,
     mem::replace,
     rc::Rc,
@@ -32,6 +31,7 @@ use crate::generic_error;
 #[cfg(feature = "html")]
 use crate::html::tree::html_new_doc_no_dtd;
 use crate::{
+    dom::elementdecl::ElementContent,
     encoding::{XmlCharEncoding, detect_encoding},
     error::{
         __xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors, parser_error,
@@ -46,9 +46,9 @@ use crate::{
     },
     tree::{
         NodeCommon, XmlAttr, XmlAttributeDefault, XmlAttributeType, XmlDocProperties,
-        XmlElementContent, XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType,
-        XmlEnumeration, XmlNode, XmlNodePtr, XmlNsPtr, validate_ncname, xml_add_doc_entity,
-        xml_add_dtd_entity, xml_create_int_subset, xml_free_dtd, xml_free_node, xml_get_doc_entity,
+        XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNode,
+        XmlNodePtr, XmlNsPtr, validate_ncname, xml_add_doc_entity, xml_add_dtd_entity,
+        xml_create_int_subset, xml_free_dtd, xml_free_node, xml_get_doc_entity,
         xml_get_parameter_entity, xml_get_predefined_entity, xml_new_cdata_block, xml_new_char_ref,
         xml_new_doc, xml_new_doc_comment, xml_new_doc_node, xml_new_doc_pi, xml_new_doc_text,
         xml_new_dtd, xml_new_ns, xml_new_ns_prop, xml_new_reference, xml_text_concat,
@@ -704,7 +704,7 @@ pub fn xml_sax2_element_decl(
     ctxt: &mut XmlParserCtxt,
     name: &str,
     typ: Option<XmlElementTypeVal>,
-    content: Option<Rc<RefCell<XmlElementContent>>>,
+    content: Option<Rc<ElementContent>>,
 ) {
     unsafe {
         let Some(my_doc) = ctxt.my_doc else {
