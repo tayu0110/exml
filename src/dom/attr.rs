@@ -7,19 +7,16 @@ use std::{
 };
 
 use crate::{
-    dom::{
-        DOMException, XML_NS_NAMESPACE, XML_XML_NAMESPACE, check_no_modification_allowed_err,
-        user_data::{DOMUserData, OperationType, UserDataHandler},
-    },
     parser::split_qname2,
     tree::{validate_name, validate_ncname},
 };
 
 use super::{
-    NodeType,
-    document::{DocumentRef, DocumentWeakRef},
+    DOMException, NodeType, XML_NS_NAMESPACE, XML_XML_NAMESPACE, check_no_modification_allowed_err,
+    document::{Document, DocumentRef},
     element::{ElementRef, ElementWeakRef},
     node::{Node, NodeConnection, NodeRef},
+    user_data::{DOMUserData, OperationType, UserDataHandler},
 };
 
 /// Implementation of [Attr](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-637646024)
@@ -41,7 +38,7 @@ pub struct Attr {
     last_child: Option<NodeRef>,
     // previous_sibling: Option<NodeWeakRef>,
     // next_sibling: Option<NodeRef>,
-    owner_document: DocumentWeakRef,
+    owner_document: Weak<RefCell<Document>>,
 
     /// Implementation of `name` attribute of `Attr`.  
     /// as same as `nodeName` for `Node`.
@@ -148,7 +145,7 @@ impl Attr {
     fn adopted_to(&mut self, new_doc: DocumentRef) {
         self.owner_element = None;
         self.specified = true;
-        self.owner_document = new_doc.downgrade();
+        self.owner_document = Rc::downgrade(&new_doc.0);
         let mut children = self.first_child.clone();
         while let Some(mut child) = children {
             children = child.next_sibling();
@@ -164,11 +161,10 @@ pub struct AttrRef(Rc<RefCell<Attr>>);
 impl AttrRef {
     /// Create new [`AttrRef`].
     pub(super) fn new(doc: DocumentRef, tag_name: Rc<str>) -> Self {
-        let doc = doc.downgrade();
         Self(Rc::new(RefCell::new(Attr {
             first_child: None,
             last_child: None,
-            owner_document: doc,
+            owner_document: Rc::downgrade(&doc.0),
             name: tag_name,
             owner_element: None,
             namespace_uri: None,
@@ -315,7 +311,7 @@ impl Node for AttrRef {
     }
 
     fn owner_document(&self) -> Option<DocumentRef> {
-        self.0.borrow().owner_document.upgrade()
+        self.0.borrow().owner_document.upgrade().map(From::from)
     }
 
     fn clone_node(&self, _deep: bool) -> NodeRef {
@@ -477,7 +473,12 @@ impl NodeConnection for AttrRef {
     }
 
     fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
-        replace(&mut self.0.borrow_mut().owner_document, new_doc.downgrade()).upgrade()
+        replace(
+            &mut self.0.borrow_mut().owner_document,
+            Rc::downgrade(&new_doc.0),
+        )
+        .upgrade()
+        .map(From::from)
     }
 
     fn set_read_only(&mut self) {

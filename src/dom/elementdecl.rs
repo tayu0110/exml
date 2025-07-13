@@ -10,7 +10,7 @@ use crate::{
     dom::{
         DOMException,
         attlistdecl::AttlistDeclRef,
-        document::{DocumentRef, DocumentWeakRef},
+        document::{Document, DocumentRef},
     },
     parser::split_qname2,
     tree::validate_name,
@@ -348,7 +348,7 @@ pub(crate) fn deep_clone_element_content(
 /// This is not an interface included in the DOM specification.
 pub struct ElementDecl {
     name: Rc<str>,
-    owner_document: Option<DocumentWeakRef>,
+    owner_document: Weak<RefCell<Document>>,
     attrdecl: HashMap<String, AttlistDeclRef>,
     contentspec: ContentSpec,
 }
@@ -360,7 +360,7 @@ impl ElementDeclRef {
     pub(crate) fn new(doc: Option<DocumentRef>, name: Rc<str>, contentspec: ContentSpec) -> Self {
         ElementDeclRef(Rc::new(RefCell::new(ElementDecl {
             name,
-            owner_document: doc.map(|doc| doc.downgrade()),
+            owner_document: doc.map(|doc| Rc::downgrade(&doc.0)).unwrap_or_default(),
             attrdecl: HashMap::new(),
             contentspec,
         })))
@@ -371,11 +371,7 @@ impl ElementDeclRef {
     }
 
     pub fn owner_document(&self) -> Option<DocumentRef> {
-        self.0
-            .borrow()
-            .owner_document
-            .clone()
-            .and_then(|doc| doc.upgrade())
+        self.0.borrow().owner_document.upgrade().map(From::from)
     }
 
     pub fn set_owner_document(&mut self, doc: DocumentRef) -> Option<DocumentRef> {
@@ -384,9 +380,10 @@ impl ElementDeclRef {
         }
         replace(
             &mut self.0.borrow_mut().owner_document,
-            Some(doc.downgrade()),
+            Rc::downgrade(&doc.0),
         )
-        .and_then(|doc| doc.upgrade())
+        .upgrade()
+        .map(From::from)
     }
 
     pub fn clone_node(&self, deep: bool) -> ElementDeclRef {

@@ -1,34 +1,36 @@
-use std::{rc::Rc, sync::Arc};
+use std::{
+    cell::RefCell,
+    rc::{Rc, Weak},
+    sync::Arc,
+};
 
 use crate::{
-    dom::{
-        DOCUMENT_POSITION_DISCONNECTED, check_no_modification_allowed_err,
-        check_owner_document_sameness,
-        named_node_map::{AttributeMap, NamedNodeMap},
-        node_list::ChildNodesList,
-        user_data::{DOMUserData, OperationType, UserDataHandler},
-    },
+    dom::document::Document,
     tree::XML_XML_NAMESPACE,
     uri::{XmlURI, build_uri},
 };
 
 use super::{
-    DOCUMENT_POSITION_CONTAINED_BY, DOCUMENT_POSITION_CONTAINS, DOCUMENT_POSITION_FOLLOWING,
-    DOCUMENT_POSITION_PRECEDING, DOMException, DocumentPosition, NodeType,
+    DOCUMENT_POSITION_CONTAINED_BY, DOCUMENT_POSITION_CONTAINS, DOCUMENT_POSITION_DISCONNECTED,
+    DOCUMENT_POSITION_FOLLOWING, DOCUMENT_POSITION_PRECEDING, DOMException, DocumentPosition,
+    NodeType,
     attr::{AttrRef, AttrWeakRef},
     character_data::{
         CDATASectionRef, CDATASectionWeakRef, CharacterData, CommentRef, CommentWeakRef, TextRef,
         TextWeakRef,
     },
-    check_vertical_hierarchy,
-    document::{DocumentRef, DocumentWeakRef},
+    check_no_modification_allowed_err, check_owner_document_sameness, check_vertical_hierarchy,
+    document::DocumentRef,
     document_fragment::{DocumentFragmentRef, DocumentFragmentWeakRef},
     document_type::{DocumentTypeRef, DocumentTypeWeakRef},
     element::{ElementRef, ElementWeakRef},
     entity::{EntityRef, EntityWeakRef},
     entity_reference::{EntityReferenceRef, EntityReferenceWeakRef},
+    named_node_map::{AttributeMap, NamedNodeMap},
+    node_list::ChildNodesList,
     notation::{NotationRef, NotationWeakRef},
     pi::{ProcessingInstructionRef, ProcessingInstructionWeakRef},
+    user_data::{DOMUserData, OperationType, UserDataHandler},
 };
 
 /// Implementation of [Node](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-1950641247)
@@ -1756,7 +1758,7 @@ impl NodeRef {
             Entity(node) => NodeWeakRef::Entity(node.downgrade()),
             ProcessingInstruction(node) => NodeWeakRef::ProcessingInstruction(node.downgrade()),
             Comment(node) => NodeWeakRef::Comment(node.downgrade()),
-            Document(node) => NodeWeakRef::Document(node.downgrade()),
+            Document(node) => NodeWeakRef::Document(Rc::downgrade(&node.0)),
             DocumentType(node) => NodeWeakRef::DocumentType(node.downgrade()),
             DocumentFragment(node) => NodeWeakRef::DocumentFragment(node.downgrade()),
             Notation(node) => NodeWeakRef::Notation(node.downgrade()),
@@ -1918,7 +1920,7 @@ pub enum NodeWeakRef {
     Entity(EntityWeakRef),
     ProcessingInstruction(ProcessingInstructionWeakRef),
     Comment(CommentWeakRef),
-    Document(DocumentWeakRef),
+    Document(Weak<RefCell<Document>>),
     DocumentType(DocumentTypeWeakRef),
     DocumentFragment(DocumentFragmentWeakRef),
     Notation(NotationWeakRef),
@@ -1939,7 +1941,9 @@ impl NodeWeakRef {
                 node.upgrade().map(NodeRef::ProcessingInstruction)
             }
             NodeWeakRef::Comment(node) => node.upgrade().map(NodeRef::Comment),
-            NodeWeakRef::Document(node) => node.upgrade().map(NodeRef::Document),
+            NodeWeakRef::Document(node) => {
+                node.upgrade().map(DocumentRef::from).map(NodeRef::Document)
+            }
             NodeWeakRef::DocumentType(node) => node.upgrade().map(NodeRef::DocumentType),
             NodeWeakRef::DocumentFragment(node) => node.upgrade().map(NodeRef::DocumentFragment),
             NodeWeakRef::Notation(node) => node.upgrade().map(NodeRef::Notation),

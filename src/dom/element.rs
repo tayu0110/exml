@@ -7,7 +7,7 @@ use std::{
 };
 
 use crate::{
-    dom::user_data::OperationType,
+    dom::document::Document,
     parser::split_qname2,
     tree::{validate_name, validate_ncname},
 };
@@ -16,11 +16,11 @@ use super::{
     DOMException, NodeType, XML_XML_NAMESPACE,
     attr::AttrRef,
     check_no_modification_allowed_err, check_owner_document_sameness,
-    document::{DocumentRef, DocumentWeakRef},
+    document::DocumentRef,
     named_node_map::{AttributeMap, NamedNodeMap},
     node::{Node, NodeConnection, NodeRef, NodeWeakRef},
     node_list::FilteredSubtreeElementsList,
-    user_data::{DOMUserData, UserDataHandler},
+    user_data::{DOMUserData, OperationType, UserDataHandler},
 };
 
 /// Implementation of [Element](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-745549614)
@@ -54,7 +54,7 @@ pub struct Element {
     next_sibling: Option<NodeRef>,
     /// Implementation of `attributes` attribute.
     attributes: AttributeMap,
-    pub(super) owner_document: DocumentWeakRef,
+    pub(super) owner_document: Weak<RefCell<Document>>,
 
     /// Implementation of `tagName` for `Element`.
     /// as same as `nodeName` for `Node`.
@@ -105,7 +105,7 @@ impl Element {
     ///     are recursively adopted.
     /// ```
     fn adopted_to(&mut self, new_doc: DocumentRef) {
-        self.owner_document = new_doc.downgrade();
+        self.owner_document = Rc::downgrade(&new_doc.0);
         let mut children = self.first_child.clone();
         while let Some(mut child) = children {
             children = child.next_sibling();
@@ -136,7 +136,7 @@ pub struct ElementRef(pub(super) Rc<RefCell<Element>>);
 impl ElementRef {
     /// Create new [`ElementRef`].
     pub(super) fn new(doc: DocumentRef, tag_name: Rc<str>) -> Self {
-        let ddoc = doc.downgrade();
+        let ddoc = Rc::downgrade(&doc.0);
         let mut new = Self(Rc::new(RefCell::new(Element {
             parent_node: None,
             first_child: None,
@@ -168,7 +168,7 @@ impl ElementRef {
         tag_name: Rc<str>,
         namespace_uri: Option<Rc<str>>,
     ) -> Self {
-        let ddoc = doc.downgrade();
+        let ddoc = Rc::downgrade(&doc.0);
         let mut new = if let Some((prefix, local_name)) = split_qname2(&tag_name) {
             Self(Rc::new(RefCell::new(Element {
                 parent_node: None,
@@ -1134,7 +1134,7 @@ impl Node for ElementRef {
     }
 
     fn owner_document(&self) -> Option<DocumentRef> {
-        self.0.borrow().owner_document.upgrade()
+        self.0.borrow().owner_document.upgrade().map(From::from)
     }
 
     fn clone_node(&self, deep: bool) -> NodeRef {
@@ -1353,7 +1353,12 @@ impl NodeConnection for ElementRef {
     }
 
     fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
-        replace(&mut self.0.borrow_mut().owner_document, new_doc.downgrade()).upgrade()
+        replace(
+            &mut self.0.borrow_mut().owner_document,
+            Rc::downgrade(&new_doc.0),
+        )
+        .upgrade()
+        .map(From::from)
     }
 
     fn set_read_only(&mut self) {

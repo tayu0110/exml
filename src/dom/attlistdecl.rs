@@ -1,6 +1,10 @@
-use std::{cell::RefCell, mem::replace, rc::Rc};
+use std::{
+    cell::RefCell,
+    mem::replace,
+    rc::{Rc, Weak},
+};
 
-use crate::dom::document::{DocumentRef, DocumentWeakRef};
+use crate::dom::document::{Document, DocumentRef};
 
 /// Attribute Types.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -42,7 +46,7 @@ pub enum DefaultDecl {
 /// This is not an interface included in the DOM specification.
 pub struct AttlistDecl {
     name: Rc<str>,
-    owner_document: Option<DocumentWeakRef>,
+    owner_document: Weak<RefCell<Document>>,
 
     att_type: AttType,
     default_decl: DefaultDecl,
@@ -62,7 +66,7 @@ impl AttlistDeclRef {
     ) -> Self {
         AttlistDeclRef(Rc::new(RefCell::new(AttlistDecl {
             name,
-            owner_document: doc.map(|doc| doc.downgrade()),
+            owner_document: doc.map(|doc| Rc::downgrade(&doc.0)).unwrap_or_default(),
             att_type,
             default_decl,
             elem_name,
@@ -78,7 +82,8 @@ impl AttlistDeclRef {
             .borrow()
             .owner_document
             .clone()
-            .and_then(|doc| doc.upgrade())
+            .upgrade()
+            .map(From::from)
     }
 
     pub fn element_name(&self) -> Rc<str> {
@@ -100,9 +105,10 @@ impl AttlistDeclRef {
     pub fn set_owner_document(&mut self, doc: DocumentRef) -> Option<DocumentRef> {
         replace(
             &mut self.0.borrow_mut().owner_document,
-            Some(doc.downgrade()),
+            Rc::downgrade(&doc.0),
         )
-        .and_then(|doc| doc.upgrade())
+        .upgrade()
+        .map(From::from)
     }
 
     pub fn clone_node(&self, _deep: bool) -> AttlistDeclRef {

@@ -6,12 +6,13 @@ use std::{
     sync::Arc,
 };
 
-use crate::dom::user_data::{DOMUserData, OperationType, UserDataHandler};
+use crate::dom::document::Document;
 
 use super::{
     NodeType,
-    document::{DocumentRef, DocumentWeakRef},
+    document::DocumentRef,
     node::{Node, NodeConnection, NodeRef, NodeWeakRef},
+    user_data::{DOMUserData, OperationType, UserDataHandler},
 };
 
 /// Implementation of [EntityReference](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-11C98490)
@@ -42,7 +43,7 @@ pub struct EntityReference {
     /// - `CDATASection`
     previous_sibling: Option<NodeWeakRef>,
     next_sibling: Option<NodeRef>,
-    owner_document: DocumentWeakRef,
+    owner_document: Weak<RefCell<Document>>,
 
     /// Name of entity referenced. as same as `nodeName` for `Node`.
     name: Rc<str>,
@@ -55,7 +56,7 @@ impl EntityReference {
     ///
     /// All character and general parsed entities in the value are expanded.
     pub(crate) fn get_entity_ref_value(&self) -> Option<String> {
-        let doc = self.owner_document.upgrade()?;
+        let doc = DocumentRef::from(self.owner_document.upgrade()?);
         let ent = doc.get_entity(&self.name)?;
         let mut children = ent.first_child();
         let mut buf = String::new();
@@ -91,7 +92,7 @@ impl EntityReferenceRef {
             last_child: None,
             previous_sibling: None,
             next_sibling: None,
-            owner_document: doc.downgrade(),
+            owner_document: Rc::downgrade(&doc.0),
             name,
             user_data: None,
         })))
@@ -153,7 +154,7 @@ impl Node for EntityReferenceRef {
     }
 
     fn owner_document(&self) -> Option<DocumentRef> {
-        self.0.borrow().owner_document.upgrade()
+        self.0.borrow().owner_document.upgrade().map(From::from)
     }
 
     fn clone_node(&self, _deep: bool) -> NodeRef {
@@ -250,7 +251,12 @@ impl NodeConnection for EntityReferenceRef {
     }
 
     fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
-        replace(&mut self.0.borrow_mut().owner_document, new_doc.downgrade()).upgrade()
+        replace(
+            &mut self.0.borrow_mut().owner_document,
+            Rc::downgrade(&new_doc.0),
+        )
+        .upgrade()
+        .map(From::from)
     }
 
     /// # Specification
@@ -269,7 +275,7 @@ impl NodeConnection for EntityReferenceRef {
             children = child.next_sibling();
         }
         self.set_last_child(None);
-        self.0.borrow_mut().owner_document = new_doc.downgrade();
+        self.0.borrow_mut().owner_document = Rc::downgrade(&new_doc.0);
 
         // If new entity reference can be created successfully,
         // move its children to `self`.

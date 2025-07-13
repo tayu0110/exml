@@ -1,10 +1,4 @@
-use std::{
-    cell::RefCell,
-    collections::HashMap,
-    mem::replace,
-    rc::{Rc, Weak},
-    sync::Arc,
-};
+use std::{cell::RefCell, collections::HashMap, mem::replace, rc::Rc, sync::Arc};
 
 use crate::{
     chvalid::XmlCharValid,
@@ -1637,11 +1631,6 @@ impl DocumentRef {
     pub fn is_enabled_read_only_check(&self) -> bool {
         self.0.borrow().is_enabled_read_only_check()
     }
-
-    /// Generate [`DocumentWeakRef`] from `self`.
-    pub fn downgrade(&self) -> DocumentWeakRef {
-        DocumentWeakRef(Rc::downgrade(&self.0))
-    }
 }
 
 impl Node for DocumentRef {
@@ -1952,17 +1941,5 @@ impl From<DocumentRef> for NodeRef {
 impl From<Rc<RefCell<Document>>> for DocumentRef {
     fn from(value: Rc<RefCell<Document>>) -> Self {
         Self(value)
-    }
-}
-
-/// Wrapper of `Weak<RefCell<Document>>`.
-#[derive(Clone)]
-pub struct DocumentWeakRef(Weak<RefCell<Document>>);
-
-impl DocumentWeakRef {
-    /// Generate [`DocumentRef`] from `self`.  
-    /// Success conditions are the same as for [`std::rc::Weak::upgrade`].
-    pub fn upgrade(&self) -> Option<DocumentRef> {
-        self.0.upgrade().map(DocumentRef)
     }
 }

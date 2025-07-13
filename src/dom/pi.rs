@@ -6,15 +6,13 @@ use std::{
     sync::Arc,
 };
 
-use crate::dom::{
-    DOMException, check_no_modification_allowed_err,
-    user_data::{DOMUserData, OperationType, UserDataHandler},
-};
+use crate::dom::document::Document;
 
 use super::{
-    NodeType,
-    document::{DocumentRef, DocumentWeakRef},
+    DOMException, NodeType, check_no_modification_allowed_err,
+    document::DocumentRef,
     node::{Node, NodeConnection, NodeRef, NodeWeakRef},
+    user_data::{DOMUserData, OperationType, UserDataHandler},
 };
 
 /// Implementation of [ProcessingInstruction](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-1004215813)
@@ -41,7 +39,7 @@ pub struct ProcessingInstruction {
     /// - `CDATASection`
     previous_sibling: Option<NodeWeakRef>,
     next_sibling: Option<NodeRef>,
-    owner_document: DocumentWeakRef,
+    owner_document: Weak<RefCell<Document>>,
     /// Implementation of `target` attribute for `ProcessingInstruction`.
     /// as same as `nodeName` for `Node`.
     target: Rc<str>,
@@ -73,7 +71,7 @@ impl ProcessingInstructionRef {
             parent_node: None,
             previous_sibling: None,
             next_sibling: None,
-            owner_document: doc.downgrade(),
+            owner_document: Rc::downgrade(&doc.0),
             target,
             data,
             user_data: None,
@@ -162,7 +160,7 @@ impl Node for ProcessingInstructionRef {
     }
 
     fn owner_document(&self) -> Option<DocumentRef> {
-        self.0.borrow().owner_document.upgrade()
+        self.0.borrow().owner_document.upgrade().map(From::from)
     }
 
     fn clone_node(&self, _deep: bool) -> NodeRef {
@@ -256,7 +254,12 @@ impl NodeConnection for ProcessingInstructionRef {
     }
 
     fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
-        replace(&mut self.0.borrow_mut().owner_document, new_doc.downgrade()).upgrade()
+        replace(
+            &mut self.0.borrow_mut().owner_document,
+            Rc::downgrade(&new_doc.0),
+        )
+        .upgrade()
+        .map(From::from)
     }
 
     fn set_read_only(&mut self) {
@@ -268,7 +271,7 @@ impl NodeConnection for ProcessingInstructionRef {
     }
 
     fn adopted_to(&mut self, new_doc: DocumentRef) {
-        self.0.borrow_mut().owner_document = new_doc.downgrade();
+        self.0.borrow_mut().owner_document = Rc::downgrade(&new_doc.0);
 
         if let Some(user_data) = self.0.borrow().user_data.as_ref() {
             for (key, value) in user_data.iter() {

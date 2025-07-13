@@ -7,18 +7,13 @@ use std::{
     sync::Arc,
 };
 
-use crate::{
-    chvalid::XmlCharValid,
-    dom::{
-        check_no_modification_allowed_err,
-        user_data::{DOMUserData, OperationType, UserDataHandler},
-    },
-};
+use crate::{chvalid::XmlCharValid, dom::document::Document};
 
 use super::{
-    DOMException, NodeType,
-    document::{DocumentRef, DocumentWeakRef},
+    DOMException, NodeType, check_no_modification_allowed_err,
+    document::DocumentRef,
     node::{Node, NodeConnection, NodeRef, NodeWeakRef},
+    user_data::{DOMUserData, OperationType, UserDataHandler},
 };
 
 /// Implementation of [CharacterData](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-FF21A306)
@@ -263,7 +258,7 @@ pub struct Text {
     /// - `CDATASection`
     previous_sibling: Option<NodeWeakRef>,
     next_sibling: Option<NodeRef>,
-    owner_document: DocumentWeakRef,
+    owner_document: Weak<RefCell<Document>>,
     data: String,
 
     user_data: Option<HashMap<String, (DOMUserData, Option<Arc<dyn UserDataHandler>>)>>,
@@ -275,7 +270,7 @@ pub struct Text {
 
 impl Text {
     fn adopted_to(&mut self, new_doc: DocumentRef) {
-        self.owner_document = new_doc.downgrade();
+        self.owner_document = Rc::downgrade(&new_doc.0);
     }
 }
 
@@ -618,7 +613,7 @@ impl TextRef {
             parent_node: None,
             previous_sibling: None,
             next_sibling: None,
-            owner_document: doc.downgrade(),
+            owner_document: Rc::downgrade(&doc.0),
             data,
             user_data: None,
             flag: 0,
@@ -665,7 +660,7 @@ impl Node for TextRef {
     }
 
     fn owner_document(&self) -> Option<DocumentRef> {
-        self.0.borrow().owner_document.upgrade()
+        self.0.borrow().owner_document.upgrade().map(From::from)
     }
 
     fn clone_node(&self, _deep: bool) -> NodeRef {
@@ -769,7 +764,12 @@ impl NodeConnection for TextRef {
     }
 
     fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
-        replace(&mut self.0.borrow_mut().owner_document, new_doc.downgrade()).upgrade()
+        replace(
+            &mut self.0.borrow_mut().owner_document,
+            Rc::downgrade(&new_doc.0),
+        )
+        .upgrade()
+        .map(From::from)
     }
 
     fn set_read_only(&mut self) {
@@ -860,7 +860,7 @@ pub struct Comment {
     /// - `CDATASection`
     previous_sibling: Option<NodeWeakRef>,
     next_sibling: Option<NodeRef>,
-    owner_document: DocumentWeakRef,
+    owner_document: Weak<RefCell<Document>>,
     data: String,
 
     user_data: Option<HashMap<String, (DOMUserData, Option<Arc<dyn UserDataHandler>>)>>,
@@ -872,7 +872,7 @@ pub struct Comment {
 
 impl Comment {
     fn adopted_to(&mut self, new_doc: DocumentRef) {
-        self.owner_document = new_doc.downgrade();
+        self.owner_document = Rc::downgrade(&new_doc.0);
     }
 }
 
@@ -895,7 +895,7 @@ impl CommentRef {
             parent_node: None,
             previous_sibling: None,
             next_sibling: None,
-            owner_document: doc.downgrade(),
+            owner_document: Rc::downgrade(&doc.0),
             data,
             user_data: None,
             flag: 0,
@@ -942,7 +942,7 @@ impl Node for CommentRef {
     }
 
     fn owner_document(&self) -> Option<DocumentRef> {
-        self.0.borrow().owner_document.upgrade()
+        self.0.borrow().owner_document.upgrade().map(From::from)
     }
 
     fn clone_node(&self, _deep: bool) -> NodeRef {
@@ -1034,7 +1034,12 @@ impl NodeConnection for CommentRef {
     }
 
     fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
-        replace(&mut self.0.borrow_mut().owner_document, new_doc.downgrade()).upgrade()
+        replace(
+            &mut self.0.borrow_mut().owner_document,
+            Rc::downgrade(&new_doc.0),
+        )
+        .upgrade()
+        .map(From::from)
     }
 
     fn set_read_only(&mut self) {
@@ -1149,7 +1154,7 @@ impl CDATASectionRef {
             parent_node: None,
             previous_sibling: None,
             next_sibling: None,
-            owner_document: doc.downgrade(),
+            owner_document: Rc::downgrade(&doc.0),
             data,
             user_data: None,
             flag: 0,
@@ -1196,7 +1201,7 @@ impl Node for CDATASectionRef {
     }
 
     fn owner_document(&self) -> Option<DocumentRef> {
-        self.0.borrow().owner_document.upgrade()
+        self.0.borrow().owner_document.upgrade().map(From::from)
     }
 
     fn clone_node(&self, _deep: bool) -> NodeRef {
@@ -1288,7 +1293,12 @@ impl NodeConnection for CDATASectionRef {
     }
 
     fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
-        replace(&mut self.0.borrow_mut().owner_document, new_doc.downgrade()).upgrade()
+        replace(
+            &mut self.0.borrow_mut().owner_document,
+            Rc::downgrade(&new_doc.0),
+        )
+        .upgrade()
+        .map(From::from)
     }
 
     fn set_read_only(&mut self) {

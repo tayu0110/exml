@@ -6,15 +6,13 @@ use std::{
     sync::Arc,
 };
 
-use crate::{
-    dom::user_data::{DOMUserData, OperationType, UserDataHandler},
-    error::{__xml_simple_error, XmlErrorDomain, XmlParserErrors},
-};
+use crate::error::{__xml_simple_error, XmlErrorDomain, XmlParserErrors};
 
 use super::{
     NodeType,
-    document::{DocumentRef, DocumentWeakRef},
+    document::{Document, DocumentRef},
     node::{Node, NodeConnection, NodeRef},
+    user_data::{DOMUserData, OperationType, UserDataHandler},
 };
 
 /// Raise an error.
@@ -54,7 +52,7 @@ pub struct Entity {
     // /// - no sibling
     // previous_sibling: Option<NodeWeakRef>,
     // next_sibling: Option<NodeRef>,
-    owner_document: Option<DocumentWeakRef>,
+    owner_document: Weak<RefCell<Document>>,
 
     /// Entity name. as same as `nodeName` for `Node`.
     name: Rc<str>,
@@ -85,7 +83,7 @@ impl EntityRef {
         Self(Rc::new(RefCell::new(Entity {
             first_child: None,
             last_child: None,
-            owner_document: doc.map(|doc| doc.downgrade()),
+            owner_document: doc.map(|doc| Rc::downgrade(&doc.0)).unwrap_or_default(),
             name,
             public_id: None,
             system_id: None,
@@ -174,11 +172,7 @@ impl Node for EntityRef {
     }
 
     fn owner_document(&self) -> Option<DocumentRef> {
-        self.0
-            .borrow()
-            .owner_document
-            .as_ref()
-            .and_then(|doc| doc.upgrade())
+        self.0.borrow().owner_document.upgrade().map(From::from)
     }
 
     fn clone_node(&self, deep: bool) -> NodeRef {
@@ -292,9 +286,10 @@ impl NodeConnection for EntityRef {
     fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
         replace(
             &mut self.0.borrow_mut().owner_document,
-            Some(new_doc.downgrade()),
+            Rc::downgrade(&new_doc.0),
         )
-        .and_then(|doc| doc.upgrade())
+        .upgrade()
+        .map(From::from)
     }
 
     fn adopted_to(&mut self, _new_doc: DocumentRef) {

@@ -6,20 +6,15 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use crate::dom::{
-    check_no_modification_allowed_err,
-    document::Document,
-    element::{Element, ElementRef},
-    entity::EntityRef,
-    notation::NotationRef,
-};
-
 use super::{
     DOMException,
     attr::AttrRef,
-    check_owner_document_sameness,
-    document::{DocumentRef, DocumentWeakRef},
+    check_no_modification_allowed_err, check_owner_document_sameness,
+    document::{Document, DocumentRef},
+    element::{Element, ElementRef},
+    entity::EntityRef,
     node::Node,
+    notation::NotationRef,
 };
 
 pub trait NamedNodeMap {
@@ -240,7 +235,7 @@ pub trait NamedNodeMap {
 /// Since the data is shared by [`Rc`], [`clone`](Clone::clone) means shallow copy, not deep copy.
 #[derive(Clone)]
 pub struct AttributeMap {
-    owner_document: DocumentWeakRef,
+    owner_document: Weak<RefCell<Document>>,
     owner_element: Weak<RefCell<Element>>,
     // (LocalPart, namespaceURI) : if inserted by Level 2 method
     // (Name, None)              : if inserted by Level 1 method
@@ -252,7 +247,7 @@ pub struct AttributeMap {
 
 impl AttributeMap {
     /// Create new empty [`AttributeMap`]
-    pub(super) fn new(doc: DocumentWeakRef) -> Self {
+    pub(super) fn new(doc: Weak<RefCell<Document>>) -> Self {
         Self {
             owner_document: doc,
             owner_element: Weak::new(),
@@ -334,7 +329,7 @@ impl AttributeMap {
 
     /// Get the owner Document.
     pub(super) fn owner_document(&self) -> Option<DocumentRef> {
-        self.owner_document.upgrade()
+        self.owner_document.upgrade().map(From::from)
     }
 
     /// Replace ownerDocument of this map.
@@ -342,7 +337,7 @@ impl AttributeMap {
     /// All data in this map won't modified.  
     /// If need, the caller should modify the ownerDocument of all data in this map additionally.
     pub(super) fn set_owner_document(&mut self, new_doc: DocumentRef) {
-        self.owner_document = new_doc.downgrade();
+        self.owner_document = Rc::downgrade(&new_doc.0);
     }
 
     pub(super) fn set_owner_element(&mut self, owner_element: ElementRef) {
@@ -357,6 +352,7 @@ impl AttributeMap {
         let Some(doc) = self
             .owner_document
             .upgrade()
+            .map(DocumentRef::from)
             .filter(|doc| check_owner_document_sameness(doc, &node))
         else {
             return Err(DOMException::WrongDocumentErr);
@@ -525,6 +521,7 @@ impl NamedNodeMap for AttributeMap {
         if self
             .owner_document
             .upgrade()
+            .map(DocumentRef::from)
             .is_none_or(|doc| doc.is_html())
         {
             return Err(DOMException::NotSupportedErr);

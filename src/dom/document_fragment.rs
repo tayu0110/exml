@@ -6,12 +6,13 @@ use std::{
     sync::Arc,
 };
 
-use crate::dom::user_data::{DOMUserData, OperationType, UserDataHandler};
+use crate::dom::document::Document;
 
 use super::{
     NodeType,
-    document::{DocumentRef, DocumentWeakRef},
+    document::DocumentRef,
     node::{Node, NodeConnection, NodeRef},
+    user_data::{DOMUserData, OperationType, UserDataHandler},
 };
 
 /// Implementation of [DocumentFragment](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-B63ED1A3)
@@ -33,14 +34,14 @@ pub struct DocumentFragment {
     // /// - no sibling
     // previous_sibling: Option<NodeWeakRef>,
     // next_sibling: Option<NodeRef>,
-    owner_document: DocumentWeakRef,
+    owner_document: Weak<RefCell<Document>>,
 
     user_data: Option<HashMap<String, (DOMUserData, Option<Arc<dyn UserDataHandler>>)>>,
 }
 
 impl DocumentFragment {
     fn adopted_to(&mut self, new_doc: DocumentRef) {
-        self.owner_document = new_doc.downgrade();
+        self.owner_document = Rc::downgrade(&new_doc.0);
         let mut children = self.first_child.clone();
         while let Some(mut child) = children {
             child.adopted_to(new_doc.clone());
@@ -64,7 +65,7 @@ impl DocumentFragmentRef {
         Self(Rc::new(RefCell::new(DocumentFragment {
             first_child: None,
             last_child: None,
-            owner_document: doc.downgrade(),
+            owner_document: Rc::downgrade(&doc.0),
             user_data: None,
         })))
     }
@@ -96,7 +97,7 @@ impl Node for DocumentFragmentRef {
     }
 
     fn owner_document(&self) -> Option<DocumentRef> {
-        self.0.borrow().owner_document.upgrade()
+        self.0.borrow().owner_document.upgrade().map(From::from)
     }
 
     fn clone_node(&self, deep: bool) -> NodeRef {
@@ -189,7 +190,12 @@ impl NodeConnection for DocumentFragmentRef {
     }
 
     fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
-        replace(&mut self.0.borrow_mut().owner_document, new_doc.downgrade()).upgrade()
+        replace(
+            &mut self.0.borrow_mut().owner_document,
+            Rc::downgrade(&new_doc.0),
+        )
+        .upgrade()
+        .map(From::from)
     }
 
     fn adopted_to(&mut self, new_doc: DocumentRef) {

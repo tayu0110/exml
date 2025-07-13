@@ -6,12 +6,11 @@ use std::{
     sync::Arc,
 };
 
-use crate::dom::user_data::{DOMUserData, OperationType, UserDataHandler};
-
 use super::{
     DOMException, NodeType,
-    document::{DocumentRef, DocumentWeakRef},
+    document::{Document, DocumentRef},
     node::{Node, NodeConnection, NodeRef},
+    user_data::{DOMUserData, OperationType, UserDataHandler},
 };
 
 pub enum NotationIdentifier {
@@ -38,7 +37,7 @@ pub struct Notation {
     // /// - no sibling
     // previous_sibling: Option<NodeWeakRef>,
     // next_sibling: Option<NodeRef>,
-    owner_document: Option<DocumentWeakRef>,
+    owner_document: Weak<RefCell<Document>>,
     /// Notation name. as same as `nodeName` for `Node`.
     name: Rc<str>,
 
@@ -64,7 +63,7 @@ impl NotationRef {
             NotationIdentifier::PublicID { public_id } => (Some(public_id), None),
         };
         Self(Rc::new(RefCell::new(Notation {
-            owner_document: doc.map(|doc| doc.downgrade()),
+            owner_document: doc.map(|doc| Rc::downgrade(&doc.0)).unwrap_or_default(),
             name,
             public_id,
             system_id,
@@ -143,11 +142,7 @@ impl Node for NotationRef {
     }
 
     fn owner_document(&self) -> Option<DocumentRef> {
-        self.0
-            .borrow()
-            .owner_document
-            .as_ref()
-            .and_then(|doc| doc.upgrade())
+        self.0.borrow().owner_document.upgrade().map(From::from)
     }
 
     fn clone_node(&self, _deep: bool) -> NodeRef {
@@ -243,9 +238,10 @@ impl NodeConnection for NotationRef {
     fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
         replace(
             &mut self.0.borrow_mut().owner_document,
-            Some(new_doc.downgrade()),
+            Rc::downgrade(&new_doc.0),
         )
-        .and_then(|doc| doc.upgrade())
+        .upgrade()
+        .map(From::from)
     }
 
     fn adopted_to(&mut self, _new_doc: DocumentRef) {
