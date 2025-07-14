@@ -40,6 +40,10 @@ pub struct DocumentFragment {
 }
 
 impl DocumentFragment {
+    pub fn owner_document(&self) -> Option<DocumentRef> {
+        self.owner_document.upgrade().map(From::from)
+    }
+
     fn adopted_to(&mut self, new_doc: DocumentRef) {
         self.owner_document = Rc::downgrade(&new_doc.0);
         let mut children = self.first_child.clone();
@@ -52,17 +56,23 @@ impl DocumentFragment {
 
 /// Wrapper of `Rc<RefCell<DocumentFragment>>`.
 #[derive(Clone)]
-pub struct DocumentFragmentRef(pub(super) Rc<RefCell<DocumentFragment>>);
+pub struct DocumentFragmentRef(
+    pub(super) Rc<RefCell<DocumentFragment>>,
+    pub(super) DocumentRef,
+);
 
 impl DocumentFragmentRef {
     /// Create new [`DocumentFragmentRef`] whose ownerDocument is `doc`.
     pub(super) fn from_doc(doc: DocumentRef) -> Self {
-        Self(Rc::new(RefCell::new(DocumentFragment {
-            first_child: None,
-            last_child: None,
-            owner_document: Rc::downgrade(&doc.0),
-            user_data: None,
-        })))
+        Self(
+            Rc::new(RefCell::new(DocumentFragment {
+                first_child: None,
+                last_child: None,
+                owner_document: Rc::downgrade(&doc.0),
+                user_data: None,
+            })),
+            doc,
+        )
     }
 }
 
@@ -92,16 +102,19 @@ impl Node for DocumentFragmentRef {
     }
 
     fn owner_document(&self) -> Option<DocumentRef> {
-        self.0.borrow().owner_document.upgrade().map(From::from)
+        Some(self.1.clone())
     }
 
     fn clone_node(&self, deep: bool) -> NodeRef {
-        let mut frag = DocumentFragmentRef(Rc::new(RefCell::new(DocumentFragment {
-            first_child: None,
-            last_child: None,
-            owner_document: self.0.borrow().owner_document.clone(),
-            user_data: None,
-        })));
+        let mut frag = DocumentFragmentRef(
+            Rc::new(RefCell::new(DocumentFragment {
+                first_child: None,
+                last_child: None,
+                owner_document: self.0.borrow().owner_document.clone(),
+                user_data: None,
+            })),
+            self.1.clone(),
+        );
 
         if deep {
             let mut children = self.first_child();
@@ -185,12 +198,8 @@ impl NodeConnection for DocumentFragmentRef {
     }
 
     fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
-        replace(
-            &mut self.0.borrow_mut().owner_document,
-            Rc::downgrade(&new_doc.0),
-        )
-        .upgrade()
-        .map(From::from)
+        self.0.borrow_mut().owner_document = Rc::downgrade(&new_doc.0);
+        Some(replace(&mut self.1, new_doc))
     }
 
     fn adopted_to(&mut self, new_doc: DocumentRef) {

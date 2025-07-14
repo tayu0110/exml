@@ -304,7 +304,7 @@ impl AttributeMap {
             .data
             .borrow()
             .iter()
-            .map(|attr| AttrRef(attr.clone()))
+            .map(|attr| AttrRef::from(attr.clone()))
             .enumerate()
         {
             if f(&data) {
@@ -388,7 +388,8 @@ impl AttributeMap {
                 Cow::Borrowed(local_name.as_ref()),
                 ns_uri.as_deref().map(Cow::Borrowed),
             )) {
-                let res = AttrRef(replace(&mut self.data.borrow_mut()[index], node.clone().0));
+                let res =
+                    AttrRef::from(replace(&mut self.data.borrow_mut()[index], node.clone().0));
                 if res.node_name() != node.node_name() {
                     self.index_fullname
                         .borrow_mut()
@@ -417,7 +418,7 @@ impl AttributeMap {
             match self.index_fullname.borrow_mut().entry(name.to_string()) {
                 Entry::Occupied(entry) => {
                     let &index = entry.get();
-                    Ok(Some(AttrRef(replace(
+                    Ok(Some(AttrRef::from(replace(
                         &mut self.data.borrow_mut()[index],
                         node.0,
                     ))))
@@ -462,7 +463,7 @@ impl NamedNodeMap for AttributeMap {
                 name,
             )
         }) {
-            let res = AttrRef(replace(&mut self.data.borrow_mut()[index], def.clone().0));
+            let res = AttrRef::from(replace(&mut self.data.borrow_mut()[index], def.clone().0));
             if let Some(local_name) = res.local_name() {
                 if def.namespace_uri() != res.namespace_uri() {
                     self.index.borrow_mut().remove(&(
@@ -491,7 +492,7 @@ impl NamedNodeMap for AttributeMap {
                 .filter(|i| **i > index)
                 .for_each(|i| *i -= 1);
 
-            let res = AttrRef(self.data.borrow_mut().remove(index));
+            let res = AttrRef::from(self.data.borrow_mut().remove(index));
             if let Some(local_name) = res.local_name() {
                 self.index.borrow_mut().remove(&(
                     local_name.to_string().into(),
@@ -504,7 +505,7 @@ impl NamedNodeMap for AttributeMap {
         }
     }
     fn item(&self, index: usize) -> Option<Self::Item> {
-        self.data.borrow().get(index).cloned().map(AttrRef)
+        self.data.borrow().get(index).cloned().map(AttrRef::from)
     }
     fn length(&self) -> usize {
         self.data.borrow().len()
@@ -547,7 +548,7 @@ impl NamedNodeMap for AttributeMap {
             .borrow()
             .get(&(Cow::Borrowed(local_name), ns_uri.map(Cow::Borrowed)))
             .ok_or(DOMException::NotFoundErr)?;
-        let attr = AttrRef(self.data.borrow()[index].clone());
+        let attr = AttrRef::from(self.data.borrow()[index].clone());
         let attr_name = attr.node_name();
         let context_node = attr.owner_element().unwrap();
         if let Some(def) = self
@@ -555,7 +556,10 @@ impl NamedNodeMap for AttributeMap {
             .and_then(|doc| doc.get_default_attribute_ns(context_node, &attr_name))
         {
             // Since the nodeName is the same, there should be no need to modify index_fullname.
-            Ok(AttrRef(replace(&mut self.data.borrow_mut()[index], def.0)))
+            Ok(AttrRef::from(replace(
+                &mut self.data.borrow_mut()[index],
+                def.0,
+            )))
         } else {
             self.index.borrow_mut().retain(|key, value| {
                 if *value > index {
@@ -569,7 +573,7 @@ impl NamedNodeMap for AttributeMap {
                 }
                 key.as_str() != attr_name.as_ref()
             });
-            Ok(AttrRef(self.data.borrow_mut().remove(index)))
+            Ok(AttrRef::from(self.data.borrow_mut().remove(index)))
         }
     }
 }

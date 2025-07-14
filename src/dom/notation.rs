@@ -49,9 +49,18 @@ pub struct Notation {
     user_data: Option<HashMap<String, (DOMUserData, Option<Arc<dyn UserDataHandler>>)>>,
 }
 
+impl Notation {
+    pub fn owner_document(&self) -> Option<DocumentRef> {
+        self.owner_document.upgrade().map(From::from)
+    }
+}
+
 /// Wrapper of `Rc<RefCell<Notation>>`.
 #[derive(Clone)]
-pub struct NotationRef(pub(super) Rc<RefCell<Notation>>);
+pub struct NotationRef(
+    pub(super) Rc<RefCell<Notation>>,
+    pub(super) Option<DocumentRef>,
+);
 
 impl NotationRef {
     pub(crate) fn new(doc: Option<DocumentRef>, name: Rc<str>, id: NotationIdentifier) -> Self {
@@ -62,13 +71,19 @@ impl NotationRef {
             } => (public_id, Some(system_id)),
             NotationIdentifier::PublicID { public_id } => (Some(public_id), None),
         };
-        Self(Rc::new(RefCell::new(Notation {
-            owner_document: doc.map(|doc| Rc::downgrade(&doc.0)).unwrap_or_default(),
-            name,
-            public_id,
-            system_id,
-            user_data: None,
-        })))
+        Self(
+            Rc::new(RefCell::new(Notation {
+                owner_document: doc
+                    .as_ref()
+                    .map(|doc| Rc::downgrade(&doc.0))
+                    .unwrap_or_default(),
+                name,
+                public_id,
+                system_id,
+                user_data: None,
+            })),
+            doc.clone(),
+        )
     }
 
     /// Get `name` attribute of this notation.
@@ -137,17 +152,20 @@ impl Node for NotationRef {
     }
 
     fn owner_document(&self) -> Option<DocumentRef> {
-        self.0.borrow().owner_document.upgrade().map(From::from)
+        self.1.clone()
     }
 
     fn clone_node(&self, _deep: bool) -> NodeRef {
-        let notation = NotationRef(Rc::new(RefCell::new(Notation {
-            owner_document: self.0.borrow().owner_document.clone(),
-            name: self.0.borrow().name.clone(),
-            public_id: self.0.borrow().public_id.clone(),
-            system_id: self.0.borrow().system_id.clone(),
-            user_data: None,
-        })));
+        let notation = NotationRef(
+            Rc::new(RefCell::new(Notation {
+                owner_document: self.0.borrow().owner_document.clone(),
+                name: self.0.borrow().name.clone(),
+                public_id: self.0.borrow().public_id.clone(),
+                system_id: self.0.borrow().system_id.clone(),
+                user_data: None,
+            })),
+            self.1.clone(),
+        );
 
         self.handle_user_data(OperationType::NodeCloned, Some(notation.clone().into()));
         notation.into()
@@ -231,12 +249,8 @@ impl NodeConnection for NotationRef {
     }
 
     fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
-        replace(
-            &mut self.0.borrow_mut().owner_document,
-            Rc::downgrade(&new_doc.0),
-        )
-        .upgrade()
-        .map(From::from)
+        self.0.borrow_mut().owner_document = Rc::downgrade(&new_doc.0);
+        replace(&mut self.1, Some(new_doc))
     }
 
     fn adopted_to(&mut self, _new_doc: DocumentRef) {
@@ -268,7 +282,8 @@ impl From<NotationRef> for NodeRef {
 
 impl From<Rc<RefCell<Notation>>> for NotationRef {
     fn from(value: Rc<RefCell<Notation>>) -> Self {
-        Self(value)
+        let doc = value.borrow().owner_document();
+        Self(value, doc)
     }
 }
 

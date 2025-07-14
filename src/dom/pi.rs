@@ -53,25 +53,37 @@ pub struct ProcessingInstruction {
     flag: u16,
 }
 
+impl ProcessingInstruction {
+    pub fn owner_document(&self) -> Option<DocumentRef> {
+        self.owner_document.upgrade().map(From::from)
+    }
+}
+
 /// Wrapper of `Rc<RefCell<ProcessingInstruction>>`.
 #[derive(Clone)]
-pub struct ProcessingInstructionRef(pub(super) Rc<RefCell<ProcessingInstruction>>);
+pub struct ProcessingInstructionRef(
+    pub(super) Rc<RefCell<ProcessingInstruction>>,
+    pub(super) DocumentRef,
+);
 
 impl ProcessingInstructionRef {
     /// Create new [`ProcessingInstructionRef`] whose ownerDocument is `doc`.
     ///
     /// This method does not validate `target`.
     pub(super) fn from_doc(doc: DocumentRef, target: Rc<str>, data: Option<Rc<str>>) -> Self {
-        Self(Rc::new(RefCell::new(ProcessingInstruction {
-            parent_node: None,
-            previous_sibling: None,
-            next_sibling: None,
-            owner_document: Rc::downgrade(&doc.0),
-            target,
-            data,
-            user_data: None,
-            flag: 0,
-        })))
+        Self(
+            Rc::new(RefCell::new(ProcessingInstruction {
+                parent_node: None,
+                previous_sibling: None,
+                next_sibling: None,
+                owner_document: Rc::downgrade(&doc.0),
+                target,
+                data,
+                user_data: None,
+                flag: 0,
+            })),
+            doc,
+        )
     }
 
     /// Implementation of `data` attribute.
@@ -159,16 +171,19 @@ impl Node for ProcessingInstructionRef {
     }
 
     fn clone_node(&self, _deep: bool) -> NodeRef {
-        let pi = ProcessingInstructionRef(Rc::new(RefCell::new(ProcessingInstruction {
-            parent_node: None,
-            previous_sibling: None,
-            next_sibling: None,
-            owner_document: self.0.borrow().owner_document.clone(),
-            target: self.0.borrow().target.clone(),
-            data: self.0.borrow().data.clone(),
-            user_data: None,
-            flag: 0,
-        })));
+        let pi = ProcessingInstructionRef(
+            Rc::new(RefCell::new(ProcessingInstruction {
+                parent_node: None,
+                previous_sibling: None,
+                next_sibling: None,
+                owner_document: self.0.borrow().owner_document.clone(),
+                target: self.0.borrow().target.clone(),
+                data: self.0.borrow().data.clone(),
+                user_data: None,
+                flag: 0,
+            })),
+            self.1.clone(),
+        );
 
         self.handle_user_data(OperationType::NodeCloned, Some(pi.clone().into()));
         pi.into()
@@ -249,12 +264,8 @@ impl NodeConnection for ProcessingInstructionRef {
     }
 
     fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
-        replace(
-            &mut self.0.borrow_mut().owner_document,
-            Rc::downgrade(&new_doc.0),
-        )
-        .upgrade()
-        .map(From::from)
+        self.0.borrow_mut().owner_document = Rc::downgrade(&new_doc.0);
+        Some(replace(&mut self.1, new_doc))
     }
 
     fn set_read_only(&mut self) {

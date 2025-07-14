@@ -74,26 +74,41 @@ pub struct Entity {
     etype: EntityType,
 }
 
+impl Entity {
+    pub fn owner_document(&self) -> Option<DocumentRef> {
+        self.owner_document.upgrade().map(From::from)
+    }
+}
+
 /// Wrapper of `Rc<RefCell<Entity>>`.
 #[derive(Clone)]
-pub struct EntityRef(pub(super) Rc<RefCell<Entity>>);
+pub struct EntityRef(
+    pub(super) Rc<RefCell<Entity>>,
+    pub(super) Option<DocumentRef>,
+);
 
 impl EntityRef {
     pub(crate) fn new(doc: Option<DocumentRef>, name: Rc<str>, etype: EntityType) -> Self {
-        Self(Rc::new(RefCell::new(Entity {
-            first_child: None,
-            last_child: None,
-            owner_document: doc.map(|doc| Rc::downgrade(&doc.0)).unwrap_or_default(),
-            name,
-            public_id: None,
-            system_id: None,
-            notation_name: None,
-            input_encoding: None,
-            xml_encoding: None,
-            xml_version: None,
-            user_data: None,
-            etype,
-        })))
+        Self(
+            Rc::new(RefCell::new(Entity {
+                first_child: None,
+                last_child: None,
+                owner_document: doc
+                    .as_ref()
+                    .map(|doc| Rc::downgrade(&doc.0))
+                    .unwrap_or_default(),
+                name,
+                public_id: None,
+                system_id: None,
+                notation_name: None,
+                input_encoding: None,
+                xml_encoding: None,
+                xml_version: None,
+                user_data: None,
+                etype,
+            })),
+            doc,
+        )
     }
 
     /// Get `name` attribute of this entity.
@@ -167,24 +182,27 @@ impl Node for EntityRef {
     }
 
     fn owner_document(&self) -> Option<DocumentRef> {
-        self.0.borrow().owner_document.upgrade().map(From::from)
+        self.1.clone()
     }
 
     fn clone_node(&self, deep: bool) -> NodeRef {
-        let mut entity = EntityRef(Rc::new(RefCell::new(Entity {
-            first_child: None,
-            last_child: None,
-            owner_document: self.0.borrow().owner_document.clone(),
-            name: self.0.borrow().name.clone(),
-            public_id: self.0.borrow().public_id.clone(),
-            system_id: self.0.borrow().system_id.clone(),
-            notation_name: self.0.borrow().notation_name.clone(),
-            input_encoding: self.0.borrow().input_encoding.clone(),
-            xml_encoding: self.0.borrow().xml_encoding.clone(),
-            xml_version: self.0.borrow().xml_version.clone(),
-            user_data: None,
-            etype: self.0.borrow().etype,
-        })));
+        let mut entity = EntityRef(
+            Rc::new(RefCell::new(Entity {
+                first_child: None,
+                last_child: None,
+                owner_document: self.0.borrow().owner_document.clone(),
+                name: self.0.borrow().name.clone(),
+                public_id: self.0.borrow().public_id.clone(),
+                system_id: self.0.borrow().system_id.clone(),
+                notation_name: self.0.borrow().notation_name.clone(),
+                input_encoding: self.0.borrow().input_encoding.clone(),
+                xml_encoding: self.0.borrow().xml_encoding.clone(),
+                xml_version: self.0.borrow().xml_version.clone(),
+                user_data: None,
+                etype: self.0.borrow().etype,
+            })),
+            self.1.clone(),
+        );
 
         if deep {
             let mut read_only_check = false;
@@ -279,12 +297,8 @@ impl NodeConnection for EntityRef {
     }
 
     fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
-        replace(
-            &mut self.0.borrow_mut().owner_document,
-            Rc::downgrade(&new_doc.0),
-        )
-        .upgrade()
-        .map(From::from)
+        self.0.borrow_mut().owner_document = Rc::downgrade(&new_doc.0);
+        replace(&mut self.1, Some(new_doc))
     }
 
     fn adopted_to(&mut self, _new_doc: DocumentRef) {
@@ -316,7 +330,8 @@ impl From<EntityRef> for NodeRef {
 
 impl From<Rc<RefCell<Entity>>> for EntityRef {
     fn from(value: Rc<RefCell<Entity>>) -> Self {
-        Self(value)
+        let doc = value.borrow().owner_document();
+        Self(value, doc)
     }
 }
 

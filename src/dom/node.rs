@@ -1931,35 +1931,66 @@ impl NodeWeakRef {
     /// Success conditions are the same as for [`std::rc::Weak::upgrade`].
     pub fn upgrade(&self) -> Option<NodeRef> {
         match self {
-            NodeWeakRef::Element(node) => node.upgrade().map(ElementRef).map(NodeRef::Element),
-            NodeWeakRef::Attribute(node) => node.upgrade().map(AttrRef).map(NodeRef::Attribute),
-            NodeWeakRef::Text(node) => node.upgrade().map(TextRef).map(NodeRef::Text),
-            NodeWeakRef::CDATASection(node) => node
-                .upgrade()
-                .map(CDATASectionRef)
-                .map(NodeRef::CDATASection),
-            NodeWeakRef::EntityReference(node) => node
-                .upgrade()
-                .map(EntityReferenceRef)
-                .map(NodeRef::EntityReference),
-            NodeWeakRef::Entity(node) => node.upgrade().map(EntityRef).map(NodeRef::Entity),
-            NodeWeakRef::ProcessingInstruction(node) => node
-                .upgrade()
-                .map(ProcessingInstructionRef)
-                .map(NodeRef::ProcessingInstruction),
-            NodeWeakRef::Comment(node) => node.upgrade().map(CommentRef).map(NodeRef::Comment),
+            NodeWeakRef::Element(node) => {
+                let elem = node.upgrade()?;
+                let doc = elem.borrow().owner_document()?;
+                Some(NodeRef::Element(ElementRef(elem, doc)))
+            }
+            NodeWeakRef::Attribute(node) => {
+                let attr = node.upgrade()?;
+                let doc = attr.borrow().owner_document()?;
+                Some(NodeRef::Attribute(AttrRef(attr, doc)))
+            }
+            NodeWeakRef::Text(node) => {
+                let text = node.upgrade()?;
+                let doc = text.borrow().owner_document()?;
+                Some(NodeRef::Text(TextRef(text, doc)))
+            }
+            NodeWeakRef::CDATASection(node) => {
+                let cdata = node.upgrade()?;
+                let doc = cdata.borrow().owner_document()?;
+                Some(NodeRef::CDATASection(CDATASectionRef(cdata, doc)))
+            }
+            NodeWeakRef::EntityReference(node) => {
+                let entref = node.upgrade()?;
+                let doc = entref.borrow().owner_document()?;
+                Some(NodeRef::EntityReference(EntityReferenceRef(entref, doc)))
+            }
+            NodeWeakRef::Entity(node) => {
+                let ent = node.upgrade()?;
+                let doc = ent.borrow().owner_document();
+                Some(NodeRef::Entity(EntityRef(ent, doc)))
+            }
+            NodeWeakRef::ProcessingInstruction(node) => {
+                let pi = node.upgrade()?;
+                let doc = pi.borrow().owner_document()?;
+                Some(NodeRef::ProcessingInstruction(ProcessingInstructionRef(
+                    pi, doc,
+                )))
+            }
+            NodeWeakRef::Comment(node) => {
+                let comment = node.upgrade()?;
+                let doc = comment.borrow().owner_document()?;
+                Some(NodeRef::Comment(CommentRef(comment, doc)))
+            }
             NodeWeakRef::Document(node) => {
                 node.upgrade().map(DocumentRef::from).map(NodeRef::Document)
             }
-            NodeWeakRef::DocumentType(node) => node
-                .upgrade()
-                .map(DocumentTypeRef)
-                .map(NodeRef::DocumentType),
-            NodeWeakRef::DocumentFragment(node) => node
-                .upgrade()
-                .map(DocumentFragmentRef)
-                .map(NodeRef::DocumentFragment),
-            NodeWeakRef::Notation(node) => node.upgrade().map(NotationRef).map(NodeRef::Notation),
+            NodeWeakRef::DocumentType(node) => {
+                let doctype = node.upgrade()?;
+                let doc = doctype.borrow().owner_document();
+                Some(NodeRef::DocumentType(DocumentTypeRef(doctype, doc)))
+            }
+            NodeWeakRef::DocumentFragment(node) => {
+                let frag = node.upgrade()?;
+                let doc = frag.borrow().owner_document()?;
+                Some(NodeRef::DocumentFragment(DocumentFragmentRef(frag, doc)))
+            }
+            NodeWeakRef::Notation(node) => {
+                let not = node.upgrade()?;
+                let doc = not.borrow().owner_document();
+                Some(NodeRef::Notation(NotationRef(not, doc)))
+            }
         }
     }
 }

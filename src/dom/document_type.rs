@@ -6,28 +6,21 @@ use std::{
     sync::Arc,
 };
 
-use crate::{
-    dom::{
-        attlistdecl::{AttType, AttlistDeclRef, DefaultDecl},
-        document::Document,
-        elementdecl::{ContentSpec, ElementDeclRef},
-        entity::EntityType,
-        named_node_map::{EntityMap, NotationMap, SubsetEntityMap, SubsetNotationMap},
-        notation::NotationIdentifier,
-        user_data::{DOMUserData, OperationType, UserDataHandler},
-    },
-    tree::{validate_name, validate_qname},
-};
+use crate::tree::{validate_name, validate_qname};
 
 use super::{
     DOMException, NodeType,
+    attlistdecl::{AttType, AttlistDeclRef, DefaultDecl},
     character_data::CommentRef,
-    document::DocumentRef,
-    entity::EntityRef,
+    document::{Document, DocumentRef},
+    elementdecl::{ContentSpec, ElementDeclRef},
+    entity::{EntityRef, EntityType},
     entity_reference::EntityReferenceRef,
+    named_node_map::{EntityMap, NotationMap, SubsetEntityMap, SubsetNotationMap},
     node::{Node, NodeConnection, NodeRef, NodeWeakRef},
-    notation::NotationRef,
+    notation::{NotationIdentifier, NotationRef},
     pi::ProcessingInstructionRef,
+    user_data::{DOMUserData, OperationType, UserDataHandler},
 };
 
 /// Implementation of [DocumentType](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-412266927)
@@ -176,7 +169,7 @@ impl DocumentType {
         }
     }
 
-    fn owner_document(&self) -> Option<DocumentRef> {
+    pub fn owner_document(&self) -> Option<DocumentRef> {
         self.owner_document.upgrade().map(From::from)
     }
 
@@ -195,7 +188,10 @@ impl DocumentType {
 
 /// Wrapper of `Rc<RefCell<DocumentType>>`.
 #[derive(Clone)]
-pub struct DocumentTypeRef(pub(super) Rc<RefCell<DocumentType>>);
+pub struct DocumentTypeRef(
+    pub(super) Rc<RefCell<DocumentType>>,
+    pub(super) Option<DocumentRef>,
+);
 
 impl DocumentTypeRef {
     /// Implementation of [`createDocumentType`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-Level-2-Core-DOM-createDocType)
@@ -238,18 +234,21 @@ impl DocumentTypeRef {
             return Err(DOMException::NamespaceErr);
         }
 
-        Ok(DocumentTypeRef(Rc::new(RefCell::new(DocumentType {
-            parent_node: None,
-            previous_sibling: None,
-            next_sibling: None,
-            owner_document: Weak::new(),
-            name: qualified_name.into(),
-            public_id: public_id.map(|pubid| pubid.into()),
-            system_id: system_id.map(|systemid| systemid.into()),
-            internal_subset: None,
-            external_subset: None,
-            user_data: None,
-        }))))
+        Ok(DocumentTypeRef(
+            Rc::new(RefCell::new(DocumentType {
+                parent_node: None,
+                previous_sibling: None,
+                next_sibling: None,
+                owner_document: Weak::new(),
+                name: qualified_name.into(),
+                public_id: public_id.map(|pubid| pubid.into()),
+                system_id: system_id.map(|systemid| systemid.into()),
+                internal_subset: None,
+                external_subset: None,
+                user_data: None,
+            })),
+            None,
+        ))
     }
 
     /// Implementation of [`name`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-1844763134) attribute.
@@ -586,32 +585,35 @@ impl Node for DocumentTypeRef {
     }
 
     fn owner_document(&self) -> Option<DocumentRef> {
-        self.0.borrow().owner_document()
+        self.1.clone()
     }
 
     fn clone_node(&self, deep: bool) -> NodeRef {
-        let doctype = DocumentTypeRef(Rc::new(RefCell::new(DocumentType {
-            parent_node: None,
-            previous_sibling: None,
-            next_sibling: None,
-            owner_document: self.0.borrow().owner_document.clone(),
-            name: self.0.borrow().name.clone(),
-            public_id: self.0.borrow().public_id.clone(),
-            system_id: self.0.borrow().system_id.clone(),
-            internal_subset: self
-                .0
-                .borrow()
-                .internal_subset
-                .as_ref()
-                .map(|sub| sub.clone_node(deep)),
-            external_subset: self
-                .0
-                .borrow()
-                .external_subset
-                .as_ref()
-                .map(|sub| sub.clone_node(deep)),
-            user_data: None,
-        })));
+        let doctype = DocumentTypeRef(
+            Rc::new(RefCell::new(DocumentType {
+                parent_node: None,
+                previous_sibling: None,
+                next_sibling: None,
+                owner_document: self.0.borrow().owner_document.clone(),
+                name: self.0.borrow().name.clone(),
+                public_id: self.0.borrow().public_id.clone(),
+                system_id: self.0.borrow().system_id.clone(),
+                internal_subset: self
+                    .0
+                    .borrow()
+                    .internal_subset
+                    .as_ref()
+                    .map(|sub| sub.clone_node(deep)),
+                external_subset: self
+                    .0
+                    .borrow()
+                    .external_subset
+                    .as_ref()
+                    .map(|sub| sub.clone_node(deep)),
+                user_data: None,
+            })),
+            self.1.clone(),
+        );
 
         self.handle_user_data(OperationType::NodeCloned, Some(doctype.clone().into()));
         doctype.into()
@@ -748,7 +750,8 @@ impl NodeConnection for DocumentTypeRef {
     }
 
     fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
-        self.0.borrow_mut().set_owner_document(new_doc)
+        self.0.borrow_mut().set_owner_document(new_doc.clone());
+        replace(&mut self.1, Some(new_doc))
     }
 
     fn adopted_to(&mut self, _new_doc: DocumentRef) {

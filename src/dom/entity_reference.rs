@@ -6,11 +6,9 @@ use std::{
     sync::Arc,
 };
 
-use crate::dom::document::Document;
-
 use super::{
     NodeType,
-    document::DocumentRef,
+    document::{Document, DocumentRef},
     node::{Node, NodeConnection, NodeRef, NodeWeakRef},
     user_data::{DOMUserData, OperationType, UserDataHandler},
 };
@@ -52,6 +50,10 @@ pub struct EntityReference {
 }
 
 impl EntityReference {
+    pub fn owner_document(&self) -> Option<DocumentRef> {
+        self.owner_document.upgrade().map(From::from)
+    }
+
     /// Build and return the expanded entity value.
     ///
     /// All character and general parsed entities in the value are expanded.
@@ -81,21 +83,27 @@ impl EntityReference {
 
 /// Wrapper of `Rc<RefCell<EntityReference>>`.
 #[derive(Clone)]
-pub struct EntityReferenceRef(pub(super) Rc<RefCell<EntityReference>>);
+pub struct EntityReferenceRef(
+    pub(super) Rc<RefCell<EntityReference>>,
+    pub(super) DocumentRef,
+);
 
 impl EntityReferenceRef {
     /// Create new [`EntityReferenceRef`] whose ownerDocument is `doc`.
     pub(super) fn from_doc(doc: DocumentRef, name: Rc<str>) -> Self {
-        Self(Rc::new(RefCell::new(EntityReference {
-            parent_node: None,
-            first_child: None,
-            last_child: None,
-            previous_sibling: None,
-            next_sibling: None,
-            owner_document: Rc::downgrade(&doc.0),
-            name,
-            user_data: None,
-        })))
+        Self(
+            Rc::new(RefCell::new(EntityReference {
+                parent_node: None,
+                first_child: None,
+                last_child: None,
+                previous_sibling: None,
+                next_sibling: None,
+                owner_document: Rc::downgrade(&doc.0),
+                name,
+                user_data: None,
+            })),
+            doc,
+        )
     }
 
     pub(crate) fn get_entity_ref_value(&self) -> Option<String> {
@@ -153,16 +161,19 @@ impl Node for EntityReferenceRef {
     }
 
     fn clone_node(&self, _deep: bool) -> NodeRef {
-        let mut entref = EntityReferenceRef(Rc::new(RefCell::new(EntityReference {
-            parent_node: None,
-            first_child: None,
-            last_child: None,
-            previous_sibling: None,
-            next_sibling: None,
-            owner_document: self.0.borrow().owner_document.clone(),
-            name: self.0.borrow().name.clone(),
-            user_data: None,
-        })));
+        let mut entref = EntityReferenceRef(
+            Rc::new(RefCell::new(EntityReference {
+                parent_node: None,
+                first_child: None,
+                last_child: None,
+                previous_sibling: None,
+                next_sibling: None,
+                owner_document: self.0.borrow().owner_document.clone(),
+                name: self.0.borrow().name.clone(),
+                user_data: None,
+            })),
+            self.1.clone(),
+        );
 
         let mut children = self.first_child();
         let mut doc = self.owner_document().unwrap();
@@ -246,12 +257,8 @@ impl NodeConnection for EntityReferenceRef {
     }
 
     fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
-        replace(
-            &mut self.0.borrow_mut().owner_document,
-            Rc::downgrade(&new_doc.0),
-        )
-        .upgrade()
-        .map(From::from)
+        self.0.borrow_mut().owner_document = Rc::downgrade(&new_doc.0);
+        Some(replace(&mut self.1, new_doc))
     }
 
     /// # Specification

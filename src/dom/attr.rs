@@ -7,6 +7,7 @@ use std::{
 };
 
 use crate::{
+    dom::element::Element,
     parser::split_qname2,
     tree::{validate_name, validate_ncname},
 };
@@ -14,7 +15,7 @@ use crate::{
 use super::{
     DOMException, NodeType, XML_NS_NAMESPACE, XML_XML_NAMESPACE, check_no_modification_allowed_err,
     document::{Document, DocumentRef},
-    element::{ElementRef, ElementWeakRef},
+    element::ElementRef,
     node::{Node, NodeConnection, NodeRef},
     user_data::{DOMUserData, OperationType, UserDataHandler},
 };
@@ -44,7 +45,7 @@ pub struct Attr {
     /// as same as `nodeName` for `Node`.
     name: Rc<str>,
     /// Implementation of `ownerElement` attribute of `Attr`.  
-    owner_element: Option<ElementWeakRef>,
+    owner_element: Weak<RefCell<Element>>,
     /// Implementation of `namespaceURI` for `Node`.
     namespace_uri: Option<Rc<str>>,
     /// Implementation of `prefix` for `Node`.
@@ -65,9 +66,14 @@ pub struct Attr {
 }
 
 impl Attr {
+    /// Implementation of `ownerDocument` attribute of `Attr`.  
+    pub fn owner_document(&self) -> Option<DocumentRef> {
+        self.owner_document.upgrade().map(DocumentRef)
+    }
+
     /// Implementation of `ownerElement` attribute of `Attr`.  
     pub fn owner_element(&self) -> Option<ElementRef> {
-        self.owner_element.as_ref().and_then(|elem| elem.upgrade())
+        self.owner_element.upgrade().map(From::from)
     }
 
     /// Implementation of `specified` attribute of `Attr`.
@@ -143,7 +149,7 @@ impl Attr {
     ///     recursively adopted.
     /// ```
     fn adopted_to(&mut self, new_doc: DocumentRef) {
-        self.owner_element = None;
+        self.owner_element = Weak::new();
         self.specified = true;
         self.owner_document = Rc::downgrade(&new_doc.0);
         let mut children = self.first_child.clone();
@@ -156,25 +162,28 @@ impl Attr {
 
 /// Wrapper of `Rc<RefCell<Attr>>`.
 #[derive(Clone)]
-pub struct AttrRef(pub(super) Rc<RefCell<Attr>>);
+pub struct AttrRef(pub(super) Rc<RefCell<Attr>>, pub(super) DocumentRef);
 
 impl AttrRef {
     /// Create new [`AttrRef`].
     pub(super) fn new(doc: DocumentRef, tag_name: Rc<str>) -> Self {
-        Self(Rc::new(RefCell::new(Attr {
-            first_child: None,
-            last_child: None,
-            owner_document: Rc::downgrade(&doc.0),
-            name: tag_name,
-            owner_element: None,
-            namespace_uri: None,
-            prefix: None,
-            local_name: None,
-            specified: true,
-            is_id: false,
-            user_data: None,
-            flag: 0,
-        })))
+        Self(
+            Rc::new(RefCell::new(Attr {
+                first_child: None,
+                last_child: None,
+                owner_document: Rc::downgrade(&doc.0),
+                name: tag_name,
+                owner_element: Weak::new(),
+                namespace_uri: None,
+                prefix: None,
+                local_name: None,
+                specified: true,
+                is_id: false,
+                user_data: None,
+                flag: 0,
+            })),
+            doc,
+        )
     }
 
     /// Create new [`AttrRef`] with namespace whose URI is `ns_uri`.
@@ -200,7 +209,8 @@ impl AttrRef {
     /// Set `isId` attribute.\
     /// Return an old flag.
     pub(super) fn set_owner_element(&mut self, elem: Option<ElementRef>) {
-        self.0.borrow_mut().owner_element = elem.map(|elem| elem.downgrade());
+        self.0.borrow_mut().owner_element =
+            elem.map(|elem| Rc::downgrade(&elem.0)).unwrap_or_default();
     }
 
     /// Implementation of `name` attribute of `Attr`.
@@ -306,7 +316,7 @@ impl Node for AttrRef {
     }
 
     fn owner_document(&self) -> Option<DocumentRef> {
-        self.0.borrow().owner_document.upgrade().map(From::from)
+        Some(self.1.clone())
     }
 
     fn clone_node(&self, _deep: bool) -> NodeRef {
@@ -315,7 +325,7 @@ impl Node for AttrRef {
             last_child: None,
             owner_document: self.0.borrow().owner_document.clone(),
             name: self.node_name().clone(),
-            owner_element: None,
+            owner_element: Weak::new(),
             namespace_uri: self.namespace_uri().clone(),
             prefix: self.prefix().clone(),
             local_name: self.local_name().clone(),
@@ -327,7 +337,7 @@ impl Node for AttrRef {
             user_data: None,
             flag: 0,
         };
-        let mut attr = AttrRef(Rc::new(RefCell::new(attr)));
+        let mut attr = AttrRef(Rc::new(RefCell::new(attr)), self.1.clone());
         let mut children = self.first_child();
         while let Some(child) = children {
             children = child.next_sibling();
@@ -468,12 +478,8 @@ impl NodeConnection for AttrRef {
     }
 
     fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
-        replace(
-            &mut self.0.borrow_mut().owner_document,
-            Rc::downgrade(&new_doc.0),
-        )
-        .upgrade()
-        .map(From::from)
+        self.0.borrow_mut().owner_document = Rc::downgrade(&new_doc.0);
+        Some(replace(&mut self.1, new_doc))
     }
 
     fn set_read_only(&mut self) {
@@ -540,5 +546,12 @@ impl NodeConnection for AttrRef {
 impl From<AttrRef> for NodeRef {
     fn from(value: AttrRef) -> Self {
         NodeRef::Attribute(value)
+    }
+}
+
+impl From<Rc<RefCell<Attr>>> for AttrRef {
+    fn from(value: Rc<RefCell<Attr>>) -> Self {
+        let doc = value.borrow().owner_document().unwrap();
+        Self(value, doc)
     }
 }

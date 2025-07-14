@@ -269,6 +269,10 @@ pub struct Text {
 }
 
 impl Text {
+    pub fn owner_document(&self) -> Option<DocumentRef> {
+        self.owner_document.upgrade().map(From::from)
+    }
+
     fn adopted_to(&mut self, new_doc: DocumentRef) {
         self.owner_document = Rc::downgrade(&new_doc.0);
     }
@@ -279,7 +283,7 @@ impl Text {
 /// Strings are encoded in UTF-8. Unlike the specification, methods that specify string
 /// boundaries are constrained to be UTF-8 character boundaries.
 #[derive(Clone)]
-pub struct TextRef(pub(super) Rc<RefCell<Text>>);
+pub struct TextRef(pub(super) Rc<RefCell<Text>>, pub(super) DocumentRef);
 
 impl TextRef {
     /// Implementation of [`splitText`](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-38853C1D) method.
@@ -604,15 +608,18 @@ impl TextRef {
 
     /// Create new [`TextRef`] whose ownerDocument is `doc`.
     pub(super) fn from_doc(doc: DocumentRef, data: String) -> Self {
-        Self(Rc::new(RefCell::new(Text {
-            parent_node: None,
-            previous_sibling: None,
-            next_sibling: None,
-            owner_document: Rc::downgrade(&doc.0),
-            data,
-            user_data: None,
-            flag: 0,
-        })))
+        Self(
+            Rc::new(RefCell::new(Text {
+                parent_node: None,
+                previous_sibling: None,
+                next_sibling: None,
+                owner_document: Rc::downgrade(&doc.0),
+                data,
+                user_data: None,
+                flag: 0,
+            })),
+            doc,
+        )
     }
 }
 
@@ -655,19 +662,22 @@ impl Node for TextRef {
     }
 
     fn owner_document(&self) -> Option<DocumentRef> {
-        self.0.borrow().owner_document.upgrade().map(From::from)
+        Some(self.1.clone())
     }
 
     fn clone_node(&self, _deep: bool) -> NodeRef {
-        let text = TextRef(Rc::new(RefCell::new(Text {
-            parent_node: None,
-            previous_sibling: None,
-            next_sibling: None,
-            owner_document: self.0.borrow().owner_document.clone(),
-            data: self.0.borrow().data.clone(),
-            user_data: None,
-            flag: 0,
-        })));
+        let text = TextRef(
+            Rc::new(RefCell::new(Text {
+                parent_node: None,
+                previous_sibling: None,
+                next_sibling: None,
+                owner_document: self.0.borrow().owner_document.clone(),
+                data: self.0.borrow().data.clone(),
+                user_data: None,
+                flag: 0,
+            })),
+            self.1.clone(),
+        );
 
         self.handle_user_data(OperationType::NodeCloned, Some(text.clone().into()));
         text.into()
@@ -759,12 +769,8 @@ impl NodeConnection for TextRef {
     }
 
     fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
-        replace(
-            &mut self.0.borrow_mut().owner_document,
-            Rc::downgrade(&new_doc.0),
-        )
-        .upgrade()
-        .map(From::from)
+        self.0.borrow_mut().owner_document = Rc::downgrade(&new_doc.0);
+        Some(replace(&mut self.1, new_doc))
     }
 
     fn set_read_only(&mut self) {
@@ -854,6 +860,10 @@ pub struct Comment {
 }
 
 impl Comment {
+    pub fn owner_document(&self) -> Option<DocumentRef> {
+        self.owner_document.upgrade().map(From::from)
+    }
+
     fn adopted_to(&mut self, new_doc: DocumentRef) {
         self.owner_document = Rc::downgrade(&new_doc.0);
     }
@@ -864,20 +874,23 @@ impl Comment {
 /// Strings are encoded in UTF-8. Unlike the specification, methods that specify string
 /// boundaries are constrained to be UTF-8 character boundaries.
 #[derive(Clone)]
-pub struct CommentRef(pub(super) Rc<RefCell<Comment>>);
+pub struct CommentRef(pub(super) Rc<RefCell<Comment>>, pub(super) DocumentRef);
 
 impl CommentRef {
     /// Create new [`CommentRef`] whose ownerDocument is `doc`.
     pub(super) fn from_doc(doc: DocumentRef, data: String) -> Self {
-        Self(Rc::new(RefCell::new(Comment {
-            parent_node: None,
-            previous_sibling: None,
-            next_sibling: None,
-            owner_document: Rc::downgrade(&doc.0),
-            data,
-            user_data: None,
-            flag: 0,
-        })))
+        Self(
+            Rc::new(RefCell::new(Comment {
+                parent_node: None,
+                previous_sibling: None,
+                next_sibling: None,
+                owner_document: Rc::downgrade(&doc.0),
+                data,
+                user_data: None,
+                flag: 0,
+            })),
+            doc,
+        )
     }
 }
 
@@ -920,19 +933,22 @@ impl Node for CommentRef {
     }
 
     fn owner_document(&self) -> Option<DocumentRef> {
-        self.0.borrow().owner_document.upgrade().map(From::from)
+        Some(self.1.clone())
     }
 
     fn clone_node(&self, _deep: bool) -> NodeRef {
-        let text = CommentRef(Rc::new(RefCell::new(Comment {
-            parent_node: None,
-            previous_sibling: None,
-            next_sibling: None,
-            owner_document: self.0.borrow().owner_document.clone(),
-            data: self.0.borrow().data.clone(),
-            user_data: None,
-            flag: 0,
-        })));
+        let text = CommentRef(
+            Rc::new(RefCell::new(Comment {
+                parent_node: None,
+                previous_sibling: None,
+                next_sibling: None,
+                owner_document: self.0.borrow().owner_document.clone(),
+                data: self.0.borrow().data.clone(),
+                user_data: None,
+                flag: 0,
+            })),
+            self.1.clone(),
+        );
 
         self.handle_user_data(OperationType::NodeCloned, Some(text.clone().into()));
         text.into()
@@ -1012,12 +1028,8 @@ impl NodeConnection for CommentRef {
     }
 
     fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
-        replace(
-            &mut self.0.borrow_mut().owner_document,
-            Rc::downgrade(&new_doc.0),
-        )
-        .upgrade()
-        .map(From::from)
+        self.0.borrow_mut().owner_document = Rc::downgrade(&new_doc.0);
+        Some(replace(&mut self.1, new_doc))
     }
 
     fn set_read_only(&mut self) {
@@ -1106,20 +1118,23 @@ impl DerefMut for CDATASection {
 /// Strings are encoded in UTF-8. Unlike the specification, methods that specify string
 /// boundaries are constrained to be UTF-8 character boundaries.
 #[derive(Clone)]
-pub struct CDATASectionRef(pub(super) Rc<RefCell<CDATASection>>);
+pub struct CDATASectionRef(pub(super) Rc<RefCell<CDATASection>>, pub(super) DocumentRef);
 
 impl CDATASectionRef {
     /// Create new [`CDATASectionRef`] whose ownerDocument is `doc`.
     pub(super) fn from_doc(doc: DocumentRef, data: String) -> Self {
-        Self(Rc::new(RefCell::new(CDATASection(Text {
-            parent_node: None,
-            previous_sibling: None,
-            next_sibling: None,
-            owner_document: Rc::downgrade(&doc.0),
-            data,
-            user_data: None,
-            flag: 0,
-        }))))
+        Self(
+            Rc::new(RefCell::new(CDATASection(Text {
+                parent_node: None,
+                previous_sibling: None,
+                next_sibling: None,
+                owner_document: Rc::downgrade(&doc.0),
+                data,
+                user_data: None,
+                flag: 0,
+            }))),
+            doc,
+        )
     }
 }
 
@@ -1162,19 +1177,22 @@ impl Node for CDATASectionRef {
     }
 
     fn owner_document(&self) -> Option<DocumentRef> {
-        self.0.borrow().owner_document.upgrade().map(From::from)
+        Some(self.1.clone())
     }
 
     fn clone_node(&self, _deep: bool) -> NodeRef {
-        let text = CDATASectionRef(Rc::new(RefCell::new(CDATASection(Text {
-            parent_node: None,
-            previous_sibling: None,
-            next_sibling: None,
-            owner_document: self.0.borrow().owner_document.clone(),
-            data: self.0.borrow().data.clone(),
-            user_data: None,
-            flag: 0,
-        }))));
+        let text = CDATASectionRef(
+            Rc::new(RefCell::new(CDATASection(Text {
+                parent_node: None,
+                previous_sibling: None,
+                next_sibling: None,
+                owner_document: self.0.borrow().owner_document.clone(),
+                data: self.0.borrow().data.clone(),
+                user_data: None,
+                flag: 0,
+            }))),
+            self.1.clone(),
+        );
 
         self.handle_user_data(OperationType::NodeCloned, Some(text.clone().into()));
         text.into()
@@ -1254,12 +1272,8 @@ impl NodeConnection for CDATASectionRef {
     }
 
     fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
-        replace(
-            &mut self.0.borrow_mut().owner_document,
-            Rc::downgrade(&new_doc.0),
-        )
-        .upgrade()
-        .map(From::from)
+        self.0.borrow_mut().owner_document = Rc::downgrade(&new_doc.0);
+        Some(replace(&mut self.1, new_doc))
     }
 
     fn set_read_only(&mut self) {
