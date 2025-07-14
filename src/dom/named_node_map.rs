@@ -6,6 +6,8 @@ use std::{
     rc::{Rc, Weak},
 };
 
+use crate::dom::attr::Attr;
+
 use super::{
     DOMException,
     attr::AttrRef,
@@ -242,7 +244,7 @@ pub struct AttributeMap {
     index: Rc<RefCell<HashMap<(Cow<'static, str>, Option<Cow<'static, str>>), usize>>>,
     // For Name and QName
     index_fullname: Rc<RefCell<HashMap<String, usize>>>,
-    data: Rc<RefCell<Vec<AttrRef>>>,
+    data: Rc<RefCell<Vec<Rc<RefCell<Attr>>>>>,
 }
 
 impl AttributeMap {
@@ -271,7 +273,11 @@ impl AttributeMap {
         self.index_fullname
             .borrow()
             .get(node.node_name().as_ref())
-            .is_some_and(|&index| self.data.borrow()[index].is_equal_node(&node.clone().into()))
+            .is_some_and(|&index| {
+                self.item(index)
+                    .unwrap()
+                    .is_equal_node(&node.clone().into())
+            })
     }
 
     /// Check if this map owns `node` or not.
@@ -282,7 +288,7 @@ impl AttributeMap {
         self.index_fullname
             .borrow()
             .get(node.node_name().as_ref())
-            .is_some_and(|&index| self.data.borrow()[index].is_same_node(&node.clone().into()))
+            .is_some_and(|&index| self.item(index).unwrap().is_same_node(&node.clone().into()))
     }
 
     /// Remove elements for which `f` returns `false`.\
@@ -293,9 +299,15 @@ impl AttributeMap {
     pub fn retain(&mut self, f: impl Fn(&AttrRef) -> bool) {
         let mut remain = vec![];
         let mut new = vec![];
-        for (i, data) in self.data.borrow().iter().enumerate() {
-            if f(data) {
-                new.push(data.clone());
+        for (i, data) in self
+            .data
+            .borrow()
+            .iter()
+            .map(|attr| AttrRef(attr.clone()))
+            .enumerate()
+        {
+            if f(&data) {
+                new.push(data.0);
                 remain.push(i);
             }
         }
@@ -375,7 +387,7 @@ impl AttributeMap {
                 Cow::Borrowed(local_name.as_ref()),
                 ns_uri.as_deref().map(Cow::Borrowed),
             )) {
-                let res = replace(&mut self.data.borrow_mut()[index], node.clone());
+                let res = AttrRef(replace(&mut self.data.borrow_mut()[index], node.clone().0));
                 if res.node_name() != node.node_name() {
                     self.index_fullname
                         .borrow_mut()
@@ -396,7 +408,7 @@ impl AttributeMap {
                 self.index_fullname
                     .borrow_mut()
                     .insert(node.node_name().to_string(), self.data.borrow().len());
-                self.data.borrow_mut().push(node);
+                self.data.borrow_mut().push(node.0);
                 Ok(None)
             }
         } else {
@@ -404,7 +416,10 @@ impl AttributeMap {
             match self.index_fullname.borrow_mut().entry(name.to_string()) {
                 Entry::Occupied(entry) => {
                     let &index = entry.get();
-                    Ok(Some(replace(&mut self.data.borrow_mut()[index], node)))
+                    Ok(Some(AttrRef(replace(
+                        &mut self.data.borrow_mut()[index],
+                        node.0,
+                    ))))
                 }
                 Entry::Vacant(entry) => {
                     let index = self.data.borrow().len();
@@ -412,7 +427,7 @@ impl AttributeMap {
                     self.index
                         .borrow_mut()
                         .insert((name.to_string().into(), None), index);
-                    self.data.borrow_mut().push(node);
+                    self.data.borrow_mut().push(node.0);
                     Ok(None)
                 }
             }
@@ -446,7 +461,7 @@ impl NamedNodeMap for AttributeMap {
                 name,
             )
         }) {
-            let res = replace(&mut self.data.borrow_mut()[index], def.clone());
+            let res = AttrRef(replace(&mut self.data.borrow_mut()[index], def.clone().0));
             if let Some(local_name) = res.local_name() {
                 if def.namespace_uri() != res.namespace_uri() {
                     self.index.borrow_mut().remove(&(
@@ -475,7 +490,7 @@ impl NamedNodeMap for AttributeMap {
                 .filter(|i| **i > index)
                 .for_each(|i| *i -= 1);
 
-            let res = self.data.borrow_mut().remove(index);
+            let res = AttrRef(self.data.borrow_mut().remove(index));
             if let Some(local_name) = res.local_name() {
                 self.index.borrow_mut().remove(&(
                     local_name.to_string().into(),
@@ -488,7 +503,7 @@ impl NamedNodeMap for AttributeMap {
         }
     }
     fn item(&self, index: usize) -> Option<Self::Item> {
-        self.data.borrow().get(index).cloned()
+        self.data.borrow().get(index).cloned().map(AttrRef)
     }
     fn length(&self) -> usize {
         self.data.borrow().len()
@@ -531,7 +546,7 @@ impl NamedNodeMap for AttributeMap {
             .borrow()
             .get(&(Cow::Borrowed(local_name), ns_uri.map(Cow::Borrowed)))
             .ok_or(DOMException::NotFoundErr)?;
-        let attr = self.data.borrow()[index].clone();
+        let attr = AttrRef(self.data.borrow()[index].clone());
         let attr_name = attr.node_name();
         let context_node = attr.owner_element().unwrap();
         if let Some(def) = self
@@ -539,7 +554,7 @@ impl NamedNodeMap for AttributeMap {
             .and_then(|doc| doc.get_default_attribute_ns(context_node, &attr_name))
         {
             // Since the nodeName is the same, there should be no need to modify index_fullname.
-            Ok(replace(&mut self.data.borrow_mut()[index], def))
+            Ok(AttrRef(replace(&mut self.data.borrow_mut()[index], def.0)))
         } else {
             self.index.borrow_mut().retain(|key, value| {
                 if *value > index {
@@ -553,7 +568,7 @@ impl NamedNodeMap for AttributeMap {
                 }
                 key.as_str() != attr_name.as_ref()
             });
-            Ok(self.data.borrow_mut().remove(index))
+            Ok(AttrRef(self.data.borrow_mut().remove(index)))
         }
     }
 }
