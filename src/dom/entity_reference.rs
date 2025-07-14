@@ -328,3 +328,10 @@ impl From<EntityReferenceRef> for NodeRef {
         NodeRef::EntityReference(value)
     }
 }
+
+impl From<Rc<RefCell<EntityReference>>> for EntityReferenceRef {
+    fn from(value: Rc<RefCell<EntityReference>>) -> Self {
+        let doc = value.borrow().owner_document().unwrap();
+        Self(value, doc)
+    }
+}

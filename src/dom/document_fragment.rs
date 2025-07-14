@@ -242,3 +242,10 @@ impl From<DocumentFragmentRef> for NodeRef {
         NodeRef::DocumentFragment(value)
     }
 }
+
+impl From<Rc<RefCell<DocumentFragment>>> for DocumentFragmentRef {
+    fn from(value: Rc<RefCell<DocumentFragment>>) -> Self {
+        let doc = value.borrow().owner_document().unwrap();
+        Self(value, doc)
+    }
+}

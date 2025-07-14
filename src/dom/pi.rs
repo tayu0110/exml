@@ -316,3 +316,10 @@ impl From<ProcessingInstructionRef> for NodeRef {
         NodeRef::ProcessingInstruction(value)
     }
 }
+
+impl From<Rc<RefCell<ProcessingInstruction>>> for ProcessingInstructionRef {
+    fn from(value: Rc<RefCell<ProcessingInstruction>>) -> Self {
+        let doc = value.borrow().owner_document().unwrap();
+        Self(value, doc)
+    }
+}

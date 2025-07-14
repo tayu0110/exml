@@ -1745,7 +1745,7 @@ pub enum NodeRef {
 
 impl NodeRef {
     /// Generate [`NodeWeakRef`] from `self`.
-    pub fn downgrade(&self) -> NodeWeakRef {
+    pub(super) fn downgrade(&self) -> NodeWeakRef {
         use NodeRef::*;
         match self {
             Element(node) => NodeWeakRef::Element(Rc::downgrade(&node.0)),
@@ -1911,7 +1911,46 @@ impl_node_conversion! {
 /// Implementation of [Node](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-1950641247)
 /// interface on [1.4 Fundamental Interfaces: Core Module](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-BBACDC08)
 #[derive(Clone)]
-pub enum NodeWeakRef {
+pub(super) enum NodeStrongRef {
+    Element(Rc<RefCell<Element>>),
+    Attribute(Rc<RefCell<Attr>>),
+    Text(Rc<RefCell<Text>>),
+    CDATASection(Rc<RefCell<CDATASection>>),
+    EntityReference(Rc<RefCell<EntityReference>>),
+    Entity(Rc<RefCell<Entity>>),
+    ProcessingInstruction(Rc<RefCell<ProcessingInstruction>>),
+    Comment(Rc<RefCell<Comment>>),
+    Document(Rc<RefCell<Document>>),
+    DocumentType(Rc<RefCell<DocumentType>>),
+    DocumentFragment(Rc<RefCell<DocumentFragment>>),
+    Notation(Rc<RefCell<Notation>>),
+}
+
+impl From<NodeStrongRef> for NodeRef {
+    fn from(value: NodeStrongRef) -> Self {
+        match value {
+            NodeStrongRef::Element(node) => From::from(ElementRef::from(node)),
+            NodeStrongRef::Attribute(node) => From::from(AttrRef::from(node)),
+            NodeStrongRef::Text(node) => From::from(TextRef::from(node)),
+            NodeStrongRef::CDATASection(node) => From::from(CDATASectionRef::from(node)),
+            NodeStrongRef::EntityReference(node) => From::from(EntityReferenceRef::from(node)),
+            NodeStrongRef::Entity(node) => From::from(EntityRef::from(node)),
+            NodeStrongRef::ProcessingInstruction(node) => {
+                From::from(ProcessingInstructionRef::from(node))
+            }
+            NodeStrongRef::Comment(node) => From::from(CommentRef::from(node)),
+            NodeStrongRef::Document(node) => From::from(DocumentRef::from(node)),
+            NodeStrongRef::DocumentType(node) => From::from(DocumentTypeRef::from(node)),
+            NodeStrongRef::DocumentFragment(node) => From::from(DocumentFragmentRef::from(node)),
+            NodeStrongRef::Notation(node) => From::from(NotationRef::from(node)),
+        }
+    }
+}
+
+/// Implementation of [Node](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-1950641247)
+/// interface on [1.4 Fundamental Interfaces: Core Module](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-BBACDC08)
+#[derive(Clone)]
+pub(super) enum NodeWeakRef {
     Element(Weak<RefCell<Element>>),
     Attribute(Weak<RefCell<Attr>>),
     Text(Weak<RefCell<Text>>),

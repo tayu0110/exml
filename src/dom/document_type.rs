@@ -781,6 +781,13 @@ impl From<DocumentTypeRef> for NodeRef {
     }
 }
 
+impl From<Rc<RefCell<DocumentType>>> for DocumentTypeRef {
+    fn from(value: Rc<RefCell<DocumentType>>) -> Self {
+        let doc = value.borrow().owner_document();
+        Self(value, doc)
+    }
+}
+
 /// Internal Subset or External Subset.\
 /// If `Ext` is `true`, this type specifies an External Subset,
 /// otherwise an Internal Subset.

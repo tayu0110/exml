@@ -7,11 +7,11 @@ use std::{
     sync::Arc,
 };
 
-use crate::{chvalid::XmlCharValid, dom::document::Document};
+use crate::chvalid::XmlCharValid;
 
 use super::{
     DOMException, NodeType, check_no_modification_allowed_err,
-    document::DocumentRef,
+    document::{Document, DocumentRef},
     node::{Node, NodeConnection, NodeRef, NodeWeakRef},
     user_data::{DOMUserData, OperationType, UserDataHandler},
 };
@@ -822,6 +822,13 @@ impl From<TextRef> for NodeRef {
     }
 }
 
+impl From<Rc<RefCell<Text>>> for TextRef {
+    fn from(value: Rc<RefCell<Text>>) -> Self {
+        let doc = value.borrow().owner_document().unwrap();
+        Self(value, doc)
+    }
+}
+
 /// Implementation of [Comment](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-1728279322)
 /// interface on [1.4 Fundamental Interfaces: Core Module](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-BBACDC08)
 ///
@@ -1093,6 +1100,13 @@ impl From<CommentRef> for NodeRef {
     }
 }
 
+impl From<Rc<RefCell<Comment>>> for CommentRef {
+    fn from(value: Rc<RefCell<Comment>>) -> Self {
+        let doc = value.borrow().owner_document().unwrap();
+        Self(value, doc)
+    }
+}
+
 /// Implementation of [CDATASection](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-667469212)
 /// interface on [1.5 Extended Interfaces: XML Module](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-E067D597)
 ///
@@ -1334,5 +1348,12 @@ impl CharacterData for CDATASectionRef {
 impl From<CDATASectionRef> for NodeRef {
     fn from(value: CDATASectionRef) -> Self {
         NodeRef::CDATASection(value)
+    }
+}
+
+impl From<Rc<RefCell<CDATASection>>> for CDATASectionRef {
+    fn from(value: Rc<RefCell<CDATASection>>) -> Self {
+        let doc = value.borrow().owner_document().unwrap();
+        Self(value, doc)
     }
 }
