@@ -2,11 +2,12 @@ use std::{
     borrow::Cow,
     cell::RefCell,
     collections::{HashMap, hash_map::Entry},
+    marker::PhantomData,
     mem::replace,
     rc::{Rc, Weak},
 };
 
-use crate::dom::attr::Attr;
+use crate::dom::{attr::Attr, entity::Entity, notation::Notation};
 
 use super::{
     DOMException,
@@ -574,20 +575,29 @@ impl NamedNodeMap for AttributeMap {
 }
 
 /// Since the data is shared by [`Rc`], [`clone`](Clone::clone) means shallow copy, not deep copy.
-#[derive(Clone)]
-pub(crate) struct DTDSubsetMap<N: Node> {
+pub(crate) struct DTDSubsetMap<I, N>
+where
+    N: Node + From<Rc<RefCell<I>>>,
+    Rc<RefCell<I>>: From<N>,
+{
     owner_document: Weak<RefCell<Document>>,
     index: Rc<RefCell<HashMap<String, usize>>>,
-    data: Rc<RefCell<Vec<N>>>,
+    data: Rc<RefCell<Vec<Rc<RefCell<I>>>>>,
+    _phantom: PhantomData<fn() -> N>,
 }
 
-impl<N: Node> DTDSubsetMap<N> {
+impl<I, N> DTDSubsetMap<I, N>
+where
+    N: Node + From<Rc<RefCell<I>>>,
+    Rc<RefCell<I>>: From<N>,
+{
     /// Create new empty [`DTDSubsetMap`]
     pub(super) fn new(owner_document: Weak<RefCell<Document>>) -> Self {
         Self {
             owner_document,
             index: Rc::new(RefCell::new(HashMap::new())),
             data: Rc::new(RefCell::new(vec![])),
+            _phantom: PhantomData,
         }
     }
 
@@ -609,7 +619,11 @@ impl<N: Node> DTDSubsetMap<N> {
         self.index
             .borrow()
             .get(node.node_name().as_ref())
-            .is_some_and(|&index| self.data.borrow()[index].is_equal_node(&node.clone().into()))
+            .is_some_and(|&index| {
+                self.item(index)
+                    .unwrap()
+                    .is_equal_node(&node.clone().into())
+            })
     }
 
     /// Implementation of `getNamedItem` method.
@@ -631,12 +645,15 @@ impl<N: Node> DTDSubsetMap<N> {
         match self.index.borrow_mut().entry(name.to_string()) {
             Entry::Occupied(entry) => {
                 let &index = entry.get();
-                Ok(Some(replace(&mut self.data.borrow_mut()[index], node)))
+                Ok(Some(From::from(replace(
+                    &mut self.data.borrow_mut()[index],
+                    From::from(node),
+                ))))
             }
             Entry::Vacant(entry) => {
                 let index = self.data.borrow().len();
                 entry.insert(index);
-                self.data.borrow_mut().push(node);
+                self.data.borrow_mut().push(From::from(node));
                 Ok(None)
             }
         }
@@ -644,7 +661,7 @@ impl<N: Node> DTDSubsetMap<N> {
 
     /// Implementation of `item` method.
     pub fn item(&self, index: usize) -> Option<N> {
-        self.data.borrow().get(index).cloned()
+        self.data.borrow().get(index).cloned().map(From::from)
     }
 
     /// Get the owner Document.
@@ -661,23 +678,46 @@ impl<N: Node> DTDSubsetMap<N> {
     }
 }
 
-pub(crate) type SubsetEntityMap = DTDSubsetMap<EntityRef>;
-pub(crate) type SubsetNotationMap = DTDSubsetMap<NotationRef>;
+impl<I, N> Clone for DTDSubsetMap<I, N>
+where
+    N: Node + From<Rc<RefCell<I>>>,
+    Rc<RefCell<I>>: From<N>,
+{
+    fn clone(&self) -> Self {
+        Self {
+            owner_document: self.owner_document.clone(),
+            index: self.index.clone(),
+            data: self.data.clone(),
+            _phantom: PhantomData,
+        }
+    }
+}
+
+pub(crate) type SubsetEntityMap = DTDSubsetMap<Entity, EntityRef>;
+pub(crate) type SubsetNotationMap = DTDSubsetMap<Notation, NotationRef>;
 
 /// Since the data is shared by [`Rc`], [`clone`](Clone::clone) means shallow copy, not deep copy.
 #[derive(Clone)]
-pub struct DTDMap<N: Node> {
-    internal_map: Option<DTDSubsetMap<N>>,
-    external_map: Option<DTDSubsetMap<N>>,
+pub struct DTDMap<I, N>
+where
+    N: Node + From<Rc<RefCell<I>>>,
+    Rc<RefCell<I>>: From<N>,
+{
+    internal_map: Option<DTDSubsetMap<I, N>>,
+    external_map: Option<DTDSubsetMap<I, N>>,
 }
 
-pub type EntityMap = DTDMap<EntityRef>;
-pub type NotationMap = DTDMap<NotationRef>;
+pub type EntityMap = DTDMap<Entity, EntityRef>;
+pub type NotationMap = DTDMap<Notation, NotationRef>;
 
-impl<N: Node> DTDMap<N> {
+impl<I, N> DTDMap<I, N>
+where
+    N: Node + From<Rc<RefCell<I>>>,
+    Rc<RefCell<I>>: From<N>,
+{
     pub(super) fn new(
-        internal_map: Option<DTDSubsetMap<N>>,
-        external_map: Option<DTDSubsetMap<N>>,
+        internal_map: Option<DTDSubsetMap<I, N>>,
+        external_map: Option<DTDSubsetMap<I, N>>,
     ) -> Self {
         Self {
             internal_map,
@@ -686,7 +726,11 @@ impl<N: Node> DTDMap<N> {
     }
 }
 
-impl<N: Node> NamedNodeMap for DTDMap<N> {
+impl<I, N> NamedNodeMap for DTDMap<I, N>
+where
+    N: Node + From<Rc<RefCell<I>>>,
+    Rc<RefCell<I>>: From<N>,
+{
     type Item = N;
 
     fn get_named_item(&self, name: &str) -> Option<Self::Item> {

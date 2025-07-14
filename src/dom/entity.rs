@@ -313,3 +313,15 @@ impl From<EntityRef> for NodeRef {
         NodeRef::Entity(value)
     }
 }
+
+impl From<Rc<RefCell<Entity>>> for EntityRef {
+    fn from(value: Rc<RefCell<Entity>>) -> Self {
+        Self(value)
+    }
+}
+
+impl From<EntityRef> for Rc<RefCell<Entity>> {
+    fn from(value: EntityRef) -> Self {
+        value.0
+    }
+}

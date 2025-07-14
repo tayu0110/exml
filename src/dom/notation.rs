@@ -265,3 +265,15 @@ impl From<NotationRef> for NodeRef {
         NodeRef::Notation(value)
     }
 }
+
+impl From<Rc<RefCell<Notation>>> for NotationRef {
+    fn from(value: Rc<RefCell<Notation>>) -> Self {
+        Self(value)
+    }
+}
+
+impl From<NotationRef> for Rc<RefCell<Notation>> {
+    fn from(value: NotationRef) -> Self {
+        value.0
+    }
+}
