@@ -1947,6 +1947,25 @@ impl From<NodeStrongRef> for NodeRef {
     }
 }
 
+impl From<NodeRef> for NodeStrongRef {
+    fn from(value: NodeRef) -> Self {
+        match value {
+            NodeRef::Element(node) => NodeStrongRef::Element(node.0),
+            NodeRef::Attribute(node) => NodeStrongRef::Attribute(node.0),
+            NodeRef::Text(node) => NodeStrongRef::Text(node.0),
+            NodeRef::CDATASection(node) => NodeStrongRef::CDATASection(node.0),
+            NodeRef::EntityReference(node) => NodeStrongRef::EntityReference(node.0),
+            NodeRef::Entity(node) => NodeStrongRef::Entity(node.0),
+            NodeRef::ProcessingInstruction(node) => NodeStrongRef::ProcessingInstruction(node.0),
+            NodeRef::Comment(node) => NodeStrongRef::Comment(node.0),
+            NodeRef::Document(node) => NodeStrongRef::Document(node.0),
+            NodeRef::DocumentType(node) => NodeStrongRef::DocumentType(node.0),
+            NodeRef::DocumentFragment(node) => NodeStrongRef::DocumentFragment(node.0),
+            NodeRef::Notation(node) => NodeStrongRef::Notation(node.0),
+        }
+    }
+}
+
 /// Implementation of [Node](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-1950641247)
 /// interface on [1.4 Fundamental Interfaces: Core Module](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-BBACDC08)
 #[derive(Clone)]

@@ -17,7 +17,7 @@ use super::{
     check_no_modification_allowed_err, check_owner_document_sameness,
     document::{Document, DocumentRef},
     named_node_map::{AttributeMap, NamedNodeMap},
-    node::{Node, NodeConnection, NodeRef, NodeWeakRef},
+    node::{Node, NodeConnection, NodeRef, NodeStrongRef, NodeWeakRef},
     node_list::FilteredSubtreeElementsList,
     user_data::{DOMUserData, OperationType, UserDataHandler},
 };
@@ -39,8 +39,8 @@ pub struct Element {
     /// - `ProcessingInstruction`
     /// - `CDATASection`
     /// - `EntityReference`
-    first_child: Option<NodeRef>,
-    last_child: Option<NodeRef>,
+    first_child: Option<NodeStrongRef>,
+    last_child: Option<NodeStrongRef>,
     /// [1.1.1 The DOM Structure Model](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-1590626202)
     /// - `DocumentType`
     /// - `EntityReference`
@@ -50,7 +50,7 @@ pub struct Element {
     /// - `Text`
     /// - `CDATASection`
     previous_sibling: Option<NodeWeakRef>,
-    next_sibling: Option<NodeRef>,
+    next_sibling: Option<NodeStrongRef>,
     /// Implementation of `attributes` attribute.
     attributes: AttributeMap,
     pub(super) owner_document: Weak<RefCell<Document>>,
@@ -109,7 +109,7 @@ impl Element {
     /// ```
     fn adopted_to(&mut self, new_doc: DocumentRef) {
         self.owner_document = Rc::downgrade(&new_doc.0);
-        let mut children = self.first_child.clone();
+        let mut children = self.first_child.clone().map(NodeRef::from);
         while let Some(mut child) = children {
             children = child.next_sibling();
             child.adopted_to(new_doc.clone());
@@ -1117,11 +1117,11 @@ impl Node for ElementRef {
     }
 
     fn first_child(&self) -> Option<NodeRef> {
-        self.0.borrow().first_child.clone()
+        self.0.borrow().first_child.clone().map(From::from)
     }
 
     fn last_child(&self) -> Option<NodeRef> {
-        self.0.borrow().last_child.clone()
+        self.0.borrow().last_child.clone().map(From::from)
     }
 
     fn previous_sibling(&self) -> Option<NodeRef> {
@@ -1133,7 +1133,7 @@ impl Node for ElementRef {
     }
 
     fn next_sibling(&self) -> Option<NodeRef> {
-        self.0.borrow().next_sibling.clone()
+        self.0.borrow().next_sibling.clone().map(From::from)
     }
 
     fn attributes(&self) -> Option<AttributeMap> {
@@ -1343,11 +1343,19 @@ impl NodeConnection for ElementRef {
     }
 
     fn set_first_child(&mut self, new_child: Option<NodeRef>) -> Option<NodeRef> {
-        replace(&mut self.0.borrow_mut().first_child, new_child)
+        replace(
+            &mut self.0.borrow_mut().first_child,
+            new_child.map(From::from),
+        )
+        .map(From::from)
     }
 
     fn set_last_child(&mut self, new_child: Option<NodeRef>) -> Option<NodeRef> {
-        replace(&mut self.0.borrow_mut().last_child, new_child)
+        replace(
+            &mut self.0.borrow_mut().last_child,
+            new_child.map(From::from),
+        )
+        .map(From::from)
     }
 
     fn set_previous_sibling(&mut self, new_sibling: Option<NodeRef>) -> Option<NodeRef> {
@@ -1359,7 +1367,11 @@ impl NodeConnection for ElementRef {
     }
 
     fn set_next_sibling(&mut self, new_sibling: Option<NodeRef>) -> Option<NodeRef> {
-        replace(&mut self.0.borrow_mut().next_sibling, new_sibling)
+        replace(
+            &mut self.0.borrow_mut().next_sibling,
+            new_sibling.map(From::from),
+        )
+        .map(From::from)
     }
 
     fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {

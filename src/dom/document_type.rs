@@ -6,7 +6,10 @@ use std::{
     sync::Arc,
 };
 
-use crate::tree::{validate_name, validate_qname};
+use crate::{
+    dom::node::NodeStrongRef,
+    tree::{validate_name, validate_qname},
+};
 
 use super::{
     DOMException, NodeType,
@@ -38,7 +41,7 @@ pub struct DocumentType {
     /// - `ProcessingInstruction`
     /// - `Comment`
     previous_sibling: Option<NodeWeakRef>,
-    next_sibling: Option<NodeRef>,
+    next_sibling: Option<NodeStrongRef>,
     owner_document: Weak<RefCell<Document>>,
 
     /// Implementation of `name` for `DocumentType`.
@@ -581,7 +584,7 @@ impl Node for DocumentTypeRef {
     }
 
     fn next_sibling(&self) -> Option<NodeRef> {
-        self.0.borrow().next_sibling.clone()
+        self.0.borrow().next_sibling.clone().map(From::from)
     }
 
     fn owner_document(&self) -> Option<DocumentRef> {
@@ -746,7 +749,11 @@ impl NodeConnection for DocumentTypeRef {
     }
 
     fn set_next_sibling(&mut self, new_sibling: Option<NodeRef>) -> Option<NodeRef> {
-        replace(&mut self.0.borrow_mut().next_sibling, new_sibling)
+        replace(
+            &mut self.0.borrow_mut().next_sibling,
+            new_sibling.map(From::from),
+        )
+        .map(From::from)
     }
 
     fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {

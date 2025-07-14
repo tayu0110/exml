@@ -6,12 +6,10 @@ use std::{
     sync::Arc,
 };
 
-use crate::dom::document::Document;
-
 use super::{
     NodeType,
-    document::DocumentRef,
-    node::{Node, NodeConnection, NodeRef},
+    document::{Document, DocumentRef},
+    node::{Node, NodeConnection, NodeRef, NodeStrongRef},
     user_data::{DOMUserData, OperationType, UserDataHandler},
 };
 
@@ -28,8 +26,8 @@ pub struct DocumentFragment {
     /// - `Text`
     /// - `CDATASection`
     /// - `EntityReference`
-    first_child: Option<NodeRef>,
-    last_child: Option<NodeRef>,
+    first_child: Option<NodeStrongRef>,
+    last_child: Option<NodeStrongRef>,
     // /// [1.1.1 The DOM Structure Model](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-1590626202)
     // /// - no sibling
     // previous_sibling: Option<NodeWeakRef>,
@@ -46,7 +44,7 @@ impl DocumentFragment {
 
     fn adopted_to(&mut self, new_doc: DocumentRef) {
         self.owner_document = Rc::downgrade(&new_doc.0);
-        let mut children = self.first_child.clone();
+        let mut children = self.first_child.clone().map(NodeRef::from);
         while let Some(mut child) = children {
             child.adopted_to(new_doc.clone());
             children = child.next_sibling();
@@ -94,11 +92,11 @@ impl Node for DocumentFragmentRef {
     }
 
     fn first_child(&self) -> Option<NodeRef> {
-        self.0.borrow().first_child.clone()
+        self.0.borrow().first_child.clone().map(From::from)
     }
 
     fn last_child(&self) -> Option<NodeRef> {
-        self.0.borrow().last_child.clone()
+        self.0.borrow().last_child.clone().map(From::from)
     }
 
     fn owner_document(&self) -> Option<DocumentRef> {
@@ -182,11 +180,19 @@ impl NodeConnection for DocumentFragmentRef {
     }
 
     fn set_first_child(&mut self, new_child: Option<NodeRef>) -> Option<NodeRef> {
-        replace(&mut self.0.borrow_mut().first_child, new_child)
+        replace(
+            &mut self.0.borrow_mut().first_child,
+            new_child.map(From::from),
+        )
+        .map(From::from)
     }
 
     fn set_last_child(&mut self, new_child: Option<NodeRef>) -> Option<NodeRef> {
-        replace(&mut self.0.borrow_mut().last_child, new_child)
+        replace(
+            &mut self.0.borrow_mut().last_child,
+            new_child.map(From::from),
+        )
+        .map(From::from)
     }
 
     fn set_previous_sibling(&mut self, _: Option<NodeRef>) -> Option<NodeRef> {

@@ -6,11 +6,11 @@ use std::{
     sync::Arc,
 };
 
-use crate::dom::document::Document;
+use crate::dom::node::NodeStrongRef;
 
 use super::{
     DOMException, NodeType, check_no_modification_allowed_err,
-    document::DocumentRef,
+    document::{Document, DocumentRef},
     node::{Node, NodeConnection, NodeRef, NodeWeakRef},
     user_data::{DOMUserData, OperationType, UserDataHandler},
 };
@@ -38,7 +38,7 @@ pub struct ProcessingInstruction {
     /// - `Text`
     /// - `CDATASection`
     previous_sibling: Option<NodeWeakRef>,
-    next_sibling: Option<NodeRef>,
+    next_sibling: Option<NodeStrongRef>,
     owner_document: Weak<RefCell<Document>>,
     /// Implementation of `target` attribute for `ProcessingInstruction`.
     /// as same as `nodeName` for `Node`.
@@ -163,7 +163,7 @@ impl Node for ProcessingInstructionRef {
     }
 
     fn next_sibling(&self) -> Option<NodeRef> {
-        self.0.borrow().next_sibling.clone()
+        self.0.borrow().next_sibling.clone().map(From::from)
     }
 
     fn owner_document(&self) -> Option<DocumentRef> {
@@ -260,7 +260,11 @@ impl NodeConnection for ProcessingInstructionRef {
     }
 
     fn set_next_sibling(&mut self, new_sibling: Option<NodeRef>) -> Option<NodeRef> {
-        replace(&mut self.0.borrow_mut().next_sibling, new_sibling)
+        replace(
+            &mut self.0.borrow_mut().next_sibling,
+            new_sibling.map(From::from),
+        )
+        .map(From::from)
     }
 
     fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {

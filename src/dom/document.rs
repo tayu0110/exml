@@ -2,7 +2,10 @@ use std::{cell::RefCell, collections::HashMap, mem::replace, rc::Rc, sync::Arc};
 
 use crate::{
     chvalid::XmlCharValid,
-    dom::user_data::{DOMUserData, OperationType, UserDataHandler},
+    dom::{
+        node::NodeStrongRef,
+        user_data::{DOMUserData, OperationType, UserDataHandler},
+    },
     error::XmlParserErrors,
     parser::split_qname2,
     tree::{validate_name, validate_qname},
@@ -37,8 +40,8 @@ pub struct Document {
     /// - `ProcessingInstruction`
     /// - `Comment`
     /// - `DocumentType` (maximum of one)
-    first_child: Option<NodeRef>,
-    last_child: Option<NodeRef>,
+    first_child: Option<NodeStrongRef>,
+    last_child: Option<NodeStrongRef>,
     // /// [1.1.1 The DOM Structure Model](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-1590626202)
     // /// - no sibling
     // previous_sibling: Option<NodeWeakRef>,
@@ -1651,11 +1654,11 @@ impl Node for DocumentRef {
     }
 
     fn first_child(&self) -> Option<NodeRef> {
-        self.0.borrow().first_child.clone()
+        self.0.borrow().first_child.clone().map(From::from)
     }
 
     fn last_child(&self) -> Option<NodeRef> {
-        self.0.borrow().last_child.clone()
+        self.0.borrow().last_child.clone().map(From::from)
     }
 
     fn insert_before(
@@ -1892,11 +1895,19 @@ impl NodeConnection for DocumentRef {
     }
 
     fn set_first_child(&mut self, new_child: Option<NodeRef>) -> Option<NodeRef> {
-        replace(&mut self.0.borrow_mut().first_child, new_child)
+        replace(
+            &mut self.0.borrow_mut().first_child,
+            new_child.map(From::from),
+        )
+        .map(From::from)
     }
 
     fn set_last_child(&mut self, new_child: Option<NodeRef>) -> Option<NodeRef> {
-        replace(&mut self.0.borrow_mut().last_child, new_child)
+        replace(
+            &mut self.0.borrow_mut().last_child,
+            new_child.map(From::from),
+        )
+        .map(From::from)
     }
 
     fn set_previous_sibling(&mut self, _: Option<NodeRef>) -> Option<NodeRef> {

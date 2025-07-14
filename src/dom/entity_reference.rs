@@ -6,6 +6,8 @@ use std::{
     sync::Arc,
 };
 
+use crate::dom::node::NodeStrongRef;
+
 use super::{
     NodeType,
     document::{Document, DocumentRef},
@@ -30,8 +32,8 @@ pub struct EntityReference {
     /// - `Text`
     /// - `CDATASection`
     /// - `EntityReference`
-    first_child: Option<NodeRef>,
-    last_child: Option<NodeRef>,
+    first_child: Option<NodeStrongRef>,
+    last_child: Option<NodeStrongRef>,
     /// [1.1.1 The DOM Structure Model](https://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/DOM3-Core.html#core-ID-1590626202)
     /// - `EntityReference`
     /// - `Element`
@@ -40,7 +42,7 @@ pub struct EntityReference {
     /// - `Text`
     /// - `CDATASection`
     previous_sibling: Option<NodeWeakRef>,
-    next_sibling: Option<NodeRef>,
+    next_sibling: Option<NodeStrongRef>,
     owner_document: Weak<RefCell<Document>>,
 
     /// Name of entity referenced. as same as `nodeName` for `Node`.
@@ -137,11 +139,11 @@ impl Node for EntityReferenceRef {
     }
 
     fn first_child(&self) -> Option<NodeRef> {
-        self.0.borrow().first_child.clone()
+        self.0.borrow().first_child.clone().map(From::from)
     }
 
     fn last_child(&self) -> Option<NodeRef> {
-        self.0.borrow().last_child.clone()
+        self.0.borrow().last_child.clone().map(From::from)
     }
 
     fn previous_sibling(&self) -> Option<NodeRef> {
@@ -153,7 +155,7 @@ impl Node for EntityReferenceRef {
     }
 
     fn next_sibling(&self) -> Option<NodeRef> {
-        self.0.borrow().next_sibling.clone()
+        self.0.borrow().next_sibling.clone().map(From::from)
     }
 
     fn owner_document(&self) -> Option<DocumentRef> {
@@ -237,11 +239,19 @@ impl NodeConnection for EntityReferenceRef {
     }
 
     fn set_first_child(&mut self, new_child: Option<NodeRef>) -> Option<NodeRef> {
-        replace(&mut self.0.borrow_mut().first_child, new_child)
+        replace(
+            &mut self.0.borrow_mut().first_child,
+            new_child.map(From::from),
+        )
+        .map(From::from)
     }
 
     fn set_last_child(&mut self, new_child: Option<NodeRef>) -> Option<NodeRef> {
-        replace(&mut self.0.borrow_mut().last_child, new_child)
+        replace(
+            &mut self.0.borrow_mut().last_child,
+            new_child.map(From::from),
+        )
+        .map(From::from)
     }
 
     fn set_previous_sibling(&mut self, new_sibling: Option<NodeRef>) -> Option<NodeRef> {
@@ -253,7 +263,11 @@ impl NodeConnection for EntityReferenceRef {
     }
 
     fn set_next_sibling(&mut self, new_sibling: Option<NodeRef>) -> Option<NodeRef> {
-        replace(&mut self.0.borrow_mut().next_sibling, new_sibling)
+        replace(
+            &mut self.0.borrow_mut().next_sibling,
+            new_sibling.map(From::from),
+        )
+        .map(From::from)
     }
 
     fn set_owner_document(&mut self, new_doc: DocumentRef) -> Option<DocumentRef> {
