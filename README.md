@@ -45,10 +45,22 @@ In addition, by providing APIs that conform to the DOM specification, users can 
 Since the `tree` module is an important module used in most aspects of libxml, it is expected that the replacement will be completed in a later version of this crate as well.
 
 # Tests
-All tests under the `tests/` directory are also based on original libxml2.\
-These tests passes test under `test/` and `result/` directory in original libxml2.
+## libxml2 tests
+`runsuite`, `runtest`, `runxmlconf`, `test_threads`, `testdict`, `testlimits` and `testrecurse` are based on original libxml2.\
+These tests pass tests under `test/` and `result/` directory.
 
-If you try to run these codes, please download test data from original libxml2 repository.
+Some tests under `test/` and `result/` are modified according to the specification, but basically all are libxml2 artifacts.
+
+## DOM Test Suite
+`dom_test_suite` is a re-implementation of the tests provided by W3C for Java for Rust.\
+In the current status, most of the methods up to DOM Level 2 Core pass the tests.
+
+You would get the original tests by running `resources/get-dom-test-suite.ts`. Note that the current W3C page seems to avoid bots, so you will need to manually get the cookie from your browser.\
+I have inserted a one second delay for each resource fetch in light of the load on the provider's server, but please be careful not to run it unnecessarily.
+
+I have also prepared `resources/generate-test-code.ts` for test generation, but please don't expect it to be good.
+
+The scripts are intended to be executed using `deno`.
 
 ## Note
 The test code for `schematron` is not included in the original v2.11.8 repository. (only the data exists.)  
