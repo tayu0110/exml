@@ -294,7 +294,14 @@ impl<'a> XmlParserInput<'a> {
             }
             return None;
         };
-        let mut input = XmlParserInput::new(Some(ctxt))?;
+        let buf = std::io::Cursor::new(content.as_bytes().to_vec());
+        let mut buf = XmlParserInputBuffer::from_reader(buf, XmlCharEncoding::None);
+        if ctxt.progressive {
+            // If PROGRESSIVE is true, the buffer is not automatically filled,
+            // so it is forced to be filled at this point.
+            while buf.grow(INPUT_CHUNK) != 0 {}
+        }
+        let mut input = XmlParserInput::from_io(ctxt, buf, XmlCharEncoding::None)?;
 
         if let Some(uri) = entity.uri.as_deref() {
             input.filename = Some(uri.to_owned());
@@ -317,13 +324,7 @@ impl<'a> XmlParserInput<'a> {
             .buf
             .as_ref()
             .map(|buf| buf.buffer.as_ref())
-            .or_else(|| {
-                self.entity
-                    .as_deref()
-                    .and_then(|ent| ent.content.as_deref())
-                    .map(|cont| cont.as_bytes())
-            })
-            .unwrap_or(&[])[self.base..]
+            .unwrap_or(&[][..])[self.base..]
     }
 
     pub(crate) fn current_contents(&self) -> &[u8] {
