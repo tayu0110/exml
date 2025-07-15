@@ -2,23 +2,23 @@
 # Source codes of libxml2
 /libxml2-*
 # Test data in libxml2
-/test
+# /test
 # Test result data in libxml2
-/result
+# /result
 # Test data in xmlconf
 /xmlconf
 /resources/DOM-Test-Suite
 
 libxml2-*
 callgrind.out.*
-*.xml
-*.xhtml
-*.html
-*.xsl
-*.dtd
+# *.xml
+# *.xhtml
+# *.html
+# *.xsl
+# *.dtd
 *.tar.gz
 *.out
 *.log
-*.svg
+# *.svg
 *.cvsignore
 *.zip

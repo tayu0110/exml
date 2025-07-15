@@ -1,4 +1,4 @@
-This software is based on [libxml2 v2.11.8](https://gitlab.gnome.org/GNOME/libxml2/-/tree/v2.11.8). The comments, function names, module names, data structures and algorithms are derived from libxml2.  
+This software is based on [libxml2 v2.11.8](https://gitlab.gnome.org/GNOME/libxml2/-/tree/v2.11.8). The comments, function names, module names, data structures, algorithms and tests are derived from libxml2.  
 The copyright of any code added to realize a procedures or data structures that cannot be expressed completely equivalently in Rust is as follows.
 
 Copyright 2024 tayu0110
