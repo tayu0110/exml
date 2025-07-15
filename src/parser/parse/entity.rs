@@ -235,7 +235,7 @@ impl XmlParserCtxt<'_> {
         };
         let input_id = input.id;
 
-        // Push the entity as the current input, read c_char by c_char
+        // Push the entity as the current input, read char by char
         // saving to the buffer until the end of the entity or an error
         if self.push_input(input).is_err() {
             return -1;
