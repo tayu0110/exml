@@ -1,3 +1,8 @@
+# This project is no longer maintained.
+Please consider the [`anyxml`](https://github.com/tayu0110/anyxml) crate.
+
+Reason: [https://github.com/tayu0110/anyxml/issues/11](https://github.com/tayu0110/anyxml/issues/11)
+
 # exml
 Re-implementation of [libxml2](https://gitlab.gnome.org/GNOME/libxml2) by Rust.\
 This library is based on v2.11.8.
